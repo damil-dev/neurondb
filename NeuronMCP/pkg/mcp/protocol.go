@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 )
@@ -72,6 +73,13 @@ func ValidateRequest(req *JSONRPCRequest) error {
 	if req.Method == "" {
 		return fmt.Errorf("method is required")
 	}
+	// Note: ID is optional for notifications, but required for requests
+	// We'll handle this in the server
 	return nil
+}
+
+// IsNotification checks if a request is a notification (no ID)
+func IsNotification(req *JSONRPCRequest) bool {
+	return len(req.ID) == 0 || bytes.Equal(req.ID, []byte("null"))
 }
 
