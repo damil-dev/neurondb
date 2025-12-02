@@ -17,8 +17,45 @@ func RegisterAllTools(registry *ToolRegistry, db *database.Database, logger *log
 	registry.Register(NewGenerateEmbeddingTool(db, logger))
 	registry.Register(NewBatchEmbeddingTool(db, logger))
 
-	// Note: Additional tools (L1, Hamming, Chebyshev, Minkowski, operations, indexing, ML, analytics, etc.)
-	// would be registered here. For brevity, implementing core functionality first.
-	// Full implementation would include all tools from the TypeScript version.
+	// Additional vector tools
+	registry.Register(NewVectorSimilarityTool(db, logger))
+	registry.Register(NewCreateVectorIndexTool(db, logger))
+
+	// ML tools
+	registry.Register(NewTrainModelTool(db, logger))
+	registry.Register(NewPredictTool(db, logger))
+	registry.Register(NewEvaluateModelTool(db, logger))
+	registry.Register(NewListModelsTool(db, logger))
+	registry.Register(NewGetModelInfoTool(db, logger))
+	registry.Register(NewDeleteModelTool(db, logger))
+
+	// Analytics tools
+	registry.Register(NewClusterDataTool(db, logger))
+	registry.Register(NewDetectOutliersTool(db, logger))
+	registry.Register(NewReduceDimensionalityTool(db, logger))
+
+	// RAG tools
+	registry.Register(NewProcessDocumentTool(db, logger))
+	registry.Register(NewRetrieveContextTool(db, logger))
+	registry.Register(NewGenerateResponseTool(db, logger))
+	registry.Register(NewChunkDocumentTool(db, logger))
+
+	// Indexing tools
+	registry.Register(NewCreateHNSWIndexTool(db, logger))
+	registry.Register(NewCreateIVFIndexTool(db, logger))
+	registry.Register(NewIndexStatusTool(db, logger))
+	registry.Register(NewDropIndexTool(db, logger))
+	registry.Register(NewTuneHNSWIndexTool(db, logger))
+	registry.Register(NewTuneIVFIndexTool(db, logger))
+
+	// Additional ML tools
+	registry.Register(NewPredictBatchTool(db, logger))
+	registry.Register(NewExportModelTool(db, logger))
+
+	// Analytics tools
+	registry.Register(NewAnalyzeDataTool(db, logger))
+
+	// Hybrid search tools
+	registry.Register(NewHybridSearchTool(db, logger))
 }
 

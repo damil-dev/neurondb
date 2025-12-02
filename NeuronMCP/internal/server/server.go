@@ -35,8 +35,19 @@ func NewServer() (*Server, error) {
 	logger := logging.NewLogger(cfgMgr.GetLoggingConfig())
 
 	db := database.NewDatabase()
+	// Try to connect, but don't fail server startup if it fails
+	// The server can start and tools will fail gracefully with proper error messages
 	if err := db.Connect(cfgMgr.GetDatabaseConfig()); err != nil {
-		return nil, fmt.Errorf("failed to connect to database: %w", err)
+		logger.Warn("Failed to connect to database at startup", map[string]interface{}{
+			"error": err.Error(),
+			"note":  "Server will start but tools may fail. Database connection will be retried on first use.",
+		})
+		// Continue anyway - tools will handle connection errors gracefully
+	} else {
+		logger.Info("Connected to database", map[string]interface{}{
+			"host":     cfgMgr.GetDatabaseConfig().GetHost(),
+			"database": cfgMgr.GetDatabaseConfig().GetDatabase(),
+		})
 	}
 
 	serverSettings := cfgMgr.GetServerSettings()

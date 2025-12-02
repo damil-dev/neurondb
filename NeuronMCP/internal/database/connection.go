@@ -13,7 +13,11 @@ import (
 
 // Database manages PostgreSQL connections
 type Database struct {
-	pool *pgxpool.Pool
+	pool     *pgxpool.Pool
+	host     string
+	port     int
+	database string
+	user     string
 }
 
 // NewDatabase creates a new database instance
@@ -23,7 +27,13 @@ func NewDatabase() *Database {
 
 // Connect connects to the database using the provided configuration
 func (d *Database) Connect(cfg *config.DatabaseConfig) error {
+	return d.ConnectWithRetry(cfg, 3, 2*time.Second)
+}
+
+// ConnectWithRetry connects to the database with retry logic
+func (d *Database) ConnectWithRetry(cfg *config.DatabaseConfig, maxRetries int, retryDelay time.Duration) error {
 	var connStr string
+	var err error
 
 	if cfg.ConnectionString != nil && *cfg.ConnectionString != "" {
 		connStr = *cfg.ConnectionString
@@ -38,8 +48,13 @@ func (d *Database) Connect(cfg *config.DatabaseConfig) error {
 			password = *cfg.Password
 		}
 
-		connStr = fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s",
-			host, port, user, password, db)
+		// Build connection string properly
+		connStr = fmt.Sprintf("host=%s port=%d user=%s dbname=%s",
+			host, port, user, db)
+		
+		if password != "" {
+			connStr += fmt.Sprintf(" password=%s", password)
+		}
 
 		// Add SSL if configured
 		if cfg.SSL != nil {
@@ -49,14 +64,23 @@ func (d *Database) Connect(cfg *config.DatabaseConfig) error {
 				} else {
 					connStr += " sslmode=disable"
 				}
+			} else if sslStr, ok := cfg.SSL.(string); ok {
+				connStr += fmt.Sprintf(" sslmode=%s", sslStr)
 			}
+		} else {
+			// Default to prefer SSL
+			connStr += " sslmode=prefer"
 		}
 	}
 
 	// Parse connection string
 	poolConfig, err := pgxpool.ParseConfig(connStr)
 	if err != nil {
-		return fmt.Errorf("failed to parse connection string: %w", err)
+		host := cfg.GetHost()
+		port := cfg.GetPort()
+		db := cfg.GetDatabase()
+		user := cfg.GetUser()
+		return fmt.Errorf("failed to parse connection string for database '%s' on host '%s:%d' as user '%s': %w (connection string format may be invalid)", db, host, port, user, err)
 	}
 
 	// Apply pool settings
@@ -68,29 +92,76 @@ func (d *Database) Connect(cfg *config.DatabaseConfig) error {
 		poolConfig.HealthCheckPeriod = 1 * time.Minute
 	}
 
-	// Create pool
-	pool, err := pgxpool.NewWithConfig(context.Background(), poolConfig)
-	if err != nil {
-		return fmt.Errorf("failed to create connection pool: %w", err)
+	// Store connection info for error messages
+	var host, dbName, dbUser string
+	var dbPort int
+	if cfg.ConnectionString != nil && *cfg.ConnectionString != "" {
+		// Try to extract info from connection string if possible
+		host = "unknown"
+		dbName = "unknown"
+		dbUser = "unknown"
+		dbPort = 0
+	} else {
+		host = cfg.GetHost()
+		dbPort = cfg.GetPort()
+		dbName = cfg.GetDatabase()
+		dbUser = cfg.GetUser()
+	}
+	d.host = host
+	d.port = dbPort
+	d.database = dbName
+	d.user = dbUser
+
+	// Retry connection
+	var pool *pgxpool.Pool
+	var lastErr error
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		pool, err = pgxpool.NewWithConfig(context.Background(), poolConfig)
+		if err == nil {
+			// Test the connection
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := pool.Ping(ctx); err == nil {
+				d.pool = pool
+				return nil
+			}
+			lastErr = fmt.Errorf("connection ping failed: database '%s' on host '%s:%d' as user '%s': %w", dbName, host, dbPort, dbUser, err)
+			pool.Close()
+		} else {
+			lastErr = fmt.Errorf("failed to create connection pool: database '%s' on host '%s:%d' as user '%s': %w", dbName, host, dbPort, dbUser, err)
+		}
+
+		if attempt < maxRetries-1 {
+			time.Sleep(retryDelay)
+			retryDelay *= 2 // Exponential backoff
+		}
 	}
 
-	d.pool = pool
-	return nil
+	return fmt.Errorf("failed to connect to database '%s' on host '%s:%d' as user '%s' after %d attempts (last error: %v)", dbName, host, dbPort, dbUser, maxRetries, lastErr)
+}
+
+// IsConnected checks if the database is connected
+func (d *Database) IsConnected() bool {
+	return d.pool != nil
 }
 
 // Query executes a query and returns rows
 func (d *Database) Query(ctx context.Context, query string, args ...interface{}) (pgx.Rows, error) {
 	if d.pool == nil {
-		return nil, fmt.Errorf("database not connected")
+		return nil, fmt.Errorf("database connection not established: database '%s' on host '%s:%d' as user '%s' (connection pool is nil, ensure Connect() was called successfully)", d.database, d.host, d.port, d.user)
 	}
-	return d.pool.Query(ctx, query, args...)
+	rows, err := d.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("query execution failed on database '%s' on host '%s:%d' as user '%s': query='%s', error=%w", d.database, d.host, d.port, d.user, query, err)
+	}
+	return rows, nil
 }
 
 // QueryRow executes a query and returns a single row
 func (d *Database) QueryRow(ctx context.Context, query string, args ...interface{}) pgx.Row {
 	if d.pool == nil {
 		// Return a row that will error on scan
-		return &errorRow{err: fmt.Errorf("database not connected")}
+		return &errorRow{err: fmt.Errorf("database connection not established: database '%s' on host '%s:%d' as user '%s' (connection pool is nil, ensure Connect() was called successfully)", d.database, d.host, d.port, d.user)}
 	}
 	return d.pool.QueryRow(ctx, query, args...)
 }
@@ -98,17 +169,25 @@ func (d *Database) QueryRow(ctx context.Context, query string, args ...interface
 // Exec executes a query without returning rows
 func (d *Database) Exec(ctx context.Context, query string, args ...interface{}) (pgconn.CommandTag, error) {
 	if d.pool == nil {
-		return pgconn.CommandTag{}, fmt.Errorf("database not connected")
+		return pgconn.CommandTag{}, fmt.Errorf("database connection not established: database '%s' on host '%s:%d' as user '%s' (connection pool is nil, ensure Connect() was called successfully)", d.database, d.host, d.port, d.user)
 	}
-	return d.pool.Exec(ctx, query, args...)
+	tag, err := d.pool.Exec(ctx, query, args...)
+	if err != nil {
+		return pgconn.CommandTag{}, fmt.Errorf("query execution failed on database '%s' on host '%s:%d' as user '%s': query='%s', error=%w", d.database, d.host, d.port, d.user, query, err)
+	}
+	return tag, nil
 }
 
 // Begin starts a transaction
 func (d *Database) Begin(ctx context.Context) (pgx.Tx, error) {
 	if d.pool == nil {
-		return nil, fmt.Errorf("database not connected")
+		return nil, fmt.Errorf("database connection not established: database '%s' on host '%s:%d' as user '%s' (connection pool is nil, ensure Connect() was called successfully)", d.database, d.host, d.port, d.user)
 	}
-	return d.pool.Begin(ctx)
+	tx, err := d.pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction on database '%s' on host '%s:%d' as user '%s': %w", d.database, d.host, d.port, d.user, err)
+	}
+	return tx, nil
 }
 
 // Close closes the connection pool
@@ -121,9 +200,13 @@ func (d *Database) Close() {
 // TestConnection tests the database connection
 func (d *Database) TestConnection(ctx context.Context) error {
 	if d.pool == nil {
-		return fmt.Errorf("database not connected")
+		return fmt.Errorf("database connection not established: database '%s' on host '%s:%d' as user '%s' (connection pool is nil, ensure Connect() was called successfully)", d.database, d.host, d.port, d.user)
 	}
-	return d.pool.Ping(ctx)
+	err := d.pool.Ping(ctx)
+	if err != nil {
+		return fmt.Errorf("connection test failed for database '%s' on host '%s:%d' as user '%s': %w", d.database, d.host, d.port, d.user, err)
+	}
+	return nil
 }
 
 // GetPoolStats returns pool statistics

@@ -68,7 +68,10 @@ func NewVectorSearchTool(db *database.Database, logger *logging.Logger) *VectorS
 func (t *VectorSearchTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error("Invalid parameters", "VALIDATION_ERROR", map[string]interface{}{"errors": errors}), nil
+		return Error(fmt.Sprintf("Invalid parameters for vector_search tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+			"errors": errors,
+			"params": params,
+		}), nil
 	}
 
 	table, _ := params["table"].(string)
@@ -87,15 +90,49 @@ func (t *VectorSearchTool) Execute(ctx context.Context, params map[string]interf
 		additionalColumns = ac
 	}
 
+	if table == "" {
+		return Error("table parameter is required and cannot be empty for vector_search tool", "VALIDATION_ERROR", map[string]interface{}{
+			"parameter": "table",
+			"params":    params,
+		}), nil
+	}
+
+	if vectorColumn == "" {
+		return Error(fmt.Sprintf("vector_column parameter is required and cannot be empty for vector_search tool on table '%s'", table), "VALIDATION_ERROR", map[string]interface{}{
+			"parameter": "vector_column",
+			"table":     table,
+			"params":    params,
+		}), nil
+	}
+
+	if queryVector == nil || len(queryVector) == 0 {
+		return Error(fmt.Sprintf("query_vector parameter is required and cannot be empty for vector_search tool on table '%s', column '%s'", table, vectorColumn), "VALIDATION_ERROR", map[string]interface{}{
+			"parameter":    "query_vector",
+			"table":        table,
+			"vector_column": vectorColumn,
+			"params":       params,
+		}), nil
+	}
+
 	results, err := t.executor.ExecuteVectorSearch(ctx, table, vectorColumn, queryVector, distanceMetric, limit, additionalColumns)
 	if err != nil {
 		t.logger.Error("Vector search failed", err, params)
-		return Error(fmt.Sprintf("Vector search failed: %v", err), "SEARCH_ERROR", nil), nil
+		return Error(fmt.Sprintf("Vector search execution failed: table='%s', vector_column='%s', distance_metric='%s', limit=%d, query_vector_dimension=%d, additional_columns_count=%d, error=%v", table, vectorColumn, distanceMetric, limit, len(queryVector), len(additionalColumns), err), "SEARCH_ERROR", map[string]interface{}{
+			"table":             table,
+			"vector_column":     vectorColumn,
+			"distance_metric":   distanceMetric,
+			"limit":            limit,
+			"query_vector_size": len(queryVector),
+			"error":            err.Error(),
+		}), nil
 	}
 
 	return Success(results, map[string]interface{}{
 		"count":          len(results),
 		"distance_metric": distanceMetric,
+		"table":          table,
+		"vector_column":  vectorColumn,
+		"limit":         limit,
 	}), nil
 }
 
@@ -146,7 +183,14 @@ func (t *VectorSearchL2Tool) Execute(ctx context.Context, params map[string]inte
 	results, err := t.executor.ExecuteVectorSearch(ctx, table, vectorColumn, queryVector, "l2", limit, nil)
 	if err != nil {
 		t.logger.Error("L2 vector search failed", err, params)
-		return Error(fmt.Sprintf("L2 vector search failed: %v", err), "SEARCH_ERROR", nil), nil
+		return Error(fmt.Sprintf("L2 vector search execution failed: table='%s', vector_column='%s', limit=%d, query_vector_dimension=%d, error=%v", table, vectorColumn, limit, len(queryVector), err), "SEARCH_ERROR", map[string]interface{}{
+			"table":             table,
+			"vector_column":     vectorColumn,
+			"distance_metric":   "l2",
+			"limit":            limit,
+			"query_vector_size": len(queryVector),
+			"error":            err.Error(),
+		}), nil
 	}
 
 	return Success(results, map[string]interface{}{
@@ -202,7 +246,14 @@ func (t *VectorSearchCosineTool) Execute(ctx context.Context, params map[string]
 	results, err := t.executor.ExecuteVectorSearch(ctx, table, vectorColumn, queryVector, "cosine", limit, nil)
 	if err != nil {
 		t.logger.Error("Cosine vector search failed", err, params)
-		return Error(fmt.Sprintf("Cosine vector search failed: %v", err), "SEARCH_ERROR", nil), nil
+		return Error(fmt.Sprintf("Cosine vector search execution failed: table='%s', vector_column='%s', limit=%d, query_vector_dimension=%d, error=%v", table, vectorColumn, limit, len(queryVector), err), "SEARCH_ERROR", map[string]interface{}{
+			"table":             table,
+			"vector_column":     vectorColumn,
+			"distance_metric":   "cosine",
+			"limit":            limit,
+			"query_vector_size": len(queryVector),
+			"error":            err.Error(),
+		}), nil
 	}
 
 	return Success(results, map[string]interface{}{
@@ -258,7 +309,14 @@ func (t *VectorSearchInnerProductTool) Execute(ctx context.Context, params map[s
 	results, err := t.executor.ExecuteVectorSearch(ctx, table, vectorColumn, queryVector, "inner_product", limit, nil)
 	if err != nil {
 		t.logger.Error("Inner product vector search failed", err, params)
-		return Error(fmt.Sprintf("Inner product vector search failed: %v", err), "SEARCH_ERROR", nil), nil
+		return Error(fmt.Sprintf("Inner product vector search execution failed: table='%s', vector_column='%s', limit=%d, query_vector_dimension=%d, error=%v", table, vectorColumn, limit, len(queryVector), err), "SEARCH_ERROR", map[string]interface{}{
+			"table":             table,
+			"vector_column":     vectorColumn,
+			"distance_metric":   "inner_product",
+			"limit":            limit,
+			"query_vector_size": len(queryVector),
+			"error":            err.Error(),
+		}), nil
 	}
 
 	return Success(results, map[string]interface{}{
@@ -309,23 +367,34 @@ func (t *GenerateEmbeddingTool) Execute(ctx context.Context, params map[string]i
 
 	text, _ := params["text"].(string)
 	model, _ := params["model"].(string)
-
-	query := "SELECT embed_text($1) AS embedding"
-	queryParams := []interface{}{text}
-	if model != "" {
-		query = "SELECT embed_text($1, $2) AS embedding"
-		queryParams = append(queryParams, model)
-	}
-
-	result, err := t.executor.ExecuteQueryOne(ctx, query, queryParams)
-	if err != nil {
-		t.logger.Error("Embedding generation failed", err, params)
-		return Error(fmt.Sprintf("Embedding generation failed: %v", err), "EMBEDDING_ERROR", nil), nil
+	
+	textLen := len(text)
+	if textLen == 0 {
+		return Error("text parameter is required and cannot be empty for generate_embedding tool", "VALIDATION_ERROR", map[string]interface{}{
+			"parameter":   "text",
+			"text_length": 0,
+			"params":      params,
+		}), nil
 	}
 
 	modelName := model
 	if modelName == "" {
 		modelName = "default"
+	}
+
+	// Use NeuronDB's unified embedding function: neurondb.embed(model, input_text, task)
+	// or neurondb.generate_embedding(model, text) for backward compatibility
+	query := "SELECT neurondb.embed($1, $2, 'embedding') AS embedding"
+	queryParams := []interface{}{modelName, text}
+
+	result, err := t.executor.ExecuteQueryOne(ctx, query, queryParams)
+	if err != nil {
+		t.logger.Error("Embedding generation failed", err, params)
+		return Error(fmt.Sprintf("Embedding generation failed: text_length=%d, model='%s', error=%v", textLen, modelName, err), "EMBEDDING_ERROR", map[string]interface{}{
+			"text_length": textLen,
+			"model":       modelName,
+			"error":       err.Error(),
+		}), nil
 	}
 
 	return Success(result, map[string]interface{}{"model": modelName}), nil
@@ -376,23 +445,42 @@ func (t *BatchEmbeddingTool) Execute(ctx context.Context, params map[string]inte
 
 	texts, _ := params["texts"].([]interface{})
 	model, _ := params["model"].(string)
-
-	query := "SELECT embed_text_batch($1) AS embeddings"
-	queryParams := []interface{}{texts}
-	if model != "" {
-		query = "SELECT embed_text_batch($1, $2) AS embeddings"
-		queryParams = append(queryParams, model)
+	
+	textsCount := len(texts)
+	if textsCount == 0 {
+		return Error("texts parameter is required and cannot be empty array for batch_embedding tool", "VALIDATION_ERROR", map[string]interface{}{
+			"parameter":   "texts",
+			"texts_count": 0,
+			"params":      params,
+		}), nil
 	}
 
-	result, err := t.executor.ExecuteQueryOne(ctx, query, queryParams)
-	if err != nil {
-		t.logger.Error("Batch embedding failed", err, params)
-		return Error(fmt.Sprintf("Batch embedding failed: %v", err), "EMBEDDING_ERROR", nil), nil
+	if textsCount > 1000 {
+		return Error(fmt.Sprintf("texts array exceeds maximum size of 1000: received %d texts for batch_embedding tool", textsCount), "VALIDATION_ERROR", map[string]interface{}{
+			"parameter":   "texts",
+			"texts_count": textsCount,
+			"max_count":   1000,
+			"params":      params,
+		}), nil
 	}
 
 	modelName := model
 	if modelName == "" {
 		modelName = "default"
+	}
+
+	// Use NeuronDB's batch embedding function: neurondb.embed_batch(model, texts[])
+	query := "SELECT neurondb.embed_batch($1, $2) AS embeddings"
+	queryParams := []interface{}{modelName, texts}
+
+	result, err := t.executor.ExecuteQueryOne(ctx, query, queryParams)
+	if err != nil {
+		t.logger.Error("Batch embedding failed", err, params)
+		return Error(fmt.Sprintf("Batch embedding generation failed: texts_count=%d, model='%s', error=%v", textsCount, modelName, err), "EMBEDDING_ERROR", map[string]interface{}{
+			"texts_count": textsCount,
+			"model":       modelName,
+			"error":       err.Error(),
+		}), nil
 	}
 
 	return Success(result, map[string]interface{}{

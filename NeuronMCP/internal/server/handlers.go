@@ -10,6 +10,14 @@ import (
 	"github.com/neurondb/NeuronMCP/pkg/mcp"
 )
 
+// min returns the minimum of two integers
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 // setupToolHandlers sets up tool-related MCP handlers
 func (s *Server) setupToolHandlers() {
 	// List tools handler
@@ -40,7 +48,11 @@ func (s *Server) handleListTools(ctx context.Context, params json.RawMessage) (i
 func (s *Server) handleCallTool(ctx context.Context, params json.RawMessage) (interface{}, error) {
 	var req mcp.CallToolRequest
 	if err := json.Unmarshal(params, &req); err != nil {
-		return nil, fmt.Errorf("failed to parse call tool request: %w", err)
+		return nil, fmt.Errorf("failed to parse tools/call request: params_length=%d, params_preview='%s', error=%w (invalid JSON format or missing required fields)", len(params), string(params[:min(100, len(params))]), err)
+	}
+
+	if req.Name == "" {
+		return nil, fmt.Errorf("tool name is required in tools/call request: received empty name, params=%v", req)
 	}
 
 	mcpReq := &middleware.MCPRequest{
@@ -58,11 +70,25 @@ func (s *Server) handleCallTool(ctx context.Context, params json.RawMessage) (in
 
 // executeTool executes a tool and returns the response
 func (s *Server) executeTool(ctx context.Context, toolName string, arguments map[string]interface{}) (*middleware.MCPResponse, error) {
-	tool := s.toolRegistry.GetTool(toolName)
-	if tool == nil {
+	if toolName == "" {
 		return &middleware.MCPResponse{
 			Content: []middleware.ContentBlock{
-				{Type: "text", Text: fmt.Sprintf("Tool not found: %s", toolName)},
+				{Type: "text", Text: fmt.Sprintf("Tool name is required and cannot be empty: received empty string, arguments_count=%d", len(arguments))},
+			},
+			IsError: true,
+		}, nil
+	}
+
+	tool := s.toolRegistry.GetTool(toolName)
+	if tool == nil {
+		availableTools := s.toolRegistry.GetAllDefinitions()
+		toolNames := make([]string, 0, len(availableTools))
+		for _, def := range availableTools {
+			toolNames = append(toolNames, def.Name)
+		}
+		return &middleware.MCPResponse{
+			Content: []middleware.ContentBlock{
+				{Type: "text", Text: fmt.Sprintf("Tool not found: tool_name='%s', arguments_count=%d, available_tools_count=%d, available_tools=%v", toolName, len(arguments), len(availableTools), toolNames)},
 			},
 			IsError: true,
 		}, nil
@@ -72,7 +98,7 @@ func (s *Server) executeTool(ctx context.Context, toolName string, arguments map
 	if err != nil {
 		return &middleware.MCPResponse{
 			Content: []middleware.ContentBlock{
-				{Type: "text", Text: fmt.Sprintf("Error: %v", err)},
+				{Type: "text", Text: fmt.Sprintf("Tool execution error: tool_name='%s', arguments_count=%d, arguments=%v, error=%v", toolName, len(arguments), arguments, err)},
 			},
 			IsError: true,
 		}, nil

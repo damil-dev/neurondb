@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 )
 
 // HandlerFunc is a function that handles an MCP request
@@ -61,6 +62,8 @@ func (s *Server) HandleInitialize(ctx context.Context, params json.RawMessage) (
 func (s *Server) Run(ctx context.Context) error {
 	// Register initialize handler
 	s.SetHandler("initialize", s.HandleInitialize)
+	
+	var initializedSent bool
 
 	for {
 		select {
@@ -69,6 +72,10 @@ func (s *Server) Run(ctx context.Context) error {
 		default:
 			req, err := s.transport.ReadMessage()
 			if err != nil {
+				if err == io.EOF {
+					return nil
+				}
+				// Check if it's an EOF error string
 				if err.Error() == "EOF" {
 					return nil
 				}
@@ -76,11 +83,35 @@ func (s *Server) Run(ctx context.Context) error {
 				continue
 			}
 
-			// Handle request
-			resp := s.handleRequest(ctx, req)
-			if err := s.transport.WriteMessage(resp); err != nil {
-				s.transport.WriteError(err)
-				continue
+			// Handle initialize specially - send initialized notification
+			if req.Method == "initialize" && !initializedSent {
+				resp := s.handleRequest(ctx, req)
+				if resp.Error == nil {
+					// Send initialized notification
+					if err := s.transport.WriteNotification("notifications/initialized", nil); err != nil {
+						s.transport.WriteError(err)
+					}
+					initializedSent = true
+				}
+				
+				// Write response if it's a request (has ID)
+				if !IsNotification(req) {
+					if err := s.transport.WriteMessage(resp); err != nil {
+						s.transport.WriteError(err)
+						continue
+					}
+				}
+			} else {
+				// Handle other requests
+				resp := s.handleRequest(ctx, req)
+				
+				// Only send response if it's a request (has ID), not a notification
+				if !IsNotification(req) {
+					if err := s.transport.WriteMessage(resp); err != nil {
+						s.transport.WriteError(err)
+						continue
+					}
+				}
 			}
 		}
 	}

@@ -85,57 +85,72 @@ type OrderBy struct {
 
 // VectorSearch builds a vector search query
 func (qb *QueryBuilder) VectorSearch(table, vectorColumn string, queryVector []float32, distanceMetric string, limit int, additionalColumns []string, minkowskiP *float64) (string, []interface{}) {
+	if len(queryVector) == 0 {
+		// Return error query - caller should handle this
+		return "", nil
+	}
+
 	var params []interface{}
 	paramIndex := 1
 
-	// Convert vector to string format
+	// Convert vector to string format for PostgreSQL
 	vectorStr := formatVector(queryVector)
 	params = append(params, vectorStr)
+	vectorParamIndex := paramIndex
+	paramIndex++
 
-	var operator string
 	var distanceExpr string
 
 	switch distanceMetric {
 	case "cosine":
-		operator = "<=>"
-		distanceExpr = fmt.Sprintf("%s %s $%d::vector AS distance", EscapeIdentifier(vectorColumn), operator, paramIndex)
+		distanceExpr = fmt.Sprintf("%s <=> $%d::vector AS distance", EscapeIdentifier(vectorColumn), vectorParamIndex)
 	case "inner_product":
-		operator = "<#>"
-		distanceExpr = fmt.Sprintf("%s %s $%d::vector AS distance", EscapeIdentifier(vectorColumn), operator, paramIndex)
+		distanceExpr = fmt.Sprintf("%s <#> $%d::vector AS distance", EscapeIdentifier(vectorColumn), vectorParamIndex)
 	case "l1":
-		distanceExpr = fmt.Sprintf("vector_l1_distance(%s, $%d::vector) AS distance", EscapeIdentifier(vectorColumn), paramIndex)
+		distanceExpr = fmt.Sprintf("vector_l1_distance(%s, $%d::vector) AS distance", EscapeIdentifier(vectorColumn), vectorParamIndex)
 	case "hamming":
-		distanceExpr = fmt.Sprintf("vector_hamming_distance(%s, $%d::vector) AS distance", EscapeIdentifier(vectorColumn), paramIndex)
+		distanceExpr = fmt.Sprintf("vector_hamming_distance(%s, $%d::vector) AS distance", EscapeIdentifier(vectorColumn), vectorParamIndex)
 	case "chebyshev":
-		distanceExpr = fmt.Sprintf("vector_chebyshev_distance(%s, $%d::vector) AS distance", EscapeIdentifier(vectorColumn), paramIndex)
+		distanceExpr = fmt.Sprintf("vector_chebyshev_distance(%s, $%d::vector) AS distance", EscapeIdentifier(vectorColumn), vectorParamIndex)
 	case "minkowski":
 		p := 2.0
 		if minkowskiP != nil {
 			p = *minkowskiP
 		}
-		paramIndex++
 		params = append(params, p)
-		distanceExpr = fmt.Sprintf("vector_minkowski_distance(%s, $%d::vector, $%d::double precision) AS distance", EscapeIdentifier(vectorColumn), paramIndex-1, paramIndex)
+		pParamIndex := paramIndex
+		paramIndex++
+		distanceExpr = fmt.Sprintf("vector_minkowski_distance(%s, $%d::vector, $%d::double precision) AS distance", EscapeIdentifier(vectorColumn), vectorParamIndex, pParamIndex)
 	default: // l2
-		operator = "<->"
-		distanceExpr = fmt.Sprintf("%s %s $%d::vector AS distance", EscapeIdentifier(vectorColumn), operator, paramIndex)
+		distanceExpr = fmt.Sprintf("%s <-> $%d::vector AS distance", EscapeIdentifier(vectorColumn), vectorParamIndex)
 	}
 
-	paramIndex++
-	selectColumns := []string{"*"}
-	for _, col := range additionalColumns {
-		selectColumns = append(selectColumns, EscapeIdentifier(col))
+	// Build SELECT columns
+	selectColumns := []string{}
+	if len(additionalColumns) > 0 {
+		for _, col := range additionalColumns {
+			selectColumns = append(selectColumns, EscapeIdentifier(col))
+		}
+		// Always include the vector column and distance
+		selectColumns = append(selectColumns, EscapeIdentifier(vectorColumn))
+	} else {
+		// If no additional columns, select all
+		selectColumns = append(selectColumns, "*")
 	}
+	selectColumns = append(selectColumns, distanceExpr)
 
+	// Add limit parameter
 	params = append(params, limit)
-	limitClause := fmt.Sprintf("LIMIT $%d", paramIndex)
+	limitParamIndex := paramIndex
 
-	query := fmt.Sprintf(`
-		SELECT %s, %s
-		FROM %s
-		ORDER BY distance
-		%s
-	`, strings.Join(selectColumns, ", "), distanceExpr, EscapeIdentifier(table), limitClause)
+	// Build the query
+	selectClause := strings.Join(selectColumns, ", ")
+	query := fmt.Sprintf(
+		"SELECT %s FROM %s ORDER BY distance ASC LIMIT $%d",
+		selectClause,
+		EscapeIdentifier(table),
+		limitParamIndex,
+	)
 
 	return query, params
 }
