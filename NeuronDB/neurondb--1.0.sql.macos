@@ -1722,6 +1722,14 @@ CREATE FUNCTION train_arima(text, text, text, integer DEFAULT 1, integer DEFAULT
     LANGUAGE C STABLE STRICT;
 COMMENT ON FUNCTION train_arima IS 'Train ARIMA time series model. Returns model_id.';
 
+CREATE FUNCTION train_timeseries_cpu(text, text, text, integer, integer, integer)
+    RETURNS integer
+    AS 'MODULE_PATHNAME', 'train_timeseries_cpu'
+    LANGUAGE C STRICT;
+
+COMMENT ON FUNCTION train_timeseries_cpu(text, text, text, integer, integer, integer) IS
+    'CPU training function for timeseries models via unified API: (table_name, feature_column, target_column, p, d, q)';
+
 CREATE FUNCTION forecast_arima(integer, integer)
     RETURNS float8
     AS 'MODULE_PATHNAME', 'forecast_arima'
@@ -3640,15 +3648,10 @@ CREATE OR REPLACE FUNCTION neurondb.llm_gpu_utilization() RETURNS TABLE(
     power_w real,
     "timestamp" timestamptz
 )
-LANGUAGE plpgsql STABLE AS $$
-BEGIN
-    /* TODO: Implement GPU utilization tracking */
-    /* For now, return empty result */
-    RETURN QUERY SELECT 0::integer, 0.0::real, 0::bigint, 0::bigint, 0.0::real, 0::integer, 0.0::real, NOW()::timestamptz WHERE false;
-END;
-$$;
+AS 'MODULE_PATHNAME', 'neurondb_llm_gpu_utilization'
+LANGUAGE C STABLE;
 
-COMMENT ON FUNCTION neurondb.llm_gpu_utilization IS 'Get GPU utilization metrics (utilization percentage, memory usage, temperature, power consumption). TODO: Implement GPU utilization tracking.';
+COMMENT ON FUNCTION neurondb.llm_gpu_utilization IS 'Get GPU utilization metrics (utilization percentage, memory usage, temperature, power consumption). Returns memory utilization from device info. GPU utilization percentage, temperature, and power require system-level APIs (NVML/rocm-smi/IOKit) and are currently placeholders.';
 
 -- ============================================================================
 -- LLM / GPU CONFIGURATION GUC VARIABLES
@@ -5701,19 +5704,58 @@ DECLARE
 	result jsonb;
 	dataset_path text;
 	cache_path text;
+	error_msg text;
 BEGIN
-	/* TODO: Implement HuggingFace dataset loading */
-	/* For now, return empty result */
-	RETURN QUERY SELECT 0::bigint, '{}'::jsonb WHERE false;
+	/* Validate inputs */
+	IF dataset_name IS NULL OR dataset_name = '' THEN
+		RAISE EXCEPTION 'dataset_name cannot be NULL or empty';
+	END IF;
+
+	IF split IS NULL THEN
+		split := 'train';
+	END IF;
+
+	/* Determine cache directory */
+	IF cache_dir IS NULL OR cache_dir = '' THEN
+		cache_path := COALESCE(current_setting('neurondb.dataset_cache_dir', true), '/tmp/neurondb_datasets');
+	ELSE
+		cache_path := cache_dir;
+	END IF;
+
+	/* 
+	 * Full implementation requires Python integration with HuggingFace datasets library.
+	 * This would require:
+	 * 1. plpython3u extension enabled
+	 * 2. Python code to call datasets.load_dataset()
+	 * 3. Conversion of dataset rows to JSONB format
+	 * 4. Streaming support for large datasets
+	 * 
+	 * For now, return informative error message
+	 */
+	error_msg := format('HuggingFace dataset loading requires Python integration. ' ||
+		'Dataset: %s, Split: %s, Config: %s, Streaming: %s, Cache: %s. ' ||
+		'Full implementation requires plpython3u extension and HuggingFace datasets library.',
+		dataset_name, split, COALESCE(config, 'default'), streaming::text, cache_path);
+	
+	RAISE EXCEPTION '%', error_msg;
 EXCEPTION WHEN OTHERS THEN
-	/* Return error in result */
-	RETURN QUERY SELECT 0::bigint, jsonb_build_object('error', SQLERRM);
+	/* Return error in result format */
+	RETURN QUERY SELECT 
+		0::bigint, 
+		jsonb_build_object(
+			'error', SQLERRM,
+			'dataset_name', dataset_name,
+			'split', split,
+			'config', config,
+			'streaming', streaming,
+			'cache_dir', cache_path
+		);
 END;
 $$;
 COMMENT ON FUNCTION neurondb.load_dataset IS 
 	'Load HuggingFace dataset: load_dataset(dataset_name, split, config, streaming, cache_dir) returns TABLE with dataset rows. 
 	Supports HuggingFace datasets with caching and streaming.
-	TODO: Implement full dataset loading support.';
+	Note: Full implementation requires Python integration (plpython3u) with HuggingFace datasets library.';
 
 CREATE OR REPLACE FUNCTION neurondb.distance(
 	vec1 vector,
