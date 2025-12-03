@@ -29,6 +29,8 @@
 #include "neurondb_validation.h"
 #include "neurondb_safe_memory.h"
 #include "neurondb_macros.h"
+#include "neurondb_guc.h"
+#include "neurondb_constants.h"
 
 /* Reuse linear regression evaluation kernel */
 extern cudaError_t launch_linreg_eval_kernel(const float *features,
@@ -163,6 +165,14 @@ ndb_cuda_lasso_train(const float *features,
 					 Jsonb * *metrics,
 					 char **errstr)
 {
+	/* CPU mode: never execute GPU code */
+	if (NDB_COMPUTE_MODE_IS_CPU())
+	{
+		if (errstr)
+			*errstr = pstrdup("CUDA lasso_train: CPU mode - GPU code should not be called");
+		return -1;
+	}
+
 	double		lambda = 0.01;
 	int			max_iters = 1000;
 	double	   *weights = NULL;
@@ -228,10 +238,10 @@ ndb_cuda_lasso_train(const float *features,
 					r = JsonbIteratorNext(&it, &v, false);
 					if (strcmp(key, "lambda") == 0)
 					{
-						if (v.type == jbvNumeric)
-						{
-							Numeric		num = DatumGetNumeric(v.val.numeric);
-							double		val = DatumGetFloat8(DirectFunctionCall1(numeric_float8, NumericGetDatum(num)));
+					if (v.type == jbvNumeric)
+					{
+						Numeric		num = (Numeric) v.val.numeric;
+						double		val = DatumGetFloat8(DirectFunctionCall1(numeric_float8, NumericGetDatum(num)));
 
 							if (val > 0.0 && val < 1e6)
 							{
@@ -248,10 +258,10 @@ ndb_cuda_lasso_train(const float *features,
 					}
 					else if (strcmp(key, "max_iters") == 0)
 					{
-						if (v.type == jbvNumeric)
-						{
-							Numeric		num = DatumGetNumeric(v.val.numeric);
-							int			val = DatumGetInt32(DirectFunctionCall1(numeric_int4, NumericGetDatum(num)));
+					if (v.type == jbvNumeric)
+					{
+						Numeric		num = (Numeric) v.val.numeric;
+						int			val = DatumGetInt32(DirectFunctionCall1(numeric_int4, NumericGetDatum(num)));
 
 							if (val > 0 && val <= 100000)
 							{

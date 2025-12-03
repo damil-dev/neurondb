@@ -741,6 +741,8 @@ ndb_cuda_hf_embed(const char *model_name,
  * ndb_cuda_hf_parse_gen_params is now replaced by ndb_json_parse_gen_params from neurondb_json.h
  * The old implementation is removed - use centralized JSON parsing
  */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
 static int
 ndb_cuda_hf_parse_gen_params_OLD_REMOVED(const char *params_json,
 							 const char *model_name,
@@ -1694,6 +1696,7 @@ ndb_cuda_hf_parse_gen_params_OLD_REMOVED(const char *params_json,
 	NDB_FREE(json_copy);
 	return 0;
 }
+#pragma GCC diagnostic pop
 /* OLD FUNCTION REMOVED - use ndb_json_parse_gen_params instead */
 
 /*
@@ -2433,10 +2436,14 @@ ndb_cuda_hf_generate_stream(const char *model_name,
 		/* Copy logit bias (limited by fixed array size) */
 		gen_params.num_logit_bias = (ndb_params.num_logit_bias < 256) ?
 			ndb_params.num_logit_bias : 256;
-		for (int i = 0; i < gen_params.num_logit_bias && i < 256; i++)
 		{
-			gen_params.logit_bias_tokens[i] = ndb_params.logit_bias_tokens[i];
-			gen_params.logit_bias_values[i] = ndb_params.logit_bias_values[i];
+			int			bias_idx;
+
+			for (bias_idx = 0; bias_idx < gen_params.num_logit_bias && bias_idx < 256; bias_idx++)
+			{
+				gen_params.logit_bias_tokens[bias_idx] = ndb_params.logit_bias_tokens[bias_idx];
+				gen_params.logit_bias_values[bias_idx] = ndb_params.logit_bias_values[bias_idx];
+			}
 		}
 		ndb_json_parse_gen_params_free(&ndb_params);
 	}
@@ -3209,7 +3216,6 @@ ndb_cuda_hf_rerank(const char *model_name,
 		int32_t    *token_ids_batch = NULL;
 		int32_t    *attention_mask_batch = NULL;
 		int			max_seq_len = 0;
-		int			seq_len = 0;
 		int			embed_dim = entry->config.embed_dim;
 		float	   *classification_weights = NULL;
 		float		classification_bias = 0.0f;

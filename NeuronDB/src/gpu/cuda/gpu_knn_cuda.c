@@ -31,6 +31,8 @@
 #include "neurondb_validation.h"
 #include "neurondb_safe_memory.h"
 #include "neurondb_macros.h"
+#include "neurondb_guc.h"
+#include "neurondb_constants.h"
 
 /* KNN model structure */
 typedef struct KNNModel
@@ -246,6 +248,14 @@ ndb_cuda_knn_train(const float *features,
 				   Jsonb * *metrics,
 				   char **errstr)
 {
+	/* CPU mode: never execute GPU code */
+	if (NDB_COMPUTE_MODE_IS_CPU())
+	{
+		if (errstr)
+			*errstr = pstrdup("CUDA knn_train: CPU mode - GPU code should not be called");
+		return -1;
+	}
+
 	struct KNNModel model;
 	bytea	   *blob = NULL;
 	Jsonb	   *metrics_json = NULL;

@@ -35,6 +35,8 @@
 #include "neurondb_validation.h"
 #include "neurondb_safe_memory.h"
 #include "neurondb_macros.h"
+#include "neurondb_guc.h"
+#include "neurondb_constants.h"
 
 /* Forward declarations for kernel launchers */
 extern int	launch_rf_predict_batch_kernel(const NdbCudaRfNode * d_nodes,
@@ -289,6 +291,14 @@ ndb_cuda_rf_train(const float *features,
 				  Jsonb * *metrics,
 				  char **errstr)
 {
+	/* CPU mode: never execute GPU code */
+	if (NDB_COMPUTE_MODE_IS_CPU())
+	{
+		if (errstr)
+			*errstr = pstrdup("CUDA rf_train: CPU mode - GPU code should not be called");
+		return -1;
+	}
+
 	const int	default_n_trees = 32;
 	int			n_trees = default_n_trees;
 	int		   *label_ints = NULL;

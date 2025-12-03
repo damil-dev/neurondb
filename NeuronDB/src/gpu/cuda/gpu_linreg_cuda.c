@@ -33,6 +33,8 @@
 #include "neurondb_validation.h"
 #include "neurondb_safe_memory.h"
 #include "neurondb_macros.h"
+#include "neurondb_guc.h"
+#include "neurondb_constants.h"
 
 /* Forward declaration for kernel launch wrappers */
 extern cudaError_t launch_build_X_matrix_kernel(const float *features,
@@ -142,6 +144,14 @@ ndb_cuda_linreg_train(const float *features,
 					  Jsonb * *metrics,
 					  char **errstr)
 {
+	/* CPU mode: never execute GPU code */
+	if (NDB_COMPUTE_MODE_IS_CPU())
+	{
+		if (errstr)
+			*errstr = pstrdup("CUDA linreg_train: CPU mode - GPU code should not be called");
+		return -1;
+	}
+
 	float	   *d_features = NULL;
 	double	   *d_targets = NULL;
 	double	   *d_XtX = NULL;

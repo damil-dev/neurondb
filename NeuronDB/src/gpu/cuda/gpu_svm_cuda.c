@@ -30,6 +30,8 @@
 #include "neurondb_validation.h"
 #include "neurondb_safe_memory.h"
 #include "neurondb_macros.h"
+#include "neurondb_guc.h"
+#include "neurondb_constants.h"
 
 /* Forward declarations for kernel launchers */
 extern int	ndb_cuda_svm_launch_compute_kernel_row(const float *features,
@@ -181,6 +183,14 @@ ndb_cuda_svm_train(const float *features,
 				   Jsonb * *metrics,
 				   char **errstr)
 {
+	/* CPU mode: never execute GPU code */
+	if (NDB_COMPUTE_MODE_IS_CPU())
+	{
+		if (errstr)
+			*errstr = pstrdup("CUDA svm_train: CPU mode - GPU code should not be called");
+		return -1;
+	}
+
 	double		C = 1.0;
 	int			max_iters = 1000;
 	float	   *alphas = NULL;
@@ -611,7 +621,7 @@ ndb_cuda_svm_predict(const bytea * model_data,
 	const float *alphas;
 	const float *support_vectors;
 	const		int32 *indices __attribute__((unused));
-	const		bytea *detoasted;
+	bytea	   *detoasted;
 	double		prediction;
 	int			i,
 				j;
@@ -629,7 +639,7 @@ ndb_cuda_svm_predict(const bytea * model_data,
 
 	/* Detoast the bytea to ensure we have the full data */
 	detoasted =
-		(const bytea *) PG_DETOAST_DATUM_COPY(PointerGetDatum(model_data));
+		(bytea *) PG_DETOAST_DATUM_COPY(PointerGetDatum(model_data));
 
 	hdr = (const NdbCudaSvmModelHeader *) VARDATA(detoasted);
 
@@ -702,7 +712,7 @@ ndb_cuda_svm_predict_batch(const bytea * model_data,
 {
 	const char *base;
 	const		NdbCudaSvmModelHeader *hdr;
-	const		bytea *detoasted;
+	bytea	   *detoasted;
 	int			i;
 	int			rc;
 	size_t		expected_size;
@@ -720,7 +730,7 @@ ndb_cuda_svm_predict_batch(const bytea * model_data,
 
 	/* Detoast the bytea to ensure we have the full data */
 	detoasted =
-		(const bytea *) PG_DETOAST_DATUM_COPY(PointerGetDatum(model_data));
+		(bytea *) PG_DETOAST_DATUM_COPY(PointerGetDatum(model_data));
 
 	/* Validate model_data bytea */
 	if (VARSIZE_ANY_EXHDR(detoasted) < sizeof(NdbCudaSvmModelHeader))
