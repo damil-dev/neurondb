@@ -394,15 +394,19 @@ embed_text(PG_FUNCTION_ARGS)
 	if (ndb_llm_route_embed(&cfg, &call_opts, input_str, &vec_data, &dim) != 0 ||
 		vec_data == NULL || dim <= 0)
 	{
+		unsigned int hash;
+		int			input_len;
+		int			model_len;
+		int			j;
+
 		/* Fallback: Generate deterministic embeddings from text hash */
 		dim = 384;
 		NDB_ALLOC(vec_data, float, dim);
 		
 		/* Generate deterministic pseudo-random vector using djb2-like hash */
-		unsigned int hash = 5381;
-		int			input_len = strlen(input_str);
-		int			model_len = model_str ? strlen(model_str) : 0;
-		int			j;
+		hash = 5381;
+		input_len = strlen(input_str);
+		model_len = model_str ? strlen(model_str) : 0;
 		
 		/* Hash input text */
 		for (j = 0; j < input_len; j++)

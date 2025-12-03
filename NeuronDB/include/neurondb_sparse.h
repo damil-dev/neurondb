@@ -41,5 +41,10 @@ typedef struct SparseVector
 	(offsetof(SparseVector, flags) + sizeof(uint16) + \
 	 sizeof(int32) * (nnz) + sizeof(float4) * (nnz))
 
+/* Macros for getting sparse_vector arguments with proper detoasting */
+#define DatumGetSparseVector(x) ((SparseVector *)PG_DETOAST_DATUM(x))
+#define PG_GETARG_SPARSE_VECTOR_P(x) DatumGetSparseVector(PG_GETARG_DATUM(x))
+#define PG_RETURN_SPARSE_VECTOR_P(x) PG_RETURN_POINTER(x)
+
 #endif /* NEURONDB_SPARSE_H */
 

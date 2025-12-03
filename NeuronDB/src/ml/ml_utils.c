@@ -44,8 +44,7 @@ neurondb_fetch_vectors_from_table(const char *table,
 	StringInfoData sql;
 	int			ret;
 	int			i,
-				d,
-				j;
+				d;
 	NDB_DECLARE(float **, result);
 	MemoryContext oldcontext;
 	MemoryContext caller_context;
@@ -188,8 +187,8 @@ neurondb_fetch_vectors_from_table(const char *table,
 			i >= SPI_processed || SPI_tuptable->vals[i] == NULL)
 		{
 			/* Free already allocated vectors */
-			for (j = 0; j < i; j++)
-				NDB_FREE(result[j]);
+			for (int j_local = 0; j_local < i; j_local++)
+				NDB_FREE(result[j_local]);
 			NDB_FREE(result);
 			NDB_FREE(sql.data);
 			NDB_SPI_SESSION_END(spi_session);
@@ -205,8 +204,8 @@ neurondb_fetch_vectors_from_table(const char *table,
 		if (isnull)
 		{
 			/* Free already allocated vectors */
-			for (int j = 0; j < i; j++)
-				NDB_FREE(result[j]);
+			for (int j_local = 0; j_local < i; j_local++)
+				NDB_FREE(result[j_local]);
 			NDB_FREE(result);
 
 			/*
@@ -228,8 +227,8 @@ neurondb_fetch_vectors_from_table(const char *table,
 		if (vec->dim != *out_dim)
 		{
 			/* Free already allocated vectors */
-			for (int j = 0; j < i; j++)
-				NDB_FREE(result[j]);
+			for (int j_local = 0; j_local < i; j_local++)
+				NDB_FREE(result[j_local]);
 			NDB_FREE(result);
 
 			/*
@@ -255,8 +254,8 @@ neurondb_fetch_vectors_from_table(const char *table,
 			if (vector_size > MaxAllocSize)
 			{
 				/* Free already allocated vectors */
-				for (int j = 0; j < i; j++)
-					NDB_FREE(result[j]);
+				for (int j_local = 0; j_local < i; j_local++)
+					NDB_FREE(result[j_local]);
 				NDB_FREE(result);
 
 				/*

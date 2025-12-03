@@ -128,7 +128,7 @@ pca_power_iteration(float **data,
 					float *eigvec,
 					int max_iter)
 {
-	float	   *y;
+	NDB_DECLARE(float *, y);
 	int			iter,
 				i,
 				j;

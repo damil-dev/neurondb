@@ -30,6 +30,8 @@
 #include "neurondb_safe_memory.h"
 #include "neurondb_macros.h"
 #include "neurondb_spi.h"
+#include "ml_catalog.h"
+#include "neurondb_constants.h"
 
 #include <math.h>
 #include <string.h>
@@ -2011,4 +2013,199 @@ neurondb_gpu_register_timeseries_model(void)
 		return;
 	ndb_gpu_register_model_ops(&timeseries_gpu_model_ops);
 	registered = true;
+}
+
+/*
+ * train_timeseries_cpu
+ * CPU training function for timeseries models via unified API
+ * 
+ * This function trains a timeseries (ARIMA) model on CPU using the unified API format:
+ * - table_name: table containing the data
+ * - feature_column: column name containing feature vectors (we use first dimension)
+ * - target_column: column name containing target values (time series values)
+ * - p, d, q: ARIMA parameters
+ */
+PG_FUNCTION_INFO_V1(train_timeseries_cpu);
+
+Datum
+train_timeseries_cpu(PG_FUNCTION_ARGS)
+{
+	text	   *table_name = PG_GETARG_TEXT_PP(0);
+	text	   *feature_col = PG_GETARG_TEXT_PP(1);
+	text	   *target_col = PG_GETARG_TEXT_PP(2);
+	int32		p = PG_GETARG_INT32(3);
+	int32		d = PG_GETARG_INT32(4);
+	int32		q = PG_GETARG_INT32(5);
+
+	char	   *table_name_str = text_to_cstring(table_name);
+	char	   *feature_col_str = text_to_cstring(feature_col);
+	char	   *target_col_str = text_to_cstring(target_col);
+	StringInfoData sql;
+	int			ret;
+	SPITupleTable *tuptable;
+	TupleDesc	tupdesc;
+	float	   *values = NULL;
+	TimeSeriesModel *model = NULL;
+	int			n_samples = 0;
+	int			i;
+	NDB_DECLARE(NdbSpiSession *, spi_session);
+	MemoryContext oldcontext;
+	int32		model_id = 0;
+	MLCatalogModelSpec spec;
+	bytea	   *model_data = NULL;
+	Jsonb	   *params_jsonb = NULL;
+	Jsonb	   *metrics_jsonb = NULL;
+	StringInfoData paramsbuf;
+	StringInfoData metricsbuf;
+
+	if (p < 0 || p > MAX_ARIMA_ORDER_P)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("p must be between 0 and %d", MAX_ARIMA_ORDER_P)));
+	if (d < 0 || d > MAX_ARIMA_ORDER_D)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("d must be between 0 and %d", MAX_ARIMA_ORDER_D)));
+	if (q < 0 || q > MAX_ARIMA_ORDER_Q)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("q must be between 0 and %d", MAX_ARIMA_ORDER_Q)));
+
+	oldcontext = CurrentMemoryContext;
+	NDB_SPI_SESSION_BEGIN(spi_session, oldcontext);
+
+	/* Fetch time series data from target column */
+	ndb_spi_stringinfo_init(spi_session, &sql);
+	appendStringInfo(&sql,
+					 "SELECT %s FROM %s ORDER BY (SELECT 1)",
+					 quote_identifier(target_col_str),
+					 quote_identifier(table_name_str));
+
+	ret = ndb_spi_execute(spi_session, sql.data, true, 0);
+	if (ret != SPI_OK_SELECT)
+	{
+		ndb_spi_stringinfo_free(spi_session, &sql);
+		NDB_SPI_SESSION_END(spi_session);
+		NDB_FREE(table_name_str);
+		NDB_FREE(feature_col_str);
+		NDB_FREE(target_col_str);
+		ereport(ERROR,
+				(errcode(ERRCODE_INTERNAL_ERROR),
+				 errmsg("failed to execute time series query")));
+	}
+
+	tuptable = SPI_tuptable;
+	tupdesc = tuptable->tupdesc;
+	n_samples = SPI_processed;
+
+	if (n_samples < MIN_ARIMA_OBSERVATIONS)
+	{
+		ndb_spi_stringinfo_free(spi_session, &sql);
+		NDB_SPI_SESSION_END(spi_session);
+		NDB_FREE(table_name_str);
+		NDB_FREE(feature_col_str);
+		NDB_FREE(target_col_str);
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("at least %d observations are required for ARIMA",
+						MIN_ARIMA_OBSERVATIONS)));
+	}
+
+	values = (float *) palloc(sizeof(float) * n_samples);
+
+	for (i = 0; i < n_samples; i++)
+	{
+		HeapTuple	tuple = tuptable->vals[i];
+		bool		isnull = false;
+		Datum		value_datum = SPI_getbinval(tuple, tupdesc, 1, &isnull);
+
+		if (isnull)
+		{
+			if (values)
+				NDB_FREE(values);
+			ndb_spi_stringinfo_free(spi_session, &sql);
+			NDB_SPI_SESSION_END(spi_session);
+			NDB_FREE(table_name_str);
+			NDB_FREE(feature_col_str);
+			NDB_FREE(target_col_str);
+			ereport(ERROR,
+					(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+					 errmsg("time series cannot contain NULL values")));
+		}
+		values[i] = (float) DatumGetFloat8(value_datum);
+	}
+
+	/* Fit ARIMA model */
+	model = fit_arima(values, n_samples, p, d, q);
+
+	if (!model)
+	{
+		ndb_spi_stringinfo_free(spi_session, &sql);
+		NDB_SPI_SESSION_END(spi_session);
+		if (values)
+			NDB_FREE(values);
+		NDB_FREE(table_name_str);
+		NDB_FREE(feature_col_str);
+		NDB_FREE(target_col_str);
+		ereport(ERROR,
+				(errcode(ERRCODE_INTERNAL_ERROR),
+				 errmsg("ARIMA model fitting failed")));
+	}
+
+	/* Serialize model */
+	model_data = timeseries_model_serialize_to_bytea(
+		model->ar_coeffs, p,
+		model->ma_coeffs, q,
+		d, model->intercept,
+		n_samples, "arima");
+
+	/* Build parameters JSON */
+	initStringInfo(&paramsbuf);
+	appendStringInfo(&paramsbuf,
+					 "{\"p\":%d,\"d\":%d,\"q\":%d,\"model_type\":\"arima\"}",
+					 p, d, q);
+	params_jsonb = DatumGetJsonbP(DirectFunctionCall1(jsonb_in,
+													  CStringGetTextDatum(paramsbuf.data)));
+	NDB_FREE(paramsbuf.data);
+
+	/* Build metrics JSON */
+	initStringInfo(&metricsbuf);
+	appendStringInfo(&metricsbuf,
+					 "{\"storage\":\"cpu\",\"p\":%d,\"d\":%d,\"q\":%d,\"intercept\":%.6f,\"model_type\":\"arima\",\"n_samples\":%d,\"training_backend\":0}",
+					 p, d, q, model->intercept, n_samples);
+	metrics_jsonb = DatumGetJsonbP(DirectFunctionCall1(jsonb_in,
+													   CStringGetTextDatum(metricsbuf.data)));
+	NDB_FREE(metricsbuf.data);
+
+	/* Register model in catalog */
+	memset(&spec, 0, sizeof(MLCatalogModelSpec));
+	spec.algorithm = NDB_ALGO_TIMESERIES;
+	spec.training_table = table_name_str;
+	spec.training_column = target_col_str;
+	spec.model_data = model_data;
+	spec.parameters = params_jsonb;
+	spec.metrics = metrics_jsonb;
+	spec.num_samples = n_samples;
+	spec.num_features = 1; /* Time series uses single feature dimension */
+
+	MemoryContextSwitchTo(oldcontext);
+	model_id = ml_catalog_register_model(&spec);
+
+	/* Cleanup */
+	ndb_spi_stringinfo_free(spi_session, &sql);
+	NDB_SPI_SESSION_END(spi_session);
+	if (values)
+		NDB_FREE(values);
+	if (model->ar_coeffs)
+		NDB_FREE(model->ar_coeffs);
+	if (model->ma_coeffs)
+		NDB_FREE(model->ma_coeffs);
+	if (model->residuals)
+		NDB_FREE(model->residuals);
+	NDB_FREE(model);
+	NDB_FREE(table_name_str);
+	NDB_FREE(feature_col_str);
+	NDB_FREE(target_col_str);
+
+	PG_RETURN_INT32(model_id);
 }

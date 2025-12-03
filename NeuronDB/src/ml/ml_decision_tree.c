@@ -447,31 +447,31 @@ find_best_split_1d(const float *features,
 
 		for (ii = 1; ii < 10; ii++)
 		{
-			float		threshold = min_val + (max_val - min_val) * ii / 10.0f;
-			int			left_count = 0,
-						right_count = 0,
-						j;
-			double	   *left_y,
-					   *right_y;
-			int			l_idx = 0,
-						r_idx = 0;
-			double		left_imp,
-						right_imp,
-						gain;
+		float		threshold = min_val + (max_val - min_val) * ii / 10.0f;
+		int			left_count = 0,
+					right_count = 0,
+					j;
+		NDB_DECLARE(double *, left_y);
+		NDB_DECLARE(double *, right_y);
+		int			l_idx = 0,
+					r_idx = 0;
+		double		left_imp,
+					right_imp,
+					gain;
 
-			for (j = 0; j < n_samples; j++)
-			{
-				if (features[indices[j] * dim + feat] <= threshold)
-					left_count++;
-				else
-					right_count++;
-			}
+		for (j = 0; j < n_samples; j++)
+		{
+			if (features[indices[j] * dim + feat] <= threshold)
+				left_count++;
+			else
+				right_count++;
+		}
 
-			if (left_count == 0 || right_count == 0)
-				continue;
+		if (left_count == 0 || right_count == 0)
+			continue;
 
-			NDB_ALLOC(left_y, double, left_count);
-			NDB_ALLOC(right_y, double, right_count);
+		NDB_ALLOC(left_y, double, left_count);
+		NDB_ALLOC(right_y, double, right_count);
 
 			l_idx = r_idx = 0;
 			for (j = 0; j < n_samples; j++)
@@ -532,8 +532,8 @@ build_tree_1d(const float *features,
 				best_feature;
 	float		best_threshold;
 	double		best_gain;
-	int		   *left_indices,
-			   *right_indices;
+	NDB_DECLARE(int *, left_indices);
+	NDB_DECLARE(int *, right_indices);
 	int			left_count = 0,
 				right_count = 0;
 
@@ -1902,40 +1902,8 @@ evaluate_decision_tree_by_model_id(PG_FUNCTION_ARGS)
 
 				if (rc == 0)
 				{
-					/* Success - build result and return */
-					initStringInfo(&jsonbuf);
-					appendStringInfo(&jsonbuf,
-									 "{\"accuracy\":%.6f,\"precision\":%.6f,\"recall\":%.6f,\"f1_score\":%.6f,\"n_samples\":%d}",
-									 accuracy,
-									 precision,
-									 recall,
-									 f1_score,
-									 valid_rows);
-
-					/* Use ndb_jsonb_in_cstring like other ML algorithms fix */
-					result_jsonb = ndb_jsonb_in_cstring(jsonbuf.data);
-					if (result_jsonb == NULL)
-					{
-						NDB_FREE(jsonbuf.data);
-						NDB_FREE(h_features);
-						NDB_FREE(h_labels);
-						if (gpu_payload)
-							NDB_FREE(gpu_payload);
-						if (gpu_metrics)
-							NDB_FREE(gpu_metrics);
-						if (gpu_errstr)
-							NDB_FREE(gpu_errstr);
-						NDB_FREE(tbl_str);
-						NDB_FREE(feat_str);
-						NDB_FREE(targ_str);
-						ndb_spi_stringinfo_free(spi_session, &query);
-						NDB_SPI_SESSION_END(spi_session);
-						MemoryContextSwitchTo(oldcontext);
-						ereport(ERROR,
-								(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
-								 errmsg("neurondb: evaluate_decision_tree_by_model_id: failed to parse metrics JSON")));
-					}
-					NDB_FREE(jsonbuf.data);
+					/* Success - cleanup and build result */
+					/* Free GPU-allocated memory before ending SPI */
 					NDB_FREE(h_features);
 					NDB_FREE(h_labels);
 					if (gpu_payload)
@@ -1948,8 +1916,34 @@ evaluate_decision_tree_by_model_id(PG_FUNCTION_ARGS)
 					NDB_FREE(feat_str);
 					NDB_FREE(targ_str);
 					ndb_spi_stringinfo_free(spi_session, &query);
+					
+					/* End SPI session BEFORE creating JSONB */
 					NDB_SPI_SESSION_END(spi_session);
+					
+					/* Switch to oldcontext to create JSONB */
 					MemoryContextSwitchTo(oldcontext);
+					
+					/* Build result JSON string */
+					initStringInfo(&jsonbuf);
+					appendStringInfo(&jsonbuf,
+									 "{\"accuracy\":%.6f,\"precision\":%.6f,\"recall\":%.6f,\"f1_score\":%.6f,\"n_samples\":%d}",
+									 accuracy,
+									 precision,
+									 recall,
+									 f1_score,
+									 valid_rows);
+
+					/* Create JSONB in oldcontext using ndb_jsonb_in_cstring */
+					result_jsonb = ndb_jsonb_in_cstring(jsonbuf.data);
+					NDB_FREE(jsonbuf.data);
+					
+					if (result_jsonb == NULL)
+					{
+						ereport(ERROR,
+								(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
+								 errmsg("neurondb: evaluate_decision_tree_by_model_id: failed to parse metrics JSON")));
+					}
+					
 					PG_RETURN_JSONB_P(result_jsonb);
 				}
 				else

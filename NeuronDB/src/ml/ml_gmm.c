@@ -1102,18 +1102,24 @@ evaluate_gmm_by_model_id(PG_FUNCTION_ARGS)
 		if (!isfinite(safe_silhouette))
 			safe_silhouette = 0.0;
 
+		/* End SPI session BEFORE creating JSONB to avoid memory context issues */
+		NDB_SPI_SESSION_END(spi_session);
+		
+		/* Switch to oldcontext to create JSONB */
+		MemoryContextSwitchTo(oldcontext);
+		
 		initStringInfo(&jsonbuf);
 		appendStringInfo(&jsonbuf,
 						 "{\"inertia\":%.6f,\"silhouette_score\":%.6f,\"n_samples\":%d}",
 						 safe_inertia, safe_silhouette, nvec);
 
-		/* Create JSONB in current context (SPI context) using ndb_jsonb_in_cstring */
-		/* This wrapper handles text conversion and error handling properly */
+		/* Create JSONB in oldcontext using ndb_jsonb_in_cstring */
 		result_jsonb = ndb_jsonb_in_cstring(jsonbuf.data);
+		NDB_FREE(jsonbuf.data);
+		jsonbuf.data = NULL;
+		
 		if (result_jsonb == NULL)
 		{
-			NDB_FREE(jsonbuf.data);
-			NDB_SPI_SESSION_END(spi_session);
 			NDB_FREE(tbl_str);
 			NDB_FREE(col_str);
 			ereport(ERROR,
@@ -1122,33 +1128,7 @@ evaluate_gmm_by_model_id(PG_FUNCTION_ARGS)
 					 errdetail("JSON string: {\"inertia\":%.6f,\"silhouette_score\":%.6f,\"n_samples\":%d}",
 							   safe_inertia, safe_silhouette, nvec)));
 		}
-
-		NDB_FREE(jsonbuf.data);
-		jsonbuf.data = NULL;
 	}
-
-	if (result_jsonb == NULL)
-	{
-		NDB_SPI_SESSION_END(spi_session);
-		NDB_FREE(tbl_str);
-		NDB_FREE(col_str);
-		ereport(ERROR,
-				(errcode(ERRCODE_INTERNAL_ERROR),
-				 errmsg("neurondb: evaluate_gmm_by_model_id: JSONB result is NULL")));
-	}
-
-	/*
-	 * Copy result_jsonb to caller's context before SPI_finish().
-	 * This ensures the JSONB remains valid after the SPI context is
-	 * deleted. The JSONB is allocated in SPI context and will be
-	 * invalid after SPI_finish() deletes that context.
-	 * This pattern matches naive_bayes.c for consistency.
-	 */
-	MemoryContextSwitchTo(oldcontext);
-	result_jsonb = (Jsonb *) PG_DETOAST_DATUM_COPY(JsonbPGetDatum(result_jsonb));
-
-	/* Now safe to finish SPI and free SPI-allocated memory */
-	NDB_SPI_SESSION_END(spi_session);
 
 	/* Free strings allocated before SPI_connect (in oldcontext) */
 	/* Note: tbl_str and col_str were allocated in oldcontext, not SPI context */
