@@ -63,12 +63,12 @@ davies_bouldin_index(PG_FUNCTION_ARGS)
 	char	   *vec_col_str;
 	char	   *cluster_col_str;
 	float	  **vectors;
-	int		   *cluster_labels;
+	NDB_DECLARE(int *, cluster_labels);
 	int			nvec;
 	int			dim;
 	int			num_clusters;
-	int		   *cluster_sizes;
-	float	  **cluster_centroids;
+	NDB_DECLARE(int *, cluster_sizes);
+	NDB_DECLARE(float **, cluster_centroids);
 	double	   *cluster_scatter;
 	double		db_index;
 	int			i;

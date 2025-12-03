@@ -113,11 +113,11 @@ auto_train(PG_FUNCTION_ARGS)
 	text	   *task = PG_ARGISNULL(3) ? NULL : PG_GETARG_TEXT_PP(3);
 	text	   *metric_text = PG_ARGISNULL(4) ? NULL : PG_GETARG_TEXT_PP(4);
 
-	char	   *table_name_str;
-	char	   *feature_col_str;
-	char	   *label_col_str;
-	char	   *task_str;
-	char	   *metric;
+	NDB_DECLARE (char *, table_name_str);
+	NDB_DECLARE (char *, feature_col_str);
+	NDB_DECLARE (char *, label_col_str);
+	NDB_DECLARE (char *, task_str);
+	NDB_DECLARE (char *, metric);
 	MemoryContext oldcontext;
 	MemoryContext automl_context;
 	StringInfoData result;
@@ -127,7 +127,7 @@ auto_train(PG_FUNCTION_ARGS)
 	float		best_score = -1.0f;
 	const char *best_algorithm = NULL;
 	int32		best_model_id = 0;
-	ModelScore *scores = NULL;
+	NDB_DECLARE (ModelScore *, scores);
 
 	/* Validate required parameters */
 	if (table_name == NULL)
@@ -320,7 +320,19 @@ auto_train(PG_FUNCTION_ARGS)
 		{
 			/* Individual algorithm failed - log warning and continue */
 			ErrorData  *edata = NULL;
-			char	   *error_message = NULL;
+			NDB_DECLARE (char *, error_message);
+			MemoryContext safe_context;
+			
+			/* Flush error state first */
+			FlushErrorState();
+			
+			/* Switch out of ErrorContext before CopyErrorData() */
+			safe_context = oldcontext;
+			if (safe_context == NULL || safe_context == ErrorContext)
+			{
+				safe_context = TopMemoryContext;
+			}
+			MemoryContextSwitchTo(safe_context);
 			
 			PG_TRY();
 			{
@@ -338,8 +350,6 @@ auto_train(PG_FUNCTION_ARGS)
 			}
 			PG_END_TRY();
 			
-			FlushErrorState();
-			
 			/* Free error data before using the copied message */
 			if (edata != NULL)
 			{
@@ -356,6 +366,9 @@ auto_train(PG_FUNCTION_ARGS)
 				edata = NULL;
 			}
 			
+			/* Switch back to automl_context for elog calls */
+			MemoryContextSwitchTo(automl_context);
+			
 			elog(WARNING,
 				 "auto_train: Algorithm '%s' failed, continuing with next algorithm",
 				 algorithms[i]);
@@ -364,8 +377,7 @@ auto_train(PG_FUNCTION_ARGS)
 				elog(WARNING,
 					 "auto_train: Error details for '%s': %s",
 					 algorithms[i], error_message);
-				pfree(error_message);
-				error_message = NULL;
+				NDB_FREE(error_message);
 			}
 			
 			scores[i].score = -1.0f;
@@ -377,30 +389,125 @@ auto_train(PG_FUNCTION_ARGS)
 		if (scores[i].model_id <= 0)
 			continue;
 
-		/*
-		 * FIXME: Skip evaluation due to transaction visibility issues
-		 * Evaluation requires querying ml_models table, but the model was
-		 * just inserted in the same transaction and isn't visible yet. For
-		 * now, assign a default score.
-		 */
-		scores[i].score = 0.5f; /* Default score, all models equal */
+		/* Evaluate model using neurondb.evaluate() directly via function call */
+		/* This avoids transaction visibility issues by calling the function directly */
+		{
+			FmgrInfo eval_flinfo;
+			Oid eval_func_oid;
+			List *eval_funcname;
+			Oid eval_argtypes[4];
+			Datum eval_values[4];
+			Datum eval_result_datum;
+			Jsonb *metrics_jsonb = NULL;
+			bool metrics_isnull = false;
+			JsonbIterator *it;
+			JsonbValue v;
+			JsonbIteratorToken r;
+			float extracted_score = 0.5f; /* Default score */
+
+			/* Lookup neurondb.evaluate function */
+			eval_funcname = list_make2(makeString("neurondb"), makeString("evaluate"));
+			eval_argtypes[0] = INT4OID;	/* model_id */
+			eval_argtypes[1] = TEXTOID;	/* table_name */
+			eval_argtypes[2] = TEXTOID;	/* feature_col */
+			eval_argtypes[3] = TEXTOID;	/* label_col */
+			eval_func_oid = LookupFuncName(eval_funcname, 4, eval_argtypes, false);
+			list_free(eval_funcname);
+
+			if (OidIsValid(eval_func_oid))
+			{
+				text	   *eval_table_name_text;
+				text	   *eval_feature_col_text;
+				text	   *eval_label_col_text;
+
+				/* Prepare function call */
+				fmgr_info(eval_func_oid, &eval_flinfo);
+
+				/* Set up arguments - create text objects from strings */
+				eval_table_name_text = cstring_to_text(table_name_str);
+				eval_feature_col_text = cstring_to_text(feature_col_str);
+				eval_label_col_text = cstring_to_text(label_col_str);
+
+				eval_values[0] = Int32GetDatum(model_id);
+				eval_values[1] = PointerGetDatum(eval_table_name_text);
+				eval_values[2] = PointerGetDatum(eval_feature_col_text);
+				eval_values[3] = PointerGetDatum(eval_label_col_text);
+
+				/* Call neurondb.evaluate() directly - avoids nested SPI and transaction visibility issues */
+				PG_TRY();
+				{
+					eval_result_datum = FunctionCall4(&eval_flinfo,
+													   eval_values[0], eval_values[1],
+													   eval_values[2], eval_values[3]);
+
+					metrics_jsonb = DatumGetJsonbP(eval_result_datum);
+					metrics_isnull = (metrics_jsonb == NULL);
+
+					if (!metrics_isnull && metrics_jsonb != NULL)
+					{
+						/* Extract metric value from JSONB */
+						it = JsonbIteratorInit((JsonbContainer *) &metrics_jsonb->root);
+
+						while ((r = JsonbIteratorNext(&it, &v, false)) != WJB_DONE)
+						{
+							if (r == WJB_KEY)
+							{
+								char *key = pnstrdup(v.val.string.val, v.val.string.len);
+
+								if (strcmp(key, "accuracy") == 0 ||
+									strcmp(key, "r_squared") == 0 ||
+									strcmp(key, "f1_score") == 0)
+								{
+									r = JsonbIteratorNext(&it, &v, false);
+									if (r == WJB_VALUE && v.type == jbvNumeric)
+									{
+										extracted_score = (float) DatumGetFloat8(
+											DirectFunctionCall1(numeric_float8,
+																NumericGetDatum(v.val.numeric)));
+										break;
+									}
+								}
+								pfree(key);
+							}
+						}
+					}
+				}
+				PG_CATCH();
+				{
+					/* Evaluation failed - use default score */
+					elog(DEBUG1,
+						 "auto_train: Evaluation of model %d failed, using default score",
+						 model_id);
+					FlushErrorState();
+					extracted_score = 0.5f;
+				}
+				PG_END_TRY();
+
+				scores[i].score = extracted_score;
+			}
+			else
+			{
+				/* Function not found - use default score */
+				elog(DEBUG1,
+					 "auto_train: neurondb.evaluate function not found, using default score");
+				scores[i].score = 0.5f;
+			}
+		}
 
 		/* Set first valid model as best */
 		if (best_model_id == 0 && scores[i].model_id > 0)
 		{
-			best_score = 0.5f;
+			best_score = scores[i].score;
 			best_algorithm = algorithms[i];
 			best_model_id = scores[i].model_id;
 		}
-
-		/* DISABLED: Evaluate model using neurondb.evaluate() */
-		/* NOTE: Evaluation code disabled due to transaction visibility issues */
-
-		/*
-		 * The model was just inserted in the same transaction and isn't
-		 * visible yet
-		 */
-		scores[i].score = 0.5f; /* Default score, all models equal */
+		else if (scores[i].model_id > 0 && scores[i].score > best_score)
+		{
+			/* Update best model if this one has a better score */
+			best_score = scores[i].score;
+			best_algorithm = algorithms[i];
+			best_model_id = scores[i].model_id;
+		}
 
 #if 0
 		/* Original evaluation code - disabled */
@@ -1113,19 +1220,53 @@ feature_importance(PG_FUNCTION_ARGS)
 								if (strcmp(key, "feature_importance") == 0 &&
 									v.type == jbvArray)
 								{
-									/*
-									 * Extract importance array - use uniform
-									 * distribution as fallback
-									 */
-									/*
-									 * TODO: Properly extract array elements
-									 * from JsonbArray
-									 */
-									/* For now, use uniform importance */
-									/* reuse outer i */
+									/* Properly extract array elements from JsonbArray */
+									int array_idx = 0;
+									JsonbIteratorToken array_token;
 
-									for (i = 0; i < n_features; i++)
-										scores[i] = 1.0f / n_features;
+									/* Iterate through array elements */
+									while ((array_token = JsonbIteratorNext(&it, &v, true)) != WJB_DONE)
+									{
+										if (array_token == WJB_ELEM)
+										{
+											if (array_idx < n_features)
+											{
+												/* Extract numeric value from array element */
+												if (v.type == jbvNumeric)
+												{
+													scores[array_idx] = (float) DatumGetFloat8(
+														DirectFunctionCall1(numeric_float8,
+																			NumericGetDatum(v.val.numeric)));
+												}
+												else if (v.type == jbvString)
+												{
+													/* Try to parse string as float */
+													char *str_val = pnstrdup(v.val.string.val, v.val.string.len);
+													scores[array_idx] = (float) strtof(str_val, NULL);
+													NDB_FREE(str_val);
+												}
+												else
+												{
+													/* Fallback for other types */
+													scores[array_idx] = 0.0f;
+												}
+												array_idx++;
+											}
+										}
+										else if (array_token == WJB_END_ARRAY)
+										{
+											/* Reached end of array */
+											break;
+										}
+									}
+
+									/* If we didn't extract enough values, fill remaining with uniform distribution */
+									if (array_idx < n_features)
+									{
+										float uniform_val = 1.0f / (float) n_features;
+										for (i = array_idx; i < n_features; i++)
+											scores[i] = uniform_val;
+									}
 								}
 								NDB_FREE(key);
 							}

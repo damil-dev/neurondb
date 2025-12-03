@@ -620,7 +620,6 @@ train_logistic_regression(PG_FUNCTION_ARGS)
 					NdbCudaLrModelHeader *hdr;
 					float	   *weights_src;
 					int			i;
-					double		final_loss = 0.0;
 					double		accuracy = 0.0;
 
 					elog(DEBUG1,
@@ -2016,29 +2015,8 @@ evaluate_logistic_regression_by_model_id(PG_FUNCTION_ARGS)
 				{
 					/* Success - build result and return */
 					nvec = valid_rows;
-					initStringInfo(&jsonbuf);
-					appendStringInfo(&jsonbuf,
-									 "{\"accuracy\":%.6f,\"precision\":%.6f,\"recall\":%.6f,\"f1_score\":%.6f,\"log_loss\":%.6f,\"n_samples\":%d}",
-									 accuracy,
-									 precision,
-									 recall,
-									 f1_score,
-									 log_loss,
-									 nvec);
-
-					/* Parse JSON string into JSONB using DirectFunctionCall1 */
-					{
-						MemoryContext oldcontext = CurrentMemoryContext;
-						result_jsonb = DatumGetJsonbP(
-							DirectFunctionCall1(
-								jsonb_in,
-								CStringGetTextDatum(jsonbuf.data)));
-						/* Copy to caller's context before SPI cleanup */
-						MemoryContextSwitchTo(oldcontext);
-						result_jsonb = (Jsonb *)PG_DETOAST_DATUM_COPY(JsonbPGetDatum(result_jsonb));
-					}
-					NDB_FREE(jsonbuf.data);
-					jsonbuf.data = NULL;
+					
+					/* Free arrays and cleanup before ending SPI */
 					NDB_FREE(h_features);
 					h_features = NULL;
 					NDB_FREE(h_labels);
@@ -2065,7 +2043,36 @@ evaluate_logistic_regression_by_model_id(PG_FUNCTION_ARGS)
 					NDB_FREE(targ_str);
 					targ_str = NULL;
 					ndb_spi_stringinfo_free(spi_session, &query);
+					
+					/* End SPI session BEFORE creating JSONB */
 					NDB_SPI_SESSION_END(spi_session);
+					
+					/* Switch to oldcontext to create JSONB */
+					MemoryContextSwitchTo(oldcontext);
+					
+					/* Build result JSON string */
+					initStringInfo(&jsonbuf);
+					appendStringInfo(&jsonbuf,
+									 "{\"accuracy\":%.6f,\"precision\":%.6f,\"recall\":%.6f,\"f1_score\":%.6f,\"log_loss\":%.6f,\"n_samples\":%d}",
+									 accuracy,
+									 precision,
+									 recall,
+									 f1_score,
+									 log_loss,
+									 nvec);
+
+					/* Create JSONB in oldcontext using ndb_jsonb_in_cstring */
+					result_jsonb = ndb_jsonb_in_cstring(jsonbuf.data);
+					NDB_FREE(jsonbuf.data);
+					jsonbuf.data = NULL;
+					
+					if (result_jsonb == NULL)
+					{
+						ereport(ERROR,
+								(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
+								 errmsg("neurondb: evaluate_logistic_regression_by_model_id: failed to parse metrics JSON")));
+					}
+					
 					PG_RETURN_JSONB_P(result_jsonb);
 				}
 				else
@@ -2113,6 +2120,7 @@ evaluate_logistic_regression_by_model_id(PG_FUNCTION_ARGS)
 	}
 #endif
 
+cpu_evaluation_path:
 	/* CPU evaluation path */
 	{
 		LRModel    *model = NULL;
@@ -3292,13 +3300,17 @@ lr_gpu_deserialize(MLGpuModel * model,
 
 #ifdef NDB_GPU_CUDA
 	LRGpuModelState *state;
-	LRModel    *lr_model = NULL;
-	uint8		training_backend = 0;
-	bytea	   *gpu_payload = NULL;
+	LRModel    *lr_model;
+	uint8		training_backend;
+	bytea	   *gpu_payload;
 	char	   *base;
 	float	   *weights_dest;
 	size_t		payload_bytes;
 	int			i;
+
+	lr_model = NULL;
+	training_backend = 0;
+	gpu_payload = NULL;
 	NdbCudaLrModelHeader *hdr;
 	/* Deserialize unified format */
 	lr_model = lr_model_deserialize(payload, &training_backend);

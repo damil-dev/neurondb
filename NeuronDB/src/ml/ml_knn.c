@@ -1088,7 +1088,6 @@ predict_knn_model_id(PG_FUNCTION_ARGS)
 			/* Convert float4[] to float8[] */
 			float4	   *features_f4 = (float4 *) ARR_DATA_PTR(features_array);
 
-			NDB_DECLARE(float8 *, features_allocated);
 			NDB_ALLOC(features_allocated, float8, nelems);
 			for (i = 0; i < nelems; i++)
 				features_allocated[i] = (float8) features_f4[i];
@@ -1734,7 +1733,6 @@ knn_predict_batch(int32 model_id,
 					 n_samples, model_id, feature_dim, k_value);
 
 				/* Allocate predictions array */
-				NDB_DECLARE(int *, predictions);
 				NDB_ALLOC(predictions, int, (size_t) n_samples);
 				if (predictions != NULL)
 				{
@@ -1998,8 +1996,6 @@ knn_predict_batch(int32 model_id,
 					Oid			feat_type_oid;
 					bool		feat_is_array;
 					MemoryContext nested_context;
-					NDB_DECLARE(float *, train_features);
-					NDB_DECLARE(double *, train_labels);
 
 					/* Save nested SPI context */
 					nested_context = CurrentMemoryContext;
@@ -2017,7 +2013,6 @@ knn_predict_batch(int32 model_id,
 					for (i = 0; i < n_train; i++)
 					{
 						HeapTuple	tuple;
-						TupleDesc	tupdesc;
 						Datum		feat_datum;
 						Datum		label_datum;
 						bool		feat_null;
@@ -2535,8 +2530,6 @@ evaluate_knn_by_model_id(PG_FUNCTION_ARGS)
 			{
 				size_t		feat_count = features_size / sizeof(float);
 				size_t		label_count = labels_size / sizeof(double);
-				NDB_DECLARE(float *, h_features);
-				NDB_DECLARE(double *, h_labels);
 				NDB_ALLOC(h_features, float, feat_count);
 				NDB_ALLOC(h_labels, double, label_count);
 			}
@@ -2710,8 +2703,30 @@ evaluate_knn_by_model_id(PG_FUNCTION_ARGS)
 
 				if (rc == 0)
 				{
-					/* Success - build result and return */
+					/* Success - cleanup and build result */
 					StringInfoData jsonbuf;
+					
+					/* Free GPU-allocated memory before ending SPI */
+					NDB_FREE(h_features);
+					NDB_FREE(h_labels);
+					if (gpu_payload)
+						NDB_FREE(gpu_payload);
+					if (gpu_metrics)
+						NDB_FREE(gpu_metrics);
+					if (gpu_errstr)
+						NDB_FREE(gpu_errstr);
+					NDB_FREE(tbl_str);
+					NDB_FREE(feat_str);
+					NDB_FREE(targ_str);
+					ndb_spi_stringinfo_free(spi_session, &query);
+					
+					/* End SPI session BEFORE creating JSONB */
+					NDB_SPI_SESSION_END(spi_session);
+					
+					/* Switch to oldcontext to create JSONB */
+					MemoryContextSwitchTo(oldcontext);
+					
+					/* Build result JSON string */
 					initStringInfo(&jsonbuf);
 					appendStringInfo(&jsonbuf,
 									 "{\"accuracy\":%.6f,\"precision\":%.6f,\"recall\":%.6f,\"f1_score\":%.6f,\"n_samples\":%d}",
@@ -2721,58 +2736,16 @@ evaluate_knn_by_model_id(PG_FUNCTION_ARGS)
 									 f1_score,
 									 valid_rows);
 
-					/* Use ndb_jsonb_in_cstring like other ML algorithms fix */
+					/* Create JSONB in oldcontext using ndb_jsonb_in_cstring */
 					result_jsonb = ndb_jsonb_in_cstring(jsonbuf.data);
+					NDB_FREE(jsonbuf.data);
+					
 					if (result_jsonb == NULL)
 					{
-						NDB_FREE(jsonbuf.data);
-						NDB_FREE(h_features);
-						NDB_FREE(h_labels);
-						if (gpu_payload)
-							NDB_FREE(gpu_payload);
-						if (gpu_metrics)
-							NDB_FREE(gpu_metrics);
-						if (gpu_errstr)
-							NDB_FREE(gpu_errstr);
-						NDB_FREE(tbl_str);
-						NDB_FREE(feat_str);
-						NDB_FREE(targ_str);
-						ndb_spi_stringinfo_free(eval_spi_session, &query);
-						NDB_SPI_SESSION_END(eval_spi_session);
-						MemoryContextSwitchTo(oldcontext);
 						ereport(ERROR,
 								(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
 								 errmsg("neurondb: evaluate_knn_by_model_id: failed to parse metrics JSON")));
 					}
-					NDB_FREE(jsonbuf.data);
-
-					MemoryContextSwitchTo(oldcontext);
-					result_jsonb = (Jsonb *) PG_DETOAST_DATUM_COPY(JsonbPGetDatum(result_jsonb));
-
-					/* Now safe to finish SPI and free SPI-allocated memory */
-					MemoryContextSwitchTo(callcontext);
-					NDB_FREE(h_features);
-					NDB_FREE(h_labels);
-					if (gpu_payload)
-						NDB_FREE(gpu_payload);
-					if (gpu_metrics)
-						NDB_FREE(gpu_metrics);
-
-					/*
-					 * Note: gpu_errstr is allocated by GPU function, don't
-					 * free it
-					 */
-					ndb_spi_stringinfo_free(spi_session, &query);
-					NDB_SPI_SESSION_END(spi_session);
-
-					/*
-					 * Switch back to oldcontext and free strings allocated
-					 * before SPI session begin
-					 */
-					MemoryContextSwitchTo(oldcontext);
-					NDB_FREE(tbl_str);
-					NDB_FREE(feat_str);
-					NDB_FREE(targ_str);
 
 					PG_RETURN_JSONB_P(result_jsonb);
 				}
@@ -2818,14 +2791,14 @@ cpu_evaluation_path:
 	/* CPU evaluation path */
 	/* Use optimized batch prediction */
 	{
-		float	   *h_features = NULL;
-		double	   *h_labels = NULL;
+		float	   *cpu_h_features = NULL;
+		double	   *cpu_h_labels = NULL;
 
 		valid_rows = 0;
 
 		/* Allocate host buffers for features and labels */
-		NDB_ALLOC(h_features, float, (size_t) nvec * (size_t) feat_dim);
-		NDB_ALLOC(h_labels, double, (size_t) nvec);
+		NDB_ALLOC(cpu_h_features, float, (size_t) nvec * (size_t) feat_dim);
+		NDB_ALLOC(cpu_h_labels, double, (size_t) nvec);
 
 		/*
 		 * Extract features and labels from SPI results - optimized batch
@@ -2852,8 +2825,8 @@ cpu_evaluation_path:
 				if (feat_null || targ_null)
 					continue;
 
-				feat_row = h_features + (valid_rows * feat_dim);
-				h_labels[valid_rows] = DatumGetFloat8(targ_datum);
+				feat_row = cpu_h_features + (valid_rows * feat_dim);
+				cpu_h_labels[valid_rows] = DatumGetFloat8(targ_datum);
 
 				/* Extract feature vector - optimized paths */
 				if (feat_is_array)
@@ -2937,8 +2910,8 @@ cpu_evaluation_path:
 					}
 				}
 
-				NDB_FREE(h_features);
-				NDB_FREE(h_labels);
+				NDB_FREE(cpu_h_features);
+				NDB_FREE(cpu_h_labels);
 				if (gpu_payload)
 					NDB_FREE(gpu_payload);
 				if (gpu_metrics)
@@ -2969,8 +2942,8 @@ cpu_evaluation_path:
 			}
 			else
 			{
-				NDB_FREE(h_features);
-				NDB_FREE(h_labels);
+				NDB_FREE(cpu_h_features);
+				NDB_FREE(cpu_h_labels);
 				if (gpu_payload)
 					NDB_FREE(gpu_payload);
 				if (gpu_metrics)
@@ -2989,8 +2962,8 @@ cpu_evaluation_path:
 
 		/* Use batch prediction helper */
 		knn_predict_batch(model_id,
-						  h_features,
-						  h_labels,
+						  cpu_h_features,
+						  cpu_h_labels,
 						  valid_rows,
 						  feat_dim,
 						  &tp,
@@ -3042,11 +3015,11 @@ cpu_evaluation_path:
 				else
 					f1_score = 0.0;
 			}
-		}
+				}
 
-		NDB_FREE(h_features);
-		NDB_FREE(h_labels);
-		if (gpu_payload)
+				NDB_FREE(cpu_h_features);
+				NDB_FREE(cpu_h_labels);
+				if (gpu_payload)
 			NDB_FREE(gpu_payload);
 		if (gpu_metrics)
 			NDB_FREE(gpu_metrics);
@@ -3193,7 +3166,7 @@ knn_gpu_release_state(KnnGpuModelState * state)
 static bool
 knn_gpu_train(MLGpuModel * model, const MLGpuTrainSpec * spec, char **errstr)
 {
-	KnnGpuModelState *state;
+	KnnGpuModelState *state = NULL;
 	bytea	   *payload;
 	Jsonb	   *metrics;
 	int			rc;
@@ -3291,7 +3264,6 @@ knn_gpu_train(MLGpuModel * model, const MLGpuTrainSpec * spec, char **errstr)
 		model->backend_state = NULL;
 	}
 
-	NDB_DECLARE(KnnGpuModelState *, state);
 	NDB_ALLOC(state, KnnGpuModelState, 1);
 	state->model_blob = payload;
 	state->feature_dim = spec->feature_dim;
@@ -3487,7 +3459,6 @@ knn_gpu_deserialize(MLGpuModel * model,
 	}
 	memcpy(payload_copy, payload, payload_size);
 
-	NDB_DECLARE(KnnGpuModelState *, state);
 	NDB_ALLOC(state, KnnGpuModelState, 1);
 	state->model_blob = payload_copy;
 	state->feature_dim = -1;

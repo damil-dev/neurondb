@@ -177,7 +177,7 @@ static bool lasso_load_model_from_catalog(int32 model_id, LassoModel * *out);
 static bool
 matrix_invert(double **matrix, int n, double **result)
 {
-	double	  **augmented;
+	NDB_DECLARE(double **, augmented);
 	int			i,
 				j,
 				k;
@@ -2084,7 +2084,7 @@ train_ridge_regression(PG_FUNCTION_ARGS)
 			int			i,
 						j;
 			int			dim_with_intercept;
-			RidgeModel *model;
+			RidgeModel *model = NULL;
 			bytea	   *model_blob;
 			Jsonb	   *metrics_json;
 			int			chunk_size;
@@ -3119,17 +3119,17 @@ train_lasso_regression(PG_FUNCTION_ARGS)
 
 			/* CPU training path - Coordinate Descent */
 			{
-				double	   *weights = NULL;
-				double	   *weights_old = NULL;
-				double	   *residuals = NULL;
-				double		y_mean = 0.0;
-				int			iter,
-							i,
-							j;
-				bool		converged = false;
-				LassoModel *model;
-				bytea	   *model_blob;
-				Jsonb	   *metrics_json;
+			double	   *weights = NULL;
+			double	   *weights_old = NULL;
+			double	   *residuals = NULL;
+			double		y_mean = 0.0;
+			int			iter,
+						i,
+						j;
+			bool		converged = false;
+			NDB_DECLARE(LassoModel *, model);
+			bytea	   *model_blob;
+			Jsonb	   *metrics_json;
 
 				nvec = dataset.n_samples;
 				dim = dataset.feature_dim;

@@ -16,6 +16,8 @@
 
 #include "postgres.h"
 
+#include <ctype.h>
+
 #include "catalog/pg_type.h"
 #include "executor/spi.h"
 #include "utils/builtins.h"
@@ -40,12 +42,50 @@
 static const char *
 ml_catalog_default_project(const char *algorithm, const char *training_table)
 {
+	NDB_DECLARE (char *, sanitized_table);
+	const char *result;
+	int			i, j;
+	
 	if (algorithm == NULL)
 		return pstrdup("ml_default_project");
-	if (training_table == NULL)
+	
+	/* Check if training_table is NULL, empty, or whitespace-only */
+	if (training_table == NULL || strlen(training_table) == 0)
 		return psprintf("%s_project", algorithm);
-
-	return psprintf("%s_%s_project", algorithm, training_table);
+	
+	/* Check if training_table is whitespace-only */
+	for (i = 0; training_table[i] != '\0'; i++)
+	{
+		if (!isspace((unsigned char) training_table[i]))
+			break;
+	}
+	if (training_table[i] == '\0')
+		return psprintf("%s_project", algorithm);
+	
+	/* Sanitize table name: replace spaces and other problematic chars with underscores */
+	sanitized_table = palloc(strlen(training_table) + 1);
+	j = 0;
+	for (i = 0; training_table[i] != '\0'; i++)
+	{
+		char c = training_table[i];
+		/* Replace spaces and other problematic characters with underscores */
+		if (isspace((unsigned char) c) || c == '-' || c == '.' || c == '/')
+			sanitized_table[j++] = '_';
+		else if (isalnum((unsigned char) c) || c == '_')
+			sanitized_table[j++] = c;
+		/* Skip other characters */
+	}
+	sanitized_table[j] = '\0';
+	
+	/* If sanitized table is empty after sanitization, use algorithm only */
+	if (strlen(sanitized_table) == 0)
+	{
+		return psprintf("%s_project", algorithm);
+	}
+	
+	result = psprintf("%s_%s_project", algorithm, sanitized_table);
+	/* sanitized_table will be automatically freed when memory context is reset */
+	return result;
 }
 
 /*

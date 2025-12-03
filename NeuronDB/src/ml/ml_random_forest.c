@@ -222,9 +222,9 @@ rf_select_split(const float *features,
 	{
 		int			feature_idx =
 			(feature_order != NULL) ? feature_order[f] : f;
-		RFSplitPair *pairs = NULL;
-		int		   *left_counts_tmp;
-		int		   *right_counts_tmp;
+		NDB_DECLARE(RFSplitPair *, pairs);
+		NDB_DECLARE(int *, left_counts_tmp);
+		NDB_DECLARE(int *, right_counts_tmp);
 		int			pair_count = 0;
 		int			i;
 		int			left_total = 0;
@@ -428,10 +428,10 @@ rf_build_branch_tree(GTree * tree,
 					 int min_samples,
 					 pg_prng_state * rng,
 					 int *feature_order,
-					 double *feature_importance,
-					 double *max_split_deviation)
+				 double *feature_importance,
+				 double *max_split_deviation)
 {
-	int		   *class_counts;
+	NDB_DECLARE(int *, class_counts);
 	int			majority_idx = -1;
 	int			i;
 	double		best_impurity = DBL_MAX;
@@ -512,8 +512,8 @@ rf_build_branch_tree(GTree * tree,
 	}
 
 	{
-		int		   *left_indices;
-		int		   *right_indices;
+		NDB_DECLARE(int *, left_indices);
+		NDB_DECLARE(int *, right_indices);
 		int			left_count = 0;
 		int			right_count = 0;
 
@@ -1583,18 +1583,20 @@ train_random_forest_classifier(PG_FUNCTION_ARGS)
 
 		if (feature_dim > 0)
 		{
-			NDB_DECLARE(double *, feature_importance_tmp);
-			NDB_ALLOC(feature_importance_tmp, double, feature_dim);
+			NDB_DECLARE(double *, feature_importance_tmp_local);
+			NDB_ALLOC(feature_importance_tmp_local, double, feature_dim);
+			feature_importance_tmp = feature_importance_tmp_local;
 		}
 
 		if (feature_dim > 0)
 		{
 			int			j;
 
-			NDB_DECLARE(int *, feature_order);
-			NDB_ALLOC(feature_order, int, feature_dim);
+			NDB_DECLARE(int *, feature_order_local);
+			NDB_ALLOC(feature_order_local, int, feature_dim);
 			for (j = 0; j < feature_dim; j++)
-				feature_order[j] = j;
+				feature_order_local[j] = j;
+			feature_order = feature_order_local;
 		}
 
 		sample_count =
@@ -2260,11 +2262,13 @@ train_random_forest_classifier(PG_FUNCTION_ARGS)
 				{
 					int			f;
 
-					NDB_DECLARE(double *, left_branch_means_vec);
-					NDB_DECLARE(double *, right_branch_means_vec);
-					NDB_ALLOC(left_branch_means_vec, double, feature_limit);
-					NDB_CHECK_ALLOC(left_branch_means_vec, "left_branch_means_vec");
-					NDB_ALLOC(right_branch_means_vec, double, feature_limit);
+					NDB_DECLARE(double *, left_branch_means_vec_local);
+					NDB_DECLARE(double *, right_branch_means_vec_local);
+					NDB_ALLOC(left_branch_means_vec_local, double, feature_limit);
+					NDB_CHECK_ALLOC(left_branch_means_vec_local, "left_branch_means_vec");
+					NDB_ALLOC(right_branch_means_vec_local, double, feature_limit);
+					left_branch_means_vec = left_branch_means_vec_local;
+					right_branch_means_vec = right_branch_means_vec_local;
 					NDB_CHECK_ALLOC(right_branch_means_vec, "right_branch_means_vec");
 
 					for (f = 0; f < feature_limit; f++)
@@ -2471,8 +2475,9 @@ train_random_forest_classifier(PG_FUNCTION_ARGS)
 
 				if (n_classes > 0)
 				{
-					NDB_DECLARE(int *, tree_counts);
-					NDB_ALLOC(tree_counts, int, n_classes);
+					NDB_DECLARE(int *, tree_counts_local);
+					NDB_ALLOC(tree_counts_local, int, n_classes);
+					tree_counts = tree_counts_local;
 				}
 
 				if (n_samples > 0)
@@ -2487,9 +2492,10 @@ train_random_forest_classifier(PG_FUNCTION_ARGS)
 
 				if (n_samples > 0)
 				{
-					NDB_DECLARE(bool *, inbag);
-					NDB_ALLOC(inbag, bool, n_samples);
-					NDB_CHECK_ALLOC(inbag, "inbag");
+					NDB_DECLARE(bool *, inbag_local);
+					NDB_ALLOC(inbag_local, bool, n_samples);
+					NDB_CHECK_ALLOC(inbag_local, "inbag");
+					inbag = inbag_local;
 				}
 
 				if (sample_target > 0 && n_samples > 0)
@@ -5870,7 +5876,7 @@ rf_read_int_array(StringInfo buf, int expected_count)
 {
 	int			flag = pq_getmsgbyte(buf);
 	int			len;
-	int		   *result;
+	NDB_DECLARE(int *, result);
 	int			i;
 	size_t		alloc_size;
 
@@ -5944,7 +5950,7 @@ rf_read_double_array(StringInfo buf, int expected_count)
 {
 	int			flag;
 	int			len;
-	double	   *result;
+	NDB_DECLARE(double *, result);
 	int			i;
 	size_t		alloc_size;
 
@@ -7178,7 +7184,7 @@ rf_gpu_release_state(RFGpuModelState * state)
 static bool
 rf_gpu_train(MLGpuModel * model, const MLGpuTrainSpec * spec, char **errstr)
 {
-	RFGpuModelState *state;
+	NDB_DECLARE(RFGpuModelState *, state);
 	bytea	   *payload;
 	Jsonb	   *metrics;
 	int			rc;
@@ -7426,7 +7432,7 @@ rf_gpu_deserialize(MLGpuModel * model,
 				   const Jsonb * metadata,
 				   char **errstr)
 {
-	RFGpuModelState *state;
+	NDB_DECLARE(RFGpuModelState *, state);
 	bytea	   *payload_copy;
 	int			payload_size;
 

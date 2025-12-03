@@ -1040,7 +1040,6 @@ train_svm_classifier(PG_FUNCTION_ARGS)
 			NdbCudaSvmModelHeader *hdr;
 			float	   *sv_src_float;
 			double	   *alpha_src;
-			int			i, j;
 
 			elog(INFO,
 				 "neurondb: svm: GPU training succeeded");
@@ -1055,7 +1054,7 @@ train_svm_classifier(PG_FUNCTION_ARGS)
 
 			/* Build SVMModel structure */
 			memset(&svm_model, 0, sizeof(SVMModel));
-			svm_model.model_id = hdr->model_id;
+			svm_model.model_id = 0; /* model_id not stored in GPU header */
 			svm_model.n_features = hdr->feature_dim;
 			svm_model.n_samples = hdr->n_samples;
 			svm_model.n_support_vectors = hdr->n_support_vectors;
@@ -3738,7 +3737,7 @@ svm_gpu_serialize(const MLGpuModel * model,
 
 	/* Build SVMModel structure */
 	memset(&svm_model, 0, sizeof(SVMModel));
-	svm_model.model_id = hdr->model_id;
+	svm_model.model_id = 0; /* model_id not stored in GPU header */
 	svm_model.n_features = hdr->feature_dim;
 	svm_model.n_samples = hdr->n_samples;
 	svm_model.n_support_vectors = hdr->n_support_vectors;
@@ -3790,10 +3789,9 @@ svm_gpu_serialize(const MLGpuModel * model,
 						 "\"training_backend\":1,"
 						 "\"n_features\":%d,"
 						 "\"n_samples\":%d,"
-						 "\"n_support_vectors\":%d}",
+						 "\"n_support_vectors\":0}",
 						 state->feature_dim > 0 ? state->feature_dim : 0,
-						 state->n_samples > 0 ? state->n_samples : 0,
-						 state->n_support_vectors > 0 ? state->n_support_vectors : 0);
+						 state->n_samples > 0 ? state->n_samples : 0);
 
 		*metadata_out = DatumGetJsonbP(DirectFunctionCall1(jsonb_in,
 														   CStringGetTextDatum(metrics_buf.data)));

@@ -1376,15 +1376,47 @@ train_linear_regression(PG_FUNCTION_ARGS)
 				Jsonb	   *updated_metrics = NULL;
 				char	   *base;
 				NdbCudaLinRegModelHeader *hdr;
-				double	   *coefficients_src;
 				int			i;
+				size_t		expected_size;
+				uint32		payload_size;
 
 				elog(INFO,
 					 "neurondb: linear_regression: GPU training succeeded");
 
+				/* Validate GPU model data size before accessing */
+				payload_size = VARSIZE(gpu_result.spec.model_data) - VARHDRSZ;
+				if (payload_size < sizeof(NdbCudaLinRegModelHeader))
+				{
+					elog(ERROR,
+						 "neurondb: linear_regression: GPU model data too small (%u bytes, minimum %zu bytes)",
+						 payload_size,
+						 sizeof(NdbCudaLinRegModelHeader));
+				}
+
 				/* Convert GPU format to unified format */
 				base = VARDATA(gpu_result.spec.model_data);
 				hdr = (NdbCudaLinRegModelHeader *) base;
+				
+				/* Validate header fields before use */
+				if (hdr->feature_dim <= 0 || hdr->feature_dim > 100000)
+				{
+					elog(ERROR,
+						 "neurondb: linear_regression: invalid feature_dim in GPU model header: %d",
+						 hdr->feature_dim);
+				}
+				
+				/* Validate expected payload size */
+				expected_size = sizeof(NdbCudaLinRegModelHeader) + 
+									sizeof(float) * (size_t) hdr->feature_dim;
+				if (payload_size < expected_size)
+				{
+					elog(ERROR,
+						 "neurondb: linear_regression: GPU model data too small for %d features (%u bytes, expected %zu bytes)",
+						 hdr->feature_dim,
+						 payload_size,
+						 expected_size);
+				}
+				
 				/* Coefficients are stored as floats after the header */
 				{
 					float	   *coef_src_float = (float *) (base + sizeof(NdbCudaLinRegModelHeader));
@@ -1447,18 +1479,96 @@ train_linear_regression(PG_FUNCTION_ARGS)
 				spec.model_data = unified_model_data;
 				spec.metrics = updated_metrics;
 
-				if (spec.training_table == NULL)
-					spec.training_table = tbl_str;
-				if (spec.training_column == NULL)
-					spec.training_column = targ_str;
+				/* ALWAYS copy all string pointers to current memory context before switching contexts */
+				/* This ensures the pointers remain valid after memory context switch */
+				
+				/* Copy algorithm */
+				if (spec.algorithm != NULL)
+				{
+					PG_TRY();
+					{
+						spec.algorithm = pstrdup(spec.algorithm);
+					}
+					PG_CATCH();
+					{
+						FlushErrorState();
+						spec.algorithm = pstrdup("linear_regression");
+					}
+					PG_END_TRY();
+				}
+				else
+				{
+					spec.algorithm = pstrdup("linear_regression");
+				}
+
+				/* Copy training_table */
+				if (spec.training_table != NULL)
+				{
+					PG_TRY();
+					{
+						spec.training_table = pstrdup(spec.training_table);
+					}
+					PG_CATCH();
+					{
+						FlushErrorState();
+						spec.training_table = (tbl_str != NULL) ? pstrdup(tbl_str) : NULL;
+					}
+					PG_END_TRY();
+				}
+				else if (tbl_str != NULL)
+				{
+					spec.training_table = pstrdup(tbl_str);
+				}
+
+				/* Copy training_column */
+				if (spec.training_column != NULL)
+				{
+					PG_TRY();
+					{
+						spec.training_column = pstrdup(spec.training_column);
+					}
+					PG_CATCH();
+					{
+						FlushErrorState();
+						spec.training_column = (targ_str != NULL) ? pstrdup(targ_str) : NULL;
+					}
+					PG_END_TRY();
+				}
+				else if (targ_str != NULL)
+				{
+					spec.training_column = pstrdup(targ_str);
+				}
+
+				/* Copy project_name - use fallback if invalid */
+				if (spec.project_name != NULL)
+				{
+					PG_TRY();
+					{
+						/* Try to validate by checking first byte */
+						if (spec.project_name[0] != '\0')
+						{
+							spec.project_name = pstrdup(spec.project_name);
+						}
+						else
+						{
+							spec.project_name = NULL;
+						}
+					}
+					PG_CATCH();
+					{
+						FlushErrorState();
+						spec.project_name = NULL;
+					}
+					PG_END_TRY();
+				}
+
 				if (spec.parameters == NULL)
 				{
 					spec.parameters = gpu_hyperparams;
 					gpu_hyperparams = NULL;
 				}
 
-				spec.algorithm = "linear_regression";
-				spec.model_type = "regression";
+				spec.model_type = pstrdup("regression");
 
 				/*
 				 * Ensure we're in a valid memory context before calling
@@ -1598,12 +1708,20 @@ train_linear_regression(PG_FUNCTION_ARGS)
 						 errhint("Ensure the training table contains at least 10 valid rows.")));
 			}
 
-			/* Allocate matrices for inversion */
-			NDB_ALLOC(XtX_inv, double *, dim_with_intercept);
-
-			for (i = 0; i < dim_with_intercept; i++)
-				NDB_ALLOC(XtX_inv[i], double, dim_with_intercept);
-			NDB_ALLOC(beta, double, dim_with_intercept);
+		/* Allocate matrices for inversion */
+		XtX_inv = NULL;
+		NDB_ALLOC(XtX_inv, double *, dim_with_intercept);
+		
+		/* palloc0 already initializes to NULL, so XtX_inv[i] are all NULL */
+		/* Allocate each row */
+		for (i = 0; i < dim_with_intercept; i++)
+		{
+			/* XtX_inv[i] is already NULL from palloc0 above */
+			NDB_ALLOC(XtX_inv[i], double, dim_with_intercept);
+		}
+			
+		beta = NULL;
+		NDB_ALLOC(beta, double, dim_with_intercept);
 
 			/*
 			 * Add small regularization (ridge) to diagonal to handle
@@ -1672,37 +1790,189 @@ train_linear_regression(PG_FUNCTION_ARGS)
 			for (i = 0; i < dim; i++)
 				model->coefficients[i] = beta[i + 1];
 
-			/* Compute approximate metrics using accumulated statistics */
-
 			/*
-			 * Note: For exact metrics, we would need a second pass through
-			 * data
+			 * Compute metrics (R², MSE, MAE) using second pass through
+			 * training data to compute exact residuals
 			 */
 			{
-				double		y_mean;
-				double		y_var;
+				double		ss_tot;
+				double		ss_res = 0.0;
+				double		mse = 0.0;
+				double		mae = 0.0;
+				int			metrics_chunk_size;
+				int			metrics_offset = 0;
 
+				/* Compute ss_tot from accumulator */
 				if (stream_accum.n_samples > 0)
 				{
-					y_mean = stream_accum.y_sum / stream_accum.n_samples;
-					y_var = (stream_accum.y_sq_sum / stream_accum.n_samples) - (y_mean * y_mean);
+					ss_tot = stream_accum.y_sq_sum - (stream_accum.y_sum * stream_accum.y_sum / stream_accum.n_samples);
 				}
 				else
 				{
-					y_mean = 0.0;
-					y_var = 1.0;
+					ss_tot = 0.0;
 				}
 
-				/* Approximate R² using variance (simplified) */
+				/* Compute MSE and MAE by processing chunks for metrics */
+				/* Limit metrics computation to avoid excessive time */
+				metrics_chunk_size = (stream_accum.n_samples > 100000) ? 100000 : stream_accum.n_samples;
 
-				/*
-				 * For exact metrics, would need second pass to compute
-				 * residuals
-				 */
-				model->r_squared = 0.5; /* Placeholder - would need second
-										 * pass for exact */
-				model->mse = y_var * 0.5;	/* Approximate */
-				model->mae = sqrt(y_var) * 0.7; /* Approximate */
+				elog(DEBUG1,
+					 "neurondb: linear_regression: computing metrics on %d samples",
+					 metrics_chunk_size);
+
+				/* Metrics computation uses new SPI session */
+				{
+					NDB_DECLARE (NdbSpiSession *, metrics_spi_session);
+					MemoryContext metrics_oldcontext;
+
+					metrics_oldcontext = CurrentMemoryContext;
+					Assert(metrics_oldcontext != NULL);
+					NDB_SPI_SESSION_BEGIN(metrics_spi_session, metrics_oldcontext);
+
+					while (metrics_offset < metrics_chunk_size)
+					{
+						StringInfoData metrics_query;
+						int			metrics_ret;
+						int			metrics_n_rows;
+						TupleDesc	metrics_tupdesc;
+						float	   *metrics_row_buffer = NULL;
+						int			metrics_i;
+
+						initStringInfo(&metrics_query);
+						elog(DEBUG1,
+							 "SELECT %s, %s FROM %s WHERE %s IS NOT NULL AND %s IS NOT NULL LIMIT %d OFFSET %d",
+							 quoted_feat,
+							 quoted_target,
+							 quoted_tbl,
+							 quoted_feat,
+							 quoted_target,
+							 10000,
+							 metrics_offset);
+						appendStringInfo(&metrics_query,
+										 "SELECT %s, %s FROM %s WHERE %s IS NOT NULL AND %s IS NOT NULL LIMIT %d OFFSET %d",
+										 quoted_feat,
+										 quoted_target,
+										 quoted_tbl,
+										 quoted_feat,
+										 quoted_target,
+										 10000,
+										 metrics_offset);
+
+						metrics_ret = ndb_spi_execute(metrics_spi_session, metrics_query.data, true, 0);
+						NDB_CHECK_SPI_TUPTABLE();
+						if (metrics_ret != SPI_OK_SELECT)
+						{
+							NDB_FREE(metrics_query.data);
+							break;
+						}
+						NDB_CHECK_SPI_TUPTABLE();
+						metrics_n_rows = SPI_processed;
+						if (metrics_n_rows == 0)
+						{
+							NDB_FREE(metrics_query.data);
+							break;
+						}
+
+						metrics_tupdesc = SPI_tuptable->tupdesc;
+						NDB_ALLOC(metrics_row_buffer, float, dim);
+
+						for (metrics_i = 0; metrics_i < metrics_n_rows && (metrics_offset + metrics_i) < metrics_chunk_size; metrics_i++)
+						{
+							HeapTuple	metrics_tuple = SPI_tuptable->vals[metrics_i];
+							Datum		metrics_feat_datum;
+							Datum		metrics_targ_datum;
+							bool		metrics_feat_null;
+							bool		metrics_targ_null;
+							double		metrics_y_true;
+							double		metrics_y_pred;
+							double		metrics_error;
+							Vector	   *metrics_vec;
+							ArrayType  *metrics_arr;
+							int			metrics_j;
+							Oid			metrics_feat_type_oid = SPI_gettypeid(metrics_tupdesc, 1);
+							bool		metrics_feat_is_array = (metrics_feat_type_oid == FLOAT8ARRAYOID || metrics_feat_type_oid == FLOAT4ARRAYOID);
+
+							metrics_feat_datum = SPI_getbinval(metrics_tuple, metrics_tupdesc, 1, &metrics_feat_null);
+							metrics_targ_datum = SPI_getbinval(metrics_tuple, metrics_tupdesc, 2, &metrics_targ_null);
+
+							if (metrics_feat_null || metrics_targ_null)
+								continue;
+
+							/* Extract features */
+							if (metrics_feat_is_array)
+							{
+								metrics_arr = DatumGetArrayTypeP(metrics_feat_datum);
+								if (ARR_NDIM(metrics_arr) != 1 || ARR_DIMS(metrics_arr)[0] != dim)
+									continue;
+								if (metrics_feat_type_oid == FLOAT8ARRAYOID)
+								{
+									float8	   *data = (float8 *) ARR_DATA_PTR(metrics_arr);
+
+									for (metrics_j = 0; metrics_j < dim; metrics_j++)
+										metrics_row_buffer[metrics_j] = (float) data[metrics_j];
+								}
+								else
+								{
+									float4	   *data = (float4 *) ARR_DATA_PTR(metrics_arr);
+
+									memcpy(metrics_row_buffer, data, sizeof(float) * dim);
+								}
+							}
+							else
+							{
+								metrics_vec = DatumGetVector(metrics_feat_datum);
+								if (metrics_vec->dim != dim)
+									continue;
+								memcpy(metrics_row_buffer, metrics_vec->data, sizeof(float) * dim);
+							}
+
+							/* Extract target */
+							{
+								Oid			metrics_targ_type = SPI_gettypeid(metrics_tupdesc, 2);
+
+								if (metrics_targ_type == INT2OID || metrics_targ_type == INT4OID || metrics_targ_type == INT8OID)
+									metrics_y_true = (double) DatumGetInt32(metrics_targ_datum);
+								else
+									metrics_y_true = DatumGetFloat8(metrics_targ_datum);
+							}
+
+							/* Compute prediction */
+							metrics_y_pred = model->intercept;
+							for (metrics_j = 0; metrics_j < dim; metrics_j++)
+								metrics_y_pred += model->coefficients[metrics_j] * metrics_row_buffer[metrics_j];
+
+							/* Accumulate errors */
+							metrics_error = metrics_y_true - metrics_y_pred;
+							mse += metrics_error * metrics_error;
+							mae += fabs(metrics_error);
+							ss_res += metrics_error * metrics_error;
+						}
+
+						NDB_FREE(metrics_row_buffer);
+						NDB_FREE(metrics_query.data);
+
+						metrics_offset += metrics_n_rows;
+						if (metrics_offset >= metrics_chunk_size)
+							break;
+					}
+
+					NDB_SPI_SESSION_END(metrics_spi_session);
+				}
+
+				/* Normalize metrics */
+				if (metrics_chunk_size > 0)
+				{
+					mse /= metrics_chunk_size;
+					mae /= metrics_chunk_size;
+				}
+
+				/* Compute R² */
+				if (ss_tot > 1e-10)
+					model->r_squared = 1.0 - (ss_res / ss_tot);
+				else
+					model->r_squared = 0.0;
+				model->mse = mse;
+				model->mae = mae;
 			}
 
 			/* Validate model before serialization */
@@ -2453,20 +2723,26 @@ evaluate_linear_regression_by_model_id_jsonb(int32 model_id, text * table_name, 
 
 				/* Build result JSON */
 				MemoryContextSwitchTo(oldcontext);
-				initStringInfo(&jsonbuf);
-				appendStringInfo(&jsonbuf,
-								 "{\"mse\":%.6f,\"mae\":%.6f,\"rmse\":%.6f,\"r_squared\":%.6f,\"n_samples\":%d}",
-								 mse, mae, rmse, r_squared, nvec);
+				{
+					initStringInfo(&jsonbuf);
+					appendStringInfo(&jsonbuf,
+									 "{\"mse\":%.6f,\"mae\":%.6f,\"rmse\":%.6f,\"r_squared\":%.6f,\"n_samples\":%d}",
+									 mse, mae, rmse, r_squared, nvec);
 
-				/* Return empty JSONB to avoid DirectFunctionCall1 issues */
-				NDB_DECLARE(char *, result_buf);
-				NBP_ALLOC(result_buf, char, VARHDRSZ + sizeof(uint32));
-				result = (Jsonb *) result_buf;
-				SET_VARSIZE(result, VARHDRSZ + sizeof(uint32));
-				*((uint32 *) VARDATA(result)) = JB_CMASK; /* Empty object header */
-				NDB_FREE(jsonbuf.data);
-				jsonbuf.data = NULL;
-				return result;
+					/* Use ndb_jsonb_in_cstring to parse JSON string to JSONB */
+					result = ndb_jsonb_in_cstring(jsonbuf.data);
+					NDB_FREE(jsonbuf.data);
+					jsonbuf.data = NULL;
+					
+					if (result == NULL)
+					{
+						ereport(ERROR,
+								(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
+								 errmsg("neurondb: failed to parse GPU evaluation metrics JSON")));
+					}
+					
+					return result;
+				}
 			}
 			else
 			{
@@ -2689,55 +2965,29 @@ evaluate_linear_regression_by_model_id_jsonb(int32 model_id, text * table_name, 
 	else
 		r_squared = 1.0 - (ss_res / ss_tot);
 
-	/* Build result JSON string first (while still in SPI context is OK) */
+	/* End SPI session BEFORE creating JSONB to avoid memory context issues */
+	NDB_SPI_SESSION_END(eval_jsonb_spi_session);
+	
+	/* Switch to oldcontext to create result */
+	MemoryContextSwitchTo(oldcontext);
+
+	/* Build result JSON string */
 	initStringInfo(&jsonbuf);
 	appendStringInfo(&jsonbuf,
 					 "{\"mse\":%.6f,\"mae\":%.6f,\"rmse\":%.6f,\"r_squared\":%.6f,\"n_samples\":%d}",
 					 mse, mae, rmse, r_squared, nvec);
 
-	/* Use ndb_jsonb_in_cstring like test 006 fix */
-	PG_TRY();
+	/* Use ndb_jsonb_in_cstring */
+	result = ndb_jsonb_in_cstring(jsonbuf.data);
+	NDB_FREE(jsonbuf.data);
+	jsonbuf.data = NULL;
+	
+	if (result == NULL)
 	{
-		result = ndb_jsonb_in_cstring(jsonbuf.data);
-		if (result == NULL)
-		{
-			NDB_FREE(jsonbuf.data);
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
-					 errmsg("neurondb: failed to parse metrics JSON")));
-		}
-	}
-	PG_CATCH();
-	{
-		ErrorData *edata;
-		edata = CopyErrorData();
-		FlushErrorState();
-		NDB_FREE(jsonbuf.data);
-		jsonbuf.data = NULL;
-		NDB_SPI_SESSION_END(eval_jsonb_spi_session);
-		NDB_FREE(model_coefficients_ptr);
-		NDB_FREE(model);
-		NDB_FREE(gpu_payload);
-		NDB_FREE(gpu_metrics);
-		NDB_FREE(tbl_str);
-		NDB_FREE(feat_str);
-		NDB_FREE(targ_str);
 		ereport(ERROR,
-				(errcode(ERRCODE_INTERNAL_ERROR),
-				 errmsg("neurondb: evaluate_linear_regression_by_model_id_jsonb: failed to create JSONB result: %s",
-						edata ? edata->message : "unknown error")));
+				(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
+				 errmsg("neurondb: failed to parse metrics JSON")));
 	}
-	PG_END_TRY();
-
-	/* Copy JSONB to caller's context BEFORE ending SPI session (same pattern as GMM) */
-	if (result != NULL)
-	{
-		MemoryContextSwitchTo(oldcontext);
-		result = (Jsonb *) PG_DETOAST_DATUM_COPY(JsonbPGetDatum(result));
-	}
-
-	/* Now safe to end SPI session */
-	NDB_SPI_SESSION_END(eval_jsonb_spi_session);
 
 	if (result == NULL)
 	{
@@ -3024,11 +3274,13 @@ linreg_gpu_serialize(const MLGpuModel * model,
 #ifdef NDB_GPU_CUDA
 	/* Convert GPU format to unified format */
 	LinRegModel	linreg_model;
-	bytea	   *unified_payload = NULL;
+	bytea	   *unified_payload;
 	char	   *base;
 	NdbCudaLinRegModelHeader *hdr;
 	float	   *coef_src_float;
 	int			i;
+
+	unified_payload = NULL;
 
 	base = VARDATA(state->model_blob);
 	hdr = (NdbCudaLinRegModelHeader *) base;

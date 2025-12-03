@@ -27,6 +27,7 @@
 #include "access/htup_details.h"
 #include <string.h>
 #include <float.h>
+#include <math.h>
 #include "neurondb_validation.h"
 #include "neurondb_safe_memory.h"
 #include "neurondb_macros.h"
@@ -1183,7 +1184,6 @@ rerank_ensemble(PG_FUNCTION_ARGS)
 			NdbLLMConfig cfg;
 			NdbLLMCallOptions call_opts;
 			NDB_DECLARE(const char **, docs);
-			int			j;
 
 			if (method_nulls[i] || !DatumGetPointer(method_datums[i]))
 				continue;

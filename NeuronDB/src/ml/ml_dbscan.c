@@ -293,13 +293,7 @@ predict_dbscan(PG_FUNCTION_ARGS)
 
 	float	   *features;
 	int			cluster_id = DBSCAN_NOISE;
-
-	/*
-	 * Suppress unused variable warnings - placeholders for future
-	 * implementation
-	 */
-	(void) model_id;
-	(void) features_array;
+	int			n_elems = 0;
 
 	/* Extract features from array */
 	{
@@ -309,7 +303,6 @@ predict_dbscan(PG_FUNCTION_ARGS)
 		char		typalign;
 		Datum	   *elems;
 		bool	   *nulls;
-		int			n_elems;
 		int			i;
 
 		get_typlenbyvalalign(elmtype, &typlen, &typbyval, &typalign);
@@ -322,14 +315,92 @@ predict_dbscan(PG_FUNCTION_ARGS)
 			features[i] = DatumGetFloat4(elems[i]);
 	}
 
-	/* For DBSCAN prediction, we need to check if the point is dense enough */
+	/* Load model from catalog and perform proper DBSCAN prediction */
+	{
+		bytea *model_payload = NULL;
+		Jsonb *model_parameters = NULL;
+		float **cluster_centers = NULL;
+		int n_clusters = 0;
+		int dim = 0;
+		double eps = 0.0;
+		int min_pts = 0;
+		int i;
+		double min_distance = DBL_MAX;
+		int nearest_cluster = -1;
 
-	/*
-	 * This is a simplified implementation - would need to load trained
-	 * clusters
-	 */
-	/* For now, classify as noise (-1) as placeholder */
-	cluster_id = DBSCAN_NOISE;
+		/* Load model from catalog */
+		if (ml_catalog_fetch_model_payload(model_id, &model_payload, &model_parameters, NULL))
+		{
+			if (model_payload != NULL)
+			{
+				/* Deserialize model to get cluster centers, eps, and min_pts */
+				if (dbscan_model_deserialize_from_bytea(model_payload,
+														&cluster_centers, &n_clusters, &dim, &eps, &min_pts) == 0)
+				{
+					/* Validate feature dimension matches model dimension */
+					if (n_elems == dim && n_clusters > 0)
+					{
+						/* Find nearest cluster center */
+						for (i = 0; i < n_clusters; i++)
+						{
+							double dist_sq = neurondb_l2_distance_squared(features, cluster_centers[i], dim);
+							double dist = sqrt(dist_sq);
+
+							if (dist < min_distance)
+							{
+								min_distance = dist;
+								nearest_cluster = i;
+							}
+						}
+
+						/* If point is within eps of a cluster center, assign to that cluster */
+						/* Note: In full DBSCAN, we'd also check if cluster has >= min_pts points,
+						 * but for prediction we use the cluster centers as representatives */
+						if (min_distance <= eps && nearest_cluster >= 0)
+						{
+							cluster_id = nearest_cluster;
+						}
+						else
+						{
+							/* Point is too far from any cluster center, classify as noise */
+							cluster_id = DBSCAN_NOISE;
+						}
+					}
+					else
+					{
+						/* Dimension mismatch or no clusters */
+						cluster_id = DBSCAN_NOISE;
+					}
+
+					/* Free cluster centers */
+					if (cluster_centers != NULL)
+					{
+						for (i = 0; i < n_clusters; i++)
+						{
+							if (cluster_centers[i] != NULL)
+								NDB_FREE(cluster_centers[i]);
+						}
+						NDB_FREE(cluster_centers);
+					}
+				}
+				else
+				{
+					/* Failed to deserialize model */
+					cluster_id = DBSCAN_NOISE;
+				}
+			}
+			else
+			{
+				/* Model payload not found */
+				cluster_id = DBSCAN_NOISE;
+			}
+		}
+		else
+		{
+			/* Failed to load model from catalog */
+			cluster_id = DBSCAN_NOISE;
+		}
+	}
 
 	NDB_FREE(features);
 
