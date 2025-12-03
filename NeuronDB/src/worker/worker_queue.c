@@ -334,7 +334,7 @@ process_job_batch(void)
 		/* Check if table exists first */
 		ret = ndb_spi_execute(session,
 			"SELECT 1 FROM pg_tables WHERE schemaname = 'neurondb' "
-			"AND tablename = 'neurondb_job_queue'",
+			"AND tablename = 'job_queue'",
 			true,
 			0);
 

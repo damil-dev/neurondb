@@ -238,15 +238,18 @@ PG_FUNCTION_INFO_V1(sparse_vector_dot_product);
 Datum
 sparse_vector_dot_product(PG_FUNCTION_ARGS)
 {
-	SparseVector *a = (SparseVector *) PG_GETARG_POINTER(0);
-	SparseVector *b = (SparseVector *) PG_GETARG_POINTER(1);
-	int32	   *a_tokens,
-			   *b_tokens;
-	float4	   *a_weights,
-			   *b_weights;
+	NDB_DECLARE(SparseVector *, a);
+	NDB_DECLARE(SparseVector *, b);
+	int32	   *a_tokens;
+	int32	   *b_tokens;
+	float4	   *a_weights;
+	float4	   *b_weights;
 	float4		result = 0.0;
 	int			i,
 				j;
+
+	a = PG_GETARG_SPARSE_VECTOR_P(0);
+	b = PG_GETARG_SPARSE_VECTOR_P(1);
 
 	if (a == NULL || b == NULL)
 		PG_RETURN_FLOAT4(0.0);

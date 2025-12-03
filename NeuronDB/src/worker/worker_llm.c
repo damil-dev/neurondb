@@ -147,7 +147,7 @@ neuranllm_main(Datum main_arg)
 				ret = ndb_spi_execute(session,
 									   "SELECT 1 FROM pg_tables WHERE "
 									   "schemaname = 'neurondb' AND tablename "
-									   "= 'neurondb_llm_jobs'",
+									   "= 'llm_jobs'",
 									   true,
 									   0);
 				table_check_processed = SPI_processed;

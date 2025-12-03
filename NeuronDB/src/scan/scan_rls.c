@@ -378,16 +378,30 @@ ndb_index_scan_rls_filter(IndexScanDesc scan, ItemPointer tid)
 	bool		passes;
 
 	/* Get or create RLS state (cached in scan->opaque) */
-	/* Note: Using xs_want_itup as temporary storage for RLS state */
-	/* TODO: Use proper scan->opaque field when available in scan descriptor */
-	rlsState =
-		(RLSFilterState *) scan->xs_want_itup;
+	/* Use scan->opaque for storing RLS filter state */
+	rlsState = (RLSFilterState *) scan->opaque;
 
 	if (rlsState == NULL)
 	{
 		/* Initialize on first call */
-		rlsState = ndb_rls_init(scan->heapRelation, NULL);
-		scan->xs_want_itup = (void *) rlsState;
+		/* Check if opaque is already in use by index AM */
+		if (scan->opaque != NULL)
+		{
+			/* If opaque is already used, we need to wrap it or use alternative storage */
+			/* For now, allocate RLS state separately and store pointer in a wrapper */
+			/* This is a fallback - ideally index AMs should cooperate with RLS */
+			elog(DEBUG1,
+				 "neurondb: scan->opaque already in use, RLS state allocated separately");
+			rlsState = ndb_rls_init(scan->heapRelation, NULL);
+			/* Store in xs_want_itup as fallback when opaque is in use */
+			scan->xs_want_itup = (void *) rlsState;
+		}
+		else
+		{
+			/* Opaque is available, use it for RLS state */
+			rlsState = ndb_rls_init(scan->heapRelation, NULL);
+			scan->opaque = (void *) rlsState;
+		}
 	}
 
 	/* Check tuple */

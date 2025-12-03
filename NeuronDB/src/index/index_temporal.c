@@ -261,12 +261,12 @@ temporal_knn_search(PG_FUNCTION_ARGS)
 	{
 		uint64		call_cntr;
 		uint64		max_calls;
-		NdbSpiSession *session2;
+		NdbSpiSession *session2_local;
 		SPITupleTable *tuptable;
 
 		call_cntr = funcctx->call_cntr;
 		max_calls = funcctx->max_calls;
-		session2 = (NdbSpiSession *) funcctx->user_fctx;
+		session2_local = (NdbSpiSession *) funcctx->user_fctx;
 		tuptable = SPI_tuptable;  /* Access via global SPI_tuptable while session is active */
 
 		if (call_cntr < max_calls)
@@ -291,8 +291,8 @@ temporal_knn_search(PG_FUNCTION_ARGS)
 		}
 		else
 		{
-			if (session2 != NULL)
-				ndb_spi_session_end(&session2);
+			if (session2_local != NULL)
+				ndb_spi_session_end(&session2_local);
 			SRF_RETURN_DONE(funcctx);
 		}
 	}

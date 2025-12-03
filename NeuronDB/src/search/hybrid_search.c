@@ -116,8 +116,6 @@ hybrid_search(PG_FUNCTION_ARGS)
 		int i;
 		int proc;
 		NDB_DECLARE(NdbSpiSession *, session);
-		NDB_DECLARE(HybridSearchState *, state);
-		FuncCallContext *funcctx;
 
 	/* Get vector argument - handle NULL case */
 	if (PG_ARGISNULL(1))

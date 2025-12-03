@@ -32,9 +32,11 @@
 #include "neurondb_validation.h"
 #include "neurondb_safe_memory.h"
 #include "neurondb_macros.h"
-#include "neurondb_macros.h"
 #include "neurondb_spi_safe.h"
 #include "neurondb_spi.h"
+#include <errno.h>
+#include <stdlib.h>
+#include <limits.h>
 
 static char *get_hnsw_tenant_table(const char *table, const char *col, int32 tenant_id);
 static void ensure_hnsw_tenant_metadata_table(void);
@@ -109,17 +111,45 @@ hnsw_tenant_search(PG_FUNCTION_ARGS)
 		char	   *index_tbl;
 		int			ret;
 		StringInfoData sql;
+		text	   *table_name;
 		Vector	   *query;
 		int32		tenant_id;
 		int32		k;
 		int16		ef_search = 100;	/* Default for demonstration */
+		NDB_DECLARE(NdbSpiSession *, lookup_session);
 
-		query = PG_GETARG_VECTOR_P(0);
-		NDB_CHECK_VECTOR_VALID(query);
-		tenant_id = PG_GETARG_INT32(1);
+		/* Read function arguments according to SQL signature: table_name, query_vector, k, tenant_id */
+		table_name = PG_GETARG_TEXT_PP(0);
+		query = PG_GETARG_VECTOR_P(1);
 		k = PG_GETARG_INT32(2);
+		{
+			text *tenant_id_text = PG_GETARG_TEXT_PP(3);
+			char *tenant_id_str;
+			char *endptr;
+			long tenant_id_long;
+
+			if (tenant_id_text == NULL)
+				ereport(ERROR, (errmsg("tenant_id cannot be null")));
+
+			tenant_id_str = text_to_cstring(tenant_id_text);
+			/* Convert tenant_id from text to int32 */
+			errno = 0;
+			tenant_id_long = strtol(tenant_id_str, &endptr, 10);
+			if (errno != 0 || *endptr != '\0' || tenant_id_long < 0 || tenant_id_long > INT_MAX)
+			{
+				pfree(tenant_id_str);
+				ereport(ERROR,
+						(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
+						 errmsg("tenant_id must be a non-negative integer, got: %s", tenant_id_str)));
+			}
+			tenant_id = (int32) tenant_id_long;
+			pfree(tenant_id_str);
+		}
 
 		/* Validate inputs */
+		if (table_name == NULL)
+			ereport(ERROR, (errmsg("table_name cannot be null")));
+
 		if (query == NULL)
 			ereport(ERROR, (errmsg("query vector cannot be null")));
 
@@ -129,13 +159,54 @@ hnsw_tenant_search(PG_FUNCTION_ARGS)
 		if (k <= 0)
 			ereport(ERROR, (errmsg("k must be positive")));
 
-		elog(DEBUG1,
-			 "HNSW tenant search: tenant=%d, query_dim=%d, k=%d, ef_search=%d",
-			 tenant_id, query->dim, k, ef_search);
+		NDB_CHECK_VECTOR_VALID(query);
 
-		/* Placeholder for table/col name, should pass/lookup real names */
-		tbl_str = pstrdup("");
-		col_str = pstrdup("");
+		tbl_str = text_to_cstring(table_name);
+
+		/* Lookup column name from metadata table */
+		col_str = NULL;
+		lookup_session = ndb_spi_session_begin(CurrentMemoryContext, false);
+		if (lookup_session != NULL)
+		{
+			StringInfoData lookup_sql;
+			Oid			argtypes[2] = {TEXTOID, INT4OID};
+			Datum		values[2];
+
+			initStringInfo(&lookup_sql);
+			appendStringInfo(&lookup_sql,
+							 "SELECT col FROM %s WHERE tbl = $1 AND tenant_id = $2 LIMIT 1",
+							 HNSW_META_TABLE);
+
+			values[0] = CStringGetTextDatum(tbl_str);
+			values[1] = Int32GetDatum(tenant_id);
+
+			ret = ndb_spi_execute_with_args(lookup_session, lookup_sql.data, 2, argtypes, values, NULL, true, 1);
+			NDB_FREE(lookup_sql.data);
+
+			if (ret == SPI_OK_SELECT && SPI_processed > 0)
+			{
+				bool isnull;
+				Datum col_datum = SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isnull);
+				if (!isnull)
+					col_str = text_to_cstring(DatumGetTextP(col_datum));
+			}
+
+			ndb_spi_session_end(&lookup_session);
+		}
+
+		/* If column not found in metadata, use a default or error */
+		if (col_str == NULL)
+		{
+			/* Try to infer column name - for now, use a common default */
+			elog(WARNING,
+				 "hnsw_tenant_search: column name not found in metadata for table %s, tenant %d, using default",
+				 tbl_str, tenant_id);
+			col_str = pstrdup("embedding"); /* Common default column name */
+		}
+
+		elog(DEBUG1,
+			 "HNSW tenant search: table=%s, col=%s, tenant=%d, query_dim=%d, k=%d, ef_search=%d",
+			 tbl_str, col_str, tenant_id, query->dim, k, ef_search);
 
 		funcctx = SRF_FIRSTCALL_INIT();
 
