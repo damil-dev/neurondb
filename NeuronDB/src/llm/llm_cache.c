@@ -43,7 +43,9 @@
 
 /* ndb_json_quote_string is now replaced by ndb_json_quote_string from neurondb_json.h */
 /* Unused function - kept for reference */
-static char * __attribute__((unused))
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
+static char *
 ndb_json_quote_string_OLD_REMOVED(const char *str)
 {
 	StringInfoData buf;
@@ -98,6 +100,7 @@ ndb_json_quote_string_OLD_REMOVED(const char *str)
 	NDB_FREE(buf.data);
 	return result;
 }
+#pragma GCC diagnostic pop
 
 /*
  * Returns true if a non-stale cache entry is found for 'key' (and text value, if non-NULL), false otherwise.

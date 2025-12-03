@@ -1191,9 +1191,6 @@ vector_compute_stats(VacAttrStats * stats, AnalyzeAttrFetchFunc fetchfunc, int s
 	NDB_ALLOC(norms, float, sample_size);
 	if (max_sample_dims > 0)
 	{
-		NDB_DECLARE(float *, dim_means);
-		NDB_DECLARE(float *, dim_mins);
-		NDB_DECLARE(float *, dim_maxs);
 		NDB_ALLOC(dim_means, float, max_sample_dims);
 		NDB_ALLOC(dim_mins, float, max_sample_dims);
 		NDB_ALLOC(dim_maxs, float, max_sample_dims);

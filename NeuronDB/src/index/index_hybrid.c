@@ -253,7 +253,6 @@ hybrid_index_search(PG_FUNCTION_ARGS)
 	{
 		uint64		call_cntr;
 		uint64		max_calls;
-		NdbSpiSession *session2;
 		SPITupleTable *tuptable;
 		HeapTuple	spi_tuple;
 		Datum		values[4];

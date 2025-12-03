@@ -27,7 +27,7 @@ int			neurondb_ivf_probes = 10;
 int			neurondb_ef_construction = 200;
 
 /* GPU GUC variables */
-int			neurondb_compute_mode = 2;  /* Default: AUTO (0=CPU, 1=GPU, 2=AUTO) */
+int			neurondb_compute_mode = 0;  /* Default: CPU (0=CPU, 1=GPU, 2=AUTO) */
 int			neurondb_gpu_backend_type = 0;  /* Default: CUDA (0=CUDA, 1=ROCm, 2=Metal) */
 int			neurondb_gpu_device = 0;
 int			neurondb_gpu_batch_size = 8192;
@@ -259,9 +259,9 @@ neurondb_init_all_gucs(void)
 							"Controls whether ML operations run on CPU, GPU, or auto-select. "
 							"Values: 0 (cpu) - CPU only, don't initialize GPU; "
 							"1 (gpu) - GPU required, error if unavailable; "
-							"2 (auto) - Try GPU first, fallback to CPU. Default is 2 (auto).",
+							"2 (auto) - Try GPU first, fallback to CPU. Default is 0 (cpu).",
 							&neurondb_compute_mode,
-							2,  /* Default: AUTO */
+							0,  /* Default: CPU */
 							0,  /* Min: CPU */
 							2,  /* Max: AUTO */
 							PGC_USERSET,

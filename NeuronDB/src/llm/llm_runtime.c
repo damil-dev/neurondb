@@ -255,7 +255,7 @@ record_llm_stats(const char *model_name,
 		return;
 
 	ret = ndb_spi_execute(session, "SELECT 1 FROM pg_tables WHERE schemaname = "
-			  "'neurondb' AND tablename = 'neurondb_llm_stats'",
+			  "'neurondb' AND tablename = 'llm_stats'",
 		true,
 		0);
 	if (ret != SPI_OK_SELECT || SPI_processed == 0)
@@ -321,19 +321,19 @@ record_llm_stats(const char *model_name,
 			"  CASE WHEN $4 THEN 1 ELSE 0 END, "
 			"  $5, $6 + $7, $6, $7, now(), now()) "
 			"ON CONFLICT (model_name) DO UPDATE SET "
-			"  total_requests = neurondb_llm_stats.total_requests + 1, "
+			"  total_requests = llm_stats.total_requests + 1, "
 			"  successful_requests = "
-			"neurondb_llm_stats.successful_requests + CASE WHEN $3 THEN 1 "
+			"llm_stats.successful_requests + CASE WHEN $3 THEN 1 "
 			"ELSE 0 END, "
-			"  failed_requests = neurondb_llm_stats.failed_requests + CASE "
+			"  failed_requests = llm_stats.failed_requests + CASE "
 			"WHEN $3 THEN 0 ELSE 1 END, "
-			"  cache_hits = neurondb_llm_stats.cache_hits + CASE WHEN $4 "
+			"  cache_hits = llm_stats.cache_hits + CASE WHEN $4 "
 			"THEN 1 ELSE 0 END, "
-			"  total_latency_ms = neurondb_llm_stats.total_latency_ms + "
+			"  total_latency_ms = llm_stats.total_latency_ms + "
 			"$5, "
-			"  total_tokens = neurondb_llm_stats.total_tokens + $6 + $7, "
-			"  total_tokens_in = neurondb_llm_stats.total_tokens_in + $6, "
-			"  total_tokens_out = neurondb_llm_stats.total_tokens_out + "
+			"  total_tokens = llm_stats.total_tokens + $6 + $7, "
+			"  total_tokens_in = llm_stats.total_tokens_in + $6, "
+			"  total_tokens_out = llm_stats.total_tokens_out + "
 			"$7, "
 			"  last_request_at = now(), "
 			"  last_updated = now()",
@@ -366,7 +366,7 @@ record_llm_stats(const char *model_name,
 
 		ret = ndb_spi_execute(session,
 			"SELECT 1 FROM pg_tables WHERE schemaname = 'neurondb' "
-			"AND tablename = 'neurondb_llm_errors'",
+			"AND tablename = 'llm_errors'",
 			true,
 			0);
 		if (ret == SPI_OK_SELECT && SPI_processed > 0)
@@ -392,7 +392,7 @@ record_llm_stats(const char *model_name,
 	}
 
 	ret = ndb_spi_execute(session, "SELECT 1 FROM pg_tables WHERE schemaname = "
-			  "'neurondb' AND tablename = 'neurondb_histograms'",
+			  "'neurondb' AND tablename = 'histograms'",
 		true,
 		0);
 	if (ret == SPI_OK_SELECT && SPI_processed > 0)
@@ -425,7 +425,7 @@ record_llm_stats(const char *model_name,
 			"last_updated) "
 			"VALUES ($1, $2, $3, $4, now()) "
 			"ON CONFLICT (metric_name, bucket_start) DO UPDATE SET "
-			"  count = neurondb_histograms.count + $4, "
+			"  count = histograms.count + $4, "
 			"  last_updated = now()",
 			4,
 			hist_argtypes,
@@ -1305,8 +1305,8 @@ ndb_llm_enqueue(PG_FUNCTION_ARGS)
 	values[1] = PointerGetDatum(payload);
 	ndb_spi_execute_with_args(session,
 		"INSERT INTO "
-		"neurondb_llm_jobs(action,payload,status,created_at) "
-		"VALUES($1,$2::jsonb,'queued',now()) RETURNING id",
+		"neurondb.llm_jobs(operation,input_text,status,model_name,created_at) "
+		"VALUES($1,$2::jsonb::text,'queued','default',now()) RETURNING job_id",
 		2,
 		argtypes,
 		values,
@@ -1439,6 +1439,114 @@ neurondb_llm_gpu_info(PG_FUNCTION_ARGS)
 		nulls[3] = false;
 		nulls[4] = false;
 		nulls[5] = false;
+
+		tuple = heap_form_tuple(tupdesc, values, nulls);
+		SRF_RETURN_NEXT(funcctx, HeapTupleGetDatum(tuple));
+	} else
+	{
+		SRF_RETURN_DONE(funcctx);
+	}
+}
+
+/*
+ * neurondb_llm_gpu_utilization
+ *	  Get GPU utilization metrics (utilization percentage, memory usage, temperature, power consumption)
+ */
+PG_FUNCTION_INFO_V1(neurondb_llm_gpu_utilization);
+
+Datum
+neurondb_llm_gpu_utilization(PG_FUNCTION_ARGS)
+{
+	FuncCallContext *funcctx;
+	TupleDesc tupdesc;
+	AttInMetadata *attinmeta;
+	Datum values[8];
+	bool nulls[8];
+	HeapTuple tuple;
+	MemoryContext oldcontext;
+
+	if (SRF_IS_FIRSTCALL())
+	{
+		funcctx = SRF_FIRSTCALL_INIT();
+		oldcontext =
+			MemoryContextSwitchTo(funcctx->multi_call_memory_ctx);
+
+		if (get_call_result_type(fcinfo, NULL, &tupdesc)
+			!= TYPEFUNC_COMPOSITE)
+			ereport(ERROR,
+				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+					errmsg("function returning record "
+					       "called in context "
+					       "that cannot accept type "
+					       "record")));
+
+		attinmeta = TupleDescGetAttInMetadata(tupdesc);
+		funcctx->attinmeta = attinmeta;
+		funcctx->user_fctx = NULL;
+		MemoryContextSwitchTo(oldcontext);
+	}
+
+	funcctx = SRF_PERCALL_SETUP();
+	attinmeta = funcctx->attinmeta;
+
+	if (funcctx->call_cntr < 1)
+	{
+		const ndb_gpu_backend *backend;
+		GPUDeviceInfo *device_info;
+		bool gpu_available;
+		int device_id = 0;
+		float4 utilization_pct = 0.0;
+		int64 memory_used_mb = 0;
+		int64 memory_total_mb = 0;
+		float4 memory_utilization_pct = 0.0;
+		int32 temperature_c = 0;
+		float4 power_w = 0.0;
+		TimestampTz timestamp;
+
+		gpu_available = neurondb_gpu_is_available();
+		backend = ndb_gpu_get_active_backend();
+
+		if (gpu_available && backend != NULL)
+		{
+			device_id = neurondb_gpu_device;
+			device_info = neurondb_gpu_get_device_info(device_id);
+			if (device_info != NULL)
+			{
+				memory_total_mb = device_info->total_memory_mb;
+				memory_used_mb = device_info->total_memory_mb - device_info->free_memory_mb;
+				if (memory_total_mb > 0)
+				{
+					memory_utilization_pct = ((float4)memory_used_mb / (float4)memory_total_mb) * 100.0;
+				}
+				/* Note: GPU utilization percentage, temperature, and power require
+				 * system-level APIs (NVML for CUDA, rocm-smi for ROCm, IOKit for Metal).
+				 * These are not yet implemented, so we return 0.0 as placeholders.
+				 * TODO: Integrate with backend-specific monitoring APIs */
+				utilization_pct = 0.0;
+				temperature_c = 0;
+				power_w = 0.0;
+			}
+		}
+
+		timestamp = GetCurrentTimestamp();
+
+		values[0] = Int32GetDatum(device_id);
+		values[1] = Float4GetDatum(utilization_pct);
+		values[2] = Int64GetDatum(memory_used_mb);
+		values[3] = Int64GetDatum(memory_total_mb);
+		values[4] = Float4GetDatum(memory_utilization_pct);
+		values[5] = Int32GetDatum(temperature_c);
+		values[6] = Float4GetDatum(power_w);
+		values[7] = TimestampTzGetDatum(timestamp);
+
+		nulls[0] = false;
+		nulls[1] = false;
+		nulls[2] = false;
+		nulls[3] = false;
+		nulls[4] = false;
+		nulls[5] = false;
+		nulls[6] = false;
+		nulls[7] = false;
 
 		tuple = heap_form_tuple(tupdesc, values, nulls);
 		SRF_RETURN_NEXT(funcctx, HeapTupleGetDatum(tuple));

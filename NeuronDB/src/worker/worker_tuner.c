@@ -297,7 +297,7 @@ sample_and_tune(void)
 
 	/* Check if table exists (before CREATE EXTENSION, this is expected) */
 	ret = ndb_spi_execute(session, "SELECT 1 FROM pg_tables WHERE schemaname = "
-							   "'neurondb' AND tablename = 'neurondb_query_metrics'",
+							   "'neurondb' AND tablename = 'query_metrics'",
 							   true,
 							   0);
 	if (ret != SPI_OK_SELECT || SPI_processed == 0)
@@ -459,7 +459,7 @@ rotate_caches(void)
 		/* Check if table exists first */
 		ret = ndb_spi_execute(session,
 								   "SELECT 1 FROM pg_tables WHERE schemaname = 'neurondb' "
-								   "AND tablename = 'neurondb_embedding_cache'",
+								   "AND tablename = 'embedding_cache'",
 								   true,
 								   0);
 		if (ret != SPI_OK_SELECT || SPI_processed == 0)
@@ -524,7 +524,7 @@ record_metrics(void)
 		/* Check if tables exist first */
 		ret = ndb_spi_execute(session,
 								   "SELECT 1 FROM pg_tables WHERE schemaname = 'neurondb' "
-								   "AND tablename = 'neurondb_histograms'",
+								   "AND tablename = 'histograms'",
 								   true,
 								   0);
 		if (ret != SPI_OK_SELECT || SPI_processed == 0)
@@ -594,7 +594,7 @@ export_prometheus_metrics(void)
 		/* Check if table exists first */
 		ret = ndb_spi_execute(session,
 								   "SELECT 1 FROM pg_tables WHERE schemaname = 'neurondb' "
-								   "AND tablename = 'neurondb_prometheus_metrics'",
+								   "AND tablename = 'prometheus_metrics'",
 								   true,
 								   0);
 		NDB_CHECK_SPI_TUPTABLE();
