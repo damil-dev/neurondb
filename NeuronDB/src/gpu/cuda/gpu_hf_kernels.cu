@@ -3051,7 +3051,6 @@ ndb_cuda_hf_cross_encoder_rerank_inference(
 	size_t cls_bytes;
 	size_t score_bytes;
 	dim3 grid, block;
-	int i;
 
 	if (errstr)
 		*errstr = NULL;

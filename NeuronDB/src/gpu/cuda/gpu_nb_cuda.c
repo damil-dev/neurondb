@@ -31,6 +31,8 @@
 #include "neurondb_validation.h"
 #include "neurondb_safe_memory.h"
 #include "neurondb_macros.h"
+#include "neurondb_guc.h"
+#include "neurondb_constants.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -277,6 +279,14 @@ ndb_cuda_nb_train(const float *features,
 				  Jsonb * *metrics,
 				  char **errstr)
 {
+	/* CPU mode: never execute GPU code */
+	if (NDB_COMPUTE_MODE_IS_CPU())
+	{
+		if (errstr)
+			*errstr = pstrdup("CUDA nb_train: CPU mode - GPU code should not be called");
+		return -1;
+	}
+
 	int		   *class_counts = NULL;
 	double	   *class_priors = NULL;
 	double	   *means = NULL;

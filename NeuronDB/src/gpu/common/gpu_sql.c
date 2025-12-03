@@ -1166,11 +1166,11 @@ ivf_knn_search_gpu(PG_FUNCTION_ARGS)
 				for (j = 0; j < meta->nlists; j++)
 				{
 					bool		already_selected = false;
-					int			k;
+					int			k_local;
 
-					for (k = 0; k < i; k++)
+					for (k_local = 0; k_local < i; k_local++)
 					{
-						if (selected_clusters[k] == j)
+						if (selected_clusters[k_local] == j)
 						{
 							already_selected = true;
 							break;
@@ -1274,7 +1274,7 @@ ivf_knn_search_gpu(PG_FUNCTION_ARGS)
 			{
 				float4	   *candidate_distances = NULL;
 				int		   *indices = NULL;
-				int			j;
+				int			j_local;
 
 				candidate_distances = (float4 *) palloc(candidate_count * sizeof(float4));
 				indices = (int *) palloc(candidate_count * sizeof(int));
@@ -1326,12 +1326,12 @@ ivf_knn_search_gpu(PG_FUNCTION_ARGS)
 					int			best_idx = i;
 					float		best_dist = candidate_distances[indices[i]];
 
-					for (j = i + 1; j < candidate_count; j++)
+					for (j_local = i + 1; j_local < candidate_count; j_local++)
 					{
-						if (candidate_distances[indices[j]] < best_dist)
+						if (candidate_distances[indices[j_local]] < best_dist)
 						{
-							best_dist = candidate_distances[indices[j]];
-							best_idx = j;
+							best_dist = candidate_distances[indices[j_local]];
+							best_idx = j_local;
 						}
 					}
 

@@ -2680,11 +2680,26 @@ ndb_metal_linreg_pack(const struct LinRegModel *model,
 						 model->mse,
 						 model->mae);
 
-		/* Try to create metrics JSON, but skip if it causes issues */
-		/* Note: DirectFunctionCall1(jsonb_in, ...) is crashing, so we'll skip metrics for now */
-		/* TODO: Investigate why DirectFunctionCall1 crashes in this context */
-		ereport(DEBUG2, (errmsg("ndb_metal_linreg_pack: skipping metrics JSON creation to avoid crash")));
-		metrics_json = NULL;
+		/* Create metrics JSON using safe wrapper function */
+		/* Use ndb_jsonb_in_cstring which properly handles memory context and error handling */
+		PG_TRY();
+		{
+			metrics_json = ndb_jsonb_in_cstring(buf.data);
+			if (metrics_json == NULL)
+			{
+				ereport(WARNING,
+						(errmsg("ndb_metal_linreg_pack: failed to create metrics JSON, continuing without metrics")));
+			}
+		}
+		PG_CATCH();
+		{
+			/* If JSON creation fails, continue without metrics */
+			FlushErrorState();
+			ereport(DEBUG2,
+					(errmsg("ndb_metal_linreg_pack: exception during metrics JSON creation, continuing without metrics")));
+			metrics_json = NULL;
+		}
+		PG_END_TRY();
 		
 		pfree(buf.data);
 		*metrics = metrics_json;

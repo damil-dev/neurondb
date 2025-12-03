@@ -308,6 +308,19 @@ ndb_gpu_try_train_model(const char *algorithm,
 		}
 		else if (ops_trained || ops_serialized)
 		{
+			/* GPU mode: error if GPU training fails */
+			/* CPU mode: never error, just return false for fallback */
+			if (!NDB_COMPUTE_MODE_IS_CPU() && NDB_REQUIRE_GPU())
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_INTERNAL_ERROR),
+						 errmsg("%s: GPU training failed - GPU mode requires GPU to be available",
+								algorithm ? algorithm : "unknown"),
+						 errdetail("GPU stage elapsed %.3f ms before failure",
+								   elapsed_ms),
+						 errhint("Set compute_mode='auto' for automatic CPU fallback.")));
+			}
+			/* AUTO mode: fall back to CPU */
 			ndb_gpu_stats_record(false, 0.0, elapsed_ms, true);
 			ereport(DEBUG1,
 					(errmsg("%s: GPU training fell back to CPU",
@@ -360,6 +373,19 @@ ndb_gpu_try_train_model(const char *algorithm,
 		}
 		else
 		{
+			/* GPU mode: error if GPU training fails */
+			/* CPU mode: never error, just return false for fallback */
+			if (!NDB_COMPUTE_MODE_IS_CPU() && NDB_REQUIRE_GPU())
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_INTERNAL_ERROR),
+						 errmsg("random_forest: GPU training failed - GPU mode requires GPU to be available"),
+						 errdetail("GPU attempt elapsed %.3f ms (%s)",
+								   elapsed_ms,
+								   (errstr && *errstr) ? *errstr : "no error"),
+						 errhint("Set compute_mode='auto' for automatic CPU fallback.")));
+			}
+			/* AUTO mode: fall back to CPU */
 			ndb_gpu_stats_record(false, 0.0, elapsed_ms, true);
 			ereport(INFO,
 					(errmsg("random_forest: GPU training "
@@ -460,6 +486,22 @@ ndb_gpu_try_train_model(const char *algorithm,
 		PG_CATCH();
 		{
 			/* Catch any PostgreSQL-level errors from CUDA code */
+			/* GPU mode: re-raise error, no fallback */
+			if (NDB_REQUIRE_GPU())
+			{
+				if (payload != NULL)
+				{
+					NDB_FREE(payload);
+					payload = NULL;
+				}
+				if (metadata != NULL)
+				{
+					NDB_FREE(metadata);
+					metadata = NULL;
+				}
+				PG_RE_THROW();
+			}
+			/* AUTO mode: fall back to CPU */
 			elog(WARNING,
 				 "logistic_regression: exception caught during GPU training, falling back to CPU");
 			gpu_rc = -1;
@@ -475,7 +517,7 @@ ndb_gpu_try_train_model(const char *algorithm,
 				NDB_FREE(metadata);
 				metadata = NULL;
 			}
-			PG_RE_THROW();
+			FlushErrorState();
 		}
 		PG_END_TRY();
 		train_end = GetCurrentTimestamp();
@@ -517,6 +559,19 @@ ndb_gpu_try_train_model(const char *algorithm,
 		}
 		else
 		{
+			/* GPU mode: error if GPU training fails */
+			/* CPU mode: never error, just return false for fallback */
+			if (!NDB_COMPUTE_MODE_IS_CPU() && NDB_REQUIRE_GPU())
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_INTERNAL_ERROR),
+						 errmsg("logistic_regression: GPU training failed - GPU mode requires GPU to be available"),
+						 errdetail("GPU attempt elapsed %.3f ms (%s)",
+								   elapsed_ms,
+								   (errstr && *errstr) ? *errstr : "no error"),
+						 errhint("Set compute_mode='auto' for automatic CPU fallback.")));
+			}
+			/* AUTO mode: fall back to CPU */
 			ndb_gpu_stats_record(false, 0.0, elapsed_ms, true);
 			ereport(INFO,
 					(errmsg("logistic_regression: GPU training "
@@ -638,6 +693,42 @@ lr_fallback:;
 		PG_CATCH();
 		{
 			/* Catch any PostgreSQL-level errors from GPU code */
+			/* CPU mode: never error, just fall back to CPU */
+			if (NDB_COMPUTE_MODE_IS_CPU())
+			{
+				elog(WARNING,
+					 "linear_regression: exception caught during GPU training attempt in CPU mode, falling back to CPU");
+				FlushErrorState();
+				gpu_rc = -1;
+				if (errstr && *errstr == NULL)
+					*errstr = pstrdup("Exception during GPU training (CPU mode)");
+				if (payload != NULL)
+				{
+					NDB_FREE(payload);
+					payload = NULL;
+				}
+				if (metadata != NULL)
+				{
+					NDB_FREE(metadata);
+					metadata = NULL;
+				}
+			}
+			/* GPU mode: re-raise error, no fallback */
+			else if (!NDB_COMPUTE_MODE_IS_CPU() && NDB_REQUIRE_GPU())
+			{
+				if (payload != NULL)
+				{
+					NDB_FREE(payload);
+					payload = NULL;
+				}
+				if (metadata != NULL)
+				{
+					NDB_FREE(metadata);
+					metadata = NULL;
+				}
+				PG_RE_THROW();
+			}
+			/* AUTO mode: fall back to CPU */
 			elog(WARNING,
 				 "linear_regression: exception caught during GPU training, falling back to CPU");
 			gpu_rc = -1;
@@ -653,7 +744,7 @@ lr_fallback:;
 				NDB_FREE(metadata);
 				metadata = NULL;
 			}
-			PG_RE_THROW();
+			FlushErrorState();
 		}
 		PG_END_TRY();
 		train_end = GetCurrentTimestamp();
@@ -725,6 +816,19 @@ lr_fallback:;
 		}
 		else
 		{
+			/* GPU mode: error if GPU training fails */
+			/* CPU mode: never error, just return false for fallback */
+			if (!NDB_COMPUTE_MODE_IS_CPU() && NDB_REQUIRE_GPU())
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_INTERNAL_ERROR),
+						 errmsg("linear_regression: GPU training failed - GPU mode requires GPU to be available"),
+						 errdetail("GPU attempt elapsed %.3f ms (%s)",
+								   elapsed_ms,
+								   (errstr && *errstr) ? *errstr : "no error"),
+						 errhint("Set compute_mode='auto' for automatic CPU fallback.")));
+			}
+			/* AUTO mode: fall back to CPU */
 			ndb_gpu_stats_record(false, 0.0, elapsed_ms, true);
 			ereport(INFO,
 					(errmsg("linear_regression: GPU training "
@@ -780,6 +884,19 @@ linreg_fallback:;
 		}
 		else
 		{
+			/* GPU mode: error if GPU training fails */
+			/* CPU mode: never error, just return false for fallback */
+			if (!NDB_COMPUTE_MODE_IS_CPU() && NDB_REQUIRE_GPU())
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_INTERNAL_ERROR),
+						 errmsg("decision_tree: GPU training failed - GPU mode requires GPU to be available"),
+						 errdetail("GPU attempt elapsed %.3f ms (%s)",
+								   elapsed_ms,
+								   (errstr && *errstr) ? *errstr : "no error"),
+						 errhint("Set compute_mode='auto' for automatic CPU fallback.")));
+			}
+			/* AUTO mode: fall back to CPU */
 			ndb_gpu_stats_record(false, 0.0, elapsed_ms, true);
 			ereport(INFO,
 					(errmsg("decision_tree: GPU training "
@@ -833,6 +950,19 @@ linreg_fallback:;
 		}
 		else
 		{
+			/* GPU mode: error if GPU training fails */
+			/* CPU mode: never error, just return false for fallback */
+			if (!NDB_COMPUTE_MODE_IS_CPU() && NDB_REQUIRE_GPU())
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_INTERNAL_ERROR),
+						 errmsg("ridge: GPU training failed - GPU mode requires GPU to be available"),
+						 errdetail("GPU attempt elapsed %.3f ms (%s)",
+								   elapsed_ms,
+								   (errstr && *errstr) ? *errstr : "no error"),
+						 errhint("Set compute_mode='auto' for automatic CPU fallback.")));
+			}
+			/* AUTO mode: fall back to CPU */
 			ndb_gpu_stats_record(false, 0.0, elapsed_ms, true);
 			ereport(INFO,
 					(errmsg("ridge: GPU training unavailable, "
@@ -886,6 +1016,19 @@ linreg_fallback:;
 		}
 		else
 		{
+			/* GPU mode: error if GPU training fails */
+			/* CPU mode: never error, just return false for fallback */
+			if (!NDB_COMPUTE_MODE_IS_CPU() && NDB_REQUIRE_GPU())
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_INTERNAL_ERROR),
+						 errmsg("lasso: GPU training failed - GPU mode requires GPU to be available"),
+						 errdetail("GPU attempt elapsed %.3f ms (%s)",
+								   elapsed_ms,
+								   (errstr && *errstr) ? *errstr : "no error"),
+						 errhint("Set compute_mode='auto' for automatic CPU fallback.")));
+			}
+			/* AUTO mode: fall back to CPU */
 			ndb_gpu_stats_record(false, 0.0, elapsed_ms, true);
 			ereport(INFO,
 					(errmsg("lasso: GPU training unavailable, "

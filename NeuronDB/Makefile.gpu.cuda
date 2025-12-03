@@ -21,9 +21,13 @@ ifeq ($(CUDA_AVAILABLE),yes)
 	NVCC_AVAILABLE := $(shell test -x "$(NVCC)" 2>/dev/null && echo "yes" || echo "no")
 	
 	ifeq ($(NVCC_AVAILABLE),yes)
-		# CUDA source files
+		# CUDA source files (.cu files compiled with nvcc)
 		CUDA_SOURCES = $(wildcard src/gpu/cuda/*.cu)
 		CUDA_OBJS = $(CUDA_SOURCES:.cu=.o)
+		
+		# CUDA C source files (.c files compiled with gcc)
+		CUDA_C_SOURCES = $(wildcard src/gpu/cuda/*.c)
+		CUDA_C_OBJS = $(CUDA_C_SOURCES:.c=.o)
 		
 		# CUDA compilation flags
 		NVCC_FLAGS = -arch=sm_75 -O3 -Xcompiler -fPIC -Xcompiler -fvisibility=hidden
@@ -39,14 +43,10 @@ ifeq ($(CUDA_AVAILABLE),yes)
 		GPU_CPPFLAGS += -DNDB_GPU_CUDA -DHAVE_CUDA -I$(CUDA_PATH)/include
 		GPU_LDFLAGS += $(CUDA_LDFLAGS)
 		GPU_LIBS += $(CUDA_LIBS)
-		GPU_OBJS += $(CUDA_OBJS)
+		GPU_OBJS += $(CUDA_OBJS) $(CUDA_C_OBJS)
 		
 		# Add CUDA objects to main OBJS
-		OBJS += $(CUDA_OBJS)
-		
-		# CUDA compilation rule
-		%.o: %.cu
-		$(NVCC) $(NVCC_FLAGS) -c $< -o $@
+		OBJS += $(CUDA_OBJS) $(CUDA_C_OBJS)
 		
 		GPU_BACKENDS := $(if $(filter-out none,$(GPU_BACKENDS)),$(GPU_BACKENDS),cuda)
 		GPU_BACKENDS := $(if $(filter cuda,$(GPU_BACKENDS)),$(GPU_BACKENDS),$(GPU_BACKENDS) cuda)
@@ -56,6 +56,15 @@ ifeq ($(CUDA_AVAILABLE),yes)
 else
 	$(info CUDA not found at $(CUDA_PATH) - CUDA backend disabled)
 endif
+
+# CUDA compilation rule - MUST be at top level (pattern rules cannot be in conditionals)
+# This rule is safe to define unconditionally - it will only match if .cu files exist
+%.o: %.cu
+	@if [ -z "$(NVCC)" ] || [ ! -x "$(NVCC)" ]; then \
+		echo "Error: NVCC not available for compiling $<"; \
+		exit 1; \
+	fi
+	$(NVCC) $(NVCC_FLAGS) -c $< -o $@
 
 .PHONY: cuda-check cuda-info
 

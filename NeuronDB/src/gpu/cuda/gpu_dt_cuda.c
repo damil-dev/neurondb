@@ -29,6 +29,8 @@
 #include "neurondb_validation.h"
 #include "neurondb_safe_memory.h"
 #include "neurondb_macros.h"
+#include "neurondb_guc.h"
+#include "neurondb_constants.h"
 
 /*
  * Helper: Free tree recursively
@@ -693,6 +695,14 @@ ndb_cuda_dt_train(const float *features,
 				  Jsonb * *metrics,
 				  char **errstr)
 {
+	/* CPU mode: never execute GPU code */
+	if (NDB_COMPUTE_MODE_IS_CPU())
+	{
+		if (errstr)
+			*errstr = pstrdup("CUDA dt_train: CPU mode - GPU code should not be called");
+		return -1;
+	}
+
 	int			max_depth = 10;
 	int			min_samples_split = 2;
 	bool		is_classification = true;

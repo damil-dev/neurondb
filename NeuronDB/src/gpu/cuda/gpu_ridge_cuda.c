@@ -36,6 +36,8 @@
 #include "neurondb_validation.h"
 #include "neurondb_safe_memory.h"
 #include "neurondb_macros.h"
+#include "neurondb_guc.h"
+#include "neurondb_constants.h"
 #endif
 
 /* Reuse linear regression kernels */
@@ -148,20 +150,20 @@ ndb_cuda_ridge_train(const float *features,
 					 char **errstr)
 {
 	const double default_lambda = 0.01;
-	double		lambda = default_lambda;
-	float	   *d_features = NULL;
-	double	   *d_targets = NULL;
-	double	   *d_XtX = NULL;
-	double	   *d_Xty = NULL;
-	double	   *d_XtX_inv = NULL;
-	double	   *d_beta = NULL;
-	double	   *h_XtX = NULL;
-	double	   *h_Xty = NULL;
-	double	   *h_XtX_inv = NULL;
-	double	   *h_beta = NULL;
-	bytea	   *payload = NULL;
-	Jsonb	   *metrics_json = NULL;
-	cudaError_t status = cudaSuccess;
+	double		lambda;
+	float	   *d_features;
+	double	   *d_targets;
+	double	   *d_XtX;
+	double	   *d_Xty;
+	double	   *d_XtX_inv;
+	double	   *d_beta;
+	double	   *h_XtX;
+	double	   *h_Xty;
+	double	   *h_XtX_inv;
+	double	   *h_beta;
+	bytea	   *payload;
+	Jsonb	   *metrics_json;
+	cudaError_t status;
 	size_t		feature_bytes;
 	size_t		target_bytes;
 	size_t		XtX_bytes;
@@ -170,7 +172,31 @@ ndb_cuda_ridge_train(const float *features,
 	int			dim_with_intercept;
 	int			i;
 	int			j;
-	int			rc = -1;
+	int			rc;
+
+	/* CPU mode: never execute GPU code */
+	if (NDB_COMPUTE_MODE_IS_CPU())
+	{
+		if (errstr)
+			*errstr = pstrdup("CUDA ridge_train: CPU mode - GPU code should not be called");
+		return -1;
+	}
+
+	lambda = default_lambda;
+	d_features = NULL;
+	d_targets = NULL;
+	d_XtX = NULL;
+	d_Xty = NULL;
+	d_XtX_inv = NULL;
+	d_beta = NULL;
+	h_XtX = NULL;
+	h_Xty = NULL;
+	h_XtX_inv = NULL;
+	h_beta = NULL;
+	payload = NULL;
+	metrics_json = NULL;
+	status = cudaSuccess;
+	rc = -1;
 
 	if (errstr)
 		*errstr = NULL;
