@@ -57,7 +57,7 @@
 static float **
 als_alloc_matrix(int nrow, int ncol)
 {
-	float	  **mat;
+	NDB_DECLARE(float **, mat);
 	int			i;
 
 	NDB_ALLOC(mat, float *, nrow);
@@ -130,12 +130,12 @@ train_collaborative_filter(PG_FUNCTION_ARGS)
 				i,
 				max_user_id = 0,
 				max_item_id = 0;
-	int		   *user_ids = NULL,
-			   *item_ids = NULL,
-				n_ratings = 0;
-	float	   *ratings = NULL;
-	float	  **P = NULL,
-			  **Q = NULL;
+	NDB_DECLARE(int *, user_ids);
+	NDB_DECLARE(int *, item_ids);
+	int			n_ratings = 0;
+	NDB_DECLARE(float *, ratings);
+	NDB_DECLARE(float **, P);
+	NDB_DECLARE(float **, Q);
 	StringInfoData sql = {0};
 	SPIPlanPtr	plan = NULL;
 
@@ -408,7 +408,7 @@ train_collaborative_filter(PG_FUNCTION_ARGS)
 			Oid			arg_types[3] = {INT4OID, INT4OID, 1021};
 			Datum		values[3];
 			char		nulls[3] = {false, false, false};
-			ArrayType  *array = NULL;
+			NDB_DECLARE(ArrayType *, array);
 			int			j;
 
 			plan = SPI_prepare(
@@ -457,7 +457,7 @@ train_collaborative_filter(PG_FUNCTION_ARGS)
 			Oid			arg_types[3] = {INT4OID, INT4OID, 1021};
 			Datum		values[3];
 			char		nulls[3] = {false, false, false};
-			ArrayType  *array = NULL;
+			NDB_DECLARE(ArrayType *, array);
 			int			j;
 
 			plan = SPI_prepare(
@@ -729,8 +729,8 @@ predict_collaborative_filter(PG_FUNCTION_ARGS)
 	int32		user_id = PG_GETARG_INT32(1);
 	int32		item_id = PG_GETARG_INT32(2);
 
-	float	   *user_factors = NULL;
-	float	  **item_factors = NULL;
+	NDB_DECLARE(float *, user_factors);
+	NDB_DECLARE(float **, item_factors);
 	int			n_factors = 0;
 	int			n_items_total = 0;
 	float		prediction = 0.0;
@@ -835,11 +835,11 @@ evaluate_collaborative_filter_by_model_id(PG_FUNCTION_ARGS)
 	rating_str = text_to_cstring(rating_col);
 
 	{
-		MemoryContext oldcontext = CurrentMemoryContext;
+		MemoryContext oldcontext_local = CurrentMemoryContext;
 		NDB_DECLARE (NdbSpiSession *, eval_cf_spi_session);
 
-		Assert(oldcontext != NULL);
-		NDB_SPI_SESSION_BEGIN(eval_cf_spi_session, oldcontext);
+		Assert(oldcontext_local != NULL);
+		NDB_SPI_SESSION_BEGIN(eval_cf_spi_session, oldcontext_local);
 
 		/* Build query */
 		initStringInfo(&query);
@@ -1018,22 +1018,22 @@ recommend_items(PG_FUNCTION_ARGS)
 	int32		user_id = PG_GETARG_INT32(1);
 	int32		n_items = PG_ARGISNULL(2) ? 10 : PG_GETARG_INT32(2);
 
-	float	   *user_factors = NULL;
+	NDB_DECLARE(float *, user_factors);
 	int			n_factors = 0;
-	int		   *item_ids = NULL;
-	float	  **item_factors = NULL;
+	NDB_DECLARE(int *, item_ids);
+	NDB_DECLARE(float **, item_factors);
 	int			n_items_total = 0;
 	int			i,
 				j;
-	int32	   *top_items = NULL;
-	float	   *top_scores = NULL;
+	NDB_DECLARE(int32 *, top_items);
+	NDB_DECLARE(float *, top_scores);
 	StringInfoData sql = {0};
 	NDB_DECLARE (NdbSpiSession *, predict_cf_spi_session);
 	MemoryContext oldcontext = CurrentMemoryContext;
 	int			ret = 0;
 
-	ArrayType  *result_array = NULL;
-	Datum	   *elems = NULL;
+	NDB_DECLARE(ArrayType *, result_array);
+	NDB_DECLARE(Datum *, elems);
 
 	NDB_SPI_SESSION_BEGIN(predict_cf_spi_session, oldcontext);
 
@@ -1157,9 +1157,9 @@ recommend_items(PG_FUNCTION_ARGS)
 	{
 		HeapTuple	itup = SPI_tuptable->vals[i];
 		int			item_id = 0;
-		float	   *fac = NULL;
+		NDB_DECLARE(float *, fac);
 		int			item_n_factors = 0;
-		ArrayType  *arr_f = NULL;
+		NDB_DECLARE(ArrayType *, arr_f);
 		bool		isnull_fac = false;
 		Datum		facdatum;
 
@@ -1291,15 +1291,15 @@ recommend_content_based(PG_FUNCTION_ARGS)
 				j,
 				item_count,
 				n_factors;
-	int32	   *other_ids = NULL;
-	float	  **other_factors = NULL;
+	NDB_DECLARE(int32 *, other_ids);
+	NDB_DECLARE(float **, other_factors);
 	int			target_idx = -1;
-	float	   *target_vec = NULL;
+	NDB_DECLARE(float *, target_vec);
 
-	ArrayType  *result_array = NULL;
-	Datum	   *elems = NULL;
-	int32	   *top_items = NULL;
-	float	   *top_sims = NULL;
+	NDB_DECLARE(ArrayType *, result_array);
+	NDB_DECLARE(Datum *, elems);
+	NDB_DECLARE(int32 *, top_items);
+	NDB_DECLARE(float *, top_sims);
 
 	if (n_recommendations < RECO_MIN_RESULT
 		|| n_recommendations > RECO_MAX_RESULT)
@@ -2175,8 +2175,8 @@ static bool
 recommender_gpu_train(MLGpuModel * model, const MLGpuTrainSpec * spec, char **errstr)
 {
 	RecommenderGpuModelState *state;
-	float	  **user_factors = NULL;
-	float	  **item_factors = NULL;
+	NDB_DECLARE(float **, user_factors);
+	NDB_DECLARE(float **, item_factors);
 	int			n_users = 100;
 	int			n_items = 1000;
 	int			n_factors = 20;
@@ -2186,8 +2186,8 @@ recommender_gpu_train(MLGpuModel * model, const MLGpuTrainSpec * spec, char **er
 	int			u,
 				i,
 				f;
-	bytea	   *model_data = NULL;
-	Jsonb	   *metrics = NULL;
+	NDB_DECLARE(bytea *, model_data);
+	NDB_DECLARE(Jsonb *, metrics);
 	StringInfoData metrics_json;
 	JsonbIterator *it;
 	JsonbValue	v;
@@ -2307,8 +2307,8 @@ recommender_gpu_predict(const MLGpuModel * model, const float *input, int input_
 						float *output, int output_dim, char **errstr)
 {
 	const		RecommenderGpuModelState *state;
-	float	  **user_factors = NULL;
-	float	  **item_factors = NULL;
+	NDB_DECLARE(float **, user_factors);
+	NDB_DECLARE(float **, item_factors);
 	int			n_users = 0,
 				n_items = 0,
 				n_factors = 0;
@@ -2476,8 +2476,8 @@ recommender_gpu_deserialize(MLGpuModel * model, const bytea * payload,
 	RecommenderGpuModelState *state;
 	bytea	   *payload_copy;
 	int			payload_size;
-	float	  **user_factors = NULL;
-	float	  **item_factors = NULL;
+	NDB_DECLARE(float **, user_factors);
+	NDB_DECLARE(float **, item_factors);
 	int			n_users = 0,
 				n_items = 0,
 				n_factors = 0;
