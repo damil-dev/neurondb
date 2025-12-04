@@ -191,7 +191,6 @@ gpu_kmeans_assign_hip(const float *h_vectors,
 		nvec * sizeof(int32_t),
 		hipMemcpyDeviceToHost);
 
-	/* Cleanup */
 	hipFree(d_vectors);
 	hipFree(d_centroids);
 	hipFree(d_assignments);
@@ -256,7 +255,6 @@ gpu_kmeans_update_hip(const float *h_vectors,
 		k * sizeof(int32_t),
 		hipMemcpyDeviceToHost);
 
-	/* Cleanup */
 	hipFree(d_vectors);
 	hipFree(d_assignments);
 	hipFree(d_centroids);

@@ -1590,7 +1590,6 @@ halfvec_in(PG_FUNCTION_ARGS)
 	capacity = 16;
 	ptr = str;
 
-	/* Skip whitespace */
 	while (isspace((unsigned char) *ptr))
 		ptr++;
 

@@ -70,7 +70,20 @@ vecmap_l2_distance(PG_FUNCTION_ARGS)
 	b_indices = VECMAP_INDICES(b);
 	b_values = VECMAP_VALUES(b);
 
-	/* Merge-like algorithm: process both sparse vectors simultaneously */
+	/*
+	 * Compute L2 distance using a merge algorithm that processes both sparse
+	 * vectors simultaneously. Since sparse vectors store only non-zero
+	 * elements with their indices, we cannot simply iterate through all
+	 * dimensions. Instead, we maintain pointers into both index arrays and
+	 * process elements in sorted index order. When indices match, we compute
+	 * the difference between both values. When indices differ, we treat the
+	 * missing value as zero and compute the difference accordingly. The
+	 * algorithm uses Kahan summation to maintain numerical precision when
+	 * accumulating squared differences, which is critical for high-dimensional
+	 * sparse vectors where cancellation errors can accumulate. This approach
+	 * achieves O(nnz) time complexity where nnz is the number of non-zero
+	 * elements, compared to O(dim) for dense vectors.
+	 */
 	i = 0;
 	j = 0;
 

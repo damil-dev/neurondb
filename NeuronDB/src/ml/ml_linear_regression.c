@@ -194,7 +194,6 @@ matrix_invert(double **matrix, int n, double **result)
 		for (j = 0; j < n; j++)
 			result[i][j] = augmented[i][j + n];
 
-	/* Cleanup */
 	for (i = 0; i < n; i++)
 		NDB_FREE(augmented[i]);
 	NDB_FREE(augmented);
@@ -359,8 +358,7 @@ linreg_dataset_load_limited(const char *quoted_tbl,
 		bool		targ_null;
 		Vector	   *vec;
 		float	   *row;
-		
-		/* Safe access to SPI_tuptable - validate before access */
+
 		if (SPI_tuptable == NULL || SPI_tuptable->vals == NULL || 
 			i >= SPI_processed || SPI_tuptable->vals[i] == NULL)
 		{
@@ -555,22 +553,18 @@ linreg_stream_accum_add_row(LinRegStreamAccum * accum,
 
 	NDB_ALLOC(xi, double, dim_with_intercept);
 
-	/* Build row vector: [1, x1, x2, ..., xd] */
-	xi[0] = 1.0;				/* intercept term */
+	xi[0] = 1.0;
 	for (i = 0; i < accum->feature_dim; i++)
 		xi[i + 1] = (double) features[i];
 
-	/* Update X'X: XtX[j][k] += xi[j] * xi[k] */
 	for (j = 0; j < dim_with_intercept; j++)
 	{
 		for (i = 0; i < dim_with_intercept; i++)
 			accum->XtX[j][i] += xi[j] * xi[i];
 
-		/* Update X'y: Xty[j] += xi[j] * y */
 		accum->Xty[j] += xi[j] * target;
 	}
 
-	/* Update statistics for metrics computation */
 	accum->n_samples++;
 	accum->y_sum += target;
 	accum->y_sq_sum += target * target;
@@ -662,10 +656,8 @@ linreg_stream_process_chunk(const char *quoted_tbl,
 			feat_is_array = true;
 	}
 
-	/* Allocate temporary buffer for one row */
 	NDB_ALLOC(row_buffer, float, accum->feature_dim);
 
-	/* Process each row in the chunk */
 		for (i = 0; i < n_rows; i++)
 		{
 			HeapTuple	tuple;
@@ -677,8 +669,7 @@ linreg_stream_process_chunk(const char *quoted_tbl,
 			Vector	   *vec;
 			ArrayType  *arr;
 			int			j;
-			
-			/* Safe access to SPI_tuptable - validate before access */
+
 			if (SPI_tuptable == NULL || SPI_tuptable->vals == NULL || 
 				i >= SPI_processed || SPI_tuptable->vals[i] == NULL || tupdesc == NULL)
 			{
@@ -687,7 +678,6 @@ linreg_stream_process_chunk(const char *quoted_tbl,
 			tuple = SPI_tuptable->vals[i];
 
 			feat_datum = SPI_getbinval(tuple, tupdesc, 1, &feat_null);
-			/* Safe access for target - validate tupdesc has at least 2 columns */
 			if (tupdesc->natts < 2)
 			{
 				continue;
@@ -1443,7 +1433,6 @@ train_linear_regression(PG_FUNCTION_ARGS)
 				/* Serialize using unified format with training_backend=1 (GPU) */
 				unified_model_data = linreg_model_serialize(&linreg_model, 1);
 
-				/* Cleanup */
 				if (linreg_model.coefficients != NULL)
 				{
 					NDB_FREE(linreg_model.coefficients);
@@ -2062,7 +2051,6 @@ train_linear_regression(PG_FUNCTION_ARGS)
 				model_id = ml_catalog_register_model(&spec);
 			}
 
-			/* Cleanup */
 			for (i = 0; i < dim_with_intercept; i++)
 				NDB_FREE(XtX_inv[i]);
 			NDB_FREE(XtX_inv);
@@ -2198,7 +2186,6 @@ predict_linear_regression_model_id(PG_FUNCTION_ARGS)
 	for (i = 0; i < model->n_features && i < features->dim; i++)
 		prediction += model->coefficients[i] * features->data[i];
 
-	/* Cleanup */
 	if (model != NULL)
 	{
 		NDB_FREE(model->coefficients);
@@ -2710,7 +2697,6 @@ evaluate_linear_regression_by_model_id_jsonb(int32 model_id, text * table_name, 
 				r_squared = gpu_r_squared;
 				nvec = valid_rows;
 
-				/* Cleanup */
 				NDB_FREE(h_features);
 				NDB_FREE(h_targets);
 				NDB_FREE(gpu_payload);
@@ -3257,6 +3243,14 @@ linreg_gpu_serialize(const MLGpuModel * model,
 					 char **errstr)
 {
 	const		LinRegGpuModelState *state;
+#ifdef NDB_GPU_CUDA
+	LinRegModel	linreg_model;
+	bytea	   *unified_payload;
+	char	   *base;
+	NdbCudaLinRegModelHeader *hdr;
+	float	   *coef_src_float;
+	int			i;
+#endif
 
 	if (errstr != NULL)
 		*errstr = NULL;
@@ -3273,13 +3267,6 @@ linreg_gpu_serialize(const MLGpuModel * model,
 
 #ifdef NDB_GPU_CUDA
 	/* Convert GPU format to unified format */
-	LinRegModel	linreg_model;
-	bytea	   *unified_payload;
-	char	   *base;
-	NdbCudaLinRegModelHeader *hdr;
-	float	   *coef_src_float;
-	int			i;
-
 	unified_payload = NULL;
 
 	base = VARDATA(state->model_blob);
@@ -3306,7 +3293,6 @@ linreg_gpu_serialize(const MLGpuModel * model,
 	/* Serialize using unified format with training_backend=1 (GPU) */
 	unified_payload = linreg_model_serialize(&linreg_model, 1);
 
-	/* Cleanup */
 	if (linreg_model.coefficients != NULL)
 	{
 		NDB_FREE(linreg_model.coefficients);

@@ -95,7 +95,7 @@ Datum
 hybrid_search(PG_FUNCTION_ARGS)
 {
 	FuncCallContext *funcctx;
-	HybridSearchState *state;
+	HybridSearchState *state = NULL;
 	
 	if (SRF_IS_FIRSTCALL())
 	{
@@ -1128,8 +1128,8 @@ diverse_vector_search(PG_FUNCTION_ARGS)
 	int proc;
 	int i, j;
 	ArrayType *ret_array;
-	Datum *datums;
-	bool *nulls;
+	Datum *datums = NULL;
+	bool *nulls = NULL;
 	int n_candidates;
 	int select_count = 0;
 	mmr_cand_t *cands;

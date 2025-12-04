@@ -323,7 +323,6 @@ detect_anomalies_isolation_forest(PG_FUNCTION_ARGS)
 	result = construct_array(
 							 result_datums, nvec, BOOLOID, typlen, typbyval, typalign);
 
-	/* Cleanup */
 	for (t = 0; t < n_trees; t++)
 		free_isolation_tree(forest->trees[t]);
 	NDB_FREE(forest->trees);
@@ -650,7 +649,6 @@ detect_anomalies_lof(PG_FUNCTION_ARGS)
 	result = construct_array(
 							 result_datums, nvec, BOOLOID, typlen, typbyval, typalign);
 
-	/* Cleanup */
 	for (i = 0; i < nvec; i++)
 		NDB_FREE(vectors[i]);
 	NDB_FREE(vectors);
@@ -785,7 +783,6 @@ detect_anomalies_ocsvm(PG_FUNCTION_ARGS)
 	result = construct_array(
 							 result_datums, nvec, BOOLOID, typlen, typbyval, typalign);
 
-	/* Cleanup */
 	for (i = 0; i < nvec; i++)
 		NDB_FREE(vectors[i]);
 	NDB_FREE(vectors);

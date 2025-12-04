@@ -74,7 +74,23 @@ check_dimensions(const Vector *a, const Vector *b)
 	}
 }
 
-/* L2 (Euclidean) distance, uses Kahan summation for numerical stability */
+/*
+ * l2_distance
+ *    Compute Euclidean distance between two vectors using Kahan summation.
+ *
+ * This function calculates the L2 norm distance between two vectors by
+ * summing the squared differences of corresponding elements and taking the
+ * square root. The implementation uses Kahan summation algorithm to maintain
+ * numerical precision when accumulating squared differences across many
+ * dimensions. Standard floating-point addition can lose precision when adding
+ * numbers of vastly different magnitudes, which is common in high-dimensional
+ * vector spaces. The Kahan algorithm compensates for rounding errors by
+ * tracking the accumulated error in a correction term and incorporating it
+ * into subsequent additions. This ensures that the final result maintains
+ * accuracy even when summing thousands of small squared differences, which
+ * is critical for reliable distance calculations in vector similarity search
+ * and machine learning applications where small errors can compound.
+ */
 float4
 l2_distance(Vector *a, Vector *b)
 {
@@ -151,7 +167,24 @@ vector_inner_product(PG_FUNCTION_ARGS)
 	PG_RETURN_FLOAT4(inner_product_simd(a, b));
 }
 
-/* Cosine distance: 1.0 - (dot(a,b) / (||a||*||b||)), returns 1.0 if norm is zero */
+/*
+ * cosine_distance
+ *    Compute cosine distance between two vectors using dot product and norms.
+ *
+ * Cosine distance measures the angular difference between two vectors,
+ * independent of their magnitudes. The cosine similarity is the dot product
+ * of normalized vectors, and cosine distance is one minus this similarity.
+ * The function computes the dot product and squared norms of both vectors
+ * in a single pass through the data for efficiency. When a vector has zero
+ * norm, it represents the zero vector which has no direction, so the cosine
+ * distance is defined as 1.0 to indicate maximum dissimilarity. The
+ * computation normalizes vectors by their L2 norms, making the metric
+ * invariant to scaling. This property is valuable for comparing documents
+ * or embeddings where the magnitude may vary but the relative proportions
+ * of features are meaningful. The result ranges from 0.0 for identical
+ * direction to 2.0 for opposite directions, with 1.0 indicating
+ * orthogonality.
+ */
 float4
 cosine_distance(Vector *a, Vector *b)
 {
@@ -163,7 +196,6 @@ cosine_distance(Vector *a, Vector *b)
 
 	check_dimensions(a, b);
 
-	/* Compute dot(a, b), ||a||^2, ||b||^2 */
 	for (i = 0; i < a->dim; i++)
 	{
 		double		va = (double) a->data[i];
@@ -174,7 +206,6 @@ cosine_distance(Vector *a, Vector *b)
 		norm_b += vb * vb;
 	}
 
-	/* Handle zero norms to prevent divide by zero */
 	if (norm_a == 0.0 || norm_b == 0.0)
 		return 1.0;
 

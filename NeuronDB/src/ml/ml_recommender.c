@@ -53,7 +53,6 @@
 #define RECO_MIN_RESULT 1
 #define RECO_MAX_RESULT 1000
 
-/* Allocate and zero new matrix (float4 **), nrow x ncol */
 static float **
 als_alloc_matrix(int nrow, int ncol)
 {
@@ -84,7 +83,6 @@ als_free_matrix(float **mat, int nrow)
 	NDB_FREE(mat);
 }
 
-/* Dot product of two float arrays */
 static float
 dot_product(const float *v1, const float *v2, int n)
 {
@@ -997,7 +995,6 @@ evaluate_collaborative_filter_by_model_id(PG_FUNCTION_ARGS)
 	result = ndb_jsonb_in_cstring(jsonbuf.data);
 	NDB_FREE(jsonbuf.data);
 
-	/* Cleanup */
 	NDB_FREE(tbl_str);
 	NDB_FREE(user_str);
 	NDB_FREE(item_str);
@@ -1679,18 +1676,18 @@ recommend_hybrid(PG_FUNCTION_ARGS)
 		Datum		arr;
 		ArrayType  *user_vec;
 		int			n_factors;
-		float	   *user_factors;
+		float	   *user_factors = NULL;
 		int			n_items_total;
-		int32	   *item_ids;
-		float	  **item_factors;
+		int32	   *item_ids = NULL;
+		float	  **item_factors = NULL;
 		int			n_feat_items;
-		int32	   *feat_item_ids;
-		float	  **content_factors;
+		int32	   *feat_item_ids = NULL;
+		float	  **content_factors = NULL;
 		int			nf_content;
 		int			ntop;
-		int32	   *top_items;
-		float	   *top_scores;
-		Datum	   *elems;
+		int32	   *top_items = NULL;
+		float	   *top_scores = NULL;
+		Datum	   *elems = NULL;
 		ArrayType  *result_array;
 
 		NDB_DECLARE(NdbSpiSession *, hybrid_spi_session);
@@ -2066,7 +2063,7 @@ recommender_model_serialize_to_bytea(float **user_factors, int n_users, float **
 {
 	StringInfoData buf;
 	int			total_size;
-	bytea	   *result;
+	bytea	   *result = NULL;
 	int			u,
 				i,
 				f;
@@ -2102,8 +2099,8 @@ recommender_model_deserialize_from_bytea(const bytea * data, float ***user_facto
 	int			u,
 				i,
 				f;
-	float	  **user_factors;
-	float	  **item_factors;
+	float	  **user_factors = NULL;
+	float	  **item_factors = NULL;
 
 	if (data == NULL || VARSIZE(data) < VARHDRSZ + sizeof(int) * 3 + sizeof(float))
 		return -1;
@@ -2429,7 +2426,7 @@ recommender_gpu_serialize(const MLGpuModel * model, bytea * *payload_out,
 						  Jsonb * *metadata_out, char **errstr)
 {
 	const		RecommenderGpuModelState *state;
-	bytea	   *payload_copy;
+	bytea	   *payload_copy = NULL;
 	int			payload_size;
 
 	if (errstr != NULL)
@@ -2474,7 +2471,7 @@ recommender_gpu_deserialize(MLGpuModel * model, const bytea * payload,
 							const Jsonb * metadata, char **errstr)
 {
 	RecommenderGpuModelState *state;
-	bytea	   *payload_copy;
+	bytea	   *payload_copy = NULL;
 	int			payload_size;
 	NDB_DECLARE(float **, user_factors);
 	NDB_DECLARE(float **, item_factors);
@@ -2522,7 +2519,7 @@ recommender_gpu_deserialize(MLGpuModel * model, const bytea * payload,
 	if (metadata != NULL)
 	{
 		int			metadata_size = VARSIZE(metadata);
-		Jsonb	   *metadata_copy;
+		Jsonb	   *metadata_copy = NULL;
 
 		NDB_ALLOC(metadata_copy, Jsonb, metadata_size);
 		memcpy(metadata_copy, metadata, metadata_size);

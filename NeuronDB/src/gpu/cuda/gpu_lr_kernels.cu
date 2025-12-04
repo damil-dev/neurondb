@@ -48,7 +48,24 @@ ndb_cuda_lr_sigmoid_kernel(const double *inputs, int n, double *outputs)
 		outputs[idx] = 1.0 / (1.0 + exp(-z));
 }
 
-/* Portable atomic add for double (works on pre-Pascal GPUs) */
+/*
+ * ndb_atomicAdd_double
+ *    Thread-safe atomic addition for double-precision floating point values.
+ *
+ * This function provides portable atomic addition for double values on GPU
+ * architectures that do not natively support atomic operations on doubles.
+ * CUDA introduced native atomicAdd for doubles in the Pascal architecture,
+ * but older GPUs require this emulation using compare-and-swap loops. The
+ * function uses the atomicCAS primitive on unsigned long long integers to
+ * implement atomic double addition. It converts the double value to its
+ * integer representation, performs an atomic compare-and-swap operation
+ * in a loop until successful, and converts back to double. This pattern
+ * ensures thread safety when multiple GPU threads simultaneously update
+ * the same memory location during gradient accumulation in parallel
+ * machine learning operations. The loop continues until the compare-and-swap
+ * succeeds, guaranteeing that all updates are correctly applied without
+ * race conditions.
+ */
 __device__ static double
 ndb_atomicAdd_double(double *addr, double val)
 {
@@ -67,6 +84,24 @@ ndb_atomicAdd_double(double *addr, double val)
 	return __longlong_as_double(old);
 }
 
+/*
+ * ndb_cuda_lr_compute_gradients_kernel
+ *    GPU kernel to compute gradients for logistic regression training.
+ *
+ * This kernel computes gradients for logistic regression weight updates
+ * by processing multiple training samples in parallel across GPU threads.
+ * Each thread handles one training sample, computing the prediction error
+ * as the difference between predicted and actual labels, then accumulating
+ * this error into global gradient arrays using atomic operations. The
+ * gradient for the bias term is simply the sum of errors across all samples,
+ * while the gradient for each weight is the sum of errors multiplied by the
+ * corresponding feature value. Atomic operations are necessary because
+ * multiple threads may update the same gradient element simultaneously when
+ * processing different samples. The function uses portable atomic double
+ * addition to ensure correctness on all GPU architectures, enabling
+ * efficient parallel gradient computation that scales with the number of
+ * available GPU cores.
+ */
 __global__ static void
 ndb_cuda_lr_compute_gradients_kernel(const float *features,
 	const double *labels,

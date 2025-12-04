@@ -87,9 +87,10 @@ _PG_init(void)
 
 	if (!process_shared_preload_libraries_in_progress)
 	{
-		elog(ERROR,
-			 "neurondb: background workers require "
-			 "shared_preload_libraries");
+		ereport(ERROR,
+				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
+				 errmsg("neurondb must be loaded via shared_preload_libraries"),
+				 errhint("Add \"neurondb\" to shared_preload_libraries in postgresql.conf, then restart the server.")));
 		return;
 	}
 

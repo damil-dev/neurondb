@@ -145,7 +145,6 @@ neurondb_hf_embedding(PG_FUNCTION_ARGS)
 		result->data[i] = sum / token_length;
 	}
 
-	/* Cleanup */
 	neurondb_onnx_free_tensor(input_tensor);
 	neurondb_onnx_free_tensor(output_tensor);
 	NDB_FREE(input_data);
@@ -260,7 +259,6 @@ neurondb_hf_classify(PG_FUNCTION_ARGS)
 						 &buf, "{\"label\": \"UNKNOWN\", \"score\": 0.0}");
 	}
 
-	/* Cleanup */
 	neurondb_onnx_free_tensor(input_tensor);
 	neurondb_onnx_free_tensor(output_tensor);
 	NDB_FREE(input_data);
@@ -371,7 +369,6 @@ neurondb_hf_ner(PG_FUNCTION_ARGS)
 
 	appendStringInfo(&buf, "]}");
 
-	/* Cleanup */
 	neurondb_onnx_free_tensor(input_tensor);
 	neurondb_onnx_free_tensor(output_tensor);
 	NDB_FREE(input_data);
@@ -495,7 +492,6 @@ neurondb_hf_qa(PG_FUNCTION_ARGS)
 					 start_idx,
 					 end_idx);
 
-	/* Cleanup */
 	neurondb_onnx_free_tensor(input_tensor);
 	neurondb_onnx_free_tensor(output_tensor);
 	NDB_FREE(input_data);
@@ -924,7 +920,6 @@ ndb_onnx_hf_complete(const char *model_name,
 	/* Copy to parent memory context */
 	*text_out = MemoryContextStrdup(oldcontext, generated_text);
 
-	/* Cleanup */
 	if (input_tensor)
 		neurondb_onnx_free_tensor(input_tensor);
 	if (output_tensor)
@@ -1387,7 +1382,6 @@ ndb_onnx_hf_image_embed(const char *model_name,
 									(*vec_out)[i] /= sum;
 							}
 
-							/* Cleanup */
 							neurondb_onnx_free_tensor(input_tensor);
 							neurondb_onnx_free_tensor(output_tensor);
 							if (input_data)
@@ -1532,7 +1526,6 @@ ndb_onnx_hf_multimodal_embed(const char *model_name,
 				(*vec_out)[i] /= sum;
 		}
 
-		/* Cleanup */
 		if (text_vec)
 			NDB_FREE(text_vec);
 		if (image_vec)

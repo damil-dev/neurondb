@@ -76,7 +76,6 @@ sparse_vector_in(PG_FUNCTION_ARGS)
 		PG_RETURN_NULL();
 	}
 
-	/* Build result */
 	result = (SparseVector *) palloc0(SPARSE_VEC_SIZE(parsed.nnz));
 	SET_VARSIZE(result, SPARSE_VEC_SIZE(parsed.nnz));
 	result->vocab_size = parsed.vocab_size;

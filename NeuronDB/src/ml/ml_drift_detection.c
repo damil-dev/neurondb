@@ -102,7 +102,6 @@ detect_centroid_drift(PG_FUNCTION_ARGS)
 	bool		nulls[3];
 	HeapTuple	tuple;
 
-	/* Parse arguments */
 	baseline_table = PG_GETARG_TEXT_PP(0);
 	baseline_column = PG_GETARG_TEXT_PP(1);
 	current_table = PG_GETARG_TEXT_PP(2);
@@ -212,7 +211,6 @@ detect_centroid_drift(PG_FUNCTION_ARGS)
 
 	tuple = heap_form_tuple(tupdesc, values, nulls);
 
-	/* Cleanup */
 	for (i = 0; i < n_baseline; i++)
 		NDB_FREE(baseline_vecs[i]);
 	for (i = 0; i < n_current; i++)
@@ -264,7 +262,6 @@ compute_distribution_divergence(PG_FUNCTION_ARGS)
 	int			i,
 				d;
 
-	/* Parse arguments */
 	baseline_table = PG_GETARG_TEXT_PP(0);
 	baseline_column = PG_GETARG_TEXT_PP(1);
 	current_table = PG_GETARG_TEXT_PP(2);
@@ -360,7 +357,6 @@ compute_distribution_divergence(PG_FUNCTION_ARGS)
 			 mean_diff * mean_diff / current_var[d] - 1.0);
 	}
 
-	/* Cleanup */
 	for (i = 0; i < n_baseline; i++)
 		NDB_FREE(baseline_vecs[i]);
 	for (i = 0; i < n_current; i++)

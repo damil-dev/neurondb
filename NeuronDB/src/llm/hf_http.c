@@ -569,7 +569,6 @@ parse_hf_emb_batch(const char *json,
 	if (!*p)
 		return false;
 	p++;
-	/* Skip whitespace */
 	while (*p && isspace(*p))
 		p++;
 

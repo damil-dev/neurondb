@@ -216,7 +216,6 @@ cluster_minibatch_kmeans(PG_FUNCTION_ARGS)
 	bool		typbyval;
 	char		typalign;
 
-	/* Parse arguments */
 	table_name = PG_GETARG_TEXT_PP(0);
 	column_name = PG_GETARG_TEXT_PP(1);
 	num_clusters = PG_GETARG_INT32(2);
@@ -381,7 +380,6 @@ cluster_minibatch_kmeans(PG_FUNCTION_ARGS)
 	result = construct_array(
 							 result_datums, nvec, INT4OID, typlen, typbyval, typalign);
 
-	/* Cleanup */
 	for (i = 0; i < nvec; i++)
 		NDB_FREE(data[i]);
 	NDB_FREE(data);
@@ -789,7 +787,6 @@ evaluate_minibatch_kmeans_by_model_id(PG_FUNCTION_ARGS)
 	result = DatumGetJsonbP(DirectFunctionCall1(jsonb_in, CStringGetTextDatum(jsonbuf.data)));
 	NDB_FREE(jsonbuf.data);
 
-	/* Cleanup */
 	NDB_FREE(tbl_str);
 	NDB_FREE(feat_str);
 
@@ -1058,7 +1055,6 @@ minibatch_kmeans_gpu_train(MLGpuModel * model, const MLGpuTrainSpec * spec, char
 	model->gpu_ready = true;
 	model->is_gpu_resident = false;
 
-	/* Cleanup */
 	for (i = 0; i < nvec; i++)
 		NDB_FREE(data[i]);
 	for (c = 0; c < num_clusters; c++)

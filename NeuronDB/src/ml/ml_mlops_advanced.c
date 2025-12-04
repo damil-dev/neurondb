@@ -58,7 +58,6 @@ create_ab_test(PG_FUNCTION_ARGS)
 	n_splits = ArrayGetNItems(
 							  ARR_NDIM(traffic_split), ARR_DIMS(traffic_split));
 
-	/* Validate */
 	if (n_models < 2)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
@@ -820,7 +819,6 @@ set_feature_flag(PG_FUNCTION_ARGS)
 	char	   *name = text_to_cstring(flag_name);
 	StringInfoData result;
 
-	/* Validate */
 	if (rollout_percentage < 0.0 || rollout_percentage > 100.0)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),

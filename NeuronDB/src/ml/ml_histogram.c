@@ -98,7 +98,6 @@ similarity_histogram(PG_FUNCTION_ARGS)
 	bool		nulls[9];
 	HeapTuple	tuple;
 
-	/* Parse arguments */
 	table_name = PG_GETARG_TEXT_PP(0);
 	vector_column = PG_GETARG_TEXT_PP(1);
 	num_samples = PG_ARGISNULL(2) ? 1000 : PG_GETARG_INT32(2);
@@ -190,7 +189,6 @@ similarity_histogram(PG_FUNCTION_ARGS)
 
 	tuple = heap_form_tuple(tupdesc, values, nulls);
 
-	/* Cleanup */
 	for (i = 0; i < nvec; i++)
 		NDB_FREE(vectors[i]);
 	NDB_FREE(vectors);

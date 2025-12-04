@@ -260,7 +260,6 @@ qlearning_train(PG_FUNCTION_ARGS)
 
 	model_id = ml_catalog_register_model(&spec);
 
-	/* Cleanup */
 	for (i = 0; i < n_states; i++)
 		NDB_FREE(agent->q_table[i]);
 	NDB_FREE(agent->q_table);
@@ -359,12 +358,12 @@ multi_armed_bandit(PG_FUNCTION_ARGS)
 	double		beta;
 	char	   *tbl_str;
 	char	   *algorithm;
-	int		   *arm_counts;
-	double	   *arm_rewards;
-	double	   *arm_probs;
+	int		   *arm_counts = NULL;
+	double	   *arm_rewards = NULL;
+	double	   *arm_probs = NULL;
 	int			i;
 	ArrayType  *result;
-	Datum	   *result_datums;
+	Datum	   *result_datums = NULL;
 	StringInfoData query;
 	int			ret;
 
@@ -534,7 +533,6 @@ multi_armed_bandit(PG_FUNCTION_ARGS)
 							 FLOAT8PASSBYVAL,
 							 'd');
 
-	/* Cleanup */
 	NDB_FREE(arm_counts);
 	NDB_FREE(arm_rewards);
 	NDB_FREE(arm_probs);

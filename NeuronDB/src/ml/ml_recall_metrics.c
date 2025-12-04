@@ -78,7 +78,6 @@ recall_at_k(PG_FUNCTION_ARGS)
 				j;
 	double		recall;
 
-	/* Parse arguments */
 	retrieved_array = PG_GETARG_ARRAYTYPE_P(0);
 	relevant_array = PG_GETARG_ARRAYTYPE_P(1);
 	k = PG_ARGISNULL(2) ? -1 : PG_GETARG_INT32(2);

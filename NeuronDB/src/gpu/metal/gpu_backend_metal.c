@@ -3121,7 +3121,6 @@ ndb_metal_linreg_train(const float *features,
 	}
 
 	ereport(DEBUG2, (errmsg("ndb_metal_linreg_train: cleaning up memory")));
-	/* Cleanup */
 	pfree(h_XtX);
 	pfree(h_Xty);
 	pfree(h_XtX_inv);
@@ -3672,7 +3671,6 @@ ndb_metal_svm_train(const float *features,
 		return -1;
 	}
 
-	/* Cleanup */
 	if (model.alphas)
 		NDB_FREE(model.alphas);
 	if (model.support_vectors)
@@ -5019,7 +5017,6 @@ ndb_metal_ridge_train(const float *features,
 		NDB_FREE(model.coefficients);
 	}
 
-	/* Cleanup */
 	NDB_FREE(h_XtX);
 	NDB_FREE(h_Xty);
 	NDB_FREE(h_XtX_inv);
@@ -5404,7 +5401,6 @@ ndb_metal_lasso_train(const float *features,
 		NDB_FREE(model.coefficients);
 	}
 
-	/* Cleanup */
 	NDB_FREE(weights);
 	NDB_FREE(weights_old);
 	NDB_FREE(residuals);
@@ -6825,7 +6821,6 @@ ndb_metal_hf_embed(const char *model_name,
 				embedding[i] = 0.0f;
 		}
 
-		/* Cleanup */
 		neurondb_onnx_free_tensor(input_tensor);
 		neurondb_onnx_free_tensor(output_tensor);
 		NDB_FREE(input_data);

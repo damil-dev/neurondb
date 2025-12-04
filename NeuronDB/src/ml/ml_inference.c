@@ -409,7 +409,6 @@ load_model(PG_FUNCTION_ARGS)
 	ModelEntry *entry;
 	struct stat statbuf;
 
-	/* Input validation */
 	NDB_CHECK_NULL_ARG(0, "model_name");
 	NDB_CHECK_NULL_ARG(1, "model_path");
 	NDB_CHECK_NULL_ARG(2, "model_type");
@@ -899,7 +898,6 @@ predict_batch(PG_FUNCTION_ARGS)
 	NDB_DECLARE(Datum *, output_datums);
 	NDB_DECLARE(bool *, output_nulls);
 
-	/* Input validation */
 	NDB_CHECK_NULL_ARG(0, "model_name");
 	NDB_CHECK_NULL_ARG(1, "inputs");
 
@@ -1302,7 +1300,6 @@ finetune_model(PG_FUNCTION_ARGS)
 	int			proc;
 	StringInfoData sql;
 
-	/* Input validation */
 	NDB_CHECK_NULL_ARG(0, "model_name");
 	NDB_CHECK_NULL_ARG(1, "train_table");
 	NDB_CHECK_NULL_ARG(2, "config");
@@ -1411,7 +1408,6 @@ export_model(PG_FUNCTION_ARGS)
 	size_t		sz;
 	FILE	   *f;
 
-	/* Input validation */
 	NDB_CHECK_NULL_ARG(0, "model_name");
 	NDB_CHECK_NULL_ARG(1, "output_path");
 	NDB_CHECK_NULL_ARG(2, "output_format");
@@ -1577,7 +1573,6 @@ export_model_to_onnx(PG_FUNCTION_ARGS)
 	char	   *script_dir;
 	char	   *full_script_path;
 
-	/* Input validation */
 	NDB_CHECK_NULL_ARG(0, "model_id");
 	NDB_CHECK_NULL_ARG(1, "output_path");
 
@@ -1875,7 +1870,6 @@ import_model_from_onnx(PG_FUNCTION_ARGS)
 	int			ret;
 	StringInfoData update_sql = {0};
 
-	/* Input validation */
 	NDB_CHECK_NULL_ARG(0, "model_id");
 	NDB_CHECK_NULL_ARG(1, "onnx_path");
 	NDB_CHECK_NULL_ARG(2, "algorithm");

@@ -779,9 +779,9 @@ get_feature_definitions(int32 store_id,
 	int			ret,
 				i,
 				nfeat;
-	char	  **fnames;
-	char	  **ftypes;
-	char	  **ftransforms;
+	char	  **fnames = NULL;
+	char	  **ftypes = NULL;
+	char	  **ftransforms = NULL;
 	NDB_DECLARE(NdbSpiSession *, spi_session);
 	MemoryContext oldcontext = CurrentMemoryContext;
 

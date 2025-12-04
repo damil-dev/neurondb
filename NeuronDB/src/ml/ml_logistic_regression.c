@@ -683,7 +683,6 @@ train_logistic_regression(PG_FUNCTION_ARGS)
 						JsonbValue *final_value = NULL;
 						Numeric		n_features_num, n_samples_num, max_iters_num, learning_rate_num, lambda_num, final_loss_num, accuracy_num;
 
-						/* Start object */
 						PG_TRY();
 						{
 							(void) pushJsonbValue(&state, WJB_BEGIN_OBJECT, NULL);
@@ -769,7 +768,6 @@ train_logistic_regression(PG_FUNCTION_ARGS)
 							jval.val.numeric = accuracy_num;
 							(void) pushJsonbValue(&state, WJB_VALUE, &jval);
 
-							/* End object */
 							final_value = pushJsonbValue(&state, WJB_END_OBJECT, NULL);
 							
 							if (final_value == NULL)
@@ -1288,7 +1286,6 @@ train_logistic_regression(PG_FUNCTION_ARGS)
 			 "logistic_regression: CPU training completed, model_id=%d",
 			 model_id);
 
-		/* Cleanup */
 		NDB_FREE(model.weights);
 
 		/*
@@ -1430,7 +1427,6 @@ predict_logistic_regression_model_id(PG_FUNCTION_ARGS)
 	/* Apply sigmoid */
 	probability = sigmoid(z);
 
-	/* Cleanup */
 	if (model != NULL)
 	{
 		if (model->weights != NULL)
@@ -1480,7 +1476,7 @@ evaluate_logistic_regression(PG_FUNCTION_ARGS)
 				f1_score;
 	int			i,
 				j;
-	Datum	   *result_datums;
+	Datum	   *result_datums = NULL;
 	ArrayType  *result_array;
 	MemoryContext oldcontext;
 	NDB_DECLARE (NdbSpiSession *, eval_spi_session);
@@ -3226,7 +3222,6 @@ lr_gpu_serialize(const MLGpuModel * model,
 		/* Serialize using unified format with training_backend=1 (GPU) */
 		unified_payload = lr_model_serialize(&lr_model, 1);
 
-		/* Cleanup */
 		if (lr_model.weights != NULL)
 		{
 			NDB_FREE(lr_model.weights);
@@ -3293,11 +3288,6 @@ lr_gpu_deserialize(MLGpuModel * model,
 				   const Jsonb * metadata,
 				   char **errstr)
 {
-	if (errstr != NULL)
-		*errstr = NULL;
-	if (model == NULL || payload == NULL)
-		return false;
-
 #ifdef NDB_GPU_CUDA
 	LRGpuModelState *state;
 	LRModel    *lr_model;
@@ -3307,11 +3297,18 @@ lr_gpu_deserialize(MLGpuModel * model,
 	float	   *weights_dest;
 	size_t		payload_bytes;
 	int			i;
+	NdbCudaLrModelHeader *hdr;
+#endif
 
+	if (errstr != NULL)
+		*errstr = NULL;
+	if (model == NULL || payload == NULL)
+		return false;
+
+#ifdef NDB_GPU_CUDA
 	lr_model = NULL;
 	training_backend = 0;
 	gpu_payload = NULL;
-	NdbCudaLrModelHeader *hdr;
 	/* Deserialize unified format */
 	lr_model = lr_model_deserialize(payload, &training_backend);
 	if (lr_model == NULL)
@@ -3674,7 +3671,6 @@ lr_try_gpu_predict_catalog(int32 model_id,
 				 gpu_err);
 		}
 
-		/* Cleanup */
 		if (lr_model != NULL)
 		{
 			if (lr_model->weights != NULL)

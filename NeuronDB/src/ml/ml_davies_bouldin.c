@@ -69,7 +69,7 @@ davies_bouldin_index(PG_FUNCTION_ARGS)
 	int			num_clusters;
 	NDB_DECLARE(int *, cluster_sizes);
 	NDB_DECLARE(float **, cluster_centroids);
-	double	   *cluster_scatter;
+	double	   *cluster_scatter = NULL;
 	double		db_index;
 	int			i;
 	int			c;
@@ -708,7 +708,6 @@ davies_bouldin_gpu_evaluate(const MLGpuModel * model, const MLGpuEvalSpec * spec
 					}
 				}
 
-				/* Cleanup */
 				for (s = 0; s < nvec; s++)
 					NDB_FREE(data[s]);
 				NDB_FREE(data);

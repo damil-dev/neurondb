@@ -138,7 +138,6 @@ gpu_pq_encode_batch_hip(const float *h_vectors,
 		nvec * m * sizeof(uint8_t),
 		hipMemcpyDeviceToHost);
 
-	/* Cleanup */
 	hipFree(d_vectors);
 	hipFree(d_codebooks);
 	hipFree(d_codes);

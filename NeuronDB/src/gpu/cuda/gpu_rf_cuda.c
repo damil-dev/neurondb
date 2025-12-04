@@ -291,14 +291,6 @@ ndb_cuda_rf_train(const float *features,
 				  Jsonb * *metrics,
 				  char **errstr)
 {
-	/* CPU mode: never execute GPU code */
-	if (NDB_COMPUTE_MODE_IS_CPU())
-	{
-		if (errstr)
-			*errstr = pstrdup("CUDA rf_train: CPU mode - GPU code should not be called");
-		return -1;
-	}
-
 	const int	default_n_trees = 32;
 	int			n_trees = default_n_trees;
 	int		   *label_ints = NULL;
@@ -325,6 +317,14 @@ ndb_cuda_rf_train(const float *features,
 	int			i;
 	int			j;
 	int			rc = -1;
+
+	/* CPU mode: never execute GPU code */
+	if (NDB_COMPUTE_MODE_IS_CPU())
+	{
+		if (errstr)
+			*errstr = pstrdup("CUDA rf_train: CPU mode - GPU code should not be called");
+		return -1;
+	}
 
 	if (errstr)
 		*errstr = NULL;

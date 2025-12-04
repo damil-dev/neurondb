@@ -183,14 +183,6 @@ ndb_cuda_svm_train(const float *features,
 				   Jsonb * *metrics,
 				   char **errstr)
 {
-	/* CPU mode: never execute GPU code */
-	if (NDB_COMPUTE_MODE_IS_CPU())
-	{
-		if (errstr)
-			*errstr = pstrdup("CUDA svm_train: CPU mode - GPU code should not be called");
-		return -1;
-	}
-
 	double		C = 1.0;
 	int			max_iters = 1000;
 	float	   *alphas = NULL;
@@ -213,6 +205,14 @@ ndb_cuda_svm_train(const float *features,
 	size_t		errors_size;
 	size_t		kernel_matrix_size;
 	size_t		kernel_row_size;
+
+	/* CPU mode: never execute GPU code */
+	if (NDB_COMPUTE_MODE_IS_CPU())
+	{
+		if (errstr)
+			*errstr = pstrdup("CUDA svm_train: CPU mode - GPU code should not be called");
+		return -1;
+	}
 
 	if (errstr)
 		*errstr = NULL;
@@ -593,7 +593,6 @@ ndb_cuda_svm_train(const float *features,
 		return -1;
 	}
 
-	/* Cleanup */
 	if (model.alphas)
 		NDB_FREE(model.alphas);
 	if (model.support_vectors)

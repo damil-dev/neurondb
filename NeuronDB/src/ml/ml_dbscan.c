@@ -646,7 +646,6 @@ evaluate_dbscan_by_model_id(PG_FUNCTION_ARGS)
 	result = DatumGetJsonbP(DirectFunctionCall1(jsonb_in, CStringGetTextDatum(jsonbuf.data)));
 	NDB_FREE(jsonbuf.data);
 
-	/* Cleanup */
 	NDB_FREE(tbl_str);
 	NDB_FREE(feat_str);
 
@@ -923,7 +922,6 @@ dbscan_gpu_train(MLGpuModel * model, const MLGpuTrainSpec * spec, char **errstr)
 	model->gpu_ready = true;
 	model->is_gpu_resident = false;
 
-	/* Cleanup */
 	for (i = 0; i < nvec; i++)
 		NDB_FREE(data[i]);
 	for (c = 0; c < n_clusters; c++)

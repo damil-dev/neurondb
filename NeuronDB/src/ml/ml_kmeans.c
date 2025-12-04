@@ -206,12 +206,28 @@ cluster_kmeans(PG_FUNCTION_ARGS)
 	for (i = 0; i < nvec; i++)
 		assignments[i] = -1;
 
+	/*
+	 * K-means clustering algorithm using Lloyd's iterative refinement method.
+	 * The algorithm alternates between two phases until convergence or maximum
+	 * iterations. In the assignment phase, each data point is assigned to its
+	 * nearest centroid based on Euclidean distance, using SIMD-optimized distance
+	 * calculations for performance. The algorithm tracks whether any assignments
+	 * changed to detect convergence early. In the update phase, centroids are
+	 * recomputed as the mean of all points assigned to each cluster. The mean
+	 * computation accumulates feature values for all points in each cluster and
+	 * divides by the cluster size. If a cluster becomes empty during the update
+	 * phase, its centroid remains unchanged to avoid division by zero. The
+	 * algorithm terminates when no assignments change between iterations, indicating
+	 * that centroids have stabilized, or when the maximum iteration count is reached.
+	 * This iterative process minimizes within-cluster variance and maximizes
+	 * between-cluster separation, producing a local optimum of the k-means objective
+	 * function.
+	 */
 	for (iter = 0; iter < max_iters && changed; iter++)
 	{
 		int		   *counts;
 
 		changed = false;
-		/* Assignment phase - SIMD optimized */
 		for (i = 0; i < nvec; i++)
 		{
 			double		min_dist = DBL_MAX;
@@ -219,7 +235,6 @@ cluster_kmeans(PG_FUNCTION_ARGS)
 
 			for (c = 0; c < num_clusters; c++)
 			{
-				/* Use SIMD-optimized L2 distance */
 				double		dist = neurondb_l2_distance_squared(
 																data[i], centers[c], dim);
 
@@ -236,7 +251,6 @@ cluster_kmeans(PG_FUNCTION_ARGS)
 			}
 		}
 
-		/* Update phase */
 		for (c = 0; c < num_clusters; c++)
 			memset(centers[c], 0, sizeof(float) * dim);
 
@@ -544,7 +558,6 @@ train_kmeans_model_id(PG_FUNCTION_ARGS)
 
 	model_id = ml_catalog_register_model(&spec);
 
-	/* Cleanup */
 	for (i = 0; i < nvec; i++)
 		NDB_FREE(data[i]);
 	for (c = 0; c < num_clusters; c++)
@@ -880,7 +893,6 @@ evaluate_kmeans_by_model_id(PG_FUNCTION_ARGS)
 		JsonbValue *final_value = NULL;
 		Numeric		inertia_num, silhouette_num, davies_bouldin_num, n_samples_num, n_clusters_num;
 
-		/* Start object */
 		PG_TRY();
 		{
 			(void) pushJsonbValue(&state, WJB_BEGIN_OBJECT, NULL);
@@ -971,7 +983,6 @@ evaluate_kmeans_by_model_id(PG_FUNCTION_ARGS)
 				}
 			}
 
-			/* End object */
 			final_value = pushJsonbValue(&state, WJB_END_OBJECT, NULL);
 			
 			if (final_value == NULL)
@@ -1235,7 +1246,6 @@ kmeans_gpu_train(MLGpuModel * model, const MLGpuTrainSpec * spec, char **errstr)
 	model->gpu_ready = true;
 	model->is_gpu_resident = false; /* CPU fallback */
 
-	/* Cleanup */
 	for (i = 0; i < nvec; i++)
 		NDB_FREE(data[i]);
 	for (c = 0; c < num_clusters; c++)
@@ -1333,7 +1343,6 @@ kmeans_gpu_predict(const MLGpuModel * model, const float *input, int input_dim,
 
 	output[0] = (float) best_cluster;
 
-	/* Cleanup */
 	for (c = 0; c < num_clusters; c++)
 		NDB_FREE(centers[c]);
 	NDB_FREE(centers);

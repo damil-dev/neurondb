@@ -29,7 +29,23 @@
 #include "neurondb_safe_memory.h"
 #include "neurondb_macros.h"
 
-/* Single-set Gini impurity */
+/*
+ * rf_gini_impurity
+ *    Compute Gini impurity for a set of class label counts.
+ *
+ * Gini impurity measures the probability of misclassifying a randomly selected
+ * element if it were labeled according to the class distribution in the set.
+ * The impurity is computed as one minus the sum of squared class probabilities,
+ * where each probability is the ratio of class count to total count. When all
+ * elements belong to the same class, the impurity is zero, indicating perfect
+ * purity. When elements are evenly distributed across classes, the impurity
+ * reaches its maximum value, indicating maximum uncertainty. The function
+ * iterates through all class counts, computes the squared probability for each
+ * class, sums these squared probabilities, and subtracts the sum from one to
+ * obtain the final impurity value. Lower impurity indicates better class
+ * separation and more informative splits, making this metric suitable for
+ * evaluating split quality in decision tree construction algorithms.
+ */
 double
 rf_gini_impurity(const int *counts, int n_classes, int total)
 {

@@ -394,33 +394,44 @@ embed_text(PG_FUNCTION_ARGS)
 	if (ndb_llm_route_embed(&cfg, &call_opts, input_str, &vec_data, &dim) != 0 ||
 		vec_data == NULL || dim <= 0)
 	{
-		unsigned int hash;
-		int			input_len;
-		int			model_len;
-		int			j;
-
-		/* Fallback: Generate deterministic embeddings from text hash */
-		dim = 384;
-		NDB_ALLOC(vec_data, float, dim);
-		
-		/* Generate deterministic pseudo-random vector using djb2-like hash */
-		hash = 5381;
-		input_len = strlen(input_str);
-		model_len = model_str ? strlen(model_str) : 0;
-		
-		/* Hash input text */
-		for (j = 0; j < input_len; j++)
-			hash = ((hash << 5) + hash) ^ (unsigned char) input_str[j];
-		
-		/* Generate embedding values based on hash */
-		for (i = 0; i < dim; i++)
+		/* Check if we should fail with error or generate fallback data */
+		if (!neurondb_llm_fail_open)
 		{
-			if (model_len > 0)
-				hash = ((hash << 5) + hash) ^ (unsigned char) (model_str[i % model_len]);
-			else
-				hash = ((hash << 5) + hash) ^ (unsigned char) (i);
-			/* Convert to float in range [-1, 1] */
-			vec_data[i] = ((float) ((hash % 2000) - 1000)) / 1000.0f;
+			ereport(ERROR,
+					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+					 errmsg("neurondb: embedding generation failed"),
+					 errhint("Configure neurondb.llm_api_key for Hugging Face API access, or set neurondb.llm_provider='onnx' for local models.")));
+		}
+		
+		/* Fallback: Generate deterministic embeddings from text hash */
+		{
+			unsigned int hash;
+			int			input_len;
+			int			model_len;
+			int			j;
+
+			dim = 384;
+			NDB_ALLOC(vec_data, float, dim);
+			
+			/* Generate deterministic pseudo-random vector using djb2-like hash */
+			hash = 5381;
+			input_len = strlen(input_str);
+			model_len = model_str ? strlen(model_str) : 0;
+			
+			/* Hash input text */
+			for (j = 0; j < input_len; j++)
+				hash = ((hash << 5) + hash) ^ (unsigned char) input_str[j];
+			
+			/* Generate embedding values based on hash */
+			for (i = 0; i < dim; i++)
+			{
+				if (model_len > 0)
+					hash = ((hash << 5) + hash) ^ (unsigned char) (model_str[i % model_len]);
+				else
+					hash = ((hash << 5) + hash) ^ (unsigned char) (i);
+				/* Convert to float in range [-1, 1] */
+				vec_data[i] = ((float) ((hash % 2000) - 1000)) / 1000.0f;
+			}
 		}
 	}
 

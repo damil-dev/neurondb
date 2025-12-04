@@ -144,14 +144,6 @@ ndb_cuda_linreg_train(const float *features,
 					  Jsonb * *metrics,
 					  char **errstr)
 {
-	/* CPU mode: never execute GPU code */
-	if (NDB_COMPUTE_MODE_IS_CPU())
-	{
-		if (errstr)
-			*errstr = pstrdup("CUDA linreg_train: CPU mode - GPU code should not be called");
-		return -1;
-	}
-
 	float	   *d_features = NULL;
 	double	   *d_targets = NULL;
 	double	   *d_XtX = NULL;
@@ -175,6 +167,14 @@ ndb_cuda_linreg_train(const float *features,
 				j,
 				k;
 	int			rc = -1;
+
+	/* CPU mode: never execute GPU code */
+	if (NDB_COMPUTE_MODE_IS_CPU())
+	{
+		if (errstr)
+			*errstr = pstrdup("CUDA linreg_train: CPU mode - GPU code should not be called");
+		return -1;
+	}
 
 	if (errstr)
 		*errstr = NULL;
@@ -723,7 +723,6 @@ cpu_fallback:
 		NDB_FREE(model.coefficients);
 	}
 
-	/* Cleanup */
 	NDB_FREE(h_XtX);
 	NDB_FREE(h_Xty);
 	NDB_FREE(h_XtX_inv);

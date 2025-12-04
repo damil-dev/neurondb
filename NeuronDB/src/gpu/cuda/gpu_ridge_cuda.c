@@ -738,7 +738,6 @@ build_model:
 		NDB_FREE(model.coefficients);
 	}
 
-	/* Cleanup */
 	NDB_FREE(h_XtX);
 	NDB_FREE(h_Xty);
 	NDB_FREE(h_XtX_inv);

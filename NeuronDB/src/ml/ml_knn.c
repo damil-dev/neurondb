@@ -119,7 +119,6 @@ knn_classify(PG_FUNCTION_ARGS)
 	int			i;
 	MemoryContext oldcontext;
 
-	/* Input validation */
 	NDB_CHECK_NULL_ARG(0, "table_name");
 	NDB_CHECK_NULL_ARG(1, "feature_col");
 	NDB_CHECK_NULL_ARG(2, "label_col");
@@ -132,14 +131,13 @@ knn_classify(PG_FUNCTION_ARGS)
 	query_vector = PG_GETARG_VECTOR_P(3);
 	k = PG_GETARG_INT32(4);
 
-	/* Validate vector structure */
-	NDB_CHECK_VECTOR_VALID(query_vector);
-
 	tbl_str = text_to_cstring(table_name);
 	feat_str = text_to_cstring(feature_col);
 	label_str = text_to_cstring(label_col);
 
 	dim = query_vector->dim;
+
+	NDB_CHECK_VECTOR_VALID(query_vector);
 
 	if (k < 1)
 		ereport(ERROR,
@@ -217,7 +215,6 @@ knn_classify(PG_FUNCTION_ARGS)
 			bool		feat_null;
 			bool		label_null;
 			Vector	   *vec;
-			/* Safe access to SPI_tuptable - validate before access */
 			if (SPI_tuptable == NULL || SPI_tuptable->vals == NULL || 
 				i >= SPI_processed || SPI_tuptable->vals[i] == NULL)
 			{
@@ -231,7 +228,6 @@ knn_classify(PG_FUNCTION_ARGS)
 			}
 
 			feat_datum = SPI_getbinval(tuple, tupdesc, 1, &feat_null);
-			/* Safe access for label - validate tupdesc has at least 2 columns */
 			if (tupdesc->natts < 2)
 			{
 				continue;
@@ -270,14 +266,11 @@ knn_classify(PG_FUNCTION_ARGS)
 								dim, vec->dim)));
 			}
 
-			/* Copy features */
 			NDB_ALLOC(samples[nsamples].features, float, dim);
 			memcpy(samples[nsamples].features, vec->data, sizeof(float) * dim);
 			samples[nsamples].dim = dim;
 
 			samples[nsamples].label = DatumGetFloat8(label_datum);
-
-			/* Compute distance */
 			samples[nsamples].distance = euclidean_distance(
 															query_vector->data, samples[nsamples].features, dim);
 			nsamples++;
@@ -456,7 +449,6 @@ knn_regress(PG_FUNCTION_ARGS)
 			bool		feat_null;
 			bool		targ_null;
 			Vector	   *vec;
-			/* Safe access to SPI_tuptable - validate before access */
 			if (SPI_tuptable == NULL || SPI_tuptable->vals == NULL || 
 				i >= SPI_processed || SPI_tuptable->vals[i] == NULL)
 			{
@@ -470,7 +462,6 @@ knn_regress(PG_FUNCTION_ARGS)
 			}
 
 			feat_datum = SPI_getbinval(tuple, tupdesc, 1, &feat_null);
-			/* Safe access for target - validate tupdesc has at least 2 columns */
 			if (tupdesc->natts < 2)
 			{
 				continue;
@@ -502,14 +493,11 @@ knn_regress(PG_FUNCTION_ARGS)
 								dim, vec->dim)));
 			}
 
-			/* Copy features */
 			NDB_ALLOC(samples[nsamples].features, float, dim);
 			memcpy(samples[nsamples].features, vec->data, sizeof(float) * dim);
 			samples[nsamples].dim = dim;
 
 			samples[nsamples].label = DatumGetFloat8(targ_datum);
-
-			/* Compute distance */
 			samples[nsamples].distance = euclidean_distance(
 															query_vector->data, samples[nsamples].features, dim);
 			nsamples++;
@@ -535,7 +523,6 @@ knn_regress(PG_FUNCTION_ARGS)
 		NDB_FREE(query.data);
 		NDB_SPI_SESSION_END(regress_spi_session);
 
-		/* Sort by distance */
 		qsort(samples, nsamples, sizeof(KNNSample), compare_samples);
 
 		for (i = 0; i < k && i < nsamples; i++)
@@ -586,7 +573,7 @@ evaluate_knn_classifier(PG_FUNCTION_ARGS)
 				recall,
 				f1_score;
 	int			i;
-	Datum	   *result_datums;
+	Datum	   *result_datums = NULL;
 	ArrayType  *result_array;
 	MemoryContext oldcontext;
 
@@ -633,7 +620,6 @@ evaluate_knn_classifier(PG_FUNCTION_ARGS)
 
 	ntest = SPI_processed;
 
-	/* For each test sample, classify using KNN */
 	for (i = 0; i < ntest; i++)
 	{
 		HeapTuple	tuple;
@@ -644,7 +630,6 @@ evaluate_knn_classifier(PG_FUNCTION_ARGS)
 		bool		label_null;
 		int			y_true;
 		int			y_pred;
-		/* Safe access to SPI_tuptable - validate before access */
 		if (SPI_tuptable == NULL || SPI_tuptable->vals == NULL || 
 			i >= SPI_processed || SPI_tuptable->vals[i] == NULL)
 		{
@@ -672,7 +657,6 @@ evaluate_knn_classifier(PG_FUNCTION_ARGS)
 												   feat_datum,
 												   Int32GetDatum(k)));
 
-		/* Update confusion matrix */
 		if (y_true == 1)
 		{
 			if (y_pred == 1)
@@ -692,7 +676,6 @@ evaluate_knn_classifier(PG_FUNCTION_ARGS)
 	NDB_FREE(query.data);
 	NDB_SPI_SESSION_END(eval_spi_session);
 
-	/* Compute metrics */
 	accuracy = (double) (tp + tn) / (tp + tn + fp + fn);
 	precision = (tp + fp > 0) ? (double) tp / (tp + fp) : 0.0;
 	recall = (tp + fn > 0) ? (double) tp / (tp + fn) : 0.0;
@@ -700,7 +683,6 @@ evaluate_knn_classifier(PG_FUNCTION_ARGS)
 		? 2.0 * precision * recall / (precision + recall)
 		: 0.0;
 
-	/* Build result array */
 	MemoryContextSwitchTo(oldcontext);
 
 	NDB_ALLOC(result_datums, Datum, 4);
@@ -787,7 +769,6 @@ train_knn_model_id(PG_FUNCTION_ARGS)
 	Assert(oldcontext != NULL);
 	NDB_SPI_SESSION_BEGIN(train_spi_session, oldcontext);
 
-	/* Load training data and labels together using SPI */
 	{
 		StringInfoData query = {0};
 		int			ret;
@@ -833,13 +814,11 @@ train_knn_model_id(PG_FUNCTION_ARGS)
 					 errhint("Reduce k or add more training data.")));
 		}
 
-		/* Get dimension from first row - handle both array and vector types */
 		{
 			TupleDesc	tupdesc = SPI_tuptable->tupdesc;
 			Oid			feat_type_oid = SPI_gettypeid(tupdesc, 1);
 			bool		feat_is_array = (feat_type_oid == FLOAT8ARRAYOID || feat_type_oid == FLOAT4ARRAYOID);
 
-			/* Safe access for complex types - validate before access */
 			if (SPI_tuptable == NULL || SPI_tuptable->vals == NULL || 
 				SPI_processed == 0 || SPI_tuptable->vals[0] == NULL)
 			{
@@ -915,7 +894,6 @@ train_knn_model_id(PG_FUNCTION_ARGS)
 
 			for (i = 0; i < nvec; i++)
 			{
-				/* Safe access to SPI_tuptable - validate before access */
 				if (SPI_tuptable == NULL || SPI_tuptable->vals == NULL || 
 					i >= SPI_processed || SPI_tuptable->vals[i] == NULL)
 				{
@@ -979,14 +957,10 @@ train_knn_model_id(PG_FUNCTION_ARGS)
 		NDB_SPI_SESSION_END(train_spi_session);
 	}
 
-	/* For KNN (lazy learner), store minimal model data: just k and dimensions */
-	/* The actual training data stays in the table */
 	initStringInfo(&model_buf);
 	appendBinaryStringInfo(&model_buf, (char *) &k_value, sizeof(int));
 	appendBinaryStringInfo(&model_buf, (char *) &nvec, sizeof(int));
 	appendBinaryStringInfo(&model_buf, (char *) &dim, sizeof(int));
-
-	/* Store table name, feature col, label col as strings for CPU prediction */
 	appendBinaryStringInfo(&model_buf, tbl_str, strlen(tbl_str) + 1);
 	appendBinaryStringInfo(&model_buf, feat_str, strlen(feat_str) + 1);
 	appendBinaryStringInfo(&model_buf, label_str, strlen(label_str) + 1);
@@ -1004,11 +978,9 @@ train_knn_model_id(PG_FUNCTION_ARGS)
 		NDB_FREE(model_buf.data);
 	}
 
-	/* Build metrics JSONB */
 	initStringInfo(&metrics_json);
 	appendStringInfo(&metrics_json, "{\"storage\": \"cpu\", \"k\": %d, \"n_samples\": %d, \"n_features\": %d}",
 					 k_value, nvec, dim);
-	/* Use ndb_jsonb_in_cstring like other ML algorithms fix */
 	metrics = ndb_jsonb_in_cstring(metrics_json.data);
 	if (metrics == NULL)
 	{
@@ -1019,7 +991,6 @@ train_knn_model_id(PG_FUNCTION_ARGS)
 	}
 	NDB_FREE(metrics_json.data);
 
-	/* Store model in catalog */
 	memset(&spec, 0, sizeof(MLCatalogModelSpec));
 	spec.project_name = NULL;
 	spec.algorithm = "knn";
@@ -1032,7 +1003,6 @@ train_knn_model_id(PG_FUNCTION_ARGS)
 
 	model_id = ml_catalog_register_model(&spec);
 
-	/* Cleanup */
 	NDB_FREE(tbl_str);
 	NDB_FREE(feat_str);
 	NDB_FREE(label_str);
@@ -1063,7 +1033,6 @@ predict_knn_model_id(PG_FUNCTION_ARGS)
 	MemoryContext oldcontext;
 	MemoryContext callcontext;
 
-	/* Validate argument count */
 	if (PG_NARGS() != 2)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
@@ -1074,18 +1043,15 @@ predict_knn_model_id(PG_FUNCTION_ARGS)
 	model_id = PG_GETARG_INT32(0);
 	features_array = PG_GETARG_ARRAYTYPE_P(1);
 
-	/* Validate features array */
 	ndims = ARR_NDIM(features_array);
 	dims = ARR_DIMS(features_array);
 	nelems = ArrayGetNItems(ndims, dims);
 
-	/* Handle both float4[] (real[]) and float8[] arrays */
 	{
 		Oid			elem_type = ARR_ELEMTYPE(features_array);
 
 		if (elem_type == FLOAT4OID)
 		{
-			/* Convert float4[] to float8[] */
 			float4	   *features_f4 = (float4 *) ARR_DATA_PTR(features_array);
 
 			NDB_ALLOC(features_allocated, float8, nelems);
@@ -1095,7 +1061,6 @@ predict_knn_model_id(PG_FUNCTION_ARGS)
 		}
 		else
 		{
-			/* Already float8[] */
 			features = (float8 *) ARR_DATA_PTR(features_array);
 		}
 	}
@@ -1105,7 +1070,6 @@ predict_knn_model_id(PG_FUNCTION_ARGS)
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("predict_knn_model_id: features array cannot be empty")));
 
-	/* Fetch model data from catalog */
 	elog(DEBUG1, "predict_knn_model_id: creating memory context");
 	callcontext = AllocSetContextCreate(CurrentMemoryContext,
 										"predict_knn_model_id context",
@@ -1146,16 +1110,6 @@ predict_knn_model_id(PG_FUNCTION_ARGS)
 
 	base = VARDATA(model_data);
 
-	/*
-	 * Check if this is CPU model (starts with k, n_samples, n_features) or
-	 * GPU model
-	 */
-
-	/*
-	 * CPU model: k (int), n_samples (int), n_features (int), table_name
-	 * (string), feature_col (string), label_col (string)
-	 */
-	/* GPU model: NdbCudaKnnModelHeader */
 	if (VARSIZE(model_data) - VARHDRSZ < sizeof(int) * 3)
 	{
 		MemoryContextSwitchTo(oldcontext);
@@ -1169,19 +1123,9 @@ predict_knn_model_id(PG_FUNCTION_ARGS)
 				 errmsg("predict_knn_model_id: model %d has invalid header (too small)", model_id)));
 	}
 
-	/* Try to detect CPU vs GPU format */
-
-	/*
-	 * CPU format: first int is k (usually 1-100), GPU format: first bytes are
-	 * magic/version
-	 */
 	{
 		int			first_int = *(int *) base;
 
-		/*
-		 * If first int is reasonable k value (1-1000) and model size matches
-		 * CPU format, use CPU
-		 */
 		if (first_int >= 1 && first_int <= 1000)
 		{
 			/* CPU model format */
@@ -1216,7 +1160,6 @@ predict_knn_model_id(PG_FUNCTION_ARGS)
 						 errmsg("Feature dimension mismatch: expected %d, got %d", n_features_cpu, nelems)));
 			}
 
-			/* Extract strings */
 			str_ptr = base + sizeof(int) * 3;
 			table_name_cpu = (char *) str_ptr;
 			str_ptr += strlen(table_name_cpu) + 1;
@@ -1224,14 +1167,6 @@ predict_knn_model_id(PG_FUNCTION_ARGS)
 			str_ptr += strlen(feature_col_cpu) + 1;
 			label_col_cpu = (char *) str_ptr;
 
-			/* Call knn_classify via SPI SQL to avoid memory context issues */
-
-			/*
-			 * knn_classify uses SPI internally, so calling it via SQL is
-			 * safer
-			 */
-
-			/* Quote strings for SQL */
 			initStringInfo(&tbl_lit);
 			appendStringInfoChar(&tbl_lit, '\'');
 			for (k = 0; table_name_cpu[k]; k++)
@@ -1262,18 +1197,14 @@ predict_knn_model_id(PG_FUNCTION_ARGS)
 			}
 			appendStringInfoChar(&label_lit, '\'');
 
-			/* Build vector literal string */
 			initStringInfo(&sql_query);
 			appendStringInfo(&sql_query, "SELECT knn_classify(%s, %s, %s, '",
 							 tbl_lit.data, feat_lit.data, label_lit.data);
-
-			/* Build vector literal */
 			appendStringInfoChar(&sql_query, '[');
 			for (i = 0; i < nelems; i++)
 			{
 				if (i > 0)
 					appendStringInfoString(&sql_query, ", ");
-				/* Validate feature value before formatting */
 				if (!isfinite(features[i]))
 				{
 					NDB_FREE(sql_query.data);
@@ -1296,7 +1227,6 @@ predict_knn_model_id(PG_FUNCTION_ARGS)
 			}
 			appendStringInfo(&sql_query, "]'::vector, %d)", k_cpu);
 
-			/* Execute via SPI */
 			{
 				NDB_DECLARE (NdbSpiSession *, predict_spi_session);
 				MemoryContext predict_oldcontext = CurrentMemoryContext;
@@ -1322,10 +1252,9 @@ predict_knn_model_id(PG_FUNCTION_ARGS)
 							(errcode(ERRCODE_INTERNAL_ERROR),
 							 errmsg("neurondb: predict_knn_model_id: knn_classify failed"),
 							 errdetail("SPI execution returned code %d (expected %d) or processed 0 rows", ret, SPI_OK_SELECT),
-							 errhint("Verify the model exists and the training table is accessible.")));
+					errhint("Verify the model exists and the training table is accessible.")));
 				}
 
-				/* Get result - use safe function for int32 */
 				{
 					int32		result_val;
 					
@@ -1346,11 +1275,9 @@ predict_knn_model_id(PG_FUNCTION_ARGS)
 			NDB_FREE(feat_lit.data);
 			NDB_FREE(label_lit.data);
 
-			/* Free features_allocated before deleting callcontext */
 			if (features_allocated)
 				NDB_FREE(features_allocated);
 
-			/* Free model_data and metrics before switching contexts */
 			if (model_data)
 				NDB_FREE(model_data);
 			if (metrics)
@@ -1363,7 +1290,6 @@ predict_knn_model_id(PG_FUNCTION_ARGS)
 		}
 	}
 
-	/* GPU model format */
 	if (VARSIZE(model_data) - VARHDRSZ < sizeof(NdbCudaKnnModelHeader))
 	{
 		MemoryContextSwitchTo(oldcontext);
@@ -1380,7 +1306,6 @@ predict_knn_model_id(PG_FUNCTION_ARGS)
 
 	hdr = (NdbCudaKnnModelHeader *) base;
 
-	/* Validate model header */
 	if (hdr->n_samples <= 0 || hdr->n_samples > 100000000 ||
 		hdr->n_features <= 0 || hdr->n_features > 1000000 ||
 		hdr->k <= 0 || hdr->k > hdr->n_samples ||
@@ -1394,7 +1319,6 @@ predict_knn_model_id(PG_FUNCTION_ARGS)
 						model_id)));
 	}
 
-	/* Validate feature dimension */
 	if (nelems != hdr->n_features)
 	{
 		MemoryContextSwitchTo(oldcontext);
@@ -1405,7 +1329,6 @@ predict_knn_model_id(PG_FUNCTION_ARGS)
 						hdr->n_features, nelems)));
 	}
 
-	/* Convert query features to float */
 	NDB_ALLOC(query_features, float, hdr->n_features);
 	for (i = 0; i < hdr->n_features; i++)
 	{
@@ -1421,7 +1344,6 @@ predict_knn_model_id(PG_FUNCTION_ARGS)
 		query_features[i] = (float) features[i];
 	}
 
-	/* Try GPU prediction if GPU is available */
 #ifdef NDB_GPU_CUDA
 	if (neurondb_gpu_is_available())
 	{
@@ -1438,7 +1360,6 @@ predict_knn_model_id(PG_FUNCTION_ARGS)
 
 			if (rc == 0)
 			{
-				/* GPU prediction succeeded */
 				NDB_FREE(query_features);
 				if (gpu_errstr)
 					NDB_FREE(gpu_errstr);
@@ -1454,7 +1375,6 @@ predict_knn_model_id(PG_FUNCTION_ARGS)
 			}
 			else
 			{
-				/* GPU prediction failed, fall through to CPU */
 				elog(DEBUG1,
 					 "neurondb: predict_knn_model_id: GPU prediction failed: %s, falling back to CPU",
 					 gpu_errstr ? gpu_errstr : "unknown error");
@@ -1472,23 +1392,19 @@ predict_knn_model_id(PG_FUNCTION_ARGS)
 	}
 #endif
 
-	/* Fallback to CPU-based prediction when GPU unavailable */
 	{
 		const float *training_features;
 		const double *training_labels;
 		NDB_DECLARE(float *, distances);
 		NDB_DECLARE(int *, indices);
 
-		/* Extract training data from model */
 		training_features = (const float *) (base + sizeof(NdbCudaKnnModelHeader));
 		training_labels = (const double *) (base + sizeof(NdbCudaKnnModelHeader) +
 											sizeof(float) * (size_t) hdr->n_samples * (size_t) hdr->n_features);
 
-		/* Allocate distance array and indices */
 		NDB_ALLOC(distances, float, hdr->n_samples);
 		NDB_ALLOC(indices, int, hdr->n_samples);
 
-		/* Compute distances to all training samples */
 		for (i = 0; i < hdr->n_samples; i++)
 		{
 			double		sum = 0.0;
@@ -1504,7 +1420,6 @@ predict_knn_model_id(PG_FUNCTION_ARGS)
 			indices[i] = i;
 		}
 
-		/* Sort by distance (simple selection sort for k nearest) */
 		for (i = 0; i < hdr->k && i < hdr->n_samples; i++)
 		{
 			int			min_idx = i;
@@ -1526,10 +1441,8 @@ predict_knn_model_id(PG_FUNCTION_ARGS)
 			}
 		}
 
-		/* Compute prediction from k nearest neighbors */
 		if (hdr->task_type == 0)
 		{
-			/* Classification: majority vote */
 			double		class_votes[2] = {0.0, 0.0};
 
 			for (i = 0; i < hdr->k && i < hdr->n_samples; i++)
@@ -1543,18 +1456,15 @@ predict_knn_model_id(PG_FUNCTION_ARGS)
 		}
 		else
 		{
-			/* Regression: average */
 			for (i = 0; i < hdr->k && i < hdr->n_samples; i++)
 				prediction += training_labels[indices[i]];
 			prediction /= hdr->k;
 		}
 
-		/* Cleanup */
 		NDB_FREE(distances);
 		NDB_FREE(indices);
 	}
 
-	/* Cleanup */
 	NDB_FREE(query_features);
 	if (features_allocated)
 		NDB_FREE(features_allocated);
@@ -1608,7 +1518,6 @@ knn_predict_batch(int32 model_id,
 		return;
 	}
 
-	/* Load model to get k value */
 	if (!ml_catalog_fetch_model_payload(model_id, &model_data, NULL, &metrics))
 	{
 		if (tp_out)
@@ -1639,18 +1548,15 @@ knn_predict_batch(int32 model_id,
 
 	base = VARDATA(model_data);
 
-	/* Detect CPU vs GPU format and get k_value */
 	{
 		int			first_int = *(int *) base;
 
 		if (first_int >= 1 && first_int <= 1000)
 		{
-			/* CPU format */
 			memcpy(&k_value, base, sizeof(int));
 		}
 		else
 		{
-			/* GPU format */
 			const		NdbCudaKnnModelHeader *gpu_hdr;
 
 			if (VARSIZE(model_data) - VARHDRSZ < (int) sizeof(NdbCudaKnnModelHeader))
@@ -1691,14 +1597,12 @@ knn_predict_batch(int32 model_id,
 		return;
 	}
 
-	/* Predict directly - avoid calling predict_knn_model_id which uses SPI */
 	{
 		int			first_int = *(int *) base;
 		bool		is_gpu = (first_int < 1 || first_int > 1000);
 
 		if (is_gpu)
 		{
-			/* GPU model: use GPU-accelerated batch evaluation when available */
 			const		NdbCudaKnnModelHeader *gpu_hdr;
 
 			if (VARSIZE(model_data) - VARHDRSZ < (int) sizeof(NdbCudaKnnModelHeader))
@@ -1720,7 +1624,6 @@ knn_predict_batch(int32 model_id,
 
 			gpu_hdr = (const NdbCudaKnnModelHeader *) base;
 
-			/* Try GPU batch prediction if GPU is available */
 #ifdef NDB_GPU_CUDA
 			if (neurondb_gpu_is_available() && gpu_hdr->task_type == 0)
 			{
@@ -1732,7 +1635,6 @@ knn_predict_batch(int32 model_id,
 					 "neurondb: knn_predict_batch: attempting GPU batch prediction for %d samples (model_id=%d, n_features=%d, k=%d)",
 					 n_samples, model_id, feature_dim, k_value);
 
-				/* Allocate predictions array */
 				NDB_ALLOC(predictions, int, (size_t) n_samples);
 				if (predictions != NULL)
 				{
@@ -1750,7 +1652,6 @@ knn_predict_batch(int32 model_id,
 							elog(DEBUG1,
 								 "neurondb: knn_predict_batch: GPU batch prediction succeeded for %d samples",
 								 n_samples);
-							/* Compute confusion matrix from GPU predictions */
 							for (i = 0; i < n_samples; i++)
 							{
 								double		y_true = labels[i];
@@ -1772,7 +1673,6 @@ knn_predict_batch(int32 model_id,
 								if (pred_class > 1)
 									pred_class = 1;
 
-								/* Update confusion matrix */
 								if (true_class == 1 && pred_class == 1)
 									tp++;
 								else if (true_class == 0 && pred_class == 0)
@@ -1802,7 +1702,6 @@ knn_predict_batch(int32 model_id,
 						}
 						else
 						{
-							/* GPU prediction failed, fall through to CPU */
 							elog(WARNING,
 								 "neurondb: knn_predict_batch: GPU batch prediction failed for %d samples (model_id=%d): %s, falling back to CPU",
 								 n_samples, model_id, gpu_errstr ? gpu_errstr : "unknown error");
@@ -1824,10 +1723,6 @@ knn_predict_batch(int32 model_id,
 			}
 #endif
 
-			/*
-			 * Fallback to CPU-based evaluation for GPU models when GPU
-			 * unavailable
-			 */
 			{
 				const float *training_features;
 				const double *training_labels;
@@ -1840,7 +1735,6 @@ knn_predict_batch(int32 model_id,
 				training_labels = (const double *) (base + sizeof(NdbCudaKnnModelHeader) +
 													sizeof(float) * (size_t) gpu_hdr->n_samples * (size_t) gpu_hdr->n_features);
 
-				/* For each test sample, compute distances and predict */
 				for (i = 0; i < n_samples; i++)
 				{
 					const float *row = features + (i * feature_dim);
@@ -1861,7 +1755,6 @@ knn_predict_batch(int32 model_id,
 					if (true_class > 1)
 						true_class = 1;
 
-					/* Compute distances to all training samples */
 					NDB_ALLOC(distances_local, float, gpu_hdr->n_samples);
 					NDB_ALLOC(indices_local, int, gpu_hdr->n_samples);
 
@@ -1881,7 +1774,6 @@ knn_predict_batch(int32 model_id,
 						indices_local[j] = j;
 					}
 
-					/* Selection sort for k nearest */
 					for (j = 0; j < k_value && j < gpu_hdr->n_samples; j++)
 					{
 						int			min_idx = j;
@@ -1904,7 +1796,6 @@ knn_predict_batch(int32 model_id,
 						}
 					}
 
-					/* Majority vote */
 					{
 						double		class_votes[2] = {0.0, 0.0};
 						int			k;
@@ -1925,11 +1816,10 @@ knn_predict_batch(int32 model_id,
 					if (pred_class > 1)
 						pred_class = 1;
 
-					NDB_FREE(distances_local);
-					NDB_FREE(indices_local);
+				NDB_FREE(distances_local);
+				NDB_FREE(indices_local);
 
-					/* Update confusion matrix */
-					if (true_class == 1 && pred_class == 1)
+				if (true_class == 1 && pred_class == 1)
 						tp++;
 					else if (true_class == 0 && pred_class == 0)
 						tn++;
@@ -1942,7 +1832,6 @@ knn_predict_batch(int32 model_id,
 		}
 		else
 		{
-			/* CPU model: load training data and predict */
 			char	   *table_name_cpu,
 					   *feature_col_cpu,
 					   *label_col_cpu;
@@ -1956,19 +1845,14 @@ knn_predict_batch(int32 model_id,
 			int			j;
 			MemoryContext outer_context;
 
-			/* Extract strings from model */
-			str_ptr = base + sizeof(int) * 3;	/* Skip k, n_samples,
-												 * n_features */
+			str_ptr = base + sizeof(int) * 3;
 			table_name_cpu = (char *) str_ptr;
 			str_ptr += strlen(table_name_cpu) + 1;
 			feature_col_cpu = (char *) str_ptr;
 			str_ptr += strlen(feature_col_cpu) + 1;
 			label_col_cpu = (char *) str_ptr;
 
-			/* Save outer memory context before nested SPI */
 			outer_context = CurrentMemoryContext;
-
-			/* Build query in outer context before nested SPI */
 			initStringInfo(&query);
 			appendStringInfo(&query,
 							 "SELECT %s, %s FROM %s WHERE %s IS NOT NULL AND %s IS NOT NULL",
@@ -1978,7 +1862,6 @@ knn_predict_batch(int32 model_id,
 							 quote_identifier(feature_col_cpu),
 							 quote_identifier(label_col_cpu));
 
-			/* Load training data using nested SPI (PostgreSQL supports this) */
 			{
 				NDB_DECLARE (NdbSpiSession *, eval_nested_spi_session);
 				MemoryContext eval_nested_oldcontext = CurrentMemoryContext;
@@ -1997,10 +1880,7 @@ knn_predict_batch(int32 model_id,
 					bool		feat_is_array;
 					MemoryContext nested_context;
 
-					/* Save nested SPI context */
 					nested_context = CurrentMemoryContext;
-
-					/* Allocate in outer context so it survives SPI_finish() */
 					MemoryContextSwitchTo(outer_context);
 					NDB_ALLOC(train_features, float, (size_t) n_train * (size_t) feature_dim);
 					NDB_ALLOC(train_labels, double, (size_t) n_train);
@@ -2020,7 +1900,6 @@ knn_predict_batch(int32 model_id,
 						Vector	   *vec;
 						ArrayType  *arr;
 						float	   *train_row;
-						/* Safe access to SPI_tuptable - validate before access */
 						if (SPI_tuptable == NULL || SPI_tuptable->vals == NULL || 
 							i >= SPI_processed || SPI_tuptable->vals[i] == NULL)
 						{
@@ -2076,10 +1955,6 @@ knn_predict_batch(int32 model_id,
 				NDB_SPI_SESSION_END(eval_nested_spi_session);
 			}
 
-			/*
-			 * Free query.data - it's allocated in outer context
-			 */
-
 			if (train_valid < k_value)
 			{
 				if (train_features)
@@ -2101,7 +1976,6 @@ knn_predict_batch(int32 model_id,
 				return;
 			}
 
-			/* For each test sample, compute distances and predict */
 			for (i = 0; i < n_samples; i++)
 			{
 				const float *row = features + (i * feature_dim);
@@ -2120,7 +1994,6 @@ knn_predict_batch(int32 model_id,
 				if (true_class > 1)
 					true_class = 1;
 
-				/* Compute distances to all training samples */
 				NDB_ALLOC(samples_local, KNNSample, train_valid);
 				for (j = 0; j < train_valid; j++)
 				{
@@ -2131,10 +2004,8 @@ knn_predict_batch(int32 model_id,
 					samples_local[j].dim = feature_dim;
 				}
 
-				/* Sort by distance */
 				qsort(samples_local, train_valid, sizeof(KNNSample), compare_samples);
 
-				/* Majority vote */
 				{
 					double		class_votes[2] = {0.0, 0.0};
 					int			k;
@@ -2157,7 +2028,6 @@ knn_predict_batch(int32 model_id,
 
 				NDB_FREE(samples_local);
 
-				/* Update confusion matrix */
 				if (true_class == 1 && pred_class == 1)
 					tp++;
 				else if (true_class == 0 && pred_class == 0)
@@ -2273,10 +2143,9 @@ evaluate_knn_by_model_id(PG_FUNCTION_ARGS)
 	 */
 	tbl_str_copy = pstrdup(tbl_str);
 	feat_str_copy = pstrdup(feat_str);
-	targ_str_copy = pstrdup(targ_str);
+				targ_str_copy = pstrdup(targ_str);
 
-	/* Build query in caller context, before SPI */
-	initStringInfo(&query);
+			initStringInfo(&query);
 	appendStringInfo(&query,
 					 "SELECT %s, %s FROM %s WHERE %s IS NOT NULL AND %s IS NOT NULL",
 					 quote_identifier(feat_str),
@@ -2285,7 +2154,6 @@ evaluate_knn_by_model_id(PG_FUNCTION_ARGS)
 					 quote_identifier(feat_str),
 					 quote_identifier(targ_str));
 
-	/* Load model from catalog to determine feature dimension */
 	if (!ml_catalog_fetch_model_payload(model_id, &gpu_payload, NULL, &gpu_metrics))
 	{
 		NDB_FREE(tbl_str);
@@ -2300,7 +2168,6 @@ evaluate_knn_by_model_id(PG_FUNCTION_ARGS)
 						model_id)));
 	}
 
-	/* Validate model payload */
 	if (gpu_payload == NULL)
 	{
 		NDB_FREE(tbl_str);
@@ -2315,7 +2182,6 @@ evaluate_knn_by_model_id(PG_FUNCTION_ARGS)
 						model_id)));
 	}
 
-	/* Check if GPU model and extract feature dimension */
 	if (gpu_payload != NULL)
 	{
 		const char *base = VARDATA(gpu_payload);
@@ -2323,7 +2189,6 @@ evaluate_knn_by_model_id(PG_FUNCTION_ARGS)
 
 		if (first_int >= 1 && first_int <= 1000)
 		{
-			/* CPU format: k, n_samples, n_features */
 			int			k_cpu,
 						n_samples_cpu,
 						n_features_cpu;
@@ -2336,7 +2201,6 @@ evaluate_knn_by_model_id(PG_FUNCTION_ARGS)
 		}
 		else
 		{
-			/* GPU format */
 			const		NdbCudaKnnModelHeader *gpu_hdr;
 
 			if (VARSIZE(gpu_payload) - VARHDRSZ >= (int) sizeof(NdbCudaKnnModelHeader))
@@ -2376,10 +2240,8 @@ evaluate_knn_by_model_id(PG_FUNCTION_ARGS)
 				 errmsg("neurondb: evaluate_knn_by_model_id: could not determine feature dimension")));
 	}
 
-	/* Connect to SPI */
 	NDB_SPI_SESSION_BEGIN(spi_session, oldcontext);
 
-	/* Save SPI context for later cleanup (used in GPU path) */
 	callcontext = CurrentMemoryContext;
 	(void) callcontext;			/* Suppress unused warning in CPU-only paths */
 
@@ -2403,7 +2265,6 @@ evaluate_knn_by_model_id(PG_FUNCTION_ARGS)
 	nvec = SPI_processed;
 	if (nvec < 1)
 	{
-		/* Check if table/view exists and has any rows at all */
 		StringInfoData check_query;
 		int			check_ret;
 		int			total_rows = 0;
@@ -2418,8 +2279,7 @@ evaluate_knn_by_model_id(PG_FUNCTION_ARGS)
 			int32		count_val;
 			Datum		count_datum;
 			bool		isnull;
-			
-			/* Use safe function to get int32 count (will be cast to int64) */
+
 			if (ndb_spi_get_result_safe(0, 1, NULL, &count_datum, &isnull) && !isnull)
 			{
 				count_val = DatumGetInt32(count_datum);
@@ -2428,7 +2288,6 @@ evaluate_knn_by_model_id(PG_FUNCTION_ARGS)
 		}
 		NDB_FREE(check_query.data);
 
-		/* Free original strings before SPI session end */
 		NDB_FREE(tbl_str);
 		NDB_FREE(feat_str);
 		NDB_FREE(targ_str);
@@ -2439,7 +2298,6 @@ evaluate_knn_by_model_id(PG_FUNCTION_ARGS)
 		ndb_spi_stringinfo_free(spi_session, &query);
 		NDB_SPI_SESSION_END(spi_session);
 
-		/* Now use copies for error messages */
 		if (total_rows == 0)
 		{
 			ereport(ERROR,
@@ -2459,16 +2317,11 @@ evaluate_knn_by_model_id(PG_FUNCTION_ARGS)
 		}
 	}
 
-	/* Determine feature column type */
 	if (SPI_tuptable != NULL && SPI_tuptable->tupdesc != NULL)
 		feat_type_oid = SPI_gettypeid(SPI_tuptable->tupdesc, 1);
 	if (feat_type_oid == FLOAT8ARRAYOID || feat_type_oid == FLOAT4ARRAYOID)
 		feat_is_array = true;
 
-	/*
-	 * GPU batch evaluation path for GPU models - uses optimized evaluation
-	 * kernel
-	 */
 	if (is_gpu_model && neurondb_gpu_is_available())
 	{
 #ifdef NDB_GPU_CUDA
@@ -2479,7 +2332,6 @@ evaluate_knn_by_model_id(PG_FUNCTION_ARGS)
 
 		valid_rows = 0;
 
-		/* Defensive check: validate payload size */
 		payload_size = VARSIZE(gpu_payload) - VARHDRSZ;
 		if (payload_size < sizeof(NdbCudaKnnModelHeader))
 		{
@@ -2489,7 +2341,6 @@ evaluate_knn_by_model_id(PG_FUNCTION_ARGS)
 			goto cpu_evaluation_path;
 		}
 
-		/* Load GPU model header with defensive checks */
 		gpu_hdr = (const NdbCudaKnnModelHeader *) VARDATA(gpu_payload);
 		if (gpu_hdr == NULL)
 		{
@@ -2514,7 +2365,6 @@ evaluate_knn_by_model_id(PG_FUNCTION_ARGS)
 			goto cpu_evaluation_path;
 		}
 
-		/* Allocate host buffers for features and labels with size checks */
 		{
 			size_t		features_size = sizeof(float) * (size_t) nvec * (size_t) feat_dim;
 			size_t		labels_size = sizeof(double) * (size_t) nvec;
@@ -2546,11 +2396,6 @@ evaluate_knn_by_model_id(PG_FUNCTION_ARGS)
 			}
 		}
 
-		/*
-		 * Extract features and labels from SPI results - optimized batch
-		 * extraction
-		 */
-		/* Cache TupleDesc to avoid repeated lookups */
 		{
 			TupleDesc	tupdesc = SPI_tuptable->tupdesc;
 
@@ -2587,7 +2432,6 @@ evaluate_knn_by_model_id(PG_FUNCTION_ARGS)
 				if (feat_null || targ_null)
 					continue;
 
-				/* Bounds check */
 				if (valid_rows >= nvec)
 				{
 					elog(DEBUG1,
@@ -2605,7 +2449,6 @@ evaluate_knn_by_model_id(PG_FUNCTION_ARGS)
 
 				h_labels[valid_rows] = DatumGetFloat8(targ_datum);
 
-				/* Extract feature vector - optimized paths */
 				if (feat_is_array)
 				{
 					arr = DatumGetArrayTypeP(feat_datum);
@@ -2613,15 +2456,10 @@ evaluate_knn_by_model_id(PG_FUNCTION_ARGS)
 						continue;
 					if (feat_type_oid == FLOAT8ARRAYOID)
 					{
-						/* Optimized: bulk conversion with loop unrolling hint */
 						float8	   *data = (float8 *) ARR_DATA_PTR(arr);
 						int			j_remain = feat_dim % 4;
 						int			j_end = feat_dim - j_remain;
 
-						/*
-						 * Process 4 elements at a time for better cache
-						 * locality
-						 */
 						for (j = 0; j < j_end; j += 4)
 						{
 							feat_row[j] = (float) data[j];
@@ -2629,13 +2467,11 @@ evaluate_knn_by_model_id(PG_FUNCTION_ARGS)
 							feat_row[j + 2] = (float) data[j + 2];
 							feat_row[j + 3] = (float) data[j + 3];
 						}
-						/* Handle remaining elements */
 						for (j = j_end; j < feat_dim; j++)
 							feat_row[j] = (float) data[j];
 					}
 					else
 					{
-						/* FLOAT4ARRAYOID: direct memcpy (already optimal) */
 						float4	   *data = (float4 *) ARR_DATA_PTR(arr);
 
 						memcpy(feat_row, data, sizeof(float) * feat_dim);
@@ -2643,7 +2479,6 @@ evaluate_knn_by_model_id(PG_FUNCTION_ARGS)
 				}
 				else
 				{
-					/* Vector type: direct memcpy (already optimal) */
 					vec = DatumGetVector(feat_datum);
 					if (vec->dim != feat_dim)
 						continue;
@@ -2672,12 +2507,10 @@ evaluate_knn_by_model_id(PG_FUNCTION_ARGS)
 					 errmsg("neurondb: evaluate_knn_by_model_id: no valid rows found")));
 		}
 
-		/* Use optimized GPU batch evaluation */
 		{
 			int			rc;
 			char	   *gpu_errstr = NULL;
 
-			/* Defensive checks before GPU call */
 			if (h_features == NULL || h_labels == NULL || valid_rows <= 0 || feat_dim <= 0)
 			{
 				elog(DEBUG1,
@@ -2703,10 +2536,8 @@ evaluate_knn_by_model_id(PG_FUNCTION_ARGS)
 
 				if (rc == 0)
 				{
-					/* Success - cleanup and build result */
 					StringInfoData jsonbuf;
-					
-					/* Free GPU-allocated memory before ending SPI */
+
 					NDB_FREE(h_features);
 					NDB_FREE(h_labels);
 					if (gpu_payload)
@@ -2719,14 +2550,11 @@ evaluate_knn_by_model_id(PG_FUNCTION_ARGS)
 					NDB_FREE(feat_str);
 					NDB_FREE(targ_str);
 					ndb_spi_stringinfo_free(spi_session, &query);
-					
-					/* End SPI session BEFORE creating JSONB */
+
 					NDB_SPI_SESSION_END(spi_session);
-					
-					/* Switch to oldcontext to create JSONB */
+
 					MemoryContextSwitchTo(oldcontext);
-					
-					/* Build result JSON string */
+
 					initStringInfo(&jsonbuf);
 					appendStringInfo(&jsonbuf,
 									 "{\"accuracy\":%.6f,\"precision\":%.6f,\"recall\":%.6f,\"f1_score\":%.6f,\"n_samples\":%d}",
@@ -2736,7 +2564,6 @@ evaluate_knn_by_model_id(PG_FUNCTION_ARGS)
 									 f1_score,
 									 valid_rows);
 
-					/* Create JSONB in oldcontext using ndb_jsonb_in_cstring */
 					result_jsonb = ndb_jsonb_in_cstring(jsonbuf.data);
 					NDB_FREE(jsonbuf.data);
 					
@@ -2751,7 +2578,6 @@ evaluate_knn_by_model_id(PG_FUNCTION_ARGS)
 				}
 				else
 				{
-					/* GPU evaluation failed - fall back to CPU */
 					elog(DEBUG1,
 						 "neurondb: evaluate_knn_by_model_id: GPU batch evaluation failed: %s, falling back to CPU",
 						 gpu_errstr ? gpu_errstr : "unknown error");
@@ -2788,23 +2614,15 @@ evaluate_knn_by_model_id(PG_FUNCTION_ARGS)
 cpu_evaluation_path:
 #pragma GCC diagnostic pop
 
-	/* CPU evaluation path */
-	/* Use optimized batch prediction */
 	{
 		float	   *cpu_h_features = NULL;
 		double	   *cpu_h_labels = NULL;
 
 		valid_rows = 0;
 
-		/* Allocate host buffers for features and labels */
 		NDB_ALLOC(cpu_h_features, float, (size_t) nvec * (size_t) feat_dim);
 		NDB_ALLOC(cpu_h_labels, double, (size_t) nvec);
 
-		/*
-		 * Extract features and labels from SPI results - optimized batch
-		 * extraction
-		 */
-		/* Cache TupleDesc to avoid repeated lookups */
 		{
 			TupleDesc	tupdesc = SPI_tuptable->tupdesc;
 
@@ -2828,7 +2646,6 @@ cpu_evaluation_path:
 				feat_row = cpu_h_features + (valid_rows * feat_dim);
 				cpu_h_labels[valid_rows] = DatumGetFloat8(targ_datum);
 
-				/* Extract feature vector - optimized paths */
 				if (feat_is_array)
 				{
 					arr = DatumGetArrayTypeP(feat_datum);
@@ -2836,15 +2653,10 @@ cpu_evaluation_path:
 						continue;
 					if (feat_type_oid == FLOAT8ARRAYOID)
 					{
-						/* Optimized: bulk conversion with loop unrolling hint */
 						float8	   *data = (float8 *) ARR_DATA_PTR(arr);
 						int			j_remain = feat_dim % 4;
 						int			j_end = feat_dim - j_remain;
 
-						/*
-						 * Process 4 elements at a time for better cache
-						 * locality
-						 */
 						for (j = 0; j < j_end; j += 4)
 						{
 							feat_row[j] = (float) data[j];
@@ -2852,13 +2664,11 @@ cpu_evaluation_path:
 							feat_row[j + 2] = (float) data[j + 2];
 							feat_row[j + 3] = (float) data[j + 3];
 						}
-						/* Handle remaining elements */
 						for (j = j_end; j < feat_dim; j++)
 							feat_row[j] = (float) data[j];
 					}
 					else
 					{
-						/* FLOAT4ARRAYOID: direct memcpy (already optimal) */
 						float4	   *data = (float4 *) ARR_DATA_PTR(arr);
 
 						memcpy(feat_row, data, sizeof(float) * feat_dim);
@@ -2866,7 +2676,6 @@ cpu_evaluation_path:
 				}
 				else
 				{
-					/* Vector type: direct memcpy (already optimal) */
 					vec = DatumGetVector(feat_datum);
 					if (vec->dim != feat_dim)
 						continue;
@@ -2879,12 +2688,9 @@ cpu_evaluation_path:
 
 		if (valid_rows == 0)
 		{
-			/* Check if we had rows but they were all filtered out */
-			/* Safe access for complex types - validate before access */
 			if (nvec > 0 && SPI_tuptable != NULL && SPI_tuptable->vals != NULL && 
 				SPI_tuptable->vals[0] != NULL && SPI_tuptable->tupdesc != NULL)
 			{
-				/* Try to determine why rows were filtered */
 				HeapTuple	tuple = SPI_tuptable->vals[0];
 				TupleDesc	tupdesc = SPI_tuptable->tupdesc;
 				Datum		feat_datum;
@@ -2960,7 +2766,6 @@ cpu_evaluation_path:
 			}
 		}
 
-		/* Use batch prediction helper */
 		knn_predict_batch(model_id,
 						  cpu_h_features,
 						  cpu_h_labels,
@@ -2971,12 +2776,10 @@ cpu_evaluation_path:
 						  &fp,
 						  &fn);
 
-		/* Compute metrics */
 		if (valid_rows > 0)
 		{
 			int			total_predictions = tp + tn + fp + fn;
 
-			/* Defensive check: ensure we have predictions */
 			if (total_predictions == 0)
 			{
 				elog(DEBUG1,
@@ -2989,10 +2792,8 @@ cpu_evaluation_path:
 			}
 			else
 			{
-				/* Use valid_rows for accuracy (original behavior) */
 				accuracy = (double) (tp + tn) / (double) valid_rows;
 
-				/* Warn if some rows were skipped during prediction */
 				if (total_predictions < valid_rows)
 				{
 					elog(DEBUG1,
@@ -3025,11 +2826,9 @@ cpu_evaluation_path:
 			NDB_FREE(gpu_metrics);
 	}
 
-	/* End SPI session BEFORE creating JSONB to avoid context conflicts */
 	ndb_spi_stringinfo_free(spi_session, &query);
 	NDB_SPI_SESSION_END(spi_session);
 
-	/* Switch to old context and build JSONB directly using JSONB API */
 	MemoryContextSwitchTo(oldcontext);
 	{
 		JsonbParseState *state = NULL;
@@ -3039,12 +2838,10 @@ cpu_evaluation_path:
 		Numeric		accuracy_num, precision_num, recall_num, f1_score_num, n_samples_num;
 		int			n_samples_val = valid_rows > 0 ? valid_rows : nvec;
 
-		/* Start object */
 		PG_TRY();
 		{
 			(void) pushJsonbValue(&state, WJB_BEGIN_OBJECT, NULL);
 
-			/* Add accuracy */
 			jkey.type = jbvString;
 			jkey.val.string.len = 9;
 			jkey.val.string.val = "accuracy";
@@ -3054,7 +2851,6 @@ cpu_evaluation_path:
 			jval.val.numeric = accuracy_num;
 			(void) pushJsonbValue(&state, WJB_VALUE, &jval);
 
-			/* Add precision */
 			jkey.val.string.val = "precision";
 			jkey.val.string.len = 9;
 			(void) pushJsonbValue(&state, WJB_KEY, &jkey);
@@ -3063,7 +2859,6 @@ cpu_evaluation_path:
 			jval.val.numeric = precision_num;
 			(void) pushJsonbValue(&state, WJB_VALUE, &jval);
 
-			/* Add recall */
 			jkey.val.string.val = "recall";
 			jkey.val.string.len = 6;
 			(void) pushJsonbValue(&state, WJB_KEY, &jkey);
@@ -3072,7 +2867,6 @@ cpu_evaluation_path:
 			jval.val.numeric = recall_num;
 			(void) pushJsonbValue(&state, WJB_VALUE, &jval);
 
-			/* Add f1_score */
 			jkey.val.string.val = "f1_score";
 			jkey.val.string.len = 8;
 			(void) pushJsonbValue(&state, WJB_KEY, &jkey);
@@ -3081,7 +2875,6 @@ cpu_evaluation_path:
 			jval.val.numeric = f1_score_num;
 			(void) pushJsonbValue(&state, WJB_VALUE, &jval);
 
-			/* Add n_samples */
 			jkey.val.string.val = "n_samples";
 			jkey.val.string.len = 9;
 			(void) pushJsonbValue(&state, WJB_KEY, &jkey);
@@ -3090,7 +2883,6 @@ cpu_evaluation_path:
 			jval.val.numeric = n_samples_num;
 			(void) pushJsonbValue(&state, WJB_VALUE, &jval);
 
-			/* End object */
 			final_value = pushJsonbValue(&state, WJB_END_OBJECT, NULL);
 			
 			if (final_value == NULL)
@@ -3117,12 +2909,10 @@ cpu_evaluation_path:
 				 errmsg("neurondb: evaluate_knn_by_model_id: JSONB result is NULL")));
 	}
 
-	/* Free strings allocated before SPI session begin (in oldcontext) */
 	NDB_FREE(tbl_str);
 	NDB_FREE(feat_str);
 	NDB_FREE(targ_str);
 
-	/* Free string copies used for error messages */
 	if (tbl_str_copy)
 		NDB_FREE(tbl_str_copy);
 	if (feat_str_copy)
@@ -3189,7 +2979,6 @@ knn_gpu_train(MLGpuModel * model, const MLGpuTrainSpec * spec, char **errstr)
 	if (backend == NULL || backend->knn_train == NULL)
 		return false;
 
-	/* Extract hyperparameters */
 	if (spec->hyperparameters != NULL)
 	{
 		Datum		k_datum;
@@ -3442,8 +3231,8 @@ knn_gpu_deserialize(MLGpuModel * model,
 					const Jsonb * metadata,
 					char **errstr)
 {
-	KnnGpuModelState *state;
-	bytea	   *payload_copy;
+	KnnGpuModelState *state = NULL;
+	bytea	   *payload_copy = NULL;
 	int			payload_size;
 
 	if (errstr != NULL)

@@ -583,7 +583,6 @@ ndb_rocm_svm_train(const float *features,
 		return -1;
 	}
 
-	/* Cleanup */
 	if (model.alphas)
 		NDB_FREE(model.alphas);
 	if (model.support_vectors)

@@ -200,7 +200,6 @@ gpu_kmeans_assign(const float *h_vectors,
 		nvec * sizeof(int32_t),
 		cudaMemcpyDeviceToHost);
 
-	/* Cleanup */
 	cudaFree(d_vectors);
 	cudaFree(d_centroids);
 	cudaFree(d_assignments);
@@ -261,7 +260,6 @@ gpu_kmeans_update(const float *h_vectors,
 		k * sizeof(int32_t),
 		cudaMemcpyDeviceToHost);
 
-	/* Cleanup */
 	cudaFree(d_vectors);
 	cudaFree(d_assignments);
 	cudaFree(d_centroids);

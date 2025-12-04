@@ -111,7 +111,6 @@ rerank_ensemble_weighted(PG_FUNCTION_ARGS)
 	bool		typbyval;
 	char		typalign;
 
-	/* Parse arguments */
 	doc_ids_array = PG_GETARG_ARRAYTYPE_P(0);
 	score_matrix_array = PG_GETARG_ARRAYTYPE_P(1);
 
@@ -262,7 +261,6 @@ rerank_ensemble_weighted(PG_FUNCTION_ARGS)
 	result = construct_array(
 							 result_datums, num_docs, INT4OID, typlen, typbyval, typalign);
 
-	/* Cleanup */
 	NDB_FREE(normalized_scores);
 	NDB_FREE(doc_scores);
 	NDB_FREE(result_datums);
@@ -308,7 +306,6 @@ rerank_ensemble_borda(PG_FUNCTION_ARGS)
 	bool		typbyval;
 	char		typalign;
 
-	/* Parse arguments */
 	ranked_lists_array = PG_GETARG_ARRAYTYPE_P(0);
 
 	ndim = ARR_NDIM(ranked_lists_array);
@@ -396,7 +393,6 @@ rerank_ensemble_borda(PG_FUNCTION_ARGS)
 	/* Sort by Borda score */
 	qsort(doc_scores, num_unique_docs, sizeof(DocScore), docscore_cmp);
 
-	/* Build result */
 	result_datums = (Datum *) palloc(sizeof(Datum) * num_unique_docs);
 	NDB_CHECK_ALLOC(result_datums, "result_datums");
 	for (i = 0; i < num_unique_docs; i++)

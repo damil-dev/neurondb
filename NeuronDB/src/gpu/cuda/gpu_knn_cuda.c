@@ -248,14 +248,6 @@ ndb_cuda_knn_train(const float *features,
 				   Jsonb * *metrics,
 				   char **errstr)
 {
-	/* CPU mode: never execute GPU code */
-	if (NDB_COMPUTE_MODE_IS_CPU())
-	{
-		if (errstr)
-			*errstr = pstrdup("CUDA knn_train: CPU mode - GPU code should not be called");
-		return -1;
-	}
-
 	struct KNNModel model;
 	bytea	   *blob = NULL;
 	Jsonb	   *metrics_json = NULL;
@@ -265,6 +257,14 @@ ndb_cuda_knn_train(const float *features,
 				j;
 	int			extracted_task;
 	int			rc = -1;
+
+	/* CPU mode: never execute GPU code */
+	if (NDB_COMPUTE_MODE_IS_CPU())
+	{
+		if (errstr)
+			*errstr = pstrdup("CUDA knn_train: CPU mode - GPU code should not be called");
+		return -1;
+	}
 
 	if (errstr)
 		*errstr = NULL;

@@ -812,7 +812,6 @@ neurondb_hf_tokenize(PG_FUNCTION_ARGS)
 	result = construct_array(
 							 dvalues, output_length, INT4OID, sizeof(int32), true, 'i');
 
-	/* Cleanup */
 	NDB_FREE(token_ids);
 	NDB_FREE(dvalues);
 	NDB_FREE(dnulls);
@@ -923,7 +922,6 @@ neurondb_hf_detokenize(PG_FUNCTION_ARGS)
 	/* Detokenize */
 	text_str = neurondb_detokenize(token_ids, length, model_name);
 
-	/* Cleanup */
 	NDB_FREE(token_ids);
 	NDB_FREE(dvalues);
 	NDB_FREE(dnulls);

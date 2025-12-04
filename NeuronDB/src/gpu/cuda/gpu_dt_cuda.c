@@ -695,14 +695,6 @@ ndb_cuda_dt_train(const float *features,
 				  Jsonb * *metrics,
 				  char **errstr)
 {
-	/* CPU mode: never execute GPU code */
-	if (NDB_COMPUTE_MODE_IS_CPU())
-	{
-		if (errstr)
-			*errstr = pstrdup("CUDA dt_train: CPU mode - GPU code should not be called");
-		return -1;
-	}
-
 	int			max_depth = 10;
 	int			min_samples_split = 2;
 	bool		is_classification = true;
@@ -712,6 +704,14 @@ ndb_cuda_dt_train(const float *features,
 	int		   *indices = NULL;
 	int			i;
 	int			rc = -1;
+
+	/* CPU mode: never execute GPU code */
+	if (NDB_COMPUTE_MODE_IS_CPU())
+	{
+		if (errstr)
+			*errstr = pstrdup("CUDA dt_train: CPU mode - GPU code should not be called");
+		return -1;
+	}
 
 	if (errstr)
 		*errstr = NULL;

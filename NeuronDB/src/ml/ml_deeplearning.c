@@ -664,7 +664,6 @@ finetune_dl_model(PG_FUNCTION_ARGS)
 	char	   *table = text_to_cstring(training_table);
 	StringInfoData result;
 
-	/* Validate */
 	if (epochs <= 0 || epochs > 1000)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
@@ -773,7 +772,6 @@ dl_predict_batch(PG_FUNCTION_ARGS)
 	char	   *out_table = text_to_cstring(output_table);
 	int			processed_rows = 0;
 
-	/* Validate */
 	if (batch_size <= 0 || batch_size > 10000)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
@@ -897,7 +895,6 @@ quantize_dl_model(PG_FUNCTION_ARGS)
 	StringInfoData result;
 	int			quantized_model_id;
 
-	/* Validate */
 	if (strcmp(quant_type, "int8") != 0 && strcmp(quant_type, "fp16") != 0
 		&& strcmp(quant_type, "dynamic") != 0)
 		ereport(ERROR,

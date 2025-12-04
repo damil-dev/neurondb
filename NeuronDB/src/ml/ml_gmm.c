@@ -611,7 +611,6 @@ train_gmm_model_id(PG_FUNCTION_ARGS)
 
 	model_id = ml_catalog_register_model(&spec);
 
-	/* Cleanup */
 	for (i = 0; i < nvec; i++)
 	{
 		NDB_FREE(data[i]);
@@ -689,7 +688,6 @@ predict_gmm_model_id(PG_FUNCTION_ARGS)
 
 	if (features->dim != model->dim)
 	{
-		/* Cleanup */
 		for (i = 0; i < model->k; i++)
 		{
 			NDB_FREE(model->means[i]);
@@ -723,7 +721,6 @@ predict_gmm_model_id(PG_FUNCTION_ARGS)
 		}
 	}
 
-	/* Cleanup */
 	NDB_FREE(probabilities);
 	for (i = 0; i < model->k; i++)
 	{
@@ -1059,7 +1056,6 @@ evaluate_gmm_by_model_id(PG_FUNCTION_ARGS)
 			silhouette = sum_silhouette / (double) valid_count;
 	}
 
-	/* Cleanup */
 	if (data)
 	{
 		for (i = 0; i < nvec; i++)

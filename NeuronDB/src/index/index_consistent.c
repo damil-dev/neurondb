@@ -306,7 +306,6 @@ build_hnsw_index(const char *table, const char *col, uint32 seed)
 					 "KEY(id))",
 					 index_table,
 					 "vector");
-	//Replace "vector" with the actual type if needed
 
 	ret = ndb_spi_execute(session, sql.data, false, 0);
 	if (ret != SPI_OK_UTILITY)

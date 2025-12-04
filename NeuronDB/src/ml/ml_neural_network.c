@@ -99,7 +99,23 @@ activation_derivative_tanh(float x)
 	return 1.0f - t * t;
 }
 
-/* Forward pass through network */
+/*
+ * neural_network_forward
+ *    Execute forward propagation through all network layers.
+ *
+ * This function processes input data through each layer of the network,
+ * computing weighted sums, applying activation functions, and propagating
+ * activations to subsequent layers. Each layer receives activations from
+ * the previous layer as input, applies matrix multiplication with learned
+ * weights, adds bias terms, and transforms the result through an activation
+ * function. The function validates all inputs and intermediate results for
+ * numerical stability, checking for NULL pointers, invalid layer counts,
+ * and non-finite values that could indicate numerical overflow or invalid
+ * training data. For each neuron in each layer, it computes the weighted
+ * sum of inputs, adds the bias term, applies the activation function
+ * (ReLU, sigmoid, tanh, or linear), and stores the result for use by the
+ * next layer or as the final output.
+ */
 static void
 neural_network_forward(NeuralNetwork * net, float *input, float *output)
 {
@@ -235,7 +251,24 @@ neural_network_forward(NeuralNetwork * net, float *input, float *output)
 	}
 }
 
-/* Backward pass (backpropagation) */
+/*
+ * neural_network_backward
+ *    Execute backpropagation algorithm to compute gradients for weight updates.
+ *
+ * This function implements the backpropagation algorithm, computing gradients
+ * of the loss function with respect to all network weights. The algorithm
+ * begins at the output layer by calculating the error between predicted and
+ * target values, then multiplies this error by the derivative of the
+ * activation function to obtain output layer deltas. These deltas are then
+ * propagated backward through hidden layers using the chain rule of
+ * calculus. For each hidden layer, the gradient flows from the next layer
+ * through the weights connecting the layers, multiplied by the derivative
+ * of the current layer's activation function. The computed deltas represent
+ * how much each neuron's output contributes to the overall error, and they
+ * are used to update weights during training to minimize the loss function.
+ * This process enables the network to learn from training examples by
+ * adjusting weights in the direction that reduces prediction error.
+ */
 static void
 neural_network_backward(NeuralNetwork * net,
 						float *input,
@@ -772,7 +805,6 @@ neural_network_deserialize(const bytea * data)
 
 			if (buf.cursor + weights_bytes_needed > buf.len)
 			{
-				/* Cleanup */
 				for (j = 0; j < i; j++)
 				{
 					NeuralLayer *prev_layer = &net->layers[j];
@@ -805,7 +837,6 @@ neural_network_deserialize(const bytea * data)
 			layer->weights[j] = (float *) palloc(weight_row_size);
 			if (layer->weights[j] == NULL)
 			{
-				/* Cleanup */
 				for (k = 0; k < j; k++)
 					NDB_FREE(layer->weights[k]);
 				NDB_FREE(layer->weights);
@@ -841,7 +872,6 @@ neural_network_deserialize(const bytea * data)
 
 				if (!isfinite(weight_val))
 				{
-					/* Cleanup */
 					for (k = 0; k <= j; k++)
 						NDB_FREE(layer->weights[k]);
 					NDB_FREE(layer->weights);
@@ -1444,7 +1474,6 @@ train_neural_network(PG_FUNCTION_ARGS)
 		MemoryContextSwitchTo(oldcontext);
 		MemoryContextDelete(callcontext);
 
-		/* Cleanup */
 		for (i = 0; i < n_samples; i++)
 			NDB_FREE(X[i]);
 		NDB_FREE(X);
@@ -1650,7 +1679,6 @@ predict_neural_network(PG_FUNCTION_ARGS)
 	}
 	PG_END_TRY();
 
-	/* Cleanup */
 	neural_network_free(net);
 	NDB_FREE(input_features);
 
@@ -1878,7 +1906,6 @@ evaluate_neural_network_by_model_id(PG_FUNCTION_ARGS)
 	result = DatumGetJsonbP(DirectFunctionCall1(jsonb_in, CStringGetTextDatum(jsonbuf.data)));
 	NDB_FREE(jsonbuf.data);
 
-	/* Cleanup */
 	NDB_FREE(tbl_str);
 	NDB_FREE(feat_str);
 	NDB_FREE(targ_str);
@@ -1912,7 +1939,7 @@ typedef struct NeuralNetworkGpuModelState
 static bool
 neural_network_gpu_train(MLGpuModel * model, const MLGpuTrainSpec * spec, char **errstr)
 {
-	NeuralNetworkGpuModelState *state;
+	NeuralNetworkGpuModelState *state = NULL;
 	float	  **X = NULL;
 	float	   *y = NULL;
 	NeuralNetwork *net = NULL;

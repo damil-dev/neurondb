@@ -203,7 +203,6 @@ gpu_pq_encode_batch(const float *h_vectors,
 		nvec * m * sizeof(uint8_t),
 		cudaMemcpyDeviceToHost);
 
-	/* Cleanup */
 	cudaFree(d_vectors);
 	cudaFree(d_codebooks);
 	cudaFree(d_codes);
@@ -261,7 +260,6 @@ gpu_pq_asymmetric_distance_batch(const float *h_query,
 		nvec * sizeof(float),
 		cudaMemcpyDeviceToHost);
 
-	/* Cleanup */
 	cudaFree(d_query);
 	cudaFree(d_codes);
 	cudaFree(d_codebooks);
