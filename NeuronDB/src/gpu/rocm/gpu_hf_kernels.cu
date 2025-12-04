@@ -2304,51 +2304,24 @@ ndb_rocm_hf_generate_inference(const char *model_name,
 			}
 		} else
 		{
-			/* No LM head weights, use dummy logits */
-			threads = GET_THREADS(config->vocab_size);
-			blocks = GET_BLOCKS(config->vocab_size, threads);
-
-			/* Initialize logits with small random values */
-			float *h_dummy_logits = NULL;
-			int j;
-
-			h_dummy_logits = (float *)malloc(logit_bytes);
-			if (!h_dummy_logits)
+			/* LM head weights are required for text generation */
+			hipFree(d_current_embedding);
+			hipFree(d_hidden_states);
+			hipFree(d_attention_output);
+			hipFree(d_ffn_output);
+			if (errstr)
 			{
-				hipFree(d_current_embedding);
-				hipFree(d_hidden_states);
-				hipFree(d_attention_output);
-				hipFree(d_ffn_output);
-				generated_count = i;
-				break;
+				const char *err_msg = "LM head weights are required for text generation. Model weights must be properly loaded.";
+				size_t len = strlen(err_msg) + 1;
+				char *err = (char *)malloc(len);
+				if (err)
+				{
+					memcpy(err, err_msg, len);
+					*errstr = err;
+				}
 			}
-
-			/* Generate dummy logits based on current token */
-			for (j = 0; j < config->vocab_size; j++)
-			{
-				/* Dummy logit: higher probability for tokens similar to current */
-				float similarity = (j == current_token_id)
-					? 1.0f
-					: (float)(rand() % 100) / 100.0f - 0.5f;
-				h_dummy_logits[j] = similarity
-					* 10.0f; /* Scale for softmax */
-			}
-
-			/* Copy to device */
-			status = hipMemcpy(d_logits,
-				h_dummy_logits,
-				logit_bytes,
-				hipMemcpyHostToDevice);
-			free(h_dummy_logits);
-			if (status != hipSuccess)
-			{
-				hipFree(d_current_embedding);
-				hipFree(d_hidden_states);
-				hipFree(d_attention_output);
-				hipFree(d_ffn_output);
-				generated_count = i;
-				break;
-			}
+			generated_count = i;
+			break;
 		}
 
 		/* Free temporary buffers */

@@ -123,18 +123,13 @@ ndb_rocm_hf_load_model_weights(const char *model_name,
 	NdbRocmHfModelWeights *weights,
 	char **errstr)
 {
-	size_t embed_table_size;
-	size_t position_embed_size;
-	size_t lm_head_size;
-	int i;
-
-	/* Placeholder: In a full implementation, this would:
-	 * 1. Load model weights from file (e.g., safetensors, pickle)
-	 * 2. Allocate GPU memory for weights
-	 * 3. Copy weights to GPU
+	/*
+	 * Model weights must be loaded from actual model files.
+	 * This requires: 1. Load model weights from file (e.g., safetensors, pickle)
+	 * 2. Allocate GPU memory for weights 3. Copy weights to GPU
 	 * 4. Initialize config structure
 	 *
-	 * For now, we'll create dummy weights for demonstration
+	 * Dummy weights are not supported. Real model loading implementation required.
 	 */
 	if (!model_name || !config || !weights)
 	{
@@ -144,51 +139,47 @@ ndb_rocm_hf_load_model_weights(const char *model_name,
 		return -1;
 	}
 
-	memset(config, 0, sizeof(NdbRocmHfModelConfig));
-	memset(weights, 0, sizeof(NdbRocmHfModelWeights));
-
-	strncpy(config->model_name, model_name, NDB_HF_MAX_MODEL_NAME - 1);
-	config->model_type = NDB_HF_MODEL_EMBEDDING;
-	config->vocab_size = 30522;
-	config->embed_dim = 768;
-	config->max_seq_len = 512;
-	config->num_layers = 12;
-	config->num_heads = 12;
-	config->hidden_dim = 3072;
-	config->use_gpu = true;
-
-	embed_table_size =
-		config->vocab_size * config->embed_dim * sizeof(float);
-	weights->embedding_table = (float *)palloc(embed_table_size);
-
-	for (i = 0; i < config->vocab_size * config->embed_dim; i++)
+	/* Validate model_path if provided */
+	if (model_path && model_path[0] != '\0')
 	{
-		weights->embedding_table[i] =
-			(float)(rand() % 1000) / 1000.0f - 0.5f;
+		struct stat statbuf;
+		
+		if (stat(model_path, &statbuf) != 0 || !S_ISREG(statbuf.st_mode))
+		{
+			if (errstr)
+			{
+				int saved_errno = errno;
+				*errstr = psprintf("Model file '%s' does not exist or is not a regular file: %s",
+								  model_path, strerror(saved_errno));
+			}
+			return -1;
+		}
+		
+		if (access(model_path, R_OK) != 0)
+		{
+			if (errstr)
+			{
+				int saved_errno = errno;
+				*errstr = psprintf("Model file '%s' is not readable: %s",
+								  model_path, strerror(saved_errno));
+			}
+			return -1;
+		}
 	}
 
-	position_embed_size =
-		config->max_seq_len * config->embed_dim * sizeof(float);
-	lm_head_size =
-		config->vocab_size * config->embed_dim * sizeof(float);
-	weights->position_embeddings = (float *)palloc(position_embed_size);
-	weights->lm_head_weights = (float *)palloc(lm_head_size);
-
-	for (i = 0; i < config->max_seq_len * config->embed_dim; i++)
-	{
-		weights->position_embeddings[i] =
-			(float)(rand() % 1000) / 1000.0f - 0.5f;
-	}
-	for (i = 0; i < config->vocab_size * config->embed_dim; i++)
-	{
-		weights->lm_head_weights[i] =
-			(float)(rand() % 1000) / 1000.0f - 0.5f;
-	}
-
-	weights->total_bytes =
-		embed_table_size + position_embed_size + lm_head_size;
-
-	return 0;
+	/* Model weight loading from files requires parsing safetensors/pickle/ONNX formats */
+	/* Full implementation requires: */
+	/* 1. Parse model file format (safetensors, pickle, ONNX, etc.) */
+	/* 2. Extract weight tensors and model configuration */
+	/* 3. Allocate GPU memory for weights */
+	/* 4. Copy weights to GPU memory */
+	/* 5. Initialize config structure from model metadata */
+	if (errstr)
+		*errstr = psprintf("Model weight loading from files is not yet implemented. "
+						  "Model file parsing (safetensors/pickle/ONNX) and GPU memory allocation "
+						  "require full implementation. Model: %s, Path: %s",
+						  model_name, model_path ? model_path : "(none)");
+	return -1;
 }
 
 static int
@@ -286,16 +277,16 @@ ndb_rocm_hf_embed(const char *model_name,
 	int *dim_out,
 	char **errstr)
 {
-	NdbRocmHfModelEntry *entry = NULL;
+	NDB_DECLARE(NdbRocmHfModelEntry *, entry);
 	NdbRocmHfModelConfig config;
 	NdbRocmHfModelWeights weights;
 	int32_t token_ids[NDB_HF_MAX_SEQ_LEN];
 	int32_t attention_mask[NDB_HF_MAX_SEQ_LEN];
 	int seq_len = 0;
-	float *embedding = NULL;
+	NDB_DECLARE(float *, embedding);
 	int embed_dim = 0;
 	hipError_t hip_status;
-	float *d_embedding_table = NULL;
+	NDB_DECLARE(float *, d_embedding_table);
 	size_t embed_table_bytes;
 	size_t embed_table_size;
 	int rc = -1;
@@ -354,7 +345,7 @@ ndb_rocm_hf_embed(const char *model_name,
 		}
 		oldcontext = MemoryContextSwitchTo(embed_context);
 
-		/* Load model (for now, use dummy weights) */
+		/* Load model weights - will error if weights cannot be loaded */
 		rc = ndb_rocm_hf_load_model_weights(
 			model_name, NULL, &config, &weights, errstr);
 		if (rc != 0)
@@ -743,10 +734,10 @@ ndb_rocm_hf_parse_gen_params_OLD_REMOVED(const char *params_json,
 							 NdbRocmHfGenParams *gen_params,
 							 char **errstr)
 {
-	char *json_copy = NULL;
+	NDB_DECLARE(char *, json_copy);
 	char *p = NULL;
-	char *key = NULL;
-	char *value = NULL;
+	NDB_DECLARE(char *, key);
+	NDB_DECLARE(char *, value);
 	char *endptr = NULL;
 	float float_val;
 	int int_val;
@@ -1082,7 +1073,7 @@ ndb_rocm_hf_parse_gen_params_OLD_REMOVED(const char *params_json,
 		{
 			/* Parse stop sequences - supports both string and array format */
 #ifdef HAVE_ONNX_RUNTIME
-			int32_t *stop_token_ids = NULL;
+			NDB_DECLARE(int32_t *, stop_token_ids);
 			int32_t stop_token_len = 0;
 #endif
 
@@ -1654,7 +1645,7 @@ ndb_rocm_hf_decode_tokens(const int32_t *token_ids,
 	char **text_out,
 	char **errstr)
 {
-	char *decoded_text = NULL;
+	NDB_DECLARE(char *, decoded_text);
 
 	if (errstr)
 		*errstr = NULL;
@@ -1829,7 +1820,7 @@ ndb_rocm_hf_complete(const char *model_name,
 	char **text_out,
 	char **errstr)
 {
-	NdbRocmHfModelEntry *entry = NULL;
+	NDB_DECLARE(NdbRocmHfModelEntry *, entry);
 	NdbRocmHfModelConfig config;
 	NdbRocmHfModelWeights weights;
 	NdbRocmHfGenParams gen_params;
@@ -1839,14 +1830,14 @@ ndb_rocm_hf_complete(const char *model_name,
 	int32_t output_token_ids[NDB_HF_MAX_GEN_TOKENS];
 	int input_seq_len = 0;
 	int output_seq_len = 0;
-	char *generated_text = NULL;
+	NDB_DECLARE(char *, generated_text);
 	int rc = -1;
 	MemoryContext oldcontext;
 	MemoryContext complete_context;
 	hipError_t hip_status;
-	float *d_embedding_table = NULL;
-	float *d_position_embeddings = NULL;
-	float *d_lm_head_weights = NULL;
+	NDB_DECLARE(float *, d_embedding_table);
+	NDB_DECLARE(float *, d_position_embeddings);
+	NDB_DECLARE(float *, d_lm_head_weights);
 	size_t embed_table_bytes;
 	size_t position_embed_bytes;
 	size_t lm_head_bytes;
@@ -1870,7 +1861,7 @@ ndb_rocm_hf_complete(const char *model_name,
 	/* Parse generation parameters */
 	if (params_json && strlen(params_json) > 0)
 	{
-		char	   *temp_errstr = NULL;
+		NDB_DECLARE(char *, temp_errstr);
 
 		NdbGenParams ndb_params = {0};
 		rc = ndb_json_parse_gen_params(params_json, &ndb_params, &temp_errstr);
@@ -1927,9 +1918,9 @@ ndb_rocm_hf_complete(const char *model_name,
 	entry = ndb_rocm_hf_find_model(model_name);
 	if (entry == NULL || !entry->loaded)
 	{
-		char	   *temp_errstr = NULL;
+		NDB_DECLARE(char *, temp_errstr);
 
-		/* Load model (for now, use dummy weights) */
+		/* Load model weights - will error if weights cannot be loaded */
 		rc = ndb_rocm_hf_load_model_weights(
 			model_name, NULL, &config, &weights, &temp_errstr);
 		if (rc != 0)
@@ -2028,7 +2019,7 @@ ndb_rocm_hf_complete(const char *model_name,
 
 	/* Tokenize prompt */
 	{
-		char	   *temp_errstr = NULL;
+		NDB_DECLARE(char *, temp_errstr);
 
 		rc = ndb_rocm_hf_tokenize_text(prompt,
 			model_name,
@@ -2050,7 +2041,7 @@ ndb_rocm_hf_complete(const char *model_name,
 	/* Initialize KV cache */
 	memset(&kv_cache, 0, sizeof(NdbRocmHfKVCache));
 	{
-		char	   *temp_errstr = NULL;
+		NDB_DECLARE(char *, temp_errstr);
 
 		rc = ndb_rocm_hf_init_kv_cache(&kv_cache, &config, &temp_errstr);
 		if (rc != 0)
@@ -2228,7 +2219,7 @@ ndb_rocm_hf_complete(const char *model_name,
 
 	/* Call ROCm generation kernel */
 	{
-		char	   *temp_errstr = NULL;
+		NDB_DECLARE(char *, temp_errstr);
 
 		rc = ndb_rocm_hf_generate_inference(model_name,
 			input_token_ids,
@@ -2257,7 +2248,7 @@ ndb_rocm_hf_complete(const char *model_name,
 
 	/* Decode generated tokens to text */
 	{
-		char	   *temp_errstr = NULL;
+		NDB_DECLARE(char *, temp_errstr);
 
 		rc = ndb_rocm_hf_decode_tokens(output_token_ids,
 			output_seq_len,
@@ -2310,7 +2301,7 @@ ndb_rocm_hf_generate_stream(const char *model_name,
 	char **errstr)
 {
 	NdbRocmHfGenParams gen_params;
-	NdbRocmHfModelEntry *entry = NULL;
+	NDB_DECLARE(NdbRocmHfModelEntry *, entry);
 	NdbRocmHfModelConfig config;
 	NdbRocmHfModelWeights weights;
 	NdbRocmHfKVCache kv_cache;
@@ -2547,7 +2538,7 @@ ndb_rocm_hf_generate_stream(const char *model_name,
 	for (i = 0; i < output_seq_len; i++)
 	{
 		int32_t token_id = output_token_ids[i];
-		char *decoded_token = NULL;
+		NDB_DECLARE(char *, decoded_token);
 
 		/* Decode single token */
 		rc = ndb_rocm_hf_decode_tokens(
@@ -2598,7 +2589,7 @@ ndb_rocm_hf_generate_batch(const char *model_name,
 {
 	int i;
 	int rc = 0;
-	hipStream_t *streams = NULL;
+	NDB_DECLARE(hipStream_t *, streams);
 	const int max_streams = 8; /* Maximum number of concurrent streams */
 	int num_streams;
 	MemoryContext oldctx;
@@ -2655,8 +2646,8 @@ ndb_rocm_hf_generate_batch(const char *model_name,
 		for (i = 0; i < num_prompts; i++)
 		{
 			int stream_idx = i % num_streams;
-			char *text_out = NULL;
-			char *prompt_err = NULL;
+			NDB_DECLARE(char *, text_out);
+			NDB_DECLARE(char *, prompt_err);
 
 			/* Set current stream with multi-GPU support */
 			{
@@ -2687,7 +2678,7 @@ ndb_rocm_hf_generate_batch(const char *model_name,
 			{
 #ifdef HAVE_ONNX_RUNTIME
 				int32 token_length;
-				int32 *token_ids = NULL;
+				NDB_DECLARE(int32 *, token_ids);
 
 				/* Count tokens from generated text */
 				PG_TRY();
@@ -2852,8 +2843,8 @@ ndb_rocm_hf_generate_batch(const char *model_name,
 		/* Fall back to sequential processing */
 		for (i = 0; i < num_prompts; i++)
 		{
-			char *text_out = NULL;
-			char *prompt_err = NULL;
+			NDB_DECLARE(char *, text_out);
+			NDB_DECLARE(char *, prompt_err);
 
 			rc = ndb_rocm_hf_complete(model_name,
 				prompts[i],
@@ -2863,7 +2854,7 @@ ndb_rocm_hf_generate_batch(const char *model_name,
 			if (rc == 0)
 			{
 				int32 token_length;
-				int32 *token_ids = NULL;
+				NDB_DECLARE(int32 *, token_ids);
 
 				/* Count tokens from generated text */
 				PG_TRY();
@@ -3008,7 +2999,7 @@ ndb_rocm_hf_generate_batch(const char *model_name,
  * ndb_rocm_hf_rerank
  *	  Rerank documents using ROCm-accelerated Hugging Face model.
  *
- * This is a placeholder implementation. For full ROCm support, we would:
+ * This function requires actual implementation. For full ROCm support, we would:
  * 1. Load reranker model weights to GPU memory
  * 2. Tokenize query and documents (concatenate query+doc for each pair)
  * 3. Run cross-encoder on GPU (query-document pairs in batch)
@@ -3118,22 +3109,22 @@ ndb_rocm_hf_rerank(const char *model_name,
 
 	/* Batch process all query-document pairs using cross-encoder kernel */
 	{
-		int32_t *token_ids_batch = NULL;
-		int32_t *attention_mask_batch = NULL;
+		NDB_DECLARE(int32_t *, token_ids_batch);
+		NDB_DECLARE(int32_t *, attention_mask_batch);
 		int max_seq_len = 0;
 		int seq_len = 0;
 		int embed_dim = entry->config.embed_dim;
-		float *classification_weights = NULL;
+		NDB_DECLARE(float *, classification_weights);
 		float classification_bias = 0.0f;
 		int j;
 
 		/* First pass: tokenize all pairs to determine max sequence length */
 		for (i = 0; i < ndocs; i++)
 		{
-			int32_t *temp_token_ids = NULL;
-			int32_t *temp_attention_mask = NULL;
+			NDB_DECLARE(int32_t *, temp_token_ids);
+			NDB_DECLARE(int32_t *, temp_attention_mask);
 			int temp_seq_len = 0;
-			char *query_doc_text = NULL;
+			NDB_DECLARE(char *, query_doc_text);
 			size_t query_len;
 			size_t doc_len;
 
@@ -3166,10 +3157,10 @@ ndb_rocm_hf_rerank(const char *model_name,
 		/* Second pass: tokenize and collect all pairs */
 		for (i = 0; i < ndocs; i++)
 		{
-			int32_t *temp_token_ids = NULL;
-			int32_t *temp_attention_mask = NULL;
+			NDB_DECLARE(int32_t *, temp_token_ids);
+			NDB_DECLARE(int32_t *, temp_attention_mask);
 			int temp_seq_len = 0;
-			char *query_doc_text = NULL;
+			NDB_DECLARE(char *, query_doc_text);
 			size_t query_len;
 			size_t doc_len;
 
@@ -3294,12 +3285,15 @@ ndb_rocm_hf_rerank(const char *model_name,
  * ndb_rocm_hf_load_model
  *	  Load a Hugging Face model into GPU memory
  *
- * This is a placeholder implementation. For full support, we would:
+ * This function requires actual model loading implementation. For full support, we would:
  * 1. Parse model configuration file
  * 2. Load model weights from file (safetensors, pickle, etc.)
  * 3. Allocate GPU memory for weights
  * 4. Copy weights to GPU
  * 5. Store model in cache
+ *
+ * Dummy implementations are not supported - this will error if model
+ * weights cannot be loaded from actual files.
  */
 int
 ndb_rocm_hf_load_model(const char *model_name,
@@ -3308,7 +3302,7 @@ ndb_rocm_hf_load_model(const char *model_name,
 	NdbRocmHfModelConfig *config,
 	char **errstr)
 {
-	NdbRocmHfModelEntry *entry = NULL;
+	NDB_DECLARE(NdbRocmHfModelEntry *, entry);
 	NdbRocmHfModelWeights weights;
 	int rc;
 
@@ -3398,8 +3392,8 @@ ndb_rocm_hf_load_model(const char *model_name,
 int
 ndb_rocm_hf_unload_model(const char *model_name, char **errstr)
 {
-	NdbRocmHfModelEntry *entry = NULL;
-	NdbRocmHfModelEntry *prev = NULL;
+	NDB_DECLARE(NdbRocmHfModelEntry *, entry);
+	NDB_DECLARE(NdbRocmHfModelEntry *, prev);
 	hipError_t hip_status;
 
 	if (errstr)

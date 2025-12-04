@@ -331,7 +331,8 @@ metal_backend_mem_alloc_impl(Size bytes)
 {
 	void	   *ptr;
 
-	ptr = palloc(bytes);
+	NDB_DECLARE(void *, ptr);
+	NDB_ALLOC(ptr, char, bytes);
 	if (ptr == NULL)
 		elog(ERROR,
 			 "neurondb: Metal mem_alloc: failed to allocate %zu "
@@ -616,8 +617,10 @@ metal_backend_kmeans_impl(const float *vectors,
 	Assert(vectors != NULL && centroids != NULL && assignments != NULL
 		   && num_vectors > 0 && k > 0 && dim > 0 && max_iters > 0);
 
-	cluster_counts = (int *) palloc0(k * sizeof(int));
-	new_centroids = (float *) palloc0(k * dim * sizeof(float));
+	NDB_DECLARE(int *, cluster_counts);
+	NDB_DECLARE(float *, new_centroids);
+	NDB_ALLOC(cluster_counts, int, k);
+	NDB_ALLOC(new_centroids, float, k * dim);
 
 	for (iter = 0; iter < max_iters; iter++)
 	{
@@ -717,8 +720,10 @@ metal_backend_dbscan_impl(const float *vectors,
 	Assert(vectors != NULL && cluster_ids != NULL && num_vectors > 0
 		   && dim > 0);
 
-	visited = (bool *) palloc0(num_vectors * sizeof(bool));
-	neighbors = (int *) palloc(num_vectors * sizeof(int));
+	NDB_DECLARE(bool *, visited);
+	NDB_DECLARE(int *, neighbors);
+	NDB_ALLOC(visited, bool, num_vectors);
+	NDB_ALLOC(neighbors, int, num_vectors);
 
 	for (i = 0; i < num_vectors; i++)
 		cluster_ids[i] = -1;
@@ -969,7 +974,8 @@ ndb_metal_launch_kmeans_update(const float *vectors,
 		num_vectors <= 0 || dim <= 0 || k <= 0)
 		return -1;
 
-	counts = (int *) palloc0(k * sizeof(int));
+	NDB_DECLARE(int *, counts);
+	NDB_ALLOC(counts, int, k);
 	memset(centroids, 0, k * dim * sizeof(float));
 
 	/* Sum vectors by cluster */
@@ -1313,16 +1319,14 @@ ndb_metal_rf_train(const float *features,
 {
 	const int	default_n_trees = 32;
 	int			n_trees;
-	int		   *label_ints;
-	int		   *class_counts;
-	int		   *best_left_counts;
-	
-	int		   *best_right_counts = NULL;
-	
-	int		   *tmp_left_counts = NULL;
-	int		   *tmp_right_counts = NULL;
-	bytea	   *payload = NULL;
-	Jsonb	   *metrics_json = NULL;
+	NDB_DECLARE(int *, label_ints);
+	NDB_DECLARE(int *, class_counts);
+	NDB_DECLARE(int *, best_left_counts);
+	NDB_DECLARE(int *, best_right_counts);
+	NDB_DECLARE(int *, tmp_left_counts);
+	NDB_DECLARE(int *, tmp_right_counts);
+	NDB_DECLARE(bytea *, payload);
+	NDB_DECLARE(Jsonb *, metrics_json);
 	pg_prng_state rng;
 	bool		seeded = false;
 	double		gini_accumulator = 0.0;
@@ -1412,7 +1416,7 @@ ndb_metal_rf_train(const float *features,
 			(errmsg("ndb_metal_rf_train: about to allocate label_ints"),
 			 errdetail("size=%zu", sizeof(int) * (size_t) n_samples)));
 	
-	label_ints = (int *) palloc(sizeof(int) * (size_t) n_samples);
+	NDB_ALLOC(label_ints, int, n_samples);
 	
 	ereport(DEBUG2,
 			(errmsg("ndb_metal_rf_train: label_ints allocated"),
@@ -1422,7 +1426,7 @@ ndb_metal_rf_train(const float *features,
 			(errmsg("ndb_metal_rf_train: about to allocate class_counts"),
 			 errdetail("class_bytes=%zu", class_bytes)));
 	
-	class_counts = (int *) palloc0(class_bytes);
+	NDB_ALLOC(class_counts, int, class_bytes / sizeof(int));
 	
 	ereport(DEBUG2,
 			(errmsg("ndb_metal_rf_train: class_counts allocated"),
@@ -1431,7 +1435,7 @@ ndb_metal_rf_train(const float *features,
 	ereport(DEBUG2,
 			(errmsg("ndb_metal_rf_train: about to allocate tmp_left_counts")));
 	
-	tmp_left_counts = (int *) palloc(class_bytes);
+	NDB_ALLOC(tmp_left_counts, int, class_bytes / sizeof(int));
 	
 	ereport(DEBUG2,
 			(errmsg("ndb_metal_rf_train: tmp_left_counts allocated"),
@@ -1440,7 +1444,7 @@ ndb_metal_rf_train(const float *features,
 	ereport(DEBUG2,
 			(errmsg("ndb_metal_rf_train: about to allocate tmp_right_counts")));
 	
-	tmp_right_counts = (int *) palloc(class_bytes);
+	NDB_ALLOC(tmp_right_counts, int, class_bytes / sizeof(int));
 	
 	ereport(DEBUG2,
 			(errmsg("ndb_metal_rf_train: tmp_right_counts allocated"),
@@ -1449,7 +1453,7 @@ ndb_metal_rf_train(const float *features,
 	ereport(DEBUG2,
 			(errmsg("ndb_metal_rf_train: about to allocate best_left_counts")));
 	
-	best_left_counts = (int *) palloc(class_bytes);
+	NDB_ALLOC(best_left_counts, int, class_bytes / sizeof(int));
 	
 	ereport(DEBUG2,
 			(errmsg("ndb_metal_rf_train: best_left_counts allocated"),
@@ -1458,7 +1462,7 @@ ndb_metal_rf_train(const float *features,
 	ereport(DEBUG2,
 			(errmsg("ndb_metal_rf_train: about to allocate best_right_counts")));
 	
-	best_right_counts = (int *) palloc(class_bytes);
+	NDB_ALLOC(best_right_counts, int, class_bytes / sizeof(int));
 	
 	ereport(DEBUG2,
 			(errmsg("ndb_metal_rf_train: all allocations completed"),
@@ -1569,7 +1573,9 @@ ndb_metal_rf_train(const float *features,
 			(errmsg("ndb_metal_rf_train: about to allocate payload"),
 			 errdetail("VARHDRSZ + payload_bytes=%zu", VARHDRSZ + payload_bytes)));
 
-	payload = (bytea *) palloc(VARHDRSZ + payload_bytes);
+	NDB_DECLARE(char *, payload_bytes_ptr);
+	NDB_ALLOC(payload_bytes_ptr, char, VARHDRSZ + payload_bytes);
+	payload = (bytea *) payload_bytes_ptr;
 	
 	ereport(DEBUG2,
 			(errmsg("ndb_metal_rf_train: payload allocated"),
@@ -2167,7 +2173,9 @@ ndb_metal_rf_pack(const struct RFModel *model,
 		return -1;
 	}
 
-	blob = (bytea *) palloc(VARHDRSZ + payload_bytes);
+	NDB_DECLARE(char *, blob_bytes);
+	NDB_ALLOC(blob_bytes, char, VARHDRSZ + payload_bytes);
+	blob = (bytea *) blob_bytes;
 	if (blob == NULL)
 	{
 		if (errstr)
@@ -2242,9 +2250,9 @@ ndb_metal_lr_train(const float *features,
 	int			max_iters = default_max_iters;
 	double		learning_rate = default_learning_rate;
 	double		lambda = default_lambda;
-	double	   *weights = NULL;
-	double	   *grad_weights = NULL;
-	double	   *predictions = NULL;
+	NDB_DECLARE(double *, weights);
+	NDB_DECLARE(double *, grad_weights);
+	NDB_DECLARE(double *, predictions);
 	double		bias = 0.0;
 	double		grad_bias = 0.0;
 	size_t		weight_bytes;
@@ -2280,9 +2288,9 @@ ndb_metal_lr_train(const float *features,
 		return -1;
 	}
 
-	weights = (double *) palloc0(weight_bytes);
-	grad_weights = (double *) palloc(weight_bytes);
-	predictions = (double *) palloc(pred_bytes);
+	NDB_ALLOC(weights, double, weight_bytes / sizeof(double));
+	NDB_ALLOC(grad_weights, double, weight_bytes / sizeof(double));
+	NDB_ALLOC(predictions, double, pred_bytes / sizeof(double));
 
 	if (weights == NULL || grad_weights == NULL || predictions == NULL)
 	{
@@ -2378,7 +2386,9 @@ ndb_metal_lr_train(const float *features,
 			goto cleanup;
 		}
 
-		blob = (bytea *) palloc(VARHDRSZ + payload_bytes);
+		NDB_DECLARE(char *, blob_bytes);
+	NDB_ALLOC(blob_bytes, char, VARHDRSZ + payload_bytes);
+	blob = (bytea *) blob_bytes;
 		if (blob == NULL)
 		{
 			if (errstr)
@@ -2537,7 +2547,9 @@ ndb_metal_lr_pack(const struct LRModel *model,
 		return -1;
 	}
 
-	blob = (bytea *) palloc(VARHDRSZ + payload_bytes);
+	NDB_DECLARE(char *, blob_bytes);
+	NDB_ALLOC(blob_bytes, char, VARHDRSZ + payload_bytes);
+	blob = (bytea *) blob_bytes;
 	if (blob == NULL)
 	{
 		if (errstr)
@@ -2618,7 +2630,9 @@ ndb_metal_linreg_pack(const struct LinRegModel *model,
 
 	ereport(DEBUG2,
 			(errmsg("ndb_metal_linreg_pack: allocating blob, payload_bytes=%zu", payload_bytes)));
-	blob = (bytea *) palloc(VARHDRSZ + payload_bytes);
+	NDB_DECLARE(char *, blob_bytes);
+	NDB_ALLOC(blob_bytes, char, VARHDRSZ + payload_bytes);
+	blob = (bytea *) blob_bytes;
 	if (blob == NULL)
 	{
 		if (errstr)
@@ -2662,7 +2676,7 @@ ndb_metal_linreg_pack(const struct LinRegModel *model,
 	if (metrics != NULL)
 	{
 		StringInfoData buf;
-		Jsonb	   *metrics_json = NULL;
+		NDB_DECLARE(Jsonb *, metrics_json);
 
 		ereport(DEBUG2, (errmsg("ndb_metal_linreg_pack: creating metrics JSON")));
 		initStringInfo(&buf);
@@ -2701,7 +2715,7 @@ ndb_metal_linreg_pack(const struct LinRegModel *model,
 		}
 		PG_END_TRY();
 		
-		pfree(buf.data);
+		NDB_FREE(buf.data);
 		*metrics = metrics_json;
 	}
 
@@ -2721,12 +2735,12 @@ ndb_metal_linreg_train(const float *features,
 					   Jsonb * *metrics,
 					   char **errstr)
 {
-	double	   *h_XtX = NULL;
-	double	   *h_Xty = NULL;
-	double	   *h_XtX_inv = NULL;
-	double	   *h_beta = NULL;
-	bytea	   *payload = NULL;
-	Jsonb	   *metrics_json = NULL;
+	NDB_DECLARE(double *, h_XtX);
+	NDB_DECLARE(double *, h_Xty);
+	NDB_DECLARE(double *, h_XtX_inv);
+	NDB_DECLARE(double *, h_beta);
+	NDB_DECLARE(bytea *, payload);
+	NDB_DECLARE(Jsonb *, metrics_json);
 	size_t		XtX_bytes;
 	size_t		Xty_bytes;
 	size_t		beta_bytes;
@@ -2764,10 +2778,10 @@ ndb_metal_linreg_train(const float *features,
 	Xty_bytes = sizeof(double) * (size_t) dim_with_intercept;
 	beta_bytes = sizeof(double) * (size_t) dim_with_intercept;
 
-	h_XtX = (double *) palloc0(XtX_bytes);
-	h_Xty = (double *) palloc0(Xty_bytes);
-	h_XtX_inv = (double *) palloc(XtX_bytes);
-	h_beta = (double *) palloc(beta_bytes);
+	NDB_ALLOC(h_XtX, double, XtX_bytes / sizeof(double));
+	NDB_ALLOC(h_Xty, double, Xty_bytes / sizeof(double));
+	NDB_ALLOC(h_XtX_inv, double, XtX_bytes / sizeof(double));
+	NDB_ALLOC(h_beta, double, beta_bytes / sizeof(double));
 
 	ereport(DEBUG2,
 			(errmsg("ndb_metal_linreg_train: starting X'X and X'y computation"),
@@ -2825,7 +2839,7 @@ ndb_metal_linreg_train(const float *features,
 			{
 				if (errstr)
 					*errstr = pstrdup("Metal LinReg train: invalid row index");
-				pfree(xi);
+				NDB_FREE(xi);
 				elog(ERROR, "ndb_metal_linreg_train: invalid row index %d", i);
 				return -1;
 			}
@@ -2913,13 +2927,13 @@ ndb_metal_linreg_train(const float *features,
 			{
 				ereport(DEBUG2, (errmsg("ndb_metal_linreg_train: allocating augmented row %d", row)));
 			}
-			augmented[row] = (double *) palloc(sizeof(double) * 2 * dim_with_intercept);
+			NDB_ALLOC(augmented[row], double, 2 * dim_with_intercept);
 			if (augmented[row] == NULL)
 			{
 				/* Free already allocated rows */
 				for (int r = 0; r < row; r++)
-					pfree(augmented[r]);
-				pfree(augmented);
+					NDB_FREE(augmented[r]);
+				NDB_FREE(augmented);
 				if (errstr)
 					*errstr = pstrdup("Metal LinReg train: failed to allocate augmented row");
 				elog(ERROR, "ndb_metal_linreg_train: palloc failed for augmented row %d", row);
@@ -2999,10 +3013,10 @@ ndb_metal_linreg_train(const float *features,
 		if (!invert_success)
 		{
 			ereport(DEBUG2, (errmsg("ndb_metal_linreg_train: matrix inversion failed, cleaning up")));
-			pfree(h_XtX);
-			pfree(h_Xty);
-			pfree(h_XtX_inv);
-			pfree(h_beta);
+			NDB_FREE(h_XtX);
+			NDB_FREE(h_Xty);
+			NDB_FREE(h_XtX_inv);
+			NDB_FREE(h_beta);
 			if (errstr)
 				*errstr = pstrdup("Matrix is singular, cannot compute linear regression");
 			return -1;
@@ -3057,7 +3071,9 @@ ndb_metal_linreg_train(const float *features,
 		ereport(DEBUG2, (errmsg("ndb_metal_linreg_train: setting intercept from h_beta[0]")));
 		model.intercept = h_beta[0];
 		ereport(DEBUG2, (errmsg("ndb_metal_linreg_train: allocating coefficients array")));
-		model.coefficients = (double *) palloc(sizeof(double) * feature_dim);
+		NDB_DECLARE(double *, model_coefficients);
+		NDB_ALLOC(model_coefficients, double, feature_dim);
+		model.coefficients = model_coefficients;
 		if (model.coefficients == NULL)
 		{
 			if (errstr)
@@ -3099,7 +3115,7 @@ ndb_metal_linreg_train(const float *features,
 		mse /= n_samples;
 		mae /= n_samples;
 		ereport(DEBUG2, (errmsg("ndb_metal_linreg_train: computing final metrics, mse=%f, mae=%f", mse, mae)));
-		model.r_squared = 1.0 - (ss_res / ss_tot);
+		model.r_squared = (ss_tot > 0.0) ? (1.0 - (ss_res / ss_tot)) : 0.0;
 		model.mse = mse;
 		model.mae = mae;
 		ereport(DEBUG2, (errmsg("ndb_metal_linreg_train: model metrics set, r_squared=%f", model.r_squared)));
@@ -3116,15 +3132,15 @@ ndb_metal_linreg_train(const float *features,
 		}
 
 		ereport(DEBUG2, (errmsg("ndb_metal_linreg_train: freeing model coefficients")));
-		pfree(model.coefficients);
+		NDB_FREE(model.coefficients);
 		ereport(DEBUG2, (errmsg("ndb_metal_linreg_train: model coefficients freed")));
 	}
 
 	ereport(DEBUG2, (errmsg("ndb_metal_linreg_train: cleaning up memory")));
-	pfree(h_XtX);
-	pfree(h_Xty);
-	pfree(h_XtX_inv);
-	pfree(h_beta);
+	NDB_FREE(h_XtX);
+	NDB_FREE(h_Xty);
+	NDB_FREE(h_XtX_inv);
+	NDB_FREE(h_beta);
 	ereport(DEBUG2, (errmsg("ndb_metal_linreg_train: memory cleaned up")));
 
 	ereport(DEBUG2, (errmsg("ndb_metal_linreg_train: checking return values, rc=%d, payload=%p", rc, (void*)payload)));
@@ -3142,9 +3158,9 @@ ndb_metal_linreg_train(const float *features,
 
 	ereport(DEBUG2, (errmsg("ndb_metal_linreg_train: cleaning up on error")));
 	if (payload != NULL)
-		pfree(payload);
+		NDB_FREE(payload);
 	if (metrics_json != NULL)
-		pfree(metrics_json);
+		NDB_FREE(metrics_json);
 
 	elog(DEBUG1, "ndb_metal_linreg_train: training failed, rc=%d, payload=%p, errstr=%s", 
 		 rc, (void*)payload, (errstr && *errstr) ? *errstr : "NULL");
@@ -3270,7 +3286,9 @@ ndb_metal_svm_pack(const struct SVMModel *model,
 		+ sizeof(float) * (size_t) model->n_support_vectors * (size_t) model->n_features
 		+ sizeof(int32) * (size_t) model->n_support_vectors;
 
-	blob = (bytea *) palloc(VARHDRSZ + payload_bytes);
+	NDB_DECLARE(char *, blob_bytes);
+	NDB_ALLOC(blob_bytes, char, VARHDRSZ + payload_bytes);
+	blob = (bytea *) blob_bytes;
 	SET_VARSIZE(blob, VARHDRSZ + payload_bytes);
 	base = VARDATA(blob);
 
@@ -3340,9 +3358,9 @@ ndb_metal_svm_train(const float *features,
 {
 	double		C = 1.0;
 	int			max_iters = 1000;
-	float	   *alphas = NULL;
-	float	   *errors = NULL;
-	float	   *kernel_matrix = NULL;
+	NDB_DECLARE(float *, alphas);
+	NDB_DECLARE(float *, errors);
+	NDB_DECLARE(float *, kernel_matrix);
 	float		bias = 0.0f;
 	int			actual_max_iters;
 	int			sample_limit;
@@ -3467,9 +3485,16 @@ ndb_metal_svm_train(const float *features,
 	}
 
 	/* Allocate memory */
-	alphas = (float *) palloc0(sizeof(float) * (size_t) sample_limit);
-	errors = (float *) palloc(sizeof(float) * (size_t) sample_limit);
-	kernel_matrix = (float *) palloc(sizeof(float) * (size_t) sample_limit * (size_t) sample_limit);
+	/* Check for integer overflow in size calculations */
+	if (sample_limit > 0 && (size_t) sample_limit > MaxAllocSize / sizeof(float) / (size_t) sample_limit)
+	{
+		if (errstr)
+			*errstr = pstrdup("Metal SVM train: kernel_matrix allocation size exceeds MaxAllocSize");
+		return -1;
+	}
+	NDB_ALLOC(alphas, float, sample_limit);
+	NDB_ALLOC(errors, float, sample_limit);
+	NDB_ALLOC(kernel_matrix, float, sample_limit * sample_limit);
 
 	if (alphas == NULL || errors == NULL || kernel_matrix == NULL)
 	{
@@ -3609,9 +3634,25 @@ ndb_metal_svm_train(const float *features,
 	model.max_iters = actual_max_iters;
 
 	/* Allocate support vectors and alphas */
-	model.alphas = (double *) palloc(sizeof(double) * (size_t) sv_count);
-	model.support_vectors = (float *) palloc(sizeof(float) * (size_t) sv_count * (size_t) feature_dim);
-	model.support_vector_indices = (int *) palloc(sizeof(int) * (size_t) sv_count);
+	/* Check for integer overflow in size calculations */
+	if (sv_count > 0 && feature_dim > 0 && (size_t) sv_count > MaxAllocSize / sizeof(float) / (size_t) feature_dim)
+	{
+		if (errstr)
+			*errstr = pstrdup("Metal SVM train: support_vectors allocation size exceeds MaxAllocSize");
+		NDB_FREE(alphas);
+		NDB_FREE(errors);
+		NDB_FREE(kernel_matrix);
+		return -1;
+	}
+	NDB_DECLARE(double *, model_alphas);
+	NDB_DECLARE(float *, model_support_vectors);
+	NDB_DECLARE(int *, model_support_vector_indices);
+	NDB_ALLOC(model_alphas, double, sv_count);
+	NDB_ALLOC(model_support_vectors, float, sv_count * feature_dim);
+	NDB_ALLOC(model_support_vector_indices, int, sv_count);
+	model.alphas = model_alphas;
+	model.support_vectors = model_support_vectors;
+	model.support_vector_indices = model_support_vector_indices;
 
 	if (model.alphas == NULL || model.support_vectors == NULL || model.support_vector_indices == NULL)
 	{
@@ -3905,8 +3946,8 @@ dt_build_tree_metal(const float *features,
 	int			best_feature = -1;
 	float		best_threshold = 0.0f;
 	double		best_gain = -DBL_MAX;
-	int		   *left_indices = NULL;
-	int		   *right_indices = NULL;
+	NDB_DECLARE(int *, left_indices);
+	NDB_DECLARE(int *, right_indices);
 	int			left_count = 0;
 	int			right_count = 0;
 
@@ -3914,7 +3955,8 @@ dt_build_tree_metal(const float *features,
 		*errstr = NULL;
 
 	/* Allocate node */
-	node = (DTNode *) palloc0(sizeof(DTNode));
+	NDB_DECLARE(DTNode *, node);
+	NDB_ALLOC(node, DTNode, 1);
 	if (node == NULL)
 	{
 		if (errstr)
@@ -3934,7 +3976,8 @@ dt_build_tree_metal(const float *features,
 			int			label;
 			int			i;
 
-			class_counts = (int *) palloc0(sizeof(int) * class_count);
+			NDB_DECLARE(int *, class_counts);
+			NDB_ALLOC(class_counts, int, class_count);
 			for (i = 0; i < n_samples; i++)
 			{
 				label = (int) labels[indices[i]];
@@ -3963,8 +4006,8 @@ dt_build_tree_metal(const float *features,
 	}
 
 	/* Allocate working arrays */
-	left_indices = (int *) palloc(sizeof(int) * n_samples);
-	right_indices = (int *) palloc(sizeof(int) * n_samples);
+	NDB_ALLOC(left_indices, int, n_samples);
+	NDB_ALLOC(right_indices, int, n_samples);
 	if (left_indices == NULL || right_indices == NULL)
 	{
 		if (errstr)
@@ -4029,8 +4072,10 @@ dt_build_tree_metal(const float *features,
 					int		   *right_counts;
 					int			label;
 
-					left_counts = (int *) palloc0(sizeof(int) * class_count);
-					right_counts = (int *) palloc0(sizeof(int) * class_count);
+					NDB_DECLARE(int *, left_counts);
+					NDB_DECLARE(int *, right_counts);
+					NDB_ALLOC(left_counts, int, class_count);
+					NDB_ALLOC(right_counts, int, class_count);
 
 					for (i = 0; i < n_samples; i++)
 					{
@@ -4066,7 +4111,8 @@ dt_build_tree_metal(const float *features,
 						int			label;
 						int			i;
 
-						parent_counts = (int *) palloc0(sizeof(int) * class_count);
+						NDB_DECLARE(int *, parent_counts);
+						NDB_ALLOC(parent_counts, int, class_count);
 						for (i = 0; i < n_samples; i++)
 						{
 							label = (int) labels[indices[i]];
@@ -4172,7 +4218,8 @@ dt_build_tree_metal(const float *features,
 			int			label;
 			int			i;
 
-			class_counts = (int *) palloc0(sizeof(int) * class_count);
+			NDB_DECLARE(int *, class_counts);
+			NDB_ALLOC(class_counts, int, class_count);
 			for (i = 0; i < n_samples; i++)
 			{
 				label = (int) labels[indices[i]];
@@ -4226,7 +4273,8 @@ dt_build_tree_metal(const float *features,
 			int			label;
 			int			i;
 
-			class_counts = (int *) palloc0(sizeof(int) * class_count);
+			NDB_DECLARE(int *, class_counts);
+			NDB_ALLOC(class_counts, int, class_count);
 			for (i = 0; i < n_samples; i++)
 			{
 				label = (int) labels[indices[i]];
@@ -4302,9 +4350,9 @@ ndb_metal_dt_train(const float *features,
 	int			min_samples_split = 2;
 	bool		is_classification = true;
 	int			class_count = 2;
-	DTModel    *model = NULL;
-	DTNode	   *root = NULL;
-	int		   *indices = NULL;
+	NDB_DECLARE(DTModel *, model);
+	NDB_DECLARE(DTNode *, root);
+	NDB_DECLARE(int *, indices);
 	int			i;
 	int			rc = -1;
 
@@ -4452,7 +4500,8 @@ ndb_metal_dt_train(const float *features,
 	}
 
 	/* Create index array */
-	indices = (int *) palloc(sizeof(int) * n_samples);
+	NDB_DECLARE(int *, indices);
+	NDB_ALLOC(indices, int, n_samples);
 	if (indices == NULL)
 	{
 		if (errstr)
@@ -4474,7 +4523,8 @@ ndb_metal_dt_train(const float *features,
 	}
 
 	/* Create model structure */
-	model = (DTModel *) palloc0(sizeof(DTModel));
+	NDB_DECLARE(DTModel *, model);
+	NDB_ALLOC(model, DTModel, 1);
 	if (model == NULL)
 	{
 		if (errstr)
@@ -4553,7 +4603,9 @@ ndb_metal_dt_pack(const struct DTModel *model,
 	nodes_bytes = sizeof(NdbCudaDtNode) * (size_t) node_count;
 	payload_bytes = header_bytes + nodes_bytes;
 
-	blob = (bytea *) palloc(VARHDRSZ + payload_bytes);
+	NDB_DECLARE(char *, blob_bytes);
+	NDB_ALLOC(blob_bytes, char, VARHDRSZ + payload_bytes);
+	blob = (bytea *) blob_bytes;
 	SET_VARSIZE(blob, VARHDRSZ + payload_bytes);
 	base = VARDATA(blob);
 
@@ -4712,7 +4764,9 @@ ndb_metal_ridge_pack(const struct RidgeModel *model,
 	payload_bytes = sizeof(NdbCudaRidgeModelHeader)
 		+ sizeof(float) * (size_t) model->n_features;
 
-	blob = (bytea *) palloc(VARHDRSZ + payload_bytes);
+	NDB_DECLARE(char *, blob_bytes);
+	NDB_ALLOC(blob_bytes, char, VARHDRSZ + payload_bytes);
+	blob = (bytea *) blob_bytes;
 	SET_VARSIZE(blob, VARHDRSZ + payload_bytes);
 	base = VARDATA(blob);
 
@@ -4778,12 +4832,12 @@ ndb_metal_ridge_train(const float *features,
 					  char **errstr)
 {
 	double		lambda = 0.01;	/* Default regularization */
-	double	   *h_XtX = NULL;
-	double	   *h_Xty = NULL;
-	double	   *h_XtX_inv = NULL;
-	double	   *h_beta = NULL;
-	bytea	   *payload = NULL;
-	Jsonb	   *metrics_json = NULL;
+	NDB_DECLARE(double *, h_XtX);
+	NDB_DECLARE(double *, h_Xty);
+	NDB_DECLARE(double *, h_XtX_inv);
+	NDB_DECLARE(double *, h_beta);
+	NDB_DECLARE(bytea *, payload);
+	NDB_DECLARE(Jsonb *, metrics_json);
 	size_t		XtX_bytes;
 	size_t		Xty_bytes;
 	size_t		beta_bytes;
@@ -4839,16 +4893,17 @@ ndb_metal_ridge_train(const float *features,
 	Xty_bytes = sizeof(double) * (size_t) dim_with_intercept;
 	beta_bytes = sizeof(double) * (size_t) dim_with_intercept;
 
-	h_XtX = (double *) palloc0(XtX_bytes);
-	h_Xty = (double *) palloc0(Xty_bytes);
-	h_XtX_inv = (double *) palloc(XtX_bytes);
-	h_beta = (double *) palloc(beta_bytes);
+	NDB_ALLOC(h_XtX, double, XtX_bytes / sizeof(double));
+	NDB_ALLOC(h_Xty, double, Xty_bytes / sizeof(double));
+	NDB_ALLOC(h_XtX_inv, double, XtX_bytes / sizeof(double));
+	NDB_ALLOC(h_beta, double, beta_bytes / sizeof(double));
 
 	/* Compute X'X and X'y */
 	for (i = 0; i < n_samples; i++)
 	{
 		const float *row = features + (i * feature_dim);
-		double	   *xi = (double *) palloc(sizeof(double) * dim_with_intercept);
+		NDB_DECLARE(double *, xi);
+		NDB_ALLOC(xi, double, dim_with_intercept);
 
 		xi[0] = 1.0;			/* intercept */
 		for (k = 1; k < dim_with_intercept; k++)
@@ -4885,7 +4940,7 @@ ndb_metal_ridge_train(const float *features,
 		augmented = (double **) palloc(sizeof(double *) * dim_with_intercept);
 		for (row = 0; row < dim_with_intercept; row++)
 		{
-			augmented[row] = (double *) palloc(sizeof(double) * 2 * dim_with_intercept);
+			NDB_ALLOC(augmented[row], double, 2 * dim_with_intercept);
 			for (col = 0; col < dim_with_intercept; col++)
 			{
 				augmented[row][col] = h_XtX[row * dim_with_intercept + col];
@@ -4979,7 +5034,9 @@ ndb_metal_ridge_train(const float *features,
 		model.n_samples = n_samples;
 		model.intercept = h_beta[0];
 		model.lambda = lambda;
-		model.coefficients = (double *) palloc(sizeof(double) * feature_dim);
+		NDB_DECLARE(double *, model_coefficients);
+		NDB_ALLOC(model_coefficients, double, feature_dim);
+		model.coefficients = model_coefficients;
 		for (i = 0; i < feature_dim; i++)
 			model.coefficients[i] = h_beta[i + 1];
 
@@ -5135,7 +5192,9 @@ ndb_metal_lasso_pack(const struct LassoModel *model,
 	payload_bytes = sizeof(NdbCudaLassoModelHeader)
 		+ sizeof(float) * (size_t) model->n_features;
 
-	blob = (bytea *) palloc(VARHDRSZ + payload_bytes);
+	NDB_DECLARE(char *, blob_bytes);
+	NDB_ALLOC(blob_bytes, char, VARHDRSZ + payload_bytes);
+	blob = (bytea *) blob_bytes;
 	SET_VARSIZE(blob, VARHDRSZ + payload_bytes);
 	base = VARDATA(blob);
 
@@ -5205,12 +5264,12 @@ ndb_metal_lasso_train(const float *features,
 {
 	double		lambda = 0.01;	/* Default regularization */
 	int			max_iters = 1000;	/* Default iterations */
-	double	   *weights = NULL;
-	double	   *weights_old = NULL;
-	double	   *residuals = NULL;
+	NDB_DECLARE(double *, weights);
+	NDB_DECLARE(double *, weights_old);
+	NDB_DECLARE(double *, residuals);
 	double		y_mean = 0.0;
-	bytea	   *payload = NULL;
-	Jsonb	   *metrics_json = NULL;
+	NDB_DECLARE(bytea *, payload);
+	NDB_DECLARE(Jsonb *, metrics_json);
 	int			iter,
 				i,
 				j;
@@ -5284,9 +5343,12 @@ ndb_metal_lasso_train(const float *features,
 	y_mean /= n_samples;
 
 	/* Initialize weights and residuals */
-	weights = (double *) palloc0(sizeof(double) * feature_dim);
-	weights_old = (double *) palloc(sizeof(double) * feature_dim);
-	residuals = (double *) palloc(sizeof(double) * n_samples);
+	NDB_DECLARE(double *, weights);
+	NDB_DECLARE(double *, weights_old);
+	NDB_DECLARE(double *, residuals);
+	NDB_ALLOC(weights, double, feature_dim);
+	NDB_ALLOC(weights_old, double, feature_dim);
+	NDB_ALLOC(residuals, double, n_samples);
 
 	/* Initialize residuals */
 	for (i = 0; i < n_samples; i++)
@@ -5367,7 +5429,9 @@ ndb_metal_lasso_train(const float *features,
 		model.intercept = y_mean;
 		model.lambda = lambda;
 		model.max_iters = max_iters;
-		model.coefficients = (double *) palloc(sizeof(double) * feature_dim);
+		NDB_DECLARE(double *, model_coefficients);
+		NDB_ALLOC(model_coefficients, double, feature_dim);
+		model.coefficients = model_coefficients;
 		for (i = 0; i < feature_dim; i++)
 			model.coefficients[i] = weights[i];
 
@@ -5516,7 +5580,9 @@ ndb_metal_nb_pack(const struct GaussianNBModel *model,
 		+ sizeof(double) * (size_t) model->n_classes * (size_t) model->n_features	/* means */
 		+ sizeof(double) * (size_t) model->n_classes * (size_t) model->n_features;	/* variances */
 
-	blob = (bytea *) palloc(VARHDRSZ + payload_bytes);
+	NDB_DECLARE(char *, blob_bytes);
+	NDB_ALLOC(blob_bytes, char, VARHDRSZ + payload_bytes);
+	blob = (bytea *) blob_bytes;
 	SET_VARSIZE(blob, VARHDRSZ + payload_bytes);
 	base = VARDATA(blob);
 
@@ -5595,13 +5661,13 @@ ndb_metal_nb_train(const float *features,
 				   Jsonb * *metrics,
 				   char **errstr)
 {
-	int		   *class_counts = NULL;
-	double	   *class_priors = NULL;
-	double	   *means = NULL;
-	double	   *variances = NULL;
+	NDB_DECLARE(int *, class_counts);
+	NDB_DECLARE(double *, class_priors);
+	NDB_DECLARE(double *, means);
+	NDB_DECLARE(double *, variances);
 	struct GaussianNBModel model;
-	bytea	   *blob = NULL;
-	Jsonb	   *metrics_json = NULL;
+	NDB_DECLARE(bytea *, blob);
+	NDB_DECLARE(Jsonb *, metrics_json);
 	int			i,
 				j,
 				class;
@@ -5623,10 +5689,14 @@ ndb_metal_nb_train(const float *features,
 		 n_samples, feature_dim, class_count);
 
 	/* Allocate host memory */
-	class_counts = (int *) palloc0(sizeof(int) * class_count);
-	class_priors = (double *) palloc(sizeof(double) * class_count);
-	means = (double *) palloc0(sizeof(double) * (size_t) class_count * (size_t) feature_dim);
-	variances = (double *) palloc0(sizeof(double) * (size_t) class_count * (size_t) feature_dim);
+	NDB_DECLARE(int *, class_counts);
+	NDB_DECLARE(double *, class_priors);
+	NDB_DECLARE(double *, means);
+	NDB_DECLARE(double *, variances);
+	NDB_ALLOC(class_counts, int, class_count);
+	NDB_ALLOC(class_priors, double, class_count);
+	NDB_ALLOC(means, double, class_count * feature_dim);
+	NDB_ALLOC(variances, double, class_count * feature_dim);
 
 	/* Step 1: Count samples per class */
 	for (i = 0; i < n_samples; i++)
@@ -5700,8 +5770,12 @@ ndb_metal_nb_train(const float *features,
 	model.n_classes = class_count;
 	model.n_features = feature_dim;
 	model.class_priors = class_priors;
-	model.means = (double **) palloc(sizeof(double *) * class_count);
-	model.variances = (double **) palloc(sizeof(double *) * class_count);
+	NDB_DECLARE(double **, model_means);
+	NDB_DECLARE(double **, model_variances);
+	NDB_ALLOC(model_means, double *, class_count);
+	NDB_ALLOC(model_variances, double *, class_count);
+	model.means = model_means;
+	model.variances = model_variances;
 
 	for (i = 0; i < class_count; i++)
 	{
@@ -5785,7 +5859,8 @@ ndb_metal_nb_predict(const bytea * model_data,
 	means = (const double *) (base + sizeof(NdbCudaNbModelHeader) + sizeof(double) * (size_t) hdr->n_classes);
 	variances = (const double *) (base + sizeof(NdbCudaNbModelHeader) + sizeof(double) * (size_t) hdr->n_classes + sizeof(double) * (size_t) hdr->n_classes * (size_t) hdr->n_features);
 
-	class_log_probs = (double *) palloc(sizeof(double) * hdr->n_classes);
+	NDB_DECLARE(double *, class_log_probs);
+	NDB_ALLOC(class_log_probs, double, hdr->n_classes);
 
 	/* Compute log probability for each class */
 	for (i = 0; i < hdr->n_classes; i++)
@@ -5890,7 +5965,9 @@ ndb_metal_gmm_pack(const struct GMMModel *model,
 		+ sizeof(double) * (size_t) model->k * (size_t) model->dim	/* means */
 		+ sizeof(double) * (size_t) model->k * (size_t) model->dim; /* variances */
 
-	blob = (bytea *) palloc(VARHDRSZ + payload_bytes);
+	NDB_DECLARE(char *, blob_bytes);
+	NDB_ALLOC(blob_bytes, char, VARHDRSZ + payload_bytes);
+	blob = (bytea *) blob_bytes;
 	SET_VARSIZE(blob, VARHDRSZ + payload_bytes);
 	base = VARDATA(blob);
 
@@ -5972,17 +6049,17 @@ ndb_metal_gmm_train(const float *features,
 {
 	int			max_iters = 100;
 	double		tolerance = 1e-6;
-	double	   *mixing_coeffs = NULL;
-	double	   *means = NULL;
-	double	   *variances = NULL;
+	NDB_DECLARE(double *, mixing_coeffs);
+	NDB_DECLARE(double *, means);
+	NDB_DECLARE(double *, variances);
 	double	  **means_2d = NULL;
 	double	  **variances_2d = NULL;
-	double	   *responsibilities = NULL;
+	NDB_DECLARE(double *, responsibilities);
 	double		log_likelihood = 0.0;
 	double		prev_log_likelihood = -DBL_MAX;
 	struct GMMModel model;
-	bytea	   *blob = NULL;
-	Jsonb	   *metrics_json = NULL;
+	NDB_DECLARE(bytea *, blob);
+	NDB_DECLARE(Jsonb *, metrics_json);
 	int			iter;
 	int			i,
 				k,
@@ -6387,7 +6464,9 @@ ndb_metal_knn_pack(const struct KNNModel *model,
 		+ sizeof(float) * (size_t) model->n_samples * (size_t) model->n_features
 		+ sizeof(double) * (size_t) model->n_samples;
 
-	blob = (bytea *) palloc(VARHDRSZ + payload_bytes);
+	NDB_DECLARE(char *, blob_bytes);
+	NDB_ALLOC(blob_bytes, char, VARHDRSZ + payload_bytes);
+	blob = (bytea *) blob_bytes;
 	SET_VARSIZE(blob, VARHDRSZ + payload_bytes);
 	base = VARDATA(blob);
 
@@ -6452,10 +6531,10 @@ ndb_metal_knn_train(const float *features,
 					char **errstr)
 {
 	struct KNNModel model;
-	bytea	   *blob = NULL;
-	Jsonb	   *metrics_json = NULL;
-	float	   *features_copy = NULL;
-	double	   *labels_copy = NULL;
+	NDB_DECLARE(bytea *, blob);
+	NDB_DECLARE(Jsonb *, metrics_json);
+	NDB_DECLARE(float *, features_copy);
+	NDB_DECLARE(double *, labels_copy);
 	int			rc = -1;
 
 	if (errstr)
@@ -6569,8 +6648,8 @@ ndb_metal_knn_predict(const bytea * model_data,
 	NdbCudaKnnModelHeader *hdr;
 	const float *training_features;
 	const double *training_labels;
-	float	   *distances = NULL;
-	int		   *top_k_indices = NULL;
+	NDB_DECLARE(float *, distances);
+	NDB_DECLARE(int *, top_k_indices);
 	int			i,
 				j;
 
@@ -6654,10 +6733,17 @@ ndb_metal_knn_predict(const bytea * model_data,
 	{
 		/* Regression: average */
 		double		sum = 0.0;
+		int			count = 0;
 
 		for (i = 0; i < hdr->k && i < hdr->n_samples; i++)
+		{
 			sum += training_labels[top_k_indices[i]];
-		*prediction_out = sum / hdr->k;
+			count++;
+		}
+		if (count > 0)
+			*prediction_out = sum / count;
+		else
+			*prediction_out = 0.0;	/* No neighbors found */
 	}
 
 	NDB_FREE(distances);
@@ -6680,13 +6766,13 @@ ndb_metal_hf_embed(const char *model_name,
 				   char **errstr)
 {
 #ifdef HAVE_ONNX_RUNTIME
-	ONNXModelSession *session = NULL;
-	int32	   *token_ids = NULL;
+	NDB_DECLARE(ONNXModelSession *, session);
+	NDB_DECLARE(int32 *, token_ids);
 	int32		token_length = 0;
-	ONNXTensor *input_tensor = NULL;
-	ONNXTensor *output_tensor = NULL;
-	float	   *input_data = NULL;
-	float	   *embedding = NULL;
+	NDB_DECLARE(ONNXTensor *, input_tensor);
+	NDB_DECLARE(ONNXTensor *, output_tensor);
+	NDB_DECLARE(float *, input_data);
+	NDB_DECLARE(float *, embedding);
 	int64		input_shape[2];
 	int			embed_dim = 0;
 	int			i;
@@ -7163,7 +7249,7 @@ neurondb_gpu_rf_predict_backend(const void *rf_hdr,
 	const		RFNodeFlat_Metal *blob_nodes;
 	int			n_trees;
 	int			n_classes;
-	int		   *tally = NULL;
+	NDB_DECLARE(int *, tally);
 	int			i;
 
 	if (errstr)
