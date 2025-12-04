@@ -34,6 +34,8 @@
 #include <cuda_runtime.h>
 #include <ctype.h>
 #include <errno.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #ifdef HAVE_ONNX_RUNTIME
 #include "neurondb_onnx.h"
 #include "neurondb_validation.h"
@@ -123,17 +125,13 @@ ndb_cuda_hf_load_model_weights(const char *model_name,
 							   NdbCudaHfModelWeights * weights,
 							   char **errstr)
 {
-	size_t		embed_table_size;
-	size_t		position_embed_size;
-	size_t		lm_head_size;
-	int			i;
-
 	/*
-	 * Placeholder: In a full implementation, this would: 1. Load model
-	 * weights from file (e.g., safetensors, pickle) 2. Allocate GPU memory
-	 * for weights 3. Copy weights to GPU 4. Initialize config structure
+	 * Model weights must be loaded from actual model files.
+	 * This requires: 1. Load model weights from file (e.g., safetensors, pickle)
+	 * 2. Allocate GPU memory for weights 3. Copy weights to GPU
+	 * 4. Initialize config structure
 	 *
-	 * For now, we'll create dummy weights for demonstration
+	 * Dummy weights are not supported. Real model loading implementation required.
 	 */
 	if (!model_name || !config || !weights)
 	{
@@ -143,51 +141,47 @@ ndb_cuda_hf_load_model_weights(const char *model_name,
 		return -1;
 	}
 
-	memset(config, 0, sizeof(NdbCudaHfModelConfig));
-	memset(weights, 0, sizeof(NdbCudaHfModelWeights));
-
-	strncpy(config->model_name, model_name, NDB_HF_MAX_MODEL_NAME - 1);
-	config->model_type = NDB_HF_MODEL_EMBEDDING;
-	config->vocab_size = 30522;
-	config->embed_dim = 768;
-	config->max_seq_len = 512;
-	config->num_layers = 12;
-	config->num_heads = 12;
-	config->hidden_dim = 3072;
-	config->use_gpu = true;
-
-	embed_table_size =
-		config->vocab_size * config->embed_dim * sizeof(float);
-	weights->embedding_table = (float *) palloc(embed_table_size);
-
-	for (i = 0; i < config->vocab_size * config->embed_dim; i++)
+	/* Validate model_path if provided */
+	if (model_path && model_path[0] != '\0')
 	{
-		weights->embedding_table[i] =
-			(float) (rand() % 1000) / 1000.0f - 0.5f;
+		struct stat statbuf;
+		
+		if (stat(model_path, &statbuf) != 0 || !S_ISREG(statbuf.st_mode))
+		{
+			if (errstr)
+			{
+				int saved_errno = errno;
+				*errstr = psprintf("Model file '%s' does not exist or is not a regular file: %s",
+								  model_path, strerror(saved_errno));
+			}
+			return -1;
+		}
+		
+		if (access(model_path, R_OK) != 0)
+		{
+			if (errstr)
+			{
+				int saved_errno = errno;
+				*errstr = psprintf("Model file '%s' is not readable: %s",
+								  model_path, strerror(saved_errno));
+			}
+			return -1;
+		}
 	}
 
-	position_embed_size =
-		config->max_seq_len * config->embed_dim * sizeof(float);
-	lm_head_size =
-		config->vocab_size * config->embed_dim * sizeof(float);
-	weights->position_embeddings = (float *) palloc(position_embed_size);
-	weights->lm_head_weights = (float *) palloc(lm_head_size);
-
-	for (i = 0; i < config->max_seq_len * config->embed_dim; i++)
-	{
-		weights->position_embeddings[i] =
-			(float) (rand() % 1000) / 1000.0f - 0.5f;
-	}
-	for (i = 0; i < config->vocab_size * config->embed_dim; i++)
-	{
-		weights->lm_head_weights[i] =
-			(float) (rand() % 1000) / 1000.0f - 0.5f;
-	}
-
-	weights->total_bytes =
-		embed_table_size + position_embed_size + lm_head_size;
-
-	return 0;
+	/* Model weight loading from files requires parsing safetensors/pickle/ONNX formats */
+	/* Full implementation requires: */
+	/* 1. Parse model file format (safetensors, pickle, ONNX, etc.) */
+	/* 2. Extract weight tensors and model configuration */
+	/* 3. Allocate GPU memory for weights */
+	/* 4. Copy weights to GPU memory */
+	/* 5. Initialize config structure from model metadata */
+	if (errstr)
+		*errstr = psprintf("Model weight loading from files is not yet implemented. "
+						  "Model file parsing (safetensors/pickle/ONNX) and GPU memory allocation "
+						  "require full implementation. Model: %s, Path: %s",
+						  model_name, model_path ? model_path : "(none)");
+	return -1;
 }
 
 static int
@@ -353,7 +347,7 @@ ndb_cuda_hf_embed(const char *model_name,
 		}
 		oldcontext = MemoryContextSwitchTo(embed_context);
 
-		/* Load model (for now, use dummy weights) */
+		/* Load model weights - will error if weights cannot be loaded */
 		rc = ndb_cuda_hf_load_model_weights(
 											model_name, NULL, &config, &weights, errstr);
 		if (rc != 0)
@@ -1985,7 +1979,7 @@ ndb_cuda_hf_complete(const char *model_name,
 	{
 		char	   *temp_errstr = NULL;
 
-		/* Load model (for now, use dummy weights) */
+		/* Load model weights - will error if weights cannot be loaded */
 		rc = ndb_cuda_hf_load_model_weights(
 											model_name, NULL, &config, &weights, &temp_errstr);
 		if (rc != 0)
@@ -3095,7 +3089,7 @@ ndb_cuda_hf_generate_batch(const char *model_name,
  * ndb_cuda_hf_rerank
  *	  Rerank documents using CUDA-accelerated Hugging Face model.
  *
- * This is a placeholder implementation. For full CUDA support, we would:
+ * This function requires actual implementation. For full CUDA support, we would:
  * 1. Load reranker model weights to GPU memory
  * 2. Tokenize query and documents (concatenate query+doc for each pair)
  * 3. Run cross-encoder on GPU (query-document pairs in batch)
@@ -3340,9 +3334,10 @@ ndb_cuda_hf_rerank(const char *model_name,
 
 		if (rc != 0)
 		{
-			/* Fallback: set all scores to 0 on error */
-			for (i = 0; i < ndocs; i++)
-				scores[i] = 0.0f;
+			NDB_FREE(scores);
+			if (errstr && !*errstr)
+				*errstr = pstrdup("Reranking failed. Cannot return dummy scores.");
+			return -1;
 		}
 	}
 
@@ -3354,12 +3349,15 @@ ndb_cuda_hf_rerank(const char *model_name,
  * ndb_cuda_hf_load_model
  *	  Load a Hugging Face model into GPU memory
  *
- * This is a placeholder implementation. For full support, we would:
+ * This function requires actual model loading implementation:
  * 1. Parse model configuration file
  * 2. Load model weights from file (safetensors, pickle, etc.)
  * 3. Allocate GPU memory for weights
  * 4. Copy weights to GPU
  * 5. Store model in cache
+ *
+ * Dummy implementations are not supported - this will error if model
+ * weights cannot be loaded from actual files.
  */
 int
 ndb_cuda_hf_load_model(const char *model_name,
