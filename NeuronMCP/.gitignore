@@ -1,0 +1,18 @@
+# Binaries
+bin/
+
+# Test output files
+test_*.json
+results_*.json
+final_*.json
+comprehensive_test_results.json
+all_tools.json
+test_output_*/
+
+# Logs
+*.log
+test_run.log
+
+# Python cache
+__pycache__/
+*.pyc
