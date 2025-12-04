@@ -1145,8 +1145,6 @@ opq_model_deserialize_from_bytea(const bytea * data, PQCodebook * codebook, floa
 	/* Check for integer overflow in size calculation */
 	if (*dim_out > 0 && (size_t) *dim_out > MaxAllocSize / sizeof(float) / (size_t) *dim_out)
 	{
-		if (errstr)
-			*errstr = pstrdup("opq_deserialize: rotation_matrix allocation size exceeds MaxAllocSize");
 		return -1;
 	}
 	*rotation_matrix_out = (float *) palloc(sizeof(float) * *dim_out * *dim_out);
