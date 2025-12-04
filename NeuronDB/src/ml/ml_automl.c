@@ -2574,6 +2574,7 @@ automl_gpu_train(MLGpuModel * model, const MLGpuTrainSpec * spec, char **errstr)
 		selected_algorithm[sizeof(selected_algorithm) - 1] = '\0';
 		best_score_val = candidate_scores[best_idx] >= 0.0f ? candidate_scores[best_idx] : 0.5f;
 
+cleanup:
 		/* Cleanup train/test splits */
 		if (train_features)
 			NDB_FREE(train_features);

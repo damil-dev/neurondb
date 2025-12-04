@@ -2812,7 +2812,8 @@ ndb_metal_linreg_train(const float *features,
 	{
 		double	   *xi;
 
-		xi = (double *) palloc(sizeof(double) * dim_with_intercept);
+		NDB_DECLARE(double *, xi);
+		NDB_ALLOC(xi, double, dim_with_intercept);
 		if (xi == NULL)
 		{
 			if (errstr)
@@ -2894,7 +2895,7 @@ ndb_metal_linreg_train(const float *features,
 		}
 
 		ereport(DEBUG2, (errmsg("ndb_metal_linreg_train: computation loop completed")));
-		pfree(xi);
+		NDB_FREE(xi);
 		ereport(DEBUG2, (errmsg("ndb_metal_linreg_train: xi buffer freed")));
 	}
 
@@ -2911,7 +2912,8 @@ ndb_metal_linreg_train(const float *features,
 
 		ereport(DEBUG2, (errmsg("ndb_metal_linreg_train: allocating augmented matrix")));
 		/* Create augmented matrix [A | I] */
-		augmented = (double **) palloc(sizeof(double *) * dim_with_intercept);
+		NDB_DECLARE(double **, augmented);
+		NDB_ALLOC(augmented, double *, dim_with_intercept);
 		if (augmented == NULL)
 		{
 			if (errstr)
@@ -4937,7 +4939,8 @@ ndb_metal_ridge_train(const float *features,
 		bool		invert_success = true;
 
 		/* Create augmented matrix [A | I] */
-		augmented = (double **) palloc(sizeof(double *) * dim_with_intercept);
+		NDB_DECLARE(double **, augmented);
+		NDB_ALLOC(augmented, double *, dim_with_intercept);
 		for (row = 0; row < dim_with_intercept; row++)
 		{
 			NDB_ALLOC(augmented[row], double, 2 * dim_with_intercept);
@@ -6129,12 +6132,18 @@ ndb_metal_gmm_train(const float *features,
 	}
 
 	/* Allocate host memory */
-	mixing_coeffs = (double *) palloc(sizeof(double) * n_components);
-	means = (double *) palloc0(sizeof(double) * (size_t) n_components * (size_t) feature_dim);
-	variances = (double *) palloc0(sizeof(double) * (size_t) n_components * (size_t) feature_dim);
-	means_2d = (double **) palloc(sizeof(double *) * n_components);
-	variances_2d = (double **) palloc(sizeof(double *) * n_components);
-	responsibilities = (double *) palloc(sizeof(double) * (size_t) n_samples * (size_t) n_components);
+	NDB_DECLARE(double *, mixing_coeffs);
+	NDB_DECLARE(double *, means);
+	NDB_DECLARE(double *, variances);
+	NDB_DECLARE(double **, means_2d);
+	NDB_DECLARE(double **, variances_2d);
+	NDB_DECLARE(double *, responsibilities);
+	NDB_ALLOC(mixing_coeffs, double, n_components);
+	NDB_ALLOC(means, double, n_components * feature_dim);
+	NDB_ALLOC(variances, double, n_components * feature_dim);
+	NDB_ALLOC(means_2d, double *, n_components);
+	NDB_ALLOC(variances_2d, double *, n_components);
+	NDB_ALLOC(responsibilities, double, n_samples * n_components);
 
 	/* Initialize means with random data points (K-means++ style) */
 	for (k = 0; k < n_components; k++)
@@ -6361,7 +6370,8 @@ ndb_metal_gmm_predict(const bytea * model_data,
 	means = (const double *) (base + sizeof(NdbCudaGmmModelHeader) + sizeof(double) * (size_t) hdr->n_components);
 	variances = (const double *) (base + sizeof(NdbCudaGmmModelHeader) + sizeof(double) * (size_t) hdr->n_components + sizeof(double) * (size_t) hdr->n_components * (size_t) hdr->n_features);
 
-	component_probs = (double *) palloc(sizeof(double) * hdr->n_components);
+	NDB_DECLARE(double *, component_probs);
+	NDB_ALLOC(component_probs, double, hdr->n_components);
 
 	/* Compute probability for each component */
 	for (i = 0; i < hdr->n_components; i++)
@@ -6602,8 +6612,10 @@ ndb_metal_knn_train(const float *features,
 	}
 
 	/* Copy training data (KNN is a lazy learner - just stores data) */
-	features_copy = (float *) palloc(sizeof(float) * (size_t) n_samples * (size_t) feature_dim);
-	labels_copy = (double *) palloc(sizeof(double) * (size_t) n_samples);
+	NDB_DECLARE(float *, features_copy);
+	NDB_DECLARE(double *, labels_copy);
+	NDB_ALLOC(features_copy, float, n_samples * feature_dim);
+	NDB_ALLOC(labels_copy, double, n_samples);
 
 	memcpy(features_copy, features, sizeof(float) * (size_t) n_samples * (size_t) feature_dim);
 	memcpy(labels_copy, labels, sizeof(double) * (size_t) n_samples);
@@ -6676,8 +6688,10 @@ ndb_metal_knn_predict(const bytea * model_data,
 	training_labels = (const double *) (base + sizeof(NdbCudaKnnModelHeader) + sizeof(float) * (size_t) hdr->n_samples * (size_t) hdr->n_features);
 
 	/* Allocate distance array */
-	distances = (float *) palloc(sizeof(float) * hdr->n_samples);
-	top_k_indices = (int *) palloc(sizeof(int) * hdr->k);
+	NDB_DECLARE(float *, distances);
+	NDB_DECLARE(int *, top_k_indices);
+	NDB_ALLOC(distances, float, hdr->n_samples);
+	NDB_ALLOC(top_k_indices, int, hdr->k);
 
 	/* Step 1: Compute distances using Metal-accelerated L2 distance */
 	for (i = 0; i < hdr->n_samples; i++)
@@ -6843,7 +6857,8 @@ ndb_metal_hf_embed(const char *model_name,
 		}
 
 		/* Convert token IDs to float array for ONNX */
-		input_data = (float *) palloc(token_length * sizeof(float));
+		NDB_DECLARE(float *, input_data);
+		NDB_ALLOC(input_data, float, token_length);
 		for (i = 0; i < token_length; i++)
 			input_data[i] = (float) token_ids[i];
 
@@ -6880,7 +6895,8 @@ ndb_metal_hf_embed(const char *model_name,
 		}
 
 		/* Allocate output embedding */
-		embedding = (float *) palloc(embed_dim * sizeof(float));
+		NDB_DECLARE(float *, embedding);
+		NDB_ALLOC(embedding, float, embed_dim);
 
 		/* Pool embeddings (mean pooling across sequence dimension) */
 		/* Defensive: Handle zero token_length */
@@ -7287,7 +7303,8 @@ neurondb_gpu_rf_predict_backend(const void *rf_hdr,
 		return false;
 	}
 
-	tally = (int *) palloc0(sizeof(int) * n_classes);
+	NDB_DECLARE(int *, tally);
+	NDB_ALLOC(tally, int, n_classes);
 	for (i = 0; i < n_trees; i++)
 	{
 		int			off = blob_trees[i].offset_to_nodes;
