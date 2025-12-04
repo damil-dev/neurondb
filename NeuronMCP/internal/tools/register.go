@@ -57,5 +57,10 @@ func RegisterAllTools(registry *ToolRegistry, db *database.Database, logger *log
 
 	// Hybrid search tools
 	registry.Register(NewHybridSearchTool(db, logger))
+
+	// PostgreSQL tools
+	registry.Register(NewPostgreSQLVersionTool(db, logger))
+	registry.Register(NewPostgreSQLStatsTool(db, logger))
+	registry.Register(NewPostgreSQLDatabaseListTool(db, logger))
 }
 
