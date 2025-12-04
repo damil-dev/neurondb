@@ -63,7 +63,6 @@ neurondb_gpu_matmul(const float *A,
 
 		if (backend && backend->mem_alloc)
 		{
-			/* Allocate GPU memory */
 			rc = backend->mem_alloc(&d_A, A_size);
 			if (rc == 0)
 				rc = backend->mem_alloc(&d_B, B_size);
@@ -72,7 +71,6 @@ neurondb_gpu_matmul(const float *A,
 
 			if (rc == 0 && backend->memcpy_h2d)
 			{
-				/* Copy data to GPU */
 				backend->memcpy_h2d(d_A, A, A_size);
 				backend->memcpy_h2d(d_B, B, B_size);
 
@@ -83,11 +81,9 @@ neurondb_gpu_matmul(const float *A,
 					 "using CPU fallback until kernel implemented",
 					 backend->name ? backend->name : "unknown");
 
-				/* Copy result back */
 				backend->memcpy_d2h(C, d_C, C_size);
 			}
 
-			/* Free GPU memory */
 			if (d_A && backend->mem_free)
 				backend->mem_free(d_A);
 			if (d_B && backend->mem_free)
@@ -95,7 +91,6 @@ neurondb_gpu_matmul(const float *A,
 			if (d_C && backend->mem_free)
 				backend->mem_free(d_C);
 
-			/* If GPU path succeeded, return early */
 			if (rc == 0)
 				return;
 		}
@@ -144,7 +139,6 @@ neurondb_gpu_vector_add(const float *a,
 
 		if (backend && backend->mem_alloc)
 		{
-			/* Allocate GPU memory */
 			rc = backend->mem_alloc(&d_a, vec_size);
 			if (rc == 0)
 				rc = backend->mem_alloc(&d_b, vec_size);
@@ -163,11 +157,9 @@ neurondb_gpu_vector_add(const float *a,
 					 "using CPU fallback until kernel implemented",
 					 backend->name ? backend->name : "unknown");
 
-				/* Copy result back */
 				backend->memcpy_d2h(result, d_result, vec_size);
 			}
 
-			/* Free GPU memory */
 			if (d_a && backend->mem_free)
 				backend->mem_free(d_a);
 			if (d_b && backend->mem_free)

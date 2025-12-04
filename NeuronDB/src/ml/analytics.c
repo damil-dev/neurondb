@@ -81,7 +81,6 @@ feedback_loop_integrate(PG_FUNCTION_ARGS)
 				 errmsg("neurondb: failed to create neurondb_feedback table")));
 	}
 
-	/* Insert feedback row. */
 	ndb_spi_stringinfo_init(spi_session, &sql);
 	appendStringInfo(&sql,
 					 "INSERT INTO neurondb_feedback (query, result, rating) VALUES "
@@ -120,7 +119,6 @@ feedback_loop_integrate(PG_FUNCTION_ARGS)
  * - Returns projected vectors in lower dimensional space
  */
 
-/* Power iteration method for computing dominant eigenvector */
 static void
 pca_power_iteration(float **data,
 					int nvec,
@@ -136,11 +134,9 @@ pca_power_iteration(float **data,
 
 	NDB_ALLOC(y, float, dim);
 
-	/* Initialize with random vector */
 	for (i = 0; i < dim; i++)
 		eigvec[i] = (float) (rand() % 1000) / 1000.0f;
 
-	/* Normalize */
 	norm = 0.0;
 	for (i = 0; i < dim; i++)
 		norm += eigvec[i] * eigvec[i];
@@ -209,18 +205,17 @@ reduce_pca(PG_FUNCTION_ARGS)
 	char	   *tbl_str;
 	char	   *col_str;
 	float	  **data;
-	float	  **components;
-	float	  **projected;
+	float	  **components = NULL;
+	float	  **projected = NULL;
 	int			nvec,
 				dim;
 	int			i,
 				j,
 				c;
 	ArrayType  *result_array;
-	Datum	   *result_datums;
-	float	   *mean;
+	Datum	   *result_datums = NULL;
+	float	   *mean = NULL;
 
-	/* Parse arguments */
 	table_name = PG_GETARG_TEXT_PP(0);
 	column_name = PG_GETARG_TEXT_PP(1);
 	n_components = PG_GETARG_INT32(2);
@@ -240,7 +235,6 @@ reduce_pca(PG_FUNCTION_ARGS)
 		 col_str,
 		 n_components);
 
-	/* Fetch vectors */
 	data = neurondb_fetch_vectors_from_table(tbl_str, col_str, &nvec, &dim);
 	if (nvec == 0)
 		ereport(ERROR,
@@ -255,7 +249,6 @@ reduce_pca(PG_FUNCTION_ARGS)
 						n_components,
 						dim)));
 
-	/* Center the data (subtract mean) */
 	NDB_ALLOC(mean, float, dim);
 	for (j = 0; j < nvec; j++)
 		for (i = 0; i < dim; i++)
@@ -266,7 +259,6 @@ reduce_pca(PG_FUNCTION_ARGS)
 		for (i = 0; i < dim; i++)
 			data[j][i] -= mean[i];
 
-	/* Compute principal components using power iteration */
 	NDB_ALLOC(components, float *, n_components);
 	for (c = 0; c < n_components; c++)
 	{
@@ -277,7 +269,6 @@ reduce_pca(PG_FUNCTION_ARGS)
 		pca_deflate(data, nvec, dim, components[c]);
 	}
 
-	/* Restore centered data for projection */
 	for (j = 0; j < nvec; j++)
 		for (i = 0; i < dim; i++)
 			data[j][i] += mean[i];
@@ -285,7 +276,6 @@ reduce_pca(PG_FUNCTION_ARGS)
 		for (i = 0; i < dim; i++)
 			data[j][i] -= mean[i];
 
-	/* Project data onto principal components */
 	NDB_ALLOC(projected, float *, nvec);
 	for (j = 0; j < nvec; j++)
 	{
@@ -302,7 +292,6 @@ reduce_pca(PG_FUNCTION_ARGS)
 		}
 	}
 
-	/* Build result array of arrays */
 	NDB_ALLOC(result_datums, Datum, nvec);
 	for (j = 0; j < nvec; j++)
 	{
@@ -342,7 +331,6 @@ reduce_pca(PG_FUNCTION_ARGS)
 									   typalign);
 	}
 
-	/* Cleanup */
 	for (j = 0; j < nvec; j++)
 	{
 		NDB_FREE(data[j]);
@@ -380,7 +368,6 @@ typedef struct IsoTreeNode
 	int			size;			/* Number of points in this node */
 }			IsoTreeNode;
 
-/* Build isolation tree recursively */
 static IsoTreeNode *
 build_iso_tree(float **data,
 			   int *indices,
@@ -397,24 +384,21 @@ build_iso_tree(float **data,
 				max_val;
 	int			left_count,
 				right_count;
-	int		   *left_indices,
-			   *right_indices;
+	int		   *left_indices = NULL,
+			   *right_indices = NULL;
 
 	node = (IsoTreeNode *) palloc0(sizeof(IsoTreeNode));
 	node->size = n;
 
-	/* Stopping criteria */
 	if (n <= 1 || depth >= max_depth)
 	{
 		node->split_dim = -1;	/* Leaf node */
 		return node;
 	}
 
-	/* Random split dimension */
 	split_dim = rand() % dim;
 	node->split_dim = split_dim;
 
-	/* Find min/max in this dimension */
 	min_val = max_val = data[indices[0]][split_dim];
 	for (i = 1; i < n; i++)
 	{
@@ -426,7 +410,6 @@ build_iso_tree(float **data,
 			max_val = val;
 	}
 
-	/* Random split value */
 	if (max_val - min_val < 1e-6)
 	{
 		node->split_dim = -1;	/* Can't split */
@@ -435,7 +418,6 @@ build_iso_tree(float **data,
 	split_val = min_val + (float) (((double) rand() / (double) RAND_MAX)) * (max_val - min_val);
 	node->split_val = split_val;
 
-	/* Partition indices */
 	NDB_ALLOC(left_indices, int, n);
 	NDB_ALLOC(right_indices, int, n);
 	left_count = right_count = 0;
@@ -448,7 +430,6 @@ build_iso_tree(float **data,
 			right_indices[right_count++] = indices[i];
 	}
 
-	/* Recursively build subtrees */
 	if (left_count > 0)
 		node->left = build_iso_tree(data,
 									left_indices,
@@ -470,7 +451,6 @@ build_iso_tree(float **data,
 	return node;
 }
 
-/* Compute path length for a point in the tree */
 static double
 iso_tree_path_length(IsoTreeNode * node, const float *point, int depth)
 {
@@ -478,15 +458,12 @@ iso_tree_path_length(IsoTreeNode * node, const float *point, int depth)
 
 	if (node->split_dim == -1)
 	{
-		/* Leaf node - estimate average path length */
 		if (node->size <= 1)
 			return depth;
-		/* Average path length for BST of size n */
 		h = log(node->size) + 0.5772156649; /* Euler's constant */
 		return depth + h;
 	}
 
-	/* Traverse tree */
 	if (point[node->split_dim] < node->split_val && node->left)
 		return iso_tree_path_length(node->left, point, depth + 1);
 	else if (node->right)
@@ -495,7 +472,6 @@ iso_tree_path_length(IsoTreeNode * node, const float *point, int depth)
 		return depth;
 }
 
-/* Free isolation tree */
 static void
 free_iso_tree(IsoTreeNode * node)
 {
@@ -528,12 +504,11 @@ detect_outliers(PG_FUNCTION_ARGS)
 	int			max_depth;
 	double		avg_path_length_full;
 	ArrayType  *result_array;
-	Datum	   *result_datums;
+	Datum	   *result_datums = NULL;
 	int16		typlen;
 	bool		typbyval;
 	char		typalign;
 
-	/* Parse arguments */
 	table_name = PG_GETARG_TEXT_PP(0);
 	column_name = PG_GETARG_TEXT_PP(1);
 	n_trees = PG_GETARG_INT32(2);
@@ -560,21 +535,18 @@ detect_outliers(PG_FUNCTION_ARGS)
 		 n_trees,
 		 contamination);
 
-	/* Fetch vectors */
 	data = neurondb_fetch_vectors_from_table(tbl_str, col_str, &nvec, &dim);
 	if (nvec == 0)
 		ereport(ERROR,
 				(errcode(ERRCODE_DATA_EXCEPTION),
 				 errmsg("No vectors found")));
 
-	/* Build forest of isolation trees */
 	max_depth = (int) ceil(log2(nvec));
 	forest = (IsoTreeNode * *) palloc(sizeof(IsoTreeNode *) * n_trees);
 	indices = (int *) palloc(sizeof(int) * nvec);
 
 	for (t = 0; t < n_trees; t++)
 	{
-		/* Sample subset of data */
 		int			sample_size = (nvec < 256) ? nvec : 256;
 
 		for (i = 0; i < sample_size; i++)
@@ -584,7 +556,6 @@ detect_outliers(PG_FUNCTION_ARGS)
 								   data, indices, sample_size, dim, 0, max_depth);
 	}
 
-	/* Compute anomaly scores */
 	avg_path_length_full = (nvec > 1) ? 2.0 * (log(nvec - 1) + 0.5772156649)
 		- 2.0 * (nvec - 1.0) / nvec
 		: 0.0;
@@ -598,14 +569,12 @@ detect_outliers(PG_FUNCTION_ARGS)
 			avg_path += iso_tree_path_length(forest[t], data[i], 0);
 		avg_path /= n_trees;
 
-		/* Anomaly score: 2^(-avg_path / c) where c is avg path length */
 		if (avg_path_length_full > 0)
 			scores[i] = pow(2.0, -avg_path / avg_path_length_full);
 		else
 			scores[i] = 0.0;
 	}
 
-	/* Build result array */
 	NDB_ALLOC(result_datums, Datum, nvec);
 	for (i = 0; i < nvec; i++)
 		result_datums[i] = Float4GetDatum((float) scores[i]);
@@ -614,7 +583,6 @@ detect_outliers(PG_FUNCTION_ARGS)
 	result_array = construct_array(
 								   result_datums, nvec, FLOAT4OID, typlen, typbyval, typalign);
 
-	/* Cleanup */
 	for (t = 0; t < n_trees; t++)
 		free_iso_tree(forest[t]);
 	for (i = 0; i < nvec; i++)
@@ -645,7 +613,6 @@ typedef struct KNNEdge
 	float		distance;
 }			KNNEdge;
 
-/* Comparison function for sorting edges by distance */
 static int
 knn_edge_compare(const void *a, const void *b)
 {
@@ -683,7 +650,6 @@ build_knn_graph(PG_FUNCTION_ARGS)
 	bool		typbyval;
 	char		typalign;
 
-	/* Parse arguments */
 	table_name = PG_GETARG_TEXT_PP(0);
 	column_name = PG_GETARG_TEXT_PP(1);
 	k = PG_GETARG_INT32(2);
@@ -702,7 +668,6 @@ build_knn_graph(PG_FUNCTION_ARGS)
 		 col_str,
 		 k);
 
-	/* Fetch vectors */
 	data = neurondb_fetch_vectors_from_table(tbl_str, col_str, &nvec, &dim);
 	if (nvec == 0)
 		ereport(ERROR,
@@ -712,7 +677,6 @@ build_knn_graph(PG_FUNCTION_ARGS)
 	if (k >= nvec)
 		k = nvec - 1;
 
-	/* Build KNN graph */
 	edges = (KNNEdge *) palloc(sizeof(KNNEdge) * nvec);
 	result_count = 0;
 	result_datums = (Datum *) palloc(sizeof(Datum) * nvec * k * 3);
@@ -722,7 +686,6 @@ build_knn_graph(PG_FUNCTION_ARGS)
 		double		dist_sq;
 		double		diff;
 
-		/* Compute distances to all other points */
 		for (j = 0; j < nvec; j++)
 		{
 			if (i == j)
@@ -738,10 +701,8 @@ build_knn_graph(PG_FUNCTION_ARGS)
 			edges[j].distance = sqrt(dist_sq);
 		}
 
-		/* Sort by distance and take k nearest */
 		qsort(edges, nvec, sizeof(KNNEdge), knn_edge_compare);
 
-		/* Add k nearest edges to result */
 		for (j = 0; j < k && j < nvec - 1; j++)
 		{
 			result_datums[result_count++] = Int32GetDatum(i);
@@ -760,7 +721,6 @@ build_knn_graph(PG_FUNCTION_ARGS)
 								   typbyval,
 								   typalign);
 
-	/* Cleanup */
 	for (i = 0; i < nvec; i++)
 		NDB_FREE(data[i]);
 	NDB_FREE(data);
@@ -792,20 +752,19 @@ compute_embedding_quality(PG_FUNCTION_ARGS)
 	char	   *col_str;
 	char	   *cluster_col_str;
 	float	  **data;
-	int		   *clusters;
+	int		   *clusters = NULL;
 	int			nvec,
 				dim;
 	int			i,
 				j;
-	double	   *a_scores;		/* Average distance to same cluster */
-	double	   *b_scores;		/* Average distance to nearest other cluster */
+	double	   *a_scores = NULL;		/* Average distance to same cluster */
+	double	   *b_scores = NULL;		/* Average distance to nearest other cluster */
 	double		silhouette;
 	StringInfoData sql;
 	int			ret;
 	NDB_DECLARE(NdbSpiSession *, spi_session);
 	MemoryContext oldcontext;
 
-	/* Parse arguments */
 	table_name = PG_GETARG_TEXT_PP(0);
 	column_name = PG_GETARG_TEXT_PP(1);
 	cluster_column = PG_GETARG_TEXT_PP(2);
@@ -820,14 +779,12 @@ compute_embedding_quality(PG_FUNCTION_ARGS)
 		 col_str,
 		 cluster_col_str);
 
-	/* Fetch vectors */
 	data = neurondb_fetch_vectors_from_table(tbl_str, col_str, &nvec, &dim);
 	if (nvec == 0)
 		ereport(ERROR,
 				(errcode(ERRCODE_DATA_EXCEPTION),
 				 errmsg("No vectors found")));
 
-	/* Fetch cluster assignments */
 	oldcontext = CurrentMemoryContext;
 	NDB_ALLOC(clusters, int, nvec);
 
@@ -866,7 +823,6 @@ compute_embedding_quality(PG_FUNCTION_ARGS)
 	ndb_spi_stringinfo_free(spi_session, &sql);
 	NDB_SPI_SESSION_END(spi_session);
 
-	/* Compute silhouette score */
 	NDB_ALLOC(a_scores, double, nvec);
 	NDB_ALLOC(b_scores, double, nvec);
 
@@ -913,7 +869,6 @@ compute_embedding_quality(PG_FUNCTION_ARGS)
 		b_scores[i] = min_other_dist;
 	}
 
-	/* Average silhouette */
 	{
 		int			valid_count = 0;
 		double		s;
@@ -939,7 +894,6 @@ compute_embedding_quality(PG_FUNCTION_ARGS)
 			silhouette /= valid_count;
 	}
 
-	/* Cleanup */
 	for (i = 0; i < nvec; i++)
 		NDB_FREE(data[i]);
 	NDB_FREE(data);

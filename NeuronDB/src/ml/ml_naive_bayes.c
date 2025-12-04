@@ -231,7 +231,6 @@ train_naive_bayes_classifier(PG_FUNCTION_ARGS)
 		 FLOAT8PASSBYVAL,
 		 'd');
  
-	 /* Cleanup */
 	 NDB_FREE(model.class_priors);
 	 for (class = 0; class < 2; class++)
 	 {
@@ -890,9 +889,9 @@ train_naive_bayes_classifier_model_id(PG_FUNCTION_ARGS)
 	 int n_params;
 	 int n_classes;
 	 int n_features;
-	 double *class_priors;
-	 double **means;
-	 double **variances;
+	 double *class_priors = NULL;
+	 double **means = NULL;
+	 double **variances = NULL;
 	 double log_probs[2] = {0.0, 0.0};
 	 int predicted_class;
 	 int i, j, idx;
@@ -983,7 +982,6 @@ train_naive_bayes_classifier_model_id(PG_FUNCTION_ARGS)
 	 /* Return class with highest log probability */
 	 predicted_class = (log_probs[1] > log_probs[0]) ? 1 : 0;
  
-	 /* Cleanup */
 	 NDB_FREE(class_priors);
 	 for (i = 0; i < n_classes; i++)
 	 {
@@ -2388,7 +2386,7 @@ nb_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec,
 	 const Jsonb *metadata,
 	 char **errstr)
  {
-	 NbGpuModelState *state;
+	 NbGpuModelState *state = NULL;
 	 const NdbCudaNbModelHeader *hdr;
 	 size_t payload_size;
 

@@ -632,7 +632,6 @@ predict_pq_codebook(PG_FUNCTION_ARGS)
 
 	result = construct_array(result_datums, m, INT2OID, 2, true, 's');
 
-	/* Cleanup */
 	for (sub = 0; sub < m; sub++)
 	{
 		for (c = 0; c < ksub; c++)
@@ -949,7 +948,6 @@ evaluate_pq_codebook_by_model_id(PG_FUNCTION_ARGS)
 	result = DatumGetJsonbP(DirectFunctionCall1(jsonb_in, CStringGetTextDatum(jsonbuf.data)));
 	NDB_FREE(jsonbuf.data);
 
-	/* Cleanup */
 	NDB_FREE(tbl_str);
 	NDB_FREE(vec_str);
 

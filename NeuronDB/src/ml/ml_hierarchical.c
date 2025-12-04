@@ -847,7 +847,6 @@ evaluate_hierarchical_by_model_id(PG_FUNCTION_ARGS)
 							calinski_harabasz = 0.0;
 						}
 
-						/* Cleanup */
 						for (i = 0; i < n_points; i++)
 							NDB_FREE(data[i]);
 						NDB_FREE(data);
@@ -917,7 +916,6 @@ evaluate_hierarchical_by_model_id(PG_FUNCTION_ARGS)
 	result = DatumGetJsonbP(DirectFunctionCall1(jsonb_in, CStringGetTextDatum(jsonbuf.data)));
 	NDB_FREE(jsonbuf.data);
 
-	/* Cleanup */
 	NDB_FREE(tbl_str);
 	NDB_FREE(feat_str);
 
@@ -983,7 +981,7 @@ hierarchical_model_deserialize_from_bytea(const bytea * data, float ***centers_o
 	int			offset = 0;
 	int			i,
 				j;
-	float	  **centers;
+	float	  **centers = NULL;
 	int			linkage_len;
 
 	if (data == NULL || VARSIZE(data) < VARHDRSZ + sizeof(int) * 3)
@@ -1258,7 +1256,6 @@ hierarchical_gpu_train(MLGpuModel * model, const MLGpuTrainSpec * spec, char **e
 	model->gpu_ready = true;
 	model->is_gpu_resident = false;
 
-	/* Cleanup */
 	for (i = 0; i < nvec; i++)
 	{
 		NDB_FREE(data[i]);
@@ -1430,7 +1427,7 @@ hierarchical_gpu_serialize(const MLGpuModel * model, bytea * *payload_out,
 	}
 
 	{
-		char	   *payload_bytes;
+		char	   *payload_bytes = NULL;
 		payload_size = VARSIZE(state->model_blob);
 		NDB_ALLOC(payload_bytes, char, payload_size);
 		payload_copy = (bytea *) payload_bytes;
@@ -1474,7 +1471,7 @@ hierarchical_gpu_deserialize(MLGpuModel * model, const bytea * payload,
 	}
 
 	{
-		char	   *payload_bytes;
+		char	   *payload_bytes = NULL;
 		payload_size = VARSIZE(payload);
 		NDB_ALLOC(payload_bytes, char, payload_size);
 		payload_copy = (bytea *) payload_bytes;
@@ -1504,7 +1501,7 @@ hierarchical_gpu_deserialize(MLGpuModel * model, const bytea * payload,
 	if (metadata != NULL)
 	{
 		int			metadata_size;
-		char	   *metadata_bytes;
+		char	   *metadata_bytes = NULL;
 		Jsonb	   *metadata_copy;
 
 		metadata_size = VARSIZE(metadata);

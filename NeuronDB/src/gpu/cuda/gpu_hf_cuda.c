@@ -731,7 +731,6 @@ ndb_cuda_hf_embed(const char *model_name,
 	memcpy(*vec_out, embedding, sizeof(float) * embed_dim);
 	*dim_out = embed_dim;
 
-	/* Delete temporary context */
 	MemoryContextDelete(embed_context);
 
 	return 0;
@@ -768,7 +767,6 @@ ndb_cuda_hf_parse_gen_params_OLD_REMOVED(const char *params_json,
 		return -1;
 	}
 
-	/* Initialize with defaults */
 	memset(gen_params, 0, sizeof(NdbCudaHfGenParams));
 	gen_params->temperature = 1.0f;
 	gen_params->top_p = 1.0f;
@@ -783,19 +781,15 @@ ndb_cuda_hf_parse_gen_params_OLD_REMOVED(const char *params_json,
 	gen_params->streaming = false;
 	gen_params->num_logit_bias = 0;
 
-	/* Skip empty JSON */
 	if (strlen(params_json) == 0 || strcmp(params_json, "{}") == 0)
 		return 0;
 
-	/* Simple JSON parsing - find key-value pairs */
 	json_copy = pstrdup(params_json);
 	p = json_copy;
 
-	/* Skip whitespace and opening brace */
 	while (*p && (isspace((unsigned char) *p) || *p == '{'))
 		p++;
 
-	/* Parse key-value pairs */
 	while (*p && *p != '}')
 	{
 		/* Skip whitespace and commas */
@@ -2354,7 +2348,6 @@ ndb_cuda_hf_complete(const char *model_name,
 		*text_out = pstrdup("");
 	}
 
-	/* Delete temporary context */
 	MemoryContextDelete(complete_context);
 
 	return 0;
@@ -3340,7 +3333,6 @@ ndb_cuda_hf_rerank(const char *model_name,
 			scores,
 			errstr);
 
-		/* Cleanup */
 		NDB_FREE(token_ids_batch);
 		NDB_FREE(attention_mask_batch);
 		if (classification_weights != entry->weights.classification_weights)

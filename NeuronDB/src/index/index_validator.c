@@ -1148,7 +1148,7 @@ neurondb_rebuild_index(PG_FUNCTION_ARGS)
 
 		/* Track rebuild history */
 		indexName = pstrdup(RelationGetRelationName(indexRel));
-		session2 = NULL;  /* Initialize */
+		session2 = NULL;
 		session2 = ndb_spi_session_begin(CurrentMemoryContext, false);
 		if (session2 == NULL)
 		{

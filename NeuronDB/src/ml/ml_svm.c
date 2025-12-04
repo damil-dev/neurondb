@@ -965,7 +965,6 @@ train_svm_classifier(PG_FUNCTION_ARGS)
 			JsonbValue *final_value = NULL;
 			Numeric		C_num, max_iters_num;
 
-			/* Start object */
 			PG_TRY();
 			{
 				(void) pushJsonbValue(&state, WJB_BEGIN_OBJECT, NULL);
@@ -989,7 +988,6 @@ train_svm_classifier(PG_FUNCTION_ARGS)
 				jval.val.numeric = max_iters_num;
 				(void) pushJsonbValue(&state, WJB_VALUE, &jval);
 
-				/* End object */
 				final_value = pushJsonbValue(&state, WJB_END_OBJECT, NULL);
 				
 				if (final_value == NULL)
@@ -1079,7 +1077,6 @@ train_svm_classifier(PG_FUNCTION_ARGS)
 			/* Serialize using unified format with training_backend=1 (GPU) */
 			unified_model_data = svm_model_serialize(&svm_model, 1);
 
-			/* Cleanup */
 			if (svm_model.alphas != NULL)
 			{
 				NDB_FREE(svm_model.alphas);
@@ -1102,7 +1099,6 @@ train_svm_classifier(PG_FUNCTION_ARGS)
 					JsonbValue *final_value = NULL;
 					Numeric		n_features_num, n_samples_num, n_support_vectors_num, C_num, max_iters_num;
 
-					/* Start object */
 					PG_TRY();
 					{
 						(void) pushJsonbValue(&state, WJB_BEGIN_OBJECT, NULL);
@@ -1134,7 +1130,6 @@ train_svm_classifier(PG_FUNCTION_ARGS)
 						jval.val.numeric = n_features_num;
 						(void) pushJsonbValue(&state, WJB_VALUE, &jval);
 
-						/* Add n_samples */
 						jkey.val.string.val = "n_samples";
 						jkey.val.string.len = strlen("n_samples");
 						(void) pushJsonbValue(&state, WJB_KEY, &jkey);
@@ -1170,7 +1165,6 @@ train_svm_classifier(PG_FUNCTION_ARGS)
 						jval.val.numeric = max_iters_num;
 						(void) pushJsonbValue(&state, WJB_VALUE, &jval);
 
-						/* End object */
 						final_value = pushJsonbValue(&state, WJB_END_OBJECT, NULL);
 						
 						if (final_value == NULL)
@@ -1254,7 +1248,6 @@ train_svm_classifier(PG_FUNCTION_ARGS)
 					JsonbValue *final_value = NULL;
 					Numeric		n_features_num, n_samples_num, n_support_vectors_num, C_num, max_iters_num;
 
-					/* Start object */
 					PG_TRY();
 					{
 						(void) pushJsonbValue(&state, WJB_BEGIN_OBJECT, NULL);
@@ -1286,7 +1279,6 @@ train_svm_classifier(PG_FUNCTION_ARGS)
 						jval.val.numeric = n_features_num;
 						(void) pushJsonbValue(&state, WJB_VALUE, &jval);
 
-						/* Add n_samples */
 						jkey.val.string.val = "n_samples";
 						jkey.val.string.len = strlen("n_samples");
 						(void) pushJsonbValue(&state, WJB_KEY, &jkey);
@@ -1322,7 +1314,6 @@ train_svm_classifier(PG_FUNCTION_ARGS)
 						jval.val.numeric = max_iters_num;
 						(void) pushJsonbValue(&state, WJB_VALUE, &jval);
 
-						/* End object */
 						final_value = pushJsonbValue(&state, WJB_END_OBJECT, NULL);
 						
 						if (final_value == NULL)
@@ -1921,7 +1912,6 @@ train_svm_classifier(PG_FUNCTION_ARGS)
 			JsonbValue *final_value = NULL;
 			Numeric		C_num, max_iters_num;
 
-			/* Start object */
 			PG_TRY();
 			{
 				(void) pushJsonbValue(&state, WJB_BEGIN_OBJECT, NULL);
@@ -1945,7 +1935,6 @@ train_svm_classifier(PG_FUNCTION_ARGS)
 				jval.val.numeric = max_iters_num;
 				(void) pushJsonbValue(&state, WJB_VALUE, &jval);
 
-				/* End object */
 				final_value = pushJsonbValue(&state, WJB_END_OBJECT, NULL);
 				
 				if (final_value == NULL)
@@ -2010,7 +1999,6 @@ train_svm_classifier(PG_FUNCTION_ARGS)
 			JsonbValue *final_value = NULL;
 			Numeric		n_samples_num, n_features_num, n_support_vectors_num, C_num, max_iters_num, actual_iters_num, accuracy_num, bias_num;
 
-			/* Start object */
 			PG_TRY();
 			{
 				(void) pushJsonbValue(&state, WJB_BEGIN_OBJECT, NULL);
@@ -2025,7 +2013,6 @@ train_svm_classifier(PG_FUNCTION_ARGS)
 				jval.val.string.len = strlen("svm");
 				(void) pushJsonbValue(&state, WJB_VALUE, &jval);
 
-				/* Add n_samples */
 				jkey.val.string.val = "n_samples";
 				jkey.val.string.len = strlen("n_samples");
 				(void) pushJsonbValue(&state, WJB_KEY, &jkey);
@@ -2079,7 +2066,6 @@ train_svm_classifier(PG_FUNCTION_ARGS)
 				jval.val.numeric = actual_iters_num;
 				(void) pushJsonbValue(&state, WJB_VALUE, &jval);
 
-				/* Add accuracy */
 				jkey.val.string.val = "accuracy";
 				jkey.val.string.len = strlen("accuracy");
 				(void) pushJsonbValue(&state, WJB_KEY, &jkey);
@@ -2097,7 +2083,6 @@ train_svm_classifier(PG_FUNCTION_ARGS)
 				jval.val.numeric = bias_num;
 				(void) pushJsonbValue(&state, WJB_VALUE, &jval);
 
-				/* End object */
 				final_value = pushJsonbValue(&state, WJB_END_OBJECT, NULL);
 				
 				if (final_value == NULL)
@@ -2284,7 +2269,6 @@ predict_svm_model_id(PG_FUNCTION_ARGS)
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("neurondb: svm: model %d not found", model_id)));
 
-	/* Validate feature dimension */
 	if (model->n_features > 0 && features->dim != model->n_features)
 	{
 		elog(DEBUG1,
@@ -2312,7 +2296,6 @@ predict_svm_model_id(PG_FUNCTION_ARGS)
 	/* Convert to binary class (-1 or 1) consistent with SVM label encoding */
 	prediction = (prediction >= 0.0) ? 1.0 : -1.0;
 
-	/* Cleanup */
 	if (model != NULL)
 	{
 		if (model->alphas != NULL)
@@ -2756,7 +2739,6 @@ evaluate_svm_by_model_id(PG_FUNCTION_ARGS)
 				if (feat_null || targ_null)
 					continue;
 
-				/* Bounds check */
 				if (valid_rows >= nvec)
 				{
 					elog(DEBUG1,
@@ -2891,12 +2873,13 @@ evaluate_svm_by_model_id(PG_FUNCTION_ARGS)
 						JsonbValue *final_value = NULL;
 						Numeric		accuracy_num, precision_num, recall_num, f1_score_num, n_samples_num;
 
-						/* Start object */
+						/* Suppress shadow warnings from nested PG_TRY blocks */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wshadow=compatible-local"
 						PG_TRY();
 						{
 							(void) pushJsonbValue(&state, WJB_BEGIN_OBJECT, NULL);
 
-							/* Add accuracy */
 							jkey.type = jbvString;
 							jkey.val.string.val = "accuracy";
 							jkey.val.string.len = strlen("accuracy");
@@ -2906,7 +2889,6 @@ evaluate_svm_by_model_id(PG_FUNCTION_ARGS)
 							jval.val.numeric = accuracy_num;
 							(void) pushJsonbValue(&state, WJB_VALUE, &jval);
 
-							/* Add precision */
 							jkey.val.string.val = "precision";
 							jkey.val.string.len = strlen("precision");
 							(void) pushJsonbValue(&state, WJB_KEY, &jkey);
@@ -2915,7 +2897,6 @@ evaluate_svm_by_model_id(PG_FUNCTION_ARGS)
 							jval.val.numeric = precision_num;
 							(void) pushJsonbValue(&state, WJB_VALUE, &jval);
 
-							/* Add recall */
 							jkey.val.string.val = "recall";
 							jkey.val.string.len = strlen("recall");
 							(void) pushJsonbValue(&state, WJB_KEY, &jkey);
@@ -2924,7 +2905,6 @@ evaluate_svm_by_model_id(PG_FUNCTION_ARGS)
 							jval.val.numeric = recall_num;
 							(void) pushJsonbValue(&state, WJB_VALUE, &jval);
 
-							/* Add f1_score */
 							jkey.val.string.val = "f1_score";
 							jkey.val.string.len = strlen("f1_score");
 							(void) pushJsonbValue(&state, WJB_KEY, &jkey);
@@ -2933,7 +2913,6 @@ evaluate_svm_by_model_id(PG_FUNCTION_ARGS)
 							jval.val.numeric = f1_score_num;
 							(void) pushJsonbValue(&state, WJB_VALUE, &jval);
 
-							/* Add n_samples */
 							jkey.val.string.val = "n_samples";
 							jkey.val.string.len = strlen("n_samples");
 							(void) pushJsonbValue(&state, WJB_KEY, &jkey);
@@ -2942,7 +2921,6 @@ evaluate_svm_by_model_id(PG_FUNCTION_ARGS)
 							jval.val.numeric = n_samples_num;
 							(void) pushJsonbValue(&state, WJB_VALUE, &jval);
 
-							/* End object */
 							final_value = pushJsonbValue(&state, WJB_END_OBJECT, NULL);
 							
 							if (final_value == NULL)
@@ -2960,6 +2938,7 @@ evaluate_svm_by_model_id(PG_FUNCTION_ARGS)
 							result_jsonb = NULL;
 						}
 						PG_END_TRY();
+#pragma GCC diagnostic pop
 					}
 
 					/*
@@ -3367,7 +3346,6 @@ cpu_evaluation_path:
 				 tp, tn, fp, fn, cpu_valid_rows);
 		}
 
-		/* Compute metrics */
 		if (cpu_valid_rows > 0)
 		{
 			accuracy = (double) (tp + tn) / (double) cpu_valid_rows;
@@ -3390,7 +3368,6 @@ cpu_evaluation_path:
 			valid_rows = cpu_valid_rows;
 		}
 
-		/* Cleanup */
 		elog(DEBUG1, "evaluate_svm_by_model_id: about to free cpu_h_features=%p", (void *) cpu_h_features);
 		NDB_FREE(cpu_h_features);
 		elog(DEBUG1, "evaluate_svm_by_model_id: freed cpu_h_features, about to free cpu_h_labels=%p", (void *) cpu_h_labels);
@@ -3447,12 +3424,10 @@ cpu_evaluation_path:
 			JsonbValue *final_value = NULL;
 			Numeric		accuracy_num, precision_num, recall_num, f1_score_num, n_samples_num;
 
-			/* Start object */
 			PG_TRY();
 			{
 				(void) pushJsonbValue(&state, WJB_BEGIN_OBJECT, NULL);
 
-				/* Add accuracy */
 				jkey.type = jbvString;
 				jkey.val.string.val = "accuracy";
 				jkey.val.string.len = strlen("accuracy");
@@ -3462,7 +3437,6 @@ cpu_evaluation_path:
 				jval.val.numeric = accuracy_num;
 				(void) pushJsonbValue(&state, WJB_VALUE, &jval);
 
-				/* Add precision */
 				jkey.val.string.val = "precision";
 				jkey.val.string.len = strlen("precision");
 				(void) pushJsonbValue(&state, WJB_KEY, &jkey);
@@ -3471,7 +3445,6 @@ cpu_evaluation_path:
 				jval.val.numeric = precision_num;
 				(void) pushJsonbValue(&state, WJB_VALUE, &jval);
 
-				/* Add recall */
 				jkey.val.string.val = "recall";
 				jkey.val.string.len = strlen("recall");
 				(void) pushJsonbValue(&state, WJB_KEY, &jkey);
@@ -3480,7 +3453,6 @@ cpu_evaluation_path:
 				jval.val.numeric = recall_num;
 				(void) pushJsonbValue(&state, WJB_VALUE, &jval);
 
-				/* Add f1_score */
 				jkey.val.string.val = "f1_score";
 				jkey.val.string.len = strlen("f1_score");
 				(void) pushJsonbValue(&state, WJB_KEY, &jkey);
@@ -3489,7 +3461,6 @@ cpu_evaluation_path:
 				jval.val.numeric = f1_score_num;
 				(void) pushJsonbValue(&state, WJB_VALUE, &jval);
 
-				/* Add n_samples */
 				jkey.val.string.val = "n_samples";
 				jkey.val.string.len = strlen("n_samples");
 				(void) pushJsonbValue(&state, WJB_KEY, &jkey);
@@ -3498,7 +3469,6 @@ cpu_evaluation_path:
 				jval.val.numeric = n_samples_num;
 				(void) pushJsonbValue(&state, WJB_VALUE, &jval);
 
-				/* End object */
 				final_value = pushJsonbValue(&state, WJB_END_OBJECT, NULL);
 				
 				if (final_value == NULL)
@@ -3540,7 +3510,6 @@ cpu_evaluation_path:
 					 errmsg("neurondb: evaluate_svm_by_model_id: JSONB result is NULL")));
 		}
 
-		/* Cleanup */
 		if (tbl_str)
 		{
 			NDB_FREE(tbl_str);
@@ -3762,7 +3731,6 @@ svm_gpu_serialize(const MLGpuModel * model,
 	/* Serialize using unified format with training_backend=1 (GPU) */
 	unified_payload = svm_model_serialize(&svm_model, 1);
 
-	/* Cleanup */
 	if (svm_model.alphas != NULL)
 	{
 		NDB_FREE(svm_model.alphas);

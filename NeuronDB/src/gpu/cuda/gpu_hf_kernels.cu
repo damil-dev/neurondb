@@ -654,7 +654,6 @@ ndb_cuda_hf_embed_inference(const char *model_name,
 	if (status != cudaSuccess)
 		goto error;
 
-	/* Cleanup */
 	cudaFree(d_token_ids);
 	cudaFree(d_attention_mask);
 	cudaFree(d_embedding_table);
@@ -2865,7 +2864,6 @@ ndb_cuda_hf_generate_inference(const char *model_name,
 			goto error;
 	}
 
-	/* Cleanup */
 	cudaFree(d_embeddings);
 	cudaFree(d_logits);
 	cudaFree(d_probs);
@@ -3178,7 +3176,6 @@ ndb_cuda_hf_cross_encoder_rerank_inference(
 	if (status != cudaSuccess)
 		goto error;
 
-	/* Cleanup */
 	cudaFree(d_classification_weights);
 	cudaFree(d_token_ids);
 	cudaFree(d_attention_mask);

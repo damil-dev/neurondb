@@ -1289,7 +1289,6 @@ train_decision_tree_classifier(PG_FUNCTION_ARGS)
 	model_id = ml_catalog_register_model(&spec);
 	model->model_id = model_id;
 
-	/* Cleanup */
 	dt_free_tree(model->root);
 	NDB_FREE(model);
 	NDB_FREE(indices);
@@ -2202,7 +2201,6 @@ cpu_evaluation_path:
 				f1_score = 0.0;
 		}
 
-		/* Cleanup */
 		NDB_FREE(h_features);
 		NDB_FREE(h_labels);
 		if (model != NULL)

@@ -300,7 +300,6 @@ vecmap_in(PG_FUNCTION_ARGS)
 		ptr++;
 	}
 
-	/* Build result */
 	size = sizeof(VectorMap) + sizeof(int32) * nnz + sizeof(float4) * nnz;
 	result = (VectorMap *) palloc0(size);
 	SET_VARSIZE(result, size);

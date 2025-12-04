@@ -271,7 +271,7 @@ static IndexBuildResult *
 hnswbuild(Relation heap, Relation index, IndexInfo * indexInfo)
 {
 	IndexBuildResult *result;
-	HnswBuildState buildstate;
+	HnswBuildState buildstate = {0};
 	Buffer		metaBuffer;
 	Page		metaPage;
 	HnswOptions *options;
@@ -343,6 +343,22 @@ hnswbuild(Relation heap, Relation index, IndexInfo * indexInfo)
 	return result;
 }
 
+/*
+ * hnswBuildCallback
+ *    Callback function invoked during index build for each heap tuple.
+ *
+ * This function is called by PostgreSQL's index build infrastructure for
+ * each tuple in the heap relation being indexed. It extracts the vector
+ * value from the tuple, determines its target layer level using the
+ * probabilistic level assignment algorithm, and inserts it into the HNSW
+ * graph structure at the appropriate layers. The insertion process
+ * maintains bidirectional links between nodes, ensuring that each node
+ * has connections to its nearest neighbors at each level it participates
+ * in. This callback operates within a transaction context and uses the
+ * temporary memory context provided in the build state for intermediate
+ * allocations, ensuring that memory is properly managed during bulk index
+ * construction operations.
+ */
 static void
 hnswBuildCallback(Relation index, ItemPointer tid, Datum *values,
 				  bool *isnull, bool tupleIsAlive, void *state)
@@ -1378,9 +1394,23 @@ hnswSearch(Relation index,
 
 /*
  * hnswInsertNode
- *		Insert a node into the HNSW graph, updating neighbor links.
+ *    Insert a vector into the HNSW graph structure with proper link maintenance.
  *
- * Follows PostgreSQL C coding standards and structure.
+ * This function implements the core insertion algorithm for HNSW graphs, which
+ * maintains a probabilistic multi-layer graph structure for efficient approximate
+ * nearest neighbor search. The insertion process begins by assigning the new node
+ * to a random level using an exponential distribution, where higher levels are
+ * exponentially less likely, creating a hierarchical structure with few nodes at
+ * high levels and many nodes at low levels. The algorithm then searches for the
+ * nearest neighbors at the assigned level and all lower levels, starting from the
+ * entry point and using a greedy search strategy that follows the closest neighbor
+ * at each step. Once candidate neighbors are found, bidirectional links are
+ * established between the new node and its nearest neighbors, maintaining the
+ * small-world property that ensures short paths between any two nodes. The link
+ * maintenance ensures that each node has at most M bidirectional connections at
+ * each level, preserving the graph's navigability and search efficiency. If the
+ * new node is assigned to a level higher than the current maximum level, it becomes
+ * the new entry point for searches starting at higher levels.
  */
 static void
 hnswInsertNode(Relation index,
@@ -1397,7 +1427,6 @@ hnswInsertNode(Relation index,
 	Size		nodeSize;
 	int			i;
 
-	/* Step 1: Assign random level using exponential law */
 	level = hnswGetRandomLevel(metaPage->ml);
 
 	/* Enforce limit on level */

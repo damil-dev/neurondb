@@ -123,7 +123,6 @@ ltr_rerank_pointwise(PG_FUNCTION_ARGS)
 	bool		typbyval;
 	char		typalign;
 
-	/* Parse arguments */
 	doc_ids_array = PG_GETARG_ARRAYTYPE_P(0);
 	feature_matrix_array = PG_GETARG_ARRAYTYPE_P(1);
 	weights_array = PG_GETARG_ARRAYTYPE_P(2);
@@ -224,7 +223,6 @@ ltr_rerank_pointwise(PG_FUNCTION_ARGS)
 	result = construct_array(
 							 result_datums, num_docs, INT4OID, typlen, typbyval, typalign);
 
-	/* Cleanup */
 	NDB_FREE(doc_scores);
 	NDB_FREE(result_datums);
 
@@ -256,7 +254,6 @@ ltr_score_features(PG_FUNCTION_ARGS)
 	ArrayType  *result;
 	Datum	   *result_datums;
 
-	/* Parse arguments */
 	feature_matrix_array = PG_GETARG_ARRAYTYPE_P(0);
 	weights_array = PG_GETARG_ARRAYTYPE_P(1);
 	bias = PG_ARGISNULL(2) ? 0.0 : PG_GETARG_FLOAT8(2);
@@ -289,7 +286,6 @@ ltr_score_features(PG_FUNCTION_ARGS)
 				* weights[f];
 	}
 
-	/* Build result */
 	result_datums = (Datum *) palloc(sizeof(Datum) * num_docs);
 	for (i = 0; i < num_docs; i++)
 		result_datums[i] = Float8GetDatum(scores[i]);

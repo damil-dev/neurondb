@@ -92,7 +92,6 @@ discover_topics_simple(PG_FUNCTION_ARGS)
 	bool		typbyval;
 	char		typalign;
 
-	/* Parse arguments */
 	table_name = PG_GETARG_TEXT_PP(0);
 	vector_column = PG_GETARG_TEXT_PP(1);
 	num_topics = PG_ARGISNULL(2) ? 10 : PG_GETARG_INT32(2);
@@ -213,7 +212,6 @@ discover_topics_simple(PG_FUNCTION_ARGS)
 	result = construct_array(
 							 result_datums, nvec, INT4OID, typlen, typbyval, typalign);
 
-	/* Cleanup */
 	for (i = 0; i < nvec; i++)
 		NDB_FREE(data[i]);
 	NDB_FREE(data);

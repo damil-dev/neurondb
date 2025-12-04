@@ -279,14 +279,6 @@ ndb_cuda_nb_train(const float *features,
 				  Jsonb * *metrics,
 				  char **errstr)
 {
-	/* CPU mode: never execute GPU code */
-	if (NDB_COMPUTE_MODE_IS_CPU())
-	{
-		if (errstr)
-			*errstr = pstrdup("CUDA nb_train: CPU mode - GPU code should not be called");
-		return -1;
-	}
-
 	int		   *class_counts = NULL;
 	double	   *class_priors = NULL;
 	double	   *means = NULL;
@@ -297,6 +289,14 @@ ndb_cuda_nb_train(const float *features,
 	int			i;
 	int			j;
 	int			rc = -1;
+
+	/* CPU mode: never execute GPU code */
+	if (NDB_COMPUTE_MODE_IS_CPU())
+	{
+		if (errstr)
+			*errstr = pstrdup("CUDA nb_train: CPU mode - GPU code should not be called");
+		return -1;
+	}
 
 	/* Initialize model structure to avoid undefined behavior in cleanup */
 	memset(&model, 0, sizeof(GaussianNBModel));

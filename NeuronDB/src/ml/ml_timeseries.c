@@ -1088,7 +1088,6 @@ evaluate_arima_by_model_id(PG_FUNCTION_ARGS)
 	result = DatumGetJsonbP(DirectFunctionCall1(jsonb_in, CStringGetTextDatum(jsonbuf.data)));
 	NDB_FREE(jsonbuf.data);
 
-	/* Cleanup */
 	NDB_FREE(tbl_str);
 	NDB_FREE(time_str);
 	NDB_FREE(value_str);
@@ -2191,7 +2190,6 @@ train_timeseries_cpu(PG_FUNCTION_ARGS)
 	MemoryContextSwitchTo(oldcontext);
 	model_id = ml_catalog_register_model(&spec);
 
-	/* Cleanup */
 	ndb_spi_stringinfo_free(spi_session, &sql);
 	NDB_SPI_SESSION_END(spi_session);
 	if (values)

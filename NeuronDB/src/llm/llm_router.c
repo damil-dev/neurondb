@@ -939,7 +939,6 @@ ndb_llm_route_embed(const NdbLLMConfig * cfg,
 								}
 							}
 
-							/* Cleanup */
 							if (input_tensor)
 								neurondb_onnx_free_tensor(
 														  input_tensor);

@@ -406,7 +406,6 @@ audit_log_query(PG_FUNCTION_ARGS)
 		success = true;
 		ndb_spi_session_end(&session);
 
-		/* Cleanup */
 		if (hmac_hex)
 			NDB_FREE(hmac_hex);
 		if (hmac_data.data)

@@ -476,7 +476,20 @@ gcn_train(PG_FUNCTION_ARGS)
 		gcn_forward(h1, adj_norm, w2, b2, n_nodes, hidden_dim, output_dim,
 					h2);
 
-		/* Compute loss and output layer gradients */
+		/*
+		 * Compute cross-entropy loss and output layer gradients using numerically
+		 * stable softmax computation. The softmax function exponentiates logits
+		 * which can cause numerical overflow when values are large. To prevent
+		 * this, we subtract the maximum logit value from all logits before
+		 * exponentiation, which shifts the values without changing the softmax
+		 * probabilities. This technique ensures that at least one exponentiated
+		 * value is exactly 1.0, preventing overflow while maintaining the
+		 * mathematical correctness of the softmax distribution. The cross-entropy
+		 * loss measures the difference between predicted and true class
+		 * distributions, and its gradient with respect to logits is simply the
+		 * softmax probabilities minus the one-hot target vector. This gradient
+		 * flows backward through the network to update weights during training.
+		 */
 		for (node = 0; node < n_nodes; node++)
 		{
 			int			true_label = labels[node];
@@ -485,14 +498,11 @@ gcn_train(PG_FUNCTION_ARGS)
 			float		max_logit = -FLT_MAX;
 			int			c;
 
-			/* Find max for numerical stability */
 			for (c = 0; c < output_dim; c++)
 			{
 				if (output[c] > max_logit)
 					max_logit = output[c];
 			}
-
-			/* Compute softmax and cross-entropy loss */
 			for (c = 0; c < output_dim; c++)
 				sum_exp += expf(output[c] - max_logit);
 
@@ -513,8 +523,20 @@ gcn_train(PG_FUNCTION_ARGS)
 			}
 		}
 
-		/* Backpropagate through layer 2 */
-		/* grad_h1 = adj_norm^T * grad_h2 * w2^T */
+		/*
+		 * Backpropagate gradients through the second graph convolutional layer.
+		 * In graph neural networks, gradients must flow through both the weight
+		 * matrix and the normalized adjacency matrix, which aggregates information
+		 * from neighboring nodes. The gradient with respect to hidden layer
+		 * activations is computed as the transpose of the adjacency matrix
+		 * multiplied by output gradients, then multiplied by the transpose of
+		 * the weight matrix. This transpose operation reverses the forward
+		 * propagation direction, allowing error signals to flow from output nodes
+		 * back through the graph structure to hidden layer nodes. The adjacency
+		 * matrix transpose ensures that gradients are distributed to neighboring
+		 * nodes in proportion to their connection strengths, maintaining the
+		 * graph structure's influence on the learning process.
+		 */
 		{
 			float	  **grad_h2_w2 = (float **) palloc(sizeof(float *) * n_nodes);
 
@@ -811,7 +833,6 @@ gcn_train(PG_FUNCTION_ARGS)
 		model_id = ml_catalog_register_model(&spec);
 	}
 
-	/* Cleanup */
 	for (i = 0; i < n_nodes; i++)
 	{
 		NDB_FREE(adjacency[i]);

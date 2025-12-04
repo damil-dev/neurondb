@@ -177,13 +177,11 @@ analyze_sentiment_advanced(PG_FUNCTION_ARGS)
 	StringInfoData result;
 	int			i;
 
-	/* Convert to lowercase for analysis */
 	lower_text = (char *) palloc(text_len + 1);
 	for (i = 0; i < text_len; i++)
 		lower_text[i] = tolower((unsigned char) text_str[i]);
 	lower_text[text_len] = '\0';
 
-	/* Simple keyword-based sentiment (production would use ML model) */
 	{
 		const char *positive_words_list[] = {
 			"good", "great", "excellent", "love", "best"
@@ -204,7 +202,6 @@ analyze_sentiment_advanced(PG_FUNCTION_ARGS)
 	sentiment_score = (float) (positive_words - negative_words)
 		/ (positive_words + negative_words + 1);
 
-	/* Build result */
 	initStringInfo(&result);
 	if (return_aspects)
 	{
@@ -272,7 +269,6 @@ summarize_text(PG_FUNCTION_ARGS)
 	int			text_len = strlen(text_str);
 	char	   *summary;
 
-	/* Validate */
 	if (max_length <= 0 || max_length > 10000)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
@@ -319,7 +315,6 @@ text_similarity_semantic(PG_FUNCTION_ARGS)
 	int			i,
 				j;
 
-	/* Simple character-based similarity (production would use embeddings) */
 	for (i = 0; i < len1 && i < 1000; i++)
 	{
 		for (j = 0; j < len2 && j < 1000; j++)

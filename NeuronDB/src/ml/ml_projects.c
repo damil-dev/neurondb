@@ -743,7 +743,6 @@ predict_kmeans_project(PG_FUNCTION_ARGS)
 		}
 	}
 
-	/* Cleanup */
 	NDB_FREE(model_data);
 	if (parameters)
 		NDB_FREE(parameters);
@@ -990,7 +989,6 @@ evaluate_kmeans_project_by_model_id(PG_FUNCTION_ARGS)
 	result = DatumGetJsonbP(DirectFunctionCall1(jsonb_in, CStringGetTextDatum(jsonbuf.data)));
 	NDB_FREE(jsonbuf.data);
 
-	/* Cleanup */
 	NDB_FREE(tbl_str);
 	NDB_FREE(feat_str);
 

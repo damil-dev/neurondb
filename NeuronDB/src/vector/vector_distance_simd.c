@@ -75,23 +75,32 @@ float4		inner_product_distance_simd(Vector *a, Vector *b);
 
 /*
  * horizontal_sum_avx2
+ *    Compute the sum of all eight float values in an AVX2 256-bit register.
  *
- * Compute horizontal sum of 8 floats in AVX2 register.
+ * SIMD registers operate on multiple values in parallel but do not provide
+ * a direct instruction to sum all elements. This function implements an
+ * efficient reduction that sums eight float values stored in a 256-bit AVX2
+ * register by repeatedly halving the number of elements through shuffling
+ * and addition operations. The algorithm first extracts the lower and upper
+ * 128-bit halves of the register and adds them together, reducing from eight
+ * to four elements. It then uses movehdup to duplicate the high elements
+ * alongside the low elements, enabling pairwise addition to reduce from four
+ * to two elements. Finally, it uses movehl to align elements for a scalar
+ * addition that produces the final sum. This reduction pattern is optimal
+ * for AVX2 architectures and achieves the horizontal sum with minimal
+ * instruction latency compared to scalar extraction and addition loops.
  */
 #if HAVE_AVX2
 static inline float
 horizontal_sum_avx2(__m256 v)
 {
-	/* Shuffle and add to reduce to 4 elements */
 	__m128		v_low = _mm256_castps256_ps128(v);
 	__m128		v_high = _mm256_extractf128_ps(v, 1);
 	__m128		sum = _mm_add_ps(v_low, v_high);
 
-	/* Reduce to 2 elements */
 	__m128		shuf = _mm_movehdup_ps(sum);
 	__m128		sums = _mm_add_ps(sum, shuf);
 
-	/* Reduce to 1 element */
 	shuf = _mm_movehl_ps(shuf, sums);
 	sums = _mm_add_ss(sums, shuf);
 
@@ -101,24 +110,32 @@ horizontal_sum_avx2(__m256 v)
 
 /*
  * horizontal_sum_avx512
+ *    Compute the sum of all sixteen float values in an AVX-512 512-bit register.
  *
- * Compute horizontal sum of 16 floats in AVX-512 register.
+ * This function extends the AVX2 horizontal reduction pattern to handle sixteen
+ * float values in a 512-bit AVX-512 register. The reduction proceeds in three
+ * stages to minimize instruction latency and maximize throughput. First, the
+ * register is split into two 256-bit halves, which are added together to reduce
+ * from sixteen to eight elements. The resulting 256-bit register is then split
+ * into two 128-bit halves and added, reducing from eight to four elements.
+ * Finally, the same shuffling and addition pattern used in AVX2 reduction is
+ * applied to reduce from four elements to two, then to the final single sum.
+ * This hierarchical reduction approach leverages the wider SIMD registers
+ * available in AVX-512 while maintaining instruction-level parallelism and
+ * minimizing data movement overhead.
  */
 #if HAVE_AVX512
 static inline float
 horizontal_sum_avx512(__m512 v)
 {
-	/* Reduce to 256-bit */
 	__m256		v_low = _mm512_castps512_ps256(v);
 	__m256		v_high = _mm512_extractf32x8_ps(v, 1);
 	__m256		sum = _mm256_add_ps(v_low, v_high);
 
-	/* Reduce to 128-bit */
 	__m128		v_low128 = _mm256_castps256_ps128(sum);
 	__m128		v_high128 = _mm256_extractf128_ps(sum, 1);
 	__m128		sum128 = _mm_add_ps(v_low128, v_high128);
 
-	/* Reduce to 1 element */
 	__m128		shuf = _mm_movehdup_ps(sum128);
 	__m128		sums = _mm_add_ps(sum128, shuf);
 
@@ -131,9 +148,21 @@ horizontal_sum_avx512(__m512 v)
 
 /*
  * l2_distance_avx2
+ *    Compute Euclidean distance between two vectors using AVX2 SIMD instructions.
  *
- * AVX2-optimized L2 (Euclidean) distance.
- * Processes 8 floats at a time.
+ * This function calculates the L2 norm distance by processing eight float values
+ * simultaneously using 256-bit AVX2 registers, providing approximately eight-fold
+ * speedup over scalar implementations for sufficiently long vectors. The algorithm
+ * loads eight consecutive elements from both input vectors into SIMD registers,
+ * computes element-wise differences, squares those differences, and accumulates
+ * the squared differences in a running sum register. This process continues for
+ * all aligned groups of eight elements, after which any remaining elements are
+ * processed using scalar operations. The final step extracts the horizontal sum
+ * from the accumulator register and computes the square root to obtain the
+ * Euclidean distance. The use of unaligned loads allows the function to work
+ * with vectors stored at any memory address, trading a small performance penalty
+ * for implementation simplicity. The remainder handling ensures correctness for
+ * vectors with dimensions not divisible by eight.
  */
 #if HAVE_AVX2
 static float4
@@ -143,7 +172,6 @@ l2_distance_avx2(const Vector *a, const Vector *b)
 	int			i;
 	int			simd_end = (a->dim / 8) * 8;
 
-	/* Process 8 elements at a time */
 	for (i = 0; i < simd_end; i += 8)
 	{
 		__m256		va = _mm256_loadu_ps(&a->data[i]);
@@ -154,10 +182,8 @@ l2_distance_avx2(const Vector *a, const Vector *b)
 		sum_vec = _mm256_add_ps(sum_vec, sq);
 	}
 
-	/* Horizontal sum */
 	float		sum = horizontal_sum_avx2(sum_vec);
 
-	/* Handle remainder */
 	for (i = simd_end; i < a->dim; i++)
 	{
 		float		diff = a->data[i] - b->data[i];

@@ -30,10 +30,22 @@
 #include "neurondb_spi_safe.h"
 
 /*
- * fetch_vectors_from_table
- *    Extract all vectors from a table column as float arrays via SPI.
- *    Returns a pointer to an allocated array of float pointers (each is a vector),
- *    sets *out_count to the number returned and *out_dim to inferred vector dimension.
+ * neurondb_fetch_vectors_from_table
+ *    Extract all vectors from a table column using SPI for training operations.
+ *
+ * This function executes a SELECT query through PostgreSQL's SPI interface
+ * to retrieve all vector values from a specified table and column. It
+ * creates a dedicated memory context for the SPI session to isolate
+ * allocations and prevent memory leaks, then switches back to the caller's
+ * context before returning results to ensure data persists after the SPI
+ * session ends. The function enforces a maximum limit on the number of
+ * vectors retrieved to prevent excessive memory allocation that could
+ * exhaust system resources. It validates the first row to determine vector
+ * dimensionality and ensures all subsequent rows match this dimension. The
+ * returned array of float pointers is allocated in the caller's memory
+ * context, so the caller must free it using NDB_FREE. This pattern is
+ * critical for safe memory management when integrating SPI operations with
+ * machine learning algorithms that process large datasets.
  */
 float	  **
 neurondb_fetch_vectors_from_table(const char *table,
@@ -51,15 +63,11 @@ neurondb_fetch_vectors_from_table(const char *table,
 	MemoryContext oldcontext_spi;
 	NDB_DECLARE(NdbSpiSession *, spi_session);
 
-	/* Save the caller's context before SPI operations */
 	caller_context = CurrentMemoryContext;
 
-	/* Limit query to prevent memory allocation errors for very large tables */
-	/* Use a conservative limit: 500k vectors max to avoid MaxAllocSize errors */
 	{
 		int			max_vectors_limit = 500000;
 
-		/* sql is allocated in caller's context, not SPI context */
 		initStringInfo(&sql);
 		appendStringInfo(&sql, "SELECT %s FROM %s LIMIT %d", col, table, max_vectors_limit);
 	}
@@ -70,12 +78,7 @@ neurondb_fetch_vectors_from_table(const char *table,
 	ret = ndb_spi_execute(spi_session, sql.data, true, 0);
 	if (ret != SPI_OK_SELECT)
 	{
-		/*
-		 * sql.data is allocated before SPI session, so it's in caller's
-		 * context
-		 */
-		/* We must free it explicitly before SPI session end */
-		char	   *query_str = sql.data;	/* Save pointer before freeing */
+		char	   *query_str = sql.data;
 
 		NDB_FREE(sql.data);
 		NDB_SPI_SESSION_END(spi_session);
@@ -87,18 +90,12 @@ neurondb_fetch_vectors_from_table(const char *table,
 	*out_count = SPI_processed;
 	if (*out_count == 0)
 	{
-		/*
-		 * sql.data is allocated before SPI session, so it's in caller's
-		 * context
-		 */
-		/* We must free it explicitly before SPI session end */
 		NDB_FREE(sql.data);
 		NDB_SPI_SESSION_END(spi_session);
 		*out_dim = 0;
 		return NULL;
 	}
 
-	/* Warn if we hit the limit */
 	if (*out_count >= 500000)
 	{
 		elog(DEBUG1,
@@ -107,13 +104,11 @@ neurondb_fetch_vectors_from_table(const char *table,
 			 500000, *out_count);
 	}
 
-	/* Get dimension from first vector */
 	{
 		bool		isnull;
 		Datum		first_datum;
 		Vector	   *first_vec;
 
-		/* Safe access for complex types - validate before access */
 		if (SPI_tuptable == NULL || SPI_tuptable->vals == NULL || 
 			SPI_processed == 0 || SPI_tuptable->vals[0] == NULL || SPI_tuptable->tupdesc == NULL)
 		{
@@ -129,11 +124,6 @@ neurondb_fetch_vectors_from_table(const char *table,
 									&isnull);
 		if (isnull)
 		{
-			/*
-			 * sql.data is allocated before SPI session, so it's in caller's
-			 * context
-			*/
-			/* We must free it explicitly before SPI session end */
 			NDB_FREE(sql.data);
 			NDB_SPI_SESSION_END(spi_session);
 			ereport(ERROR,

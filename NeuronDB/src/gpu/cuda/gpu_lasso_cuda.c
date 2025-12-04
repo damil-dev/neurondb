@@ -165,14 +165,6 @@ ndb_cuda_lasso_train(const float *features,
 					 Jsonb * *metrics,
 					 char **errstr)
 {
-	/* CPU mode: never execute GPU code */
-	if (NDB_COMPUTE_MODE_IS_CPU())
-	{
-		if (errstr)
-			*errstr = pstrdup("CUDA lasso_train: CPU mode - GPU code should not be called");
-		return -1;
-	}
-
 	double		lambda = 0.01;
 	int			max_iters = 1000;
 	double	   *weights = NULL;
@@ -196,6 +188,14 @@ ndb_cuda_lasso_train(const float *features,
 	size_t		feature_bytes;
 	size_t		residual_bytes;
 	int			cleanup_needed = 0;
+
+	/* CPU mode: never execute GPU code */
+	if (NDB_COMPUTE_MODE_IS_CPU())
+	{
+		if (errstr)
+			*errstr = pstrdup("CUDA lasso_train: CPU mode - GPU code should not be called");
+		return -1;
+	}
 
 	if (errstr)
 		*errstr = NULL;

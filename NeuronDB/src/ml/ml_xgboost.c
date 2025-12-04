@@ -923,7 +923,6 @@ evaluate_xgboost_by_model_id(PG_FUNCTION_ARGS)
     result = DatumGetJsonbP(DirectFunctionCall1(jsonb_in, CStringGetTextDatum(jsonbuf.data)));
     NDB_FREE(jsonbuf.data);
 
-    /* Cleanup */
     NDB_FREE(tbl_str);
     NDB_FREE(feat_str);
     NDB_FREE(targ_str);
@@ -1023,7 +1022,7 @@ xgboost_model_deserialize_from_bytea(const bytea *data, int *n_estimators_out, i
 static bool
 xgboost_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 {
-	XGBoostGpuModelState *state;
+	XGBoostGpuModelState *state = NULL;
 	int n_estimators = 100;
 	int max_depth = 6;
 	float learning_rate = 0.1f;
@@ -1264,8 +1263,8 @@ static bool
 xgboost_gpu_deserialize(MLGpuModel *model, const bytea *payload,
 	const Jsonb *metadata, char **errstr)
 {
-	XGBoostGpuModelState *state;
-	bytea *payload_copy;
+	XGBoostGpuModelState *state = NULL;
+	bytea *payload_copy = NULL;
 	int payload_size;
 	int n_estimators = 0;
 	int max_depth = 0;

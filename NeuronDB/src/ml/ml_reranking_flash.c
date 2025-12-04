@@ -273,7 +273,6 @@ rerank_long_context(PG_FUNCTION_ARGS)
 			}
 		}
 
-		/* Cleanup */
 		for (i = 0; i < ncandidates; i++)
 		{
 			if (docs[i] && docs[i][0] != '\0')

@@ -189,7 +189,6 @@ whiten_embeddings(PG_FUNCTION_ARGS)
 	int			dims[2];
 	int			lbs[2];
 
-	/* Parse arguments */
 	table_name = PG_GETARG_TEXT_PP(0);
 	vector_column = PG_GETARG_TEXT_PP(1);
 	epsilon = PG_ARGISNULL(2) ? WHITENING_EPSILON : PG_GETARG_FLOAT8(2);
@@ -346,7 +345,6 @@ whiten_embeddings(PG_FUNCTION_ARGS)
 								true,
 								'i');
 
-	/* Cleanup */
 	for (i = 0; i < nvec; i++)
 	{
 		NDB_FREE(vectors[i]);

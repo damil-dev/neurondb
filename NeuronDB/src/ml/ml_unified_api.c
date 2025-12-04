@@ -176,8 +176,7 @@ neurondb_load_training_data(NdbSpiSession *session,
 	int			n_samples = 0;
 	int			feature_dim = 0;
 	int			class_count = 0;
-	int			valid_samples = 0;	/* Track valid samples after skipping
-									 * NULLs */
+	int			valid_samples = 0;
 	NDB_DECLARE (float *, feature_matrix);
 	NDB_DECLARE (double *, label_vector);
 	TupleDesc	tupdesc;
@@ -355,7 +354,6 @@ neurondb_load_training_data(NdbSpiSession *session,
 		Datum		featval;
 		Datum		labelval;
 
-		/* Safe access to SPI_tuptable - validate before access */
 		if (SPI_tuptable == NULL || SPI_tuptable->vals == NULL || i >= SPI_processed)
 		{
 			continue;
@@ -366,7 +364,6 @@ neurondb_load_training_data(NdbSpiSession *session,
 			continue;
 		}
 
-		/* Features */
 		featval = SPI_getbinval(current_tuple, tupdesc, 1, &isnull_feat);
 		if (isnull_feat)
 		{
@@ -1700,16 +1697,16 @@ neurondb_train(PG_FUNCTION_ARGS)
 			/* CPU mode: never error, should have been handled above */
 			else if (!NDB_COMPUTE_MODE_IS_CPU() && NDB_REQUIRE_GPU())
 			{
+				MemoryContext safe_context;
+				ErrorData    *edata;
+				char		 *error_msg;
+				char		 *algorithm_safe;
+				
 				/* Defensive assertion: this should NEVER happen in CPU mode */
 				if (NDB_COMPUTE_MODE_IS_CPU())
 				{
 					elog(ERROR, "BUG: GPU error path reached in CPU mode! compute_mode=%d", neurondb_compute_mode);
 				}
-				
-				MemoryContext safe_context;
-				ErrorData    *edata;
-				char		 *error_msg;
-				char		 *algorithm_safe;
 
 				/* GPU mode: re-raise error, no fallback */
 				/* Switch out of ErrorContext before CopyErrorData() */
@@ -3610,6 +3607,8 @@ neurondb_evaluate(PG_FUNCTION_ARGS)
 		MemoryContextSwitchTo(oldcontext);
 
 		/* Suppress shadow warnings from nested PG_TRY blocks */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wshadow=compatible-local"
 		PG_TRY();
 		{
 			if (CurrentMemoryContext != ErrorContext)
@@ -3627,6 +3626,7 @@ neurondb_evaluate(PG_FUNCTION_ARGS)
 			FlushErrorState();
 		}
 		PG_END_TRY();
+#pragma GCC diagnostic pop
 
 		/* Create safe error message (escape quotes) */
 		if (edata != NULL && edata->message != NULL)

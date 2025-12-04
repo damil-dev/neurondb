@@ -30,9 +30,6 @@
 #include "neurondb_safe_memory.h"
 #include "neurondb_macros.h"
 
-/*
- * Compute Euclidean distance from a vector to the mean
- */
 static inline double
 distance_from_mean(const float *vec, const double *mean, int dim)
 {
@@ -48,9 +45,6 @@ distance_from_mean(const float *vec, const double *mean, int dim)
 	return sqrt(sum);
 }
 
-/*
- * Comparison function for qsort (ascending order)
- */
 static int
 double_compare(const void *a, const void *b)
 {
@@ -128,7 +122,6 @@ detect_outliers_zscore(PG_FUNCTION_ARGS)
 	bool		typbyval;
 	char		typalign;
 
-	/* Parse arguments */
 	table_name = PG_GETARG_TEXT_PP(0);
 	vector_column = PG_GETARG_TEXT_PP(1);
 	threshold = PG_ARGISNULL(2) ? 3.0 : PG_GETARG_FLOAT8(2);
@@ -338,7 +331,6 @@ detect_outliers_zscore(PG_FUNCTION_ARGS)
 	result = construct_array(
 							 result_datums, nvec, BOOLOID, typlen, typbyval, typalign);
 
-	/* Cleanup */
 	for (i = 0; i < nvec; i++)
 		NDB_FREE(vectors[i]);
 	NDB_FREE(vectors);
@@ -389,7 +381,6 @@ compute_outlier_scores(PG_FUNCTION_ARGS)
 	ArrayType  *result;
 	Datum	   *result_datums;
 
-	/* Parse arguments */
 	table_name = PG_GETARG_TEXT_PP(0);
 	vector_column = PG_GETARG_TEXT_PP(1);
 	method_text = PG_ARGISNULL(2) ? cstring_to_text("zscore")
@@ -496,7 +487,6 @@ compute_outlier_scores(PG_FUNCTION_ARGS)
 				 errmsg("Unknown method '%s'", method)));
 	}
 
-	/* Build result */
 	result_datums = (Datum *) palloc(sizeof(Datum) * nvec);
 	for (i = 0; i < nvec; i++)
 		result_datums[i] = Float8GetDatum(scores[i]);
@@ -508,7 +498,6 @@ compute_outlier_scores(PG_FUNCTION_ARGS)
 							 FLOAT8PASSBYVAL,
 							 'd');
 
-	/* Cleanup */
 	for (i = 0; i < nvec; i++)
 		NDB_FREE(vectors[i]);
 	NDB_FREE(vectors);

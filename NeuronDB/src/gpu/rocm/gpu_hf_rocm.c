@@ -728,7 +728,6 @@ ndb_rocm_hf_embed(const char *model_name,
 	memcpy(*vec_out, embedding, sizeof(float) * embed_dim);
 	*dim_out = embed_dim;
 
-	/* Delete temporary context */
 	MemoryContextDelete(embed_context);
 
 	return 0;
@@ -763,7 +762,6 @@ ndb_rocm_hf_parse_gen_params_OLD_REMOVED(const char *params_json,
 		return -1;
 	}
 
-	/* Initialize with defaults */
 	memset(gen_params, 0, sizeof(NdbRocmHfGenParams));
 	gen_params->temperature = 1.0f;
 	gen_params->top_p = 1.0f;
@@ -2291,7 +2289,6 @@ ndb_rocm_hf_complete(const char *model_name,
 		*text_out = pstrdup("");
 	}
 
-	/* Delete temporary context */
 	MemoryContextDelete(complete_context);
 
 	return 0;
@@ -3249,7 +3246,6 @@ ndb_rocm_hf_rerank(const char *model_name,
 			scores,
 			errstr);
 
-		/* Cleanup */
 		NDB_FREE(token_ids_batch);
 		NDB_FREE(attention_mask_batch);
 		if (classification_weights != entry->weights.classification_weights)
@@ -3284,7 +3280,6 @@ ndb_rocm_hf_rerank(const char *model_name,
 
 		scores[i] = relevance_score;
 
-		/* Cleanup */
 		NDB_FREE(token_ids);
 		NDB_FREE(attention_mask);
 		if (query_doc_embedding)

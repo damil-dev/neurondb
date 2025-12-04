@@ -115,7 +115,6 @@ train_opq_rotation(PG_FUNCTION_ARGS)
 	ArrayType  *result;
 	Datum	   *result_datums;
 
-	/* Parse arguments */
 	table_name = PG_GETARG_TEXT_PP(0);
 	vector_column = PG_GETARG_TEXT_PP(1);
 	num_subspaces = PG_ARGISNULL(2) ? 8 : PG_GETARG_INT32(2);
@@ -298,7 +297,6 @@ train_opq_rotation(PG_FUNCTION_ARGS)
 				rotation_matrix[i * dim + j] = eigenvectors[j][i];
 		}
 
-		/* Cleanup */
 		NDB_FREE(mean);
 		if (covariance != NULL)
 		{
@@ -332,7 +330,6 @@ train_opq_rotation(PG_FUNCTION_ARGS)
 							 FLOAT8PASSBYVAL,
 							 'd');
 
-	/* Cleanup */
 	for (i = 0; i < nvec; i++)
 		NDB_FREE(data[i]);
 	NDB_FREE(data);
@@ -414,7 +411,6 @@ apply_opq_rotation(PG_FUNCTION_ARGS)
 		for (j = 0; j < dim; j++)
 			rotated[i] += rotation[i * dim + j] * vector[j];
 
-	/* Build result */
 	result_datums = (Datum *) palloc(sizeof(Datum) * dim);
 	NDB_CHECK_ALLOC(result_datums, "result_datums");
 	for (i = 0; i < dim; i++)
@@ -716,7 +712,6 @@ predict_opq_rotation(PG_FUNCTION_ARGS)
 							 FLOAT8PASSBYVAL,
 							 'd');
 
-	/* Cleanup */
 	NDB_FREE(rotated);
 	NDB_FREE(result_datums);
 	NDB_FREE(rotation);
@@ -1020,7 +1015,6 @@ evaluate_opq_rotation_by_model_id(PG_FUNCTION_ARGS)
 	result = DatumGetJsonbP(DirectFunctionCall1(jsonb_in, CStringGetTextDatum(jsonbuf.data)));
 	NDB_FREE(jsonbuf.data);
 
-	/* Cleanup */
 	NDB_FREE(tbl_str);
 	NDB_FREE(vec_str);
 

@@ -128,14 +128,12 @@ hybrid_search_fusion(PG_FUNCTION_ARGS)
 	bool		typbyval;
 	char		typalign;
 
-	/* Parse arguments */
 	doc_ids_array = PG_GETARG_ARRAYTYPE_P(0);
 	semantic_scores_array = PG_GETARG_ARRAYTYPE_P(1);
 	lexical_scores_array = PG_GETARG_ARRAYTYPE_P(2);
 	semantic_weight = PG_ARGISNULL(3) ? 0.5 : PG_GETARG_FLOAT8(3);
 	normalize = PG_ARGISNULL(4) ? true : PG_GETARG_BOOL(4);
 
-	/* Validate */
 	if (ARR_NDIM(doc_ids_array) != 1 || ARR_NDIM(semantic_scores_array) != 1
 		|| ARR_NDIM(lexical_scores_array) != 1)
 		ereport(ERROR,
@@ -236,7 +234,6 @@ hybrid_search_fusion(PG_FUNCTION_ARGS)
 	/* Sort by hybrid score */
 	qsort(scores, num_docs, sizeof(HybridScore), hybrid_score_cmp);
 
-	/* Build result */
 	result_datums = (Datum *) palloc(sizeof(Datum) * num_docs);
 	for (i = 0; i < num_docs; i++)
 		result_datums[i] = Int32GetDatum(scores[i].doc_id);

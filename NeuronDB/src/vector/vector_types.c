@@ -82,8 +82,6 @@ vectorp_in(PG_FUNCTION_ARGS)
 		if (dim >= capacity)
 		{
 			capacity *= 2;
-			/* For reallocation, we need to manually handle since NDB_ALLOC doesn't support repalloc */
-			/* This is acceptable for dynamic growth patterns */
 			temp_data = (float4 *) repalloc(
 											temp_data, sizeof(float4) * capacity);
 		}
@@ -105,8 +103,6 @@ vectorp_in(PG_FUNCTION_ARGS)
 						"dimension")));
 
 	size = VECTORP_SIZE(dim);
-	/* Variable-length type requires custom size - use palloc0 but ensure proper cleanup */
-	/* Note: For variable-length PostgreSQL types, palloc0 is standard */
 	result = (VectorPacked *) palloc0(size);
 	SET_VARSIZE(result, size);
 
@@ -117,7 +113,7 @@ vectorp_in(PG_FUNCTION_ARGS)
 	result->fingerprint = fingerprint;
 	result->version = 1;
 	result->dim = dim;
-	result->endian_guard = 0x01;	/* Little endian */
+	result->endian_guard = 0x01;
 	result->flags = 0;
 
 	memcpy(result->data, temp_data, sizeof(float4) * dim);
@@ -173,9 +169,8 @@ vecmap_in(PG_FUNCTION_ARGS)
 	dim = 0;
 	nnz = 0;
 
-	(void) i;					/* Suppress unused warning */
+	(void) i;
 
-	/* Parse JSON-like format */
 	ptr = str;
 	while (isspace((unsigned char) *ptr))
 		ptr++;
@@ -186,7 +181,6 @@ vecmap_in(PG_FUNCTION_ARGS)
 				 errmsg("vecmap must start with '{'")));
 	ptr++;
 
-	/* Parse dim */
 	while (isspace((unsigned char) *ptr))
 		ptr++;
 
@@ -201,7 +195,6 @@ vecmap_in(PG_FUNCTION_ARGS)
 		ptr = endptr;
 	}
 
-	/* Parse nnz */
 	while (isspace((unsigned char) *ptr) || *ptr == ',')
 		ptr++;
 
@@ -231,7 +224,6 @@ vecmap_in(PG_FUNCTION_ARGS)
 	NDB_ALLOC(indices, int32, nnz);
 	NDB_ALLOC(values, float4, nnz);
 
-	/* Parse indices array */
 	while (isspace((unsigned char) *ptr) || *ptr == ',')
 		ptr++;
 
@@ -278,7 +270,6 @@ vecmap_in(PG_FUNCTION_ARGS)
 		ptr++;
 	}
 
-	/* Parse values array */
 	while (isspace((unsigned char) *ptr) || *ptr == ',')
 		ptr++;
 
@@ -317,7 +308,6 @@ vecmap_in(PG_FUNCTION_ARGS)
 		ptr++;
 	}
 
-	/* Build result */
 	size = sizeof(VectorMap) + sizeof(int32) * nnz + sizeof(float4) * nnz;
 	result = (VectorMap *) palloc0(size);
 	SET_VARSIZE(result, size);
@@ -419,7 +409,6 @@ sparsevec_in(PG_FUNCTION_ARGS)
 	NDB_ALLOC(indices, int32, capacity);
 	NDB_ALLOC(values, float4, capacity);
 
-	/* Parse entries */
 	while (*ptr && *ptr != '}')
 	{
 		while (isspace((unsigned char) *ptr) || *ptr == ',')
@@ -428,7 +417,6 @@ sparsevec_in(PG_FUNCTION_ARGS)
 		if (*ptr == '}' || *ptr == '\0')
 			break;
 
-		/* Check for dim: prefix */
 		if (strncmp(ptr, "dim:", 4) == 0)
 		{
 			ptr += 4;
@@ -441,7 +429,6 @@ sparsevec_in(PG_FUNCTION_ARGS)
 			continue;
 		}
 
-		/* Parse index:value pair */
 		if (nnz >= capacity)
 		{
 			capacity *= 2;
@@ -500,7 +487,6 @@ sparsevec_in(PG_FUNCTION_ARGS)
 				 errmsg("sparsevec dimension %d exceeds maximum of 1000000",
 						dim)));
 
-	/* Validate indices are within dimension */
 	for (i = 0; i < nnz; i++)
 	{
 		if (indices[i] >= dim)
@@ -511,7 +497,6 @@ sparsevec_in(PG_FUNCTION_ARGS)
 							dim)));
 	}
 
-	/* Build result */
 	size = sizeof(VectorMap) + sizeof(int32) * nnz + sizeof(float4) * nnz;
 	result = (VectorMap *) palloc0(size);
 	SET_VARSIZE(result, size);
@@ -550,11 +535,9 @@ sparsevec_out(PG_FUNCTION_ARGS)
 	initStringInfo(&buf);
 	appendStringInfoChar(&buf, '{');
 
-	/* Output dim: if needed */
 	if (vec->total_dim > 0)
 		appendStringInfo(&buf, "dim:%d,", vec->total_dim);
 
-	/* Output index:value pairs */
 	for (i = 0; i < vec->nnz; i++)
 	{
 		if (i > 0)
@@ -671,7 +654,6 @@ sparsevec_eq(PG_FUNCTION_ARGS)
 	a_values = VECMAP_VALUES(a);
 	b_values = VECMAP_VALUES(b);
 
-	/* Compare indices and values */
 	for (i = 0; i < a->nnz; i++)
 	{
 		if (a_indices[i] != b_indices[i])
@@ -742,7 +724,6 @@ PG_FUNCTION_INFO_V1(sparsevec_l2_distance);
 Datum
 sparsevec_l2_distance(PG_FUNCTION_ARGS)
 {
-	/* Reuse vecmap_l2_distance since sparsevec uses VectorMap structure */
 	return vecmap_l2_distance(fcinfo);
 }
 
@@ -753,7 +734,6 @@ PG_FUNCTION_INFO_V1(sparsevec_cosine_distance);
 Datum
 sparsevec_cosine_distance(PG_FUNCTION_ARGS)
 {
-	/* Reuse vecmap_cosine_distance since sparsevec uses VectorMap structure */
 	return vecmap_cosine_distance(fcinfo);
 }
 
@@ -764,7 +744,6 @@ PG_FUNCTION_INFO_V1(sparsevec_inner_product);
 Datum
 sparsevec_inner_product(PG_FUNCTION_ARGS)
 {
-	/* Reuse vecmap_inner_product since sparsevec uses VectorMap structure */
 	return vecmap_inner_product(fcinfo);
 }
 
@@ -816,12 +795,10 @@ sparsevec_l2_normalize(PG_FUNCTION_ARGS)
 
 	values = VECMAP_VALUES(v);
 
-	/* Compute L2 norm */
 	for (i = 0; i < v->nnz; i++)
 		norm += (double) values[i] * (double) values[i];
 	norm = sqrt(norm);
 
-	/* If norm is zero, return zero vector */
 	if (norm == 0.0 || v->nnz == 0)
 	{
 		size = sizeof(VectorMap) + sizeof(int32) * 0 + sizeof(float4) * 0;
@@ -832,7 +809,6 @@ sparsevec_l2_normalize(PG_FUNCTION_ARGS)
 		PG_RETURN_POINTER(result);
 	}
 
-	/* Allocate result with same structure */
 	size = sizeof(VectorMap) + sizeof(int32) * v->nnz + sizeof(float4) * v->nnz;
 	result = (VectorMap *) palloc0(size);
 	SET_VARSIZE(result, size);
@@ -842,7 +818,6 @@ sparsevec_l2_normalize(PG_FUNCTION_ARGS)
 	result_indices = VECMAP_INDICES(result);
 	result_values = VECMAP_VALUES(result);
 
-	/* Copy indices and normalize values */
 	memcpy(result_indices, VECMAP_INDICES(v), sizeof(int32) * v->nnz);
 	for (i = 0; i < v->nnz; i++)
 		result_values[i] = (float4) ((double) values[i] / norm);
@@ -864,14 +839,13 @@ rtext_in(PG_FUNCTION_ARGS)
 
 	text_len = strlen(str);
 
-	/* Basic implementation: store text, tokenize later */
 	size = sizeof(RetrievableText) + text_len + 1;
 	result = (RetrievableText *) palloc0(size);
 	SET_VARSIZE(result, size);
 
 	result->text_len = text_len;
-	result->num_tokens = 0;		/* Will be computed on first access */
-	result->lang_tag = 0;		/* Auto-detect */
+	result->num_tokens = 0;
+	result->lang_tag = 0;
 	result->flags = 0;
 
 	memcpy(RTEXT_DATA(result), str, text_len);
@@ -918,7 +892,6 @@ vgraph_in(PG_FUNCTION_ARGS)
 	num_edges = 0;
 	edge_capacity = 32;
 
-	/* Parse JSON-like format */
 	ptr = str;
 	while (isspace((unsigned char) *ptr))
 		ptr++;
@@ -929,7 +902,6 @@ vgraph_in(PG_FUNCTION_ARGS)
 				 errmsg("vgraph must start with '{'")));
 	ptr++;
 
-	/* Parse nodes */
 	while (isspace((unsigned char) *ptr))
 		ptr++;
 
@@ -953,7 +925,6 @@ vgraph_in(PG_FUNCTION_ARGS)
 	edges = NULL;
 	NDB_ALLOC(edges, GraphEdge, edge_capacity);
 
-	/* Parse edges array */
 	while (isspace((unsigned char) *ptr) || *ptr == ',')
 		ptr++;
 
@@ -969,7 +940,6 @@ vgraph_in(PG_FUNCTION_ARGS)
 					 errmsg("edges must be an array")));
 		ptr++;
 
-		/* Parse edge pairs */
 		while (*ptr && *ptr != ']')
 		{
 			int32		from_node,
@@ -988,7 +958,6 @@ vgraph_in(PG_FUNCTION_ARGS)
 								"array [from,to]")));
 			ptr++;
 
-			/* Parse from node */
 			while (isspace((unsigned char) *ptr))
 				ptr++;
 
@@ -1008,7 +977,6 @@ vgraph_in(PG_FUNCTION_ARGS)
 
 			ptr = endptr;
 
-			/* Parse comma */
 			while (isspace((unsigned char) *ptr))
 				ptr++;
 			if (*ptr != ',')
@@ -1018,7 +986,6 @@ vgraph_in(PG_FUNCTION_ARGS)
 								"edge nodes")));
 			ptr++;
 
-			/* Parse to node */
 			while (isspace((unsigned char) *ptr))
 				ptr++;
 
@@ -1038,7 +1005,6 @@ vgraph_in(PG_FUNCTION_ARGS)
 
 			ptr = endptr;
 
-			/* Close edge array */
 			while (isspace((unsigned char) *ptr))
 				ptr++;
 			if (*ptr != ']')
@@ -1048,7 +1014,6 @@ vgraph_in(PG_FUNCTION_ARGS)
 								"edge pair")));
 			ptr++;
 
-			/* Store edge */
 			if (num_edges >= edge_capacity)
 			{
 				edge_capacity *= 2;
@@ -1058,8 +1023,8 @@ vgraph_in(PG_FUNCTION_ARGS)
 
 			edges[num_edges].src_idx = from_node;
 			edges[num_edges].dst_idx = to_node;
-			edges[num_edges].edge_type = 0; /* Default edge type */
-			edges[num_edges].weight = 1.0;	/* Default weight */
+			edges[num_edges].edge_type = 0;
+			edges[num_edges].weight = 1.0;
 			num_edges++;
 		}
 
@@ -1067,14 +1032,13 @@ vgraph_in(PG_FUNCTION_ARGS)
 			ptr++;
 	}
 
-	/* Build result - simplified: no node IDs, just edges */
 	size = sizeof(VectorGraph) + sizeof(GraphEdge) * num_edges;
 	result = (VectorGraph *) palloc0(size);
 	SET_VARSIZE(result, size);
 
 	result->num_nodes = num_nodes;
 	result->num_edges = num_edges;
-	result->edge_types = 0;		/* No labeled edge types in simple format */
+	result->edge_types = 0;
 
 	memcpy(VGRAPH_EDGES(result), edges, sizeof(GraphEdge) * num_edges);
 
@@ -1139,7 +1103,6 @@ vectorp_validate(PG_FUNCTION_ARGS)
 
 	dim = vec->dim;
 
-	/* Recompute fingerprint */
 	expected_fp = crc32(0L, Z_NULL, 0);
 	expected_fp = crc32(expected_fp, (unsigned char *) &dim, sizeof(dim));
 
@@ -1194,7 +1157,6 @@ vector_compute_stats(VacAttrStats * stats, AnalyzeAttrFetchFunc fetchfunc, int s
 		NDB_ALLOC(dim_means, float, max_sample_dims);
 		NDB_ALLOC(dim_mins, float, max_sample_dims);
 		NDB_ALLOC(dim_maxs, float, max_sample_dims);
-		/* Initialize dim_means to zero */
 		memset(dim_means, 0, sizeof(float) * max_sample_dims);
 		for (i = 0; i < max_sample_dims; i++)
 		{
@@ -1314,8 +1276,6 @@ vector_analyze(PG_FUNCTION_ARGS)
 	PG_RETURN_BOOL(true);
 }
 
-/* ===================== BINARY VECTOR TYPE ===================== */
-
 /*
  * BinaryVec: Packed binary vector for efficient quantization
  * Stores bits in a compact format where each bit represents a binary value
@@ -1346,16 +1306,13 @@ binaryvec_in(PG_FUNCTION_ARGS)
 	int			bit_index;
 	int			bit_value;
 
-	/* Skip whitespace */
 	while (*ptr && isspace(*ptr))
 		ptr++;
 
-	/* Check for array format [1,0,1,0] */
 	if (*ptr == '[')
 	{
-		ptr++;					/* skip '[' */
+		ptr++;
 
-		/* Count bits and validate */
 		count_ptr = ptr;
 		while (*count_ptr)
 		{
@@ -1365,7 +1322,6 @@ binaryvec_in(PG_FUNCTION_ARGS)
 			}
 			else if (*count_ptr == ',' || *count_ptr == ']' || isspace(*count_ptr))
 			{
-				/* valid separators */
 			}
 			else
 			{
@@ -1380,16 +1336,14 @@ binaryvec_in(PG_FUNCTION_ARGS)
 		{
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
-					 errmsg("binaryvec: empty array not allowed")));
+						errmsg("binaryvec: empty array not allowed")));
 		}
 
-		/* Allocate result */
 		result = (BinaryVec *) palloc0(BINARYVEC_SIZE(dim));
 		SET_VARSIZE(result, BINARYVEC_SIZE(dim));
 		result->dim = dim;
 
-		/* Parse bits */
-		ptr = str + 1;			/* skip '[' */
+		ptr = str + 1;
 		bit_index = 0;
 		while (*ptr && *ptr != ']')
 		{
@@ -1416,7 +1370,6 @@ binaryvec_in(PG_FUNCTION_ARGS)
 	}
 	else
 	{
-		/* Binary string format "1010" */
 		while (*ptr)
 		{
 			if (*ptr == '0' || *ptr == '1')
@@ -1436,15 +1389,13 @@ binaryvec_in(PG_FUNCTION_ARGS)
 		{
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
-					 errmsg("binaryvec: empty binary string not allowed")));
+						errmsg("binaryvec: empty binary string not allowed")));
 		}
 
-		/* Allocate result */
 		result = (BinaryVec *) palloc0(BINARYVEC_SIZE(dim));
 		SET_VARSIZE(result, BINARYVEC_SIZE(dim));
 		result->dim = dim;
 
-		/* Parse bits */
 		ptr = str;
 		bit_index = 0;
 		while (*ptr)
@@ -1531,7 +1482,6 @@ binaryvec_hamming_distance(PG_FUNCTION_ARGS)
 				 errmsg("binaryvec: dimensions must match: %d vs %d", bv1->dim, bv2->dim)));
 	}
 
-	/* Count differing bits */
 	for (i = 0; i < bv1->dim; i++)
 	{
 		int			byte_index = i / 8;

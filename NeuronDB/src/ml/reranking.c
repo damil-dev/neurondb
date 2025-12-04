@@ -548,7 +548,6 @@ rerank_llm(PG_FUNCTION_ARGS)
 		funcctx->max_calls = max_calls;
 		funcctx->user_fctx = state;
 
-		/* Cleanup */
 		if (llm_response && llm_response != resp.text)
 			NDB_FREE(llm_response);
 		if (resp.text)
@@ -1251,7 +1250,6 @@ rerank_ensemble(PG_FUNCTION_ARGS)
 			state->indices[i] = i;
 		}
 
-		/* Cleanup */
 		for (i = 0; i < nmethods; i++)
 		{
 			if (method_scores[i])

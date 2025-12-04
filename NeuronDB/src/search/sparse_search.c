@@ -260,7 +260,6 @@ splade_embed(PG_FUNCTION_ARGS)
 	memcpy(SPARSE_VEC_TOKEN_IDS(sparse_vec), indices, sizeof(int32) * sparse_count);
 	memcpy(SPARSE_VEC_WEIGHTS(sparse_vec), values, sizeof(float4) * sparse_count);
 
-	/* Cleanup */
 	neurondb_onnx_free_tensor(input_tensor);
 	neurondb_onnx_free_tensor(output_tensor);
 	NDB_FREE(token_ids);
@@ -438,7 +437,6 @@ colbertv2_embed(PG_FUNCTION_ARGS)
 	memcpy(SPARSE_VEC_TOKEN_IDS(sparse_vec), indices, sizeof(int32) * sparse_count);
 	memcpy(SPARSE_VEC_WEIGHTS(sparse_vec), values, sizeof(float4) * sparse_count);
 
-	/* Cleanup */
 	neurondb_onnx_free_tensor(input_tensor);
 	neurondb_onnx_free_tensor(output_tensor);
 	NDB_FREE(token_ids);
@@ -625,7 +623,6 @@ bm25_score(PG_FUNCTION_ARGS)
 		score += bm25_term;
 	}
 
-	/* Cleanup */
 	for (i = 0; i < num_query_tokens; i++)
 		NDB_FREE(query_tokens[i]);
 	for (i = 0; i < num_doc_tokens; i++)

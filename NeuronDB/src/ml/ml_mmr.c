@@ -55,18 +55,22 @@ cosine_similarity(const float *a, const float *b, int dim)
 
 /*
  * mmr_rerank
- *    Rerank results using Maximal Marginal Relevance
+ *    Rerank search results using Maximal Marginal Relevance algorithm.
  *
- * MMR Formula:
- *   MMR = λ × Sim(D_i, Q) - (1-λ) × max(Sim(D_i, D_j) for D_j in S)
- *
- * Arguments:
- *   - query_vector: query embedding
- *   - candidate_vectors: array of candidate document embeddings
- *   - lambda: balance parameter [0,1] (1.0 = pure relevance, 0.0 = pure diversity)
- *   - top_k: number of results to return
- *
- * Returns: array of indices (1-based) in MMR order
+ * This function implements the MMR algorithm to balance relevance and
+ * diversity in search results. The algorithm iteratively selects documents
+ * that maximize a combination of relevance to the query and dissimilarity
+ * to previously selected documents. The MMR score for each candidate
+ * document is computed as lambda times its similarity to the query minus
+ * one minus lambda times its maximum similarity to any document already
+ * in the result set. Lambda controls the trade-off between relevance and
+ * diversity, with values near 1.0 favoring relevance and values near 0.0
+ * favoring diversity. The algorithm begins by selecting the most relevant
+ * document, then repeatedly selects the document with the highest MMR score
+ * until the desired number of results is obtained. This approach prevents
+ * redundancy in results while maintaining high relevance, making it
+ * particularly useful for information retrieval scenarios where diverse
+ * perspectives on a topic are valuable.
  */
 PG_FUNCTION_INFO_V1(mmr_rerank);
 
@@ -94,7 +98,6 @@ mmr_rerank(PG_FUNCTION_ARGS)
 	bool		typbyval;
 	char		typalign;
 
-	/* Parse arguments */
 	query_array = PG_GETARG_ARRAYTYPE_P(0);
 	candidates_array = PG_GETARG_ARRAYTYPE_P(1);
 	lambda = PG_GETARG_FLOAT4(2);
@@ -215,7 +218,6 @@ mmr_rerank(PG_FUNCTION_ARGS)
 							 typbyval,
 							 typalign);
 
-	/* Cleanup */
 	NDB_FREE(candidates);
 	NDB_FREE(query_scores);
 	NDB_FREE(selected);
@@ -364,7 +366,6 @@ mmr_rerank_with_scores(PG_FUNCTION_ARGS)
 							 true,
 							 'i');
 
-	/* Cleanup */
 	NDB_FREE(candidates);
 	NDB_FREE(query_scores);
 	NDB_FREE(selected);

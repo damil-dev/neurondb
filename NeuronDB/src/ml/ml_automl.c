@@ -334,6 +334,9 @@ auto_train(PG_FUNCTION_ARGS)
 			}
 			MemoryContextSwitchTo(safe_context);
 			
+			/* Suppress shadow warnings from nested PG_TRY blocks */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wshadow=compatible-local"
 			PG_TRY();
 			{
 				edata = CopyErrorData();
@@ -349,10 +352,14 @@ auto_train(PG_FUNCTION_ARGS)
 				FlushErrorState();
 			}
 			PG_END_TRY();
+#pragma GCC diagnostic pop
 			
 			/* Free error data before using the copied message */
 			if (edata != NULL)
 			{
+				/* Suppress shadow warnings from nested PG_TRY blocks */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wshadow=compatible-local"
 				PG_TRY();
 				{
 					FreeErrorData(edata);
@@ -363,6 +370,7 @@ auto_train(PG_FUNCTION_ARGS)
 					FlushErrorState();
 				}
 				PG_END_TRY();
+#pragma GCC diagnostic pop
 				edata = NULL;
 			}
 			
@@ -434,6 +442,9 @@ auto_train(PG_FUNCTION_ARGS)
 				eval_values[3] = PointerGetDatum(eval_label_col_text);
 
 				/* Call neurondb.evaluate() directly - avoids nested SPI and transaction visibility issues */
+				/* Suppress shadow warnings from nested PG_TRY blocks */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wshadow=compatible-local"
 				PG_TRY();
 				{
 					eval_result_datum = FunctionCall4(&eval_flinfo,
@@ -482,6 +493,7 @@ auto_train(PG_FUNCTION_ARGS)
 					extracted_score = 0.5f;
 				}
 				PG_END_TRY();
+#pragma GCC diagnostic pop
 
 				scores[i].score = extracted_score;
 			}
@@ -690,7 +702,6 @@ auto_train(PG_FUNCTION_ARGS)
 		}
 	}
 
-	/* Build result */
 	initStringInfo(&result);
 	if (best_algorithm != NULL && best_model_id > 0)
 	{
@@ -968,7 +979,7 @@ optimize_hyperparameters(PG_FUNCTION_ARGS)
 									 * PG_TRY blocks
 									 */
 #pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wshadow"
+#pragma GCC diagnostic ignored "-Wshadow=compatible-local"
 									PG_TRY();
 									{
 										metrics_it = JsonbIteratorInit((JsonbContainer *) & metrics_jsonb->root);
@@ -1048,7 +1059,6 @@ optimize_hyperparameters(PG_FUNCTION_ARGS)
 
 	NDB_SPI_SESSION_END(opt_spi_session);
 
-	/* Build result */
 	initStringInfo(&result);
 	if (best_model_id > 0 && best_params_str != NULL)
 	{
@@ -1323,7 +1333,7 @@ feature_importance(PG_FUNCTION_ARGS)
 	/* Cleanup and return */
 	MemoryContextSwitchTo(oldcontext);
 	{
-		ArrayType  *result_copy;
+		ArrayType  *result_copy = NULL;
 
 		NDB_ALLOC(result_copy, ArrayType, VARSIZE(result_array));
 
@@ -1746,7 +1756,6 @@ create_ensemble(PG_FUNCTION_ARGS)
 
 	NDB_SPI_SESSION_END(ensemble_spi_session);
 
-	/* Build result */
 	initStringInfo(&result);
 	if (ensemble_model_id > 0)
 	{
@@ -1915,7 +1924,6 @@ auto_feature_engineering(PG_FUNCTION_ARGS)
 
 	NDB_SPI_SESSION_END(feat_eng_spi_session);
 
-	/* Build result */
 	initStringInfo(&result);
 	appendStringInfo(&result,
 					 "Feature engineering completed for table %s\n"
@@ -2024,7 +2032,6 @@ model_leaderboard(PG_FUNCTION_ARGS)
 	NDB_CHECK_SPI_TUPTABLE();
 	NDB_FREE(sql.data);
 
-	/* Build result */
 	initStringInfo(&result);
 	appendStringInfo(&result,
 					 "Model leaderboard for %s (sorted by %s):\n",
@@ -2128,7 +2135,7 @@ automl_model_serialize_to_bytea(int selected_model_id, const char *selected_algo
 {
 	StringInfoData buf;
 	int			total_size;
-	bytea	   *result;
+	bytea	   *result = NULL;
 	int			alg_len;
 	int			task_len;
 	int			hyper_size = 0;
@@ -2497,7 +2504,6 @@ automl_gpu_train(MLGpuModel * model, const MLGpuTrainSpec * spec, char **errstr)
 								score = 0.5f;	/* Default score if not found */
 						}
 
-						/* Cleanup */
 						if (ops->destroy)
 							ops->destroy(&eval_model);
 					}
@@ -2699,7 +2705,7 @@ automl_gpu_serialize(const MLGpuModel * model, bytea * *payload_out,
 					 Jsonb * *metadata_out, char **errstr)
 {
 	const		AutoMLGpuModelState *state;
-	bytea	   *payload_copy;
+	bytea	   *payload_copy = NULL;
 	int			payload_size;
 
 	if (errstr != NULL)
@@ -2744,7 +2750,7 @@ automl_gpu_deserialize(MLGpuModel * model, const bytea * payload,
 					   const Jsonb * metadata, char **errstr)
 {
 	AutoMLGpuModelState *state;
-	bytea	   *payload_copy;
+	bytea	   *payload_copy = NULL;
 	int			payload_size;
 	int			selected_model_id = 0;
 	char		selected_algorithm[64];
@@ -2792,7 +2798,7 @@ automl_gpu_deserialize(MLGpuModel * model, const bytea * payload,
 	if (metadata != NULL)
 	{
 		int			metadata_size = VARSIZE(metadata);
-		Jsonb	   *metadata_copy;
+		Jsonb	   *metadata_copy = NULL;
 
 		NDB_ALLOC(metadata_copy, Jsonb, metadata_size);
 		memcpy(metadata_copy, metadata, metadata_size);

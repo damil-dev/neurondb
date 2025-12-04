@@ -1365,7 +1365,6 @@ ivf_knn_search_gpu(PG_FUNCTION_ARGS)
 				distances = NULL;
 			}
 
-			/* Cleanup */
 			if (centroids)
 				NDB_FREE(centroids);
 			if (centroid_distances)

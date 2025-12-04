@@ -152,44 +152,28 @@ pg_stat_neurondb(PG_FUNCTION_ARGS)
 	 * all other metrics are directly cast to Datum.
 	 */
 	values[0] = Int64GetDatum(g_stats.queries_total);
-	//queries_total
-		values[1] = Int64GetDatum(g_stats.queries_hnsw);
-	//queries_hnsw
-		values[2] = Int64GetDatum(g_stats.queries_ivf);
-	//queries_ivf
-		values[3] = Int64GetDatum(g_stats.queries_hybrid);
-	//queries_hybrid
-		values[4] = Int64GetDatum(g_stats.avg_latency_ms);
-	//avg_latency_ms
-		values[5] = Int64GetDatum(g_stats.max_latency_ms);
-	//max_latency_ms
-		values[6] = Float8GetDatum(
+	values[1] = Int64GetDatum(g_stats.queries_hnsw);
+	values[2] = Int64GetDatum(g_stats.queries_ivf);
+	values[3] = Int64GetDatum(g_stats.queries_hybrid);
+	values[4] = Int64GetDatum(g_stats.avg_latency_ms);
+	values[5] = Int64GetDatum(g_stats.max_latency_ms);
+	values[6] = Float8GetDatum(
 								   (double) g_stats.recall_at_1 / 100.0);
-	//recall_at_1(fraction)
-		values[7] = Float8GetDatum((double) g_stats.recall_at_10
+	values[7] = Float8GetDatum((double) g_stats.recall_at_10
 								   / 100.0);
-	//recall_at_10(fraction)
-		values[8] = Float8GetDatum((double) g_stats.recall_at_100
+	values[8] = Float8GetDatum((double) g_stats.recall_at_100
 								   / 100.0);
-	//recall_at_100(fraction)
-		values[9] = Int64GetDatum(g_stats.cache_hits);
-	//cache_hits
-		values[10] = Int64GetDatum(g_stats.cache_misses);
-	//cache_misses
-		values[11] = Int64GetDatum(g_stats.index_rebuilds);
-	//index_rebuilds
-		values[12] = TimestampTzGetDatum(
+	values[9] = Int64GetDatum(g_stats.cache_hits);
+	values[10] = Int64GetDatum(g_stats.cache_misses);
+	values[11] = Int64GetDatum(g_stats.index_rebuilds);
+	values[12] = TimestampTzGetDatum(
 										 g_stats.last_reset);
-	//last_reset(timestamptz)
 
 	/*
 	 * Materialize the constructed row to the tuplestore.
 	 */
-		tuplestore_putvalues(tupstore, tupdesc, values, nulls);
+	tuplestore_putvalues(tupstore, tupdesc, values, nulls);
 
-	/*
-	 * Done; function returns set ("void"/NULL for SRF end).
-	 */
 	PG_RETURN_NULL();
 }
 
@@ -201,17 +185,10 @@ PG_FUNCTION_INFO_V1(pg_neurondb_stat_reset);
 Datum
 pg_neurondb_stat_reset(PG_FUNCTION_ARGS)
 {
-	/* Unused argument */
 	(void) fcinfo;
 
-	/*
-	 * Clear the static statistics structure for clean slate. All fields
-	 * zeroed, then last_reset updated to "now".
-	 */
 	memset(&g_stats, 0, sizeof(NeuronDBStats));
 	g_stats.last_reset = GetCurrentTimestamp();
-
-	/* Emit a NOTICE to end users so resets are confirmed. */
 
 	PG_RETURN_VOID();
 }
@@ -242,7 +219,6 @@ neurondb_update_query_stats(int index_type, int latency_ms, int recall_percent)
 			g_stats.queries_hybrid++;
 			break;
 		default:
-			/* Ignore bad types, can extend to error if wanted */
 			break;
 	}
 
@@ -255,7 +231,6 @@ neurondb_update_query_stats(int index_type, int latency_ms, int recall_percent)
 		? (uint64) latency_ms
 		: (g_stats.avg_latency_ms + (uint64) latency_ms) / 2;
 
-	/* Track maximum latency exactly (compare/copy) */
 	if ((uint64) latency_ms > g_stats.max_latency_ms)
 		g_stats.max_latency_ms = (uint64) latency_ms;
 

@@ -337,7 +337,6 @@ reduce_tsne(PG_FUNCTION_ARGS)
 				NDB_FREE(Q);
 			}
 
-			/* Cleanup */
 			for (i = 0; i < nvec; i++)
 			{
 				NDB_FREE(distances_sq[i]);
@@ -698,7 +697,6 @@ reduce_umap(PG_FUNCTION_ARGS)
 				NDB_FREE(gradient);
 			}
 
-			/* Cleanup */
 			for (i = 0; i < nvec; i++)
 			{
 				NDB_FREE(distances[i]);
@@ -1329,7 +1327,6 @@ train_autoencoder(PG_FUNCTION_ARGS)
 
 	model_id = ml_catalog_register_model(&spec);
 
-	/* Cleanup */
 	for (i = 0; i < nvec; i++)
 		NDB_FREE(vectors[i]);
 	NDB_FREE(vectors);

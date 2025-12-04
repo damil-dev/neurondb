@@ -1185,7 +1185,6 @@ ndb_json_parse_gen_params(const char *params_json,
 		return -1;
 	}
 
-	/* Initialize with defaults */
 	memset(gen_params, 0, sizeof(NdbGenParams));
 	gen_params->temperature = 1.0f;
 	gen_params->top_p = 1.0f;
@@ -1953,7 +1952,6 @@ ndb_json_extract_openai_response(const char *json_str,
 								if (p != NULL)
 								{
 									p++;
-									/* Skip whitespace */
 									while (*p && isspace((unsigned char) *p))
 										p++;
 

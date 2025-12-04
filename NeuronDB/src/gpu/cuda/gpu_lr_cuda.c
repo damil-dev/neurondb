@@ -126,14 +126,6 @@ ndb_cuda_lr_train(const float *features,
 				  Jsonb * *metrics,
 				  char **errstr)
 {
-	/* CPU mode: never execute GPU code */
-	if (NDB_COMPUTE_MODE_IS_CPU())
-	{
-		if (errstr)
-			*errstr = pstrdup("CUDA lr_train: CPU mode - GPU code should not be called");
-		return -1;
-	}
-
 	const int	default_max_iters = 1000;
 	const double default_learning_rate = 0.01;
 	const double default_lambda = 0.001;
@@ -176,6 +168,14 @@ ndb_cuda_lr_train(const float *features,
 	int			iter;
 	int			i;
 	int			rc = -1;
+
+	/* CPU mode: never execute GPU code */
+	if (NDB_COMPUTE_MODE_IS_CPU())
+	{
+		if (errstr)
+			*errstr = pstrdup("CUDA lr_train: CPU mode - GPU code should not be called");
+		return -1;
+	}
 
 	if (errstr)
 		*errstr = NULL;

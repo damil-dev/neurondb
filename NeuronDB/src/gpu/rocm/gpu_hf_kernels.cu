@@ -657,7 +657,6 @@ ndb_rocm_hf_embed_inference(const char *model_name,
 	if (status != hipSuccess)
 		goto error;
 
-	/* Cleanup */
 	hipFree(d_token_ids);
 	hipFree(d_attention_mask);
 	hipFree(d_embedding_table);
@@ -2868,7 +2867,6 @@ ndb_rocm_hf_generate_inference(const char *model_name,
 			goto error;
 	}
 
-	/* Cleanup */
 	hipFree(d_embeddings);
 	hipFree(d_logits);
 	hipFree(d_probs);
@@ -3182,7 +3180,6 @@ ndb_rocm_hf_cross_encoder_rerank_inference(
 	if (status != hipSuccess)
 		goto error;
 
-	/* Cleanup */
 	hipFree(d_classification_weights);
 	hipFree(d_token_ids);
 	hipFree(d_attention_mask);

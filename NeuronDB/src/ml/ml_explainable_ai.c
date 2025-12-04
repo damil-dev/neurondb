@@ -109,7 +109,7 @@ calculate_shap_values(PG_FUNCTION_ARGS)
 	int			n_samples;
 	float	   *features;
 	int			n_features;
-	double	   *shap_values;
+	double	   *shap_values = NULL;
 	int			i,
 				j;
 	ArrayType  *result;
@@ -196,7 +196,6 @@ calculate_shap_values(PG_FUNCTION_ARGS)
 							 FLOAT8PASSBYVAL,
 							 'd');
 
-	/* Cleanup */
 	NDB_FREE(shap_values);
 	NDB_FREE(result_datums);
 	NDB_SPI_SESSION_END(spi_session);
@@ -229,10 +228,10 @@ explain_with_lime(PG_FUNCTION_ARGS)
 	int			n_features;
 	float	   *features;
 	int			feature_dim;
-	float	   *perturbed_features;
-	double	   *predictions;
-	double	   *weights;
-	double	   *coefficients;
+	float	   *perturbed_features = NULL;
+	double	   *predictions = NULL;
+	double	   *weights = NULL;
+	double	   *coefficients = NULL;
 	int			i,
 				j;
 	StringInfoData jsonbuf;
@@ -327,7 +326,6 @@ explain_with_lime(PG_FUNCTION_ARGS)
 	result = DatumGetJsonbP(
 							DirectFunctionCall1(jsonb_in, CStringGetTextDatum(jsonbuf.data)));
 
-	/* Cleanup */
 	NDB_FREE(perturbed_features);
 	NDB_FREE(predictions);
 	NDB_FREE(weights);
@@ -601,7 +599,6 @@ feature_importance(PG_FUNCTION_ARGS)
 							 FLOAT8PASSBYVAL,
 							 'd');
 
-	/* Cleanup */
 	NDB_FREE(features);
 	NDB_FREE(targets);
 	NDB_FREE(importance);
