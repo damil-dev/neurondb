@@ -95,3 +95,4 @@ SELECT
     (SELECT COUNT(*) FROM neurondb_agent.memory_chunks) as total_memory_chunks,
     (SELECT COUNT(*) FROM neurondb_agent.api_keys) as total_api_keys;
 
+

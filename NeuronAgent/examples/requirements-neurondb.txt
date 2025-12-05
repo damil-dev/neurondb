@@ -54,3 +54,4 @@ python-dotenv>=1.0.0,<2.0.0
 # JSON schema validation
 jsonschema>=4.19.0,<5.0.0
 
+

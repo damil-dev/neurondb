@@ -107,3 +107,4 @@ class WebSocketClient:
             self._ws.close()
         self._running = False
 
+

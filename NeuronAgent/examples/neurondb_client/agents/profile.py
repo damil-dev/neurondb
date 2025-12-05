@@ -131,3 +131,4 @@ def get_default_profile(name: str) -> Optional[AgentProfile]:
     """Get a default profile by name"""
     return DEFAULT_PROFILES.get(name)
 
+
