@@ -430,15 +430,17 @@ neural_network_init(int n_inputs,
 	output_layer = &net->layers[n_hidden];
 	output_layer->n_inputs = prev_size;
 	output_layer->n_outputs = n_outputs;
-	NDB_DECLARE(float **, output_weights);
-	NDB_DECLARE(float *, output_activations);
-	NDB_DECLARE(float *, output_deltas);
-	NDB_ALLOC(output_weights, float *, output_layer->n_outputs);
-	NDB_ALLOC(output_activations, float, output_layer->n_outputs);
-	NDB_ALLOC(output_deltas, float, output_layer->n_outputs);
-	output_layer->weights = output_weights;
-	output_layer->activations = output_activations;
-	output_layer->deltas = output_deltas;
+	{
+		float	  **output_weights;
+		float	   *output_activations;
+		float	   *output_deltas;
+
+		NDB_ALLOC(output_weights, float *, output_layer->n_outputs);
+		NDB_ALLOC(output_activations, float, output_layer->n_outputs);
+		NDB_ALLOC(output_deltas, float, output_layer->n_outputs);
+		output_layer->weights = output_weights;
+		output_layer->activations = output_activations;
+		output_layer->deltas = output_deltas;
 
 	for (j = 0; j < output_layer->n_outputs; j++)
 	{
@@ -1007,7 +1009,6 @@ train_neural_network(PG_FUNCTION_ARGS)
 		/* Extract hidden layers */
 		n_hidden = ArrayGetNItems(
 								  ARR_NDIM(hidden_layers_array), ARR_DIMS(hidden_layers_array));
-		NDB_DECLARE(int *, hidden_layers);
 		NDB_ALLOC(hidden_layers, int, n_hidden);
 
 		for (i = 0; i < n_hidden; i++)
@@ -2293,9 +2294,9 @@ neural_network_gpu_serialize(const MLGpuModel *model, bytea * *payload_out,
 							 Jsonb * *metadata_out, char **errstr)
 {
 	const		NeuralNetworkGpuModelState *state;
-
-	NDB_DECLARE(bytea *, payload_copy);
+	bytea	   *payload_copy;
 	int			payload_size;
+	char	   *payload_copy_raw;
 
 	if (errstr != NULL)
 		*errstr = NULL;
@@ -2319,7 +2320,6 @@ neural_network_gpu_serialize(const MLGpuModel *model, bytea * *payload_out,
 	}
 
 	payload_size = VARSIZE(state->model_blob);
-	NDB_DECLARE(char *, payload_copy_raw);
 	NDB_ALLOC(payload_copy_raw, char, payload_size);
 	payload_copy = (bytea *) payload_copy_raw;
 	memcpy(payload_copy, state->model_blob, payload_size);
@@ -2340,14 +2340,14 @@ static bool
 neural_network_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 							   const Jsonb * metadata, char **errstr)
 {
-	NDB_DECLARE(NeuralNetworkGpuModelState *, state);
+	NeuralNetworkGpuModelState *state;
 	bytea	   *payload_copy;
 	int			payload_size;
-
-	NDB_DECLARE(NeuralNetwork *, net);
+	NeuralNetwork *net;
 	JsonbIterator *it;
 	JsonbValue	v;
 	int			r;
+	char	   *payload_copy_raw;
 
 	if (errstr != NULL)
 		*errstr = NULL;
@@ -2359,7 +2359,6 @@ neural_network_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 	}
 
 	payload_size = VARSIZE(payload);
-	NDB_DECLARE(char *, payload_copy_raw);
 	NDB_ALLOC(payload_copy_raw, char, payload_size);
 	payload_copy = (bytea *) payload_copy_raw;
 	memcpy(payload_copy, payload, payload_size);
