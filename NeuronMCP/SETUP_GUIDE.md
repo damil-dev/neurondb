@@ -177,3 +177,4 @@ Create `mcp-config.json`:
 - Query timeouts are set appropriately
 - GPU acceleration is available when configured
 
+
