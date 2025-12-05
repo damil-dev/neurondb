@@ -236,3 +236,4 @@ class ConversationManager:
         self.session = None
         self.message_history = []
 
+

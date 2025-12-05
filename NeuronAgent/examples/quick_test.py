@@ -58,3 +58,4 @@ print("1. Generate API key: cd NeuronAgent && ./scripts/generate_api_keys.sh")
 print("2. Set environment: export NEURONAGENT_API_KEY=your_key")
 print("3. Run examples: python3 examples_modular/01_basic_usage.py")
 
+

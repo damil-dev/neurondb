@@ -163,3 +163,4 @@ However, there is a **critical authentication bug** preventing authenticated API
 
 The authentication issue appears to be related to scanning JSONB fields (Metadata) from the database. The JSONBMap scanner has been implemented, but authentication is still failing. Further investigation is needed to identify the root cause.
 
+

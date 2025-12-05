@@ -16,3 +16,4 @@ websocket-client>=1.6.0,<2.0.0
 # HTTP retry support (dependency of requests)
 urllib3>=2.0.0,<3.0.0
 
+

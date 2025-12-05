@@ -214,3 +214,4 @@ class AgentManager:
         self.client.delete(f'/api/v1/agents/{agent_id}')
         logger.info(f"Agent deleted: {agent_id}")
 
+
