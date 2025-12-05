@@ -67,6 +67,7 @@ build_warnings.log
 *.tmp
 *.temp
 *.bak
+*.BAK
 *.backup
 *.backup.*
 *.old
@@ -74,6 +75,12 @@ build_warnings.log
 *.save
 *.swp
 *.swo
+
+# PostgreSQL source backup files
+pgsrc*.BAK
+pgsrc*.bak
+*.h.BAK
+*.h.bak
 
 # ============================================================================
 # SECRETS & SENSITIVE CONFIGURATION
@@ -188,7 +195,9 @@ NeuronDB/gpu_model_bridge.o
 
 # PostgreSQL extension files (compiled)
 NeuronDB/*.control.bak
+NeuronDB/*.control.BAK
 NeuronDB/*.sql.bak
+NeuronDB/*.sql.BAK
 
 # Python cache (for scripts)
 __pycache__/
@@ -204,6 +213,8 @@ NeuronDB/python/**/__pycache__/
 NeuronDB/scripts/**/__pycache__/
 NeuronDB/tools/**/__pycache__/
 NeuronDB/dataset/**/__pycache__/
+NeuronAgent/**/__pycache__/
+NeuronMCP/**/__pycache__/
 
 # Python virtual environments
 venv/
