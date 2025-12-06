@@ -25,7 +25,6 @@
 #include "neurondb_safe_memory.h"
 #include "neurondb_macros.h"
 
-/* FP16 conversion utilities */
 static inline uint16_t
 float_to_fp16(float f)
 {
@@ -43,7 +42,6 @@ float_to_fp16(float f)
 
 	if (exp == 0)
 	{
-		/* Denormalized */
 		return sign;
 	}
 
@@ -52,7 +50,7 @@ float_to_fp16(float f)
 	if (new_exp <= 0)
 		return sign;
 	if (new_exp >= 31)
-		return sign | 0x7C00;	/* Infinity */
+		return sign | 0x7C00;
 
 	return sign | (new_exp << 10) | (mantissa >> 13);
 }
@@ -71,18 +69,15 @@ fp16_to_float(uint16_t fp16)
 			bits = sign << 16;
 		else
 		{
-			/* Denormalized */
 			bits = (sign << 16) | ((mantissa << 13) >> 23);
 		}
 	}
 	else if (exp == 31)
 	{
-		/* Infinity or NaN */
 		bits = (sign << 16) | 0x7F800000 | (mantissa << 13);
 	}
 	else
 	{
-		/* Normalized */
 		int			new_exp = exp - 15 + 127;
 
 		bits = (sign << 16) | (new_exp << 23) | (mantissa << 13);
@@ -91,11 +86,6 @@ fp16_to_float(uint16_t fp16)
 	return *(float *) &bits;
 }
 
-/*
- * vector_quantize_fp16
- *
- * Quantize vector to FP16 format (2x compression).
- */
 PG_FUNCTION_INFO_V1(vector_quantize_fp16);
 Datum
 vector_quantize_fp16(PG_FUNCTION_ARGS)
@@ -139,10 +129,8 @@ vector_quantize_fp16(PG_FUNCTION_ARGS)
 				 errmsg("out of memory")));
 	SET_VARSIZE(result, VARHDRSZ + size);
 
-	/* Store dimension */
 	*(int16 *) VARDATA(result) = vec->dim;
 
-	/* Convert to FP16 */
 	fp16_data = (uint16_t *) (VARDATA(result) + sizeof(int16));
 	for (i = 0; i < vec->dim; i++)
 		fp16_data[i] = float_to_fp16(vec->data[i]);
@@ -150,11 +138,6 @@ vector_quantize_fp16(PG_FUNCTION_ARGS)
 	PG_RETURN_BYTEA_P(result);
 }
 
-/*
- * vector_dequantize_fp16
- *
- * Dequantize FP16 vector back to FP32.
- */
 PG_FUNCTION_INFO_V1(vector_dequantize_fp16);
 Datum
 vector_dequantize_fp16(PG_FUNCTION_ARGS)
@@ -217,12 +200,6 @@ vector_dequantize_fp16(PG_FUNCTION_ARGS)
 	PG_RETURN_VECTOR_P(result);
 }
 
-/*
- * vector_quantize_int8
- *
- * Quantize vector to INT8 format (4x compression).
- * Requires min, max, and scale vectors for calibration.
- */
 PG_FUNCTION_INFO_V1(vector_quantize_int8);
 Datum
 vector_quantize_int8(PG_FUNCTION_ARGS)
@@ -306,11 +283,6 @@ vector_quantize_int8(PG_FUNCTION_ARGS)
 	PG_RETURN_BYTEA_P(result);
 }
 
-/*
- * vector_dequantize_int8
- *
- * Dequantize INT8 vector back to FP32.
- */
 PG_FUNCTION_INFO_V1(vector_dequantize_int8);
 Datum
 vector_dequantize_int8(PG_FUNCTION_ARGS)
@@ -401,11 +373,6 @@ vector_dequantize_int8(PG_FUNCTION_ARGS)
 	PG_RETURN_VECTOR_P(result);
 }
 
-/*
- * vector_l2_distance_fp16
- *
- * Compute L2 distance between two FP16 quantized vectors.
- */
 PG_FUNCTION_INFO_V1(vector_l2_distance_fp16);
 Datum
 vector_l2_distance_fp16(PG_FUNCTION_ARGS)
@@ -458,11 +425,6 @@ vector_l2_distance_fp16(PG_FUNCTION_ARGS)
 	PG_RETURN_FLOAT4(result);
 }
 
-/*
- * vector_cosine_distance_fp16
- *
- * Compute cosine distance between two FP16 quantized vectors.
- */
 PG_FUNCTION_INFO_V1(vector_cosine_distance_fp16);
 Datum
 vector_cosine_distance_fp16(PG_FUNCTION_ARGS)
@@ -488,29 +450,19 @@ vector_cosine_distance_fp16(PG_FUNCTION_ARGS)
 				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
 				 errmsg("FP16 vectors must not be NULL")));
 
-	/* Dequantize both vectors */
 	a = DatumGetVector(DirectFunctionCall1(vector_dequantize_fp16,
 										   PointerGetDatum(fp16_a)));
 	b = DatumGetVector(DirectFunctionCall1(vector_dequantize_fp16,
 										   PointerGetDatum(fp16_b)));
 
-	/* Compute distance */
 	result = cosine_distance(a, b);
 
-	/* Free temporary vectors */
 	NDB_FREE(a);
 	NDB_FREE(b);
 
 	PG_RETURN_FLOAT4(result);
 }
 
-/*
- * vector_quantize_binary
- *
- * Quantize vector to binary format (32x compression).
- * Each float value is converted to a single bit: positive = 1, zero/negative = 0.
- * Returns a BinaryVec (packed bits).
- */
 PG_FUNCTION_INFO_V1(vector_quantize_binary);
 Datum
 vector_quantize_binary(PG_FUNCTION_ARGS)
@@ -568,7 +520,6 @@ vector_quantize_binary(PG_FUNCTION_ARGS)
 	SET_VARSIZE(result, size);
 	result->dim = vec->dim;
 
-	/* Convert each float to a bit: positive = 1, zero/negative = 0 */
 	for (i = 0; i < vec->dim; i++)
 	{
 		if (vec->data[i] > 0.0f)

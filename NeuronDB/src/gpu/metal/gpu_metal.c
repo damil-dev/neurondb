@@ -26,7 +26,6 @@
 #include "gpu_metal_wrapper.h"
 #include <string.h>
 
-/* Initialize Metal backend */
 bool
 neurondb_gpu_metal_init(void)
 {
@@ -47,49 +46,42 @@ neurondb_gpu_metal_init(void)
 	return false;
 }
 
-/* Cleanup Metal resources */
 void
 neurondb_gpu_metal_cleanup(void)
 {
 	metal_backend_cleanup();
 }
 
-/* Check if Metal is available */
 bool
 neurondb_gpu_metal_is_available(void)
 {
 	return metal_backend_is_available();
 }
 
-/* Get Metal device name */
 const char *
 neurondb_gpu_metal_device_name(void)
 {
 	return metal_backend_device_name();
 }
 
-/* L2 distance calculation using Metal */
 float
 neurondb_gpu_metal_l2_distance(const float *a, const float *b, int dim)
 {
 	return metal_backend_l2_distance(a, b, dim);
 }
 
-/* Cosine distance calculation using Metal */
 float
 neurondb_gpu_metal_cosine_distance(const float *a, const float *b, int dim)
 {
 	return metal_backend_cosine_distance(a, b, dim);
 }
 
-/* Inner product calculation using Metal */
 float
 neurondb_gpu_metal_inner_product(const float *a, const float *b, int dim)
 {
 	return metal_backend_inner_product(a, b, dim);
 }
 
-/* Batch L2 distance calculation using Metal */
 void
 neurondb_gpu_metal_batch_l2(const float *queries,
 							const float *targets,
@@ -98,11 +90,9 @@ neurondb_gpu_metal_batch_l2(const float *queries,
 							int dim,
 							float *distances)
 {
-	/* For small batches, not worth Metal overhead */
 	if (num_queries * num_targets < 1000)
 		return;
 
-	/* Use individual distance calculations */
 	for (int i = 0; i < num_queries; i++)
 	{
 		for (int j = 0; j < num_targets; j++)
@@ -116,7 +106,6 @@ neurondb_gpu_metal_batch_l2(const float *queries,
 	}
 }
 
-/* Get Metal device information */
 void
 neurondb_gpu_metal_device_info(char *name,
 							   size_t name_len,
@@ -126,9 +115,8 @@ neurondb_gpu_metal_device_info(char *name,
 	metal_backend_device_info(name, name_len, total_memory, free_memory);
 }
 
-#else							/* !NDB_GPU_METAL */
+#else
 
-/* Stub functions when Metal is not available */
 bool
 neurondb_gpu_metal_init(void)
 {

@@ -47,7 +47,6 @@
 /* Maximum dimensions for vision models */
 #define MAX_IMAGE_DIMENSION 8192
 
-/* ImageFormat and ImageMetadata are now defined in neurondb_llm.h */
 
 /*
  * ndb_detect_image_format
@@ -59,7 +58,6 @@ ndb_detect_image_format(const unsigned char *data, size_t size)
 	if (size < 8)
 		return IMAGE_FORMAT_UNKNOWN;
 
-	/* PNG: 89 50 4E 47 0D 0A 1A 0A */
 	if (size >= 8 &&
 		data[0] == IMAGE_MAGIC_PNG_1 &&
 		data[1] == IMAGE_MAGIC_PNG_2 &&
@@ -69,14 +67,12 @@ ndb_detect_image_format(const unsigned char *data, size_t size)
 		data[6] == 0x1A && data[7] == 0x0A)
 		return IMAGE_FORMAT_PNG;
 
-	/* JPEG: FF D8 FF */
 	if (size >= 3 &&
 		data[0] == IMAGE_MAGIC_JPEG_1 &&
 		data[1] == IMAGE_MAGIC_JPEG_2 &&
 		data[2] == IMAGE_MAGIC_JPEG_1)
 		return IMAGE_FORMAT_JPEG;
 
-	/* GIF: 47 49 46 38 (GIF8) */
 	if (size >= 4 &&
 		data[0] == IMAGE_MAGIC_GIF_1 &&
 		data[1] == IMAGE_MAGIC_GIF_2 &&
@@ -91,14 +87,12 @@ ndb_detect_image_format(const unsigned char *data, size_t size)
 		data[2] == IMAGE_MAGIC_WEBP_3 &&
 		data[3] == IMAGE_MAGIC_WEBP_4)
 	{
-		/* Check for WEBP signature at offset 8 */
 		if (size >= 12 &&
 			data[8] == 'W' && data[9] == 'E' &&
 			data[10] == 'B' && data[11] == 'P')
 			return IMAGE_FORMAT_WEBP;
 	}
 
-	/* BMP: BM */
 	if (size >= 2 && data[0] == 'B' && data[1] == 'M')
 		return IMAGE_FORMAT_BMP;
 
@@ -125,7 +119,7 @@ ndb_get_image_mime_type(ImageFormat format)
 		case IMAGE_FORMAT_BMP:
 			return "image/bmp";
 		default:
-			return "image/jpeg";	/* Default fallback */
+			return "image/jpeg";
 	}
 }
 
@@ -143,7 +137,6 @@ ndb_parse_png_dimensions(const unsigned char *data,
 	if (size < 24)
 		return false;
 
-	/* IHDR chunk: width (4 bytes) at offset 16, height (4 bytes) at offset 20 */
 	*width = (data[16] << 24) | (data[17] << 16) | (data[18] << 8) | data[19];
 	*height = (data[20] << 24) | (data[21] << 16) | (data[22] << 8) | data[23];
 
@@ -172,20 +165,17 @@ ndb_parse_jpeg_dimensions(const unsigned char *data,
 
 	p += 2;
 
-	/* Search for SOF markers (Start of Frame) */
 	while (p < end - 8)
 	{
 		if (p[0] == 0xFF)
 		{
 			unsigned char marker = p[1];
 
-			/* SOF markers: 0xC0-0xC3, 0xC5-0xC7, 0xC9-0xCB, 0xCD-0xCF */
 			if ((marker >= 0xC0 && marker <= 0xC3) ||
 				(marker >= 0xC5 && marker <= 0xC7) ||
 				(marker >= 0xC9 && marker <= 0xCB) ||
 				(marker >= 0xCD && marker <= 0xCF))
 			{
-				/* Height (2 bytes) at offset 5, Width (2 bytes) at offset 7 */
 				if (p + 9 <= end)
 				{
 					*height = (p[5] << 8) | p[6];
@@ -226,14 +216,12 @@ ndb_validate_image(const unsigned char *data, size_t size, MemoryContext mctx)
 	meta->size = size;
 	meta->is_valid = false;
 
-	/* Check minimum size */
 	if (size < MIN_IMAGE_SIZE)
 	{
 		meta->error_msg = pstrdup("Image too small (minimum 100 bytes)");
 		return meta;
 	}
 
-	/* Check maximum size */
 	if (size > MAX_IMAGE_SIZE)
 	{
 		meta->error_msg = pstrdup("Image too large (maximum 100MB)");

@@ -29,18 +29,11 @@
 #include "neurondb_safe_memory.h"
 #include "neurondb_macros.h"
 
-/* Forward declarations */
 extern float4 l2_distance(Vector *a, Vector *b);
 extern float4 cosine_distance(Vector *a, Vector *b);
 extern float4 inner_product_distance(Vector *a, Vector *b);
 extern Vector *normalize_vector_new(Vector *v);
 
-/*
- * vector_l2_distance_batch
- *
- * Compute L2 distance between query vector and array of vectors.
- * Returns array of distances.
- */
 PG_FUNCTION_INFO_V1(vector_l2_distance_batch);
 Datum
 vector_l2_distance_batch(PG_FUNCTION_ARGS)
@@ -167,11 +160,6 @@ vector_l2_distance_batch(PG_FUNCTION_ARGS)
 	PG_RETURN_ARRAYTYPE_P(result);
 }
 
-/*
- * vector_cosine_distance_batch
- *
- * Compute cosine distance between query vector and array of vectors.
- */
 PG_FUNCTION_INFO_V1(vector_cosine_distance_batch);
 Datum
 vector_cosine_distance_batch(PG_FUNCTION_ARGS)
@@ -298,11 +286,6 @@ vector_cosine_distance_batch(PG_FUNCTION_ARGS)
 	PG_RETURN_ARRAYTYPE_P(result);
 }
 
-/*
- * vector_inner_product_batch
- *
- * Compute inner product between query vector and array of vectors.
- */
 PG_FUNCTION_INFO_V1(vector_inner_product_batch);
 Datum
 vector_inner_product_batch(PG_FUNCTION_ARGS)
@@ -479,7 +462,6 @@ vector_normalize_batch(PG_FUNCTION_ARGS)
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("vector array must not be empty")));
 
-	/* Get vector type OID and type information */
 	vector_oid = ARR_ELEMTYPE(vec_array);
 	if (!OidIsValid(vector_oid))
 		ereport(ERROR,
@@ -560,11 +542,6 @@ vector_normalize_batch(PG_FUNCTION_ARGS)
 	PG_RETURN_ARRAYTYPE_P(result);
 }
 
-/*
- * vector_sum_batch
- *
- * Sum array of vectors element-wise.
- */
 PG_FUNCTION_INFO_V1(vector_sum_batch);
 Datum
 vector_sum_batch(PG_FUNCTION_ARGS)
@@ -614,10 +591,6 @@ vector_sum_batch(PG_FUNCTION_ARGS)
 
 	get_typlenbyvalalign(vector_oid, &typlen, &typbyval, &typalign);
 
-	/*
-	 * Get the lower bound of the input array (typically 1 for PostgreSQL
-	 * arrays)
-	 */
 	lb = ARR_LBOUND(vec_array)[0];
 
 	for (i = 0; i < nvec; i++)
@@ -669,11 +642,6 @@ vector_sum_batch(PG_FUNCTION_ARGS)
 	PG_RETURN_VECTOR_P(result);
 }
 
-/*
- * vector_avg_batch
- *
- * Average array of vectors element-wise.
- */
 PG_FUNCTION_INFO_V1(vector_avg_batch);
 Datum
 vector_avg_batch(PG_FUNCTION_ARGS)
@@ -724,10 +692,6 @@ vector_avg_batch(PG_FUNCTION_ARGS)
 
 	get_typlenbyvalalign(vector_oid, &typlen, &typbyval, &typalign);
 
-	/*
-	 * Get the lower bound of the input array (typically 1 for PostgreSQL
-	 * arrays)
-	 */
 	lb = ARR_LBOUND(vec_array)[0];
 
 	for (i = 0; i < nvec; i++)

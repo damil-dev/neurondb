@@ -34,9 +34,6 @@
 #include <string.h>
 #include <math.h>
 
-/*
- * hybrid_dense_sparse_search: Combine dense and sparse search
- */
 PG_FUNCTION_INFO_V1(hybrid_dense_sparse_search);
 Datum
 hybrid_dense_sparse_search(PG_FUNCTION_ARGS)
@@ -108,7 +105,6 @@ hybrid_dense_sparse_search(PG_FUNCTION_ARGS)
 				(errcode(ERRCODE_INTERNAL_ERROR),
 				 errmsg("neurondb: failed to begin SPI session")));
 
-	/* Perform hybrid search using weighted fusion */
 	initStringInfo(&sql);
 	appendStringInfo(&sql,
 					 "WITH dense_scores AS ("
@@ -170,7 +166,6 @@ hybrid_dense_sparse_search(PG_FUNCTION_ARGS)
 				(errcode(ERRCODE_INTERNAL_ERROR),
 				 errmsg("hybrid_dense_sparse_search query failed")));
 
-	/* Return results */
 	for (int i = 0; i < SPI_processed; i++)
 	{
 		HeapTuple	tuple = SPI_tuptable->vals[i];
@@ -204,12 +199,11 @@ rrf_fusion(PG_FUNCTION_ARGS)
 	float4		k_param;
 	float4		rrf_score;
 
-	PG_GETARG_INT32(0);			/* k - reserved for future use */
+	PG_GETARG_INT32(0);
 	dense_rank = PG_GETARG_FLOAT4(1);
 	sparse_rank = PG_GETARG_FLOAT4(2);
 	k_param = PG_ARGISNULL(3) ? 60.0f : PG_GETARG_FLOAT4(3);
 
-	/* RRF formula: 1 / (k + rank) */
 	rrf_score = 1.0f / (k_param + dense_rank) + 1.0f / (k_param + sparse_rank);
 
 	PG_RETURN_FLOAT4(rrf_score);

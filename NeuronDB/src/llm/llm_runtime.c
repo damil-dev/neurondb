@@ -30,12 +30,8 @@
 #include "neurondb_spi_safe.h"
 #include "neurondb_spi.h"
 
-/* Forward declaration for image validation */
 extern ImageMetadata *ndb_validate_image(const unsigned char *data, size_t size, MemoryContext mctx);
 
-/* GUC variables are now defined in neurondb_guc.c */
-
-/* ---- Shared rate-limiter (Token Bucket) ---- */
 typedef struct NdbLLMRateLimiter
 {
 	double		tokens;
@@ -117,7 +113,6 @@ ndb_elapsed_ms(TimestampTz start, TimestampTz end)
 	return ((double) secs * 1000.0) + ((double) usecs / 1000.0);
 }
 
-/* GUC initialization is now centralized in neurondb_guc.c */
 
 static void
 compute_cache_key(StringInfo dst,

@@ -21,9 +21,6 @@
 #include "fmgr.h"
 #include "utils/builtins.h"
 
-/*
- * Post-quantum Vector Encryption: Kyber or AES-GCM+Kyber hybrid
- */
 PG_FUNCTION_INFO_V1(encrypt_postquantum);
 Datum
 encrypt_postquantum(PG_FUNCTION_ARGS)
@@ -36,10 +33,6 @@ encrypt_postquantum(PG_FUNCTION_ARGS)
 		 "neurondb: post-quantum encryption of %d-dim vector",
 		 input->dim);
 
-	/* In production: Use Kyber KEM for key exchange */
-	/* Then use AES-GCM for data encryption */
-	/* Provides quantum-resistant security */
-
 	result_size = VARHDRSZ + sizeof(uint32) + (input->dim * sizeof(float4));
 	result = (bytea *) palloc0(result_size);
 	SET_VARSIZE(result, result_size);
@@ -47,9 +40,6 @@ encrypt_postquantum(PG_FUNCTION_ARGS)
 	PG_RETURN_BYTEA_P(result);
 }
 
-/*
- * Confidential Compute Mode: SGX/SEV isolation
- */
 PG_FUNCTION_INFO_V1(enable_confidential_compute);
 Datum
 enable_confidential_compute(PG_FUNCTION_ARGS)
@@ -60,16 +50,9 @@ enable_confidential_compute(PG_FUNCTION_ARGS)
 		 "neurondb: confidential compute mode %s",
 		 enable ? "enabled" : "disabled");
 
-	/* In production: Initialize SGX enclave */
-	/* Or configure AMD SEV for encrypted memory */
-	/* Embedding decryption happens in secure enclave */
-
 	PG_RETURN_BOOL(true);
 }
 
-/*
- * Fine-grained Access Masks: Limit distance metrics or index methods per role
- */
 PG_FUNCTION_INFO_V1(set_access_mask);
 Datum
 set_access_mask(PG_FUNCTION_ARGS)
@@ -85,24 +68,13 @@ set_access_mask(PG_FUNCTION_ARGS)
 	metrics_str = text_to_cstring(allowed_metrics);
 	indexes_str = text_to_cstring(allowed_indexes);
 
-	/*
-	 * Suppress unused variable warnings - placeholders for future
-	 * implementation
-	 */
 	(void) role_str;
 	(void) metrics_str;
 	(void) indexes_str;
 
-
-	/* Store access control rules */
-	/* Enforce at query execution time */
-
 	PG_RETURN_BOOL(true);
 }
 
-/*
- * Secure Federated Queries: Encrypted vector transfer between clusters
- */
 PG_FUNCTION_INFO_V1(federated_vector_query);
 Datum
 federated_vector_query(PG_FUNCTION_ARGS)
@@ -114,18 +86,11 @@ federated_vector_query(PG_FUNCTION_ARGS)
 
 	host_str = text_to_cstring(remote_host);
 
-	/*
-	 * Suppress unused variable warning - placeholder for future
-	 * implementation
-	 */
 	(void) host_str;
 	query_str = text_to_cstring(query);
 	(void) query_str;
 
 
-	/* Establish secure libpq connection with TLS */
-	/* Encrypt vectors before transmission */
-	/* Decrypt results securely */
 
 	PG_RETURN_TEXT_P(cstring_to_text("Federated query completed"));
 }

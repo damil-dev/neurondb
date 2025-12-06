@@ -15,13 +15,11 @@
 #include <stdint.h>
 #include <stddef.h>
 
-/* Metal backend initialization */
 extern bool neurondb_gpu_metal_init(void);
 extern void neurondb_gpu_metal_cleanup(void);
 extern bool neurondb_gpu_metal_is_available(void);
 extern const char *neurondb_gpu_metal_device_name(void);
 
-/* Metal distance operations */
 extern float
 			neurondb_gpu_metal_l2_distance(const float *a, const float *b, int dim);
 extern float
@@ -29,7 +27,6 @@ extern float
 extern float
 			neurondb_gpu_metal_inner_product(const float *a, const float *b, int dim);
 
-/* Metal batch operations */
 extern void neurondb_gpu_metal_batch_l2(const float *queries,
 										const float *targets,
 										int num_queries,
@@ -37,7 +34,6 @@ extern void neurondb_gpu_metal_batch_l2(const float *queries,
 										int dim,
 										float *distances);
 
-/* Metal device information */
 extern void neurondb_gpu_metal_device_info(char *name,
 										   size_t name_len,
 										   uint64_t * total_memory,

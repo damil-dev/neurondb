@@ -21,9 +21,6 @@
 #include "neurondb_safe_memory.h"
 #include "neurondb_macros.h"
 
-/* Note: PG_MODULE_MAGIC is defined in src/core/neurondb.c (only once per extension) */
-
-/* Helper for safe text->cstring conversion: always NOT NULL, panics otherwise */
 static char *
 safe_text_to_cstring(const text * txt)
 {
@@ -34,18 +31,17 @@ safe_text_to_cstring(const text * txt)
 	return text_to_cstring(txt);
 }
 
-/* Helper to split a vector string into a float array, crash-proof, Postgres style */
 static float8 *
 parse_vector_str(const char *vec, int *out_dim)
 {
 	char	   *copy;
 	int			capacity = 32;
 	int			count = 0;
-
-	NDB_DECLARE(float8 *, result);
 	char	   *token;
 	char	   *ptr;
 	char	   *saveptr = NULL;
+
+	NDB_DECLARE(float8 *, result);
 
 	copy = pstrdup(vec);
 	NDB_ALLOC(result, float8, capacity);
@@ -110,13 +106,6 @@ parse_vector_str(const char *vec, int *out_dim)
 	return result;
 }
 
-/*
- * Delta encoding: output run-length and delta-encoded compact form in simple text.
- * For crashproofness, every error must elog/ereport with a detailed msg.
- *
- * Format example: dimension:int;[rle|delta,varint|...]
- * This is not a production binary encoding, just safe, round-trip, and traceable.
- */
 PG_FUNCTION_INFO_V1(vector_wal_compress);
 Datum
 vector_wal_compress(PG_FUNCTION_ARGS)
@@ -154,11 +143,6 @@ vector_wal_compress(PG_FUNCTION_ARGS)
 		 "neurondb: Compressing vector using delta encoding, dim=%d",
 		 dim);
 
-	/*
-	 * Algorithm: For each element: delta = cur - base. Run-length encode
-	 * sequences of repeated deltas. For demonstration, deltas stored as text
-	 * and rle length. Example: 3:0.5;2:-0.1;1:0.0
-	 */
 	appendStringInfo(&compressed, "D%d:", dim);
 	i = 0;
 	while (i < dim)
@@ -166,7 +150,6 @@ vector_wal_compress(PG_FUNCTION_ARGS)
 		delta = cur_values[i] - base_values[i];
 		run_len = 1;
 
-		/* Find repeated consecutive identical deltas */
 		while ((i + run_len < dim)
 			   && fabs((cur_values[i + run_len]
 						- base_values[i + run_len])
@@ -176,7 +159,6 @@ vector_wal_compress(PG_FUNCTION_ARGS)
 			run_len++;
 		}
 
-		/* Write run-length, delta pair */
 		appendStringInfo(&compressed,
 						 "%d:%.17g%s",
 						 run_len,
@@ -188,9 +170,6 @@ vector_wal_compress(PG_FUNCTION_ARGS)
 	PG_RETURN_TEXT_P(cstring_to_text(compressed.data));
 }
 
-/*
- * vector_wal_decompress: Decompress a delta-encoded vector, robust and crash-proof.
- */
 PG_FUNCTION_INFO_V1(vector_wal_decompress);
 Datum
 vector_wal_decompress(PG_FUNCTION_ARGS)
@@ -218,9 +197,6 @@ vector_wal_decompress(PG_FUNCTION_ARGS)
 		 "neurondb: Decompressing vector from delta encoding: \"%s\"",
 		 comp_str);
 
-	/*
-	 * Parse header: D<dim>:
-	 */
 	p = comp_str;
 	if (*p != 'D')
 		ereport(ERROR,
@@ -251,13 +227,9 @@ vector_wal_decompress(PG_FUNCTION_ARGS)
 	output = NULL;
 	NDB_ALLOC(output, float8, dim);
 
-	/*
-	 * Parse run-length encoding: <run>:<delta>;... (semi-colon separated)
-	 */
 	out_idx = 0;
 	while (*p && out_idx < dim)
 	{
-		/* read run-length */
 		run = strtol(p, &endptr, 10);
 		if (run <= 0 || *endptr != ':')
 			ereport(ERROR,
@@ -267,7 +239,6 @@ vector_wal_decompress(PG_FUNCTION_ARGS)
 							"<run>:<delta>",
 							(int) (p - comp_str))));
 		p = endptr + 1;
-		/* read delta */
 		delta = strtod(p, &endptr);
 		if ((endptr == p) || isnan(delta) || isinf(delta))
 			ereport(ERROR,
@@ -276,7 +247,6 @@ vector_wal_decompress(PG_FUNCTION_ARGS)
 							"invalid float8 delta: \"%s\"",
 							p)));
 		p = endptr;
-		/* apply run times */
 		for (int j = 0; j < run; ++j)
 		{
 			if (out_idx >= dim)
@@ -307,7 +277,6 @@ vector_wal_decompress(PG_FUNCTION_ARGS)
 						out_idx,
 						dim)));
 
-	/* render back to string [x,y,z,...], max precision */
 	initStringInfo(&decompressed);
 	appendStringInfoChar(&decompressed, '[');
 	for (int i = 0; i < dim; i++)
@@ -321,10 +290,6 @@ vector_wal_decompress(PG_FUNCTION_ARGS)
 	PG_RETURN_TEXT_P(cstring_to_text(decompressed.data));
 }
 
-/*
- * vector_wal_estimate_size: Estimate compressed size robustly.
- * Handles NULL and crazy input thoughtfully. Never crashes.
- */
 PG_FUNCTION_INFO_V1(vector_wal_estimate_size);
 Datum
 vector_wal_estimate_size(PG_FUNCTION_ARGS)
@@ -336,19 +301,14 @@ vector_wal_estimate_size(PG_FUNCTION_ARGS)
 	int32		estimated_compressed_size;
 	float4		compression_ratio;
 
-	/* NULL-safe: treat NULL as empty vector */
 	if (!vector)
 		PG_RETURN_INT32(0);
 
-	/* base_vector is accepted for API consistency but not currently used */
 	(void) base_vector;
 
-	vec_str = text_to_cstring(
-							  vector);	/* Postgres returns "" for zero-length
-										 * text */
+	vec_str = text_to_cstring(vector);
 	original_size = strlen(vec_str);
 
-	/* Compression ratio: guard against divide by zero, crazy size */
 	if (original_size == 0)
 		compression_ratio = 1.0f;
 	else
@@ -372,17 +332,12 @@ vector_wal_estimate_size(PG_FUNCTION_ARGS)
 	PG_RETURN_INT32(estimated_compressed_size);
 }
 
-/*
- * vector_wal_set_compression: Simulate enable/disable WAL compression feature.
- * Always crash-proof, always returns true (for now).
- */
 PG_FUNCTION_INFO_V1(vector_wal_set_compression);
 Datum
 vector_wal_set_compression(PG_FUNCTION_ARGS)
 {
 	bool		enable;
 
-	/* Strict in PostgreSQL ensures not called with NULL, but double check */
 	if (PG_ARGISNULL(0))
 		ereport(ERROR,
 				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
@@ -397,18 +352,9 @@ vector_wal_set_compression(PG_FUNCTION_ARGS)
 	{
 	}
 
-	/*
-	 * In real system: would set neurondb.wal_compression GUC, and
-	 * (un)register hooks here.
-	 */
-
 	PG_RETURN_BOOL(true);
 }
 
-/*
- * vector_wal_get_stats: Return current WAL compression statistics.
- * For now, returns simulated numbers, never crashes.
- */
 PG_FUNCTION_INFO_V1(vector_wal_get_stats);
 Datum
 vector_wal_get_stats(PG_FUNCTION_ARGS)
@@ -418,7 +364,6 @@ vector_wal_get_stats(PG_FUNCTION_ARGS)
 	int64		total_bytes_compressed = 409600;
 	float4		compression_ratio;
 
-	/* In production, would be extracted from shared memory/GUC, for now fake. */
 	if (total_bytes_compressed == 0)
 		compression_ratio = 0.0;
 	else

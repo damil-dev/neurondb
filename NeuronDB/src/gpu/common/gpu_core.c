@@ -57,11 +57,6 @@ extern bool neurondb_gpu_rf_predict_backend(const void *,
 											char **);
 #endif
 
-/* GUC variables are now defined in neurondb_guc.c */
-
-/*
- * Convert GPU backend type enum to backend name string
- */
 static const char *
 ndb_gpu_backend_type_to_name(int backend_type)
 {
@@ -133,8 +128,6 @@ ndb_gpu_stats_record(bool used_gpu, double gpu_ms, double cpu_ms, bool fallback)
 		gpu_stats.avg_latency_ms = 0.0;
 }
 
-/* GUC initialization is now centralized in neurondb_guc.c */
-
 bool
 ndb_gpu_kernel_enabled(const char *kernel_name)
 {
@@ -148,7 +141,6 @@ ndb_gpu_kernel_enabled(const char *kernel_name)
 	nlen = strlen(kernel_name);
 	while (*k)
 	{
-		/* skip whitespace and commas */
 		while (*k == ',' || *k == ' ')
 			k++;
 		if (strncmp(k, kernel_name, nlen) == 0
@@ -156,7 +148,6 @@ ndb_gpu_kernel_enabled(const char *kernel_name)
 		{
 			return true;
 		}
-		/* skip to next */
 		while (*k && *k != ',')
 			k++;
 		if (*k == ',')
@@ -171,24 +162,18 @@ ndb_gpu_runtime_init(int *device_id)
 	const char *requested = NULL;
 	const ndb_gpu_backend *backend;
 
-	/* Ignore SIGPIPE to prevent crashes when writing to broken pipes */
-	/* This is especially important during error reporting in GPU init */
 	pqsignal(SIGPIPE, SIG_IGN);
 
 	if (device_id)
 		*device_id = 0;
 
-	/* Check compute mode - CPU mode should not reach here, but check anyway */
 	if (NDB_COMPUTE_MODE_IS_CPU())
 		return -1;
 
-	/* Determine backend name from enum */
 	if (NDB_SHOULD_TRY_GPU())
 	{
-		/* Use enum-based backend type */
 		requested = ndb_gpu_backend_type_to_name(neurondb_gpu_backend_type);
 
-		/* Default to "auto" if enum is invalid */
 		if (requested == NULL || requested[0] == '\0')
 		{
 			requested = "auto";
@@ -196,11 +181,9 @@ ndb_gpu_runtime_init(int *device_id)
 	}
 	else
 	{
-		/* Should not reach here - CPU mode checked above */
 		return -1;
 	}
 
-	/* Check for explicit "cpu" request (legacy compatibility) */
 	if (requested && pg_strcasecmp(requested, "cpu") == 0)
 		return -1;
 
@@ -243,11 +226,6 @@ ndb_gpu_mem_pool_init(int pool_size_mb)
 
 	if (!active_backend)
 		return;
-
-	/*
-	 * TODO: Memory pool allocation helpers are in place. For now, rely on
-	 * per-operation allocations.
-	 */
 }
 
 void
@@ -257,8 +235,6 @@ ndb_gpu_streams_init(int num_streams)
 
 	if (!active_backend)
 		return;
-
-	/* Stream creation will be delegated to backend stream helpers when wired. */
 }
 
 void

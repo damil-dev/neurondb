@@ -39,13 +39,11 @@ neurondb_gpu_batch_l2_distance(const float *queries,
 	float		diff,
 				sum;
 
-	/* CPU mode: never attempt GPU code, go straight to CPU fallback */
 	if (NDB_COMPUTE_MODE_IS_CPU())
 		goto cpu_fallback;
 
 	if (!neurondb_gpu_is_available())
 	{
-		/* CPU fallback */
 		goto cpu_fallback;
 	}
 
@@ -63,7 +61,6 @@ neurondb_gpu_batch_l2_distance(const float *queries,
 	goto cpu_fallback;
 
 cpu_fallback:
-	/* Efficient CPU implementation using matrix operations */
 	for (q = 0; q < num_queries; q++)
 	{
 		const float *query = queries + q * dim;
@@ -108,7 +105,6 @@ neurondb_gpu_batch_cosine_distance(const float *queries,
 
 	if (!neurondb_gpu_is_available())
 	{
-		/* CPU fallback */
 		goto cpu_fallback;
 	}
 

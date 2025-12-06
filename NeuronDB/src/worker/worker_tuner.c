@@ -56,7 +56,6 @@ get_guc_int(const char *name, int default_val)
 	return val ? atoi(val) : default_val;
 }
 
-/* Helper to get double GUC value */
 static double
 get_guc_double(const char *name, double default_val)
 {
@@ -65,7 +64,6 @@ get_guc_double(const char *name, double default_val)
 	return val ? atof(val) : default_val;
 }
 
-/* Helper to get bool GUC value */
 static bool
 get_guc_bool(const char *name, bool default_val)
 {
@@ -76,7 +74,6 @@ get_guc_bool(const char *name, bool default_val)
 	return (strcmp(val, "on") == 0 || strcmp(val, "true") == 0 || strcmp(val, "1") == 0);
 }
 
-/* Shared memory structure */
 typedef struct NeuranmonSharedState
 {
 	LWLock	   *lock;
@@ -92,7 +89,6 @@ typedef struct NeuranmonSharedState
 
 static NeuranmonSharedState * neuranmon_state = NULL;
 
-/* Forward declarations */
 PGDLLEXPORT void neuranmon_main(Datum main_arg);
 static void neuranmon_sigterm(SIGNAL_ARGS);
 static void neuranmon_sighup(SIGNAL_ARGS);
@@ -104,9 +100,6 @@ static void export_prometheus_metrics(void);
 static volatile sig_atomic_t got_sigterm = false;
 static volatile sig_atomic_t got_sighup = false;
 
-/*
- * Signal handlers
- */
 static void
 neuranmon_sigterm(SIGNAL_ARGS)
 {
@@ -133,20 +126,12 @@ neuranmon_sighup(SIGNAL_ARGS)
 	errno = save_errno;
 }
 
-/* GUC initialization is now centralized in neurondb_guc.c */
-
-/*
- * Estimate shared memory size
- */
 Size
 neuranmon_shmem_size(void)
 {
 	return MAXALIGN(sizeof(NeuranmonSharedState));
 }
 
-/*
- * Initialize shared memory
- */
 void
 neuranmon_shmem_init(void)
 {
@@ -165,8 +150,8 @@ neuranmon_shmem_init(void)
 		neuranmon_state->adjustments_made = 0;
 		neuranmon_state->avg_latency_ms = 0.0;
 		neuranmon_state->avg_recall = 0.0;
-		neuranmon_state->current_ef_search = 64;	/* default */
-		neuranmon_state->current_hybrid_weight = 0.7;	/* default */
+		neuranmon_state->current_ef_search = 64;
+		neuranmon_state->current_hybrid_weight = 0.7;
 		neuranmon_state->last_heartbeat = GetCurrentTimestamp();
 		neuranmon_state->worker_pid = 0;
 	}
@@ -174,15 +159,11 @@ neuranmon_shmem_init(void)
 	LWLockRelease(AddinShmemInitLock);
 }
 
-/*
- * Main entry point for tuner worker
- */
 PGDLLEXPORT void
 neuranmon_main(Datum main_arg)
 {
-	(void) main_arg;			/* Unused */
+	(void) main_arg;
 
-	/* Defensive: check shared memory and lock */
 	if (neuranmon_state == NULL)
 	{
 		elog(LOG, "neurondb: neuranmon_state is NULL, shared memory not initialized. Exiting to prevent segfault.");
@@ -194,18 +175,14 @@ neuranmon_main(Datum main_arg)
 		proc_exit(1);
 	}
 
-	/* Establish signal handlers */
 	pqsignal(SIGTERM, neuranmon_sigterm);
 	pqsignal(SIGHUP, neuranmon_sighup);
-	/* Ignore SIGPIPE to prevent crashes when writing to broken pipes */
 	pqsignal(SIGPIPE, SIG_IGN);
 
 	BackgroundWorkerUnblockSignals();
 
-	/* Connect to database */
 	BackgroundWorkerInitializeConnection("postgres", NULL, 0);
 
-	/* Initialize shared state */
 	LWLockAcquire(neuranmon_state->lock, LW_EXCLUSIVE);
 	neuranmon_state->worker_pid = MyProcPid;
 	neuranmon_state->last_heartbeat = GetCurrentTimestamp();
@@ -213,7 +190,6 @@ neuranmon_main(Datum main_arg)
 
 	elog(LOG, "neurondb: neuranmon worker started (PID %d)", MyProcPid);
 
-	/* Main loop */
 	while (!got_sigterm)
 	{
 		int			rc;
@@ -231,12 +207,10 @@ neuranmon_main(Datum main_arg)
 			proc_exit(0);
 		}
 
-		/* Update heartbeat */
 		LWLockAcquire(neuranmon_state->lock, LW_EXCLUSIVE);
 		neuranmon_state->last_heartbeat = GetCurrentTimestamp();
 		LWLockRelease(neuranmon_state->lock);
 
-		/* Perform tuning tasks with error handling */
 		PG_TRY();
 		{
 			StartTransactionCommand();
@@ -264,7 +238,6 @@ neuranmon_main(Datum main_arg)
 		}
 		PG_END_TRY();
 
-		/* Wait for next cycle */
 		rc = WaitLatch(MyLatch,
 					   WL_LATCH_SET | WL_TIMEOUT | WL_POSTMASTER_DEATH,
 					   get_guc_int("neurondb.neuranmon_naptime", 60000),
@@ -279,9 +252,6 @@ neuranmon_main(Datum main_arg)
 	proc_exit(0);
 }
 
-/*
- * Sample queries and adjust parameters based on SLOs
- */
 static void
 sample_and_tune(void)
 {
@@ -294,31 +264,23 @@ sample_and_tune(void)
 	bool		needs_adjustment = false;
 
 	NDB_DECLARE(NdbSpiSession *, session);
+
 	session = ndb_spi_session_begin(CurrentMemoryContext, false);
 	if (session == NULL)
 		elog(ERROR, "neurondb: failed to begin SPI session in neuranmon");
 
-	/* Check if table exists (before CREATE EXTENSION, this is expected) */
 	ret = ndb_spi_execute(session, "SELECT 1 FROM pg_tables WHERE schemaname = "
 						  "'neurondb' AND tablename = 'query_metrics'",
 						  true,
 						  0);
 	if (ret != SPI_OK_SELECT || SPI_processed == 0)
 	{
-		/*
-		 * Table doesn't exist yet - extension not created. This is normal at
-		 * startup.
-		 */
 		ndb_spi_session_end(&session);
 		elog(DEBUG1,
 			 "neurondb: tuner waiting for extension to be created");
 		return;
 	}
 
-	/*
-	 * Sample queries from pg_stat_statements if available, otherwise from
-	 * query_history
-	 */
 	initStringInfo(&sql);
 	appendStringInfo(&sql,
 					 "SELECT AVG(latency_ms) as avg_latency, "
@@ -350,7 +312,6 @@ sample_and_tune(void)
 			avg_recall = DatumGetFloat8(recall_datum);
 	}
 
-	/* Defensive: check shared state before accessing */
 	if (neuranmon_state == NULL || neuranmon_state->lock == NULL)
 	{
 		elog(LOG,
@@ -361,7 +322,6 @@ sample_and_tune(void)
 		return;
 	}
 
-	/* Adjust ef_search based on latency/recall trade-off */
 	LWLockAcquire(neuranmon_state->lock, LW_SHARED);
 	new_ef_search = neuranmon_state->current_ef_search;
 	new_hybrid_weight = neuranmon_state->current_hybrid_weight;
@@ -370,7 +330,6 @@ sample_and_tune(void)
 	if (avg_recall < get_guc_double("neurondb.neuranmon_target_recall", 0.95)
 		&& avg_latency < get_guc_double("neurondb.neuranmon_target_latency", 100.0))
 	{
-		/* Recall too low, latency acceptable -> increase ef_search */
 		new_ef_search = (int) (new_ef_search * 1.2);
 		if (new_ef_search > 512)
 			new_ef_search = 512;
@@ -379,14 +338,12 @@ sample_and_tune(void)
 	else if (avg_recall >= get_guc_double("neurondb.neuranmon_target_recall", 0.95)
 			 && avg_latency > get_guc_double("neurondb.neuranmon_target_latency", 100.0))
 	{
-		/* Recall good, latency too high -> decrease ef_search */
 		new_ef_search = (int) (new_ef_search * 0.8);
 		if (new_ef_search < 16)
 			new_ef_search = 16;
 		needs_adjustment = true;
 	}
 
-	/* Update shared state */
 	if (needs_adjustment)
 	{
 		LWLockAcquire(neuranmon_state->lock, LW_EXCLUSIVE);
@@ -404,7 +361,6 @@ sample_and_tune(void)
 			 avg_latency,
 			 avg_recall);
 
-		/* Update GUC variable to apply the new ef_search value */
 		PG_TRY();
 		{
 			initStringInfo(&sql);
@@ -430,7 +386,6 @@ sample_and_tune(void)
 		}
 		PG_END_TRY();
 	}
-	/* Update statistics - defensive check before accessing */
 	if (neuranmon_state != NULL && neuranmon_state->lock != NULL)
 	{
 		LWLockAcquire(neuranmon_state->lock, LW_EXCLUSIVE);
@@ -438,14 +393,10 @@ sample_and_tune(void)
 		LWLockRelease(neuranmon_state->lock);
 	}
 
-	/* Clean up StringInfo - must be freed before session end destroys context */
 	NDB_FREE(sql.data);
 	ndb_spi_session_end(&session);
 }
 
-/*
- * Rotate caches to maintain freshness
- */
 static void
 rotate_caches(void)
 {
@@ -460,7 +411,6 @@ rotate_caches(void)
 
 	PG_TRY();
 	{
-		/* Check if table exists first */
 		ret = ndb_spi_execute(session,
 							  "SELECT 1 FROM pg_tables WHERE schemaname = 'neurondb' "
 							  "AND tablename = 'embedding_cache'",
@@ -468,12 +418,10 @@ rotate_caches(void)
 							  0);
 		if (ret != SPI_OK_SELECT || SPI_processed == 0)
 		{
-			/* Table doesn't exist, skip cache rotation */
 			ndb_spi_session_end(&session);
 			return;
 		}
 
-		/* Evict old cache entries */
 		initStringInfo(&sql);
 		appendStringInfo(&sql,
 						 "DELETE FROM neurondb.embedding_cache "
@@ -509,9 +457,6 @@ rotate_caches(void)
 	ndb_spi_session_end(&session);
 }
 
-/*
- * Record detailed metrics for analysis
- */
 static void
 record_metrics(void)
 {
@@ -525,7 +470,6 @@ record_metrics(void)
 
 	PG_TRY();
 	{
-		/* Check if tables exist first */
 		ret = ndb_spi_execute(session,
 							  "SELECT 1 FROM pg_tables WHERE schemaname = 'neurondb' "
 							  "AND tablename = 'histograms'",
@@ -533,12 +477,10 @@ record_metrics(void)
 							  0);
 		if (ret != SPI_OK_SELECT || SPI_processed == 0)
 		{
-			/* Tables don't exist, skip metrics recording */
 			ndb_spi_session_end(&session);
 			return;
 		}
 
-		/* Record latency histogram */
 		initStringInfo(&sql);
 		appendStringInfo(&sql,
 						 "INSERT INTO neurondb.histograms "
@@ -572,9 +514,6 @@ record_metrics(void)
 	ndb_spi_session_end(&session);
 }
 
-/*
- * Export Prometheus metrics
- */
 static void
 export_prometheus_metrics(void)
 {
@@ -596,7 +535,6 @@ export_prometheus_metrics(void)
 		double		avg_recall;
 		int			current_ef_search;
 
-		/* Check if table exists first */
 		ret = ndb_spi_execute(session,
 							  "SELECT 1 FROM pg_tables WHERE schemaname = 'neurondb' "
 							  "AND tablename = 'prometheus_metrics'",
@@ -605,12 +543,10 @@ export_prometheus_metrics(void)
 		NDB_CHECK_SPI_TUPTABLE();
 		if (ret != SPI_OK_SELECT || SPI_processed == 0)
 		{
-			/* Table doesn't exist, skip metrics export */
 			ndb_spi_session_end(&session);
 			return;
 		}
 
-		/* Defensive: check shared state before accessing */
 		if (neuranmon_state == NULL || neuranmon_state->lock == NULL)
 		{
 			ndb_spi_session_end(&session);
@@ -620,8 +556,6 @@ export_prometheus_metrics(void)
 		initStringInfo(&sql);
 		initStringInfo(&metrics);
 
-		/* Read metrics with lock protection */
-
 		LWLockAcquire(neuranmon_state->lock, LW_SHARED);
 		queries_sampled = neuranmon_state->queries_sampled;
 		adjustments_made = neuranmon_state->adjustments_made;
@@ -630,7 +564,6 @@ export_prometheus_metrics(void)
 		current_ef_search = neuranmon_state->current_ef_search;
 		LWLockRelease(neuranmon_state->lock);
 
-		/* Export key metrics to Prometheus metrics table */
 		appendStringInfo(&sql,
 						 "INSERT INTO neurondb.prometheus_metrics "
 						 "(metric_name, metric_value) "
@@ -675,16 +608,12 @@ export_prometheus_metrics(void)
 	ndb_spi_session_end(&session);
 }
 
-/*
- * Manual execution function for operators
- */
 PG_FUNCTION_INFO_V1(neuranmon_sample);
 Datum
 neuranmon_sample(PG_FUNCTION_ARGS)
 {
-	(void) fcinfo;				/* Unused */
+	(void) fcinfo;
 
-	/* Function is called from user session, already in transaction */
 	sample_and_tune();
 
 	PG_RETURN_BOOL(true);

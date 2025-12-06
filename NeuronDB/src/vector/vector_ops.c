@@ -29,9 +29,6 @@
 #include <math.h>
 #include <stdint.h>
 
-/*
- * Vector element access
- */
 PG_FUNCTION_INFO_V1(vector_get);
 Datum
 vector_get(PG_FUNCTION_ARGS)
@@ -82,9 +79,6 @@ vector_set(PG_FUNCTION_ARGS)
 	PG_RETURN_VECTOR_P(result);
 }
 
-/*
- * Vector slice (extract subvector)
- */
 PG_FUNCTION_INFO_V1(vector_slice);
 Datum
 vector_slice(PG_FUNCTION_ARGS)
@@ -112,9 +106,6 @@ vector_slice(PG_FUNCTION_ARGS)
 	PG_RETURN_VECTOR_P(result);
 }
 
-/*
- * Vector append
- */
 PG_FUNCTION_INFO_V1(vector_append);
 Datum
 vector_append(PG_FUNCTION_ARGS)
@@ -136,9 +127,6 @@ vector_append(PG_FUNCTION_ARGS)
 	PG_RETURN_VECTOR_P(result);
 }
 
-/*
- * Vector prepend
- */
 PG_FUNCTION_INFO_V1(vector_prepend);
 Datum
 vector_prepend(PG_FUNCTION_ARGS)
@@ -158,9 +146,6 @@ vector_prepend(PG_FUNCTION_ARGS)
 	PG_RETURN_VECTOR_P(result);
 }
 
-/*
- * Element-wise absolute value
- */
 PG_FUNCTION_INFO_V1(vector_abs);
 Datum
 vector_abs(PG_FUNCTION_ARGS)
@@ -180,9 +165,6 @@ vector_abs(PG_FUNCTION_ARGS)
 	PG_RETURN_VECTOR_P(result);
 }
 
-/*
- * Element-wise square
- */
 PG_FUNCTION_INFO_V1(vector_square);
 Datum
 vector_square(PG_FUNCTION_ARGS)
@@ -202,9 +184,6 @@ vector_square(PG_FUNCTION_ARGS)
 	PG_RETURN_VECTOR_P(result);
 }
 
-/*
- * Element-wise square root
- */
 PG_FUNCTION_INFO_V1(vector_sqrt);
 Datum
 vector_sqrt(PG_FUNCTION_ARGS)
@@ -231,9 +210,6 @@ vector_sqrt(PG_FUNCTION_ARGS)
 	PG_RETURN_VECTOR_P(result);
 }
 
-/*
- * Element-wise power
- */
 PG_FUNCTION_INFO_V1(vector_pow);
 Datum
 vector_pow(PG_FUNCTION_ARGS)
@@ -284,9 +260,6 @@ vector_hadamard(PG_FUNCTION_ARGS)
 	PG_RETURN_VECTOR_P(result);
 }
 
-/*
- * Element-wise division
- */
 PG_FUNCTION_INFO_V1(vector_divide);
 Datum
 vector_divide(PG_FUNCTION_ARGS)
@@ -319,9 +292,6 @@ vector_divide(PG_FUNCTION_ARGS)
 	PG_RETURN_VECTOR_P(result);
 }
 
-/*
- * Vector statistics
- */
 PG_FUNCTION_INFO_V1(vector_mean);
 Datum
 vector_mean(PG_FUNCTION_ARGS)
@@ -500,9 +470,6 @@ vector_sum(PG_FUNCTION_ARGS)
 	PG_RETURN_FLOAT8(sum);
 }
 
-/*
- * Vector comparison
- */
 PG_FUNCTION_INFO_V1(vector_eq);
 Datum
 vector_eq(PG_FUNCTION_ARGS)
@@ -525,13 +492,11 @@ vector_eq(PG_FUNCTION_ARGS)
 	if (a->dim != b->dim)
 		PG_RETURN_BOOL(false);
 
-	/* Use epsilon comparison for float equality */
 	for (i = 0; i < a->dim; i++)
-	{
-		if (isnan(a->data[i]) || isnan(b->data[i]))
 		{
-			/* NaN != NaN */
-			if (isnan(a->data[i]) != isnan(b->data[i]))
+			if (isnan(a->data[i]) || isnan(b->data[i]))
+			{
+				if (isnan(a->data[i]) != isnan(b->data[i]))
 				PG_RETURN_BOOL(false);
 		}
 		else if (fabs(a->data[i] - b->data[i]) > 1e-6)
@@ -569,13 +534,10 @@ vector_hash(PG_FUNCTION_ARGS)
 	if (v == NULL)
 		PG_RETURN_UINT32(0);
 
-	/* Hash dimension first */
 	hash = ((hash << 5) + hash) + (uint32) v->dim;
 
-	/* Hash vector data (use first 16 elements for performance) */
 	for (i = 0; i < v->dim && i < 16; i++)
 	{
-		/* Convert float to int for hashing (multiply by large number) */
 		int32		tmp = (int32) (v->data[i] * 1000000.0f);
 
 		hash = ((hash << 5) + hash) + (uint32) tmp;
@@ -597,9 +559,6 @@ vector_hash(PG_FUNCTION_ARGS)
 	PG_RETURN_UINT32(hash);
 }
 
-/*
- * Vector clipping (element-wise min/max)
- */
 PG_FUNCTION_INFO_V1(vector_clip);
 Datum
 vector_clip(PG_FUNCTION_ARGS)
@@ -661,7 +620,6 @@ vector_standardize(PG_FUNCTION_ARGS)
 				 errmsg("cannot standardize vector with dimension %d",
 						v->dim)));
 
-	/* Calculate mean */
 	for (i = 0; i < v->dim; i++)
 		mean += v->data[i];
 	mean /= v->dim;
@@ -675,25 +633,20 @@ vector_standardize(PG_FUNCTION_ARGS)
 	}
 	stddev = sqrt(stddev / v->dim);
 
-	/* Standardize */
 	result = new_vector(v->dim);
 	if (stddev > 0.0)
 	{
 		for (i = 0; i < v->dim; i++)
 			result->data[i] = (v->data[i] - mean) / stddev;
-	}
+		}
 	else
-	{
-		/* All values are the same - set to zero */
-		memset(result->data, 0, sizeof(float4) * v->dim);
+		{
+			memset(result->data, 0, sizeof(float4) * v->dim);
 	}
 
 	PG_RETURN_VECTOR_P(result);
 }
 
-/*
- * Vector min-max normalization
- */
 PG_FUNCTION_INFO_V1(vector_minmax_normalize);
 Datum
 vector_minmax_normalize(PG_FUNCTION_ARGS)
@@ -718,7 +671,6 @@ vector_minmax_normalize(PG_FUNCTION_ARGS)
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("cannot normalize empty vector")));
 
-	/* Find min and max */
 	min_val = max_val = v->data[0];
 	for (i = 1; i < v->dim; i++)
 	{
@@ -735,12 +687,11 @@ vector_minmax_normalize(PG_FUNCTION_ARGS)
 	{
 		for (i = 0; i < v->dim; i++)
 			result->data[i] = (v->data[i] - min_val) / range;
-	}
+		}
 	else
-	{
-		/* All values are the same */
-		for (i = 0; i < v->dim; i++)
-			result->data[i] = 0.5;	/* Middle of [0,1] range */
+		{
+			for (i = 0; i < v->dim; i++)
+				result->data[i] = 0.5;
 	}
 
 	PG_RETURN_VECTOR_P(result);

@@ -29,10 +29,8 @@
 #include <string.h>
 #include <stdint.h>
 
-/* Forward declarations for fp16 conversion */
 PGDLLEXPORT float fp16_to_float(uint16 h);
 
-/* Helper: Convert float32 to fp16 */
 static inline uint16
 float_to_fp16_local(float f)
 {
@@ -54,11 +52,6 @@ float_to_fp16_local(float f)
 		return sign | (exp << 10) | (mantissa >> 13);
 }
 
-/*
- * array_to_vector_float4
- *
- * Convert PostgreSQL float4 array to vector.
- */
 PG_FUNCTION_INFO_V1(array_to_vector_float4);
 Datum
 array_to_vector_float4(PG_FUNCTION_ARGS)
@@ -117,11 +110,6 @@ array_to_vector_float4(PG_FUNCTION_ARGS)
 	PG_RETURN_VECTOR_P(result);
 }
 
-/*
- * array_to_vector_float8
- *
- * Convert PostgreSQL float8 array to vector.
- */
 PG_FUNCTION_INFO_V1(array_to_vector_float8);
 Datum
 array_to_vector_float8(PG_FUNCTION_ARGS)
@@ -180,11 +168,6 @@ array_to_vector_float8(PG_FUNCTION_ARGS)
 	PG_RETURN_VECTOR_P(result);
 }
 
-/*
- * array_to_vector_integer
- *
- * Convert PostgreSQL integer array to vector.
- */
 PG_FUNCTION_INFO_V1(array_to_vector_integer);
 Datum
 array_to_vector_integer(PG_FUNCTION_ARGS)
@@ -305,11 +288,6 @@ vector_to_array_float4(PG_FUNCTION_ARGS)
 	PG_RETURN_ARRAYTYPE_P(result);
 }
 
-/*
- * vector_to_array_float8
- *
- * Convert vector to PostgreSQL float8 array.
- */
 PG_FUNCTION_INFO_V1(vector_to_array_float8);
 Datum
 vector_to_array_float8(PG_FUNCTION_ARGS)
@@ -367,11 +345,6 @@ vector_to_array_float8(PG_FUNCTION_ARGS)
 	PG_RETURN_ARRAYTYPE_P(result);
 }
 
-/*
- * vector_cast_dimension
- *
- * Change vector dimension by truncating or padding with zeros.
- */
 PG_FUNCTION_INFO_V1(vector_cast_dimension);
 Datum
 vector_cast_dimension(PG_FUNCTION_ARGS)
@@ -417,13 +390,11 @@ vector_cast_dimension(PG_FUNCTION_ARGS)
 
 	if (new_dim <= vec->dim)
 	{
-		/* Truncate */
 		for (i = 0; i < new_dim; i++)
 			result->data[i] = vec->data[i];
 	}
 	else
 	{
-		/* Pad with zeros */
 		for (i = 0; i < vec->dim; i++)
 			result->data[i] = vec->data[i];
 		for (i = vec->dim; i < new_dim; i++)
@@ -433,9 +404,6 @@ vector_cast_dimension(PG_FUNCTION_ARGS)
 	PG_RETURN_VECTOR_P(result);
 }
 
-/*
- * vector_to_halfvec: Convert vector to halfvec (pgvector compatibility)
- */
 PG_FUNCTION_INFO_V1(vector_to_halfvec);
 Datum
 vector_to_halfvec(PG_FUNCTION_ARGS)
@@ -468,16 +436,12 @@ vector_to_halfvec(PG_FUNCTION_ARGS)
 	SET_VARSIZE(result, size);
 	result->dim = v->dim;
 
-	/* Convert float32 to fp16 */
 	for (i = 0; i < v->dim; i++)
 		result->data[i] = float_to_fp16_local(v->data[i]);
 
 	PG_RETURN_POINTER(result);
 }
 
-/*
- * halfvec_to_vector: Convert halfvec to vector (pgvector compatibility)
- */
 PG_FUNCTION_INFO_V1(halfvec_to_vector);
 Datum
 halfvec_to_vector(PG_FUNCTION_ARGS)
@@ -491,17 +455,12 @@ halfvec_to_vector(PG_FUNCTION_ARGS)
 
 	result = new_vector(vf16->dim);
 
-	/* Convert fp16 to float32 */
 	for (i = 0; i < vf16->dim; i++)
 		result->data[i] = fp16_to_float(vf16->data[i]);
 
 	PG_RETURN_VECTOR_P(result);
 }
 
-/*
- * vector_to_sparsevec: Convert vector to sparsevec (pgvector compatibility)
- * Only stores non-zero values
- */
 PG_FUNCTION_INFO_V1(vector_to_sparsevec);
 Datum
 vector_to_sparsevec(PG_FUNCTION_ARGS)
@@ -521,7 +480,6 @@ vector_to_sparsevec(PG_FUNCTION_ARGS)
 	if (v == NULL)
 		PG_RETURN_NULL();
 
-	/* Count non-zero values */
 	capacity = 16;
 	indices = NULL;
 	values = NULL;
@@ -564,9 +522,6 @@ vector_to_sparsevec(PG_FUNCTION_ARGS)
 	PG_RETURN_POINTER(result);
 }
 
-/*
- * sparsevec_to_vector: Convert sparsevec to vector (pgvector compatibility)
- */
 PG_FUNCTION_INFO_V1(sparsevec_to_vector);
 Datum
 sparsevec_to_vector(PG_FUNCTION_ARGS)
@@ -581,13 +536,11 @@ sparsevec_to_vector(PG_FUNCTION_ARGS)
 		PG_RETURN_NULL();
 
 	result = new_vector(sv->total_dim);
-	/* Initialize to zeros */
 	memset(result->data, 0, sizeof(float4) * sv->total_dim);
 
 	indices = VECMAP_INDICES(sv);
 	values = VECMAP_VALUES(sv);
 
-	/* Fill in non-zero values */
 	for (i = 0; i < sv->nnz; i++)
 	{
 		if (indices[i] < 0 || indices[i] >= result->dim)

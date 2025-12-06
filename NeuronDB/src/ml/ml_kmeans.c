@@ -54,11 +54,9 @@ kmeanspp_init(float **data, int nvec, int dim, int k, int *centroids)
 	selected = (bool *) palloc0(sizeof(bool) * nvec);
 	NDB_ALLOC(dist, double, nvec);
 
-	/* Pick first centroid randomly */
 	centroids[0] = rand() % nvec;
 	selected[centroids[0]] = true;
 
-	/* Compute initial distances from first centroid */
 	for (i = 0; i < nvec; i++)
 	{
 		double		acc = 0.0;
@@ -72,7 +70,6 @@ kmeanspp_init(float **data, int nvec, int dim, int k, int *centroids)
 		dist[i] = acc;
 	}
 
-	/* Pick remaining centroids */
 	for (c = 1; c < k; c++)
 	{
 		double		sum = 0.0;
@@ -1046,10 +1043,6 @@ evaluate_kmeans_by_model_id(PG_FUNCTION_ARGS)
 	PG_RETURN_JSONB_P(result_jsonb);
 }
 
-/*-------------------------------------------------------------------------
- * GPU Model Ops Registration for K-Means
- *-------------------------------------------------------------------------
- */
 #include "neurondb_gpu_model.h"
 #include "neurondb_validation.h"
 #include "neurondb_safe_memory.h"

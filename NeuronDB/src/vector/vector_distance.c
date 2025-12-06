@@ -26,7 +26,6 @@
 #include "neurondb_macros.h"
 #include "neurondb_spi.h"
 
-/* SIMD-optimized distance functions */
 extern float4 l2_distance_simd(Vector *a, Vector *b);
 extern float4 inner_product_simd(Vector *a, Vector *b);
 extern float4 cosine_distance_simd(Vector *a, Vector *b);
@@ -137,7 +136,6 @@ vector_l2_distance(PG_FUNCTION_ARGS)
 	PG_RETURN_FLOAT4(l2_distance_simd(a, b));
 }
 
-/* Inner product distance, negative for correct ordering for similarity */
 float4
 inner_product_distance(Vector *a, Vector *b)
 {
@@ -167,24 +165,6 @@ vector_inner_product(PG_FUNCTION_ARGS)
 	PG_RETURN_FLOAT4(inner_product_simd(a, b));
 }
 
-/*
- * cosine_distance
- *    Compute cosine distance between two vectors using dot product and norms.
- *
- * Cosine distance measures the angular difference between two vectors,
- * independent of their magnitudes. The cosine similarity is the dot product
- * of normalized vectors, and cosine distance is one minus this similarity.
- * The function computes the dot product and squared norms of both vectors
- * in a single pass through the data for efficiency. When a vector has zero
- * norm, it represents the zero vector which has no direction, so the cosine
- * distance is defined as 1.0 to indicate maximum dissimilarity. The
- * computation normalizes vectors by their L2 norms, making the metric
- * invariant to scaling. This property is valuable for comparing documents
- * or embeddings where the magnitude may vary but the relative proportions
- * of features are meaningful. The result ranges from 0.0 for identical
- * direction to 2.0 for opposite directions, with 1.0 indicating
- * orthogonality.
- */
 float4
 cosine_distance(Vector *a, Vector *b)
 {
@@ -235,7 +215,6 @@ vector_cosine_distance(PG_FUNCTION_ARGS)
 	PG_RETURN_FLOAT4(cosine_distance_simd(a, b));
 }
 
-/* L1 (Manhattan) distance, standard implementation */
 float4
 l1_distance(Vector *a, Vector *b)
 {
@@ -265,7 +244,6 @@ vector_l1_distance(PG_FUNCTION_ARGS)
 	PG_RETURN_FLOAT4(l1_distance_simd(a, b));
 }
 
-/* Hamming distance: counts differing coordinates */
 PG_FUNCTION_INFO_V1(vector_hamming_distance);
 Datum
 vector_hamming_distance(PG_FUNCTION_ARGS)
@@ -284,10 +262,6 @@ vector_hamming_distance(PG_FUNCTION_ARGS)
 
 	for (i = 0; i < a->dim; i++)
 	{
-		/*
-		 * Using "!=" direct numerical for float equality; optionally consider
-		 * tolerances
-		 */
 		if (a->data[i] != b->data[i])
 			count++;
 	}
@@ -295,7 +269,6 @@ vector_hamming_distance(PG_FUNCTION_ARGS)
 	PG_RETURN_INT32(count);
 }
 
-/* Chebyshev distance: maximum coordinate-wise difference */
 PG_FUNCTION_INFO_V1(vector_chebyshev_distance);
 Datum
 vector_chebyshev_distance(PG_FUNCTION_ARGS)
@@ -323,7 +296,6 @@ vector_chebyshev_distance(PG_FUNCTION_ARGS)
 	PG_RETURN_FLOAT8(max_diff);
 }
 
-/* Minkowski distance, p-norm (generalized distance): sum(|a_i-b_i|^p)^(1/p) */
 PG_FUNCTION_INFO_V1(vector_minkowski_distance);
 Datum
 vector_minkowski_distance(PG_FUNCTION_ARGS)
@@ -349,14 +321,12 @@ vector_minkowski_distance(PG_FUNCTION_ARGS)
 
 	if (p == 1.0)
 	{
-		/* Shortcut: L1 distance (Manhattan) */
 		for (i = 0; i < a->dim; i++)
 			sum += fabs((double) a->data[i] - (double) b->data[i]);
 		PG_RETURN_FLOAT8(sum);
 	}
 	else if (p == 2.0)
 	{
-		/* Shortcut: L2 distance */
 		double		partial = 0.0,
 					c = 0.0;
 
@@ -371,7 +341,7 @@ vector_minkowski_distance(PG_FUNCTION_ARGS)
 		}
 		PG_RETURN_FLOAT8(sqrt(partial));
 	}
-	else if (p == INFINITY || p > 1e10) /* Large p treated as Chebyshev */
+	else if (p == INFINITY || p > 1e10)
 	{
 		double		max_diff = 0.0;
 
@@ -387,7 +357,6 @@ vector_minkowski_distance(PG_FUNCTION_ARGS)
 	}
 	else
 	{
-		/* General Minkowski sum */
 		for (i = 0; i < a->dim; i++)
 		{
 			double		diff =
@@ -433,11 +402,6 @@ vector_squared_l2_distance(PG_FUNCTION_ARGS)
 	PG_RETURN_FLOAT8(sum);
 }
 
-/*
- * Jaccard distance: 1 - Jaccard similarity
- * Jaccard similarity = |A ∩ B| / |A ∪ B|
- * For vectors, treats non-zero values as set membership
- */
 PG_FUNCTION_INFO_V1(vector_jaccard_distance);
 Datum
 vector_jaccard_distance(PG_FUNCTION_ARGS)
@@ -469,18 +433,13 @@ vector_jaccard_distance(PG_FUNCTION_ARGS)
 
 	if (union_count == 0)
 	{
-		PG_RETURN_FLOAT8(0.0);	/* Both vectors are zero */
+		PG_RETURN_FLOAT8(0.0);
 	}
 
 	jaccard_sim = (double) intersection / (double) union_count;
 	PG_RETURN_FLOAT8(1.0 - jaccard_sim);
 }
 
-/*
- * Dice distance: 1 - Dice coefficient
- * Dice coefficient = 2|A ∩ B| / (|A| + |B|)
- * For vectors, treats non-zero values as set membership
- */
 PG_FUNCTION_INFO_V1(vector_dice_distance);
 Datum
 vector_dice_distance(PG_FUNCTION_ARGS)
@@ -514,21 +473,15 @@ vector_dice_distance(PG_FUNCTION_ARGS)
 	}
 
 	if (a_count == 0 && b_count == 0)
-		return 0.0;				/* Both vectors are zero */
+		return 0.0;
 
 	if (a_count == 0 || b_count == 0)
-		return 1.0;				/* No overlap */
+		return 1.0;
 
 	dice_coeff = (2.0 * (double) intersection) / ((double) a_count + (double) b_count);
 	PG_RETURN_FLOAT8(1.0 - dice_coeff);
 }
 
-/*
- * Mahalanobis distance: sqrt((a-b)^T * S^(-1) * (a-b))
- * Where S is the covariance matrix
- * Requires pre-computed covariance matrix (passed as vector of inverse diagonal)
- * Simplified version: assumes diagonal covariance matrix
- */
 PG_FUNCTION_INFO_V1(vector_mahalanobis_distance);
 Datum
 vector_mahalanobis_distance(PG_FUNCTION_ARGS)
@@ -549,7 +502,6 @@ vector_mahalanobis_distance(PG_FUNCTION_ARGS)
 
 	if (covariance_inv == NULL)
 	{
-		/* No covariance matrix: fall back to L2 distance */
 		PG_RETURN_FLOAT4(l2_distance(a, b));
 	}
 
@@ -560,7 +512,6 @@ vector_mahalanobis_distance(PG_FUNCTION_ARGS)
 						covariance_inv->dim,
 						a->dim)));
 
-	/* Compute Mahalanobis distance with diagonal covariance assumption */
 	for (i = 0; i < a->dim; i++)
 	{
 		double		diff = (double) a->data[i] - (double) b->data[i];

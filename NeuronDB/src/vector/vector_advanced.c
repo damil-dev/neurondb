@@ -27,12 +27,6 @@
 #include "neurondb_macros.h"
 #include "neurondb_macros.h"
 
-/*
- * vector_cross_product
- *
- * Compute cross product of two 3D vectors.
- * Returns: a × b
- */
 PG_FUNCTION_INFO_V1(vector_cross_product);
 Datum
 vector_cross_product(PG_FUNCTION_ARGS)
@@ -81,11 +75,6 @@ vector_cross_product(PG_FUNCTION_ARGS)
 	PG_RETURN_VECTOR_P(result);
 }
 
-/*
- * vector_percentile
- *
- * Compute percentile value of vector elements.
- */
 PG_FUNCTION_INFO_V1(vector_percentile);
 Datum
 vector_percentile(PG_FUNCTION_ARGS)
@@ -134,7 +123,6 @@ vector_percentile(PG_FUNCTION_ARGS)
 	for (i = 0; i < vec->dim; i++)
 		sorted[i] = vec->data[i];
 
-	/* Simple bubble sort (for small vectors) */
 	for (i = 0; i < vec->dim - 1; i++)
 	{
 		for (j = 0; j < vec->dim - i - 1; j++)
@@ -160,11 +148,6 @@ vector_percentile(PG_FUNCTION_ARGS)
 	PG_RETURN_FLOAT4(result);
 }
 
-/*
- * vector_median
- *
- * Compute median value of vector elements.
- */
 PG_FUNCTION_INFO_V1(vector_median);
 Datum
 vector_median(PG_FUNCTION_ARGS)
@@ -273,11 +256,6 @@ vector_quantile(PG_FUNCTION_ARGS)
 	PG_RETURN_ARRAYTYPE_P(result);
 }
 
-/*
- * vector_scale
- *
- * Scale vector by per-dimension scaling factors.
- */
 PG_FUNCTION_INFO_V1(vector_scale);
 Datum
 vector_scale(PG_FUNCTION_ARGS)
@@ -342,11 +320,6 @@ vector_scale(PG_FUNCTION_ARGS)
 	PG_RETURN_VECTOR_P(result);
 }
 
-/*
- * vector_translate
- *
- * Translate vector by adding offset vector.
- */
 PG_FUNCTION_INFO_V1(vector_translate);
 Datum
 vector_translate(PG_FUNCTION_ARGS)
@@ -394,11 +367,6 @@ vector_translate(PG_FUNCTION_ARGS)
 	PG_RETURN_VECTOR_P(result);
 }
 
-/*
- * vector_filter
- *
- * Filter vector elements using boolean mask.
- */
 PG_FUNCTION_INFO_V1(vector_filter);
 Datum
 vector_filter(PG_FUNCTION_ARGS)
@@ -474,11 +442,6 @@ vector_filter(PG_FUNCTION_ARGS)
 	PG_RETURN_VECTOR_P(result);
 }
 
-/*
- * vector_where
- *
- * Conditional vector assignment: where(condition, value_if_true, value_if_false)
- */
 PG_FUNCTION_INFO_V1(vector_where);
 Datum
 vector_where(PG_FUNCTION_ARGS)

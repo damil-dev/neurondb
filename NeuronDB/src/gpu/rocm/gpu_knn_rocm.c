@@ -32,15 +32,14 @@
 #include "neurondb_safe_memory.h"
 #include "neurondb_macros.h"
 
-/* KNN model structure */
 typedef struct KNNModel
 {
 	int			n_samples;
 	int			n_features;
 	int			k;
-	int			task_type;		/* 0=classification, 1=regression */
-	float	   *features;		/* Training features [n_samples * n_features] */
-	double	   *labels;			/* Training labels [n_samples] */
+	int			task_type;
+	float	   *features;
+	double	   *labels;
 }			KNNModel;
 
 int
@@ -67,7 +66,6 @@ ndb_rocm_knn_pack(const struct KNNModel *model,
 		return -1;
 	}
 
-	/* Validate model structure */
 	if (model->n_samples <= 0 || model->n_samples > 100000000)
 	{
 		if (errstr)
@@ -93,7 +91,6 @@ ndb_rocm_knn_pack(const struct KNNModel *model,
 		return -1;
 	}
 
-	/* Check for integer overflow in size calculations */
 	features_bytes = sizeof(float) * (size_t) model->n_samples * (size_t) model->n_features;
 	labels_bytes = sizeof(double) * (size_t) model->n_samples;
 

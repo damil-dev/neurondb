@@ -44,9 +44,6 @@ typedef struct mmr_cand_t
 	bool		selected;
 }			mmr_cand_t;
 
-/*
- * Helper: Build SQL safe literal for text input
- */
 static inline char *
 to_sql_literal(const char *val)
 {
@@ -66,9 +63,6 @@ to_sql_literal(const char *val)
 	return buf.data;
 }
 
-/*
- * Helper: Extract float array from Vector datum
- */
 static void
 __attribute__((unused))
 vector_to_float_array(const Vector *vec, float *arr, int dim)
@@ -79,10 +73,6 @@ vector_to_float_array(const Vector *vec, float *arr, int dim)
 		arr[i] = vec->data[i];
 }
 
-/*
- * Hybrid search: Vector + FTS + Metadata filters
- * Returns SRF: TABLE(id bigint, score real)
- */
 typedef struct HybridSearchState
 {
 	int			num_results;
@@ -119,23 +109,19 @@ hybrid_search(PG_FUNCTION_ARGS)
 
 		NDB_DECLARE(NdbSpiSession *, session);
 
-		/* Get vector argument - handle NULL case */
 		if (PG_ARGISNULL(1))
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("hybrid_search: query vector cannot be NULL")));
 
-		/* PG_GETARG_VECTOR_P already handles detoasting */
 		query_vec = PG_GETARG_VECTOR_P(1);
 		NDB_CHECK_VECTOR_VALID(query_vec);
 
-		/* Validate vector structure */
 		if (query_vec == NULL)
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("hybrid_search: query vector is NULL")));
 
-		/* Check vector size */
 		if (VARSIZE(query_vec) < VARHDRSZ + sizeof(int16) * 2)
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
@@ -146,7 +132,6 @@ hybrid_search(PG_FUNCTION_ARGS)
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("hybrid_search: invalid vector dimension %d", query_vec->dim)));
 
-		/* Validate vector has enough data */
 		if (VARSIZE(query_vec) < VARHDRSZ + sizeof(int16) * 2 + sizeof(float4) * query_vec->dim)
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
@@ -170,11 +155,6 @@ hybrid_search(PG_FUNCTION_ARGS)
 		if (session == NULL)
 			ereport(ERROR, (errmsg("hybrid_search: failed to begin SPI session")));
 
-		/*
-		 * Build vector literal representation for SQL (float array as
-		 * '{...}')
-		 */
-		/* Vector data is a flexible array member, access directly */
 		initStringInfo(&vec_lit);
 		appendStringInfoChar(&vec_lit, '{');
 		for (i = 0; i < query_vec->dim; i++)
@@ -184,10 +164,8 @@ hybrid_search(PG_FUNCTION_ARGS)
 			if (i)
 				appendStringInfoChar(&vec_lit, ',');
 
-			/* Access vector data safely - flexible array member */
 			val = query_vec->data[i];
 
-			/* Validate each value before formatting */
 			if (!isfinite(val))
 			{
 				NDB_FREE(vec_lit.data);
@@ -205,7 +183,6 @@ hybrid_search(PG_FUNCTION_ARGS)
 
 		initStringInfo(&sql);
 
-		/* Compose SQL and inject vector literal directly */
 		appendStringInfo(&sql,
 						 "WITH _hybrid_scores AS ("
 						 " SELECT id,"
@@ -252,7 +229,6 @@ hybrid_search(PG_FUNCTION_ARGS)
 		NDB_ALLOC(state, HybridSearchState, 1);
 		NDB_CHECK_ALLOC(state, "state");
 
-		/* Build tuple descriptor */
 		if (get_call_result_type(fcinfo, NULL, &tupdesc) != TYPEFUNC_COMPOSITE)
 			ereport(ERROR,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
@@ -267,9 +243,9 @@ hybrid_search(PG_FUNCTION_ARGS)
 		}
 		else
 		{
-			/* Extract results from SPI */
 			NDB_DECLARE(int64 *, ids);
 			NDB_DECLARE(float4 *, scores);
+
 			state->num_results = proc;
 			NBP_ALLOC(ids, int64, proc);
 			NDB_CHECK_ALLOC(ids, "state->ids");
@@ -285,13 +261,11 @@ hybrid_search(PG_FUNCTION_ARGS)
 				Datum		id_val,
 							score_val;
 
-				/* Get id (column 1) */
 				id_val = SPI_getbinval(SPI_tuptable->vals[i],
 									   SPI_tuptable->tupdesc,
 									   1,
 									   &isnull_id);
 
-				/* Get score (column 2) */
 				score_val = SPI_getbinval(SPI_tuptable->vals[i],
 										  SPI_tuptable->tupdesc,
 										  2,
@@ -299,7 +273,6 @@ hybrid_search(PG_FUNCTION_ARGS)
 
 				if (!isnull_id)
 				{
-					/* Convert id to int64 */
 					Oid			id_type = SPI_gettypeid(SPI_tuptable->tupdesc, 1);
 
 					if (id_type == INT8OID)
@@ -307,7 +280,7 @@ hybrid_search(PG_FUNCTION_ARGS)
 					else if (id_type == INT4OID)
 						state->ids[i] = (int64) DatumGetInt32(id_val);
 					else
-						state->ids[i] = 0;	/* fallback */
+						state->ids[i] = 0;
 				}
 				else
 					state->ids[i] = 0;
@@ -331,7 +304,6 @@ hybrid_search(PG_FUNCTION_ARGS)
 		MemoryContextSwitchTo(oldcontext);
 	}
 
-	/* Subsequent calls */
 	funcctx = SRF_PERCALL_SETUP();
 	state = (HybridSearchState *) funcctx->user_fctx;
 
@@ -353,9 +325,6 @@ hybrid_search(PG_FUNCTION_ARGS)
 	}
 }
 
-/*
- * Comparison function for RRF items (for qsort)
- */
 typedef struct RrfItem
 {
 	const char *key;
@@ -368,7 +337,6 @@ compare_rrf_items(const void *a, const void *b)
 	const		RrfItem *item_a = (const RrfItem *) a;
 	const		RrfItem *item_b = (const RrfItem *) b;
 
-	/* Sort by decreasing score */
 	if (item_b->score > item_a->score)
 		return 1;
 	if (item_b->score < item_a->score)
@@ -376,9 +344,6 @@ compare_rrf_items(const void *a, const void *b)
 	return 0;
 }
 
-/*
- * Reciprocal Rank Fusion (RRF)
- */
 PG_FUNCTION_INFO_V1(reciprocal_rank_fusion);
 Datum
 reciprocal_rank_fusion(PG_FUNCTION_ARGS)
@@ -403,10 +368,6 @@ reciprocal_rank_fusion(PG_FUNCTION_ARGS)
 		 "neurondb: Computing Reciprocal Rank Fusion with k=%.2f",
 		 k);
 
-	/*
-	 * This implementation expects an array of text[] where each is an id
-	 * order
-	 */
 	if (ARR_NDIM(rankings) != 1)
 		ereport(ERROR,
 				(errmsg("rankings argument must be 1-dimensional array "
@@ -423,7 +384,6 @@ reciprocal_rank_fusion(PG_FUNCTION_ARGS)
 					  NULL,
 					  &n_rankers);
 
-	/* Build a hash table of document ids to cumulative RRF scores */
 	memset(&info, 0, sizeof(info));
 	info.keysize = 512;
 	info.entrysize = sizeof(RrfItem);
@@ -503,7 +463,6 @@ reciprocal_rank_fusion(PG_FUNCTION_ARGS)
 		int			idx_i,
 					idx_j;
 
-		/* Collect items with scores */
 		items = palloc(sizeof(*items) * item_count);
 		NDB_CHECK_ALLOC(items, "allocation");
 		hash_seq_init(&stat, item_hash);
@@ -547,7 +506,6 @@ reciprocal_rank_fusion(PG_FUNCTION_ARGS)
 				  compare_rrf_items);
 		}
 
-		/* Extract sorted keys */
 		for (idx = 0; idx < item_count; idx++)
 		{
 			result_datums[idx] =
@@ -569,9 +527,6 @@ reciprocal_rank_fusion(PG_FUNCTION_ARGS)
 	PG_RETURN_ARRAYTYPE_P(ret_array);
 }
 
-/*
- * Semantic + Keyword search with BM25
- */
 PG_FUNCTION_INFO_V1(semantic_keyword_search);
 Datum
 semantic_keyword_search(PG_FUNCTION_ARGS)
@@ -703,9 +658,6 @@ semantic_keyword_search(PG_FUNCTION_ARGS)
 	PG_RETURN_ARRAYTYPE_P(ret_array);
 }
 
-/*
- * Multi-vector search (ColBERT-style late interaction)
- */
 PG_FUNCTION_INFO_V1(multi_vector_search);
 Datum
 multi_vector_search(PG_FUNCTION_ARGS)
@@ -764,9 +716,8 @@ multi_vector_search(PG_FUNCTION_ARGS)
 						"vector required")));
 	}
 
-	{
-		/* Check first vector exists and validate */
-		Vector	   *first_vec = (Vector *) DatumGetPointer(vec_datums[0]);
+		{
+			Vector	   *first_vec = (Vector *) DatumGetPointer(vec_datums[0]);
 
 		if (first_vec->dim <= 0)
 		{
@@ -881,9 +832,6 @@ multi_vector_search(PG_FUNCTION_ARGS)
 	PG_RETURN_ARRAYTYPE_P(ret_array);
 }
 
-/*
- * Faceted search with vector similarity
- */
 PG_FUNCTION_INFO_V1(faceted_vector_search);
 Datum
 faceted_vector_search(PG_FUNCTION_ARGS)
@@ -1005,9 +953,6 @@ faceted_vector_search(PG_FUNCTION_ARGS)
 	PG_RETURN_ARRAYTYPE_P(ret_array);
 }
 
-/*
- * Temporal-aware vector search - boost recent documents with exponential decay
- */
 PG_FUNCTION_INFO_V1(temporal_vector_search);
 Datum
 temporal_vector_search(PG_FUNCTION_ARGS)
@@ -1015,7 +960,7 @@ temporal_vector_search(PG_FUNCTION_ARGS)
 	text	   *table_name;
 	Vector	   *query_vec;
 	text	   *timestamp_col;
-	float8		decay_rate;		/* e.g. 0.1 means decays by 1/exp(0.1) per day */
+	float8		decay_rate;
 	int32		top_k;
 	char	   *tbl_str;
 	char	   *ts_str;
@@ -1135,10 +1080,6 @@ temporal_vector_search(PG_FUNCTION_ARGS)
 	PG_RETURN_ARRAYTYPE_P(ret_array);
 }
 
-/*
- * Diversity-aware search (Maximal Marginal Relevance - MMR)
- * Returns top_k doc ids, maximizing both relevance and novelty.
- */
 PG_FUNCTION_INFO_V1(diverse_vector_search);
 Datum
 diverse_vector_search(PG_FUNCTION_ARGS)
@@ -1223,9 +1164,7 @@ diverse_vector_search(PG_FUNCTION_ARGS)
 		PG_RETURN_ARRAYTYPE_P(ret_array);
 	}
 
-	n_candidates = proc;
-
-	/* MMR greedy selection */
+		n_candidates = proc;
 
 	cands = NULL;
 	NDB_ALLOC(cands, mmr_cand_t, n_candidates);
@@ -1273,7 +1212,6 @@ diverse_vector_search(PG_FUNCTION_ARGS)
 			if (cands[j].selected)
 				continue;
 
-			/* Calculate max similarity to selected set */
 			if (i > 0)
 			{
 				int			s;

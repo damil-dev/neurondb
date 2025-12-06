@@ -26,13 +26,6 @@
 #include "neurondb_safe_memory.h"
 #include "neurondb_macros.h"
 
-/*
- * neurondb_gpu_matmul
- *    GPU-accelerated matrix multiplication (C = A * B).
- *
- *    A is (m x n), B is (n x k), C is (m x k).
- *    If use_gpu is false or GPU is unavailable, falls back to CPU.
- */
 void
 neurondb_gpu_matmul(const float *A,
 					const float *B,
@@ -46,7 +39,6 @@ neurondb_gpu_matmul(const float *A,
 	int			j;
 	int			l;
 
-	/* CPU mode: never run GPU code */
 	if (NDB_COMPUTE_MODE_IS_CPU())
 		use_gpu = false;
 
@@ -74,8 +66,6 @@ neurondb_gpu_matmul(const float *A,
 				backend->memcpy_h2d(d_A, A, A_size);
 				backend->memcpy_h2d(d_B, B, B_size);
 
-				/* GPU matmul kernel would be called here */
-				/* For now, use CPU fallback but with GPU memory framework */
 				elog(DEBUG1,
 					 "neurondb: GPU matmul framework ready (backend %s), "
 					 "using CPU fallback until kernel implemented",

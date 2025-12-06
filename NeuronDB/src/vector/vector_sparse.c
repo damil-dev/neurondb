@@ -27,7 +27,6 @@
 #include "neurondb_safe_memory.h"
 #include "neurondb_macros.h"
 
-/* Helper: Check dimensions match */
 static inline void
 check_vecmap_dimensions(const VectorMap *a, const VectorMap *b)
 {
@@ -70,20 +69,6 @@ vecmap_l2_distance(PG_FUNCTION_ARGS)
 	b_indices = VECMAP_INDICES(b);
 	b_values = VECMAP_VALUES(b);
 
-	/*
-	 * Compute L2 distance using a merge algorithm that processes both sparse
-	 * vectors simultaneously. Since sparse vectors store only non-zero
-	 * elements with their indices, we cannot simply iterate through all
-	 * dimensions. Instead, we maintain pointers into both index arrays and
-	 * process elements in sorted index order. When indices match, we compute
-	 * the difference between both values. When indices differ, we treat the
-	 * missing value as zero and compute the difference accordingly. The
-	 * algorithm uses Kahan summation to maintain numerical precision when
-	 * accumulating squared differences, which is critical for
-	 * high-dimensional sparse vectors where cancellation errors can
-	 * accumulate. This approach achieves O(nnz) time complexity where nnz is
-	 * the number of non-zero elements, compared to O(dim) for dense vectors.
-	 */
 	i = 0;
 	j = 0;
 
@@ -91,7 +76,6 @@ vecmap_l2_distance(PG_FUNCTION_ARGS)
 	{
 		if (i >= a->nnz)
 		{
-			/* Only b has value at this index */
 			idx_b = b_indices[j];
 			diff = 0.0 - (double) b_values[j];
 			y = (diff * diff) - c;
@@ -102,7 +86,6 @@ vecmap_l2_distance(PG_FUNCTION_ARGS)
 		}
 		else if (j >= b->nnz)
 		{
-			/* Only a has value at this index */
 			idx_a = a_indices[i];
 			diff = (double) a_values[i] - 0.0;
 			y = (diff * diff) - c;
@@ -118,7 +101,6 @@ vecmap_l2_distance(PG_FUNCTION_ARGS)
 
 			if (idx_a < idx_b)
 			{
-				/* Only a has value at this index */
 				diff = (double) a_values[i] - 0.0;
 				y = (diff * diff) - c;
 				t = sum + y;
@@ -128,7 +110,6 @@ vecmap_l2_distance(PG_FUNCTION_ARGS)
 			}
 			else if (idx_a > idx_b)
 			{
-				/* Only b has value at this index */
 				diff = 0.0 - (double) b_values[j];
 				y = (diff * diff) - c;
 				t = sum + y;
@@ -138,7 +119,6 @@ vecmap_l2_distance(PG_FUNCTION_ARGS)
 			}
 			else
 			{
-				/* Both have values at this index */
 				diff = (double) a_values[i] - (double) b_values[j];
 				y = (diff * diff) - c;
 				t = sum + y;
@@ -177,7 +157,6 @@ vecmap_inner_product(PG_FUNCTION_ARGS)
 	b_indices = VECMAP_INDICES(b);
 	b_values = VECMAP_VALUES(b);
 
-	/* Merge-like algorithm: only multiply when both have non-zero values */
 	i = 0;
 	j = 0;
 
@@ -193,7 +172,6 @@ vecmap_inner_product(PG_FUNCTION_ARGS)
 		}
 		else
 		{
-			/* Both have values at this index */
 			sum += (double) a_values[i] * (double) b_values[j];
 			i++;
 			j++;
@@ -203,9 +181,6 @@ vecmap_inner_product(PG_FUNCTION_ARGS)
 	PG_RETURN_FLOAT4((float4) sum);
 }
 
-/*
- * Sparse cosine distance: optimized for sparse vectors
- */
 PG_FUNCTION_INFO_V1(vecmap_cosine_distance);
 Datum
 vecmap_cosine_distance(PG_FUNCTION_ARGS)
@@ -231,7 +206,6 @@ vecmap_cosine_distance(PG_FUNCTION_ARGS)
 	b_indices = VECMAP_INDICES(b);
 	b_values = VECMAP_VALUES(b);
 
-	/* Compute dot product and norms simultaneously */
 	i = 0;
 	j = 0;
 
@@ -266,7 +240,6 @@ vecmap_cosine_distance(PG_FUNCTION_ARGS)
 			}
 			else
 			{
-				/* Both have values at this index */
 				double		va = (double) a_values[i];
 				double		vb = (double) b_values[j];
 
@@ -279,16 +252,12 @@ vecmap_cosine_distance(PG_FUNCTION_ARGS)
 		}
 	}
 
-	/* Handle zero norms */
 	if (norm_a == 0.0 || norm_b == 0.0)
 		PG_RETURN_FLOAT4(1.0f);
 
 	PG_RETURN_FLOAT4((float4) (1.0 - (dot / (sqrt(norm_a) * sqrt(norm_b)))));
 }
 
-/*
- * Sparse L1 (Manhattan) distance: optimized for sparse vectors
- */
 PG_FUNCTION_INFO_V1(vecmap_l1_distance);
 Datum
 vecmap_l1_distance(PG_FUNCTION_ARGS)
@@ -310,7 +279,6 @@ vecmap_l1_distance(PG_FUNCTION_ARGS)
 	b_indices = VECMAP_INDICES(b);
 	b_values = VECMAP_VALUES(b);
 
-	/* Merge-like algorithm */
 	i = 0;
 	j = 0;
 
@@ -318,13 +286,11 @@ vecmap_l1_distance(PG_FUNCTION_ARGS)
 	{
 		if (i >= a->nnz)
 		{
-			/* Only b has value */
 			sum += fabs((double) b_values[j]);
 			j++;
 		}
 		else if (j >= b->nnz)
 		{
-			/* Only a has value */
 			sum += fabs((double) a_values[i]);
 			i++;
 		}
@@ -342,7 +308,6 @@ vecmap_l1_distance(PG_FUNCTION_ARGS)
 			}
 			else
 			{
-				/* Both have values */
 				sum += fabs((double) a_values[i] - (double) b_values[j]);
 				i++;
 				j++;
@@ -353,9 +318,6 @@ vecmap_l1_distance(PG_FUNCTION_ARGS)
 	PG_RETURN_FLOAT4((float4) sum);
 }
 
-/*
- * Sparse vector addition: creates new sparse vector
- */
 PG_FUNCTION_INFO_V1(vecmap_add);
 Datum
 vecmap_add(PG_FUNCTION_ARGS)
@@ -390,7 +352,6 @@ vecmap_add(PG_FUNCTION_ARGS)
 	NDB_ALLOC(result_indices, int32, max_nnz);
 	NDB_ALLOC(result_values, float4, max_nnz);
 
-	/* Merge-like addition */
 	i = 0;
 	j = 0;
 	k = 0;
@@ -429,7 +390,6 @@ vecmap_add(PG_FUNCTION_ARGS)
 			}
 			else
 			{
-				/* Both have values - add them */
 				float4		sum_val = a_values[i] + b_values[j];
 
 				if (fabs(sum_val) > 1e-10f) /* Skip near-zero results */
@@ -446,15 +406,9 @@ vecmap_add(PG_FUNCTION_ARGS)
 
 	result_nnz = k;
 
-	/* Allocate result - variable-length type requires custom size */
 	size = sizeof(VectorMap) + sizeof(int32) * result_nnz +
 		sizeof(float4) * result_nnz;
 
-	/*
-	 * Variable-length type requires custom size - use palloc0 but ensure
-	 * proper cleanup
-	 */
-	/* Note: For variable-length PostgreSQL types, palloc0 is standard */
 	result = (VectorMap *) palloc0(size);
 	SET_VARSIZE(result, size);
 
@@ -470,9 +424,6 @@ vecmap_add(PG_FUNCTION_ARGS)
 	PG_RETURN_POINTER(result);
 }
 
-/*
- * Sparse vector subtraction: creates new sparse vector
- */
 PG_FUNCTION_INFO_V1(vecmap_sub);
 Datum
 vecmap_sub(PG_FUNCTION_ARGS)
@@ -506,7 +457,6 @@ vecmap_sub(PG_FUNCTION_ARGS)
 	NDB_ALLOC(result_indices, int32, max_nnz);
 	NDB_ALLOC(result_values, float4, max_nnz);
 
-	/* Merge-like subtraction */
 	i = 0;
 	j = 0;
 	k = 0;
@@ -516,7 +466,7 @@ vecmap_sub(PG_FUNCTION_ARGS)
 		if (i >= a->nnz)
 		{
 			result_indices[k] = b_indices[j];
-			result_values[k] = -b_values[j];	/* Negate b */
+			result_values[k] = -b_values[j];
 			j++;
 			k++;
 		}
@@ -545,7 +495,6 @@ vecmap_sub(PG_FUNCTION_ARGS)
 			}
 			else
 			{
-				/* Both have values - subtract */
 				float4		diff_val = a_values[i] - b_values[j];
 
 				if (fabs(diff_val) > 1e-10f)
@@ -579,9 +528,6 @@ vecmap_sub(PG_FUNCTION_ARGS)
 	PG_RETURN_POINTER(result);
 }
 
-/*
- * Sparse vector scalar multiplication: creates new sparse vector
- */
 PG_FUNCTION_INFO_V1(vecmap_mul_scalar);
 Datum
 vecmap_mul_scalar(PG_FUNCTION_ARGS)
@@ -600,7 +546,6 @@ vecmap_mul_scalar(PG_FUNCTION_ARGS)
 	a_indices = VECMAP_INDICES(a);
 	a_values = VECMAP_VALUES(a);
 
-	/* Count non-zero results */
 	result_nnz = 0;
 	for (i = 0; i < a->nnz; i++)
 	{
@@ -638,9 +583,6 @@ vecmap_mul_scalar(PG_FUNCTION_ARGS)
 	PG_RETURN_POINTER(result);
 }
 
-/*
- * Sparse vector norm (L2): compute ||v||
- */
 PG_FUNCTION_INFO_V1(vecmap_norm);
 Datum
 vecmap_norm(PG_FUNCTION_ARGS)

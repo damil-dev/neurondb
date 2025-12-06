@@ -42,8 +42,7 @@
 #include "neurondb_safe_memory.h"
 #include "neurondb_macros.h"
 
-/* IVF index structure definitions (matching ivf_am.c) */
-#define IVF_MAGIC_NUMBER 0x49564646 /* "IVFF" in hex */
+#define IVF_MAGIC_NUMBER 0x49564646
 
 typedef struct IvfMetaPageData
 {
@@ -75,34 +74,19 @@ typedef struct IvfListEntryData
 {
 	ItemPointerData heapPtr;
 	int16		dim;
-	/* Followed by float4 vector[dim] */
 }			IvfListEntryData;
 
-/*
- * ndb_gpu_can_run
- * Check if GPU support and specific kernel are enabled and available.
- * All conditions required for this to return true; safe for fallback.
- */
 static inline bool
 ndb_gpu_can_run(const char *kernel_name)
 {
-	/* Check if global GPU support is enabled. */
 	if (!NDB_SHOULD_TRY_GPU())
 		return false;
-	/* Check if the specified kernel is available. */
 	if (!ndb_gpu_kernel_enabled(kernel_name))
 		return false;
-	/* If needed, initialize device/system. */
 	ndb_gpu_init_if_needed();
-	/* Final status: device is available and ready. */
 	return neurondb_gpu_is_available();
 }
 
-/*
- * vector_l2_distance_gpu
- * SQL-callable interface: Compute L2 distance (Euclidean norm) between
- * two vectors. Uses GPU if available, otherwise falls back to CPU.
- */
 PG_FUNCTION_INFO_V1(vector_l2_distance_gpu);
 Datum
 vector_l2_distance_gpu(PG_FUNCTION_ARGS)
@@ -122,18 +106,11 @@ vector_l2_distance_gpu(PG_FUNCTION_ARGS)
 		result = neurondb_gpu_l2_distance(a->data, b->data, a->dim);
 		if (result >= 0.0f && !isnan(result))
 			PG_RETURN_FLOAT4(result);
-		/* Otherwise, fall through to CPU. */
 	}
 
-	/* CPU fallback. */
 	PG_RETURN_FLOAT4(l2_distance(a, b));
 }
 
-/*
- * vector_cosine_distance_gpu
- * SQL-callable interface: Compute cosine distance (1 - cosine similarity)
- * between two vectors. Prefers GPU, falls back to CPU when needed.
- */
 PG_FUNCTION_INFO_V1(vector_cosine_distance_gpu);
 Datum
 vector_cosine_distance_gpu(PG_FUNCTION_ARGS)
@@ -158,11 +135,6 @@ vector_cosine_distance_gpu(PG_FUNCTION_ARGS)
 	PG_RETURN_FLOAT4(cosine_distance(a, b));
 }
 
-/*
- * vector_inner_product_gpu
- * SQL-callable interface: Compute -dot(a, b) as a distance metric.
- * Uses GPU if able, else falls back to CPU.
- */
 PG_FUNCTION_INFO_V1(vector_inner_product_gpu);
 Datum
 vector_inner_product_gpu(PG_FUNCTION_ARGS)

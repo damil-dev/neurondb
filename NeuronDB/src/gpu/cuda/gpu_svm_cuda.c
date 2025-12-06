@@ -33,7 +33,6 @@
 #include "neurondb_guc.h"
 #include "neurondb_constants.h"
 
-/* Forward declarations for kernel launchers */
 extern int	ndb_cuda_svm_launch_compute_kernel_row(const float *features,
 												   int n_samples,
 												   int feature_dim,

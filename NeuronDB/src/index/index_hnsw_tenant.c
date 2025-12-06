@@ -49,11 +49,6 @@ static void maybe_build_hnsw_index(const char *tbl, const char *col, int32 tenan
 static const char *HNSW_META_TABLE = "__hnsw_tenant_meta";
 static const char *HNSW_INDEX_PREFIX = "__hnsw_tnt_";
 
-/*-------------------------------------------------------------------------
- * Create tenant-aware HNSW index with quota, ef_search, and max_level.
- * Stores per-tenant metadata, ensures index table.
- *-------------------------------------------------------------------------
- */
 PG_FUNCTION_INFO_V1(hnsw_tenant_create);
 
 Datum
@@ -89,11 +84,10 @@ hnsw_tenant_create(PG_FUNCTION_ARGS)
 	PG_RETURN_BOOL(true);
 }
 
-/*-------------------------------------------------------------------------
+/*
  * Query tenant-aware HNSW index for k nearest neighbors
  * Respects per-tenant settings.
  * RETURNS: SETOF (id bigint, dist float4)
- *-------------------------------------------------------------------------
  */
 PG_FUNCTION_INFO_V1(hnsw_tenant_search);
 
@@ -293,11 +287,10 @@ hnsw_tenant_search(PG_FUNCTION_ARGS)
 	}
 }
 
-/*-------------------------------------------------------------------------
+/*
  * Check tenant quota usage.
  * Scans meta table for the tenant's quota status.
  * RETURNS: JSON text { "used": <int>, "total": <int> }
- *-------------------------------------------------------------------------
  */
 PG_FUNCTION_INFO_V1(hnsw_tenant_quota);
 
@@ -321,11 +314,6 @@ hnsw_tenant_quota(PG_FUNCTION_ARGS)
 
 	PG_RETURN_TEXT_P(result_txt);
 }
-
-/*-------------------------------------------------------------------------
- * Utility Functions
- *-------------------------------------------------------------------------
- */
 
 /*
  * Ensure the per-tenant HNSW meta table exists (idempotent).

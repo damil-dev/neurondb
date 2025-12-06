@@ -34,7 +34,6 @@
 #include "neurondb_rocm_launchers.h"
 #include "neurondb_rocm_hf.h"
 
-/* Forward declarations for ML model functions */
 extern int ndb_rocm_rf_train(const float *features,
 	const double *labels,
 	int n_samples,
@@ -239,8 +238,6 @@ static struct
 	bool initialized;
 } rocm_ctx = { 0 };
 
-/* === ROCm Backend Lifecycle === */
-
 static bool
 rocm_backend_init_impl(void)
 {
@@ -308,8 +305,6 @@ rocm_backend_is_available_impl(void)
 	return (err == hipSuccess && device_count > 0);
 }
 
-/* === ROCm Device Management === */
-
 static int
 rocm_backend_get_device_count_impl(void)
 {
@@ -355,8 +350,6 @@ rocm_backend_set_device_impl(int device_id)
 	return (hipSetDevice(device_id) == hipSuccess);
 }
 
-/* === ROCm Memory Management === */
-
 static void *
 rocm_backend_mem_alloc_impl(size_t bytes)
 {
@@ -392,8 +385,6 @@ rocm_backend_synchronize_impl(void)
 {
 	hipDeviceSynchronize();
 }
-
-/* === ROCm Vector Operations === */
 
 static float
 rocm_backend_l2_distance_impl(const float *a, const float *b, int dim)
@@ -483,8 +474,6 @@ rocm_backend_inner_product_impl(const float *a, const float *b, int dim)
 	return result;
 }
 
-/* === ROCm Batch Operations === */
-
 static bool
 rocm_backend_batch_l2_impl(const float *queries,
 	const float *targets,
@@ -552,8 +541,6 @@ rocm_backend_batch_cosine_impl(const float *queries,
 		queries, targets, num_queries, num_targets, dim, distances);
 }
 
-/* === ROCm Quantization === */
-
 static bool
 rocm_backend_quantize_int8_impl(const float *input, int8_t *output, int count)
 {
@@ -585,8 +572,6 @@ rocm_backend_quantize_fp16_impl(const float *input, void *output, int count)
 	/* FP16 quantization */
 	return true;
 }
-
-/* === ROCm Clustering === */
 
 static bool
 rocm_backend_kmeans_impl(const float *vectors,
@@ -627,8 +612,6 @@ rocm_backend_kmeans_impl(const float *vectors,
 
 	return true;
 }
-
-/* === ROCm Streams === */
 
 static bool
 rocm_backend_create_streams_impl(int num_streams)
@@ -757,8 +740,6 @@ rocm_backend_dbscan_impl(const float *vectors,
 
 	return true;
 }
-
-/* === ROCm Kernel Launchers === */
 
 rocblas_handle
 ndb_rocm_get_rocblas_handle(void)

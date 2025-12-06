@@ -42,12 +42,6 @@
 #include <limits.h>
 #include <string.h>
 
-/*----------------------------------------------------------------------------
- * 1. Scalar Comparison Operators for VECTOR: =, <>, <, <=, >, >=
- *    These are crash-proof, lexicographically correct for all dimensions and
- *    inputs. They check argument validity and dimension equality before comparing.
- *--------------------------------------------------------------------------*/
-
 PG_FUNCTION_INFO_V1(vector_lt);
 Datum
 vector_lt(PG_FUNCTION_ARGS)
@@ -156,11 +150,6 @@ vector_ge(PG_FUNCTION_ARGS)
 	PG_RETURN_BOOL(true);
 }
 
-/*----------------------------------------------------------------------------
- * 2. Distance Operators for VECTOR:
- *    Fully protected, with null safety and numerically stable.
- *--------------------------------------------------------------------------*/
-
 PG_FUNCTION_INFO_V1(vector_cosine_similarity);
 Datum
 vector_cosine_similarity(PG_FUNCTION_ARGS)
@@ -242,11 +231,6 @@ vector_dot_product(PG_FUNCTION_ARGS)
 	PG_RETURN_FLOAT4(result);
 }
 
-/*----------------------------------------------------------------------------
- * 3. Vector Arithmetic: +, -, *, /
- *    Crash-proof with strict safety on zero division, allocation.
- *--------------------------------------------------------------------------*/
-
 PG_FUNCTION_INFO_V1(vector_div);
 Datum
 vector_div(PG_FUNCTION_ARGS)
@@ -281,12 +265,6 @@ vector_div(PG_FUNCTION_ARGS)
 
 	PG_RETURN_VECTOR_P(res);
 }
-
-/*----------------------------------------------------------------------------
- * 4. Aggregation Operators: vector_sum, vector_avg
- *    Warning/crash proof, safe for variable-length input arrays.
- *    Proper shape, partial agg logic.
- *--------------------------------------------------------------------------*/
 
 PG_FUNCTION_INFO_V1(vector_avg);
 Datum
@@ -354,10 +332,6 @@ vector_avg(PG_FUNCTION_ARGS)
 	PG_RETURN_VECTOR_P(sumvec);
 }
 
-/*----------------------------------------------------------------------------
- * 5. Set Operators for VECTOR: containment, overlap
- *    All explicit checking for safety and dimension.
- *--------------------------------------------------------------------------*/
 PG_FUNCTION_INFO_V1(vector_contains);
 Datum
 vector_contains(PG_FUNCTION_ARGS)

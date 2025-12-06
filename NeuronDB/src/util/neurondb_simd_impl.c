@@ -16,10 +16,8 @@
 
 #include "postgres.h"
 
-/* Forward declaration */
 double		neurondb_l2_distance_squared(const float *a, const float *b, int n);
 
-/* Include SIMD headers for architecture detection */
 #ifdef __AVX2__
 #include <immintrin.h>
 #define NEURONDB_HAS_AVX2 1
@@ -34,7 +32,6 @@ double		neurondb_l2_distance_squared(const float *a, const float *b, int n);
 #define NEURONDB_HAS_NEON 0
 #endif
 
-/* External definition for neurondb_l2_distance_squared */
 __attribute__((visibility("default")))
 double
 neurondb_l2_distance_squared(const float *a, const float *b, int n)

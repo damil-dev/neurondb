@@ -47,13 +47,12 @@ typedef struct NeuronDBConfigOpt
 	const char *description;
 	const char *default_value;
 	ConfigType	type;
-	const char *guc_var;		/* NULL if purely virtual config variable */
-	const char **enum_values;	/* For enum type variables */
+	const char *guc_var;
+	const char **enum_values;
 }			NeuronDBConfigOpt;
 
 static const char *wal_compression_enums[] = {"on", "off", NULL};
 
-/* Full configuration catalog of supported NeuronDB options */
 static const NeuronDBConfigOpt neuron_config_catalog[] = {
 	{"ef_construction",
 		"Index",
@@ -118,10 +117,9 @@ static const NeuronDBConfigOpt neuron_config_catalog[] = {
 		NEURON_GUC_BOOL,
 		NDB_GUC_USE_GPU,
 	NULL},
-	{NULL, NULL, NULL, NULL, 0, NULL, NULL} /* List terminator */
+	{NULL, NULL, NULL, NULL, 0, NULL, NULL}
 };
 
-/* Utility: Lookup option by name (case-insensitive) */
 static const NeuronDBConfigOpt *
 get_config_opt(const char *name)
 {
@@ -136,7 +134,6 @@ get_config_opt(const char *name)
 	return NULL;
 }
 
-/* Utility: Validate and apply a string to a GUC, according to type */
 static void
 set_neurondb_guc(const NeuronDBConfigOpt * opt, const char *value)
 {
@@ -247,7 +244,9 @@ set_neurondb_guc(const NeuronDBConfigOpt * opt, const char *value)
 	}
 }
 
-/* Utility: Read GUC as string representation */
+/*
+ * get_neurondb_guc - Read GUC value as string representation
+ */
 static char *
 get_neurondb_guc(const NeuronDBConfigOpt * opt)
 {
@@ -261,8 +260,6 @@ get_neurondb_guc(const NeuronDBConfigOpt * opt)
 
 	return val ? pstrdup(val) : NULL;
 }
-
-/* ========== SHOW ALL CONFIGURATION ========== */
 
 PG_FUNCTION_INFO_V1(show_vector_config);
 
@@ -295,7 +292,6 @@ show_vector_config(PG_FUNCTION_ARGS)
 		funcctx->tuple_desc = BlessTupleDesc(tupdesc);
 		funcctx->max_calls = 0;
 
-		/* Set pointer to step through catalog during iteration */
 		oldcontext =
 			MemoryContextSwitchTo(funcctx->multi_call_memory_ctx);
 		funcctx->user_fctx = (void *) &neuron_config_catalog[0];
@@ -309,7 +305,6 @@ show_vector_config(PG_FUNCTION_ARGS)
 	if (!catalog_row || !catalog_row->name)
 		SRF_RETURN_DONE(funcctx);
 
-	/* Compose 'name=value' as in SHOW ALL GUCs */
 	initStringInfo(&valbuf);
 	curr_value = get_neurondb_guc(catalog_row);
 	appendStringInfo(&valbuf,
@@ -324,13 +319,10 @@ show_vector_config(PG_FUNCTION_ARGS)
 
 	tuple = heap_form_tuple(funcctx->tuple_desc, values, nulls);
 
-	/* Move to next catalog entry */
 	funcctx->user_fctx = (void *) (catalog_row + 1);
 
 	SRF_RETURN_NEXT(funcctx, HeapTupleGetDatum(tuple));
 }
-
-/* ========== SET CONFIG PARAMETER ========== */
 
 PG_FUNCTION_INFO_V1(set_vector_config);
 
@@ -356,11 +348,8 @@ set_vector_config(PG_FUNCTION_ARGS)
 
 	set_neurondb_guc(opt, value_str);
 
-
 	PG_RETURN_BOOL(true);
 }
-
-/* ========== GET CONFIG PARAMETER ========== */
 
 PG_FUNCTION_INFO_V1(get_vector_config);
 
@@ -391,8 +380,6 @@ get_vector_config(PG_FUNCTION_ARGS)
 
 	PG_RETURN_TEXT_P(cstring_to_text(curr_value));
 }
-
-/* ========== RESET ALL CONFIGURATION TO DEFAULTS ========== */
 
 PG_FUNCTION_INFO_V1(reset_vector_config);
 

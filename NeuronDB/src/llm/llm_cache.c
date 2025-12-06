@@ -41,8 +41,6 @@
 #include "neurondb_constants.h"
 #include "neurondb_json.h"
 
-/* ndb_json_quote_string is now replaced by ndb_json_quote_string from neurondb_json.h */
-/* Unused function - kept for reference */
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-function"
 static char *
@@ -474,11 +472,7 @@ ndb_llm_cache_stats(PG_FUNCTION_ARGS)
 
 PG_FUNCTION_INFO_V1(ndb_llm_cache_clear);
 /*
- * ndb_llm_cache_clear
- *    Clear all cache entries or entries matching a pattern.
- *
- * pattern: TEXT (optional, NULL clears all)
- * Returns: INTEGER (number of entries cleared)
+ * ndb_llm_cache_clear - Clear all cache entries or entries matching a pattern
  */
 Datum
 ndb_llm_cache_clear(PG_FUNCTION_ARGS)
@@ -532,10 +526,7 @@ ndb_llm_cache_clear(PG_FUNCTION_ARGS)
 
 PG_FUNCTION_INFO_V1(ndb_llm_cache_evict_stale);
 /*
- * ndb_llm_cache_evict_stale
- *    Evict stale cache entries (older than TTL).
- *
- * Returns: INTEGER (number of entries evicted)
+ * ndb_llm_cache_evict_stale - Evict stale cache entries
  */
 Datum
 ndb_llm_cache_evict_stale(PG_FUNCTION_ARGS)
@@ -574,11 +565,7 @@ ndb_llm_cache_evict_stale(PG_FUNCTION_ARGS)
 
 PG_FUNCTION_INFO_V1(ndb_llm_cache_evict_size);
 /*
- * ndb_llm_cache_evict_size
- *    Evict cache entries to maintain max_size limit (LRU eviction).
- *
- * max_size: INTEGER
- * Returns: INTEGER (number of entries evicted)
+ * ndb_llm_cache_evict_size - Evict cache entries to maintain max_size limit
  */
 Datum
 ndb_llm_cache_evict_size(PG_FUNCTION_ARGS)
@@ -599,12 +586,7 @@ ndb_llm_cache_evict_size(PG_FUNCTION_ARGS)
 
 PG_FUNCTION_INFO_V1(ndb_llm_cache_warm);
 /*
- * ndb_llm_cache_warm
- *    Pre-populate cache with embeddings for given texts and model.
- *
- * texts: TEXT[]
- * model: TEXT (optional)
- * Returns: INTEGER (number of entries cached)
+ * ndb_llm_cache_warm - Pre-populate cache with embeddings
  */
 Datum
 ndb_llm_cache_warm(PG_FUNCTION_ARGS)

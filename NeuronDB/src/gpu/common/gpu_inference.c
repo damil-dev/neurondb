@@ -26,9 +26,6 @@
 #include <onnxruntime_cxx_api.h>
 #endif
 
-/*
- * GPU ONNX inference
- */
 void
 neurondb_gpu_onnx_inference(void *model_handle,
 							const float *input,
@@ -44,7 +41,6 @@ neurondb_gpu_onnx_inference(void *model_handle,
 	(void) output;
 	(void) output_size;
 
-	/* CPU mode: never run GPU code */
 	if (NDB_COMPUTE_MODE_IS_CPU())
 		return;
 
