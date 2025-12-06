@@ -38,9 +38,9 @@ ndb_rocm_lr_pack_model(const LRModel *model,
 					   char **errstr)
 {
 	size_t		payload_bytes;
-	char	   *base;
-	NdbCudaLrModelHeader *hdr;
-	float	   *weights_dest;
+	char	   *base = NULL;
+	NdbCudaLrModelHeader *hdr = NULL;
+	float	   *weights_dest = NULL;
 
 	if (errstr)
 		*errstr = NULL;

@@ -807,7 +807,7 @@ typedef struct AutoencoderLayer
 	int			n_inputs;
 	int			n_outputs;
 	float	  **weights;		/* [n_outputs][n_inputs+1] (includes bias) */
-	float *activations;
+	float *activations = NULL;
 	float *deltas;
 }			AutoencoderLayer;
 

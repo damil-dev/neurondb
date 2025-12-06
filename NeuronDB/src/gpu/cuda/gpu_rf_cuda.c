@@ -149,10 +149,10 @@ ndb_cuda_rf_pack_model(const RFModel *model,
 	size_t		header_bytes;
 	size_t		nodes_bytes;
 	size_t		payload_bytes;
-	char	   *base;
-	NdbCudaRfModelHeader *model_hdr;
-	NdbCudaRfTreeHeader *tree_hdrs;
-	NdbCudaRfNode *nodes;
+	char	   *base = NULL;
+	NdbCudaRfModelHeader *model_hdr = NULL;
+	NdbCudaRfTreeHeader *tree_hdrs = NULL;
+	NdbCudaRfNode *nodes = NULL;
 	bytea	   *blob = NULL;
 	char	   *blob_raw = NULL;
 	int			node_cursor = 0;
@@ -732,7 +732,7 @@ ndb_cuda_rf_predict(const bytea * model_data,
 	int			best_class;
 	int			best_votes;
 	int			effective_dim;
-	RfGpuModelCacheEntry *cache_entry;
+	RfGpuModelCacheEntry *cache_entry = NULL;
 	RfGpuModelCacheKey cache_key;
 	bool		found;
 	NdbCudaRfGpuModel *gpu_model = NULL;
@@ -973,7 +973,7 @@ ndb_cuda_rf_model_upload(const NdbCudaRfNode *nodes,
 						 int majority_class,
 						 NdbCudaRfGpuModel **out_model)
 {
-	NdbCudaRfGpuModel *model;
+	NdbCudaRfGpuModel *model = NULL;
 	cudaError_t status;
 	int			total_nodes = 0;
 	int			i;
@@ -1221,7 +1221,7 @@ ndb_cuda_rf_predict_batch(const bytea * model_data,
 	const NdbCudaRfNode *nodes_base;
 	size_t		header_bytes;
 	int			effective_dim;
-	RfGpuModelCacheEntry *cache_entry;
+	RfGpuModelCacheEntry *cache_entry = NULL;
 	RfGpuModelCacheKey cache_key;
 	bool		found;
 	NdbCudaRfGpuModel *gpu_model = NULL;

@@ -53,11 +53,11 @@ ndb_cuda_knn_pack(const struct KNNModel *model,
 	size_t		payload_bytes;
 	size_t		features_bytes;
 	size_t		labels_bytes;
-	bytea	   *blob;
-	char	   *base;
-	NdbCudaKnnModelHeader *hdr;
-	float	   *features_dest;
-	double	   *labels_dest;
+	bytea	   *blob = NULL;
+	char	   *base = NULL;
+	NdbCudaKnnModelHeader *hdr = NULL;
+	float	   *features_dest = NULL;
+	double	   *labels_dest = NULL;
 
 	if (errstr)
 		*errstr = NULL;
@@ -461,7 +461,7 @@ ndb_cuda_knn_predict(const bytea * model_data,
 					 char **errstr)
 {
 	const char *base;
-	NdbCudaKnnModelHeader *hdr;
+	NdbCudaKnnModelHeader *hdr = NULL;
 	const float *training_features;
 	const double *training_labels;
 	float	   *distances = NULL;

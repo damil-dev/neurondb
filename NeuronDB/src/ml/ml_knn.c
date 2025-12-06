@@ -2746,7 +2746,7 @@ cpu_evaluation_path:
 				TupleDesc	tupdesc = SPI_tuptable->tupdesc;
 				Datum		feat_datum;
 				bool		feat_null;
-				Vector	   *vec;
+				Vector	   *vec = NULL;
 				int			actual_dim = 0;
 
 				feat_datum = SPI_getbinval(tuple, tupdesc, 1, &feat_null);
@@ -2985,8 +2985,8 @@ cpu_evaluation_path:
 /* GPU Model State */
 typedef struct KnnGpuModelState
 {
-	bytea	   *model_blob;
-	Jsonb	   *metrics;
+	bytea	   *model_blob = NULL;
+	Jsonb	   *metrics = NULL;
 	int			feature_dim;
 	int			n_samples;
 	int			k;
@@ -3181,7 +3181,7 @@ knn_gpu_evaluate(const MLGpuModel *model,
 				 char **errstr)
 {
 	const		KnnGpuModelState *state;
-	Jsonb	   *metrics_json;
+	Jsonb	   *metrics_json = NULL;
 
 	if (errstr != NULL)
 		*errstr = NULL;
@@ -3235,7 +3235,7 @@ knn_gpu_serialize(const MLGpuModel *model,
 				  char **errstr)
 {
 	const		KnnGpuModelState *state;
-	bytea	   *payload_copy;
+	bytea	   *payload_copy = NULL;
 	int			payload_size;
 
 	if (errstr != NULL)

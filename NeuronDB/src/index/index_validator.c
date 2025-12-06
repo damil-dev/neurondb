@@ -1236,7 +1236,20 @@ PG_FUNCTION_INFO_V1(index_statistics);
 Datum
 index_statistics(PG_FUNCTION_ARGS)
 {
-	text	   *index_name;
+	text	   *index_name = NULL;
+	char	   *idx_name = NULL;
+	Oid			indexOid;
+	Relation	indexRel;
+	DiagResult *diag = NULL;
+	StringInfoData json_buf;
+	Jsonb	   *result_jsonb = NULL;
+	int64		total_blocks;
+	int64		index_size_bytes;
+	int64		heap_size_bytes;
+	int64		total_tuples;
+	int64		dead_tuples;
+	float4		fragmentation;
+	char	   *index_type = "unknown";
 
 	/* Validate argument count */
 	if (PG_NARGS() != 1)
@@ -1245,19 +1258,6 @@ index_statistics(PG_FUNCTION_ARGS)
 				 errmsg("neurondb: index_statistics requires 1 argument")));
 
 	index_name = PG_GETARG_TEXT_P(0);
-	char *idx_name = NULL;
-	Oid			indexOid;
-	Relation	indexRel;
-	DiagResult *diag = NULL;
-	StringInfoData json_buf;
-	Jsonb *result_jsonb = NULL;
-	int64		total_blocks;
-	int64		index_size_bytes;
-	int64		heap_size_bytes;
-	int64		total_tuples;
-	int64		dead_tuples;
-	float4		fragmentation;
-	char	   *index_type = "unknown";
 
 	idx_name = text_to_cstring(index_name);
 
@@ -1388,7 +1388,19 @@ PG_FUNCTION_INFO_V1(index_health);
 Datum
 index_health(PG_FUNCTION_ARGS)
 {
-	text	   *index_name;
+	text	   *index_name = NULL;
+	char	   *idx_name = NULL;
+	Oid			indexOid;
+	Relation	indexRel;
+	DiagResult *diag = NULL;
+	StringInfoData json_buf;
+	Jsonb	   *result_jsonb = NULL;
+	float4		health_score;
+	char	   *health_status = NULL;
+	int64		total_tuples;
+	int64		dead_tuples;
+	float4		fragmentation;
+	int64		orphan_nodes;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 1)
@@ -1397,18 +1409,6 @@ index_health(PG_FUNCTION_ARGS)
 				 errmsg("neurondb: index_health requires 1 argument")));
 
 	index_name = PG_GETARG_TEXT_P(0);
-	char *idx_name = NULL;
-	Oid			indexOid;
-	Relation	indexRel;
-	DiagResult *diag = NULL;
-	StringInfoData json_buf;
-	Jsonb *result_jsonb = NULL;
-	float4		health_score;
-	char *health_status = NULL;
-	int64		total_tuples;
-	int64		dead_tuples;
-	float4		fragmentation;
-	int64		orphan_nodes;
 
 	idx_name = text_to_cstring(index_name);
 
@@ -1505,7 +1505,20 @@ PG_FUNCTION_INFO_V1(index_rebuild_recommendation);
 Datum
 index_rebuild_recommendation(PG_FUNCTION_ARGS)
 {
-	text	   *index_name;
+	text	   *index_name = NULL;
+	char	   *idx_name = NULL;
+	Oid			indexOid;
+	Relation	indexRel;
+	DiagResult *diag = NULL;
+	StringInfoData json_buf;
+	Jsonb	   *result_jsonb = NULL;
+	bool		should_rebuild = false;
+	char	   *rebuild_reason = NULL;
+	float4		dead_ratio;
+	float4		fragmentation;
+	int64		orphan_nodes;
+	int64		days_since_last_rebuild = 0;
+	TimestampTz last_rebuild_time = 0;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 1)
@@ -1514,19 +1527,6 @@ index_rebuild_recommendation(PG_FUNCTION_ARGS)
 				 errmsg("neurondb: index_rebuild_recommendation requires 1 argument")));
 
 	index_name = PG_GETARG_TEXT_P(0);
-	char *idx_name = NULL;
-	Oid			indexOid;
-	Relation	indexRel;
-	DiagResult *diag = NULL;
-	StringInfoData json_buf;
-	Jsonb *result_jsonb = NULL;
-	bool		should_rebuild = false;
-	char	   *rebuild_reason = NULL;
-	float4		dead_ratio;
-	float4		fragmentation;
-	int64		orphan_nodes;
-	int64		days_since_last_rebuild = 0;
-	TimestampTz last_rebuild_time = 0;
 
 	idx_name = text_to_cstring(index_name);
 

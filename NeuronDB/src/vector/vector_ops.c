@@ -33,7 +33,7 @@ PG_FUNCTION_INFO_V1(vector_get);
 Datum
 vector_get(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
+	Vector	   *v = NULL;
 	int32		idx;
 
 	/* Validate argument count */
@@ -64,7 +64,7 @@ PG_FUNCTION_INFO_V1(vector_set);
 Datum
 vector_set(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
+	Vector	   *v = NULL;
 	int32		idx;
 	float4		val;
 	Vector *result = NULL;
@@ -128,7 +128,7 @@ PG_FUNCTION_INFO_V1(vector_append);
 Datum
 vector_append(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
+	Vector	   *v = NULL;
 	float4		val;
 
 	Vector *result = NULL;
@@ -156,7 +156,7 @@ Datum
 vector_prepend(PG_FUNCTION_ARGS)
 {
 	float4		val;
-	Vector	   *v;
+	Vector	   *v = NULL;
 	Vector *result = NULL;
 
 	/* Validate argument count */
@@ -180,7 +180,7 @@ PG_FUNCTION_INFO_V1(vector_abs);
 Datum
 vector_abs(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
+	Vector	   *v = NULL;
 	Vector *result = NULL;
 
 	int			i;
@@ -205,7 +205,7 @@ PG_FUNCTION_INFO_V1(vector_square);
 Datum
 vector_square(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
+	Vector	   *v = NULL;
 	Vector *result = NULL;
 
 	int			i;
@@ -230,7 +230,7 @@ PG_FUNCTION_INFO_V1(vector_sqrt);
 Datum
 vector_sqrt(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
+	Vector	   *v = NULL;
 	Vector *result = NULL;
 
 	int			i;
@@ -292,7 +292,7 @@ PG_FUNCTION_INFO_V1(vector_hadamard);
 Datum
 vector_hadamard(PG_FUNCTION_ARGS)
 {
-	Vector	   *a;
+	Vector	   *a = NULL;
 	Vector *b = NULL;
 	Vector *result = NULL;
 	int			i;
@@ -324,7 +324,7 @@ PG_FUNCTION_INFO_V1(vector_divide);
 Datum
 vector_divide(PG_FUNCTION_ARGS)
 {
-	Vector	   *a;
+	Vector	   *a = NULL;
 	Vector *b = NULL;
 	Vector *result = NULL;
 	int			i;
@@ -362,7 +362,7 @@ PG_FUNCTION_INFO_V1(vector_mean);
 Datum
 vector_mean(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
+	Vector	   *v = NULL;
 	double		sum = 0.0;
 	int			i;
 
@@ -396,7 +396,7 @@ PG_FUNCTION_INFO_V1(vector_variance);
 Datum
 vector_variance(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
+	Vector	   *v = NULL;
 	double		mean = 0.0;
 	double		variance = 0.0;
 	int			i;
@@ -439,7 +439,7 @@ PG_FUNCTION_INFO_V1(vector_stddev);
 Datum
 vector_stddev(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
+	Vector	   *v = NULL;
 	double		mean = 0.0;
 	double		variance = 0.0;
 	int			i;
@@ -482,7 +482,7 @@ PG_FUNCTION_INFO_V1(vector_min);
 Datum
 vector_min(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
+	Vector	   *v = NULL;
 	float4		min_val;
 	int			i;
 
@@ -517,7 +517,7 @@ PG_FUNCTION_INFO_V1(vector_max);
 Datum
 vector_max(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
+	Vector	   *v = NULL;
 	float4		max_val;
 	int			i;
 
@@ -552,7 +552,7 @@ PG_FUNCTION_INFO_V1(vector_sum);
 Datum
 vector_sum(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
+	Vector	   *v = NULL;
 	double		sum = 0.0;
 
 	int			i;
@@ -576,8 +576,8 @@ PG_FUNCTION_INFO_V1(vector_eq);
 Datum
 vector_eq(PG_FUNCTION_ARGS)
 {
-	Vector	   *a;
-	Vector	   *b;
+	Vector	   *a = NULL;
+	Vector	   *b = NULL;
 	int			i;
 
 	/* Validate argument count */
@@ -632,7 +632,7 @@ PG_FUNCTION_INFO_V1(vector_hash);
 Datum
 vector_hash(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
+	Vector	   *v = NULL;
 	uint32		hash = 5381;	/* DJB hash seed */
 	int			i;
 

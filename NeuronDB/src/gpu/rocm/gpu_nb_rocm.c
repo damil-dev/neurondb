@@ -55,11 +55,11 @@ ndb_rocm_nb_pack_model(const GaussianNBModel * model,
 	size_t		priors_bytes;
 	size_t		means_bytes;
 	size_t		variances_bytes;
-	char	   *base;
-	NdbCudaNbModelHeader *hdr;
-	double	   *priors_dest;
-	double	   *means_dest;
-	double	   *variances_dest;
+	char	   *base = NULL;
+	NdbCudaNbModelHeader *hdr = NULL;
+	double	   *priors_dest = NULL;
+	double	   *means_dest = NULL;
+	double	   *variances_dest = NULL;
 	int			i,
 				j;
 
@@ -525,11 +525,11 @@ ndb_rocm_nb_predict(const bytea * model_data,
 					char **errstr)
 {
 	const char *base;
-	NdbCudaNbModelHeader *hdr;
+	NdbCudaNbModelHeader *hdr = NULL;
 	const double *priors;
 	const double *means;
 	const double *variances;
-	double	   *class_log_probs;
+	double	   *class_log_probs = NULL;
 	double		max_log_prob;
 	int			best_class;
 	int			i,

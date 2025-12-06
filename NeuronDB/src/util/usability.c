@@ -30,9 +30,9 @@ create_model(PG_FUNCTION_ARGS)
 	char	   *name_str = NULL;
 	char	   *type_str = NULL;
 	NdbSpiSession *session = NULL;
-	text	   *config_json;
-	text	   *model_name;
-	text	   *model_type;
+	text	   *config_json = NULL;
+	text	   *model_name = NULL;
+	text	   *model_type = NULL;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 3)
@@ -72,7 +72,7 @@ drop_model(PG_FUNCTION_ARGS)
 {
 	char	   *name_str = NULL;
 	NdbSpiSession *session2 = NULL;
-	text	   *model_name;
+	text	   *model_name = NULL;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 1)
@@ -101,11 +101,11 @@ PG_FUNCTION_INFO_V1(create_ann_index);
 Datum
 create_ann_index(PG_FUNCTION_ARGS)
 {
-	text	   *index_name;
-	text	   *table_name;
-	text	   *column_name;
-	text	   *index_type;
-	text	   *options;
+	text	   *index_name = NULL;
+	text	   *table_name = NULL;
+	text	   *column_name = NULL;
+	text	   *index_type = NULL;
+	text	   *options = NULL;
 	char *idx_str = NULL;
 	char *tbl_str = NULL;
 	char *col_str = NULL;
@@ -144,7 +144,7 @@ PG_FUNCTION_INFO_V1(explain_vector_query);
 Datum
 explain_vector_query(PG_FUNCTION_ARGS)
 {
-	text	   *query;
+	text	   *query = NULL;
 
 	char *query_str = NULL;
 
@@ -188,7 +188,7 @@ PG_FUNCTION_INFO_V1(neurondb_api_docs);
 Datum
 neurondb_api_docs(PG_FUNCTION_ARGS)
 {
-	text	   *function_name;
+	text	   *function_name = NULL;
 
 	char *func_str = NULL;
 	StringInfoData docs;

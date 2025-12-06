@@ -74,8 +74,8 @@ PG_FUNCTION_INFO_V1(vector_l2_distance);
 Datum
 vector_l2_distance(PG_FUNCTION_ARGS)
 {
-	Vector	   *a;
-	Vector	   *b;
+	Vector	   *a = NULL;
+	Vector	   *b = NULL;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 2)
@@ -109,8 +109,8 @@ PG_FUNCTION_INFO_V1(vector_inner_product);
 Datum
 vector_inner_product(PG_FUNCTION_ARGS)
 {
-	Vector	   *a;
-	Vector	   *b;
+	Vector	   *a = NULL;
+	Vector	   *b = NULL;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 2)
@@ -161,8 +161,8 @@ PG_FUNCTION_INFO_V1(vector_cosine_distance);
 Datum
 vector_cosine_distance(PG_FUNCTION_ARGS)
 {
-	Vector	   *a;
-	Vector	   *b;
+	Vector	   *a = NULL;
+	Vector	   *b = NULL;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 2)
@@ -197,8 +197,8 @@ PG_FUNCTION_INFO_V1(vector_l1_distance);
 Datum
 vector_l1_distance(PG_FUNCTION_ARGS)
 {
-	Vector	   *a;
-	Vector	   *b;
+	Vector	   *a = NULL;
+	Vector	   *b = NULL;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 2)
@@ -219,8 +219,8 @@ PG_FUNCTION_INFO_V1(vector_hamming_distance);
 Datum
 vector_hamming_distance(PG_FUNCTION_ARGS)
 {
-	Vector	   *a;
-	Vector	   *b;
+	Vector	   *a = NULL;
+	Vector	   *b = NULL;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 2)
@@ -256,8 +256,8 @@ PG_FUNCTION_INFO_V1(vector_chebyshev_distance);
 Datum
 vector_chebyshev_distance(PG_FUNCTION_ARGS)
 {
-	Vector	   *a;
-	Vector	   *b;
+	Vector	   *a = NULL;
+	Vector	   *b = NULL;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 2)
@@ -291,8 +291,8 @@ PG_FUNCTION_INFO_V1(vector_minkowski_distance);
 Datum
 vector_minkowski_distance(PG_FUNCTION_ARGS)
 {
-	Vector	   *a;
-	Vector	   *b;
+	Vector	   *a = NULL;
+	Vector	   *b = NULL;
 	float8		p;
 
 	/* Validate argument count */

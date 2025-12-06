@@ -136,12 +136,12 @@ typedef struct HnswSearchState
 	int			candidateCount;
 	int			candidateCapacity;
 
-	HnswSearchElement *visited; /* Visited nodes */
+	HnswSearchElement *visited;
 	int			visitedCount;
 	int			visitedCapacity;
 
 	/* Result set */
-	HnswSearchElement *results; /* Top-k results */
+	HnswSearchElement *results;
 	int			resultCount;
 }			HnswSearchState;
 
@@ -653,7 +653,7 @@ hnswSearchLayer0(Relation index,
 				 float4 * *distances,
 				 int *resultCount)
 {
-	HnswSearchState *state;
+	HnswSearchState *state = NULL;
 	BlockNumber block;
 	float4		distance;
 	int			i;

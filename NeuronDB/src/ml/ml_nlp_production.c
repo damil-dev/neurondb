@@ -626,7 +626,7 @@ nlp_production_gpu_evaluate(const MLGpuModel *model, const MLGpuEvalSpec *spec,
 							MLGpuMetrics *out, char **errstr)
 {
 	const		NLPProductionGpuModelState *state;
-	Jsonb	   *metrics_json;
+	Jsonb	   *metrics_json = NULL;
 	StringInfoData buf;
 
 	if (errstr != NULL)
@@ -713,7 +713,7 @@ static bool
 nlp_production_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 							   const Jsonb * metadata, char **errstr)
 {
-	NLPProductionGpuModelState *state;
+	NLPProductionGpuModelState *state = NULL;
 	bytea *payload_copy = NULL;
 	char *payload_copy_raw = NULL;
 	int			payload_size;

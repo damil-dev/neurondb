@@ -70,7 +70,7 @@ static IsolationNode *
 build_isolation_tree(float **data, int *indices, int n_points, int dim,
 					 int current_depth, int max_depth)
 {
-	IsolationNode *node;
+	IsolationNode *node = NULL;
 	int			i,
 				d;
 	float		min_val,

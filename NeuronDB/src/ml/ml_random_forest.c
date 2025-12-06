@@ -3271,7 +3271,7 @@ train_random_forest_classifier(PG_FUNCTION_ARGS)
 					   forest_oob_accuracy);
 
 		{
-			RFModel    *stored_model;
+			RFModel    *stored_model = NULL;
 			MLCatalogModelSpec spec;
 
 			bytea *serialized = NULL;
@@ -5094,7 +5094,7 @@ evaluate_random_forest_by_model_id(PG_FUNCTION_ARGS)
 
 						/* Suppress shadow warnings from nested PG_TRY blocks */
 #pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wshadow=compatible-local"
+#pragma GCC diagnostic ignored "-Wshadow"
 						PG_TRY();
 						{
 							(void) pushJsonbValue(&state, WJB_BEGIN_OBJECT, NULL);
@@ -7434,7 +7434,7 @@ rf_gpu_evaluate(const MLGpuModel *model,
 				char **errstr)
 {
 	const		RFGpuModelState *state;
-	Jsonb	   *metrics_json;
+	Jsonb	   *metrics_json = NULL;
 	StringInfoData buf;
 
 	if (errstr != NULL)
@@ -7482,7 +7482,7 @@ rf_gpu_serialize(const MLGpuModel *model,
 				 char **errstr)
 {
 	const		RFGpuModelState *state;
-	bytea	   *payload_copy;
+	bytea	   *payload_copy = NULL;
 	int			payload_size;
 
 	if (errstr != NULL)

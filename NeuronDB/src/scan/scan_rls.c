@@ -420,8 +420,8 @@ ndb_rls_filter_results(Relation rel,
 					   ItemPointer * *filtered,
 					   int *filteredCount)
 {
-	RLSFilterState *rlsState;
-	ItemPointer *result;
+	RLSFilterState *rlsState = NULL;
+	ItemPointer *result = NULL;
 	int			resultCount = 0;
 	int			i;
 

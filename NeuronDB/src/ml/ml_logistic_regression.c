@@ -185,9 +185,9 @@ train_logistic_regression(PG_FUNCTION_ARGS)
 	LRStreamAccum stream_accum;
 	MLGpuTrainResult gpu_result;
 	StringInfoData hyperbuf = {0};
-	text	   *feature_col;
-	text	   *table_name;
-	text	   *target_col;
+	text	   *feature_col = NULL;
+	text	   *table_name = NULL;
+	text	   *target_col = NULL;
 
 	/* Initialize gpu_result to zero to avoid undefined behavior */
 	memset(&gpu_result, 0, sizeof(MLGpuTrainResult));
@@ -630,9 +630,9 @@ train_logistic_regression(PG_FUNCTION_ARGS)
 
 						bytea *unified_model_data = NULL;
 						Jsonb *updated_metrics = NULL;
-						char	   *base;
-						NdbCudaLrModelHeader *hdr;
-						float	   *weights_src;
+						char	   *base = NULL;
+						NdbCudaLrModelHeader *hdr = NULL;
+						float	   *weights_src = NULL;
 						int			i;
 						double		accuracy = 0.0;
 
@@ -1127,8 +1127,8 @@ train_logistic_regression(PG_FUNCTION_ARGS)
 					Datum		targ_datum;
 					bool		feat_null;
 					bool		targ_null;
-					Vector	   *vec;
-					ArrayType  *arr;
+					Vector	   *vec = NULL;
+					ArrayType  *arr = NULL;
 					double		y_true;
 					double		z;
 					double		prediction;
@@ -1250,7 +1250,7 @@ train_logistic_regression(PG_FUNCTION_ARGS)
 	/* Build LRModel and register in catalog */
 	{
 		LRModel		model;
-		bytea	   *serialized;
+		bytea	   *serialized = NULL;
 		MLCatalogModelSpec spec;
 
 		/* Build model struct */
@@ -1350,11 +1350,11 @@ PG_FUNCTION_INFO_V1(predict_logistic_regression);
 Datum
 predict_logistic_regression(PG_FUNCTION_ARGS)
 {
-	ArrayType  *coef_array;
-	Vector	   *features;
+	ArrayType  *coef_array = NULL;
+	Vector	   *features = NULL;
 	int			ncoef;
-	float8	   *coef;
-	float	   *x;
+	float8	   *coef = NULL;
+	float	   *x = NULL;
 	int			dim;
 	double		z;
 	double		probability;
@@ -1405,7 +1405,7 @@ Datum
 predict_logistic_regression_model_id(PG_FUNCTION_ARGS)
 {
 	int32		model_id;
-	Vector	   *features;
+	Vector	   *features = NULL;
 
 	LRModel *model = NULL;
 	double		probability;
@@ -1496,10 +1496,10 @@ PG_FUNCTION_INFO_V1(evaluate_logistic_regression);
 Datum
 evaluate_logistic_regression(PG_FUNCTION_ARGS)
 {
-	text	   *table_name;
-	text	   *feature_col;
-	text	   *target_col;
-	ArrayType  *coef_array;
+	text	   *table_name = NULL;
+	text	   *feature_col = NULL;
+	text	   *target_col = NULL;
+	ArrayType  *coef_array = NULL;
 	double		threshold = PG_GETARG_FLOAT8(4);
 	char *tbl_str = NULL;
 	char *feat_str = NULL;
@@ -1508,7 +1508,7 @@ evaluate_logistic_regression(PG_FUNCTION_ARGS)
 	int			ret;
 	int			nvec = 0;
 	int			ncoef;
-	float8	   *coef;
+	float8	   *coef = NULL;
 	int			tp = 0,
 				tn = 0,
 				fp = 0,
@@ -1522,7 +1522,7 @@ evaluate_logistic_regression(PG_FUNCTION_ARGS)
 				j;
 
 	Datum *result_datums = NULL;
-	ArrayType  *result_array;
+	ArrayType  *result_array = NULL;
 	MemoryContext oldcontext;
 
 	NdbSpiSession *eval_spi_session = NULL;
@@ -1586,7 +1586,7 @@ evaluate_logistic_regression(PG_FUNCTION_ARGS)
 		Datum		targ_datum;
 		bool		feat_null;
 		bool		targ_null;
-		Vector	   *vec;
+		Vector	   *vec = NULL;
 		double		y_true;
 		double		z;
 		double		probability;
@@ -1703,9 +1703,9 @@ Datum
 evaluate_logistic_regression_by_model_id(PG_FUNCTION_ARGS)
 {
 	int32		model_id;
-	text	   *table_name;
-	text	   *feature_col;
-	text	   *label_col;
+	text	   *table_name = NULL;
+	text	   *feature_col = NULL;
+	text	   *label_col = NULL;
 	double		threshold = PG_ARGISNULL(4) ? 0.5 : PG_GETARG_FLOAT8(4);
 	char *tbl_str = NULL;
 	char *feat_str = NULL;
@@ -1723,7 +1723,7 @@ evaluate_logistic_regression_by_model_id(PG_FUNCTION_ARGS)
 	int			i;
 	Oid			feat_type_oid = InvalidOid;
 	bool		feat_is_array = false;
-	Jsonb	   *result_jsonb;
+	Jsonb	   *result_jsonb = NULL;
 	StringInfoData jsonbuf;
 
 	bytea *gpu_payload = NULL;
@@ -1909,9 +1909,9 @@ evaluate_logistic_regression_by_model_id(PG_FUNCTION_ARGS)
 				Datum		targ_datum;
 				bool		feat_null;
 				bool		targ_null;
-				Vector	   *vec;
-				ArrayType  *arr;
-				float	   *feat_row;
+				Vector	   *vec = NULL;
+				ArrayType  *arr = NULL;
+				float	   *feat_row = NULL;
 
 				if (SPI_tuptable == NULL || SPI_tuptable->vals == NULL || i >= SPI_processed)
 					break;
@@ -2161,9 +2161,7 @@ evaluate_logistic_regression_by_model_id(PG_FUNCTION_ARGS)
 	}
 #ifndef NDB_GPU_CUDA
 	/* When CUDA is not available, always use CPU path */
-	if (false)
-	{
-	}
+	/* Fall through to CPU path */
 #endif
 
 cpu_evaluation_path:
@@ -2288,8 +2286,8 @@ cpu_evaluation_path:
 			Datum		targ_datum;
 			bool		feat_null;
 			bool		targ_null;
-			Vector	   *vec;
-			ArrayType  *arr;
+			Vector	   *vec = NULL;
+			ArrayType  *arr = NULL;
 			int			actual_dim;
 			double		y_true;
 			double		y_pred_prob;
@@ -2594,8 +2592,8 @@ lr_dataset_load_limited(const char *quoted_tbl,
 		TupleDesc	tupdesc = SPI_tuptable->tupdesc;
 		Datum		feat_datum;
 		bool		feat_null;
-		Vector	   *vec;
-		ArrayType  *arr;
+		Vector	   *vec = NULL;
+		ArrayType  *arr = NULL;
 
 		feat_datum = SPI_getbinval(first_tuple, tupdesc, 1, &feat_null);
 		if (!feat_null)
@@ -2643,9 +2641,9 @@ lr_dataset_load_limited(const char *quoted_tbl,
 		Datum		targ_datum;
 		bool		feat_null;
 		bool		targ_null;
-		Vector	   *vec;
-		ArrayType  *arr;
-		float	   *row;
+		Vector	   *vec = NULL;
+		ArrayType  *arr = NULL;
+		float	   *row = NULL;
 
 		feat_datum = SPI_getbinval(tuple, tupdesc, 1, &feat_null);
 		if (feat_null)
@@ -2916,8 +2914,8 @@ lr_stream_process_chunk(const char *quoted_tbl,
 		Datum		targ_datum;
 		bool		feat_null;
 		bool		targ_null;
-		Vector	   *vec;
-		ArrayType  *arr;
+		Vector	   *vec = NULL;
+		ArrayType  *arr = NULL;
 		double		y_true;
 		double		z;
 		double		prediction;
@@ -3167,7 +3165,7 @@ lr_gpu_evaluate(const MLGpuModel *model,
 				char **errstr)
 {
 	const		LRGpuModelState *state;
-	Jsonb	   *metrics_json;
+	Jsonb	   *metrics_json = NULL;
 
 	if (errstr != NULL)
 		*errstr = NULL;
@@ -3235,9 +3233,9 @@ lr_gpu_serialize(const MLGpuModel *model,
 	/* Convert GPU format to unified format */
 	{
 		LRModel		lr_model;
-		char	   *base;
-		NdbCudaLrModelHeader *hdr;
-		float	   *weights_src;
+		char	   *base = NULL;
+		NdbCudaLrModelHeader *hdr = NULL;
+		float	   *weights_src = NULL;
 		double		final_loss = 0.0;
 		double		accuracy = 0.0;
 		int			i;
@@ -3320,7 +3318,7 @@ lr_gpu_serialize(const MLGpuModel *model,
 	if (metadata_out != NULL && state->metrics != NULL)
 	{
 		/* Copy metrics and update training_backend to integer */
-		Jsonb	   *updated_metrics;
+		Jsonb	   *updated_metrics = NULL;
 		StringInfoData metrics_buf;
 
 		initStringInfo(&metrics_buf);
@@ -3359,15 +3357,15 @@ lr_gpu_deserialize(MLGpuModel *model,
 				   char **errstr)
 {
 #ifdef NDB_GPU_CUDA
-	LRGpuModelState *state;
-	LRModel    *lr_model;
+	LRGpuModelState *state = NULL;
+	LRModel    *lr_model = NULL;
 	uint8		training_backend;
-	bytea	   *gpu_payload;
-	char	   *base;
-	float	   *weights_dest;
+	bytea	   *gpu_payload = NULL;
+	char	   *base = NULL;
+	float	   *weights_dest = NULL;
 	size_t		payload_bytes;
 	int			i;
-	NdbCudaLrModelHeader *hdr;
+	NdbCudaLrModelHeader *hdr = NULL;
 #endif
 
 	if (errstr != NULL)
@@ -3589,7 +3587,7 @@ static bool
 lr_metadata_is_gpu(Jsonb * metadata)
 {
 	bool		is_gpu = false;
-	JsonbIterator *it;
+	JsonbIterator *it = NULL;
 	JsonbValue	v;
 	JsonbIteratorToken r;
 
@@ -3689,9 +3687,9 @@ lr_try_gpu_predict_catalog(int32 model_id,
 		uint8		training_backend = 0;
 
 		bytea *gpu_payload = NULL;
-		char	   *base;
-		NdbCudaLrModelHeader *hdr;
-		float	   *weights_dest;
+		char	   *base = NULL;
+		NdbCudaLrModelHeader *hdr = NULL;
+		float	   *weights_dest = NULL;
 		size_t		payload_bytes;
 		int			i;
 
@@ -3822,7 +3820,7 @@ lr_load_model_from_catalog(int32 model_id, LRModel **out)
 {
 	bytea *payload = NULL;
 	Jsonb *metrics = NULL;
-	LRModel    *decoded;
+	LRModel    *decoded = NULL;
 
 	if (out == NULL)
 		return false;

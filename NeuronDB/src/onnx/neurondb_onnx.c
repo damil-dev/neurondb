@@ -194,7 +194,7 @@ neurondb_onnx_load_model(const char *model_path,
 	ONNXModelType model_type,
 	ONNXProvider provider)
 {
-	ONNXModelSession *session;
+	ONNXModelSession *session = NULL;
 	OrtSessionOptions *session_options = NULL;
 	OrtStatus *status = NULL;
 
@@ -653,7 +653,7 @@ ONNXModelSession *
 neurondb_onnx_get_or_load_model(const char *model_name,
 	ONNXModelType model_type)
 {
-	ONNXModelSession *session;
+	ONNXModelSession *session = NULL;
 	char model_path[MAXPGPATH];
 	ONNXProvider provider;
 

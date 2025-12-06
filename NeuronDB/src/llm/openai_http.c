@@ -103,7 +103,7 @@ http_post_json(const char *url,
 	long		code = 0;
 	CURLcode	res = CURLE_OK;
 	int			result = -1;
-	char	   *auth_header_data;
+	char	   *auth_header_data = NULL;
 
 	if (out == NULL)
 		return -1;
@@ -247,8 +247,8 @@ ndb_openai_complete(const NdbLLMConfig *cfg,
 {
 	StringInfoData url,
 				body;
-	char	   *model_quoted;
-	char	   *prompt_quoted;
+	char	   *model_quoted = NULL;
+	char	   *prompt_quoted = NULL;
 
 	initStringInfo(&url);
 	initStringInfo(&body);
@@ -482,8 +482,8 @@ ndb_openai_embed(const NdbLLMConfig *cfg,
 {
 	StringInfoData url,
 				body;
-	char	   *model_quoted;
-	char	   *text_quoted;
+	char	   *model_quoted = NULL;
+	char	   *text_quoted = NULL;
 	char	   *json_resp = NULL;
 	int			http_status;
 
@@ -582,7 +582,7 @@ ndb_openai_embed_batch(const NdbLLMConfig *cfg,
 {
 	StringInfoData url,
 				body;
-	char	   *model_quoted;
+	char	   *model_quoted = NULL;
 	char	   *json_resp = NULL;
 	int			http_status;
 	float	  **vecs = NULL;

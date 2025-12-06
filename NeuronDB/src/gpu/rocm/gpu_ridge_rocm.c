@@ -62,9 +62,9 @@ ndb_rocm_ridge_pack_model(const RidgeModel *model,
 						  char **errstr)
 {
 	size_t		payload_bytes;
-	char	   *base;
-	NdbCudaRidgeModelHeader *hdr;
-	float	   *coef_dest;
+	char	   *base = NULL;
+	NdbCudaRidgeModelHeader *hdr = NULL;
+	float	   *coef_dest = NULL;
 
 	if (errstr)
 		*errstr = NULL;

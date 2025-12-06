@@ -385,8 +385,8 @@ PG_FUNCTION_INFO_V1(vector_contains);
 Datum
 vector_contains(PG_FUNCTION_ARGS)
 {
-	ArrayType  *set1;
-	ArrayType  *set2;
+	ArrayType  *set1 = NULL;
+	ArrayType  *set2 = NULL;
 	int			n1,
 				n2,
 				i2,
@@ -462,8 +462,8 @@ PG_FUNCTION_INFO_V1(vector_overlap);
 Datum
 vector_overlap(PG_FUNCTION_ARGS)
 {
-	ArrayType  *set1;
-	ArrayType  *set2;
+	ArrayType  *set1 = NULL;
+	ArrayType  *set2 = NULL;
 	int			n1,
 				n2,
 				i1,

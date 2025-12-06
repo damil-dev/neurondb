@@ -1905,8 +1905,8 @@ ndb_llm_complete_batch(PG_FUNCTION_ARGS)
 
 		/* Extract prompts from array using deconstruct_array */
 		{
-			Datum *prompt_datums;
-			bool *prompt_nulls;
+			Datum *prompt_datums = NULL;
+			bool *prompt_nulls = NULL;
 			int			nprompt_elems;
 
 			deconstruct_array(prompts_arr,
@@ -2223,8 +2223,8 @@ ndb_llm_rerank_batch(PG_FUNCTION_ARGS)
 
 		/* Extract queries from array using deconstruct_array */
 		{
-			Datum *query_datums;
-			bool *query_nulls;
+			Datum *query_datums = NULL;
+			bool *query_nulls = NULL;
 			int			nquery_elems;
 
 			deconstruct_array(queries_arr,

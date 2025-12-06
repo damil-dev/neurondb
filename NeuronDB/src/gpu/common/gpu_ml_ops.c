@@ -249,7 +249,7 @@ neurondb_gpu_kmeans_update(const float *data,
 	int			i;
 	int			j;
 	int			c;
-	int		   *counts;
+	int		   *counts = NULL;
 
 	/* CPU mode: never run GPU code */
 	if (NDB_COMPUTE_MODE_IS_CPU())

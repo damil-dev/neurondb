@@ -3839,7 +3839,7 @@ neurondb_evaluate(PG_FUNCTION_ARGS)
 
 		/* Suppress shadow warnings from nested PG_TRY blocks */
 #pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wshadow=compatible-local"
+#pragma GCC diagnostic ignored "-Wshadow"
 		PG_TRY();
 		{
 			if (CurrentMemoryContext != ErrorContext)

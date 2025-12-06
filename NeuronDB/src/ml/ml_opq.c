@@ -1394,7 +1394,7 @@ opq_gpu_predict(const MLGpuModel *model, const float *input, int input_dim,
 				float *output, int output_dim, char **errstr)
 {
 	const		OPQGpuModelState *state;
-	PQCodebook *codebook;
+	PQCodebook *codebook = NULL;
 
 	float *rotated_input = NULL;
 	int			sub;
@@ -1525,7 +1525,7 @@ opq_gpu_evaluate(const MLGpuModel *model, const MLGpuEvalSpec *spec,
 				 MLGpuMetrics *out, char **errstr)
 {
 	const		OPQGpuModelState *state;
-	Jsonb	   *metrics_json;
+	Jsonb	   *metrics_json = NULL;
 	StringInfoData buf;
 	double		avg_error = 0.0;
 
@@ -1574,7 +1574,7 @@ opq_gpu_serialize(const MLGpuModel *model, bytea * *payload_out,
 				  Jsonb * *metadata_out, char **errstr)
 {
 	const		OPQGpuModelState *state;
-	bytea	   *payload_copy;
+	bytea	   *payload_copy = NULL;
 	int			payload_size;
 
 	if (errstr != NULL)
@@ -1624,14 +1624,14 @@ static bool
 opq_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 					const Jsonb * metadata, char **errstr)
 {
-	OPQGpuModelState *state;
-	bytea	   *payload_copy;
+	OPQGpuModelState *state = NULL;
+	bytea	   *payload_copy = NULL;
 	int			payload_size;
 	PQCodebook	codebook;
 
-	float	   *rotation_matrix;
+	float	   *rotation_matrix = NULL;
 	int			dim = 0;
-	JsonbIterator *it;
+	JsonbIterator *it = NULL;
 	JsonbValue	v;
 	int			r;
 

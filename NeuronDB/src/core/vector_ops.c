@@ -32,7 +32,7 @@ PG_FUNCTION_INFO_V1(vector_get);
 Datum
 vector_get(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
+	Vector	   *v = NULL;
 	int32		idx;
 
 	/* Validate argument count */
@@ -63,7 +63,7 @@ vector_set(PG_FUNCTION_ARGS)
 	float4		val;
 	int32		idx;
 	Vector	   *result = NULL;
-	Vector	   *v;
+	Vector	   *v = NULL;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 3)
@@ -95,7 +95,7 @@ vector_slice(PG_FUNCTION_ARGS)
 	int32		end;
 	int32		start;
 	Vector	   *result = NULL;
-	Vector	   *v;
+	Vector	   *v = NULL;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 3)
@@ -129,7 +129,7 @@ vector_append(PG_FUNCTION_ARGS)
 {
 	float4		val;
 	Vector	   *result = NULL;
-	Vector	   *v;
+	Vector	   *v = NULL;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 2)
@@ -157,7 +157,7 @@ Datum
 vector_prepend(PG_FUNCTION_ARGS)
 {
 	float4		val;
-	Vector	   *v;
+	Vector	   *v = NULL;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 2)
@@ -185,7 +185,7 @@ PG_FUNCTION_INFO_V1(vector_abs);
 Datum
 vector_abs(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
+	Vector	   *v = NULL;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 1)
@@ -213,7 +213,7 @@ PG_FUNCTION_INFO_V1(vector_square);
 Datum
 vector_square(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
+	Vector	   *v = NULL;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 1)
@@ -241,7 +241,7 @@ PG_FUNCTION_INFO_V1(vector_sqrt);
 Datum
 vector_sqrt(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
+	Vector	   *v = NULL;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 1)
@@ -276,7 +276,7 @@ PG_FUNCTION_INFO_V1(vector_pow);
 Datum
 vector_pow(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
+	Vector	   *v = NULL;
 	float8		exp;
 
 	/* Validate argument count */
@@ -305,8 +305,8 @@ PG_FUNCTION_INFO_V1(vector_hadamard);
 Datum
 vector_hadamard(PG_FUNCTION_ARGS)
 {
-	Vector	   *a;
-	Vector	   *b;
+	Vector	   *a = NULL;
+	Vector	   *b = NULL;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 2)
@@ -341,8 +341,8 @@ PG_FUNCTION_INFO_V1(vector_divide);
 Datum
 vector_divide(PG_FUNCTION_ARGS)
 {
-	Vector	   *a;
-	Vector	   *b;
+	Vector	   *a = NULL;
+	Vector	   *b = NULL;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 2)
@@ -383,7 +383,7 @@ PG_FUNCTION_INFO_V1(vector_mean);
 Datum
 vector_mean(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
+	Vector	   *v = NULL;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 1)
@@ -413,7 +413,7 @@ PG_FUNCTION_INFO_V1(vector_variance);
 Datum
 vector_variance(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
+	Vector	   *v = NULL;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 1)
@@ -452,7 +452,7 @@ PG_FUNCTION_INFO_V1(vector_stddev);
 Datum
 vector_stddev(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
+	Vector	   *v = NULL;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 1)
@@ -491,7 +491,7 @@ PG_FUNCTION_INFO_V1(vector_min);
 Datum
 vector_min(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
+	Vector	   *v = NULL;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 1)
@@ -522,7 +522,7 @@ PG_FUNCTION_INFO_V1(vector_max);
 Datum
 vector_max(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
+	Vector	   *v = NULL;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 1)
@@ -553,7 +553,7 @@ PG_FUNCTION_INFO_V1(vector_sum);
 Datum
 vector_sum(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
+	Vector	   *v = NULL;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 1)
@@ -580,8 +580,8 @@ PG_FUNCTION_INFO_V1(vector_eq);
 Datum
 vector_eq(PG_FUNCTION_ARGS)
 {
-	Vector	   *a;
-	Vector	   *b;
+	Vector	   *a = NULL;
+	Vector	   *b = NULL;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 2)
@@ -623,7 +623,7 @@ PG_FUNCTION_INFO_V1(vector_clip);
 Datum
 vector_clip(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
+	Vector	   *v = NULL;
 	float4		min_val;
 	float4		max_val;
 
@@ -666,7 +666,7 @@ PG_FUNCTION_INFO_V1(vector_standardize);
 Datum
 vector_standardize(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
+	Vector	   *v = NULL;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 1)
@@ -725,7 +725,7 @@ PG_FUNCTION_INFO_V1(vector_minmax_normalize);
 Datum
 vector_minmax_normalize(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
+	Vector	   *v = NULL;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 1)

@@ -304,7 +304,7 @@ process_llm_job(int job_id, const char *job_type, const char *payload)
 		{
 			const char *prompt = (const char *) payload;
 			int			print_dim;
-			char	   *vec_str;
+			char	   *vec_str = NULL;
 			char		cache_key[256];
 
 			if (strcmp(job_type, "complete") == 0)

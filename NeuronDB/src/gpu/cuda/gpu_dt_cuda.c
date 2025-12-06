@@ -121,10 +121,10 @@ ndb_cuda_dt_pack_model(const DTModel *model,
 	size_t		header_bytes;
 	size_t		nodes_bytes;
 	size_t		payload_bytes;
-	bytea	   *blob;
-	char	   *base;
-	NdbCudaDtModelHeader *hdr;
-	NdbCudaDtNode *nodes;
+	bytea	   *blob = NULL;
+	char	   *base = NULL;
+	NdbCudaDtModelHeader *hdr = NULL;
+	NdbCudaDtNode *nodes = NULL;
 	int			node_idx = 0;
 	char	   *blob_raw = NULL;
 

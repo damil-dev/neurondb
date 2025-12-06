@@ -3300,8 +3300,8 @@ ndb_cuda_hf_rerank(const char *model_name,
 				   float **scores_out,
 				   char **errstr)
 {
-	NdbCudaHfModelEntry *entry;
-	float	   *scores;
+	NdbCudaHfModelEntry *entry = NULL;
+	float	   *scores = NULL;
 	int			i;
 	int			rc;
 	cudaError_t cuda_err;
@@ -3767,7 +3767,7 @@ ndb_cuda_hf_get_model_config(const char *model_name,
 							 NdbCudaHfModelConfig *config,
 							 char **errstr)
 {
-	NdbCudaHfModelEntry *entry;
+	NdbCudaHfModelEntry *entry = NULL;
 
 	if (errstr)
 		*errstr = NULL;

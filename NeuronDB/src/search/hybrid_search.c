@@ -92,29 +92,28 @@ hybrid_search(PG_FUNCTION_ARGS)
 	{
 		MemoryContext oldcontext;
 		TupleDesc	tupdesc;
-		text	   *table_name;
+		text	   *table_name = NULL;
 		Vector *query_vec = NULL;
-		text	   *query_text;
-		text	   *filters;
+		text	   *query_text = NULL;
+		text	   *filters = NULL;
 		float8		vector_weight;
 		int32		limit;
+
+		char	   *tbl_str = NULL;
+		char	   *txt_str = NULL;
+		char	   *filter_str = NULL;
+		StringInfoData sql;
+		StringInfoData vec_lit;
+		int			spi_ret;
+		int			i;
+		int			proc;
+		NdbSpiSession *session = NULL;
 
 		/* Validate argument count */
 		if (PG_NARGS() != 6)
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("neurondb: hybrid_search requires 6 arguments")));
-
-		char *tbl_str = NULL;
-		char *txt_str = NULL;
-		char *filter_str = NULL;
-		StringInfoData sql;
-		StringInfoData vec_lit;
-		int			spi_ret;
-		int			i;
-
-		int			proc;
-		NdbSpiSession *session = NULL;
 
 		table_name = PG_GETARG_TEXT_PP(0);
 		query_text = PG_GETARG_TEXT_PP(2);
@@ -361,7 +360,7 @@ PG_FUNCTION_INFO_V1(reciprocal_rank_fusion);
 Datum
 reciprocal_rank_fusion(PG_FUNCTION_ARGS)
 {
-	ArrayType  *rankings;
+	ArrayType  *rankings = NULL;
 	float8		k;
 
 	/* Validate argument count */
@@ -372,19 +371,20 @@ reciprocal_rank_fusion(PG_FUNCTION_ARGS)
 
 	rankings = PG_GETARG_ARRAYTYPE_P(0);
 	k = PG_GETARG_FLOAT8(1);
+
 	int			n_rankers;
 	int			i;
 	int			j;
 	int16		elmlen;
 	bool		elmbyval;
 	char		elmalign;
-	ArrayType **rank_arrays;
+	ArrayType  **rank_arrays;
 	int			item_count = 0;
-	HTAB *item_hash = NULL;
+	HTAB		   *item_hash = NULL;
 	HASHCTL		info;
-	Datum *result_datums = NULL;
-	bool *result_nulls = NULL;
-	ArrayType *ret_array = NULL;
+	Datum		   *result_datums = NULL;
+	bool		   *result_nulls = NULL;
+	ArrayType  *ret_array = NULL;
 
 	elog(DEBUG1,
 		 "neurondb: Computing Reciprocal Rank Fusion with k=%.2f",
@@ -690,9 +690,9 @@ PG_FUNCTION_INFO_V1(multi_vector_search);
 Datum
 multi_vector_search(PG_FUNCTION_ARGS)
 {
-	text	   *table_name;
-	ArrayType  *query_vectors;
-	text	   *agg_method;
+	text	   *table_name = NULL;
+	ArrayType  *query_vectors = NULL;
+	text	   *agg_method = NULL;
 	int32		top_k;
 
 	/* Validate argument count */
@@ -705,22 +705,26 @@ multi_vector_search(PG_FUNCTION_ARGS)
 	query_vectors = PG_GETARG_ARRAYTYPE_P(1);
 	agg_method = PG_GETARG_TEXT_PP(2);
 	top_k = PG_GETARG_INT32(3);
-	char	   *tbl_str = text_to_cstring(table_name);
-	char	   *agg_str = text_to_cstring(agg_method);
-	int			nvecs;
+
+	char		   *tbl_str;
+	char		   *agg_str;
+	int				nvecs;
 	StringInfoData sql;
 	StringInfoData subquery;
-	Datum *vec_datums = NULL;
-	bool *vec_nulls = NULL;
-	Oid			vec_elemtype = ARR_ELEMTYPE(query_vectors);
-	int			i;
-	int			spi_ret;
-	int			proc;
-	ArrayType *ret_array = NULL;
-	Datum *datums = NULL;
-	bool *nulls = NULL;
+	Datum		   *vec_datums = NULL;
+	bool		   *vec_nulls = NULL;
+	Oid				vec_elemtype;
+	int				i;
+	int				spi_ret;
+	int				proc;
+	ArrayType	   *ret_array = NULL;
+	Datum		   *datums = NULL;
+	bool		   *nulls = NULL;
+	NdbSpiSession  *session = NULL;
 
-	NdbSpiSession *session = NULL;
+	tbl_str = text_to_cstring(table_name);
+	agg_str = text_to_cstring(agg_method);
+	vec_elemtype = ARR_ELEMTYPE(query_vectors);
 
 	nvecs = ArrayGetNItems(
 						   ARR_NDIM(query_vectors), ARR_DIMS(query_vectors));

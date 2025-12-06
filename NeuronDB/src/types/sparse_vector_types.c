@@ -219,8 +219,8 @@ sparse_vector_send(PG_FUNCTION_ARGS)
 {
 	SparseVector *sv = (SparseVector *) PG_GETARG_POINTER(0);
 	StringInfoData buf;
-	int32	   *token_ids;
-	float4	   *weights;
+	int32	   *token_ids = NULL;
+	float4	   *weights = NULL;
 	int			i;
 
 	token_ids = SPARSE_VEC_TOKEN_IDS(sv);

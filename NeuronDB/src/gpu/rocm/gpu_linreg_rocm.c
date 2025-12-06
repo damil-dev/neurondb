@@ -60,9 +60,9 @@ ndb_rocm_linreg_pack_model(const LinRegModel *model,
 						   char **errstr)
 {
 	size_t		payload_bytes;
-	char	   *base;
-	NdbCudaLinRegModelHeader *hdr;
-	float	   *coef_dest;
+	char	   *base = NULL;
+	NdbCudaLinRegModelHeader *hdr = NULL;
+	float	   *coef_dest = NULL;
 
 	if (errstr)
 		*errstr = NULL;

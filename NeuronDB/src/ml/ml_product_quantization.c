@@ -837,8 +837,8 @@ evaluate_pq_codebook_by_model_id(PG_FUNCTION_ARGS)
 						HeapTuple	tuple = SPI_tuptable->vals[i];
 						Datum		vec_datum;
 						bool		vec_null;
-						Vector	   *vec;
-						float	   *vec_data;
+						Vector	   *vec = NULL;
+						float	   *vec_data = NULL;
 						double		vector_error = 0.0;
 						int			start_dim;
 
@@ -1389,7 +1389,7 @@ product_quantization_gpu_predict(const MLGpuModel *model, const float *input, in
 								 float *output, int output_dim, char **errstr)
 {
 	const		ProductQuantizationGpuModelState *state;
-	PQCodebook *codebook;
+	PQCodebook *codebook = NULL;
 	int			sub;
 	int			start_dim;
 	double		min_dist;
@@ -1490,7 +1490,7 @@ product_quantization_gpu_evaluate(const MLGpuModel *model, const MLGpuEvalSpec *
 								  MLGpuMetrics *out, char **errstr)
 {
 	const		ProductQuantizationGpuModelState *state;
-	Jsonb	   *metrics_json;
+	Jsonb	   *metrics_json = NULL;
 	StringInfoData buf;
 	double		avg_error = 0.0;
 
@@ -1539,7 +1539,7 @@ product_quantization_gpu_serialize(const MLGpuModel *model, bytea * *payload_out
 								   Jsonb * *metadata_out, char **errstr)
 {
 	const		ProductQuantizationGpuModelState *state;
-	bytea	   *payload_copy;
+	bytea	   *payload_copy = NULL;
 	int			payload_size;
 
 	if (errstr != NULL)
@@ -1587,8 +1587,8 @@ static bool
 product_quantization_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 									 const Jsonb * metadata, char **errstr)
 {
-	ProductQuantizationGpuModelState *state;
-	bytea	   *payload_copy;
+	ProductQuantizationGpuModelState *state = NULL;
+	bytea	   *payload_copy = NULL;
 	int			payload_size;
 	PQCodebook	codebook;
 

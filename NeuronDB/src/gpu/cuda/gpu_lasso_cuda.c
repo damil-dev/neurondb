@@ -77,9 +77,9 @@ ndb_cuda_lasso_pack_model(const LassoModel *model,
 						  char **errstr)
 {
 	size_t		payload_bytes;
-	char	   *base;
-	NdbCudaLassoModelHeader *hdr;
-	float	   *coef_dest;
+	char	   *base = NULL;
+	NdbCudaLassoModelHeader *hdr = NULL;
+	float	   *coef_dest = NULL;
 	bytea *blob = NULL;
 	char *blob_raw = NULL;
 

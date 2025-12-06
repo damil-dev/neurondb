@@ -88,8 +88,8 @@ clip_embed(PG_FUNCTION_ARGS)
 		NdbLLMConfig cfg;
 		NdbLLMCallOptions call_opts;
 
-		float *vec_data;
-		Vector *result_vec;
+		float *vec_data = NULL;
+		Vector *result_vec = NULL;
 		int			dim = 0;
 		int			i;
 
@@ -184,8 +184,8 @@ imagebind_embed(PG_FUNCTION_ARGS)
 		NdbLLMConfig cfg;
 		NdbLLMCallOptions call_opts;
 
-		float *vec_data;
-		Vector *result_vec;
+		float *vec_data = NULL;
+		Vector *result_vec = NULL;
 		int			dim = 0;
 		int			i;
 

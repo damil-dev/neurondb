@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/neurondb/NeuronMCP/internal/config"
 	"github.com/neurondb/NeuronMCP/internal/database"
 	"github.com/neurondb/NeuronMCP/internal/logging"
 	"github.com/neurondb/NeuronMCP/internal/tools"
@@ -12,10 +13,11 @@ import (
 // TestAllToolsRegistered tests that all tools are properly registered
 func TestAllToolsRegistered(t *testing.T) {
 	db := database.NewDatabase()
-	logger := logging.NewLogger(logging.Config{
+	output := "stderr"
+	logger := logging.NewLogger(&config.LoggingConfig{
 		Level:  "info",
 		Format: "text",
-		Output: "stderr",
+		Output: &output,
 	})
 
 	registry := tools.NewToolRegistry(db, logger)
@@ -72,10 +74,11 @@ func TestAllToolsRegistered(t *testing.T) {
 // TestToolValidation tests parameter validation
 func TestToolValidation(t *testing.T) {
 	db := database.NewDatabase()
-	logger := logging.NewLogger(logging.Config{
+	output := "stderr"
+	logger := logging.NewLogger(&config.LoggingConfig{
 		Level:  "info",
 		Format: "text",
-		Output: "stderr",
+		Output: &output,
 	})
 
 	registry := tools.NewToolRegistry(db, logger)
@@ -103,13 +106,6 @@ func TestToolValidation(t *testing.T) {
 
 // TestPostgreSQLTools tests PostgreSQL tools (no DB connection required for version)
 func TestPostgreSQLTools(t *testing.T) {
-	db := database.NewDatabase()
-	logger := logging.NewLogger(logging.Config{
-		Level:  "info",
-		Format: "text",
-		Output: "stderr",
-	})
-
 	// Note: These tests require a database connection
 	// They are integration tests and should be run with a test database
 	t.Skip("Skipping integration tests - requires database connection")

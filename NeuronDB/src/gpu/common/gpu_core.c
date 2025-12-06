@@ -670,8 +670,8 @@ neurondb_gpu_rf_best_split_binary(const float *feature_values,
 								  int *right_count)
 {
 	int			total_pos;
-	int		   *i_idx;
-	int		   *prefix_pos;
+	int		   *i_idx = NULL;
+	int		   *prefix_pos = NULL;
 	int			i;
 	int			lp;
 	int			ln;

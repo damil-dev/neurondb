@@ -378,7 +378,7 @@ neural_network_init(int n_inputs,
 	int			j;
 	int			k;
 	int			prev_size;
-	NeuralLayer *output_layer;
+	NeuralLayer *output_layer = NULL;
 	NeuralNetwork *net = NULL;
 	NeuralLayer *layers = NULL;
 
@@ -1886,7 +1886,7 @@ evaluate_neural_network_by_model_id(PG_FUNCTION_ARGS)
 			Datum		targ_datum;
 			bool		feat_null;
 			bool		targ_null;
-			Vector	   *vec;
+			Vector	   *vec = NULL;
 			double		y_true;
 			double		y_pred;
 			double		error;
@@ -2276,7 +2276,7 @@ neural_network_gpu_evaluate(const MLGpuModel *model, const MLGpuEvalSpec *spec,
 							MLGpuMetrics *out, char **errstr)
 {
 	const		NeuralNetworkGpuModelState *state;
-	Jsonb	   *metrics_json;
+	Jsonb	   *metrics_json = NULL;
 	StringInfoData buf;
 
 	if (errstr != NULL)
@@ -2318,7 +2318,7 @@ neural_network_gpu_serialize(const MLGpuModel *model, bytea * *payload_out,
 							 Jsonb * *metadata_out, char **errstr)
 {
 	const		NeuralNetworkGpuModelState *state;
-	bytea	   *payload_copy;
+	bytea	   *payload_copy = NULL;
 	int			payload_size;
 	char	   *payload_copy_raw = NULL;
 
@@ -2365,10 +2365,10 @@ neural_network_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 							   const Jsonb * metadata, char **errstr)
 {
 	NeuralNetworkGpuModelState *state = NULL;
-	bytea	   *payload_copy;
+	bytea	   *payload_copy = NULL;
 	int			payload_size;
-	NeuralNetwork *net;
-	JsonbIterator *it;
+	NeuralNetwork *net = NULL;
+	JsonbIterator *it = NULL;
 	JsonbValue	v;
 	int			r;
 	char	   *payload_copy_raw = NULL;

@@ -52,12 +52,12 @@ ndb_cuda_svm_pack_model(const SVMModel * model,
 						char **errstr)
 {
 	size_t		payload_bytes;
-	bytea	   *blob;
-	char	   *base;
-	NdbCudaSvmModelHeader *hdr;
-	float	   *alphas_dest;
-	float	   *sv_dest;
-	int32	   *indices_dest;
+	bytea	   *blob = NULL;
+	char	   *base = NULL;
+	NdbCudaSvmModelHeader *hdr = NULL;
+	float	   *alphas_dest = NULL;
+	float	   *sv_dest = NULL;
+	int32	   *indices_dest = NULL;
 	char	   *blob_raw = NULL;
 	int			i,
 				j;
@@ -627,7 +627,7 @@ ndb_cuda_svm_predict(const bytea * model_data,
 	const float *alphas;
 	const float *support_vectors;
 	const		int32 *indices __attribute__((unused));
-	bytea	   *detoasted;
+	bytea	   *detoasted = NULL;
 	double		prediction;
 	int			i,
 				j;
@@ -718,7 +718,7 @@ ndb_cuda_svm_predict_batch(const bytea * model_data,
 {
 	const char *base;
 	const NdbCudaSvmModelHeader *hdr;
-	bytea	   *detoasted;
+	bytea	   *detoasted = NULL;
 	int			i;
 	int			rc;
 	size_t		expected_size;

@@ -371,7 +371,7 @@ ridge_dataset_load(const char *quoted_tbl,
 		TupleDesc	tupdesc = SPI_tuptable->tupdesc;
 		Datum		feat_datum;
 		bool		feat_null;
-		Vector	   *vec;
+		Vector	   *vec = NULL;
 
 		feat_datum = SPI_getbinval(first_tuple, tupdesc, 1, &feat_null);
 		if (!feat_null)
@@ -550,7 +550,7 @@ ridge_dataset_load_limited(const char *quoted_tbl,
 		TupleDesc	tupdesc = SPI_tuptable->tupdesc;
 		Datum		feat_datum;
 		bool		feat_null;
-		Vector	   *vec;
+		Vector	   *vec = NULL;
 
 		feat_datum = SPI_getbinval(first_tuple, tupdesc, 1, &feat_null);
 		if (!feat_null)
@@ -6593,7 +6593,7 @@ evaluate_elastic_net_by_model_id(PG_FUNCTION_ARGS)
 typedef struct RidgeGpuModelState
 {
 	bytea	   *model_blob;
-	Jsonb	   *metrics;
+		Jsonb	   *metrics;
 	int			feature_dim;
 	int			n_samples;
 }			RidgeGpuModelState;
@@ -6714,7 +6714,7 @@ ridge_gpu_evaluate(const MLGpuModel *model, const MLGpuEvalSpec *spec,
 				   MLGpuMetrics *out, char **errstr)
 {
 	const		RidgeGpuModelState *state;
-	Jsonb	   *metrics_json;
+	Jsonb	   *metrics_json = NULL;
 
 	if (errstr != NULL)
 		*errstr = NULL;
@@ -7077,7 +7077,7 @@ lasso_gpu_evaluate(const MLGpuModel *model, const MLGpuEvalSpec *spec,
 				   MLGpuMetrics *out, char **errstr)
 {
 	const		LassoGpuModelState *state;
-	Jsonb	   *metrics_json;
+	Jsonb	   *metrics_json = NULL;
 
 	if (errstr != NULL)
 		*errstr = NULL;

@@ -587,8 +587,8 @@ metal_backend_kmeans_impl(const float *vectors,
 						  float *centroids,
 						  int *assignments)
 {
-	int		   *cluster_counts;
-	float	   *new_centroids;
+	int		   *cluster_counts = NULL;
+	float	   *new_centroids = NULL;
 	int			iter;
 	bool		changed;
 	int			i,
@@ -598,8 +598,6 @@ metal_backend_kmeans_impl(const float *vectors,
 	Assert(vectors != NULL && centroids != NULL && assignments != NULL
 		   && num_vectors > 0 && k > 0 && dim > 0 && max_iters > 0);
 
-	int *cluster_counts = NULL;
-	float *new_centroids = NULL;
 	nalloc(cluster_counts, int, k);
 	nalloc(new_centroids, float, k * dim);
 
@@ -693,16 +691,14 @@ metal_backend_dbscan_impl(const float *vectors,
 						  int min_points,
 						  int *cluster_ids)
 {
-	bool	   *visited;
-	int		   *neighbors;
+	bool	   *visited = NULL;
+	int		   *neighbors = NULL;
 	int			cluster = -1;
 	int			i;
 
 	Assert(vectors != NULL && cluster_ids != NULL && num_vectors > 0
 		   && dim > 0);
 
-	bool *visited = NULL;
-	int *neighbors = NULL;
 	nalloc(visited, bool, num_vectors);
 	nalloc(neighbors, int, num_vectors);
 
@@ -942,7 +938,7 @@ ndb_metal_launch_kmeans_update(const float *vectors,
 							   int k,
 							   ndb_stream_t stream)
 {
-	int		   *counts;
+	int		   *counts = NULL;
 	int			i,
 				j,
 				c;
@@ -953,7 +949,6 @@ ndb_metal_launch_kmeans_update(const float *vectors,
 		num_vectors <= 0 || dim <= 0 || k <= 0)
 		return -1;
 
-	int *counts = NULL;
 	nalloc(counts, int, k);
 	memset(centroids, 0, k * dim * sizeof(float));
 
@@ -1314,7 +1309,8 @@ ndb_metal_rf_train(const float *features,
 	int			total_nodes;
 	size_t		header_bytes;
 	size_t		payload_bytes;
-	char *base = NULL;
+	char	   *base = NULL;
+	char	   *payload_bytes_ptr = NULL;
 	int			majority_class = 0;
 	int			best_count = 0;
 	double		majority_fraction = 0.0;
@@ -1532,8 +1528,6 @@ ndb_metal_rf_train(const float *features,
 			(errmsg("ndb_metal_rf_train: payload sizes calculated"),
 			 errdetail("total_nodes=%d, header_bytes=%zu, payload_bytes=%zu, MaxAllocSize=%zu, VARHDRSZ=%d",
 					   total_nodes, header_bytes, payload_bytes, MaxAllocSize, VARHDRSZ)));
-
-	char *payload_bytes_ptr = NULL;
 
 	if (payload_bytes > MaxAllocSize || VARHDRSZ + payload_bytes > MaxAllocSize)
 	{
@@ -2079,11 +2073,12 @@ ndb_metal_rf_pack(const struct RFModel *model,
 	size_t		header_bytes;
 	size_t		nodes_bytes;
 	size_t		payload_bytes;
-	bytea	   *blob;
-	char	   *base;
-	NdbCudaRfModelHeader *model_hdr;
-	NdbCudaRfTreeHeader *tree_hdrs;
-	NdbCudaRfNode *nodes;
+	bytea	   *blob = NULL;
+	char	   *base = NULL;
+	char	   *blob_bytes = NULL;
+	NdbCudaRfModelHeader *model_hdr = NULL;
+	NdbCudaRfTreeHeader *tree_hdrs = NULL;
+	NdbCudaRfNode *nodes = NULL;
 	int			node_cursor = 0;
 	RFMetricsSpec spec;
 
@@ -2138,7 +2133,6 @@ ndb_metal_rf_pack(const struct RFModel *model,
 			*errstr = pstrdup("Metal RF pack: payload size exceeds MaxAllocSize");
 		return -1;
 	}
-	char *blob_bytes = NULL;
 
 	if (VARHDRSZ + payload_bytes > MaxAllocSize)
 	{
@@ -2333,10 +2327,10 @@ ndb_metal_lr_train(const float *features,
 	{
 		LRModel		model;
 		size_t		payload_bytes;
-		bytea	   *blob;
-		char	   *base;
-		NdbCudaLrModelHeader *hdr;
-		float	   *weights_dest;
+		bytea	   *blob = NULL;
+		char	   *base = NULL;
+		NdbCudaLrModelHeader *hdr = NULL;
+		float	   *weights_dest = NULL;
 
 		char *blob_bytes = NULL;
 
@@ -2495,10 +2489,11 @@ ndb_metal_lr_pack(const struct LRModel *model,
 				  char **errstr)
 {
 	size_t		payload_bytes;
-	bytea	   *blob;
-	char	   *base;
-	NdbCudaLrModelHeader *hdr;
-	float	   *weights_dest;
+	bytea	   *blob = NULL;
+	char	   *base = NULL;
+	char	   *blob_bytes = NULL;
+	NdbCudaLrModelHeader *hdr = NULL;
+	float	   *weights_dest = NULL;
 	int			i;
 
 	if (errstr)
@@ -2512,8 +2507,6 @@ ndb_metal_lr_pack(const struct LRModel *model,
 
 	payload_bytes = sizeof(NdbCudaLrModelHeader) +
 		sizeof(float) * (size_t) model->n_features;
-
-	char *blob_bytes = NULL;
 
 	if (VARHDRSZ + payload_bytes > MaxAllocSize)
 	{
@@ -2579,10 +2572,11 @@ ndb_metal_linreg_pack(const struct LinRegModel *model,
 					  char **errstr)
 {
 	size_t		payload_bytes;
-	bytea	   *blob;
-	char	   *base;
-	NdbCudaLinRegModelHeader *hdr;
-	float	   *coef_dest;
+	bytea	   *blob = NULL;
+	char	   *base = NULL;
+	char	   *blob_bytes = NULL;
+	NdbCudaLinRegModelHeader *hdr = NULL;
+	float	   *coef_dest = NULL;
 
 	ereport(DEBUG2, (errmsg("ndb_metal_linreg_pack: entry")));
 	if (errstr)
@@ -2594,8 +2588,6 @@ ndb_metal_linreg_pack(const struct LinRegModel *model,
 			*errstr = pstrdup("invalid LinReg model for Metal pack");
 		return -1;
 	}
-
-	char *blob_bytes = NULL;
 
 	ereport(DEBUG2,
 			(errmsg("ndb_metal_linreg_pack: calculating payload size, n_features=%d", model->n_features)));
@@ -2789,8 +2781,6 @@ ndb_metal_linreg_train(const float *features,
 	ereport(DEBUG2, (errmsg("ndb_metal_linreg_train: allocating xi buffer")));
 	{
 		double *xi = NULL;
-
-		double *xi = NULL;
 		nalloc(xi, double, dim_with_intercept);
 		if (xi == NULL)
 		{
@@ -2880,17 +2870,16 @@ ndb_metal_linreg_train(const float *features,
 	ereport(DEBUG2, (errmsg("ndb_metal_linreg_train: about to invert X'X matrix")));
 	/* Invert X'X using Gauss-Jordan elimination */
 	{
-		double	  **augmented;
+		double	  **augmented = NULL;
 		int			row,
-					col,
-					k;
+				col,
+				k;
 		double		pivot,
-					factor;
+				factor;
 		bool		invert_success = true;
 
 		ereport(DEBUG2, (errmsg("ndb_metal_linreg_train: allocating augmented matrix")));
 		/* Create augmented matrix [A | I] */
-		double **augmented = NULL;
 		nalloc(augmented, double *, dim_with_intercept);
 		if (augmented == NULL)
 		{
@@ -3242,12 +3231,13 @@ ndb_metal_svm_pack(const struct SVMModel *model,
 				   char **errstr)
 {
 	size_t		payload_bytes;
-	bytea	   *blob;
-	char	   *base;
-	NdbCudaSvmModelHeader *hdr;
-	float	   *alphas_dest;
-	float	   *sv_dest;
-	int32	   *indices_dest;
+	bytea	   *blob = NULL;
+	char	   *base = NULL;
+	char	   *blob_bytes = NULL;
+	NdbCudaSvmModelHeader *hdr = NULL;
+	float	   *alphas_dest = NULL;
+	float	   *sv_dest = NULL;
+	int32	   *indices_dest = NULL;
 	int			i,
 				j;
 
@@ -3265,7 +3255,6 @@ ndb_metal_svm_pack(const struct SVMModel *model,
 		+ sizeof(float) * (size_t) model->n_support_vectors * (size_t) model->n_features
 		+ sizeof(int32) * (size_t) model->n_support_vectors;
 
-	char *blob_bytes = NULL;
 	nalloc(blob_bytes, char, VARHDRSZ + payload_bytes);
 	blob = (bytea *) blob_bytes;
 	SET_VARSIZE(blob, VARHDRSZ + payload_bytes);
@@ -3350,6 +3339,9 @@ ndb_metal_svm_train(const float *features,
 	double		eps = 1e-3;
 	int			sv_count = 0;
 	SVMModel	model;
+	double	   *model_alphas = NULL;
+	float	   *model_support_vectors = NULL;
+	int		   *model_support_vector_indices = NULL;
 	int			i,
 				j;
 	int			rc = -1;
@@ -3613,10 +3605,6 @@ ndb_metal_svm_train(const float *features,
 	model.bias = (double) bias;
 	model.C = C;
 	model.max_iters = actual_max_iters;
-
-	double *model_alphas = NULL;
-	float *model_support_vectors = NULL;
-	int *model_support_vector_indices = NULL;
 
 	/* Allocate support vectors and alphas */
 	/* Check for integer overflow in size calculations */
@@ -3920,7 +3908,7 @@ dt_build_tree_metal(const float *features,
 					int class_count,
 					char **errstr)
 {
-	DTNode	   *node;
+	DTNode	   *node = NULL;
 	int			i;
 	int			best_feature = -1;
 	float		best_threshold = 0.0f;
@@ -3935,7 +3923,6 @@ dt_build_tree_metal(const float *features,
 		*errstr = NULL;
 
 	/* Allocate node */
-	DTNode *node = NULL;
 	nalloc(node, DTNode, 1);
 	if (node == NULL)
 	{
@@ -3956,7 +3943,6 @@ dt_build_tree_metal(const float *features,
 			int			label;
 			int			i;
 
-			int *class_counts = NULL;
 			nalloc(class_counts, int, class_count);
 			for (i = 0; i < n_samples; i++)
 			{
@@ -4050,8 +4036,6 @@ dt_build_tree_metal(const float *features,
 					int *right_counts = NULL;
 					int			label;
 
-					int *left_counts = NULL;
-					int *right_counts = NULL;
 					nalloc(left_counts, int, class_count);
 					nalloc(right_counts, int, class_count);
 
@@ -4089,7 +4073,6 @@ dt_build_tree_metal(const float *features,
 						int			label;
 						int			i;
 
-						int *parent_counts = NULL;
 						nalloc(parent_counts, int, class_count);
 						for (i = 0; i < n_samples; i++)
 						{
@@ -4196,7 +4179,6 @@ dt_build_tree_metal(const float *features,
 			int			label;
 			int			i;
 
-			int *class_counts = NULL;
 			nalloc(class_counts, int, class_count);
 			for (i = 0; i < n_samples; i++)
 			{
@@ -4251,7 +4233,6 @@ dt_build_tree_metal(const float *features,
 			int			label;
 			int			i;
 
-			int *class_counts = NULL;
 			nalloc(class_counts, int, class_count);
 			for (i = 0; i < n_samples; i++)
 			{
@@ -4545,10 +4526,11 @@ ndb_metal_dt_pack(const struct DTModel *model,
 	size_t		header_bytes;
 	size_t		nodes_bytes;
 	size_t		payload_bytes;
-	bytea	   *blob;
-	char	   *base;
-	NdbCudaDtModelHeader *hdr;
-	NdbCudaDtNode *nodes;
+	bytea	   *blob = NULL;
+	char	   *base = NULL;
+	char	   *blob_bytes = NULL;
+	NdbCudaDtModelHeader *hdr = NULL;
+	NdbCudaDtNode *nodes = NULL;
 	int			node_idx = 0;
 
 	if (errstr)
@@ -4579,7 +4561,6 @@ ndb_metal_dt_pack(const struct DTModel *model,
 	nodes_bytes = sizeof(NdbCudaDtNode) * (size_t) node_count;
 	payload_bytes = header_bytes + nodes_bytes;
 
-	char *blob_bytes = NULL;
 	nalloc(blob_bytes, char, VARHDRSZ + payload_bytes);
 	blob = (bytea *) blob_bytes;
 	SET_VARSIZE(blob, VARHDRSZ + payload_bytes);
@@ -4722,10 +4703,11 @@ ndb_metal_ridge_pack(const struct RidgeModel *model,
 					 char **errstr)
 {
 	size_t		payload_bytes;
-	bytea	   *blob;
-	char	   *base;
-	NdbCudaRidgeModelHeader *hdr;
-	float	   *coef_dest;
+	bytea	   *blob = NULL;
+	char	   *base = NULL;
+	char	   *blob_bytes = NULL;
+	NdbCudaRidgeModelHeader *hdr = NULL;
+	float	   *coef_dest = NULL;
 
 	if (errstr)
 		*errstr = NULL;
@@ -4739,7 +4721,6 @@ ndb_metal_ridge_pack(const struct RidgeModel *model,
 	payload_bytes = sizeof(NdbCudaRidgeModelHeader)
 		+ sizeof(float) * (size_t) model->n_features;
 
-	char *blob_bytes = NULL;
 	nalloc(blob_bytes, char, VARHDRSZ + payload_bytes);
 	blob = (bytea *) blob_bytes;
 	SET_VARSIZE(blob, VARHDRSZ + payload_bytes);
@@ -4906,7 +4887,7 @@ ndb_metal_ridge_train(const float *features,
 
 	/* Invert X'X + λI using Gauss-Jordan elimination */
 	{
-		double	  **augmented;
+		double	  **augmented = NULL;
 		int			row,
 					col,
 					k;
@@ -4915,7 +4896,6 @@ ndb_metal_ridge_train(const float *features,
 		bool		invert_success = true;
 
 		/* Create augmented matrix [A | I] */
-		double **augmented = NULL;
 		nalloc(augmented, double *, dim_with_intercept);
 		for (row = 0; row < dim_with_intercept; row++)
 		{
@@ -5151,10 +5131,11 @@ ndb_metal_lasso_pack(const struct LassoModel *model,
 					 char **errstr)
 {
 	size_t		payload_bytes;
-	bytea	   *blob;
-	char	   *base;
-	NdbCudaLassoModelHeader *hdr;
-	float	   *coef_dest;
+	bytea	   *blob = NULL;
+	char	   *base = NULL;
+	char	   *blob_bytes = NULL;
+	NdbCudaLassoModelHeader *hdr = NULL;
+	float	   *coef_dest = NULL;
 
 	if (errstr)
 		*errstr = NULL;
@@ -5168,7 +5149,6 @@ ndb_metal_lasso_pack(const struct LassoModel *model,
 	payload_bytes = sizeof(NdbCudaLassoModelHeader)
 		+ sizeof(float) * (size_t) model->n_features;
 
-	char *blob_bytes = NULL;
 	nalloc(blob_bytes, char, VARHDRSZ + payload_bytes);
 	blob = (bytea *) blob_bytes;
 	SET_VARSIZE(blob, VARHDRSZ + payload_bytes);
@@ -5528,12 +5508,13 @@ ndb_metal_nb_pack(const struct GaussianNBModel *model,
 				  char **errstr)
 {
 	size_t		payload_bytes;
-	bytea	   *blob;
-	char	   *base;
-	NdbCudaNbModelHeader *hdr;
-	double	   *priors_dest;
-	double	   *means_dest;
-	double	   *variances_dest;
+	bytea	   *blob = NULL;
+	char	   *base = NULL;
+	char	   *blob_bytes = NULL;
+	NdbCudaNbModelHeader *hdr = NULL;
+	double	   *priors_dest = NULL;
+	double	   *means_dest = NULL;
+	double	   *variances_dest = NULL;
 	int			i,
 				j;
 
@@ -5551,7 +5532,6 @@ ndb_metal_nb_pack(const struct GaussianNBModel *model,
 		+ sizeof(double) * (size_t) model->n_classes * (size_t) model->n_features
 		+ sizeof(double) * (size_t) model->n_classes * (size_t) model->n_features;
 
-	char *blob_bytes = NULL;
 	nalloc(blob_bytes, char, VARHDRSZ + payload_bytes);
 	blob = (bytea *) blob_bytes;
 	SET_VARSIZE(blob, VARHDRSZ + payload_bytes);
@@ -5632,14 +5612,16 @@ ndb_metal_nb_train(const float *features,
 				   Jsonb * *metrics,
 				   char **errstr)
 {
-	int *class_counts = NULL;
-	double *class_priors = NULL;
-	double *means = NULL;
-	double *variances = NULL;
+	int		   *class_counts = NULL;
+	double	   *class_priors = NULL;
+	double	   *means = NULL;
+	double	   *variances = NULL;
+	double	  **model_means = NULL;
+	double	  **model_variances = NULL;
 	struct GaussianNBModel model;
 
-	bytea *blob = NULL;
-	Jsonb *metrics_json = NULL;
+	bytea	   *blob = NULL;
+	Jsonb	   *metrics_json = NULL;
 	int			i,
 				j,
 				class;
@@ -5661,10 +5643,6 @@ ndb_metal_nb_train(const float *features,
 		 n_samples, feature_dim, class_count);
 
 	/* Allocate host memory */
-	int *class_counts = NULL;
-	double *class_priors = NULL;
-	double *means = NULL;
-	double *variances = NULL;
 	nalloc(class_counts, int, class_count);
 	nalloc(class_priors, double, class_count);
 	nalloc(means, double, class_count * feature_dim);
@@ -5742,8 +5720,6 @@ ndb_metal_nb_train(const float *features,
 	model.n_classes = class_count;
 	model.n_features = feature_dim;
 	model.class_priors = class_priors;
-	double **model_means = NULL;
-	double **model_variances = NULL;
 	nalloc(model_means, double *, class_count);
 	nalloc(model_variances, double *, class_count);
 	model.means = model_means;
@@ -5796,12 +5772,12 @@ ndb_metal_nb_predict(const bytea * model_data,
 					 double *probability_out,
 					 char **errstr)
 {
-	const char *base;
-	NdbCudaNbModelHeader *hdr;
-	const double *priors;
-	const double *means;
-	const double *variances;
-	double	   *class_log_probs;
+	const char *base = NULL;
+	NdbCudaNbModelHeader *hdr = NULL;
+	const double *priors = NULL;
+	const double *means = NULL;
+	const double *variances = NULL;
+	double	   *class_log_probs = NULL;
 	double		max_log_prob;
 	int			best_class;
 	int			i,
@@ -5830,7 +5806,7 @@ ndb_metal_nb_predict(const bytea * model_data,
 	means = (const double *) (base + sizeof(NdbCudaNbModelHeader) + sizeof(double) * (size_t) hdr->n_classes);
 	variances = (const double *) (base + sizeof(NdbCudaNbModelHeader) + sizeof(double) * (size_t) hdr->n_classes + sizeof(double) * (size_t) hdr->n_classes * (size_t) hdr->n_features);
 
-	double *class_log_probs = NULL;
+	class_log_probs = NULL;
 	nalloc(class_log_probs, double, hdr->n_classes);
 
 	/* Compute log probability for each class */
@@ -5909,12 +5885,13 @@ ndb_metal_gmm_pack(const struct GMMModel *model,
 				   char **errstr)
 {
 	size_t		payload_bytes;
-	bytea	   *blob;
-	char	   *base;
-	NdbCudaGmmModelHeader *hdr;
-	double	   *mixing_dest;
-	double	   *means_dest;
-	double	   *variances_dest;
+	bytea	   *blob = NULL;
+	char	   *base = NULL;
+	char	   *blob_bytes = NULL;
+	NdbCudaGmmModelHeader *hdr = NULL;
+	double	   *mixing_dest = NULL;
+	double	   *means_dest = NULL;
+	double	   *variances_dest = NULL;
 	int			i,
 				j;
 
@@ -5932,7 +5909,6 @@ ndb_metal_gmm_pack(const struct GMMModel *model,
 		+ sizeof(double) * (size_t) model->k * (size_t) model->dim
 		+ sizeof(double) * (size_t) model->k * (size_t) model->dim;
 
-	char *blob_bytes = NULL;
 	nalloc(blob_bytes, char, VARHDRSZ + payload_bytes);
 	blob = (bytea *) blob_bytes;
 	SET_VARSIZE(blob, VARHDRSZ + payload_bytes);
@@ -6099,12 +6075,6 @@ ndb_metal_gmm_train(const float *features,
 	}
 
 	/* Allocate host memory */
-	double *mixing_coeffs = NULL;
-	double *means = NULL;
-	double *variances = NULL;
-	double **means_2d = NULL;
-	double **variances_2d = NULL;
-	double *responsibilities = NULL;
 	nalloc(mixing_coeffs, double, n_components);
 	nalloc(means, double, n_components * feature_dim);
 	nalloc(variances, double, n_components * feature_dim);
@@ -6298,12 +6268,12 @@ ndb_metal_gmm_predict(const bytea * model_data,
 					  double *probability_out,
 					  char **errstr)
 {
-	const char *base;
-	NdbCudaGmmModelHeader *hdr;
-	const double *mixing;
-	const double *means;
-	const double *variances;
-	double	   *component_probs;
+	const char *base = NULL;
+	NdbCudaGmmModelHeader *hdr = NULL;
+	const double *mixing = NULL;
+	const double *means = NULL;
+	const double *variances = NULL;
+	double	   *component_probs = NULL;
 	double		max_prob;
 	int			best_component;
 	int			i,
@@ -6332,7 +6302,7 @@ ndb_metal_gmm_predict(const bytea * model_data,
 	means = (const double *) (base + sizeof(NdbCudaGmmModelHeader) + sizeof(double) * (size_t) hdr->n_components);
 	variances = (const double *) (base + sizeof(NdbCudaGmmModelHeader) + sizeof(double) * (size_t) hdr->n_components + sizeof(double) * (size_t) hdr->n_components * (size_t) hdr->n_features);
 
-	double *component_probs = NULL;
+	component_probs = NULL;
 	nalloc(component_probs, double, hdr->n_components);
 
 	/* Compute probability for each component */
@@ -6413,11 +6383,12 @@ ndb_metal_knn_pack(const struct KNNModel *model,
 				   char **errstr)
 {
 	size_t		payload_bytes;
-	bytea	   *blob;
-	char	   *base;
-	NdbCudaKnnModelHeader *hdr;
-	float	   *features_dest;
-	double	   *labels_dest;
+	bytea	   *blob = NULL;
+	char	   *base = NULL;
+	char	   *blob_bytes = NULL;
+	NdbCudaKnnModelHeader *hdr = NULL;
+	float	   *features_dest = NULL;
+	double	   *labels_dest = NULL;
 
 	if (errstr)
 		*errstr = NULL;
@@ -6432,7 +6403,6 @@ ndb_metal_knn_pack(const struct KNNModel *model,
 		+ sizeof(float) * (size_t) model->n_samples * (size_t) model->n_features
 		+ sizeof(double) * (size_t) model->n_samples;
 
-	char *blob_bytes = NULL;
 	nalloc(blob_bytes, char, VARHDRSZ + payload_bytes);
 	blob = (bytea *) blob_bytes;
 	SET_VARSIZE(blob, VARHDRSZ + payload_bytes);
@@ -6571,8 +6541,6 @@ ndb_metal_knn_train(const float *features,
 	}
 
 	/* Copy training data (KNN is a lazy learner - just stores data) */
-	float *features_copy = NULL;
-	double *labels_copy = NULL;
 	nalloc(features_copy, float, n_samples * feature_dim);
 	nalloc(labels_copy, double, n_samples);
 
@@ -6615,10 +6583,10 @@ ndb_metal_knn_predict(const bytea * model_data,
 					  double *prediction_out,
 					  char **errstr)
 {
-	const char *base;
-	NdbCudaKnnModelHeader *hdr;
-	const float *training_features;
-	const double *training_labels;
+	const char *base = NULL;
+	NdbCudaKnnModelHeader *hdr = NULL;
+	const float *training_features = NULL;
+	const double *training_labels = NULL;
 
 	float *distances = NULL;
 	int *top_k_indices = NULL;
@@ -6648,8 +6616,6 @@ ndb_metal_knn_predict(const bytea * model_data,
 	training_labels = (const double *) (base + sizeof(NdbCudaKnnModelHeader) + sizeof(float) * (size_t) hdr->n_samples * (size_t) hdr->n_features);
 
 	/* Allocate distance array */
-	float *distances = NULL;
-	int *top_k_indices = NULL;
 	nalloc(distances, float, hdr->n_samples);
 	nalloc(top_k_indices, int, hdr->k);
 
@@ -6818,7 +6784,6 @@ ndb_metal_hf_embed(const char *model_name,
 		}
 
 		/* Convert token IDs to float array for ONNX */
-		float *input_data = NULL;
 		nalloc(input_data, float, token_length);
 		for (i = 0; i < token_length; i++)
 			input_data[i] = (float) token_ids[i];
@@ -6856,7 +6821,6 @@ ndb_metal_hf_embed(const char *model_name,
 		}
 
 		/* Allocate output embedding */
-		float *embedding = NULL;
 		nalloc(embedding, float, embed_dim);
 
 		/* Pool embeddings (mean pooling across sequence dimension) */
@@ -7265,7 +7229,6 @@ neurondb_gpu_rf_predict_backend(const void *rf_hdr,
 		return false;
 	}
 
-	int *tally = NULL;
 	nalloc(tally, int, n_classes);
 	for (i = 0; i < n_trees; i++)
 	{

@@ -91,7 +91,7 @@ PG_FUNCTION_INFO_V1(vector_l2_distance_gpu);
 Datum
 vector_l2_distance_gpu(PG_FUNCTION_ARGS)
 {
-	Vector	   *a;
+	Vector	   *a = NULL;
 	Vector *b = NULL;
 	float4		result = -1.0f;
 	extern float4 l2_distance(Vector *a, Vector *b);
@@ -115,7 +115,7 @@ PG_FUNCTION_INFO_V1(vector_cosine_distance_gpu);
 Datum
 vector_cosine_distance_gpu(PG_FUNCTION_ARGS)
 {
-	Vector	   *a;
+	Vector	   *a = NULL;
 	Vector *b = NULL;
 	float4		result = -1.0f;
 	extern float4 cosine_distance(Vector *a, Vector *b);
@@ -139,7 +139,7 @@ PG_FUNCTION_INFO_V1(vector_inner_product_gpu);
 Datum
 vector_inner_product_gpu(PG_FUNCTION_ARGS)
 {
-	Vector	   *a;
+	Vector	   *a = NULL;
 	Vector *b = NULL;
 	float4		result = -1.0f;
 	extern float4 inner_product_distance(Vector *a, Vector *b);
@@ -168,7 +168,7 @@ PG_FUNCTION_INFO_V1(vector_to_int8_gpu);
 Datum
 vector_to_int8_gpu(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
+	Vector	   *v = NULL;
 	int			count;
 	bytea *out = NULL;
 	char *out_raw = NULL;
@@ -409,7 +409,7 @@ PG_FUNCTION_INFO_V1(vector_to_uint8_gpu);
 Datum
 vector_to_uint8_gpu(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
+	Vector	   *v = NULL;
 	VectorU8 *result = NULL;
 	bytea *out = NULL;
 
@@ -432,7 +432,7 @@ PG_FUNCTION_INFO_V1(vector_to_ternary_gpu);
 Datum
 vector_to_ternary_gpu(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
+	Vector	   *v = NULL;
 	VectorTernary *result = NULL;
 	bytea *out = NULL;
 
@@ -455,7 +455,7 @@ PG_FUNCTION_INFO_V1(vector_to_int4_gpu);
 Datum
 vector_to_int4_gpu(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
+	Vector	   *v = NULL;
 	VectorI4 *result = NULL;
 	bytea *out = NULL;
 
@@ -1235,8 +1235,8 @@ ivf_knn_search_gpu(PG_FUNCTION_ARGS)
 							 list_offnum = OffsetNumberNext(list_offnum))
 						{
 							ItemId		item_id = PageGetItemId(list_page, list_offnum);
-							IvfListEntryData *entry;
-							float4	   *entry_vec;
+							IvfListEntryData *entry = NULL;
+							float4	   *entry_vec = NULL;
 
 							if (!ItemIdIsValid(item_id) || ItemIdIsDead(item_id))
 								continue;

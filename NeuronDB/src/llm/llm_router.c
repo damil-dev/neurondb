@@ -479,10 +479,7 @@ ndb_llm_route_complete(const NdbLLMConfig *cfg,
 #ifdef HAVE_ONNX_RUNTIME
 				PG_TRY();
 				{
-					const char *ptr = NULL;
-					int			in_word = 0;
 					int			output_token_length;
-					int			word_count = 0;
 					int32	   *output_token_ids = NULL;
 
 					output_token_ids = neurondb_tokenize_with_model(
@@ -1331,7 +1328,7 @@ ndb_llm_route_complete_batch(const NdbLLMConfig *cfg,
 				|| opts->require_gpu))
 		{
 #ifdef NDB_GPU_CUDA
-			NdbCudaHfBatchResult *batch_results;
+			NdbCudaHfBatchResult *batch_results = NULL;
 			int			rc;
 			char	   *gpu_err = NULL;
 

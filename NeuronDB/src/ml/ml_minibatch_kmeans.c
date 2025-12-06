@@ -70,7 +70,7 @@ minibatch_kmeans_pp_init(float **data,
 						 int k,
 						 float **centroids)
 {
-	bool	   *selected;
+	bool	   *selected = NULL;
 	double *dist = NULL;
 	int			c,
 				i,
@@ -916,8 +916,8 @@ minibatch_kmeans_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char *
 {
 	typedef struct MiniBatchKMeansGpuModelState
 	{
-		bytea	   *model_blob;
-		Jsonb	   *metrics;
+	bytea	   *model_blob;
+	Jsonb	   *metrics;
 		int			num_clusters;
 		int			dim;
 		int			n_samples;
@@ -1131,8 +1131,8 @@ minibatch_kmeans_gpu_predict(const MLGpuModel *model, const float *input, int in
 {
 	typedef struct MiniBatchKMeansGpuModelState
 	{
-		bytea	   *model_blob;
-		Jsonb	   *metrics;
+	bytea	   *model_blob;
+	Jsonb	   *metrics;
 		int			num_clusters;
 		int			dim;
 		int			n_samples;
@@ -1222,8 +1222,8 @@ minibatch_kmeans_gpu_evaluate(const MLGpuModel *model, const MLGpuEvalSpec *spec
 {
 	typedef struct MiniBatchKMeansGpuModelState
 	{
-		bytea	   *model_blob;
-		Jsonb	   *metrics;
+	bytea	   *model_blob;
+	Jsonb	   *metrics;
 		int			num_clusters;
 		int			dim;
 		int			n_samples;
@@ -1231,7 +1231,7 @@ minibatch_kmeans_gpu_evaluate(const MLGpuModel *model, const MLGpuEvalSpec *spec
 	}			MiniBatchKMeansGpuModelState;
 
 	const		MiniBatchKMeansGpuModelState *state;
-	Jsonb	   *metrics_json;
+	Jsonb	   *metrics_json = NULL;
 	StringInfoData buf;
 
 	if (errstr != NULL)
@@ -1272,8 +1272,8 @@ minibatch_kmeans_gpu_serialize(const MLGpuModel *model, bytea * *payload_out,
 {
 	typedef struct MiniBatchKMeansGpuModelState
 	{
-		bytea	   *model_blob;
-		Jsonb	   *metrics;
+	bytea	   *model_blob;
+	Jsonb	   *metrics;
 		int			num_clusters;
 		int			dim;
 		int			n_samples;
@@ -1281,7 +1281,7 @@ minibatch_kmeans_gpu_serialize(const MLGpuModel *model, bytea * *payload_out,
 	}			MiniBatchKMeansGpuModelState;
 
 	const		MiniBatchKMeansGpuModelState *state;
-	bytea	   *payload_copy;
+	bytea	   *payload_copy = NULL;
 	int			payload_size;
 
 	if (errstr != NULL)
@@ -1331,8 +1331,8 @@ minibatch_kmeans_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 {
 	typedef struct MiniBatchKMeansGpuModelState
 	{
-		bytea	   *model_blob;
-		Jsonb	   *metrics;
+	bytea	   *model_blob;
+	Jsonb	   *metrics;
 		int			num_clusters;
 		int			dim;
 		int			n_samples;
@@ -1340,7 +1340,7 @@ minibatch_kmeans_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 	}			MiniBatchKMeansGpuModelState;
 
 	MiniBatchKMeansGpuModelState *state;
-	bytea	   *payload_copy;
+	bytea	   *payload_copy = NULL;
 	int			payload_size;
 	float **centers = NULL;
 	int			num_clusters = 0;
@@ -1435,8 +1435,8 @@ minibatch_kmeans_gpu_destroy(MLGpuModel *model)
 {
 	typedef struct MiniBatchKMeansGpuModelState
 	{
-		bytea	   *model_blob;
-		Jsonb	   *metrics;
+	bytea	   *model_blob;
+	Jsonb	   *metrics;
 		int			num_clusters;
 		int			dim;
 		int			n_samples;
