@@ -28,9 +28,6 @@
 #include "neurondb_macros.h"
 #include "neurondb_spi.h"
 
-/*
- * Vector element access
- */
 PG_FUNCTION_INFO_V1(vector_get);
 Datum
 vector_get(PG_FUNCTION_ARGS)
@@ -51,9 +48,6 @@ vector_get(PG_FUNCTION_ARGS)
 	PG_RETURN_FLOAT4(v->data[idx]);
 }
 
-/*
- * Vector element update
- */
 PG_FUNCTION_INFO_V1(vector_set);
 Datum
 vector_set(PG_FUNCTION_ARGS)
@@ -76,9 +70,6 @@ vector_set(PG_FUNCTION_ARGS)
 	PG_RETURN_VECTOR_P(result);
 }
 
-/*
- * Vector slice (extract subvector)
- */
 PG_FUNCTION_INFO_V1(vector_slice);
 Datum
 vector_slice(PG_FUNCTION_ARGS)

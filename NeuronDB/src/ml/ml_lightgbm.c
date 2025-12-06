@@ -103,10 +103,6 @@ predict_lightgbm(PG_FUNCTION_ARGS)
 	PG_RETURN_FLOAT8(0.0);
 }
 
-/*-------------------------------------------------------------------------
- * GPU Model Ops Registration for LightGBM
- *-------------------------------------------------------------------------
- */
 #include "neurondb_gpu_model.h"
 #include "ml_gpu_registry.h"
 #include "neurondb_validation.h"

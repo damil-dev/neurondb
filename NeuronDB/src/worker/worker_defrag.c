@@ -59,10 +59,6 @@
 #include "neurondb_macros.h"
 #include "neurondb_guc.h"
 
-/* GUC variables are now centralized in neurondb_guc.c */
-/* Use GetConfigOption() to retrieve GUC values */
-
-/* Helper to get int GUC value */
 static int
 get_guc_int(const char *name, int default_val)
 {
@@ -71,8 +67,6 @@ get_guc_int(const char *name, int default_val)
 	return val ? atoi(val) : default_val;
 }
 
-/* Helper to get double GUC value */
-/* Unused function - kept for potential future use */
 static double
 __attribute__((unused))
 get_guc_double(const char *name, double default_val)
@@ -82,7 +76,6 @@ get_guc_double(const char *name, double default_val)
 	return val ? atof(val) : default_val;
 }
 
-/* Helper to get bool GUC value */
 static bool
 get_guc_bool(const char *name, bool default_val)
 {
@@ -93,7 +86,6 @@ get_guc_bool(const char *name, bool default_val)
 	return (strcmp(val, "on") == 0 || strcmp(val, "true") == 0 || strcmp(val, "1") == 0);
 }
 
-/* Shared state structure for defrag worker, lives in shmem */
 typedef struct NeurandefragSharedState
 {
 	LWLock	   *lock;
@@ -107,10 +99,8 @@ typedef struct NeurandefragSharedState
 	bool		in_maintenance_window;
 }			NeurandefragSharedState;
 
-/* Pointer to shared memory state */
 static NeurandefragSharedState * neurandefrag_state = NULL;
 
-/* Exported worker entrypoint */
 PGDLLEXPORT void neurandefrag_main(Datum main_arg);
 
 static volatile sig_atomic_t got_sigterm = 0;
@@ -133,7 +123,6 @@ neurandefrag_run(PG_FUNCTION_ARGS)
 
 	elog(DEBUG1, "neurondb: neurandefrag_run invoked");
 
-	/* Connect to SPI */
 	session = ndb_spi_session_begin(CurrentMemoryContext, false);
 	if (session == NULL)
 	{
@@ -141,7 +130,6 @@ neurandefrag_run(PG_FUNCTION_ARGS)
 		PG_RETURN_BOOL(false);
 	}
 
-	/* Find HNSW indexes that may need defragmentation */
 	initStringInfo(&query);
 	appendStringInfo(&query,
 					 "SELECT c.oid, c.relname, n.nspname "
@@ -165,7 +153,6 @@ neurandefrag_run(PG_FUNCTION_ARGS)
 			 "neurondb: neurandefrag_run: found %d HNSW indexes to check",
 			 n_indexes);
 
-		/* For each index, check fragmentation and reorganize if needed */
 		for (i = 0; i < n_indexes; i++)
 		{
 			HeapTuple	tuple = SPI_tuptable->vals[i];
@@ -181,12 +168,9 @@ neurandefrag_run(PG_FUNCTION_ARGS)
 
 			index_oid = DatumGetObjectId(oid_datum);
 
-			/* Open index relation */
 			index_rel = index_open(index_oid, AccessShareLock);
 			nblocks = RelationGetNumberOfBlocks(index_rel);
 
-			/* Simple fragmentation estimate: check if pages are sparse */
-			/* For now, just check if index exists and has pages */
 			if (nblocks > 0)
 			{
 				/* Basic defragmentation: update statistics */
@@ -199,10 +183,6 @@ neurandefrag_run(PG_FUNCTION_ARGS)
 					 "neurondb: neurandefrag_run: index %u has %u blocks",
 					 index_oid,
 					 nblocks);
-
-				/* Update index statistics */
-				/* Note: vacuum_one_index is not available in PostgreSQL 18+ */
-				/* Index statistics will be updated on next VACUUM */
 
 				success = true;
 			}
@@ -226,7 +206,6 @@ neurandefrag_run(PG_FUNCTION_ARGS)
 	}
 }
 
-/* SIGTERM: request orderly shutdown */
 static void
 __attribute__((unused))
 neurandefrag_sigterm(SIGNAL_ARGS)
@@ -239,7 +218,6 @@ neurandefrag_sigterm(SIGNAL_ARGS)
 	errno = save_errno;
 }
 
-/* SIGHUP: reload config */
 static void
 __attribute__((unused))
 neurandefrag_sighup(SIGNAL_ARGS)
@@ -252,14 +230,12 @@ neurandefrag_sighup(SIGNAL_ARGS)
 	errno = save_errno;
 }
 
-/* SIGSEGV handler: try to recover from crash in worker logic */
 static void
 __attribute__((unused))
 neurandefrag_segv_handler(int signum)
 {
 	if (segv_recursed)
 	{
-		/* Already handling a SEGV: give up and terminate */
 		signal(signum, SIG_DFL);
 		raise(signum);
 		return;
@@ -271,17 +247,12 @@ neurandefrag_segv_handler(int signum)
 	longjmp(segv_jmp_buf, 1);
 }
 
-/* Register all tunable parameters (GUCs) for the defrag worker. */
-/* GUC initialization is now centralized in neurondb_guc.c */
-
-/* Shared memory size required for the worker */
 Size
 neurandefrag_shmem_size(void)
 {
 	return MAXALIGN(sizeof(NeurandefragSharedState));
 }
 
-/* Initialize or attach to shared memory state for defrag worker */
 void
 neurandefrag_shmem_init(void)
 {
@@ -340,10 +311,8 @@ neurandefrag_main(Datum main_arg)
 	pqsignal(SIGHUP, neurandefrag_sighup);
 	pqsignal(SIGSEGV, neurandefrag_segv_handler);
 
-	/* Connect to database - must be called before any SPI operations */
 	BackgroundWorkerInitializeConnection("postgres", NULL, 0);
 
-	/* Attach to shmem state */
 	LWLockAcquire(AddinShmemInitLock, LW_EXCLUSIVE);
 	neurandefrag_state = (NeurandefragSharedState *) ShmemInitStruct(
 																	 "NeuronDB Defrag Worker State",
@@ -359,10 +328,8 @@ neurandefrag_main(Datum main_arg)
 		proc_exit(1);
 	}
 
-	/* Set up longjmp exception handler */
 	if (sigsetjmp(local_sigjmp_buf, 1) != 0)
 	{
-		/* Error occurred, reset and cleanup */
 		FlushErrorState();
 		MemoryContextSwitchTo(TopMemoryContext);
 		if (worker_memctx)
@@ -415,12 +382,10 @@ neurandefrag_main(Datum main_arg)
 
 		oldctx = MemoryContextSwitchTo(worker_memctx);
 
-		/* Heartbeat */
 		LWLockAcquire(AddinShmemInitLock, LW_EXCLUSIVE);
 		neurandefrag_state->last_heartbeat = GetCurrentTimestamp();
 		LWLockRelease(AddinShmemInitLock);
 
-		/* Main defragmentation logic */
 		{
 			int64		tombstones_found = 0;
 			int64		edges_cleaned = 0;
@@ -431,11 +396,8 @@ neurandefrag_main(Datum main_arg)
 			SPITupleTable *tuptable;
 			bool		isnull;
 
-			/*
-			 * Start transaction - required before SPI operations and relation
-			 * access
-			 */
 			NDB_DECLARE(NdbSpiSession *, nested_session);
+
 			StartTransactionCommand();
 			PushActiveSnapshot(GetTransactionSnapshot());
 
@@ -444,7 +406,6 @@ neurandefrag_main(Datum main_arg)
 			{
 				PG_TRY();
 				{
-					/* Find HNSW indexes that need maintenance */
 					initStringInfo(&sql);
 					appendStringInfo(&sql,
 									 "SELECT c.relname, c.oid "
@@ -495,16 +456,9 @@ neurandefrag_main(Datum main_arg)
 							}
 							indexOid = DatumGetObjectId(oid_datum);
 
-							/* Open index and scan for issues */
 							indexRel = index_open(indexOid, AccessShareLock);
 							nblocks = RelationGetNumberOfBlocks(indexRel);
 
-							/* Scan index pages for tombstones/dead tuples */
-
-							/*
-							 * This is a simplified scan - full implementation
-							 * would traverse HNSW graph structure
-							 */
 							{
 								BufferAccessStrategy strategy;
 								BlockNumber blkno;
@@ -524,7 +478,6 @@ neurandefrag_main(Datum main_arg)
 									LockBuffer(buf, BUFFER_LOCK_SHARE);
 									page = BufferGetPage(buf);
 
-									/* Check for empty/deleted items on page */
 									if (PageGetMaxOffsetNumber(page) == 0)
 									{
 										dead_count++;

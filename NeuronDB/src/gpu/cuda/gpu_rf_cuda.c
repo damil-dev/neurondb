@@ -38,7 +38,6 @@
 #include "neurondb_guc.h"
 #include "neurondb_constants.h"
 
-/* Forward declarations for kernel launchers */
 extern int	launch_rf_predict_batch_kernel(const NdbCudaRfNode *d_nodes,
 										   const NdbCudaRfTreeHeader *d_trees,
 										   int tree_count,
@@ -65,14 +64,12 @@ typedef struct RfGpuModelCacheKey
 typedef struct RfGpuModelCacheEntry
 {
 	RfGpuModelCacheKey key;		/* Compound key */
-	NdbCudaRfGpuModel *gpu_model;	/* GPU-resident model */
+	NdbCudaRfGpuModel *gpu_model;
 }			RfGpuModelCacheEntry;
 
-/* Backend-local hash table for GPU model cache */
 static HTAB * rf_gpu_model_cache = NULL;
 static bool rf_cache_initialized = false;
 
-/* Forward declarations */
 static void rf_gpu_cache_init(void);
 static void rf_gpu_cache_cleanup(int code, Datum arg);
 
@@ -84,7 +81,6 @@ rf_model_hash(const void *key, Size keysize)
 	const		RfGpuModelCacheKey *cache_key = (const RfGpuModelCacheKey *) key;
 
 	(void) keysize;
-	/* Combine hash and size for better collision resistance */
 	hash_val = cache_key->model_hash ^ cache_key->model_size;
 	return hash_val;
 }
@@ -1156,7 +1152,6 @@ cleanup:
 	return -1;
 }
 
-/* Forward declaration for GPU-only batch inference */
 static int	ndb_cuda_rf_infer_batch_gpu(const NdbCudaRfGpuModel *model,
 										const float *d_features,
 										int n_samples,

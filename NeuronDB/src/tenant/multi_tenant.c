@@ -63,7 +63,7 @@ ndb_text_to_cstring_safe(text * t)
 	return result;
 }
 
-/*-------------------------------------------------------------------------
+/*
  * Tenant-Scoped Background Worker creation.
  * Validates and simulates worker registration. Always safe.
  *-------------------------------------------------------------------------
@@ -127,10 +127,6 @@ create_tenant_worker(PG_FUNCTION_ARGS)
 	PG_RETURN_INT32(worker_id);
 }
 
-/*-------------------------------------------------------------------------
- * Usage Metering: Returns usage stats as TEXT (simulate pg_stat_tenant)
- *-------------------------------------------------------------------------
- */
 PG_FUNCTION_INFO_V1(get_tenant_stats);
 Datum
 get_tenant_stats(PG_FUNCTION_ARGS)
@@ -160,10 +156,9 @@ get_tenant_stats(PG_FUNCTION_ARGS)
 	PG_RETURN_TEXT_P(cstring_to_text(stats.data));
 }
 
-/*-------------------------------------------------------------------------
+/*
  * Policy Engine: Register SQL-defined tenant policies.
  * Safe SPI usage, robust memory and transaction handling.
- *-------------------------------------------------------------------------
  */
 PG_FUNCTION_INFO_V1(create_policy);
 Datum
@@ -243,10 +238,6 @@ create_policy(PG_FUNCTION_ARGS)
 	PG_RETURN_BOOL(success);
 }
 
-/*-------------------------------------------------------------------------
- * Audit Log: Insert immutable audit entry with vector hash (SHA256 recommended for HMAC—stub here)
- *-------------------------------------------------------------------------
- */
 #include <math.h>
 
 static uint32

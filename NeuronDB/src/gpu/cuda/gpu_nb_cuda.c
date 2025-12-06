@@ -38,12 +38,11 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-/* Gaussian Naive Bayes model structure (matches ml_naive_bayes.c) */
 typedef struct GaussianNBModel
 {
-	double	   *class_priors;	/* P(class) */
-	double	  **means;			/* Mean for each feature per class */
-	double	  **variances;		/* Variance for each feature per class */
+	double	   *class_priors;
+	double	  **means;
+	double	  **variances;
 	int			n_classes;
 	int			n_features;
 }			GaussianNBModel;
@@ -77,7 +76,6 @@ ndb_cuda_nb_pack_model(const GaussianNBModel * model,
 		return -1;
 	}
 
-	/* Validate model structure */
 	if (model->n_classes <= 0 || model->n_classes > 1000000)
 	{
 		if (errstr)
@@ -91,7 +89,6 @@ ndb_cuda_nb_pack_model(const GaussianNBModel * model,
 		return -1;
 	}
 
-	/* Check for integer overflow in size calculations */
 	priors_bytes = sizeof(double) * (size_t) model->n_classes;
 	means_bytes = sizeof(double) * (size_t) model->n_classes * (size_t) model->n_features;
 	variances_bytes = sizeof(double) * (size_t) model->n_classes * (size_t) model->n_features;

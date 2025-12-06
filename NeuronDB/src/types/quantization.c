@@ -1564,11 +1564,6 @@ int4_to_vector(PG_FUNCTION_ARGS)
 	PG_RETURN_VECTOR_P(result);
 }
 
-/*-------------------------------------------------------------------------
- * halfvec type I/O functions (native PostgreSQL type for FP16 vectors)
- *-------------------------------------------------------------------------
- */
-
 /*
  * halfvec_in: Parse text input like "[1.0, 2.0, 3.0]" and convert to VectorF16
  */
@@ -1729,11 +1724,6 @@ halfvec_send(PG_FUNCTION_ARGS)
 	PG_RETURN_BYTEA_P(pq_endtypsend(&buf));
 }
 
-/*-------------------------------------------------------------------------
- * Comparison operators for halfvec type
- *-------------------------------------------------------------------------
- */
-
 /*
  * halfvec_eq: Equality comparison for halfvec
  */
@@ -1814,11 +1804,6 @@ halfvec_hash(PG_FUNCTION_ARGS)
 
 	PG_RETURN_UINT32(hash);
 }
-
-/*-------------------------------------------------------------------------
- * Distance functions for halfvec type
- *-------------------------------------------------------------------------
- */
 
 /*
  * halfvec_l2_distance: L2 distance between two halfvec vectors
@@ -1933,11 +1918,6 @@ halfvec_inner_product(PG_FUNCTION_ARGS)
 	PG_RETURN_FLOAT4((float4) (-sum));
 }
 
-/*-------------------------------------------------------------------------
- * bit type support for binary vectors (pgvector compatibility)
- *-------------------------------------------------------------------------
- */
-
 /*
  * vector_to_bit: Convert vector to PostgreSQL bit type (pgvector compatibility)
  * Returns bit type instead of bytea
@@ -2023,11 +2003,6 @@ bit_to_vector(PG_FUNCTION_ARGS)
 
 	PG_RETURN_VECTOR_P(result);
 }
-
-/*-------------------------------------------------------------------------
- * Distance functions for bit type (Hamming distance)
- *-------------------------------------------------------------------------
- */
 
 /*
  * bit_hamming_distance: Hamming distance between two bit vectors

@@ -6575,11 +6575,6 @@ evaluate_elastic_net_by_model_id(PG_FUNCTION_ARGS)
 	PG_RETURN_JSONB_P(result);
 }
 
-/*-------------------------------------------------------------------------
- * GPU Model Ops for Ridge Regression
- *-------------------------------------------------------------------------
- */
-
 typedef struct RidgeGpuModelState
 {
 	bytea	   *model_blob;
@@ -6941,11 +6936,6 @@ static const MLGpuModelOps ridge_gpu_model_ops = {
 	.destroy = ridge_gpu_destroy,
 };
 
-/*-------------------------------------------------------------------------
- * GPU Model Ops for Lasso Regression
- *-------------------------------------------------------------------------
- */
-
 typedef struct LassoGpuModelState
 {
 	bytea	   *model_blob;
@@ -7306,11 +7296,6 @@ static const MLGpuModelOps lasso_gpu_model_ops = {
 	.deserialize = lasso_gpu_deserialize,
 	.destroy = lasso_gpu_destroy,
 };
-
-/*-------------------------------------------------------------------------
- * GPU Model Ops Registration
- *-------------------------------------------------------------------------
- */
 
 void
 neurondb_gpu_register_ridge_model(void)

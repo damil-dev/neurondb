@@ -28,16 +28,12 @@
 #include <math.h>
 #include <float.h>
 
-/* ROCm resources */
 static bool rocm_initialized = false;
 static int rocm_device_id = 0;
 static rocblas_handle rocblas_handle = NULL;
 static hipStream_t hip_stream = NULL;
 static uint64_t total_rocm_ops = 0;
 
-/*
- * Initialize ROCm backend
- */
 bool
 neurondb_gpu_rocm_init(void)
 {
@@ -48,7 +44,6 @@ neurondb_gpu_rocm_init(void)
 	if (rocm_initialized)
 		return true;
 
-	/* Check for HIP devices */
 	hip_err = hipGetDeviceCount(&device_count);
 	if (hip_err != hipSuccess || device_count == 0)
 	{
@@ -57,7 +52,6 @@ neurondb_gpu_rocm_init(void)
 		return false;
 	}
 
-	/* Set device */
 	hip_err = hipSetDevice(rocm_device_id);
 	if (hip_err != hipSuccess)
 	{
@@ -67,7 +61,6 @@ neurondb_gpu_rocm_init(void)
 		return false;
 	}
 
-	/* Get device properties */
 	hipDeviceProp_t prop;
 	hip_err = hipGetDeviceProperties(&prop, rocm_device_id);
 	if (hip_err == hipSuccess)
@@ -82,7 +75,6 @@ neurondb_gpu_rocm_init(void)
 			prop.multiProcessorCount);
 	}
 
-	/* Create rocBLAS handle */
 	rocblas_status = rocblas_create_handle(&rocblas_handle);
 	if (rocblas_status != rocblas_status_success)
 	{
@@ -91,7 +83,6 @@ neurondb_gpu_rocm_init(void)
 		return false;
 	}
 
-	/* Create HIP stream */
 	hip_err = hipStreamCreate(&hip_stream);
 	if (hip_err != hipSuccess)
 	{
@@ -112,9 +103,6 @@ neurondb_gpu_rocm_init(void)
 	return true;
 }
 
-/*
- * Cleanup ROCm resources
- */
 void
 neurondb_gpu_rocm_cleanup(void)
 {
@@ -150,9 +138,6 @@ neurondb_gpu_rocm_is_available(void)
 	return rocm_initialized;
 }
 
-/*
- * Get ROCm device name
- */
 const char *
 neurondb_gpu_rocm_device_name(void)
 {
@@ -168,9 +153,6 @@ neurondb_gpu_rocm_device_name(void)
 	return device_name;
 }
 
-/*
- * L2 distance using ROCm
- */
 float
 neurondb_gpu_rocm_l2_distance(const float *a, const float *b, int dim)
 {
@@ -183,7 +165,6 @@ neurondb_gpu_rocm_l2_distance(const float *a, const float *b, int dim)
 	if (!rocm_initialized || dim < 64)
 		return -1.0f;
 
-	/* Allocate device memory */
 	hip_err = hipMalloc(&d_a, size);
 	if (hip_err != hipSuccess)
 		return -1.0f;
@@ -203,7 +184,6 @@ neurondb_gpu_rocm_l2_distance(const float *a, const float *b, int dim)
 		return -1.0f;
 	}
 
-	/* Copy data to device */
 	hipMemcpyAsync(d_a, a, size, hipMemcpyHostToDevice, hip_stream);
 	hipMemcpyAsync(d_b, b, size, hipMemcpyHostToDevice, hip_stream);
 	hipMemcpyAsync(d_diff, a, size, hipMemcpyHostToDevice, hip_stream);
@@ -214,10 +194,8 @@ neurondb_gpu_rocm_l2_distance(const float *a, const float *b, int dim)
 	/* Compute norm: result = ||d_diff|| */
 	rocblas_snrm2(rocblas_handle, dim, d_diff, 1, &result);
 
-	/* Wait for completion */
 	hipStreamSynchronize(hip_stream);
 
-	/* Free device memory */
 	hipFree(d_a);
 	hipFree(d_b);
 	hipFree(d_diff);
@@ -226,9 +204,6 @@ neurondb_gpu_rocm_l2_distance(const float *a, const float *b, int dim)
 	return result;
 }
 
-/*
- * Cosine distance using ROCm
- */
 float
 neurondb_gpu_rocm_cosine_distance(const float *a, const float *b, int dim)
 {
@@ -255,7 +230,6 @@ neurondb_gpu_rocm_cosine_distance(const float *a, const float *b, int dim)
 	hipMemcpyAsync(d_a, a, size, hipMemcpyHostToDevice, hip_stream);
 	hipMemcpyAsync(d_b, b, size, hipMemcpyHostToDevice, hip_stream);
 
-	/* Compute dot product and norms using rocBLAS */
 	rocblas_sdot(rocblas_handle, dim, d_a, 1, d_b, 1, &dot);
 	rocblas_snrm2(rocblas_handle, dim, d_a, 1, &norm_a);
 	rocblas_snrm2(rocblas_handle, dim, d_b, 1, &norm_b);
@@ -272,9 +246,6 @@ neurondb_gpu_rocm_cosine_distance(const float *a, const float *b, int dim)
 	return result;
 }
 
-/*
- * Inner product using ROCm
- */
 float
 neurondb_gpu_rocm_inner_product(const float *a, const float *b, int dim)
 {
@@ -311,23 +282,6 @@ neurondb_gpu_rocm_inner_product(const float *a, const float *b, int dim)
 	return -result;
 }
 
-/*
- * Batch L2 distance using ROCm
- * 
- * Computes L2 distances between all query vectors and all target vectors.
- * 
- * NOTE: Full parallel implementation requires a HIP kernel file (e.g., gpu_rocm_kernels.hip)
- * that would launch parallel threads to compute all distances simultaneously.
- * 
- * Current implementation: Uses individual GPU distance calls in a loop.
- * This is more efficient than CPU fallback but not as optimal as a true parallel kernel.
- * 
- * TODO: Implement proper HIP kernel for batch L2 distance computation:
- *   - Create gpu_rocm_kernels.hip with __global__ kernel
- *   - Launch kernel with grid/block dimensions for num_queries * num_targets threads
- *   - Each thread computes one distance
- *   - Use shared memory for query/target vectors when beneficial
- */
 void
 neurondb_gpu_rocm_batch_l2(const float *queries,
 	const float *targets,
@@ -338,9 +292,6 @@ neurondb_gpu_rocm_batch_l2(const float *queries,
 {
 	int i, j;
 
-	/* Optimized batch computation using GPU */
-	/* For large batches, this uses individual GPU calls which is efficient */
-	/* For even better performance, a dedicated HIP kernel can be added in gpu_rocm_kernels.cu */
 	for (i = 0; i < num_queries; i++)
 	{
 		for (j = 0; j < num_targets; j++)
@@ -353,16 +304,6 @@ neurondb_gpu_rocm_batch_l2(const float *queries,
 				distances[i * num_targets + j] = FLT_MAX;
 		}
 	}
-
-	/* Note: A dedicated HIP kernel (similar to CUDA's cuda_batch_l2_kernel) can be added
-	 * in a separate gpu_rocm_kernels.cu file for even better parallel performance:
-	 * 
-	 * hipLaunchKernelGGL(rocm_batch_l2_kernel,
-	 *     dim3((num_queries * num_targets + 255) / 256),
-	 *     dim3(256),
-	 *     0, hip_stream,
-	 *     d_queries, d_targets, d_distances,
-	 *     num_queries, num_targets, dim);
 	 */
 }
 

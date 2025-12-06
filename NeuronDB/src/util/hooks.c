@@ -27,9 +27,6 @@
 #include "neurondb_safe_memory.h"
 #include "neurondb_macros.h"
 
-/*
- * Planner Extension API: Register custom distance or reranker operators
- */
 PG_FUNCTION_INFO_V1(register_custom_operator);
 Datum
 register_custom_operator(PG_FUNCTION_ARGS)
@@ -47,16 +44,9 @@ register_custom_operator(PG_FUNCTION_ARGS)
 		 name_str,
 		 func_str);
 
-	/* Store operator metadata */
-	/* Register with query planner */
-	/* Allow custom distance functions without rebuild */
-
 	PG_RETURN_BOOL(true);
 }
 
-/*
- * Logical Replication Plugin: Replicate embeddings through binary messages
- */
 PG_FUNCTION_INFO_V1(enable_vector_replication);
 Datum
 enable_vector_replication(PG_FUNCTION_ARGS)
@@ -66,23 +56,11 @@ enable_vector_replication(PG_FUNCTION_ARGS)
 
 	pub_str = text_to_cstring(publication_name);
 
-	/*
-	 * Suppress unused variable warning - placeholder for future
-	 * implementation
-	 */
 	(void) pub_str;
-
-
-	/* Register logical replication output plugin */
-	/* Encode vectors in binary-safe format */
-	/* Stream ANN index updates */
 
 	PG_RETURN_BOOL(true);
 }
 
-/*
- * Foreign Data Wrapper: Query external vector stores (FAISS, Milvus, Weaviate)
- */
 PG_FUNCTION_INFO_V1(create_vector_fdw);
 Datum
 create_vector_fdw(PG_FUNCTION_ARGS)
@@ -104,10 +82,6 @@ create_vector_fdw(PG_FUNCTION_ARGS)
 		 name_str,
 		 conn_str);
 
-	/* Register FDW handlers */
-	/* Map remote vector store operations to PostgreSQL */
-	/* Support: FAISS, Milvus, Weaviate, Pinecone */
-
 	NDB_FREE(name_str);
 	NDB_FREE(type_str);
 	NDB_FREE(conn_str);
@@ -115,9 +89,6 @@ create_vector_fdw(PG_FUNCTION_ARGS)
 	PG_RETURN_BOOL(true);
 }
 
-/*
- * Unit Test Framework: SQL-based assert engine for ANN accuracy
- */
 PG_FUNCTION_INFO_V1(assert_recall);
 Datum
 assert_recall(PG_FUNCTION_ARGS)

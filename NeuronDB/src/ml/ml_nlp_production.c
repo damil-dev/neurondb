@@ -403,10 +403,6 @@ answer_question(PG_FUNCTION_ARGS)
 	PG_RETURN_TEXT_P(cstring_to_text(answer.data));
 }
 
-/*-------------------------------------------------------------------------
- * GPU Model Ops Registration for NLP Production
- *-------------------------------------------------------------------------
- */
 #include "neurondb_gpu_model.h"
 #include "ml_gpu_registry.h"
 #include "neurondb_safe_memory.h"

@@ -32,7 +32,6 @@
 #include "neurondb_safe_memory.h"
 #include "neurondb_macros.h"
 
-/* Queue structure for BFS */
 typedef struct QueueNode
 {
 	int32		node_idx;
@@ -109,7 +108,6 @@ queue_free(Queue * q)
 	NDB_FREE(q);
 }
 
-/* Stack structure for DFS */
 typedef struct StackNode
 {
 	int32		node_idx;
@@ -228,7 +226,6 @@ vgraph_bfs(PG_FUNCTION_ARGS)
 		NDB_ALLOC(visited, int32, graph->num_nodes);
 		NDB_ALLOC(depth, int32, graph->num_nodes);
 		NDB_ALLOC(parent, int32, graph->num_nodes);
-		/* Initialize arrays to zero */
 		memset(visited, 0, sizeof(int32) * graph->num_nodes);
 		memset(depth, 0, sizeof(int32) * graph->num_nodes);
 		memset(parent, 0, sizeof(int32) * graph->num_nodes);
@@ -236,7 +233,6 @@ vgraph_bfs(PG_FUNCTION_ARGS)
 		fctx->depth = depth;
 		fctx->parent = parent;
 
-		/* Initialize depth and parent arrays */
 		for (i = 0; i < graph->num_nodes; i++)
 		{
 			fctx->depth[i] = -1;
@@ -246,7 +242,6 @@ vgraph_bfs(PG_FUNCTION_ARGS)
 		fctx->queue = queue_create();
 		edges = VGRAPH_EDGES(graph);
 
-		/* Initialize BFS */
 		fctx->visited[start_node_idx] = 1;
 		fctx->depth[start_node_idx] = 0;
 		fctx->parent[start_node_idx] = -1;

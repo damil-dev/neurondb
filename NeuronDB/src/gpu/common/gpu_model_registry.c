@@ -59,7 +59,6 @@ ndb_gpu_register_model_ops(const MLGpuModelOps *ops)
 
 	ndb_gpu_init_model_registry();
 
-	/* Copy algorithm name to key buffer */
 	strlcpy(key, ops->algorithm, sizeof(key));
 
 	entry = (MLGpuModelEntry *) hash_search(

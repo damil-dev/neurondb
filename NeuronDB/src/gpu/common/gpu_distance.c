@@ -25,16 +25,12 @@
 #include <math.h>
 #include <string.h>
 
-/*
- * GPU L2 distance (Euclidean)
- */
 float
 neurondb_gpu_l2_distance(const float *vec1, const float *vec2, int dim)
 {
 	const ndb_gpu_backend *backend;
 	float		result = -1.0f;
 
-	/* CPU mode: never run GPU code */
 	if (NDB_COMPUTE_MODE_IS_CPU())
 		return -1.0f;
 
@@ -57,16 +53,12 @@ neurondb_gpu_l2_distance(const float *vec1, const float *vec2, int dim)
 	return result;
 }
 
-/*
- * GPU cosine distance
- */
 float
 neurondb_gpu_cosine_distance(const float *vec1, const float *vec2, int dim)
 {
 	const ndb_gpu_backend *backend;
 	float		result = -1.0f;
 
-	/* CPU mode: never run GPU code */
 	if (NDB_COMPUTE_MODE_IS_CPU())
 		return -1.0f;
 
@@ -89,9 +81,6 @@ neurondb_gpu_cosine_distance(const float *vec1, const float *vec2, int dim)
 	return result;
 }
 
-/*
- * GPU inner product (negative for maximum inner product search)
- */
 float
 neurondb_gpu_inner_product(const float *vec1, const float *vec2, int dim)
 {
@@ -99,18 +88,16 @@ neurondb_gpu_inner_product(const float *vec1, const float *vec2, int dim)
 	int			i;
 	float		dot = 0.0f;
 
-	/* CPU mode: never run GPU code */
 	if (NDB_COMPUTE_MODE_IS_CPU())
 	{
 		/* CPU fallback */
 		for (i = 0; i < dim; i++)
 			dot += vec1[i] * vec2[i];
-		return -dot;			/* Negative for maximum inner product search */
+		return -dot;
 	}
 
 	if (!neurondb_gpu_is_available())
 	{
-		/* CPU fallback */
 		for (i = 0; i < dim; i++)
 			dot += vec1[i] * vec2[i];
 		return -dot;			/* Negative for maximum inner product search */

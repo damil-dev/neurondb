@@ -39,10 +39,6 @@
 /* Forward declaration */
 static int	hierarchical_model_deserialize_from_bytea(const bytea * data, float ***centers_out, int *n_clusters_out, int *dim_out, char *linkage_out, int linkage_max);
 
-/*--------------------
- * ClusterNode - Represents a cluster in the hierarchy.
- *--------------------
- */
 typedef struct ClusterNode
 {
 	int			id;				/* Cluster ID */
@@ -955,10 +951,6 @@ evaluate_hierarchical_by_model_id(PG_FUNCTION_ARGS)
 	PG_RETURN_JSONB_P(result);
 }
 
-/*-------------------------------------------------------------------------
- * GPU Model Ops Registration for Hierarchical Clustering
- *-------------------------------------------------------------------------
- */
 #include "neurondb_gpu_model.h"
 #include "neurondb_safe_memory.h"
 #include "neurondb_macros.h"

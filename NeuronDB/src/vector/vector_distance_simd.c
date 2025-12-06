@@ -24,7 +24,6 @@
 #include <math.h>
 #include <float.h>
 
-/* SIMD includes - conditional compilation */
 #ifdef __AVX2__
 #include <immintrin.h>
 #define HAVE_AVX2 1
@@ -39,19 +38,12 @@
 #define HAVE_AVX512 0
 #endif
 
-/* CPU feature detection */
 static int	simd_capabilities = -1;
 
 #define SIMD_NONE 0
 #define SIMD_AVX2 1
 #define SIMD_AVX512 2
 
-/*
- * detect_simd_capabilities
- *
- * Detect available SIMD instruction sets at runtime.
- * Returns: SIMD_NONE, SIMD_AVX2, or SIMD_AVX512
- */
 int
 detect_simd_capabilities(void)
 {
@@ -70,7 +62,6 @@ detect_simd_capabilities(void)
 	return simd_capabilities;
 }
 
-/* Forward declarations */
 float4		inner_product_distance_simd(Vector *a, Vector *b);
 
 /*
@@ -220,10 +211,8 @@ l2_distance_avx512(const Vector *a, const Vector *b)
 		sum_vec = _mm512_add_ps(sum_vec, sq);
 	}
 
-	/* Horizontal sum */
 	float		sum = horizontal_sum_avx512(sum_vec);
 
-	/* Handle remainder */
 	for (i = simd_end; i < a->dim; i++)
 	{
 		float		diff = a->data[i] - b->data[i];
@@ -258,10 +247,8 @@ inner_product_avx2(const Vector *a, const Vector *b)
 		sum_vec = _mm256_add_ps(sum_vec, prod);
 	}
 
-	/* Horizontal sum */
 	float		sum = horizontal_sum_avx2(sum_vec);
 
-	/* Handle remainder */
 	for (i = simd_end; i < a->dim; i++)
 		sum += a->data[i] * b->data[i];
 
@@ -330,12 +317,10 @@ cosine_distance_avx2(const Vector *a, const Vector *b)
 		norm_b_vec = _mm256_fmadd_ps(vb, vb, norm_b_vec);
 	}
 
-	/* Horizontal sums */
 	float		dot = horizontal_sum_avx2(dot_vec);
 	float		norm_a = horizontal_sum_avx2(norm_a_vec);
 	float		norm_b = horizontal_sum_avx2(norm_b_vec);
 
-	/* Handle remainder */
 	for (i = simd_end; i < a->dim; i++)
 	{
 		float		va = a->data[i];
@@ -382,12 +367,10 @@ cosine_distance_avx512(const Vector *a, const Vector *b)
 		norm_b_vec = _mm512_fmadd_ps(vb, vb, norm_b_vec);
 	}
 
-	/* Horizontal sums */
 	float		dot = horizontal_sum_avx512(dot_vec);
 	float		norm_a = horizontal_sum_avx512(norm_a_vec);
 	float		norm_b = horizontal_sum_avx512(norm_b_vec);
 
-	/* Handle remainder */
 	for (i = simd_end; i < a->dim; i++)
 	{
 		float		va = a->data[i];
@@ -432,10 +415,8 @@ l1_distance_avx2(const Vector *a, const Vector *b)
 		sum_vec = _mm256_add_ps(sum_vec, abs_diff);
 	}
 
-	/* Horizontal sum */
 	float		sum = horizontal_sum_avx2(sum_vec);
 
-	/* Handle remainder */
 	for (i = simd_end; i < a->dim; i++)
 		sum += fabsf(a->data[i] - b->data[i]);
 
@@ -524,7 +505,6 @@ l2_distance_simd(Vector *a, Vector *b)
 	}
 #endif
 
-	/* Fallback to scalar */
 	return l2_distance(a, b);
 }
 
@@ -574,15 +554,9 @@ inner_product_simd(Vector *a, Vector *b)
 	}
 #endif
 
-	/* Fallback to scalar */
 	return -inner_product_distance(a, b);
 }
 
-/*
- * inner_product_distance_simd
- *
- * Alias for inner_product_simd to match naming convention.
- */
 float4
 inner_product_distance_simd(Vector *a, Vector *b)
 {
@@ -635,15 +609,9 @@ cosine_distance_simd(Vector *a, Vector *b)
 	}
 #endif
 
-	/* Fallback to scalar */
 	return cosine_distance(a, b);
 }
 
-/*
- * l1_distance_simd
- *
- * SIMD-optimized L1 distance with automatic fallback.
- */
 float4
 l1_distance_simd(Vector *a, Vector *b)
 {
@@ -685,6 +653,5 @@ l1_distance_simd(Vector *a, Vector *b)
 	}
 #endif
 
-	/* Fallback to scalar */
 	return l1_distance(a, b);
 }

@@ -36,15 +36,10 @@
 #include "neurondb_safe_memory.h"
 #include "neurondb_macros.h"
 
-/* Forward declarations for vecmap distance functions */
 extern Datum vecmap_l2_distance(PG_FUNCTION_ARGS);
 extern Datum vecmap_cosine_distance(PG_FUNCTION_ARGS);
 extern Datum vecmap_inner_product(PG_FUNCTION_ARGS);
 
-/*
- * vectorp_in: Parse vectorp from text
- * Format: "[1.0,2.0,3.0]"
- */
 PG_FUNCTION_INFO_V1(vectorp_in);
 Datum
 vectorp_in(PG_FUNCTION_ARGS)
@@ -106,7 +101,6 @@ vectorp_in(PG_FUNCTION_ARGS)
 	result = (VectorPacked *) palloc0(size);
 	SET_VARSIZE(result, size);
 
-	/* Compute fingerprint (CRC32 of dimension count) */
 	fingerprint = crc32(0L, Z_NULL, 0);
 	fingerprint = crc32(fingerprint, (unsigned char *) &dim, sizeof(dim));
 
@@ -122,9 +116,6 @@ vectorp_in(PG_FUNCTION_ARGS)
 	PG_RETURN_POINTER(result);
 }
 
-/*
- * vectorp_out: Convert vectorp to text
- */
 PG_FUNCTION_INFO_V1(vectorp_out);
 Datum
 vectorp_out(PG_FUNCTION_ARGS)
@@ -147,10 +138,6 @@ vectorp_out(PG_FUNCTION_ARGS)
 	PG_RETURN_CSTRING(buf.data);
 }
 
-/*
- * vecmap_in: Parse sparse vector map
- * Format: "{dim:1000,nnz:5,indices:[0,10,20],values:[1.0,2.0,3.0]}"
- */
 PG_FUNCTION_INFO_V1(vecmap_in);
 Datum
 vecmap_in(PG_FUNCTION_ARGS)
@@ -324,9 +311,6 @@ vecmap_in(PG_FUNCTION_ARGS)
 	PG_RETURN_POINTER(result);
 }
 
-/*
- * vecmap_out: Convert sparse vector map to text
- */
 PG_FUNCTION_INFO_V1(vecmap_out);
 Datum
 vecmap_out(PG_FUNCTION_ARGS)
@@ -366,16 +350,6 @@ vecmap_out(PG_FUNCTION_ARGS)
 	PG_RETURN_CSTRING(buf.data);
 }
 
-/*-------------------------------------------------------------------------
- * sparsevec type I/O functions (pgvector-compatible sparse vector type)
- * Format: "{1:0.5, 5:0.3, 10:0.8}" or "{dim:1000,1:0.5,5:0.3,10:0.8}"
- *-------------------------------------------------------------------------
- */
-
-/*
- * sparsevec_in: Parse pgvector-compatible sparse vector format
- * Format: "{index:value, index:value, ...}" or "{dim:N, index:value, ...}"
- */
 PG_FUNCTION_INFO_V1(sparsevec_in);
 Datum
 sparsevec_in(PG_FUNCTION_ARGS)
@@ -513,9 +487,6 @@ sparsevec_in(PG_FUNCTION_ARGS)
 	PG_RETURN_POINTER(result);
 }
 
-/*
- * sparsevec_out: Convert sparsevec to pgvector-compatible text format
- */
 PG_FUNCTION_INFO_V1(sparsevec_out);
 Datum
 sparsevec_out(PG_FUNCTION_ARGS)
@@ -549,9 +520,6 @@ sparsevec_out(PG_FUNCTION_ARGS)
 	PG_RETURN_CSTRING(buf.data);
 }
 
-/*
- * sparsevec_recv: Binary receive function
- */
 PG_FUNCTION_INFO_V1(sparsevec_recv);
 Datum
 sparsevec_recv(PG_FUNCTION_ARGS)
@@ -591,9 +559,6 @@ sparsevec_recv(PG_FUNCTION_ARGS)
 	PG_RETURN_POINTER(result);
 }
 
-/*
- * sparsevec_send: Binary send function
- */
 PG_FUNCTION_INFO_V1(sparsevec_send);
 Datum
 sparsevec_send(PG_FUNCTION_ARGS)
@@ -620,14 +585,6 @@ sparsevec_send(PG_FUNCTION_ARGS)
 	PG_RETURN_BYTEA_P(pq_endtypsend(&buf));
 }
 
-/*-------------------------------------------------------------------------
- * Comparison operators for sparsevec type
- *-------------------------------------------------------------------------
- */
-
-/*
- * sparsevec_eq: Equality comparison for sparsevec
- */
 PG_FUNCTION_INFO_V1(sparsevec_eq);
 Datum
 sparsevec_eq(PG_FUNCTION_ARGS)
@@ -665,9 +622,6 @@ sparsevec_eq(PG_FUNCTION_ARGS)
 	PG_RETURN_BOOL(true);
 }
 
-/*
- * sparsevec_ne: Inequality comparison for sparsevec
- */
 PG_FUNCTION_INFO_V1(sparsevec_ne);
 Datum
 sparsevec_ne(PG_FUNCTION_ARGS)
@@ -678,9 +632,6 @@ sparsevec_ne(PG_FUNCTION_ARGS)
 		: BoolGetDatum(true);
 }
 
-/*
- * sparsevec_hash: Hash function for sparsevec
- */
 PG_FUNCTION_INFO_V1(sparsevec_hash);
 Datum
 sparsevec_hash(PG_FUNCTION_ARGS)
@@ -712,14 +663,6 @@ sparsevec_hash(PG_FUNCTION_ARGS)
 	PG_RETURN_UINT32(hash);
 }
 
-/*-------------------------------------------------------------------------
- * Distance functions for sparsevec type (reuse vecmap functions)
- *-------------------------------------------------------------------------
- */
-
-/*
- * sparsevec_l2_distance: L2 distance for sparsevec (uses vecmap_l2_distance)
- */
 PG_FUNCTION_INFO_V1(sparsevec_l2_distance);
 Datum
 sparsevec_l2_distance(PG_FUNCTION_ARGS)
@@ -727,9 +670,6 @@ sparsevec_l2_distance(PG_FUNCTION_ARGS)
 	return vecmap_l2_distance(fcinfo);
 }
 
-/*
- * sparsevec_cosine_distance: Cosine distance for sparsevec
- */
 PG_FUNCTION_INFO_V1(sparsevec_cosine_distance);
 Datum
 sparsevec_cosine_distance(PG_FUNCTION_ARGS)
@@ -737,9 +677,6 @@ sparsevec_cosine_distance(PG_FUNCTION_ARGS)
 	return vecmap_cosine_distance(fcinfo);
 }
 
-/*
- * sparsevec_inner_product: Inner product for sparsevec
- */
 PG_FUNCTION_INFO_V1(sparsevec_inner_product);
 Datum
 sparsevec_inner_product(PG_FUNCTION_ARGS)
@@ -747,9 +684,6 @@ sparsevec_inner_product(PG_FUNCTION_ARGS)
 	return vecmap_inner_product(fcinfo);
 }
 
-/*
- * sparsevec_l2_norm: L2 norm for sparsevec (pgvector compatibility)
- */
 PG_FUNCTION_INFO_V1(sparsevec_l2_norm);
 Datum
 sparsevec_l2_norm(PG_FUNCTION_ARGS)
@@ -772,9 +706,6 @@ sparsevec_l2_norm(PG_FUNCTION_ARGS)
 	PG_RETURN_FLOAT8(sqrt(sum));
 }
 
-/*
- * sparsevec_l2_normalize: Normalize sparsevec with L2 norm (pgvector compatibility)
- */
 PG_FUNCTION_INFO_V1(sparsevec_l2_normalize);
 Datum
 sparsevec_l2_normalize(PG_FUNCTION_ARGS)
@@ -825,9 +756,6 @@ sparsevec_l2_normalize(PG_FUNCTION_ARGS)
 	PG_RETURN_POINTER(result);
 }
 
-/*
- * rtext_in: Parse retrievable text
- */
 PG_FUNCTION_INFO_V1(rtext_in);
 Datum
 rtext_in(PG_FUNCTION_ARGS)
@@ -853,9 +781,6 @@ rtext_in(PG_FUNCTION_ARGS)
 	PG_RETURN_POINTER(result);
 }
 
-/*
- * rtext_out: Convert retrievable text to string
- */
 PG_FUNCTION_INFO_V1(rtext_out);
 Datum
 rtext_out(PG_FUNCTION_ARGS)
@@ -870,10 +795,6 @@ rtext_out(PG_FUNCTION_ARGS)
 	PG_RETURN_CSTRING(result);
 }
 
-/*
- * vgraph_in: Parse graph structure
- * Format: "{nodes:5,edges:[[0,1],[1,2],[2,3]]}"
- */
 PG_FUNCTION_INFO_V1(vgraph_in);
 Datum
 vgraph_in(PG_FUNCTION_ARGS)
@@ -1047,9 +968,6 @@ vgraph_in(PG_FUNCTION_ARGS)
 	PG_RETURN_POINTER(result);
 }
 
-/*
- * vgraph_out: Convert graph to text
- */
 PG_FUNCTION_INFO_V1(vgraph_out);
 Datum
 vgraph_out(PG_FUNCTION_ARGS)
@@ -1078,9 +996,6 @@ vgraph_out(PG_FUNCTION_ARGS)
 	PG_RETURN_CSTRING(buf.data);
 }
 
-/*
- * vectorp_dims: Get dimensions of packed vector
- */
 PG_FUNCTION_INFO_V1(vectorp_dims);
 Datum
 vectorp_dims(PG_FUNCTION_ARGS)
@@ -1090,9 +1005,6 @@ vectorp_dims(PG_FUNCTION_ARGS)
 	PG_RETURN_INT32(vec->dim);
 }
 
-/*
- * vectorp_validate: Validate fingerprint and endianness
- */
 PG_FUNCTION_INFO_V1(vectorp_validate);
 Datum
 vectorp_validate(PG_FUNCTION_ARGS)
@@ -1120,7 +1032,6 @@ vectorp_validate(PG_FUNCTION_ARGS)
 	PG_RETURN_BOOL(true);
 }
 
-/* Helper function for compute_stats callback (PostgreSQL 16+ API) */
 static void
 vector_compute_stats(VacAttrStats * stats, AnalyzeAttrFetchFunc fetchfunc, int samplerows, double totalrows)
 {
@@ -1250,17 +1161,6 @@ vector_compute_stats(VacAttrStats * stats, AnalyzeAttrFetchFunc fetchfunc, int s
 		NDB_FREE(dim_maxs);
 }
 
-/*
- * vector_analyze: ANALYZE hook for collecting vector column statistics
- * This function is called during ANALYZE to collect statistics about vector columns
- * that can help the query planner make better decisions.
- *
- * Collects:
- * - Dimensionality (all vectors should have same dimension)
- * - Vector norm statistics (min, max, mean, stddev)
- * - Per-dimension statistics (min, max, mean for first few dimensions)
- * - Sample vectors for distance estimation
- */
 PG_FUNCTION_INFO_V1(vector_analyze);
 Datum
 vector_analyze(PG_FUNCTION_ARGS)
@@ -1276,10 +1176,6 @@ vector_analyze(PG_FUNCTION_ARGS)
 	PG_RETURN_BOOL(true);
 }
 
-/*
- * BinaryVec: Packed binary vector for efficient quantization
- * Stores bits in a compact format where each bit represents a binary value
- */
 typedef struct BinaryVec
 {
 	int32		vl_len_;		/* varlena header */
@@ -1290,10 +1186,6 @@ typedef struct BinaryVec
 #define BINARYVEC_SIZE(dim) (offsetof(BinaryVec, data) + ((dim + 7) / 8))
 #define BINARYVEC_DIMENSION(bv) ((bv)->dim)
 
-/*
- * binaryvec_in: Parse binaryvec from text
- * Format: "[1,0,1,0]" or "1010" (binary string)
- */
 PG_FUNCTION_INFO_V1(binaryvec_in);
 Datum
 binaryvec_in(PG_FUNCTION_ARGS)
@@ -1425,10 +1317,6 @@ binaryvec_in(PG_FUNCTION_ARGS)
 	PG_RETURN_POINTER(result);
 }
 
-/*
- * binaryvec_out: Convert binaryvec to text
- * Output format: "[1,0,1,0]"
- */
 PG_FUNCTION_INFO_V1(binaryvec_out);
 Datum
 binaryvec_out(PG_FUNCTION_ARGS)
@@ -1462,10 +1350,6 @@ binaryvec_out(PG_FUNCTION_ARGS)
 	PG_RETURN_CSTRING(buf.data);
 }
 
-/*
- * binaryvec_hamming_distance: Compute Hamming distance between two binary vectors
- * Returns the number of positions where the bits differ
- */
 PG_FUNCTION_INFO_V1(binaryvec_hamming_distance);
 Datum
 binaryvec_hamming_distance(PG_FUNCTION_ARGS)

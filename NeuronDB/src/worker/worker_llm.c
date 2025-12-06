@@ -62,7 +62,6 @@ static void
 static int
 			prune_llm_jobs_safe(int max_age_days);
 
-/* Signal handlers */
 static volatile sig_atomic_t got_sigterm = false;
 
 static void
@@ -75,19 +74,6 @@ neuranllm_sigterm(SIGNAL_ARGS)
 	errno = save_errno;
 }
 
-/*
- * neuranllm_main - Background worker main loop.
- *
- * This worker is structured so that if any code in any part crashes,
- * panics, or throws (including segfault, OOM, error), we fully clean up:
- *   - All open transactions are aborted
- *   - All memory context allocations are cleaned
- *   - All job pointer state is reset
- *   - The error is logged
- *   - The worker loop is restarted with no residue
- * Worker cannot leave any transactional or memory junk, even after crash.
- * If a crash happens processing a job, the job is marked as failed.
- */
 PGDLLEXPORT void
 neuranllm_main(Datum main_arg)
 {
@@ -98,9 +84,7 @@ neuranllm_main(Datum main_arg)
 
 	(void) main_arg;
 
-	/* Establish signal handler */
 	pqsignal(SIGTERM, neuranllm_sigterm);
-	/* Ignore SIGPIPE to prevent crashes when writing to broken pipes */
 	pqsignal(SIGPIPE, SIG_IGN);
 
 	BackgroundWorkerUnblockSignals();
@@ -123,16 +107,12 @@ neuranllm_main(Datum main_arg)
 
 		PG_TRY();
 		{
-			/* -- Begin transactional-safe loop. If this code crashes at any */
-			/* point, we will catch it and fully clean up as described. */
-
 			StartTransactionCommand();
 			PushActiveSnapshot(GetTransactionSnapshot());
 
 			job_type = NULL;
 			payload = NULL;
 
-			/* Check if LLM jobs table exists before trying to acquire jobs */
 			{
 				int			ret;
 				uint64		table_check_processed;
@@ -157,14 +137,12 @@ neuranllm_main(Datum main_arg)
 				if (ret != SPI_OK_SELECT
 					|| table_check_processed == 0)
 				{
-					/* Table doesn't exist yet, just sleep and continue */
 					PopActiveSnapshot();
 					CommitTransactionCommand();
 
 					MemoryContextSwitchTo(oldcxt);
 					MemoryContextDelete(llm_loop_ctx);
-					llm_loop_ctx =
-						NULL;	/* Prevent double-free */
+					llm_loop_ctx = NULL;
 
 					(void) WaitLatch(MyLatch,
 									 WL_LATCH_SET | WL_TIMEOUT
@@ -191,15 +169,10 @@ neuranllm_main(Datum main_arg)
 					 (int) job_id,
 					 job_type);
 
-				/* Process job in separate function to avoid nested PG_TRY */
 				process_llm_job_safe(job_id,
 									 (const char *) job_type,
 									 (const char *) payload);
 
-				/*
-				 * -- Always free job_type/payload after job processing, no
-				 * matter what
-				 */
 				if (job_type != NULL)
 				{
 					pfree((void *) job_type);
@@ -222,7 +195,6 @@ neuranllm_main(Datum main_arg)
 
 				StartTransactionCommand();
 				PushActiveSnapshot(GetTransactionSnapshot());
-				/* Prune jobs in separate function to avoid nested PG_TRY */
 				pruned = prune_llm_jobs_safe(7);
 				if (pruned > 0)
 					elog(LOG,
@@ -238,10 +210,6 @@ neuranllm_main(Datum main_arg)
 			EmitErrorReport();
 			FlushErrorState();
 
-			/*
-			 * If any top-level error/crash, abort transaction & cleanup
-			 * memory/ptrs
-			 */
 			if (IsTransactionState())
 				AbortCurrentTransaction();
 			if (job_type != NULL)
@@ -287,11 +255,6 @@ neuranllm_main(Datum main_arg)
 	proc_exit(0);
 }
 
-/*
- * process_llm_job - Execute a single LLM job.
- * Any crash, OOM, segfault, or exception in this routine (or anything it calls)
- * will be caught and the job will be marked failed, never allowed to propagate.
- */
 static void
 process_llm_job(int job_id, const char *job_type, const char *payload)
 {
@@ -304,8 +267,6 @@ process_llm_job(int job_id, const char *job_type, const char *payload)
 	char	   *error_msg = NULL;
 	int			rc = -1;
 
-	/* Allocate job-local memory context, so even if an OOM or crash happens, */
-	/* it gets cleaned without leaving leaks or junk. */
 	job_ctx = AllocSetContextCreate(
 									CurrentMemoryContext, "neuranllm/job", ALLOCSET_DEFAULT_SIZES);
 	oldcxt = MemoryContextSwitchTo(job_ctx);
@@ -348,7 +309,6 @@ process_llm_job(int job_id, const char *job_type, const char *payload)
 
 			if (strcmp(job_type, "complete") == 0)
 			{
-				/* If this next code OOMs/crashes/exceptions, will be caught */
 				call_opts.task = "complete";
 				rc = ndb_llm_route_complete(
 											&cfg, &call_opts, prompt, NULL, &resp);
@@ -391,10 +351,6 @@ process_llm_job(int job_id, const char *job_type, const char *payload)
 				float	   *vec = NULL;
 				int			dim = 0;
 
-				/*
-				 * This line may crash internally on OOM, segfault, etc, but
-				 * we will catch it
-				 */
 				call_opts.task = "embed";
 				rc = ndb_llm_route_embed(
 										 &cfg, &call_opts, prompt, &vec, &dim);
@@ -467,7 +423,6 @@ process_llm_job(int job_id, const char *job_type, const char *payload)
 	}
 	PG_CATCH();
 	{
-		/* Crash, OOM, segfault, provider error: nothing escapes. */
 		EmitErrorReport();
 		FlushErrorState();
 
@@ -485,7 +440,6 @@ process_llm_job(int job_id, const char *job_type, const char *payload)
 	}
 	PG_END_TRY();
 
-	/* Always cleanup local memory, regardless of outcome */
 	if (result_json.data)
 	{
 		NDB_FREE(result_json.data);
@@ -506,10 +460,6 @@ process_llm_job(int job_id, const char *job_type, const char *payload)
 	MemoryContextDelete(job_ctx);
 }
 
-/*
- * process_llm_job_safe - Wrapper to process LLM job with error handling.
- * Extracted to avoid nested PG_TRY blocks.
- */
 static void
 process_llm_job_safe(int job_id, const char *job_type, const char *payload)
 {
@@ -542,10 +492,6 @@ process_llm_job_safe(int job_id, const char *job_type, const char *payload)
 	PG_END_TRY();
 }
 
-/*
- * prune_llm_jobs_safe - Wrapper to prune old LLM jobs with error handling.
- * Extracted to avoid nested PG_TRY blocks.
- */
 static int
 prune_llm_jobs_safe(int max_age_days)
 {

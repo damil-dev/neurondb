@@ -17,9 +17,6 @@
 #include "utils/timestamp.h"
 #include "lib/stringinfo.h"
 
-/*
- * Shared memory structure for ANN buffer
- */
 typedef struct ANNBufferEntry
 {
 	Oid			index_oid;
@@ -42,16 +39,13 @@ typedef struct ANNBufferControl
 
 static ANNBufferControl * ann_buffer_control = NULL;
 
-/*
- * neurondb_ann_buffer_init: Initialize the ANN buffer in shared memory
- */
 static void
 __attribute__((unused))
 neurondb_ann_buffer_init(void)
 {
 	bool		found;
 	Size		size;
-	int			max_entries = 1000; /* Default: cache 1000 centroids */
+	int			max_entries = 1000;
 
 	size = offsetof(ANNBufferControl, entries)
 		+ max_entries * sizeof(ANNBufferEntry);
@@ -73,9 +67,6 @@ neurondb_ann_buffer_init(void)
 	}
 }
 
-/*
- * neurondb_ann_buffer_get_centroid: Get a centroid from the buffer
- */
 PG_FUNCTION_INFO_V1(neurondb_ann_buffer_get_centroid);
 Datum
 neurondb_ann_buffer_get_centroid(PG_FUNCTION_ARGS)
@@ -96,7 +87,6 @@ neurondb_ann_buffer_get_centroid(PG_FUNCTION_ARGS)
 		PG_RETURN_NULL();
 	}
 
-	/* Search for the centroid in the buffer */
 	for (i = 0; i < ann_buffer_control->num_entries; i++)
 	{
 		if (ann_buffer_control->entries[i].valid
@@ -125,9 +115,6 @@ neurondb_ann_buffer_get_centroid(PG_FUNCTION_ARGS)
 	PG_RETURN_TEXT_P(cstring_to_text("[cached_vector]"));
 }
 
-/*
- * neurondb_ann_buffer_put_centroid: Put a centroid into the buffer
- */
 PG_FUNCTION_INFO_V1(neurondb_ann_buffer_put_centroid);
 Datum
 neurondb_ann_buffer_put_centroid(PG_FUNCTION_ARGS)
@@ -144,18 +131,15 @@ neurondb_ann_buffer_put_centroid(PG_FUNCTION_ARGS)
 		PG_RETURN_BOOL(false);
 	}
 
-	/* Find an empty slot or evict LRU entry */
 	if (ann_buffer_control->num_entries < ann_buffer_control->max_entries)
 	{
 		slot = ann_buffer_control->num_entries++;
 	}
 	else
 	{
-		/* Evict LRU entry (entry with oldest last_access) */
 		slot = 0;
 	}
 
-	/* Store the centroid */
 	ann_buffer_control->entries[slot].index_oid = index_oid;
 	ann_buffer_control->entries[slot].centroid_id = centroid_id;
 	ann_buffer_control->entries[slot].access_count = 0;
@@ -168,9 +152,6 @@ neurondb_ann_buffer_put_centroid(PG_FUNCTION_ARGS)
 	PG_RETURN_BOOL(true);
 }
 
-/*
- * neurondb_ann_buffer_get_stats: Get buffer statistics
- */
 PG_FUNCTION_INFO_V1(neurondb_ann_buffer_get_stats);
 Datum
 neurondb_ann_buffer_get_stats(PG_FUNCTION_ARGS)
@@ -227,7 +208,6 @@ neurondb_ann_buffer_clear(PG_FUNCTION_ARGS)
 		PG_RETURN_BOOL(false);
 	}
 
-	/* Mark all entries as invalid */
 	for (i = 0; i < ann_buffer_control->num_entries; i++)
 	{
 		ann_buffer_control->entries[i].valid = false;
@@ -236,7 +216,6 @@ neurondb_ann_buffer_clear(PG_FUNCTION_ARGS)
 	ann_buffer_control->num_entries = 0;
 	ann_buffer_control->total_hits = 0;
 	ann_buffer_control->total_misses = 0;
-
 
 	PG_RETURN_BOOL(true);
 }
