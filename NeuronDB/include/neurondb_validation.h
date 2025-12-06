@@ -390,13 +390,13 @@
  * Usage:
  *   NDB_SAFE_PFREE_AND_NULL(ptr);
  *
- * This macro is an alias for NDB_FREE from neurondb_macros.h.
+ * This macro is an alias for nfree from neurondb_macros.h.
  * It checks for NULL internally and sets ptr = NULL to prevent
  * double-free and use-after-free.
  *
  * Must be applied to ALL pfree operations per crash-proof plan.
  */
-#define NDB_SAFE_PFREE_AND_NULL(ptr) NDB_FREE(ptr)
+#define NDB_SAFE_PFREE_AND_NULL(ptr) nfree(ptr)
 
 /*-------------------------------------------------------------------------
  * SPI Context Safety Macros

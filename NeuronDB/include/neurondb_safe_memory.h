@@ -5,7 +5,7 @@
  *
  * Provides memory context validation and management functions.
  * Note: Safe pointer freeing functionality has been moved to neurondb_macros.h
- * (use NDB_FREE() instead of ndb_safe_pfree()).
+ * (use nfree() instead of ndb_safe_pfree()).
  *
  * Copyright (c) 2024-2025, neurondb, Inc.
  *
@@ -23,7 +23,7 @@
 
 /*-------------------------------------------------------------------------
  * Note: Safe pointer freeing functionality has been moved to neurondb_macros.h
- * Use NDB_FREE(ptr) instead of ndb_safe_pfree(ptr)
+ * Use nfree(ptr) instead of ndb_safe_pfree(ptr)
  *-------------------------------------------------------------------------
  */
 
@@ -33,7 +33,7 @@ extern bool ndb_ensure_memory_context(MemoryContext context);
 extern void ndb_safe_context_cleanup(MemoryContext context, MemoryContext oldcontext);
 
 /*-------------------------------------------------------------------------
- * Note: Cleanup helpers have been removed. Use NDB_FREE() from
+ * Note: Cleanup helpers have been removed. Use nfree() from
  * neurondb_macros.h in cleanup code paths.
  *-------------------------------------------------------------------------
  */
