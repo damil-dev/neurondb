@@ -172,7 +172,7 @@ HnswGetNeighborsSafe(HnswNode node, int level, int m)
  * Node size depends on the m parameter. All nodes in an index must use
  * the same m value that matches meta->m.
  */
-static inline Size
+static inline Size __attribute__((used))
 HnswNodeSizeWithM(int dim, int level, int m)
 {
 	return MAXALIGN(sizeof(HnswNodeData) +
@@ -485,7 +485,7 @@ hnswinsert(Relation index,
 		   bool indexUnchanged,
 		   struct IndexInfo *indexInfo)
 {
-	float4	   *vectorData;
+	float4	   *vectorData = NULL;
 	int			dim;
 	Buffer		metaBuffer;
 	Page		metaPage;
@@ -557,7 +557,7 @@ hnswbulkdelete(IndexVacuumInfo * info,
 	OffsetNumber maxoff;
 	OffsetNumber offnum;
 	HnswNode	node;
-	BlockNumber *neighbors;
+	BlockNumber *neighbors = NULL;
 	int16		neighborCount;
 	int			level;
 	int			i;
@@ -788,8 +788,8 @@ hnswoptions(Datum reloptions, bool validate)
 		{"ef_construction", RELOPT_TYPE_INT, offsetof(HnswOptions, ef_construction)},
 		{"ef_search", RELOPT_TYPE_INT, offsetof(HnswOptions, ef_search)}
 	};
-	HnswOptions *opts;
-	bytea *result;
+	HnswOptions *opts = NULL;
+	bytea *result = NULL;
 
 	/* Lazy initialization: ensure relopt_kind_hnsw is registered */
 	if (relopt_kind_hnsw == 0)
@@ -1120,7 +1120,7 @@ hnswLoadOptions(Relation index, HnswOptions *opts_out)
 		{"ef_construction", RELOPT_TYPE_INT, offsetof(HnswOptions, ef_construction)},
 		{"ef_search", RELOPT_TYPE_INT, offsetof(HnswOptions, ef_search)}
 	};
-	HnswOptions *opts;
+	HnswOptions *opts = NULL;
 	Datum		relopts = PointerGetDatum(index->rd_options);
 
 	/* Lazy initialization: ensure relopt_kind_hnsw is registered */
@@ -1559,7 +1559,7 @@ hnswSearch(Relation index,
 	volatile	Buffer nodeBuf = InvalidBuffer;
 	Page		nodePage;
 	HnswNode	node;
-	float4	   *nodeVector;
+	float4	   *nodeVector = NULL;
 	float4		currentDist;
 	int			level;
 	int			i,
@@ -2238,7 +2238,7 @@ hnswInsertNode(Relation index,
 							Buffer		neighborBuf;
 							Page		neighborPage;
 							HnswNode	neighbor;
-							float4	   *neighborVector;
+							float4	   *neighborVector = NULL;
 							float4		neighborDist;
 
 							neighborBuf = ReadBuffer(index, entryNeighbors[i]);
@@ -2752,7 +2752,7 @@ hnswRemoveNodeFromNeighbor(Relation index,
 	Buffer		buf;
 	Page		page;
 	HnswNode	neighbor;
-	BlockNumber *neighbors;
+	BlockNumber *neighbors = NULL;
 	int16		neighborCount;
 	int			i,
 				j;
@@ -2857,7 +2857,7 @@ hnswdelete(Relation index,
 	HnswMetaPage meta;
 	int			level;
 	int			i;
-	BlockNumber *neighbors;
+	BlockNumber *neighbors = NULL;
 	int16		neighborCount;
 
 	if (!hnswFindNodeByTid(index, tid, &nodeBlkno, &nodeOffset))

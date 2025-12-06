@@ -50,12 +50,12 @@ ndb_rocm_svm_pack_model(const SVMModel * model,
 						char **errstr)
 {
 	size_t		payload_bytes;
-	bytea	   *blob;
-	char	   *base;
-	NdbCudaSvmModelHeader *hdr;
-	float	   *alphas_dest;
-	float	   *sv_dest;
-	int32	   *indices_dest;
+	bytea	   *blob = NULL;
+	char	   *base = NULL;
+	NdbCudaSvmModelHeader *hdr = NULL;
+	float	   *alphas_dest = NULL;
+	float	   *sv_dest = NULL;
+	int32	   *indices_dest = NULL;
 	int			i,
 				j;
 	size_t		alphas_size;

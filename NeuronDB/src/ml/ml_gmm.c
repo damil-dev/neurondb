@@ -1506,7 +1506,7 @@ gmm_gpu_evaluate(const MLGpuModel *model,
 				 char **errstr)
 {
 	const		GmmGpuModelState *state;
-	Jsonb	   *metrics_json;
+	Jsonb	   *metrics_json = NULL;
 
 	if (errstr != NULL)
 		*errstr = NULL;

@@ -106,10 +106,10 @@ ndb_rocm_rf_pack_model(const struct RFModel *model,
 	size_t		header_bytes;
 	size_t		nodes_bytes;
 	size_t		payload_bytes;
-	char	   *base;
-	NdbCudaRfModelHeader *model_hdr;
-	NdbCudaRfTreeHeader *tree_hdrs;
-	NdbCudaRfNode *nodes;
+	char	   *base = NULL;
+	NdbCudaRfModelHeader *model_hdr = NULL;
+	NdbCudaRfTreeHeader *tree_hdrs = NULL;
+	NdbCudaRfNode *nodes = NULL;
 	int			node_cursor = 0;
 
 	if (errstr)

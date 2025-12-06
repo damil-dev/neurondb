@@ -2460,7 +2460,7 @@ recommender_gpu_evaluate(const MLGpuModel *model, const MLGpuEvalSpec *spec,
 						 MLGpuMetrics *out, char **errstr)
 {
 	const		RecommenderGpuModelState *state;
-	Jsonb	   *metrics_json;
+	Jsonb	   *metrics_json = NULL;
 	StringInfoData buf;
 
 	if (errstr != NULL)
@@ -2545,7 +2545,7 @@ static bool
 recommender_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 							const Jsonb * metadata, char **errstr)
 {
-	RecommenderGpuModelState *state;
+	RecommenderGpuModelState *state = NULL;
 
 	bytea *payload_copy = NULL;
 	int			payload_size;

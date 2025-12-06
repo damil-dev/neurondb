@@ -59,12 +59,12 @@ ndb_rocm_gmm_pack_model(const struct GMMModel *model,
 	size_t		mixing_bytes;
 	size_t		means_bytes;
 	size_t		variances_bytes;
-	bytea	   *blob;
-	char	   *base;
-	NdbCudaGmmModelHeader *hdr;
-	double	   *mixing_dest;
-	double	   *means_dest;
-	double	   *variances_dest;
+	bytea	   *blob = NULL;
+	char	   *base = NULL;
+	NdbCudaGmmModelHeader *hdr = NULL;
+	double	   *mixing_dest = NULL;
+	double	   *means_dest = NULL;
+	double	   *variances_dest = NULL;
 	int			i,
 				j;
 
@@ -643,11 +643,11 @@ ndb_rocm_gmm_predict(const bytea * model_data,
 					 char **errstr)
 {
 	const char *base;
-	NdbCudaGmmModelHeader *hdr;
+	NdbCudaGmmModelHeader *hdr = NULL;
 	const double *mixing;
 	const double *means;
 	const double *variances;
-	double	   *component_probs;
+	double	   *component_probs = NULL;
 	double		max_prob;
 	int			best_component;
 	int			i,

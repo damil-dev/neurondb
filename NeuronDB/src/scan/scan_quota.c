@@ -338,8 +338,8 @@ ndb_quota_check(const char *tenantId,
 				int64 additionalVectors,
 				int64 additionalBytes)
 {
-	QuotaLimits *limits;
-	QuotaUsage *usage;
+	QuotaLimits *limits = NULL;
+	QuotaUsage *usage = NULL;
 	bool		allowed = true;
 
 	if (!get_guc_bool("neurondb.enforce_quotas", true))

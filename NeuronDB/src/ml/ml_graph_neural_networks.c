@@ -940,7 +940,7 @@ graphsage_aggregate(PG_FUNCTION_ARGS)
 		StringInfoData query;
 		int			ret;
 
-		int *neighbors;
+		int *neighbors = NULL;
 		int			neighbor_count = 0;
 		int			max_neighbors = n_samples * depth;
 
@@ -1061,7 +1061,7 @@ graphsage_aggregate(PG_FUNCTION_ARGS)
 		}
 
 		/* Load features for sampled neighbors */
-		float *aggregated;
+		float *aggregated = NULL;
 		nalloc(aggregated, float, feature_dim);
 
 		if (sampled_count > 0)
@@ -1083,7 +1083,7 @@ graphsage_aggregate(PG_FUNCTION_ARGS)
 					float	   *feat_data = (float *) ARR_DATA_PTR(feat_array);
 					int			feat_len = ARR_DIMS(feat_array)[0];
 
-					float *neighbor_feat;
+					float *neighbor_feat = NULL;
 					nalloc(neighbor_feat, float, feature_dim);
 					neighbor_features[i] = neighbor_feat;
 					for (j = 0; j < feature_dim && j < feat_len; j++)
@@ -1093,7 +1093,7 @@ graphsage_aggregate(PG_FUNCTION_ARGS)
 				}
 				else
 				{
-					float *neighbor_feat;
+					float *neighbor_feat = NULL;
 					nalloc(neighbor_feat, float, feature_dim);
 					neighbor_features[i] = neighbor_feat;
 				}

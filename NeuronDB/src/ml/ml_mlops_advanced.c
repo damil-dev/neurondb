@@ -43,9 +43,9 @@ PG_FUNCTION_INFO_V1(create_ab_test);
 Datum
 create_ab_test(PG_FUNCTION_ARGS)
 {
-	text	   *experiment_name;
-	ArrayType  *model_ids;
-	ArrayType  *traffic_split;
+	text	   *experiment_name = NULL;
+	ArrayType  *model_ids = NULL;
+	ArrayType  *traffic_split = NULL;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 3)
@@ -57,11 +57,13 @@ create_ab_test(PG_FUNCTION_ARGS)
 	model_ids = PG_GETARG_ARRAYTYPE_P(1);
 	traffic_split = PG_GETARG_ARRAYTYPE_P(2);
 
-	char	   *name = text_to_cstring(experiment_name);
+	char	   *name;
 	int			n_models;
 	int			n_splits;
 	StringInfoData result;
 	int			experiment_id = 0;
+
+	name = text_to_cstring(experiment_name);
 
 	/* Get array sizes */
 	n_models = ArrayGetNItems(ARR_NDIM(model_ids), ARR_DIMS(model_ids));
@@ -284,8 +286,8 @@ Datum
 log_prediction(PG_FUNCTION_ARGS)
 {
 	int32		model_id;
-	text	   *input_data;
-	text	   *prediction;
+	text	   *input_data = NULL;
+	text	   *prediction = NULL;
 	float8		confidence;
 	int32		latency_ms;
 
@@ -410,7 +412,7 @@ Datum
 monitor_model_performance(PG_FUNCTION_ARGS)
 {
 	int32		model_id;
-	text	   *time_window;
+	text	   *time_window = NULL;
 
 	/* Validate minimum argument count */
 	if (PG_NARGS() < 1)
@@ -421,13 +423,13 @@ monitor_model_performance(PG_FUNCTION_ARGS)
 	model_id = PG_GETARG_INT32(0);
 	time_window = PG_ARGISNULL(1) ? NULL : PG_GETARG_TEXT_PP(1);
 
-	char *window = NULL;
+	char		   *window = NULL;
 	StringInfoData result;
-	int			predictions_count = 0;
-	float		accuracy = 0.0f;
-	float		avg_latency = 0.0f;
-	float		p95_latency = 0.0f;
-	float		error_rate = 0.0f;
+	int				predictions_count = 0;
+	float			accuracy = 0.0f;
+	float			avg_latency = 0.0f;
+	float			p95_latency = 0.0f;
+	float			error_rate = 0.0f;
 
 	window = time_window ? text_to_cstring(time_window) : pstrdup("1 hour");
 
@@ -585,8 +587,8 @@ Datum
 detect_model_drift(PG_FUNCTION_ARGS)
 {
 	int32		model_id;
-	text	   *baseline_period;
-	text	   *current_period;
+	text	   *baseline_period = NULL;
+	text	   *current_period = NULL;
 	float8		threshold;
 
 	/* Validate minimum argument count */
@@ -600,11 +602,14 @@ detect_model_drift(PG_FUNCTION_ARGS)
 	current_period = PG_GETARG_TEXT_PP(2);
 	threshold = PG_ARGISNULL(3) ? 0.05 : PG_GETARG_FLOAT8(3);
 
-	char	   *baseline = text_to_cstring(baseline_period);
-	char	   *current = text_to_cstring(current_period);
-	float		drift_score;
-	bool		drift_detected;
+	char		   *baseline;
+	char		   *current;
+	float			drift_score;
+	bool			drift_detected;
 	StringInfoData result;
+
+	baseline = text_to_cstring(baseline_period);
+	current = text_to_cstring(current_period);
 
 	/* Defensive: validate model_id */
 	if (model_id <= 0)
@@ -750,8 +755,8 @@ Datum
 create_model_version(PG_FUNCTION_ARGS)
 {
 	int32		model_id;
-	text	   *version_tag;
-	text	   *description;
+	text	   *version_tag = NULL;
+	text	   *description = NULL;
 
 	/* Validate minimum argument count */
 	if (PG_NARGS() < 2)
@@ -763,10 +768,13 @@ create_model_version(PG_FUNCTION_ARGS)
 	version_tag = PG_GETARG_TEXT_PP(1);
 	description = PG_ARGISNULL(2) ? NULL : PG_GETARG_TEXT_PP(2);
 
-	char	   *tag = text_to_cstring(version_tag);
-	char	   *desc = description ? text_to_cstring(description) : pstrdup("");
+	char		   *tag;
+	char		   *desc;
 	StringInfoData result;
-	int			version_id;
+	int				version_id;
+
+	tag = text_to_cstring(version_tag);
+	desc = description ? text_to_cstring(description) : pstrdup("");
 
 	/* Defensive: validate model_id */
 	if (model_id <= 0)
@@ -894,7 +902,7 @@ PG_FUNCTION_INFO_V1(set_feature_flag);
 Datum
 set_feature_flag(PG_FUNCTION_ARGS)
 {
-	text	   *flag_name;
+	text	   *flag_name = NULL;
 	bool		enabled;
 	float8		rollout_percentage;
 
@@ -908,8 +916,10 @@ set_feature_flag(PG_FUNCTION_ARGS)
 	enabled = PG_GETARG_BOOL(1);
 	rollout_percentage = PG_ARGISNULL(2) ? 100.0 : PG_GETARG_FLOAT8(2);
 
-	char	   *name = text_to_cstring(flag_name);
+	char		   *name;
 	StringInfoData result;
+
+	name = text_to_cstring(flag_name);
 
 	if (rollout_percentage < 0.0 || rollout_percentage > 100.0)
 		ereport(ERROR,
@@ -939,9 +949,9 @@ Datum
 track_experiment_metric(PG_FUNCTION_ARGS)
 {
 	int32		experiment_id;
-	text	   *metric_name;
+	text	   *metric_name = NULL;
 	float8		value;
-	text	   *variant;
+	text	   *variant = NULL;
 
 	/* Validate minimum argument count */
 	if (PG_NARGS() < 3)
@@ -954,8 +964,11 @@ track_experiment_metric(PG_FUNCTION_ARGS)
 	value = PG_GETARG_FLOAT8(2);
 	variant = PG_ARGISNULL(3) ? NULL : PG_GETARG_TEXT_PP(3);
 
-	char	   *metric = text_to_cstring(metric_name);
-	char	   *var = variant ? text_to_cstring(variant) : pstrdup("control");
+	char		   *metric;
+	char		   *var;
+
+	metric = text_to_cstring(metric_name);
+	var = variant ? text_to_cstring(variant) : pstrdup("control");
 
 	/* Track metric (production would insert into metrics table) */
 	(void) experiment_id;
@@ -986,6 +999,7 @@ get_experiment_results(PG_FUNCTION_ARGS)
 				 errmsg("neurondb: get_experiment_results requires 1 argument")));
 
 	experiment_id = PG_GETARG_INT32(0);
+
 	StringInfoData result;
 
 	/* Get results (production would aggregate metrics) */

@@ -408,7 +408,7 @@ PG_FUNCTION_INFO_V1(vector_to_halfvec);
 Datum
 vector_to_halfvec(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
+	Vector	   *v = NULL;
 	VectorF16 *result = NULL;
 	int			size;
 	int			i;

@@ -2483,7 +2483,7 @@ ndb_json_parse_openai_embedding(const char *json_str,
 					void *tmp_ptr = NULL;
 					cap = cap * 2;
 					tmp_ptr = repalloc((void *) vec, sizeof(float) * cap);
-					vec = (volatile float *) tmp_ptr;
+					vec = (float *) tmp_ptr;
 					}
 
 					vec[n++] = (float) v;
@@ -2497,7 +2497,7 @@ ndb_json_parse_openai_embedding(const char *json_str,
 					{
 						void *tmp_ptr = NULL;
 						tmp_ptr = repalloc((void *) vec, sizeof(float) * n);
-						vec = (volatile float *) tmp_ptr;
+						vec = (float *) tmp_ptr;
 					}
 					*vec_out = (float *) (void *) vec;
 					*dim_out = n;

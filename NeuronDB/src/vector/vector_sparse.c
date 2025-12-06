@@ -588,7 +588,7 @@ Datum
 vecmap_norm(PG_FUNCTION_ARGS)
 {
 	VectorMap  *a = (VectorMap *) PG_GETARG_POINTER(0);
-	float4	   *values;
+	float4	   *values = NULL;
 	double		sum = 0.0;
 	int			i;
 

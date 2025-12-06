@@ -119,10 +119,10 @@ ndb_rocm_dt_pack_model(const DTModel *model,
 	size_t		header_bytes;
 	size_t		nodes_bytes;
 	size_t		payload_bytes;
-	bytea	   *blob;
-	char	   *base;
-	NdbCudaDtModelHeader *hdr;
-	NdbCudaDtNode *nodes;
+	bytea	   *blob = NULL;
+	char	   *base = NULL;
+	NdbCudaDtModelHeader *hdr = NULL;
+	NdbCudaDtNode *nodes = NULL;
 	int			node_idx = 0;
 
 	if (errstr)
@@ -328,7 +328,7 @@ dt_build_tree_gpu(const float *features,
 				  int class_count,
 				  char **errstr)
 {
-	DTNode	   *node;
+	DTNode	   *node = NULL;
 	int			i;
 	int			best_feature = -1;
 	float		best_threshold = 0.0f;

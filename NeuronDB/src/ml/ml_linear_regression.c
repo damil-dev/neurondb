@@ -302,7 +302,7 @@ linreg_dataset_load_limited(const char *quoted_tbl,
 		TupleDesc	tupdesc = SPI_tuptable->tupdesc;
 		Datum		feat_datum;
 		bool		feat_null;
-		Vector	   *vec;
+		Vector	   *vec = NULL;
 
 		feat_datum = SPI_getbinval(first_tuple, tupdesc, 1, &feat_null);
 		if (!feat_null)
@@ -3253,7 +3253,7 @@ linreg_gpu_evaluate(const MLGpuModel *model,
 					char **errstr)
 {
 	const		LinRegGpuModelState *state;
-	Jsonb	   *metrics_json;
+	Jsonb	   *metrics_json = NULL;
 
 	if (errstr != NULL)
 		*errstr = NULL;
@@ -3304,10 +3304,10 @@ linreg_gpu_serialize(const MLGpuModel *model,
 	const		LinRegGpuModelState *state;
 #ifdef NDB_GPU_CUDA
 	LinRegModel linreg_model;
-	bytea	   *unified_payload;
-	char	   *base;
-	NdbCudaLinRegModelHeader *hdr;
-	float	   *coef_src_float;
+	bytea	   *unified_payload = NULL;
+	char	   *base = NULL;
+	NdbCudaLinRegModelHeader *hdr = NULL;
+	float	   *coef_src_float = NULL;
 	int			i;
 #endif
 

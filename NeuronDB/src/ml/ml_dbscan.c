@@ -357,7 +357,7 @@ Datum
 predict_dbscan(PG_FUNCTION_ARGS)
 {
 	int32		model_id;
-	ArrayType  *features_array;
+	ArrayType  *features_array = NULL;
 	int			cluster_id = DBSCAN_NOISE;
 	int			n_elems = 0;
 	float *features = NULL;
@@ -1112,7 +1112,7 @@ dbscan_gpu_evaluate(const MLGpuModel *model, const MLGpuEvalSpec *spec,
 					MLGpuMetrics *out, char **errstr)
 {
 	const		DBSCANGpuModelState *state;
-	Jsonb	   *metrics_json;
+	Jsonb	   *metrics_json = NULL;
 	StringInfoData buf;
 
 	if (errstr != NULL)
@@ -1153,7 +1153,7 @@ dbscan_gpu_serialize(const MLGpuModel *model, bytea * *payload_out,
 					 Jsonb * *metadata_out, char **errstr)
 {
 	const		DBSCANGpuModelState *state;
-	bytea	   *payload_copy;
+	bytea	   *payload_copy = NULL;
 	int			payload_size;
 	char *payload_bytes = NULL;
 
@@ -1199,7 +1199,7 @@ static bool
 dbscan_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 					   const Jsonb * metadata, char **errstr)
 {
-	bytea	   *payload_copy;
+	bytea	   *payload_copy = NULL;
 	int			payload_size;
 	float **centers = NULL;
 	int			n_clusters = 0;

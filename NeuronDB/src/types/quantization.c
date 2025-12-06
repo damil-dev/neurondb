@@ -92,7 +92,7 @@ PG_FUNCTION_INFO_V1(vector_to_int8);
 Datum
 vector_to_int8(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
+	Vector	   *v = NULL;
 	VectorI8 *result = NULL;
 
 	/* Validate argument count */
@@ -239,7 +239,7 @@ PG_FUNCTION_INFO_V1(vector_to_float16);
 Datum
 vector_to_float16(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
+	Vector	   *v = NULL;
 	VectorF16 *result = NULL;
 
 	/* Validate argument count */
@@ -259,7 +259,7 @@ PG_FUNCTION_INFO_V1(float16_to_vector);
 Datum
 float16_to_vector(PG_FUNCTION_ARGS)
 {
-	VectorF16  *vf16;
+	VectorF16  *vf16 = NULL;
 	Vector *result = NULL;
 	int			i;
 
@@ -318,7 +318,7 @@ PG_FUNCTION_INFO_V1(vector_to_binary);
 Datum
 vector_to_binary(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
+	Vector	   *v = NULL;
 	VectorBinary *result = NULL;
 
 	/* Validate argument count */
@@ -351,7 +351,7 @@ PG_FUNCTION_INFO_V1(binary_to_vector);
 Datum
 binary_to_vector(PG_FUNCTION_ARGS)
 {
-	VectorBinary *vb;
+	VectorBinary *vb = NULL;
 	Vector *result = NULL;
 	int			i;
 	int			byte_idx;
@@ -386,8 +386,11 @@ PG_FUNCTION_INFO_V1(binary_hamming_distance);
 Datum
 binary_hamming_distance(PG_FUNCTION_ARGS)
 {
-	VectorBinary *a;
-	VectorBinary *b;
+	VectorBinary *a = NULL;
+	VectorBinary *b = NULL;
+	int			count = 0;
+	int			nbytes;
+	int			i;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 2)
@@ -397,9 +400,6 @@ binary_hamming_distance(PG_FUNCTION_ARGS)
 
 	a = (VectorBinary *) PG_GETARG_POINTER(0);
 	b = (VectorBinary *) PG_GETARG_POINTER(1);
-	int			count = 0;
-	int			nbytes;
-	int			i;
 
 	if (a->dim != b->dim)
 		ereport(ERROR,
@@ -433,7 +433,7 @@ PG_FUNCTION_INFO_V1(dynamic_quantize_vector);
 Datum
 dynamic_quantize_vector(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
+	Vector	   *v = NULL;
 	float8		memory_pressure;
 	float8		recall_target;
 
@@ -1407,7 +1407,7 @@ PG_FUNCTION_INFO_V1(vector_to_uint8);
 Datum
 vector_to_uint8(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
+	Vector	   *v = NULL;
 	VectorU8 *result = NULL;
 
 	/* Validate argument count */
@@ -1427,7 +1427,7 @@ PG_FUNCTION_INFO_V1(uint8_to_vector);
 Datum
 uint8_to_vector(PG_FUNCTION_ARGS)
 {
-	VectorU8   *vu8;
+	VectorU8   *vu8 = NULL;
 
 	Vector *result = NULL;
 	int			i;
@@ -1508,7 +1508,7 @@ PG_FUNCTION_INFO_V1(vector_to_ternary);
 Datum
 vector_to_ternary(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
+	Vector	   *v = NULL;
 	VectorTernary *result = NULL;
 
 	/* Validate argument count */
@@ -1645,7 +1645,7 @@ PG_FUNCTION_INFO_V1(vector_to_int4);
 Datum
 vector_to_int4(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
+	Vector	   *v = NULL;
 	VectorI4 *result = NULL;
 
 	/* Validate argument count */
@@ -1698,7 +1698,15 @@ PG_FUNCTION_INFO_V1(halfvec_in);
 Datum
 halfvec_in(PG_FUNCTION_ARGS)
 {
-	char	   *str;
+	char	   *str = NULL;
+	VectorF16  *result = NULL;
+	float4	   *temp_data = NULL;
+	int			dim;
+	int			capacity;
+	char	   *ptr = NULL;
+	char	   *endptr = NULL;
+	int			size;
+	int			i;
 
 	/* Validate minimum argument count */
 	if (PG_NARGS() < 1)
@@ -1707,14 +1715,6 @@ halfvec_in(PG_FUNCTION_ARGS)
 				 errmsg("neurondb: halfvec_in requires at least 1 argument")));
 
 	str = PG_GETARG_CSTRING(0);
-	VectorF16 *result = NULL;
-	float4 *temp_data = NULL;
-	int			dim;
-	int			capacity;
-	char *ptr = NULL;
-	char *endptr = NULL;
-	int			size;
-	int			i;
 
 	dim = 0;
 	capacity = 16;
@@ -1787,7 +1787,9 @@ PG_FUNCTION_INFO_V1(halfvec_out);
 Datum
 halfvec_out(PG_FUNCTION_ARGS)
 {
-	VectorF16  *vf16;
+	VectorF16  *vf16 = NULL;
+	StringInfoData buf;
+	int			i;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 1)
@@ -1796,8 +1798,6 @@ halfvec_out(PG_FUNCTION_ARGS)
 				 errmsg("neurondb: halfvec_out requires 1 argument")));
 
 	vf16 = (VectorF16 *) PG_GETARG_POINTER(0);
-	StringInfoData buf;
-	int			i;
 
 	if (vf16 == NULL)
 		PG_RETURN_CSTRING(pstrdup("NULL"));
@@ -1854,7 +1854,9 @@ PG_FUNCTION_INFO_V1(halfvec_send);
 Datum
 halfvec_send(PG_FUNCTION_ARGS)
 {
-	VectorF16  *vf16;
+	VectorF16  *vf16 = NULL;
+	StringInfoData buf;
+	int			i;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 1)
@@ -1863,8 +1865,6 @@ halfvec_send(PG_FUNCTION_ARGS)
 				 errmsg("neurondb: halfvec_send requires 1 argument")));
 
 	vf16 = (VectorF16 *) PG_GETARG_POINTER(0);
-	StringInfoData buf;
-	int			i;
 
 	pq_begintypsend(&buf);
 	pq_sendint(&buf, vf16->dim, sizeof(int16));
@@ -1882,8 +1882,9 @@ PG_FUNCTION_INFO_V1(halfvec_eq);
 Datum
 halfvec_eq(PG_FUNCTION_ARGS)
 {
-	VectorF16  *a;
-	VectorF16  *b;
+	VectorF16  *a = NULL;
+	VectorF16  *b = NULL;
+	int			i;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 2)
@@ -1893,7 +1894,6 @@ halfvec_eq(PG_FUNCTION_ARGS)
 
 	a = (VectorF16 *) PG_GETARG_POINTER(0);
 	b = (VectorF16 *) PG_GETARG_POINTER(1);
-	int			i;
 
 	/* Handle NULL vectors */
 	if (a == NULL && b == NULL)
@@ -1934,7 +1934,9 @@ PG_FUNCTION_INFO_V1(halfvec_hash);
 Datum
 halfvec_hash(PG_FUNCTION_ARGS)
 {
-	VectorF16  *v;
+	VectorF16  *v = NULL;
+	uint32		hash = 5381;
+	int			i;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 1)
@@ -1943,8 +1945,6 @@ halfvec_hash(PG_FUNCTION_ARGS)
 				 errmsg("neurondb: halfvec_hash requires 1 argument")));
 
 	v = (VectorF16 *) PG_GETARG_POINTER(0);
-	uint32		hash = 5381;
-	int			i;
 
 	if (v == NULL)
 		PG_RETURN_UINT32(0);
@@ -1980,8 +1980,11 @@ PG_FUNCTION_INFO_V1(halfvec_l2_distance);
 Datum
 halfvec_l2_distance(PG_FUNCTION_ARGS)
 {
-	VectorF16  *a;
-	VectorF16  *b;
+	VectorF16  *a = NULL;
+	VectorF16  *b = NULL;
+	double		sum = 0.0;
+	int			i;
+	float4		result;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 2)
@@ -1991,9 +1994,6 @@ halfvec_l2_distance(PG_FUNCTION_ARGS)
 
 	a = (VectorF16 *) PG_GETARG_POINTER(0);
 	b = (VectorF16 *) PG_GETARG_POINTER(1);
-	double		sum = 0.0;
-	int			i;
-	float4		result;
 
 	if (a == NULL || b == NULL)
 		ereport(ERROR,
@@ -2027,8 +2027,13 @@ PG_FUNCTION_INFO_V1(halfvec_cosine_distance);
 Datum
 halfvec_cosine_distance(PG_FUNCTION_ARGS)
 {
-	VectorF16  *a;
-	VectorF16  *b;
+	VectorF16  *a = NULL;
+	VectorF16  *b = NULL;
+	double		dot = 0.0,
+				norm_a = 0.0,
+				norm_b = 0.0;
+	int			i;
+	float4		result;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 2)
@@ -2038,11 +2043,6 @@ halfvec_cosine_distance(PG_FUNCTION_ARGS)
 
 	a = (VectorF16 *) PG_GETARG_POINTER(0);
 	b = (VectorF16 *) PG_GETARG_POINTER(1);
-	double		dot = 0.0,
-				norm_a = 0.0,
-				norm_b = 0.0;
-	int			i;
-	float4		result;
 
 	if (a == NULL || b == NULL)
 		ereport(ERROR,
@@ -2078,8 +2078,8 @@ PG_FUNCTION_INFO_V1(halfvec_inner_product);
 Datum
 halfvec_inner_product(PG_FUNCTION_ARGS)
 {
-	VectorF16  *a;
-	VectorF16  *b;
+	VectorF16  *a = NULL;
+	VectorF16  *b = NULL;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 2)
@@ -2127,17 +2127,17 @@ vector_to_bit(PG_FUNCTION_ARGS)
 	VectorBinary *vb = NULL;
 	VarBit *result = NULL;
 	int			nbits;
+	int			nbytes;
+	int			i;
+	int			byte_idx;
+	int			bit_idx;
+	bits8	   *bit_data = NULL;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 1)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("neurondb: vector_to_bit requires 1 argument")));
-	int			nbytes;
-	int			i;
-	int			byte_idx;
-	int			bit_idx;
-	bits8 *bit_data = NULL;
 
 	v = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(v);
@@ -2181,7 +2181,11 @@ PG_FUNCTION_INFO_V1(bit_to_vector);
 Datum
 bit_to_vector(PG_FUNCTION_ARGS)
 {
-	VarBit	   *bit_vec;
+	VarBit	   *bit_vec = NULL;
+	Vector	   *result = NULL;
+	int			nbits;
+	int			i;
+	bits8	   *bit_data = NULL;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 1)
@@ -2190,10 +2194,6 @@ bit_to_vector(PG_FUNCTION_ARGS)
 				 errmsg("neurondb: bit_to_vector requires 1 argument")));
 
 	bit_vec = PG_GETARG_VARBIT_P(0);
-	Vector *result = NULL;
-	int			nbits;
-	int			i;
-	bits8 *bit_data = NULL;
 
 	if (bit_vec == NULL)
 		PG_RETURN_NULL();
@@ -2222,8 +2222,13 @@ PG_FUNCTION_INFO_V1(bit_hamming_distance);
 Datum
 bit_hamming_distance(PG_FUNCTION_ARGS)
 {
-	VarBit	   *a;
-	VarBit	   *b;
+	VarBit	   *a = NULL;
+	VarBit	   *b = NULL;
+	int			nbits;
+	int			count = 0;
+	int			i;
+	bits8	   *a_bits,
+			   *b_bits;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 2)
@@ -2233,11 +2238,6 @@ bit_hamming_distance(PG_FUNCTION_ARGS)
 
 	a = PG_GETARG_VARBIT_P(0);
 	b = PG_GETARG_VARBIT_P(1);
-	int			nbits;
-	int			count = 0;
-	int			i;
-	bits8	   *a_bits,
-			   *b_bits;
 
 	if (a == NULL || b == NULL)
 		ereport(ERROR,

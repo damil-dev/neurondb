@@ -49,7 +49,7 @@ generate_grid_combinations(Jsonb * param_grid,
 						   List * *value_lists,
 						   List * *combinations)
 {
-	JsonbIterator *it;
+	JsonbIterator *it = NULL;
 	JsonbValue	v;
 	int			r;
 
@@ -395,7 +395,7 @@ random_sample_parameters(Jsonb * param_distributions,
 						 List * *param_names,
 						 List * *values_list)
 {
-	JsonbIterator *it;
+	JsonbIterator *it = NULL;
 	JsonbValue	v;
 	int			r;
 
@@ -497,7 +497,7 @@ neurondb_random_search(PG_FUNCTION_ARGS)
 									 param_distributions, &names, &vals);
 
 			{
-				Jsonb	   *jbcomb;
+				Jsonb	   *jbcomb = NULL;
 				float8		score;
 				Datum		values[3];
 				bool		nulls[3] = {false, false, false};
@@ -562,7 +562,7 @@ bayes_sample_parameters(Jsonb * param_space,
 						List * *param_names,
 						List * *values_list)
 {
-	JsonbIterator *it;
+	JsonbIterator *it = NULL;
 	JsonbValue	v;
 	int			r;
 

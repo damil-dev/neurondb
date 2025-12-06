@@ -40,7 +40,7 @@ vectorp_in(PG_FUNCTION_ARGS)
 {
 	char	   *endptr = NULL;
 	char	   *ptr = NULL;
-	char	   *str;
+	char	   *str = NULL;
 
 	/* Validate minimum argument count */
 	if (PG_NARGS() < 1)
@@ -128,7 +128,7 @@ vectorp_out(PG_FUNCTION_ARGS)
 {
 	int			i;
 	StringInfoData buf;
-	VectorPacked *vec;
+	VectorPacked *vec = NULL;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 1)
@@ -160,7 +160,7 @@ PG_FUNCTION_INFO_V1(vecmap_in);
 Datum
 vecmap_in(PG_FUNCTION_ARGS)
 {
-	char	   *str;
+	char	   *str = NULL;
 
 	/* Validate minimum argument count */
 	if (PG_NARGS() < 1)
@@ -347,7 +347,7 @@ PG_FUNCTION_INFO_V1(vecmap_out);
 Datum
 vecmap_out(PG_FUNCTION_ARGS)
 {
-	VectorMap  *vec;
+	VectorMap  *vec = NULL;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 1)
@@ -357,8 +357,8 @@ vecmap_out(PG_FUNCTION_ARGS)
 
 	vec = (VectorMap *) PG_GETARG_POINTER(0);
 	StringInfoData buf;
-	int32	   *indices;
-	float4	   *values;
+	int32	   *indices = NULL;
+	float4	   *values = NULL;
 	int			i;
 
 	indices = VECMAP_INDICES(vec);
@@ -397,7 +397,7 @@ PG_FUNCTION_INFO_V1(rtext_in);
 Datum
 rtext_in(PG_FUNCTION_ARGS)
 {
-	char	   *str;
+	char	   *str = NULL;
 
 	/* Validate minimum argument count */
 	if (PG_NARGS() < 1)
@@ -434,7 +434,8 @@ PG_FUNCTION_INFO_V1(rtext_out);
 Datum
 rtext_out(PG_FUNCTION_ARGS)
 {
-	RetrievableText *rt;
+	RetrievableText *rt = NULL;
+	char *result = NULL;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 1)
@@ -443,7 +444,6 @@ rtext_out(PG_FUNCTION_ARGS)
 				 errmsg("neurondb: rtext_out requires 1 argument")));
 
 	rt = (RetrievableText *) PG_GETARG_POINTER(0);
-	char *result = NULL;
 
 	result = (char *) palloc(rt->text_len + 1);
 	memcpy(result, RTEXT_DATA(rt), rt->text_len);
@@ -460,7 +460,7 @@ PG_FUNCTION_INFO_V1(vgraph_in);
 Datum
 vgraph_in(PG_FUNCTION_ARGS)
 {
-	char	   *str;
+	char	   *str = NULL;
 
 	/* Validate minimum argument count */
 	if (PG_NARGS() < 1)
@@ -469,12 +469,12 @@ vgraph_in(PG_FUNCTION_ARGS)
 				 errmsg("neurondb: vgraph_in requires at least 1 argument")));
 
 	str = PG_GETARG_CSTRING(0);
-	VectorGraph *result;
+	VectorGraph *result = NULL;
 	int32		num_nodes;
 	int32		num_edges;
-	GraphEdge *edges;
-	char *ptr;
-	char *endptr;
+	GraphEdge *edges = NULL;
+	char *ptr = NULL;
+	char *endptr = NULL;
 	int			size;
 	int			edge_capacity;
 
@@ -653,7 +653,8 @@ PG_FUNCTION_INFO_V1(vgraph_out);
 Datum
 vgraph_out(PG_FUNCTION_ARGS)
 {
-	VectorGraph *graph;
+	VectorGraph *graph = NULL;
+	GraphEdge  *edges = NULL;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 1)
@@ -662,7 +663,6 @@ vgraph_out(PG_FUNCTION_ARGS)
 				 errmsg("neurondb: vgraph_out requires 1 argument")));
 
 	graph = (VectorGraph *) PG_GETARG_POINTER(0);
-	GraphEdge  *edges;
 	StringInfoData buf;
 	int			i;
 
@@ -692,7 +692,7 @@ PG_FUNCTION_INFO_V1(vectorp_dims);
 Datum
 vectorp_dims(PG_FUNCTION_ARGS)
 {
-	VectorPacked *vec;
+	VectorPacked *vec = NULL;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 1)
@@ -712,7 +712,7 @@ PG_FUNCTION_INFO_V1(vectorp_validate);
 Datum
 vectorp_validate(PG_FUNCTION_ARGS)
 {
-	VectorPacked *vec;
+	VectorPacked *vec = NULL;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 1)

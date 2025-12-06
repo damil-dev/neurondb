@@ -1393,7 +1393,7 @@ hierarchical_gpu_evaluate(const MLGpuModel *model, const MLGpuEvalSpec *spec,
 						  MLGpuMetrics *out, char **errstr)
 {
 	const		HierarchicalGpuModelState *state;
-	Jsonb	   *metrics_json;
+	Jsonb	   *metrics_json = NULL;
 	StringInfoData buf;
 
 	if (errstr != NULL)

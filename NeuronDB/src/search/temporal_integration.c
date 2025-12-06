@@ -139,7 +139,7 @@ temporal_rerank_results(ItemPointer * items,
 						int count,
 						TemporalConfig * config)
 {
-	float4	   *scores;
+	float4	   *scores = NULL;
 	int			i,
 				j;
 	float4		temp_score,
@@ -293,8 +293,8 @@ temporal_integrate_hnsw_search(Relation heapRel,
 							   float4 recencyWeight,
 							   const char *timestampColumnName)
 {
-	TimestampTz *timestamps;
-	TemporalConfig *config;
+	TimestampTz *timestamps = NULL;
+	TemporalConfig *config = NULL;
 	Snapshot	snapshot;
 	TupleDesc	tupdesc;
 	int			timestamp_attnum = -1;

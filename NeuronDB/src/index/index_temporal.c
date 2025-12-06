@@ -356,7 +356,7 @@ PG_FUNCTION_INFO_V1(vector_l2);
 Datum
 vector_l2(PG_FUNCTION_ARGS)
 {
-	Vector	   *a;
+	Vector	   *a = NULL;
 	Vector *b = NULL;
 	float4		sum = 0.0;
 	int			i;

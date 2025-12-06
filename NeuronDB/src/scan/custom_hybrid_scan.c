@@ -73,7 +73,7 @@ typedef struct HybridScanState
 
 	/* Candidate management */
 	TupleTableSlot **candidates;
-	float4	   *scores;			/* Hybrid scores */
+	float4	   *scores;
 	int			candidateCount;
 	int			currentPos;
 
@@ -139,7 +139,7 @@ static PlannedStmt *
 hybrid_planner_hook(Query * parse, const char *query_string, int cursorOptions,
 					ParamListInfo boundParams)
 {
-	PlannedStmt *result;
+	PlannedStmt *result = NULL;
 
 	/* Call previous planner hook if any */
 	if (prev_planner_hook)

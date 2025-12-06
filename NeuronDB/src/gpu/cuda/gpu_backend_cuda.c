@@ -683,8 +683,8 @@ ndb_cuda_launch_kmeans_update(const float *vectors,
 							  int k,
 							  ndb_stream_t stream)
 {
-	int32_t    *assign32;
-	int32_t    *counts;
+	int32_t    *assign32 = NULL;
+	int32_t    *counts = NULL;
 	int			i;
 	int			rc;
 

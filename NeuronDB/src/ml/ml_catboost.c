@@ -109,7 +109,7 @@ write_csv_from_spi(char *csv_path,
 				   int n_features,
 				   int label_idx)
 {
-	FILE	   *fp;
+	FILE	   *fp = NULL;
 	uint64		row;
 	int			i;
 
@@ -1199,7 +1199,7 @@ catboost_gpu_evaluate(const MLGpuModel *model, const MLGpuEvalSpec *spec,
 					  MLGpuMetrics *out, char **errstr)
 {
 	const		CatBoostGpuModelState *state;
-	Jsonb	   *metrics_json;
+	Jsonb	   *metrics_json = NULL;
 	StringInfoData buf;
 
 	if (errstr != NULL)
@@ -1241,7 +1241,7 @@ catboost_gpu_serialize(const MLGpuModel *model, bytea * *payload_out,
 					   Jsonb * *metadata_out, char **errstr)
 {
 	const		CatBoostGpuModelState *state;
-	bytea	   *payload_copy;
+	bytea	   *payload_copy = NULL;
 	char *payload_copy_raw = NULL;
 	int			payload_size;
 
@@ -1287,8 +1287,8 @@ static bool
 catboost_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 						 const Jsonb * metadata, char **errstr)
 {
-	CatBoostGpuModelState *state;
-	bytea	   *payload_copy;
+	CatBoostGpuModelState *state = NULL;
+	bytea	   *payload_copy = NULL;
 	char *payload_copy_raw = NULL;
 	int			payload_size;
 	int			iterations = 0;

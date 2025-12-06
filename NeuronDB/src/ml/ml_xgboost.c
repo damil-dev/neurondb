@@ -1183,7 +1183,7 @@ xgboost_gpu_evaluate(const MLGpuModel *model, const MLGpuEvalSpec *spec,
 	MLGpuMetrics *out, char **errstr)
 {
 	const XGBoostGpuModelState *state;
-	Jsonb *metrics_json;
+	Jsonb *metrics_json = NULL;
 	StringInfoData buf;
 
 	if (errstr != NULL)
@@ -1225,7 +1225,7 @@ xgboost_gpu_serialize(const MLGpuModel *model, bytea **payload_out,
 	Jsonb **metadata_out, char **errstr)
 {
 	const XGBoostGpuModelState *state;
-	bytea *payload_copy;
+	bytea *payload_copy = NULL;
 	int payload_size;
 	char *payload_bytes = NULL;
 

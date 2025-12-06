@@ -335,7 +335,7 @@ lightgbm_gpu_evaluate(const MLGpuModel *model, const MLGpuEvalSpec *spec,
 					  MLGpuMetrics *out, char **errstr)
 {
 	const		LightGBMGpuModelState *state;
-	Jsonb	   *metrics_json;
+	Jsonb	   *metrics_json = NULL;
 	StringInfoData buf;
 
 	if (errstr != NULL)
@@ -377,7 +377,7 @@ lightgbm_gpu_serialize(const MLGpuModel *model, bytea * *payload_out,
 					   Jsonb * *metadata_out, char **errstr)
 {
 	const		LightGBMGpuModelState *state;
-	bytea	   *payload_copy;
+	bytea	   *payload_copy = NULL;
 	int			payload_size;
 
 	if (errstr != NULL)
@@ -421,15 +421,15 @@ static bool
 lightgbm_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 						 const Jsonb * metadata, char **errstr)
 {
-	LightGBMGpuModelState *state;
-	bytea	   *payload_copy;
+	LightGBMGpuModelState *state = NULL;
+	bytea	   *payload_copy = NULL;
 	int			payload_size;
 	int			n_estimators = 0;
 	int			max_depth = 0;
 	float		learning_rate = 0.0f;
 	int			n_features = 0;
 	char		boosting_type[32];
-	JsonbIterator *it;
+	JsonbIterator *it = NULL;
 	JsonbValue	v;
 	int			r;
 

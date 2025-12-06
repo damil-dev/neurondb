@@ -3175,8 +3175,8 @@ ndb_rocm_hf_rerank(const char *model_name,
 	float **scores_out,
 	char **errstr)
 {
-	NdbRocmHfModelEntry *entry;
-	float *scores;
+	NdbRocmHfModelEntry *entry = NULL;
+	float *scores = NULL;
 	int i;
 	int rc;
 	hipError_t cuda_err;
@@ -3650,7 +3650,7 @@ ndb_rocm_hf_get_model_config(const char *model_name,
 	NdbRocmHfModelConfig *config,
 	char **errstr)
 {
-	NdbRocmHfModelEntry *entry;
+	NdbRocmHfModelEntry *entry = NULL;
 
 	if (errstr)
 		*errstr = NULL;

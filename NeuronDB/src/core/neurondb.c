@@ -235,8 +235,8 @@ PG_FUNCTION_INFO_V1(vector_in);
 Datum
 vector_in(PG_FUNCTION_ARGS)
 {
-	char	   *str;
-	Vector	   *result;
+	char	   *str = NULL;
+	Vector	   *result = NULL;
 
 	/* Validate minimum argument count */
 	if (PG_NARGS() < 1)
@@ -267,7 +267,7 @@ PG_FUNCTION_INFO_V1(vector_out);
 Datum
 vector_out(PG_FUNCTION_ARGS)
 {
-	Vector	   *vector;
+	Vector	   *vector = NULL;
 	char *result = NULL;
 
 	/* Validate argument count */
@@ -326,7 +326,7 @@ PG_FUNCTION_INFO_V1(vector_send);
 Datum
 vector_send(PG_FUNCTION_ARGS)
 {
-	Vector	   *vec;
+	Vector	   *vec = NULL;
 	StringInfoData buf;
 	int			i;
 
@@ -346,7 +346,7 @@ PG_FUNCTION_INFO_V1(vector_dims);
 Datum
 vector_dims(PG_FUNCTION_ARGS)
 {
-	Vector	   *vector;
+	Vector	   *vector = NULL;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 1)
@@ -365,7 +365,7 @@ PG_FUNCTION_INFO_V1(vector_norm);
 Datum
 vector_norm(PG_FUNCTION_ARGS)
 {
-	Vector	   *vector;
+	Vector	   *vector = NULL;
 	double		sum = 0.0;
 	int			i;
 
@@ -461,7 +461,7 @@ PG_FUNCTION_INFO_V1(vector_normalize);
 Datum
 vector_normalize(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
+	Vector	   *v = NULL;
 	Vector *result = NULL;
 
 	/* Validate argument count */
@@ -481,7 +481,7 @@ PG_FUNCTION_INFO_V1(vector_concat);
 Datum
 vector_concat(PG_FUNCTION_ARGS)
 {
-	Vector	   *a;
+	Vector	   *a = NULL;
 	Vector *b = NULL;
 	Vector *result = NULL;
 	int			new_dim;
@@ -521,7 +521,7 @@ PG_FUNCTION_INFO_V1(vector_add);
 Datum
 vector_add(PG_FUNCTION_ARGS)
 {
-	Vector	   *a;
+	Vector	   *a = NULL;
 	Vector *b = NULL;
 	Vector *result = NULL;
 	int			i;
@@ -568,7 +568,7 @@ PG_FUNCTION_INFO_V1(vector_sub);
 Datum
 vector_sub(PG_FUNCTION_ARGS)
 {
-	Vector	   *a;
+	Vector	   *a = NULL;
 	Vector *b = NULL;
 	Vector *result = NULL;
 	int			i;
@@ -615,7 +615,7 @@ PG_FUNCTION_INFO_V1(vector_mul);
 Datum
 vector_mul(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
+	Vector	   *v = NULL;
 	float8		scalar;
 	Vector *result = NULL;
 	int			i;
@@ -659,7 +659,16 @@ PG_FUNCTION_INFO_V1(array_to_vector);
 Datum
 array_to_vector(PG_FUNCTION_ARGS)
 {
-	ArrayType  *array;
+	ArrayType  *array = NULL;
+	Vector	   *result = NULL;
+	int16		typlen;
+	bool		typbyval;
+	char		typalign;
+	Datum	   *elems = NULL;
+	bool	   *nulls = NULL;
+	int			nelems;
+	int			i;
+	Oid			elem_type;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 1)
@@ -668,15 +677,6 @@ array_to_vector(PG_FUNCTION_ARGS)
 				 errmsg("neurondb: array_to_vector requires 1 argument")));
 
 	array = PG_GETARG_ARRAYTYPE_P(0);
-	Vector *result = NULL;
-	int16		typlen;
-	bool		typbyval;
-	char		typalign;
-	Datum *elems = NULL;
-	bool *nulls = NULL;
-	int			nelems;
-	int			i;
-	Oid			elem_type;
 
 	if (array == NULL)
 		ereport(ERROR,
@@ -742,7 +742,14 @@ PG_FUNCTION_INFO_V1(vector_typmod_in);
 Datum
 vector_typmod_in(PG_FUNCTION_ARGS)
 {
-	ArrayType  *ta;
+	ArrayType  *ta = NULL;
+	Datum	   *elem_values = NULL;
+	int			nelems;
+	int16		typlen;
+	bool		typbyval;
+	char		typalign;
+	char	   *s = NULL;
+	long		dim;
 
 	/* Validate minimum argument count */
 	if (PG_NARGS() < 1)
@@ -751,13 +758,6 @@ vector_typmod_in(PG_FUNCTION_ARGS)
 				 errmsg("neurondb: vector_typmod_in requires at least 1 argument")));
 
 	ta = (ArrayType *) PG_GETARG_POINTER(0);
-	Datum *elem_values = NULL;
-	int			nelems;
-	int16		typlen;
-	bool		typbyval;
-	char		typalign;
-	char *s = NULL;
-	long		dim;
 
 	get_typlenbyvalalign(CSTRINGOID, &typlen, &typbyval, &typalign);
 	deconstruct_array(ta,
@@ -790,6 +790,7 @@ Datum
 vector_typmod_out(PG_FUNCTION_ARGS)
 {
 	int32		typmod;
+	StringInfoData buf;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 1)
@@ -798,7 +799,6 @@ vector_typmod_out(PG_FUNCTION_ARGS)
 				 errmsg("neurondb: vector_typmod_out requires 1 argument")));
 
 	typmod = PG_GETARG_INT32(0);
-	StringInfoData buf;
 
 	if (typmod < 0)
 		PG_RETURN_CSTRING(pstrdup(""));
@@ -811,7 +811,7 @@ vector_typmod_out(PG_FUNCTION_ARGS)
 Datum
 vector_to_array(PG_FUNCTION_ARGS)
 {
-	Vector	   *vec;
+	Vector	   *vec = NULL;
 	Datum *elems = NULL;
 	ArrayType *result = NULL;
 	int			i;

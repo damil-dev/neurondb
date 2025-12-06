@@ -1182,7 +1182,7 @@ text_gpu_evaluate(const MLGpuModel *model, const MLGpuEvalSpec *spec,
 				  MLGpuMetrics *out, char **errstr)
 {
 	const		TextGpuModelState *state;
-	Jsonb	   *metrics_json;
+	Jsonb	   *metrics_json = NULL;
 	StringInfoData buf;
 
 	if (errstr != NULL)
@@ -1222,7 +1222,7 @@ text_gpu_serialize(const MLGpuModel *model, bytea * *payload_out,
 				   Jsonb * *metadata_out, char **errstr)
 {
 	const		TextGpuModelState *state;
-	bytea	   *payload_copy;
+	bytea	   *payload_copy = NULL;
 	int			payload_size;
 
 	if (errstr != NULL)
@@ -1267,13 +1267,13 @@ static bool
 text_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 					 const Jsonb * metadata, char **errstr)
 {
-	TextGpuModelState *state;
-	bytea	   *payload_copy;
+	TextGpuModelState *state = NULL;
+	bytea	   *payload_copy = NULL;
 	int			payload_size;
 	int			vocab_size = 0;
 	int			feature_dim = 0;
 	char		task_type[32];
-	JsonbIterator *it;
+	JsonbIterator *it = NULL;
 	JsonbValue	v;
 	int			r;
 

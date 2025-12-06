@@ -53,7 +53,7 @@ PG_FUNCTION_INFO_V1(vector_l2_distance_op);
 Datum
 vector_l2_distance_op(PG_FUNCTION_ARGS)
 {
-	Vector	   *a;
+	Vector	   *a = NULL;
 	Vector *b = NULL;
 	float4		result;
 	float4		l2_distance_simd(Vector *a, Vector *b);
@@ -854,21 +854,23 @@ PG_FUNCTION_INFO_V1(neurondb_has_opclass);
 Datum
 neurondb_has_opclass(PG_FUNCTION_ARGS)
 {
-	
+	text	   *opclass_name = NULL;
+	char	   *name = NULL;
+	bool		exists = false;
+	int			ret;
+	StringInfoData query;
+	NdbSpiSession *session = NULL;
+
 	/* Validate argument count */
 	if (PG_NARGS() != 1)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("neurondb: neurondb_has_opclass requires 1 argument")));
 
-	text	   *opclass_name = PG_GETARG_TEXT_PP(0);
-	char	   *name = text_to_cstring(opclass_name);
-	bool		exists = false;
-	int			ret;
-	StringInfoData query;
+	opclass_name = PG_GETARG_TEXT_PP(0);
+	name = text_to_cstring(opclass_name);
 
 	/* Connect to SPI */
-	NdbSpiSession *session = NULL;
 	session = ndb_spi_session_begin(CurrentMemoryContext, false);
 	if (session == NULL)
 	{

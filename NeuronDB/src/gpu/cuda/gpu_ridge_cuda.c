@@ -67,9 +67,9 @@ ndb_cuda_ridge_pack_model(const RidgeModel *model,
 						  char **errstr)
 {
 	size_t		payload_bytes;
-	char	   *base;
-	NdbCudaRidgeModelHeader *hdr;
-	float	   *coef_dest;
+	char	   *base = NULL;
+	NdbCudaRidgeModelHeader *hdr = NULL;
+	float	   *coef_dest = NULL;
 	bytea *blob = NULL;
 	char *blob_raw = NULL;
 
@@ -151,12 +151,12 @@ ndb_cuda_ridge_train(const float *features,
 {
 	const double default_lambda = 0.01;
 	double		lambda;
-	float	   *d_features;
-	double	   *d_targets;
-	double	   *d_XtX;
-	double	   *d_Xty;
-	double	   *d_XtX_inv;
-	double	   *d_beta;
+	float	   *d_features = NULL;
+	double	   *d_targets = NULL;
+	double	   *d_XtX = NULL;
+	double	   *d_Xty = NULL;
+	double	   *d_XtX_inv = NULL;
+	double	   *d_beta = NULL;
 	double *h_XtX = NULL;
 	double *h_Xty = NULL;
 	double *h_XtX_inv = NULL;

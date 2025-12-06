@@ -233,7 +233,7 @@ static struct
 {
 	int device_id;
 	rocblas_handle rocblas_handle;
-	hipStream_t *streams;
+	hipStream_t *streams = NULL;
 	int num_streams;
 	bool initialized;
 } rocm_ctx = { 0 };
@@ -583,7 +583,7 @@ rocm_backend_kmeans_impl(const float *vectors,
 	int *assignments)
 {
 	float *d_vectors, *d_centroids;
-	int *d_assignments;
+	int *d_assignments = NULL;
 
 	size_t vec_size = num_vectors * dim * sizeof(float);
 	size_t cent_size = k * dim * sizeof(float);
@@ -911,7 +911,7 @@ ndb_rocm_launch_kmeans_assign(const float *vectors,
 	int k,
 	ndb_stream_t stream)
 {
-	int32_t *assign32;
+	int32_t *assign32 = NULL;
 	int rc;
 
 	(void)stream;
@@ -951,8 +951,8 @@ ndb_rocm_launch_kmeans_update(const float *vectors,
 	int k,
 	ndb_stream_t stream)
 {
-	int32_t *assign32;
-	int32_t *counts;
+	int32_t *assign32 = NULL;
+	int32_t *counts = NULL;
 	int i;
 	int rc;
 

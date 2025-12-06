@@ -393,7 +393,7 @@ arima_forecast(const TimeSeriesModel * model,
 				j;
 	int			p,
 				d;
-	float	   *history;
+	float	   *history = NULL;
 
 	Assert(model != NULL);
 	Assert(last_values != NULL);
@@ -1883,7 +1883,7 @@ timeseries_gpu_evaluate(const MLGpuModel *model, const MLGpuEvalSpec *spec,
 						MLGpuMetrics *out, char **errstr)
 {
 	const		TimeSeriesGpuModelState *state;
-	Jsonb	   *metrics_json;
+	Jsonb	   *metrics_json = NULL;
 	StringInfoData buf;
 
 	if (errstr != NULL)
@@ -1925,7 +1925,7 @@ timeseries_gpu_serialize(const MLGpuModel *model, bytea * *payload_out,
 						 Jsonb * *metadata_out, char **errstr)
 {
 	const		TimeSeriesGpuModelState *state;
-	bytea	   *payload_copy;
+	bytea	   *payload_copy = NULL;
 	int			payload_size;
 	char *payload_copy_raw = NULL;
 
@@ -1971,8 +1971,8 @@ static bool
 timeseries_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 						   const Jsonb * metadata, char **errstr)
 {
-	TimeSeriesGpuModelState *state;
-	bytea	   *payload_copy;
+	TimeSeriesGpuModelState *state = NULL;
+	bytea	   *payload_copy = NULL;
 	int			payload_size;
 
 	float *ar_coeffs = NULL;

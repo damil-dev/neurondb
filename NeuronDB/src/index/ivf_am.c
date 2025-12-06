@@ -274,7 +274,7 @@ typedef struct IvfScanOpaqueData
 	ItemPointerData *results;	/* Result heap TIDs */
 	float4	   *distances;		/* Result distances */
 	int			currentResult;	/* Current result index */
-	int		   *selectedClusters;	/* Selected cluster IDs (nprobe) */
+	int		   *selectedClusters;
 	int			currentCluster; /* Current cluster being scanned */
 	BlockNumber currentListBlock;	/* Current list block */
 	int			currentListOffset;	/* Current offset in list */
@@ -463,7 +463,7 @@ ivfBuildCallback(Relation index,
 				 void *state)
 {
 	IvfBuildState *buildstate = (IvfBuildState *) state;
-	float4	   *vectorData;
+	float4	   *vectorData = NULL;
 	int			dim;
 
 	if (isnull[0])
@@ -503,11 +503,11 @@ ivfbuild(Relation heap, Relation index, struct IndexInfo *indexInfo)
 {
 	IndexBuildResult *result = NULL;
 	IvfBuildState buildstate;
-	IvfOptions *options;
+	IvfOptions *options = NULL;
 	Buffer		metaBuffer;
 	Page		metaPage;
 	IvfMetaPage meta;
-	KMeansState *kmeans;
+	KMeansState *kmeans = NULL;
 	int			nlists;
 	int			i;
 	BlockNumber centroidsBlock;
@@ -657,9 +657,9 @@ ivfbuild(Relation heap, Relation index, struct IndexInfo *indexInfo)
 
 	for (i = 0; i < nlists; i++)
 	{
-		IvfCentroidData *centroid;
+		IvfCentroidData *centroid = NULL;
 
-		char *centroid_raw;
+		char *centroid_raw = NULL;
 
 		if (kmeans->centroids[i] == NULL)
 		{
@@ -804,10 +804,10 @@ ivfinsert(Relation index,
 		  bool indexUnchanged,
 		  struct IndexInfo *indexInfo)
 {
-	Vector	   *input_vec;
+	Vector	   *input_vec = NULL;
 	BlockNumber meta_blkno = 0;
 	Buffer		meta_buf;
-	IvfMetaPageData *meta;
+	IvfMetaPageData *meta = NULL;
 	int			i,
 				min_idx = 0,
 				nlist;
@@ -819,7 +819,7 @@ ivfinsert(Relation index,
 
 	/* Extract vector data (handles vector, halfvec, sparsevec, bit) */
 	{
-		float4 *vectorData;
+		float4 *vectorData = NULL;
 		int			dim;
 		Oid			keyType;
 		MemoryContext oldctx;
@@ -878,7 +878,7 @@ ivfinsert(Relation index,
 		OffsetNumber maxoff;
 		OffsetNumber offnum;
 		IvfCentroid centroid;
-		float4 *centroidVector;
+		float4 *centroidVector = NULL;
 		float4		accum;
 		int			k;
 
@@ -959,7 +959,7 @@ ivfinsert(Relation index,
 		BlockNumber listBlock;
 		Buffer		listBuf;
 		Page		listPage;
-		IvfListPageHeader *listHeader;
+		IvfListPageHeader *listHeader = NULL;
 		Size		entrySize;
 		OffsetNumber newOffnum;
 		bool		needNewBlock = false;
@@ -995,7 +995,7 @@ ivfinsert(Relation index,
 			/* Traverse to last block in chain */
 			Buffer		tempBuf;
 			Page		tempPage;
-			IvfListPageHeader *tempHeader;
+			IvfListPageHeader *tempHeader = NULL;
 
 			tempBuf = ReadBuffer(index, listBlock);
 			if (!BufferIsValid(tempBuf))
@@ -1069,7 +1069,7 @@ ivfinsert(Relation index,
 				BlockNumber newBlock = P_NEW;
 				Buffer		newBuf;
 				Page		newPage;
-				IvfListPageHeader *newHeader;
+				IvfListPageHeader *newHeader = NULL;
 
 				newBuf = ReadBuffer(index, newBlock);
 				if (!BufferIsValid(newBuf))
@@ -1102,7 +1102,7 @@ ivfinsert(Relation index,
 		{
 			char *entryData = NULL;
 			IvfListEntry tempEntry;
-			float4 *entryVector;
+			float4 *entryVector = NULL;
 			nalloc(entryData, char, entrySize);
 			tempEntry = (IvfListEntry) entryData;
 
@@ -1184,11 +1184,11 @@ ivfbulkdelete(IndexVacuumInfo * info,
 	OffsetNumber maxoff;
 	OffsetNumber offnum;
 	IvfCentroid centroid;
-	BlockNumber listBlock;
-	Buffer		listBuf;
-	Page		listPage;
-	IvfListPageHeader *listHeader;
-	OffsetNumber listMaxoff;
+		BlockNumber listBlock;
+		Buffer		listBuf;
+		Page		listPage;
+		IvfListPageHeader *listHeader = NULL;
+		OffsetNumber listMaxoff;
 	OffsetNumber listOffnum;
 	IvfListEntry entry;
 	ItemId		itemId;
@@ -1447,7 +1447,7 @@ ivfrescan(IndexScanDesc scan,
 	Buffer		metaBuffer;
 	Page		metaPage;
 	IvfMetaPage meta;
-	IvfOptions *options;
+	IvfOptions *options = NULL;
 
 	if (so == NULL)
 		return;
@@ -1607,7 +1607,7 @@ ivfSelectClusters(Relation index,
 	OffsetNumber maxoff;
 	OffsetNumber offnum;
 	IvfCentroid centroid;
-	float4	   *centroidVector;
+	float4	   *centroidVector = NULL;
 	float4	   *clusterDistances = NULL;
 	int			i,
 				j;
@@ -2312,7 +2312,7 @@ ivfdelete(Relation index,
 	Buffer		centroidsBuf;
 	Page		centroidsPage;
 	IvfCentroid centroid;
-	float4	   *centroidVector;
+	float4	   *centroidVector = NULL;
 	BlockNumber listBlock;
 	Buffer		listBuf;
 	Page		listPage;
@@ -2323,7 +2323,7 @@ ivfdelete(Relation index,
 	int			i;
 	int			minIdx = -1;
 	float4		minDist = FLT_MAX;
-	Vector	   *inputVec;
+	Vector	   *inputVec = NULL;
 	int			metaBlkno = 0;
 	BlockNumber centroidsBlock;
 	int			nlists;
@@ -2355,7 +2355,7 @@ ivfdelete(Relation index,
 	/* Step 2: Get vector from heap to find which centroid it belongs to */
 	if (values != NULL && !isnull[0])
 	{
-		float4 *vectorData;
+		float4 *vectorData = NULL;
 		int			dim;
 		Oid			keyType;
 		MemoryContext oldctx;
@@ -2404,7 +2404,7 @@ ivfdelete(Relation index,
 
 			/* Scan this list for the ItemPointer */
 			{
-				IvfListPageHeader *listHeader;
+				IvfListPageHeader *listHeader = NULL;
 
 				while (listBlock != InvalidBlockNumber && !found)
 				{
@@ -2540,7 +2540,7 @@ ivfdelete(Relation index,
 
 			/* Scan list for the ItemPointer */
 			{
-				IvfListPageHeader *listHeader;
+				IvfListPageHeader *listHeader = NULL;
 
 				while (listBlock != InvalidBlockNumber && !found)
 				{

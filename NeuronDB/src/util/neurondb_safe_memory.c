@@ -83,7 +83,7 @@ ndb_safe_context_cleanup(MemoryContext context, MemoryContext oldcontext)
 
 typedef struct NdbPointerEntry
 {
-	void *ptr;
+	void *ptr = NULL;
 	MemoryContext context;
 	const char *alloc_func;
 }			NdbPointerEntry;

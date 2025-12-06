@@ -66,11 +66,11 @@ typedef struct VocabEntry
 /* ---- Tokenizer cache entry ---- */
 typedef struct TokenizerCacheEntry
 {
-	char	   *model_name;		/* Model identifier */
+	char	   *model_name;
 	VocabEntry **vocab_table;	/* Vocabulary hash table */
 	bool		vocab_loaded;	/* Whether vocabulary is loaded */
 	int32		vocab_size;		/* Vocabulary size */
-	char	   *vocab_path;		/* Path to vocabulary file */
+	char	   *vocab_path;
 	time_t		last_used;		/* Last access time for LRU */
 	struct TokenizerCacheEntry *next;	/* Linked list pointer */
 }			TokenizerCacheEntry;

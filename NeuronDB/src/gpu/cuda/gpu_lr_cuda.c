@@ -43,9 +43,9 @@ ndb_cuda_lr_pack_model(const LRModel *model,
 					   char **errstr)
 {
 	size_t		payload_bytes;
-	char	   *base;
-	NdbCudaLrModelHeader *hdr;
-	float	   *weights_dest;
+	char	   *base = NULL;
+	NdbCudaLrModelHeader *hdr = NULL;
+	float	   *weights_dest = NULL;
 	bytea	   *blob = NULL;
 	char	   *blob_raw = NULL;
 
@@ -568,7 +568,7 @@ ndb_cuda_lr_train(const float *features,
 	/* Optimized: Use block-based conversion for better cache locality */
 	{
 		char	   *h_features_col_raw = NULL;
-		float	   *h_features_col;
+		float	   *h_features_col = NULL;
 		int			conv_i;
 		const int	BLOCK_SIZE = 64;	/* Cache-friendly block size */
 		nalloc(h_features_col_raw, char, feature_bytes);

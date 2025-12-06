@@ -357,7 +357,7 @@ auto_train(PG_FUNCTION_ARGS)
 
 			/* Suppress shadow warnings from nested PG_TRY blocks */
 #pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wshadow=compatible-local"
+#pragma GCC diagnostic ignored "-Wshadow"
 			PG_TRY();
 			{
 				edata = CopyErrorData();
@@ -380,7 +380,7 @@ auto_train(PG_FUNCTION_ARGS)
 			{
 				/* Suppress shadow warnings from nested PG_TRY blocks */
 #pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wshadow=compatible-local"
+#pragma GCC diagnostic ignored "-Wshadow"
 				PG_TRY();
 				{
 					FreeErrorData(edata);
@@ -473,7 +473,7 @@ auto_train(PG_FUNCTION_ARGS)
 				 */
 				/* Suppress shadow warnings from nested PG_TRY blocks */
 #pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wshadow=compatible-local"
+#pragma GCC diagnostic ignored "-Wshadow"
 				PG_TRY();
 				{
 					eval_result_datum = FunctionCall4(&eval_flinfo,
@@ -1014,7 +1014,7 @@ optimize_hyperparameters(PG_FUNCTION_ARGS)
 									 * PG_TRY blocks
 									 */
 #pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wshadow=compatible-local"
+#pragma GCC diagnostic ignored "-Wshadow"
 									PG_TRY();
 									{
 										metrics_it = JsonbIteratorInit((JsonbContainer *) & metrics_jsonb->root);
@@ -2777,7 +2777,7 @@ automl_gpu_evaluate(const MLGpuModel *model, const MLGpuEvalSpec *spec,
 					MLGpuMetrics *out, char **errstr)
 {
 	const		AutoMLGpuModelState *state;
-	Jsonb	   *metrics_json;
+	Jsonb	   *metrics_json = NULL;
 	StringInfoData buf;
 
 	if (errstr != NULL)

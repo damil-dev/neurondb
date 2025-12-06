@@ -56,7 +56,7 @@ ndb_hf_vision_complete(const NdbLLMConfig *cfg,
 {
 	bool		ok = false;
 	bytea	   *image_bytea = NULL;
-	char	   *base64_data = NULL;
+	char	   *base64_data;
 	char	   *image_bytea_raw = NULL;
 	char	   *quoted_prompt = NULL;
 	char	   *resp = NULL;
@@ -1378,7 +1378,7 @@ parse_hf_emb_batch(const char *json,
 	int		   *dims = NULL;
 	int			num_vecs = 0;
 	int			cap = 16;
-	char	   *endptr;
+	char	   *endptr = NULL;
 	double		v;
 	float	   *vec = NULL;
 	int			vec_dim = 0;
@@ -1708,7 +1708,7 @@ ndb_hf_image_embed(const NdbLLMConfig *cfg,
 	char	   *resp = NULL;
 	int			code;
 	bool		ok;
-	char	   *base64_data = NULL;
+	char	   *base64_data;
 	text	   *encoded_text = NULL;
 	NdbLLMResp	temp_resp = {0};
 	HfEndpointKind kind;
@@ -1858,7 +1858,7 @@ ndb_hf_multimodal_embed(const NdbLLMConfig *cfg,
 	char	   *resp = NULL;
 	int			code;
 	bool		ok;
-	char	   *base64_data = NULL;
+	char	   *base64_data;
 	text	   *encoded_text = NULL;
 	char	   *quoted_text = NULL;
 	NdbLLMResp	temp_resp = {0};

@@ -2287,7 +2287,7 @@ static bool
 nb_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec,
 			 char **errstr)
 {
-	NbGpuModelState *state;
+	NbGpuModelState *state = NULL;
 
 	bytea *payload = NULL;
 	int			rc;

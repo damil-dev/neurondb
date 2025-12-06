@@ -562,7 +562,7 @@ build_tree_1d(const float *features,
 			  int min_samples_split,
 			  bool is_classification)
 {
-	DTNode	   *node;
+	DTNode	   *node = NULL;
 	int			i,
 				best_feature;
 	float		best_threshold;
@@ -2454,7 +2454,7 @@ dt_gpu_evaluate(const MLGpuModel *model, const MLGpuEvalSpec *spec,
 				MLGpuMetrics *out, char **errstr)
 {
 	const		DTGpuModelState *state;
-	Jsonb	   *metrics_json;
+	Jsonb	   *metrics_json = NULL;
 
 	if (errstr != NULL)
 		*errstr = NULL;
@@ -2535,7 +2535,7 @@ static bool
 dt_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 				   const Jsonb * metadata, char **errstr)
 {
-	DTGpuModelState *state;
+	DTGpuModelState *state = NULL;
 	bytea *payload_copy = NULL;
 	char *payload_copy_raw = NULL;
 	int			payload_size;
