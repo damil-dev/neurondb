@@ -66,11 +66,11 @@ PG_FUNCTION_INFO_V1(recall_at_k);
 Datum
 recall_at_k(PG_FUNCTION_ARGS)
 {
-	ArrayType  *retrieved_array;
-	ArrayType  *relevant_array;
+	ArrayType *retrieved_array = NULL;
+	ArrayType *relevant_array = NULL;
 	int			k;
-	int32	   *retrieved_ids;
-	int32	   *relevant_ids;
+	int32 *retrieved_ids = NULL;
+	int32 *relevant_ids = NULL;
 	int			n_retrieved;
 	int			n_relevant;
 	int			found_count;
@@ -132,11 +132,11 @@ PG_FUNCTION_INFO_V1(precision_at_k);
 Datum
 precision_at_k(PG_FUNCTION_ARGS)
 {
-	ArrayType  *retrieved_array;
-	ArrayType  *relevant_array;
+	ArrayType *retrieved_array = NULL;
+	ArrayType *relevant_array = NULL;
 	int			k;
-	int32	   *retrieved_ids;
-	int32	   *relevant_ids;
+	int32 *retrieved_ids = NULL;
+	int32 *relevant_ids = NULL;
 	int			n_retrieved;
 	int			n_relevant;
 	int			found_count;
@@ -192,11 +192,11 @@ PG_FUNCTION_INFO_V1(f1_at_k);
 Datum
 f1_at_k(PG_FUNCTION_ARGS)
 {
-	ArrayType  *retrieved_array;
-	ArrayType  *relevant_array;
+	ArrayType *retrieved_array = NULL;
+	ArrayType *relevant_array = NULL;
 	int			k;
-	int32	   *retrieved_ids;
-	int32	   *relevant_ids;
+	int32 *retrieved_ids = NULL;
+	int32 *relevant_ids = NULL;
 	int			n_retrieved;
 	int			n_relevant;
 	int			found_count;
@@ -273,8 +273,8 @@ PG_FUNCTION_INFO_V1(mean_reciprocal_rank);
 Datum
 mean_reciprocal_rank(PG_FUNCTION_ARGS)
 {
-	ArrayType  *retrieved_array;
-	ArrayType  *relevant_array;
+	ArrayType *retrieved_array = NULL;
+	ArrayType *relevant_array = NULL;
 	int			ndim_retrieved,
 				ndim_relevant;
 	int		   *dims_retrieved,
@@ -282,8 +282,8 @@ mean_reciprocal_rank(PG_FUNCTION_ARGS)
 	int			n_queries;
 	int			max_retrieved_len,
 				max_relevant_len;
-	int32	   *retrieved_data;
-	int32	   *relevant_data;
+	int32 *retrieved_data = NULL;
+	int32 *relevant_data = NULL;
 	double		mrr;
 	double		sum_rr;
 	int			q,

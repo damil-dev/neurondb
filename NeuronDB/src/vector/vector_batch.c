@@ -38,11 +38,11 @@ PG_FUNCTION_INFO_V1(vector_l2_distance_batch);
 Datum
 vector_l2_distance_batch(PG_FUNCTION_ARGS)
 {
-	ArrayType  *vec_array;
-	Vector	   *query;
-	ArrayType  *result;
-	Datum	   *elems;
-	bool	   *nulls;
+	ArrayType *vec_array = NULL;
+	Vector *query = NULL;
+	ArrayType *result = NULL;
+	Datum *elems = NULL;
+	bool *nulls = NULL;
 	int			nvec;
 	int			i;
 	Oid			vector_oid;
@@ -51,7 +51,7 @@ vector_l2_distance_batch(PG_FUNCTION_ARGS)
 	char		typalign;
 	bool		isnull;
 	Datum		vec_datum;
-	Vector	   *vec;
+	Vector *vec = NULL;
 	int			lb;
 	int			idx;
 
@@ -98,8 +98,8 @@ vector_l2_distance_batch(PG_FUNCTION_ARGS)
 
 	elems = NULL;
 	nulls = NULL;
-	NDB_ALLOC(elems, Datum, nvec);
-	NDB_ALLOC(nulls, bool, nvec);
+	nalloc(elems, Datum, nvec);
+	nalloc(nulls, bool, nvec);
 
 	/*
 	 * Get the lower bound of the input array (typically 1 for PostgreSQL
@@ -154,8 +154,8 @@ vector_l2_distance_batch(PG_FUNCTION_ARGS)
 	}
 
 	result = construct_array(elems, nvec, FLOAT4OID, sizeof(float4), true, 'i');
-	NDB_FREE(elems);
-	NDB_FREE(nulls);
+	nfree(elems);
+	nfree(nulls);
 
 	PG_RETURN_ARRAYTYPE_P(result);
 }
@@ -164,11 +164,11 @@ PG_FUNCTION_INFO_V1(vector_cosine_distance_batch);
 Datum
 vector_cosine_distance_batch(PG_FUNCTION_ARGS)
 {
-	ArrayType  *vec_array;
-	Vector	   *query;
-	ArrayType  *result;
-	Datum	   *elems;
-	bool	   *nulls;
+	ArrayType *vec_array = NULL;
+	Vector *query = NULL;
+	ArrayType *result = NULL;
+	Datum *elems = NULL;
+	bool *nulls = NULL;
 	int			nvec;
 	int			i;
 	Oid			vector_oid;
@@ -177,7 +177,7 @@ vector_cosine_distance_batch(PG_FUNCTION_ARGS)
 	char		typalign;
 	bool		isnull;
 	Datum		vec_datum;
-	Vector	   *vec;
+	Vector *vec = NULL;
 	int			lb;
 	int			idx;
 
@@ -224,8 +224,8 @@ vector_cosine_distance_batch(PG_FUNCTION_ARGS)
 
 	elems = NULL;
 	nulls = NULL;
-	NDB_ALLOC(elems, Datum, nvec);
-	NDB_ALLOC(nulls, bool, nvec);
+	nalloc(elems, Datum, nvec);
+	nalloc(nulls, bool, nvec);
 
 	/*
 	 * Get the lower bound of the input array (typically 1 for PostgreSQL
@@ -280,8 +280,8 @@ vector_cosine_distance_batch(PG_FUNCTION_ARGS)
 	}
 
 	result = construct_array(elems, nvec, FLOAT4OID, sizeof(float4), true, 'i');
-	NDB_FREE(elems);
-	NDB_FREE(nulls);
+	nfree(elems);
+	nfree(nulls);
 
 	PG_RETURN_ARRAYTYPE_P(result);
 }
@@ -290,11 +290,11 @@ PG_FUNCTION_INFO_V1(vector_inner_product_batch);
 Datum
 vector_inner_product_batch(PG_FUNCTION_ARGS)
 {
-	ArrayType  *vec_array;
-	Vector	   *query;
-	ArrayType  *result;
-	Datum	   *elems;
-	bool	   *nulls;
+	ArrayType *vec_array = NULL;
+	Vector *query = NULL;
+	ArrayType *result = NULL;
+	Datum *elems = NULL;
+	bool *nulls = NULL;
 	int			nvec;
 	int			i;
 	Oid			vector_oid;
@@ -303,7 +303,7 @@ vector_inner_product_batch(PG_FUNCTION_ARGS)
 	char		typalign;
 	bool		isnull;
 	Datum		vec_datum;
-	Vector	   *vec;
+	Vector *vec = NULL;
 	int			lb;
 	int			idx;
 
@@ -350,8 +350,8 @@ vector_inner_product_batch(PG_FUNCTION_ARGS)
 
 	elems = NULL;
 	nulls = NULL;
-	NDB_ALLOC(elems, Datum, nvec);
-	NDB_ALLOC(nulls, bool, nvec);
+	nalloc(elems, Datum, nvec);
+	nalloc(nulls, bool, nvec);
 
 	/*
 	 * Get the lower bound of the input array (typically 1 for PostgreSQL
@@ -406,8 +406,8 @@ vector_inner_product_batch(PG_FUNCTION_ARGS)
 	}
 
 	result = construct_array(elems, nvec, FLOAT4OID, sizeof(float4), true, 'i');
-	NDB_FREE(elems);
-	NDB_FREE(nulls);
+	nfree(elems);
+	nfree(nulls);
 
 	PG_RETURN_ARRAYTYPE_P(result);
 }
@@ -421,10 +421,10 @@ PG_FUNCTION_INFO_V1(vector_normalize_batch);
 Datum
 vector_normalize_batch(PG_FUNCTION_ARGS)
 {
-	ArrayType  *vec_array;
-	ArrayType  *result;
-	Datum	   *elems;
-	bool	   *nulls;
+	ArrayType *vec_array = NULL;
+	ArrayType *result = NULL;
+	Datum *elems = NULL;
+	bool *nulls = NULL;
 	int			nvec;
 	int			i;
 	Oid			vector_oid;
@@ -433,8 +433,8 @@ vector_normalize_batch(PG_FUNCTION_ARGS)
 	char		typalign;
 	bool		isnull;
 	Datum		vec_datum;
-	Vector	   *vec;
-	Vector	   *normalized;
+	Vector *vec = NULL;
+	Vector *normalized = NULL;
 	int			lb;
 	int			idx;
 
@@ -472,8 +472,8 @@ vector_normalize_batch(PG_FUNCTION_ARGS)
 
 	elems = NULL;
 	nulls = NULL;
-	NDB_ALLOC(elems, Datum, nvec);
-	NDB_ALLOC(nulls, bool, nvec);
+	nalloc(elems, Datum, nvec);
+	nalloc(nulls, bool, nvec);
 
 	/*
 	 * Get the lower bound of the input array (typically 1 for PostgreSQL
@@ -536,8 +536,8 @@ vector_normalize_batch(PG_FUNCTION_ARGS)
 		lbs[0] = 1;
 		result = construct_md_array(elems, nulls, 1, dims, lbs, vector_oid, typlen, typbyval, typalign);
 	}
-	NDB_FREE(elems);
-	NDB_FREE(nulls);
+	nfree(elems);
+	nfree(nulls);
 
 	PG_RETURN_ARRAYTYPE_P(result);
 }
@@ -546,7 +546,7 @@ PG_FUNCTION_INFO_V1(vector_sum_batch);
 Datum
 vector_sum_batch(PG_FUNCTION_ARGS)
 {
-	ArrayType  *vec_array;
+	ArrayType *vec_array = NULL;
 	Vector	   *result = NULL;
 	int			nvec;
 	int			i;
@@ -554,7 +554,7 @@ vector_sum_batch(PG_FUNCTION_ARGS)
 	int			j;
 	bool		isnull;
 	Datum		vec_datum;
-	Vector	   *vec;
+	Vector *vec = NULL;
 	Oid			vector_oid;
 	int16		typlen;
 	bool		typbyval;
@@ -646,7 +646,7 @@ PG_FUNCTION_INFO_V1(vector_avg_batch);
 Datum
 vector_avg_batch(PG_FUNCTION_ARGS)
 {
-	ArrayType  *vec_array;
+	ArrayType *vec_array = NULL;
 	Vector	   *result = NULL;
 	int			nvec;
 	int			i;
@@ -655,7 +655,7 @@ vector_avg_batch(PG_FUNCTION_ARGS)
 	int			j;
 	bool		isnull;
 	Datum		vec_datum;
-	Vector	   *vec;
+	Vector *vec = NULL;
 	Oid			vector_oid;
 	int16		typlen;
 	bool		typbyval;

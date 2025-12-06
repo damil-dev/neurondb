@@ -43,7 +43,7 @@ static char *
 ndb_text_to_cstring_safe(text * t)
 {
 	size_t		len;
-	char	   *result;
+	char *result = NULL;
 
 	/* Defensive: NULL pointer not allowed */
 	Assert(t != NULL);
@@ -170,7 +170,7 @@ create_policy(PG_FUNCTION_ARGS)
 	char	   *rule_str = NULL;
 	volatile bool success = false;
 
-	NDB_DECLARE(NdbSpiSession *, session);
+	NdbSpiSession *session = NULL;
 
 	if (policy_name == NULL || policy_rule == NULL)
 		ereport(ERROR,
@@ -269,7 +269,7 @@ compute_hmac_sha256(const char *key, const char *data)
 {
 	unsigned char hmac[SHA256_DIGEST_LENGTH];
 	unsigned int hmac_len;
-	char	   *hex_hmac;
+	char *hex_hmac = NULL;
 	int			i;
 
 	if (!key || !data)
@@ -304,11 +304,11 @@ audit_log_query(PG_FUNCTION_ARGS)
 	char	   *user_str = NULL;
 	volatile	uint32 vector_hash = 0;
 	volatile bool success = false;
-	char	   *hmac_hex = NULL;
-	char	   *hmac_key = NULL;
+	char *hmac_hex = NULL;
+	char *hmac_key = NULL;
 	StringInfoData hmac_data;
 
-	NDB_DECLARE(NdbSpiSession *, session);
+	NdbSpiSession *session = NULL;
 
 	if (query_text == NULL || user_id == NULL || result_vectors == NULL)
 		ereport(ERROR,
@@ -362,11 +362,11 @@ audit_log_query(PG_FUNCTION_ARGS)
 	if (session == NULL)
 	{
 		if (hmac_hex)
-			NDB_FREE(hmac_hex);
+			nfree(hmac_hex);
 		if (hmac_data.data)
-			NDB_FREE(hmac_data.data);
+			nfree(hmac_data.data);
 		if (hmac_key && strstr(hmac_key, "neurondb_audit_") == hmac_key)
-			NDB_FREE(hmac_key);
+			nfree(hmac_key);
 		elog(ERROR, "failed to begin SPI session in audit_log_query");
 	}
 
@@ -400,21 +400,21 @@ audit_log_query(PG_FUNCTION_ARGS)
 		ndb_spi_session_end(&session);
 
 		if (hmac_hex)
-			NDB_FREE(hmac_hex);
+			nfree(hmac_hex);
 		if (hmac_data.data)
-			NDB_FREE(hmac_data.data);
+			nfree(hmac_data.data);
 		if (hmac_key && strstr(hmac_key, "neurondb_audit_") == hmac_key)
-			NDB_FREE(hmac_key);
+			nfree(hmac_key);
 	}
 	PG_CATCH();
 	{
 		ndb_spi_session_end(&session);
 		if (hmac_hex)
-			NDB_FREE(hmac_hex);
+			nfree(hmac_hex);
 		if (hmac_data.data)
-			NDB_FREE(hmac_data.data);
+			nfree(hmac_data.data);
 		if (hmac_key && strstr(hmac_key, "neurondb_audit_") == hmac_key)
-			NDB_FREE(hmac_key);
+			nfree(hmac_key);
 		PG_RE_THROW();
 	}
 	PG_END_TRY();

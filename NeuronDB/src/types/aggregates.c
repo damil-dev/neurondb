@@ -43,8 +43,8 @@ Datum
 vector_avg_transfn(PG_FUNCTION_ARGS)
 {
 	MemoryContext aggcontext;
-	VectorAggState *state;
-	Vector	   *vec;
+	VectorAggState *state = NULL;
+	Vector *vec = NULL;
 	int			i;
 
 	if (!AggCheckCallContext(fcinfo, &aggcontext))
@@ -95,8 +95,8 @@ PG_FUNCTION_INFO_V1(vector_avg_finalfn);
 Datum
 vector_avg_finalfn(PG_FUNCTION_ARGS)
 {
-	VectorAggState *state;
-	Vector	   *result;
+	VectorAggState *state = NULL;
+	Vector *result = NULL;
 	int			i;
 
 	if (PG_ARGISNULL(0))
@@ -122,8 +122,8 @@ PG_FUNCTION_INFO_V1(vector_sum_finalfn);
 Datum
 vector_sum_finalfn(PG_FUNCTION_ARGS)
 {
-	VectorAggState *state;
-	Vector	   *result;
+	VectorAggState *state = NULL;
+	Vector *result = NULL;
 	int			i;
 
 	if (PG_ARGISNULL(0))

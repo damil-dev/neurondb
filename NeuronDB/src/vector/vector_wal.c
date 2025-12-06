@@ -34,17 +34,17 @@ safe_text_to_cstring(const text * txt)
 static float8 *
 parse_vector_str(const char *vec, int *out_dim)
 {
-	char	   *copy;
+	char *copy = NULL;
 	int			capacity = 32;
 	int			count = 0;
-	char	   *token;
-	char	   *ptr;
+	char *token = NULL;
+	char *ptr = NULL;
 	char	   *saveptr = NULL;
 
-	NDB_DECLARE(float8 *, result);
+	float8 *result = NULL;
 
 	copy = pstrdup(vec);
-	NDB_ALLOC(result, float8, capacity);
+	nalloc(result, float8, capacity);
 
 	*out_dim = 0;
 
@@ -84,7 +84,7 @@ parse_vector_str(const char *vec, int *out_dim)
 			capacity *= 2;
 
 			/*
-			 * For reallocation, we need to manually handle since NDB_ALLOC
+			 * For reallocation, we need to manually handle since nalloc
 			 * doesn't support repalloc
 			 */
 			/* This is acceptable for dynamic growth patterns */
@@ -95,7 +95,7 @@ parse_vector_str(const char *vec, int *out_dim)
 		token = strtok_r(NULL, ",", &saveptr);
 	}
 
-	NDB_FREE(copy);
+	nfree(copy);
 	*out_dim = count;
 
 	if (count == 0)
@@ -225,7 +225,7 @@ vector_wal_decompress(PG_FUNCTION_ARGS)
 						dim)));
 
 	output = NULL;
-	NDB_ALLOC(output, float8, dim);
+	nalloc(output, float8, dim);
 
 	out_idx = 0;
 	while (*p && out_idx < dim)
@@ -296,7 +296,7 @@ vector_wal_estimate_size(PG_FUNCTION_ARGS)
 {
 	text	   *vector = PG_GETARG_TEXT_PP(0);
 	text	   *base_vector = PG_GETARG_TEXT_PP(1);
-	char	   *vec_str;
+	char *vec_str = NULL;
 	int32		original_size;
 	int32		estimated_compressed_size;
 	float4		compression_ratio;

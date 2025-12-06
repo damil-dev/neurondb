@@ -67,15 +67,15 @@ neurondb_create_ml_project(PG_FUNCTION_ARGS)
 	text	   *project_name_text = PG_GETARG_TEXT_PP(0);
 	text	   *model_type_text = PG_GETARG_TEXT_PP(1);
 	text	   *description_text = PG_ARGISNULL(2) ? NULL : PG_GETARG_TEXT_PP(2);
-	char	   *project_name;
-	char	   *model_type;
-	char	   *description;
+	char *project_name = NULL;
+	char *model_type = NULL;
+	char *description = NULL;
 	StringInfoData sql;
 	int			ret;
 	int32		project_id_val;
 	int			project_id;
 
-	NDB_DECLARE(NdbSpiSession *, spi_session);
+	NdbSpiSession *spi_session = NULL;
 	MemoryContext oldcontext;
 
 	project_name = text_to_cstring(project_name_text);
@@ -110,10 +110,10 @@ neurondb_create_ml_project(PG_FUNCTION_ARGS)
 	{
 		ndb_spi_stringinfo_free(spi_session, &sql);
 		NDB_SPI_SESSION_END(spi_session);
-		NDB_FREE(project_name);
-		NDB_FREE(model_type);
+		nfree(project_name);
+		nfree(model_type);
 		if (description)
-			NDB_FREE(description);
+			nfree(description);
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
 				 errmsg("neurondb: failed to create project: %s", project_name)));
@@ -134,10 +134,10 @@ neurondb_create_ml_project(PG_FUNCTION_ARGS)
 		{
 			ndb_spi_stringinfo_free(spi_session, &sql);
 			NDB_SPI_SESSION_END(spi_session);
-			NDB_FREE(project_name);
-			NDB_FREE(model_type);
+			nfree(project_name);
+			nfree(model_type);
 			if (description)
-				NDB_FREE(description);
+				nfree(description);
 			ereport(ERROR,
 					(errcode(ERRCODE_INTERNAL_ERROR),
 					 errmsg("neurondb: project exists but could not retrieve ID: %s",
@@ -179,13 +179,13 @@ neurondb_list_ml_projects(PG_FUNCTION_ARGS)
 {
 	ReturnSetInfo *rsinfo = (ReturnSetInfo *) fcinfo->resultinfo;
 	TupleDesc	tupdesc;
-	Tuplestorestate *tupstore;
+	Tuplestorestate *tupstore = NULL;
 	MemoryContext per_query_ctx;
 	MemoryContext oldcontext;
 	int			ret;
 	int			i;
 
-	NDB_DECLARE(NdbSpiSession *, spi_session);
+	NdbSpiSession *spi_session = NULL;
 	MemoryContext oldcontext_spi;
 
 	/* Check result context */
@@ -236,7 +236,7 @@ neurondb_list_ml_projects(PG_FUNCTION_ARGS)
 			/* Extract values from SPI tuple */
 			{
 				int32		val_int32;
-				text	   *val_text;
+				text *val_text = NULL;
 
 				if (ndb_spi_get_int32(spi_session, i, 1, &val_int32))
 					values[0] = Int32GetDatum(val_int32);
@@ -293,7 +293,7 @@ neurondb_delete_ml_project(PG_FUNCTION_ARGS)
 	StringInfoData sql;
 	int			ret;
 
-	NDB_DECLARE(NdbSpiSession *, spi_session);
+	NdbSpiSession *spi_session = NULL;
 	MemoryContext oldcontext = CurrentMemoryContext;
 
 	NDB_SPI_SESSION_BEGIN(spi_session, oldcontext);
@@ -336,9 +336,9 @@ neurondb_get_project_info(PG_FUNCTION_ARGS)
 	StringInfoData sql;
 	int			ret;
 	Datum		result;
-	Jsonb	   *jsonb_result;
+	Jsonb *jsonb_result = NULL;
 
-	NDB_DECLARE(NdbSpiSession *, spi_session);
+	NdbSpiSession *spi_session = NULL;
 	MemoryContext oldcontext = CurrentMemoryContext;
 
 	NDB_SPI_SESSION_BEGIN(spi_session, oldcontext);
@@ -356,7 +356,7 @@ neurondb_get_project_info(PG_FUNCTION_ARGS)
 	{
 		ndb_spi_stringinfo_free(spi_session, &sql);
 		NDB_SPI_SESSION_END(spi_session);
-		NDB_FREE(project_name);
+		nfree(project_name);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("neurondb: project not found: %s", project_name)));
@@ -367,7 +367,7 @@ neurondb_get_project_info(PG_FUNCTION_ARGS)
 	{
 		ndb_spi_stringinfo_free(spi_session, &sql);
 		NDB_SPI_SESSION_END(spi_session);
-		NDB_FREE(project_name);
+		nfree(project_name);
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
 				 errmsg("neurondb: failed to get project info for: %s", project_name)));
@@ -440,8 +440,8 @@ neurondb_train_kmeans_project(PG_FUNCTION_ARGS)
 	int64		end_time;
 	int			training_time_ms;
 
-	NDB_DECLARE(NdbSpiSession *, spi_session);
-	NDB_DECLARE(NdbSpiSession *, spi_session2);
+	NdbSpiSession *spi_session = NULL;
+	NdbSpiSession *spi_session2 = NULL;
 	MemoryContext oldcontext;
 	MemoryContext oldcontext2;
 
@@ -462,9 +462,9 @@ neurondb_train_kmeans_project(PG_FUNCTION_ARGS)
 	{
 		ndb_spi_stringinfo_free(spi_session, &sql);
 		NDB_SPI_SESSION_END(spi_session);
-		NDB_FREE(project_name);
-		NDB_FREE(table_name);
-		NDB_FREE(vector_col);
+		nfree(project_name);
+		nfree(table_name);
+		nfree(vector_col);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("neurondb: project not found: %s", project_name)));
@@ -474,9 +474,9 @@ neurondb_train_kmeans_project(PG_FUNCTION_ARGS)
 	{
 		ndb_spi_stringinfo_free(spi_session, &sql);
 		NDB_SPI_SESSION_END(spi_session);
-		NDB_FREE(project_name);
-		NDB_FREE(table_name);
-		NDB_FREE(vector_col);
+		nfree(project_name);
+		nfree(table_name);
+		nfree(vector_col);
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
 				 errmsg("neurondb: failed to get project_id from result")));
@@ -496,9 +496,9 @@ neurondb_train_kmeans_project(PG_FUNCTION_ARGS)
 	{
 		ndb_spi_stringinfo_free(spi_session, &sql);
 		NDB_SPI_SESSION_END(spi_session);
-		NDB_FREE(project_name);
-		NDB_FREE(table_name);
-		NDB_FREE(vector_col);
+		nfree(project_name);
+		nfree(table_name);
+		nfree(vector_col);
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
 				 errmsg("neurondb: failed to get next version")));
@@ -508,9 +508,9 @@ neurondb_train_kmeans_project(PG_FUNCTION_ARGS)
 	{
 		ndb_spi_stringinfo_free(spi_session, &sql);
 		NDB_SPI_SESSION_END(spi_session);
-		NDB_FREE(project_name);
-		NDB_FREE(table_name);
-		NDB_FREE(vector_col);
+		nfree(project_name);
+		nfree(table_name);
+		nfree(vector_col);
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
 				 errmsg("neurondb: failed to get next version")));
@@ -539,9 +539,9 @@ neurondb_train_kmeans_project(PG_FUNCTION_ARGS)
 	{
 		ndb_spi_stringinfo_free(spi_session, &sql);
 		NDB_SPI_SESSION_END(spi_session);
-		NDB_FREE(project_name);
-		NDB_FREE(table_name);
-		NDB_FREE(vector_col);
+		nfree(project_name);
+		nfree(table_name);
+		nfree(vector_col);
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
 				 errmsg("neurondb: failed to create model record")));
@@ -551,9 +551,9 @@ neurondb_train_kmeans_project(PG_FUNCTION_ARGS)
 	{
 		ndb_spi_stringinfo_free(spi_session, &sql);
 		NDB_SPI_SESSION_END(spi_session);
-		NDB_FREE(project_name);
-		NDB_FREE(table_name);
-		NDB_FREE(vector_col);
+		nfree(project_name);
+		nfree(table_name);
+		nfree(vector_col);
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
 				 errmsg("neurondb: failed to get model_id from result")));
@@ -611,7 +611,7 @@ kmeans_model_deserialize_from_bytea(const bytea * data, float ***centers_out, in
 	int			i,
 				j;
 
-	NDB_DECLARE(float **, centers);
+	float **centers = NULL;
 
 	if (data == NULL || VARSIZE(data) < VARHDRSZ + sizeof(int) * 2)
 		return -1;
@@ -628,11 +628,11 @@ kmeans_model_deserialize_from_bytea(const bytea * data, float ***centers_out, in
 		return -1;
 
 	/* Allocate centroids */
-	NDB_ALLOC(centers, float *, *num_clusters_out);
+	nalloc(centers, float *, *num_clusters_out);
 	for (i = 0; i < *num_clusters_out; i++)
 	{
-		NDB_DECLARE(float *, center_row);
-		NDB_ALLOC(center_row, float, *dim_out);
+		float *center_row = NULL;
+		nalloc(center_row, float, *dim_out);
 		centers[i] = center_row;
 		for (j = 0; j < *dim_out; j++)
 		{
@@ -676,14 +676,14 @@ predict_kmeans_project(PG_FUNCTION_ARGS)
 	int32		model_id = PG_GETARG_INT32(0);
 	ArrayType  *features_array = PG_GETARG_ARRAYTYPE_P(1);
 
-	NDB_DECLARE(bytea *, model_data);
-	NDB_DECLARE(Jsonb *, parameters);
-	NDB_DECLARE(Jsonb *, metrics);
-	float	  **centers = NULL;
+	bytea *model_data = NULL;
+	Jsonb *parameters = NULL;
+	Jsonb *metrics = NULL;
+	float **centers = NULL;
 	int			n_clusters = 0;
 	int			dim = 0;
 
-	NDB_DECLARE(float *, features);
+	float *features = NULL;
 	int			n_features = 0;
 	int			cluster_id = 0;
 	int			i;
@@ -703,14 +703,14 @@ predict_kmeans_project(PG_FUNCTION_ARGS)
 				 errmsg("predict_kmeans_project: features must be 1-dimensional array")));
 
 	n_features = ARR_DIMS(features_array)[0];
-	NDB_ALLOC(features, float, n_features);
+	nalloc(features, float, n_features);
 	for (i = 0; i < n_features; i++)
 		features[i] = (float) DatumGetFloat8(ARR_DATA_PTR(features_array)[i]);
 
 	/* Load model from catalog */
 	if (!ml_catalog_fetch_model_payload(model_id, &model_data, &parameters, &metrics))
 	{
-		NDB_FREE(features);
+		nfree(features);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("predict_kmeans_project: model %d not found", model_id)));
@@ -719,12 +719,12 @@ predict_kmeans_project(PG_FUNCTION_ARGS)
 	/* Deserialize model */
 	if (kmeans_model_deserialize_from_bytea(model_data, &centers, &n_clusters, &dim) != 0)
 	{
-		NDB_FREE(model_data);
+		nfree(model_data);
 		if (parameters)
-			NDB_FREE(parameters);
+			nfree(parameters);
 		if (metrics)
-			NDB_FREE(metrics);
-		NDB_FREE(features);
+			nfree(metrics);
+		nfree(features);
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
 				 errmsg("predict_kmeans_project: failed to deserialize model %d", model_id)));
@@ -733,15 +733,15 @@ predict_kmeans_project(PG_FUNCTION_ARGS)
 	/* Validate dimension match */
 	if (dim != n_features)
 	{
-		NDB_FREE(model_data);
+		nfree(model_data);
 		if (parameters)
-			NDB_FREE(parameters);
+			nfree(parameters);
 		if (metrics)
-			NDB_FREE(metrics);
+			nfree(metrics);
 		for (i = 0; i < n_clusters; i++)
-			NDB_FREE(centers[i]);
-		NDB_FREE(centers);
-		NDB_FREE(features);
+			nfree(centers[i]);
+		nfree(centers);
+		nfree(features);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("predict_kmeans_project: feature dimension mismatch: model expects %d, got %d",
@@ -759,15 +759,15 @@ predict_kmeans_project(PG_FUNCTION_ARGS)
 		}
 	}
 
-	NDB_FREE(model_data);
+	nfree(model_data);
 	if (parameters)
-		NDB_FREE(parameters);
+		nfree(parameters);
 	if (metrics)
-		NDB_FREE(metrics);
+		nfree(metrics);
 	for (i = 0; i < n_clusters; i++)
-		NDB_FREE(centers[i]);
-	NDB_FREE(centers);
-	NDB_FREE(features);
+		nfree(centers[i]);
+	nfree(centers);
+	nfree(features);
 
 	PG_RETURN_INT32(cluster_id);
 }
@@ -782,20 +782,20 @@ Datum
 evaluate_kmeans_project_by_model_id(PG_FUNCTION_ARGS)
 {
 	int32		model_id;
-	text	   *table_name;
-	text	   *feature_col;
-	char	   *tbl_str;
-	char	   *feat_str;
+	text *table_name = NULL;
+	text *feature_col = NULL;
+	char *tbl_str = NULL;
+	char *feat_str = NULL;
 	StringInfoData query;
 	int			ret;
 	int			n_points = 0;
 	StringInfoData jsonbuf;
-	Jsonb	   *result;
+	Jsonb *result = NULL;
 	MemoryContext oldcontext;
 	double		inertia;
 	int			n_clusters;
 
-	NDB_DECLARE(NdbSpiSession *, spi_session);
+	NdbSpiSession *spi_session = NULL;
 	MemoryContext oldcontext_spi;
 
 	/* Validate arguments */
@@ -846,8 +846,8 @@ evaluate_kmeans_project_by_model_id(PG_FUNCTION_ARGS)
 	{
 		ndb_spi_stringinfo_free(spi_session, &query);
 		NDB_SPI_SESSION_END(spi_session);
-		NDB_FREE(tbl_str);
-		NDB_FREE(feat_str);
+		nfree(tbl_str);
+		nfree(feat_str);
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
 				 errmsg("neurondb: evaluate_kmeans_project_by_model_id: query failed")));
@@ -858,8 +858,8 @@ evaluate_kmeans_project_by_model_id(PG_FUNCTION_ARGS)
 	{
 		ndb_spi_stringinfo_free(spi_session, &query);
 		NDB_SPI_SESSION_END(spi_session);
-		NDB_FREE(tbl_str);
-		NDB_FREE(feat_str);
+		nfree(tbl_str);
+		nfree(feat_str);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("neurondb: evaluate_kmeans_project_by_model_id: need at least 2 points, got %d",
@@ -868,15 +868,15 @@ evaluate_kmeans_project_by_model_id(PG_FUNCTION_ARGS)
 
 	/* Load model and compute actual inertia */
 	{
-		NDB_DECLARE(bytea *, model_payload);
-		NDB_DECLARE(Jsonb *, model_parameters);
-		NDB_DECLARE(float **, centers);
-		float	  **data = NULL;
+		bytea *model_payload = NULL;
+		Jsonb *model_parameters = NULL;
+		float **centers = NULL;
+		float **data = NULL;
 		int			model_dim = 0;
 		int			i,
 					c;
 
-		NDB_DECLARE(int *, assignments);
+		int *assignments = NULL;
 
 		/* Load model from catalog */
 		if (ml_catalog_fetch_model_payload(model_id, &model_payload, &model_parameters, NULL))
@@ -895,11 +895,11 @@ evaluate_kmeans_project_by_model_id(PG_FUNCTION_ARGS)
 				if (n_clusters > 0 && n_clusters <= 10000 && model_dim > 0 && model_dim <= 100000)
 				{
 					/* Allocate centroids */
-					NDB_ALLOC(centers, float *, n_clusters);
+					nalloc(centers, float *, n_clusters);
 					for (c = 0; c < n_clusters; c++)
 					{
-						NDB_DECLARE(float *, center_row);
-						NDB_ALLOC(center_row, float, model_dim);
+						float *center_row = NULL;
+						nalloc(center_row, float, model_dim);
 						centers[c] = center_row;
 						for (i = 0; i < model_dim; i++)
 						{
@@ -914,7 +914,7 @@ evaluate_kmeans_project_by_model_id(PG_FUNCTION_ARGS)
 					if (data != NULL && n_points > 0)
 					{
 						/* Allocate assignments */
-						NDB_ALLOC(assignments, int, n_points);
+						nalloc(assignments, int, n_points);
 
 						/*
 						 * Assign points to nearest centroids and compute
@@ -950,9 +950,9 @@ evaluate_kmeans_project_by_model_id(PG_FUNCTION_ARGS)
 
 						/* Cleanup data */
 						for (i = 0; i < n_points; i++)
-							NDB_FREE(data[i]);
-						NDB_FREE(data);
-						NDB_FREE(assignments);
+							nfree(data[i]);
+						nfree(data);
+						nfree(assignments);
 					}
 					else
 					{
@@ -960,15 +960,15 @@ evaluate_kmeans_project_by_model_id(PG_FUNCTION_ARGS)
 						if (data != NULL)
 						{
 							for (i = 0; i < n_points; i++)
-								NDB_FREE(data[i]);
-							NDB_FREE(data);
+								nfree(data[i]);
+							nfree(data);
 						}
 					}
 
 					/* Cleanup centers */
 					for (c = 0; c < n_clusters; c++)
-						NDB_FREE(centers[c]);
-					NDB_FREE(centers);
+						nfree(centers[c]);
+					nfree(centers);
 				}
 				else
 				{
@@ -982,9 +982,9 @@ evaluate_kmeans_project_by_model_id(PG_FUNCTION_ARGS)
 				n_clusters = 0;
 			}
 			if (model_payload)
-				NDB_FREE(model_payload);
+				nfree(model_payload);
 			if (model_parameters)
-				NDB_FREE(model_parameters);
+				nfree(model_parameters);
 		}
 		else
 		{
@@ -1005,10 +1005,10 @@ evaluate_kmeans_project_by_model_id(PG_FUNCTION_ARGS)
 					 inertia, n_clusters, n_points);
 
 	result = DatumGetJsonbP(DirectFunctionCall1(jsonb_in, CStringGetTextDatum(jsonbuf.data)));
-	NDB_FREE(jsonbuf.data);
+	nfree(jsonbuf.data);
 
-	NDB_FREE(tbl_str);
-	NDB_FREE(feat_str);
+	nfree(tbl_str);
+	nfree(feat_str);
 
 	PG_RETURN_JSONB_P(result);
 }
@@ -1033,7 +1033,7 @@ neurondb_deploy_model(PG_FUNCTION_ARGS)
 	StringInfoData sql;
 	int			ret;
 
-	NDB_DECLARE(NdbSpiSession *, spi_session);
+	NdbSpiSession *spi_session = NULL;
 	MemoryContext oldcontext = CurrentMemoryContext;
 
 	NDB_SPI_SESSION_BEGIN(spi_session, oldcontext);
@@ -1115,7 +1115,7 @@ neurondb_get_deployed_model(PG_FUNCTION_ARGS)
 	int32		model_id_val;
 	int			model_id;
 
-	NDB_DECLARE(NdbSpiSession *, spi_session);
+	NdbSpiSession *spi_session = NULL;
 	MemoryContext oldcontext = CurrentMemoryContext;
 
 	NDB_SPI_SESSION_BEGIN(spi_session, oldcontext);
@@ -1134,7 +1134,7 @@ neurondb_get_deployed_model(PG_FUNCTION_ARGS)
 	{
 		ndb_spi_stringinfo_free(spi_session, &sql);
 		NDB_SPI_SESSION_END(spi_session);
-		NDB_FREE(project_name);
+		nfree(project_name);
 		PG_RETURN_NULL();
 	}
 
@@ -1142,7 +1142,7 @@ neurondb_get_deployed_model(PG_FUNCTION_ARGS)
 	{
 		ndb_spi_stringinfo_free(spi_session, &sql);
 		NDB_SPI_SESSION_END(spi_session);
-		NDB_FREE(project_name);
+		nfree(project_name);
 		PG_RETURN_NULL();
 	}
 	model_id = model_id_val;
@@ -1170,14 +1170,14 @@ neurondb_list_project_models(PG_FUNCTION_ARGS)
 	char	   *project_name = text_to_cstring(project_name_text);
 	ReturnSetInfo *rsinfo = (ReturnSetInfo *) fcinfo->resultinfo;
 	TupleDesc	tupdesc;
-	Tuplestorestate *tupstore;
+	Tuplestorestate *tupstore = NULL;
 	MemoryContext per_query_ctx;
 	MemoryContext oldcontext;
 	StringInfoData sql;
 	int			ret;
 	int			i;
 
-	NDB_DECLARE(NdbSpiSession *, spi_session);
+	NdbSpiSession *spi_session = NULL;
 	MemoryContext oldcontext_spi;
 
 	/* Check result context */
@@ -1239,8 +1239,8 @@ neurondb_list_project_models(PG_FUNCTION_ARGS)
 			/* Extract all columns */
 			{
 				int32		val_int32;
-				text	   *val_text;
-				Jsonb	   *val_jsonb;
+				text *val_text = NULL;
+				Jsonb *val_jsonb = NULL;
 
 				if (ndb_spi_get_int32(spi_session, i, 1, &val_int32))
 					values[0] = Int32GetDatum(val_int32);

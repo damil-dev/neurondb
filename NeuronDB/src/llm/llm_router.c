@@ -57,6 +57,13 @@ fallback_complete(const NdbLLMConfig *cfg,
 				  const char *params_json,
 				  NdbLLMResp *out)
 {
+	/* Validate inputs */
+	if (cfg == NULL || prompt == NULL || out == NULL)
+	{
+		elog(WARNING, "neurondb: fallback_complete called with NULL parameters");
+		return NDB_LLM_ROUTE_ERROR;
+	}
+
 	if (opts != NULL && opts->require_gpu)
 	{
 		ereport(ERROR,
@@ -72,13 +79,11 @@ fallback_complete(const NdbLLMConfig *cfg,
 		NdbLLMConfig fallback = *cfg;
 
 		fallback.provider = "huggingface";
-		ereport(ERROR,
-				(errmsg("neurondb: LLM provider \"%s\" unavailable "
-						"locally (%s); falling back to remote Hugging "
-						"Face",
-						cfg->provider ? cfg->provider
-						: "huggingface-local",
-						reason ? reason : "not supported")));
+		elog(DEBUG1,
+			 "neurondb: LLM provider \"%s\" unavailable "
+			 "locally (%s); falling back to remote Hugging Face",
+			 cfg->provider ? cfg->provider : "huggingface-local",
+			 reason ? reason : "not supported");
 		return ndb_hf_complete(&fallback, prompt, params_json, out);
 	}
 
@@ -98,6 +103,13 @@ fallback_embed(const NdbLLMConfig *cfg,
 			   float **vec_out,
 			   int *dim_out)
 {
+	/* Validate inputs */
+	if (cfg == NULL || text == NULL || vec_out == NULL || dim_out == NULL)
+	{
+		elog(WARNING, "neurondb: fallback_embed called with NULL parameters");
+		return NDB_LLM_ROUTE_ERROR;
+	}
+
 	if (opts != NULL && opts->require_gpu)
 	{
 		ereport(ERROR,
@@ -113,13 +125,11 @@ fallback_embed(const NdbLLMConfig *cfg,
 		NdbLLMConfig fallback = *cfg;
 
 		fallback.provider = "huggingface";
-		ereport(ERROR,
-				(errmsg("neurondb: LLM provider \"%s\" unavailable "
-						"locally (%s); falling back to remote Hugging "
-						"Face",
-						cfg->provider ? cfg->provider
-						: "huggingface-local",
-						reason ? reason : "not supported")));
+		elog(DEBUG1,
+			 "neurondb: LLM provider \"%s\" unavailable "
+			 "locally (%s); falling back to remote Hugging Face",
+			 cfg->provider ? cfg->provider : "huggingface-local",
+			 reason ? reason : "not supported");
 		return ndb_hf_embed(&fallback, text, vec_out, dim_out);
 	}
 
@@ -140,6 +150,13 @@ fallback_rerank(const NdbLLMConfig *cfg,
 				int ndocs,
 				float **scores_out)
 {
+	/* Validate inputs */
+	if (cfg == NULL || query == NULL || docs == NULL || scores_out == NULL || ndocs <= 0)
+	{
+		elog(WARNING, "neurondb: fallback_rerank called with NULL or invalid parameters");
+		return NDB_LLM_ROUTE_ERROR;
+	}
+
 	if (opts != NULL && opts->require_gpu)
 	{
 		ereport(ERROR,
@@ -155,13 +172,11 @@ fallback_rerank(const NdbLLMConfig *cfg,
 		NdbLLMConfig fallback = *cfg;
 
 		fallback.provider = "huggingface";
-		ereport(ERROR,
-				(errmsg("neurondb: LLM provider \"%s\" unavailable "
-						"locally (%s); falling back to remote Hugging "
-						"Face",
-						cfg->provider ? cfg->provider
-						: "huggingface-local",
-						reason ? reason : "not supported")));
+		elog(DEBUG1,
+			 "neurondb: LLM provider \"%s\" unavailable "
+			 "locally (%s); falling back to remote Hugging Face",
+			 cfg->provider ? cfg->provider : "huggingface-local",
+			 reason ? reason : "not supported");
 		return ndb_hf_rerank(&fallback, query, docs, ndocs, scores_out);
 	}
 
@@ -182,6 +197,14 @@ ndb_llm_route_complete(const NdbLLMConfig *cfg,
 {
 	if (cfg == NULL || prompt == NULL || out == NULL)
 	{
+		elog(WARNING, "neurondb: ndb_llm_route_complete called with NULL parameters");
+		return NDB_LLM_ROUTE_ERROR;
+	}
+
+	/* Validate prompt is not empty */
+	if (strlen(prompt) == 0)
+	{
+		elog(WARNING, "neurondb: ndb_llm_route_complete called with empty prompt");
 		return NDB_LLM_ROUTE_ERROR;
 	}
 
@@ -203,9 +226,11 @@ ndb_llm_route_complete(const NdbLLMConfig *cfg,
 			&& (opts == NULL || opts->prefer_gpu
 				|| opts->require_gpu))
 		{
-			char	   *gpu_text = NULL;
 			char	   *gpu_err = NULL;
+			char	   *gpu_text = NULL;
 			int			rc;
+			int32		token_length;
+			int32	   *token_ids = NULL;
 
 			rc = neurondb_gpu_hf_complete(cfg->model,
 										  prompt,
@@ -214,8 +239,15 @@ ndb_llm_route_complete(const NdbLLMConfig *cfg,
 										  &gpu_err);
 			if (rc == 0)
 			{
-				int32		token_length;
-				int32	   *token_ids;
+
+				/* Validate gpu_text before use */
+				if (gpu_text == NULL)
+				{
+					elog(WARNING, "neurondb: GPU completion returned NULL text");
+					if (gpu_err)
+						nfree(gpu_err);
+					return NDB_LLM_ROUTE_ERROR;
+				}
 
 				token_ids = neurondb_tokenize_with_model(prompt,
 														 2048,
@@ -227,7 +259,7 @@ ndb_llm_route_complete(const NdbLLMConfig *cfg,
 					out->tokens_in =
 						0;
 				if (token_ids)
-					NDB_FREE(token_ids);
+					nfree(token_ids);
 
 #ifdef HAVE_ONNX_RUNTIME
 				PG_TRY();
@@ -248,32 +280,31 @@ ndb_llm_route_complete(const NdbLLMConfig *cfg,
 					}
 					else
 					{
-						if (gpu_text
-							&& strlen(gpu_text) > 0)
-						{
-							const char *ptr =
-								gpu_text;
-							int			word_count = 0;
-							int			in_word = 0;
+					if (gpu_text
+						&& strlen(gpu_text) > 0)
+					{
+						const char *ptr = gpu_text;
+						int			in_word = 0;
+						int			word_count = 0;
 
-							while (*ptr)
+						while (*ptr)
+						{
+							if (!isspace((
+										  unsigned char) *ptr))
 							{
-								if (!isspace((
-											  unsigned char) *ptr))
+								if (!in_word)
 								{
-									if (!in_word)
-									{
-										word_count++;
-										in_word =
-											1;
-									}
-								}
-								else
-								{
+									word_count++;
 									in_word =
-										0;
+										1;
 								}
-								ptr++;
+							}
+							else
+							{
+								in_word =
+									0;
+							}
+							ptr++;
 							}
 							out->tokens_out =
 								word_count > 0
@@ -286,7 +317,7 @@ ndb_llm_route_complete(const NdbLLMConfig *cfg,
 						}
 					}
 					if (output_token_ids)
-						NDB_FREE(output_token_ids);
+						nfree(output_token_ids);
 				}
 				PG_CATCH();
 				{
@@ -296,8 +327,8 @@ ndb_llm_route_complete(const NdbLLMConfig *cfg,
 					if (gpu_text && strlen(gpu_text) > 0)
 					{
 						const char *ptr = gpu_text;
-						int			word_count = 0;
 						int			in_word = 0;
+						int			word_count = 0;
 
 						while (*ptr)
 						{
@@ -328,27 +359,27 @@ ndb_llm_route_complete(const NdbLLMConfig *cfg,
 				}
 				PG_END_TRY();
 #else
-				if (gpu_text && strlen(gpu_text) > 0)
-				{
-					const char *ptr = gpu_text;
-					int			word_count = 0;
-					int			in_word = 0;
+			if (gpu_text && strlen(gpu_text) > 0)
+			{
+				const char *ptr = gpu_text;
+				int			in_word = 0;
+				int			word_count = 0;
 
-					while (*ptr)
+				while (*ptr)
+				{
+					if (!isspace((
+								  unsigned char) *ptr))
 					{
-						if (!isspace((
-									  unsigned char) *ptr))
+						if (!in_word)
 						{
-							if (!in_word)
-							{
-								word_count++;
-								in_word = 1;
-							}
+							word_count++;
+							in_word = 1;
 						}
-						else
-						{
-							in_word = 0;
-						}
+					}
+					else
+					{
+						in_word = 0;
+					}
 						ptr++;
 					}
 					out->tokens_out =
@@ -364,29 +395,35 @@ ndb_llm_route_complete(const NdbLLMConfig *cfg,
 				out->json = NULL;
 				out->http_status = 200;
 				if (gpu_err)
-					NDB_FREE(gpu_err);
+					nfree(gpu_err);
 				return NDB_LLM_ROUTE_SUCCESS;
 			}
 			if (opts != NULL && opts->require_gpu)
 			{
 				if (gpu_err)
-					ereport(ERROR,
-							(errmsg("neurondb: GPU HF "
-									"completion failed: %s",
-									gpu_err)));
-				ereport(ERROR,
-						(errmsg("neurondb: GPU HF completion "
-								"failed")));
+				{
+					elog(ERROR,
+						 "neurondb: GPU HF completion failed: %s",
+						 gpu_err);
+					nfree(gpu_err);
+				}
+				else
+				{
+					elog(ERROR,
+						 "neurondb: GPU HF completion failed (no error message)");
+				}
 				if (gpu_text)
-					NDB_FREE(gpu_text);
-				if (gpu_err)
-					NDB_FREE(gpu_err);
+					nfree(gpu_text);
 				return NDB_LLM_ROUTE_ERROR;
 			}
-			if (gpu_text)
-				NDB_FREE(gpu_text);
+			/* GPU not required, log warning and continue */
 			if (gpu_err)
-				NDB_FREE(gpu_err);
+			{
+				elog(DEBUG1, "neurondb: GPU HF completion failed (non-fatal): %s", gpu_err);
+				nfree(gpu_err);
+			}
+			if (gpu_text)
+				nfree(gpu_text);
 		}
 #ifdef HAVE_ONNX_RUNTIME
 		if (!neurondb_onnx_available())
@@ -397,8 +434,8 @@ ndb_llm_route_complete(const NdbLLMConfig *cfg,
 									 params_json,
 									 out);
 		{
-			char	   *onnx_text = NULL;
-			char	   *onnx_err = NULL;
+			char *onnx_text = NULL;
+			char *onnx_err = NULL;
 			int			rc;
 
 			rc = ndb_onnx_hf_complete(cfg->model,
@@ -408,8 +445,24 @@ ndb_llm_route_complete(const NdbLLMConfig *cfg,
 									  &onnx_err);
 			if (rc == 0 && onnx_text != NULL)
 			{
-				int32		token_length;
-				int32	   *token_ids;
+				int32	   *token_ids = NULL;
+				int			token_length = 0;
+
+				/* Validate onnx_text before use */
+				if (strlen(onnx_text) == 0)
+				{
+					elog(WARNING, "neurondb: ONNX completion returned empty text");
+					nfree(onnx_text);
+					onnx_text = NULL;
+					if (onnx_err)
+						nfree(onnx_err);
+					return fallback_complete(cfg,
+											 opts,
+											 "ONNX completion returned empty text",
+											 prompt,
+											 params_json,
+											 out);
+				}
 
 				token_ids = neurondb_tokenize_with_model(prompt,
 														 2048,
@@ -421,18 +474,22 @@ ndb_llm_route_complete(const NdbLLMConfig *cfg,
 					out->tokens_in =
 						0;
 				if (token_ids)
-					NDB_FREE(token_ids);
+					nfree(token_ids);
 
 #ifdef HAVE_ONNX_RUNTIME
 				PG_TRY();
 				{
-					int32		output_token_length;
-					int32	   *output_token_ids =
-						neurondb_tokenize_with_model(
-													 onnx_text,
-													 2048,
-													 &output_token_length,
-													 cfg->model);
+					const char *ptr = NULL;
+					int			in_word = 0;
+					int			output_token_length;
+					int			word_count = 0;
+					int32	   *output_token_ids = NULL;
+
+					output_token_ids = neurondb_tokenize_with_model(
+																   onnx_text,
+																   2048,
+																   &output_token_length,
+																   cfg->model);
 
 					if (output_token_ids
 						&& output_token_length > 0)
@@ -446,10 +503,9 @@ ndb_llm_route_complete(const NdbLLMConfig *cfg,
 							&& strlen(onnx_text)
 							> 0)
 						{
-							const char *ptr =
-								onnx_text;
-							int			word_count = 0;
+							const char *ptr = onnx_text;
 							int			in_word = 0;
+							int			word_count = 0;
 
 							while (*ptr)
 							{
@@ -481,36 +537,36 @@ ndb_llm_route_complete(const NdbLLMConfig *cfg,
 						}
 					}
 					if (output_token_ids)
-						NDB_FREE(output_token_ids);
+						nfree(output_token_ids);
 				}
 				PG_CATCH();
 				{
 					EmitErrorReport();
 					FlushErrorState();
 
-					if (onnx_text && strlen(onnx_text) > 0)
-					{
-						const char *ptr = onnx_text;
-						int			word_count = 0;
-						int			in_word = 0;
+				if (onnx_text && strlen(onnx_text) > 0)
+				{
+					const char *ptr = onnx_text;
+					int			in_word = 0;
+					int			word_count = 0;
 
-						while (*ptr)
+					while (*ptr)
+					{
+						if (!isspace((
+									  unsigned char) *ptr))
 						{
-							if (!isspace((
-										  unsigned char) *ptr))
+							if (!in_word)
 							{
-								if (!in_word)
-								{
-									word_count++;
-									in_word =
-										1;
-								}
+								word_count++;
+								in_word =
+									1;
 							}
-							else
-							{
-								in_word = 0;
-							}
-							ptr++;
+						}
+						else
+						{
+							in_word = 0;
+						}
+						ptr++;
 						}
 						out->tokens_out = word_count > 0
 							? word_count
@@ -526,8 +582,8 @@ ndb_llm_route_complete(const NdbLLMConfig *cfg,
 				if (onnx_text && strlen(onnx_text) > 0)
 				{
 					const char *ptr = onnx_text;
-					int			word_count = 0;
 					int			in_word = 0;
+					int			word_count = 0;
 
 					while (*ptr)
 					{
@@ -559,35 +615,47 @@ ndb_llm_route_complete(const NdbLLMConfig *cfg,
 				out->json = NULL;
 				out->http_status = 200;
 				if (onnx_err)
-					NDB_FREE(onnx_err);
+					nfree(onnx_err);
 				return NDB_LLM_ROUTE_SUCCESS;
 			}
 			if (opts != NULL && opts->require_gpu)
 			{
 				if (onnx_err)
-					ereport(ERROR,
-							(errmsg("neurondb: ONNX HF "
-									"completion failed: %s",
-									onnx_err)));
-				ereport(ERROR,
-						(errmsg("neurondb: ONNX HF completion "
-								"failed")));
+				{
+					elog(ERROR,
+						 "neurondb: ONNX HF completion failed: %s",
+						 onnx_err);
+					nfree(onnx_err);
+				}
+				else
+				{
+					elog(ERROR,
+						 "neurondb: ONNX HF completion failed (no error message)");
+				}
 				if (onnx_text)
-					NDB_FREE(onnx_text);
-				if (onnx_err)
-					NDB_FREE(onnx_err);
+					nfree(onnx_text);
 				return NDB_LLM_ROUTE_ERROR;
 			}
-			if (onnx_text)
-				NDB_FREE(onnx_text);
-			if (onnx_err)
-				NDB_FREE(onnx_err);
-			return fallback_complete(cfg,
-									 opts,
-									 "ONNX completion failed",
-									 prompt,
-									 params_json,
-									 out);
+			/* ONNX not required, log warning and fallback */
+			{
+				const char *fallback_reason = "ONNX completion failed";
+
+				if (onnx_err)
+				{
+					elog(DEBUG1, "neurondb: ONNX HF completion failed (non-fatal): %s", onnx_err);
+					fallback_reason = onnx_err;
+				}
+				if (onnx_text)
+					nfree(onnx_text);
+				if (onnx_err)
+					nfree(onnx_err);
+				return fallback_complete(cfg,
+										 opts,
+										 fallback_reason,
+										 prompt,
+										 params_json,
+										 out);
+			}
 		}
 #else
 		return fallback_complete(cfg,
@@ -620,7 +688,17 @@ ndb_llm_route_vision_complete(const NdbLLMConfig *cfg,
 							  NdbLLMResp *out)
 {
 	if (cfg == NULL || image_data == NULL || image_size == 0 || out == NULL)
+	{
+		elog(WARNING, "neurondb: ndb_llm_route_vision_complete called with NULL or invalid parameters");
 		return NDB_LLM_ROUTE_ERROR;
+	}
+
+	/* Validate prompt if provided (it's optional for vision) */
+	if (prompt != NULL && strlen(prompt) == 0)
+	{
+		elog(DEBUG1, "neurondb: ndb_llm_route_vision_complete called with empty prompt, using default");
+		prompt = NULL; /* Will use default in backend */
+	}
 
 	if (provider_is(cfg->provider, "openai") || provider_is(cfg->provider, "chatgpt"))
 		return ndb_openai_vision_complete(cfg, image_data, image_size, prompt, params_json, out);
@@ -659,13 +737,13 @@ ndb_llm_route_vision_complete(const NdbLLMConfig *cfg,
 										 * yet */
 					out->tokens_out = 0;
 					if (gpu_err)
-						NDB_FREE(gpu_err);
+						nfree(gpu_err);
 					return NDB_LLM_ROUTE_SUCCESS;
 				}
 				if (gpu_text)
-					NDB_FREE(gpu_text);
+					nfree(gpu_text);
 				if (gpu_err)
-					NDB_FREE(gpu_err);
+					nfree(gpu_err);
 				if (opts != NULL && opts->require_gpu)
 				{
 					return NDB_LLM_ROUTE_ERROR;
@@ -688,7 +766,17 @@ ndb_llm_route_embed(const NdbLLMConfig *cfg,
 					int *dim_out)
 {
 	if (cfg == NULL || text == NULL || vec_out == NULL || dim_out == NULL)
+	{
+		elog(WARNING, "neurondb: ndb_llm_route_embed called with NULL parameters");
 		return NDB_LLM_ROUTE_ERROR;
+	}
+
+	/* Validate text is not empty */
+	if (strlen(text) == 0)
+	{
+		elog(WARNING, "neurondb: ndb_llm_route_embed called with empty text");
+		return NDB_LLM_ROUTE_ERROR;
+	}
 
 	if (provider_is(cfg->provider, "openai") || provider_is(cfg->provider, "chatgpt"))
 		return ndb_openai_embed(cfg, text, vec_out, dim_out);
@@ -713,7 +801,7 @@ ndb_llm_route_embed(const NdbLLMConfig *cfg,
 				*vec_out = gpu_vec;
 				*dim_out = gpu_dim;
 				if (gpu_err)
-					NDB_FREE(gpu_err);
+					nfree(gpu_err);
 				return NDB_LLM_ROUTE_SUCCESS;
 			}
 			if (opts != NULL && opts->require_gpu)
@@ -727,15 +815,15 @@ ndb_llm_route_embed(const NdbLLMConfig *cfg,
 						(errmsg("neurondb: GPU HF embedding "
 								"failed")));
 				if (gpu_vec)
-					NDB_FREE(gpu_vec);
+					nfree(gpu_vec);
 				if (gpu_err)
-					NDB_FREE(gpu_err);
+					nfree(gpu_err);
 				return NDB_LLM_ROUTE_ERROR;
 			}
 			if (gpu_vec)
-				NDB_FREE(gpu_vec);
+				nfree(gpu_vec);
 			if (gpu_err)
-				NDB_FREE(gpu_err);
+				nfree(gpu_err);
 		}
 		/* Fall back to HTTP API */
 		return ndb_hf_embed(cfg, text, vec_out, dim_out);
@@ -760,7 +848,7 @@ ndb_llm_route_embed(const NdbLLMConfig *cfg,
 				*vec_out = gpu_vec;
 				*dim_out = gpu_dim;
 				if (gpu_err)
-					NDB_FREE(gpu_err);
+					nfree(gpu_err);
 				return NDB_LLM_ROUTE_SUCCESS;
 			}
 			if (opts != NULL && opts->require_gpu)
@@ -774,15 +862,15 @@ ndb_llm_route_embed(const NdbLLMConfig *cfg,
 						(errmsg("neurondb: GPU HF embedding "
 								"failed")));
 				if (gpu_vec)
-					NDB_FREE(gpu_vec);
+					nfree(gpu_vec);
 				if (gpu_err)
-					NDB_FREE(gpu_err);
+					nfree(gpu_err);
 				return NDB_LLM_ROUTE_ERROR;
 			}
 			if (gpu_vec)
-				NDB_FREE(gpu_vec);
+				nfree(gpu_vec);
 			if (gpu_err)
-				NDB_FREE(gpu_err);
+				nfree(gpu_err);
 		}
 #ifdef HAVE_ONNX_RUNTIME
 		if (!neurondb_onnx_available())
@@ -793,12 +881,12 @@ ndb_llm_route_embed(const NdbLLMConfig *cfg,
 								  vec_out,
 								  dim_out);
 		{
-			ONNXModelSession *session;
-			int32	   *token_ids = NULL;
+			ONNXModelSession *session = NULL;
+			int32 *token_ids = NULL;
 			int32		token_length;
 			ONNXTensor *input_tensor = NULL;
 			ONNXTensor *output_tensor = NULL;
-			float	   *input_data = NULL;
+			float *input_data = NULL;
 			int			i;
 			int64		input_shape[2];
 			int			rc = NDB_LLM_ROUTE_ERROR;
@@ -844,7 +932,7 @@ ndb_llm_route_embed(const NdbLLMConfig *cfg,
 					}
 					else if (token_length <= 0)
 					{
-						NDB_FREE(token_ids);
+						nfree(token_ids);
 						token_ids = NULL;
 						rc = fallback_embed(cfg,
 											opts,
@@ -890,9 +978,9 @@ ndb_llm_route_embed(const NdbLLMConfig *cfg,
 								neurondb_onnx_free_tensor(
 														  input_tensor);
 							if (input_data)
-								NDB_FREE(input_data);
+								nfree(input_data);
 							if (token_ids)
-								NDB_FREE(token_ids);
+								nfree(token_ids);
 							rc = fallback_embed(cfg,
 												opts,
 												"ONNX "
@@ -952,9 +1040,9 @@ ndb_llm_route_embed(const NdbLLMConfig *cfg,
 								neurondb_onnx_free_tensor(
 														  output_tensor);
 							if (input_data)
-								NDB_FREE(input_data);
+								nfree(input_data);
 							if (token_ids)
-								NDB_FREE(token_ids);
+								nfree(token_ids);
 
 							rc = NDB_LLM_ROUTE_SUCCESS;
 						}
@@ -973,12 +1061,12 @@ ndb_llm_route_embed(const NdbLLMConfig *cfg,
 					neurondb_onnx_free_tensor(
 											  output_tensor);
 				if (input_data)
-					NDB_FREE(input_data);
+					nfree(input_data);
 				if (token_ids)
-					NDB_FREE(token_ids);
+					nfree(token_ids);
 				if (*vec_out)
 				{
-					NDB_FREE(*vec_out);
+					nfree(*vec_out);
 					*vec_out = NULL;
 					*dim_out = 0;
 				}
@@ -1021,7 +1109,38 @@ ndb_llm_route_rerank(const NdbLLMConfig *cfg,
 					 float **scores_out)
 {
 	if (cfg == NULL || query == NULL || docs == NULL || scores_out == NULL)
+	{
+		elog(WARNING, "neurondb: ndb_llm_route_rerank called with NULL parameters");
 		return NDB_LLM_ROUTE_ERROR;
+	}
+
+	/* Validate query is not empty */
+	if (strlen(query) == 0)
+	{
+		elog(WARNING, "neurondb: ndb_llm_route_rerank called with empty query");
+		return NDB_LLM_ROUTE_ERROR;
+	}
+
+	/* Validate ndocs is positive */
+	if (ndocs <= 0)
+	{
+		elog(WARNING, "neurondb: ndb_llm_route_rerank called with invalid ndocs: %d", ndocs);
+		return NDB_LLM_ROUTE_ERROR;
+	}
+
+	/* Validate docs array elements are not NULL */
+	for (int i = 0; i < ndocs; i++)
+	{
+		if (docs[i] == NULL)
+		{
+			elog(WARNING, "neurondb: ndb_llm_route_rerank called with NULL doc at index %d", i);
+			return NDB_LLM_ROUTE_ERROR;
+		}
+		if (strlen(docs[i]) == 0)
+		{
+			elog(DEBUG1, "neurondb: ndb_llm_route_rerank called with empty doc at index %d", i);
+		}
+	}
 
 	if (provider_is(cfg->provider, "openai") || provider_is(cfg->provider, "chatgpt"))
 	{
@@ -1059,7 +1178,7 @@ ndb_llm_route_rerank(const NdbLLMConfig *cfg,
 			{
 				*scores_out = gpu_scores;
 				if (gpu_err)
-					NDB_FREE(gpu_err);
+					nfree(gpu_err);
 				return NDB_LLM_ROUTE_SUCCESS;
 			}
 			if (opts != NULL && opts->require_gpu)
@@ -1073,15 +1192,15 @@ ndb_llm_route_rerank(const NdbLLMConfig *cfg,
 						(errmsg("neurondb: GPU HF reranking "
 								"failed")));
 				if (gpu_scores)
-					NDB_FREE(gpu_scores);
+					nfree(gpu_scores);
 				if (gpu_err)
-					NDB_FREE(gpu_err);
+					nfree(gpu_err);
 				return NDB_LLM_ROUTE_ERROR;
 			}
 			if (gpu_scores)
-				NDB_FREE(gpu_scores);
+				nfree(gpu_scores);
 			if (gpu_err)
-				NDB_FREE(gpu_err);
+				nfree(gpu_err);
 		}
 #ifdef HAVE_ONNX_RUNTIME
 		if (!neurondb_onnx_available())
@@ -1094,8 +1213,8 @@ ndb_llm_route_rerank(const NdbLLMConfig *cfg,
 								   scores_out);
 		/* Try ONNX reranking */
 		{
-			float	   *onnx_scores = NULL;
-			char	   *onnx_err = NULL;
+			float *onnx_scores = NULL;
+			char *onnx_err = NULL;
 			int			rc;
 
 			rc = ndb_onnx_hf_rerank(cfg->model,
@@ -1108,7 +1227,7 @@ ndb_llm_route_rerank(const NdbLLMConfig *cfg,
 			{
 				*scores_out = onnx_scores;
 				if (onnx_err)
-					NDB_FREE(onnx_err);
+					nfree(onnx_err);
 				return NDB_LLM_ROUTE_SUCCESS;
 			}
 			if (opts != NULL && opts->require_gpu)
@@ -1122,15 +1241,15 @@ ndb_llm_route_rerank(const NdbLLMConfig *cfg,
 						(errmsg("neurondb: ONNX HF reranking "
 								"failed")));
 				if (onnx_scores)
-					NDB_FREE(onnx_scores);
+					nfree(onnx_scores);
 				if (onnx_err)
-					NDB_FREE(onnx_err);
+					nfree(onnx_err);
 				return NDB_LLM_ROUTE_ERROR;
 			}
 			if (onnx_scores)
-				NDB_FREE(onnx_scores);
+				nfree(onnx_scores);
 			if (onnx_err)
-				NDB_FREE(onnx_err);
+				nfree(onnx_err);
 			/* Fall back to HTTP */
 			return fallback_rerank(cfg,
 								   opts,
@@ -1175,7 +1294,22 @@ ndb_llm_route_complete_batch(const NdbLLMConfig *cfg,
 
 	if (cfg == NULL || prompts == NULL || out == NULL || num_prompts <= 0)
 	{
+		elog(WARNING, "neurondb: ndb_llm_route_complete_batch called with NULL or invalid parameters");
 		return NDB_LLM_ROUTE_ERROR;
+	}
+
+	/* Validate prompts array elements */
+	for (i = 0; i < num_prompts; i++)
+	{
+		if (prompts[i] == NULL)
+		{
+			elog(WARNING, "neurondb: ndb_llm_route_complete_batch called with NULL prompt at index %d", i);
+			return NDB_LLM_ROUTE_ERROR;
+		}
+		if (strlen(prompts[i]) == 0)
+		{
+			elog(DEBUG1, "neurondb: ndb_llm_route_complete_batch called with empty prompt at index %d", i);
+		}
 	}
 
 	/* Initialize output */
@@ -1218,8 +1352,20 @@ ndb_llm_route_complete_batch(const NdbLLMConfig *cfg,
 					if (batch_results[i].status == 0)
 					{
 						int32		token_length;
-						int32	   *token_ids =
-							neurondb_tokenize_with_model(
+						int32 *token_ids = NULL;
+
+						/* Validate prompt before tokenization */
+						if (prompts[i] == NULL || strlen(prompts[i]) == 0)
+						{
+							elog(WARNING, "neurondb: batch completion: invalid prompt at index %d", i);
+							out->texts[i] = NULL;
+							out->tokens_in[i] = 0;
+							out->tokens_out[i] = 0;
+							out->http_status[i] = 500;
+							continue;
+						}
+
+						token_ids = neurondb_tokenize_with_model(
 														 prompts[i],
 														 2048,
 														 &token_length,
@@ -1233,7 +1379,7 @@ ndb_llm_route_complete_batch(const NdbLLMConfig *cfg,
 							out->tokens_in[i] =
 								0;
 						if (token_ids)
-							NDB_FREE(token_ids);
+							nfree(token_ids);
 
 						out->texts[i] =
 							batch_results[i].text
@@ -1252,14 +1398,14 @@ ndb_llm_route_complete_batch(const NdbLLMConfig *cfg,
 						out->tokens_out[i] = 0;
 						out->http_status[i] = 500;
 						if (batch_results[i].error)
-							NDB_FREE(batch_results[i]
+							nfree(batch_results[i]
 									 .error);
 					}
 				}
 				out->num_success = num_success;
 				if (gpu_err)
-					NDB_FREE(gpu_err);
-				NDB_FREE(batch_results);
+					nfree(gpu_err);
+				nfree(batch_results);
 				return (num_success > 0) ? NDB_LLM_ROUTE_SUCCESS
 					: NDB_LLM_ROUTE_ERROR;
 			}
@@ -1275,13 +1421,13 @@ ndb_llm_route_complete_batch(const NdbLLMConfig *cfg,
 						(errmsg("neurondb: GPU HF batch "
 								"completion failed")));
 				if (gpu_err)
-					NDB_FREE(gpu_err);
-				NDB_FREE(batch_results);
+					nfree(gpu_err);
+				nfree(batch_results);
 				return NDB_LLM_ROUTE_ERROR;
 			}
 			if (gpu_err)
-				NDB_FREE(gpu_err);
-			NDB_FREE(batch_results);
+				nfree(gpu_err);
+			nfree(batch_results);
 #endif
 		}
 		else
@@ -1293,6 +1439,17 @@ ndb_llm_route_complete_batch(const NdbLLMConfig *cfg,
 		{
 			NdbLLMResp	resp;
 			int			rc;
+
+			/* Validate prompt before processing */
+			if (prompts[i] == NULL || strlen(prompts[i]) == 0)
+			{
+				elog(DEBUG1, "neurondb: batch completion: skipping invalid prompt at index %d", i);
+				out->texts[i] = NULL;
+				out->tokens_in[i] = 0;
+				out->tokens_out[i] = 0;
+				out->http_status[i] = 500;
+				continue;
+			}
 
 			memset(&resp, 0, sizeof(NdbLLMResp));
 			rc = ndb_llm_route_complete(
@@ -1323,6 +1480,17 @@ ndb_llm_route_complete_batch(const NdbLLMConfig *cfg,
 	{
 		NdbLLMResp	resp;
 		int			rc;
+
+		/* Validate prompt before processing */
+		if (prompts[i] == NULL || strlen(prompts[i]) == 0)
+		{
+			elog(DEBUG1, "neurondb: batch completion: skipping invalid prompt at index %d", i);
+			out->texts[i] = NULL;
+			out->tokens_in[i] = 0;
+			out->tokens_out[i] = 0;
+			out->http_status[i] = 500;
+			continue;
+		}
 
 		memset(&resp, 0, sizeof(NdbLLMResp));
 		rc = ndb_hf_complete(cfg, prompts[i], params_json, &resp);
@@ -1366,7 +1534,25 @@ ndb_llm_route_rerank_batch(const NdbLLMConfig *cfg,
 	if (cfg == NULL || queries == NULL || docs_array == NULL
 		|| ndocs_array == NULL || scores_out == NULL
 		|| nscores_out == NULL || num_queries <= 0)
+	{
+		elog(WARNING, "neurondb: ndb_llm_route_rerank_batch called with NULL or invalid parameters");
 		return NDB_LLM_ROUTE_ERROR;
+	}
+
+	/* Validate array dimensions */
+	for (i = 0; i < num_queries; i++)
+	{
+		if (ndocs_array[i] < 0)
+		{
+			elog(WARNING, "neurondb: ndb_llm_route_rerank_batch: invalid ndocs_array[%d] = %d", i, ndocs_array[i]);
+			return NDB_LLM_ROUTE_ERROR;
+		}
+		if (ndocs_array[i] > 0 && docs_array[i] == NULL)
+		{
+			elog(WARNING, "neurondb: ndb_llm_route_rerank_batch: NULL docs_array[%d] with ndocs_array[%d] = %d", i, i, ndocs_array[i]);
+			return NDB_LLM_ROUTE_ERROR;
+		}
+	}
 
 	/* Initialize output */
 	*scores_out = (float **) palloc0(num_queries * sizeof(float *));
@@ -1429,7 +1615,23 @@ ndb_llm_route_embed_batch(const NdbLLMConfig *cfg,
 
 	if (cfg == NULL || texts == NULL || vecs_out == NULL
 		|| dims_out == NULL || num_success_out == NULL || num_texts <= 0)
+	{
+		elog(WARNING, "neurondb: ndb_llm_route_embed_batch called with NULL or invalid parameters");
 		return NDB_LLM_ROUTE_ERROR;
+	}
+
+	/* Validate texts array elements */
+	for (i = 0; i < num_texts; i++)
+	{
+		if (texts[i] == NULL)
+		{
+			elog(DEBUG1, "neurondb: ndb_llm_route_embed_batch: NULL text at index %d, will skip", i);
+		}
+		else if (strlen(texts[i]) == 0)
+		{
+			elog(DEBUG1, "neurondb: ndb_llm_route_embed_batch: empty text at index %d, will skip", i);
+		}
+	}
 
 	if (provider_is(cfg->provider, "openai") || provider_is(cfg->provider, "chatgpt"))
 	{
@@ -1452,9 +1654,9 @@ ndb_llm_route_embed_batch(const NdbLLMConfig *cfg,
 			/* For GPU, process sequentially but efficiently */
 			for (i = 0; i < num_texts; i++)
 			{
-				float	   *gpu_vec = NULL;
+				float *gpu_vec = NULL;
 				int			gpu_dim = 0;
-				char	   *gpu_err = NULL;
+				char *gpu_err = NULL;
 				int			rc;
 
 				if (texts[i] == NULL)
@@ -1472,16 +1674,16 @@ ndb_llm_route_embed_batch(const NdbLLMConfig *cfg,
 					dims[i] = gpu_dim;
 					num_success++;
 					if (gpu_err)
-						NDB_FREE(gpu_err);
+						nfree(gpu_err);
 				}
 				else
 				{
 					vecs[i] = NULL;
 					dims[i] = 0;
 					if (gpu_vec)
-						NDB_FREE(gpu_vec);
+						nfree(gpu_vec);
 					if (gpu_err)
-						NDB_FREE(gpu_err);
+						nfree(gpu_err);
 					/* If GPU required, fail entire batch */
 					if (opts != NULL && opts->require_gpu)
 					{
@@ -1489,10 +1691,10 @@ ndb_llm_route_embed_batch(const NdbLLMConfig *cfg,
 						for (i = 0; i < num_texts; i++)
 						{
 							if (vecs[i])
-								NDB_FREE(vecs[i]);
+								nfree(vecs[i]);
 						}
-						NDB_FREE(vecs);
-						NDB_FREE(dims);
+						nfree(vecs);
+						nfree(dims);
 						return NDB_LLM_ROUTE_ERROR;
 					}
 				}
@@ -1530,10 +1732,10 @@ ndb_llm_route_embed_batch(const NdbLLMConfig *cfg,
 				for (i = 0; i < num_texts; i++)
 				{
 					if (vecs[i])
-						NDB_FREE(vecs[i]);
+						nfree(vecs[i]);
 				}
-				NDB_FREE(vecs);
-				NDB_FREE(dims);
+				nfree(vecs);
+				nfree(dims);
 				vecs = NULL;
 				dims = NULL;
 				num_success = 0;
@@ -1554,10 +1756,10 @@ ndb_llm_route_embed_batch(const NdbLLMConfig *cfg,
 				for (i = 0; i < num_texts; i++)
 				{
 					if (vecs[i])
-						NDB_FREE(vecs[i]);
+						nfree(vecs[i]);
 				}
-				NDB_FREE(vecs);
-				NDB_FREE(dims);
+				nfree(vecs);
+				nfree(dims);
 			}
 
 			rc = ndb_hf_embed_batch(cfg, texts, num_texts,
@@ -1580,8 +1782,8 @@ ndb_llm_route_embed_batch(const NdbLLMConfig *cfg,
 	else
 	{
 		/* Unknown provider */
-		NDB_FREE(vecs);
-		NDB_FREE(dims);
+		nfree(vecs);
+		nfree(dims);
 		return NDB_LLM_ROUTE_ERROR;
 	}
 
@@ -1639,13 +1841,13 @@ ndb_llm_route_image_embed(const NdbLLMConfig *cfg,
 					*vec_out = gpu_vec;
 					*dim_out = gpu_dim;
 					if (gpu_err)
-						NDB_FREE(gpu_err);
+						nfree(gpu_err);
 					return NDB_LLM_ROUTE_SUCCESS;
 				}
 				if (gpu_vec)
-					NDB_FREE(gpu_vec);
+					nfree(gpu_vec);
 				if (gpu_err)
-					NDB_FREE(gpu_err);
+					nfree(gpu_err);
 				if (opts != NULL && opts->require_gpu)
 				{
 					return NDB_LLM_ROUTE_ERROR;
@@ -1656,7 +1858,7 @@ ndb_llm_route_image_embed(const NdbLLMConfig *cfg,
 			/* Try ONNX CLIP image embedding (uses GPU provider if available) */
 			if (neurondb_onnx_available())
 			{
-				char	   *onnx_err = NULL;
+				char *onnx_err = NULL;
 				int			onnx_rc;
 
 				onnx_rc = ndb_onnx_hf_image_embed(
@@ -1665,12 +1867,12 @@ ndb_llm_route_image_embed(const NdbLLMConfig *cfg,
 				if (onnx_rc == 0 && *vec_out != NULL && *dim_out > 0)
 				{
 					if (onnx_err)
-						NDB_FREE(onnx_err);
+						nfree(onnx_err);
 					return NDB_LLM_ROUTE_SUCCESS;
 				}
 				/* ONNX failed, fall through to HTTP */
 				if (onnx_err)
-					NDB_FREE(onnx_err);
+					nfree(onnx_err);
 				if (opts != NULL && opts->require_gpu)
 				{
 					/* GPU required but failed */
@@ -1735,13 +1937,13 @@ ndb_llm_route_multimodal_embed(const NdbLLMConfig *cfg,
 					*vec_out = gpu_vec;
 					*dim_out = gpu_dim;
 					if (gpu_err)
-						NDB_FREE(gpu_err);
+						nfree(gpu_err);
 					return NDB_LLM_ROUTE_SUCCESS;
 				}
 				if (gpu_vec)
-					NDB_FREE(gpu_vec);
+					nfree(gpu_vec);
 				if (gpu_err)
-					NDB_FREE(gpu_err);
+					nfree(gpu_err);
 				if (opts != NULL && opts->require_gpu)
 				{
 					return NDB_LLM_ROUTE_ERROR;
@@ -1756,7 +1958,7 @@ ndb_llm_route_multimodal_embed(const NdbLLMConfig *cfg,
 			 */
 			if (neurondb_onnx_available())
 			{
-				char	   *onnx_err = NULL;
+				char *onnx_err = NULL;
 				int			onnx_rc;
 
 				onnx_rc = ndb_onnx_hf_multimodal_embed(
@@ -1765,12 +1967,12 @@ ndb_llm_route_multimodal_embed(const NdbLLMConfig *cfg,
 				if (onnx_rc == 0 && *vec_out != NULL && *dim_out > 0)
 				{
 					if (onnx_err)
-						NDB_FREE(onnx_err);
+						nfree(onnx_err);
 					return NDB_LLM_ROUTE_SUCCESS;
 				}
 				/* ONNX failed, fall through to HTTP */
 				if (onnx_err)
-					NDB_FREE(onnx_err);
+					nfree(onnx_err);
 				if (opts != NULL && opts->require_gpu)
 				{
 					/* GPU required but failed */

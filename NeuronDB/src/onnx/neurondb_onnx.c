@@ -119,7 +119,7 @@ onnx_check_status(OrtStatus *status, const char *operation)
 void
 neurondb_onnx_init(void)
 {
-	OrtStatus *status;
+	OrtStatus *status = NULL;
 
 	if (g_onnx_initialized)
 		return;
@@ -165,8 +165,8 @@ neurondb_onnx_cleanup(void)
 		if (entry->session)
 			neurondb_onnx_unload_model(entry->session);
 		if (entry->model_name)
-			NDB_FREE(entry->model_name);
-		NDB_FREE(entry);
+			nfree(entry->model_name);
+		nfree(entry);
 	}
 
 	g_model_cache_head = NULL;
@@ -348,9 +348,9 @@ neurondb_onnx_unload_model(ONNXModelSession *session)
 		g_ort_api->ReleaseSessionOptions(session->session_options);
 
 	if (session->model_path)
-		NDB_FREE(session->model_path);
+		nfree(session->model_path);
 
-	NDB_FREE(session);
+	nfree(session);
 }
 
 /*
@@ -362,9 +362,9 @@ neurondb_onnx_unload_model(ONNXModelSession *session)
 ONNXTensor *
 neurondb_onnx_create_tensor(float *data, int64 *shape, int32 ndim)
 {
-	NDB_DECLARE(ONNXTensor *, tensor);
-	NDB_DECLARE(float *, tensor_data);
-	NDB_DECLARE(int64 *, tensor_shape);
+	ONNXTensor *tensor = NULL;
+	float *tensor_data = NULL;
+	int64 *tensor_shape = NULL;
 	size_t total_size = 1;
 	int i;
 
@@ -375,13 +375,13 @@ neurondb_onnx_create_tensor(float *data, int64 *shape, int32 ndim)
 	for (i = 0; i < ndim; i++)
 		total_size *= (size_t)shape[i];
 
-	NDB_ALLOC(tensor, ONNXTensor, 1);
-	NDB_ALLOC(tensor_data, float, total_size);
+	nalloc(tensor, ONNXTensor, 1);
+	nalloc(tensor_data, float, total_size);
 	memcpy(tensor_data, data, total_size * sizeof(float));
 	tensor->data = tensor_data;
 
 	/* Allocate shape as int64_t for ONNX API compatibility */
-	NDB_ALLOC(tensor_shape, int64, ndim);
+	nalloc(tensor_shape, int64, ndim);
 	tensor->shape = tensor_shape;
 	for (i = 0; i < ndim; i++)
 		tensor->shape[i] = shape[i];
@@ -401,14 +401,14 @@ neurondb_onnx_create_tensor(float *data, int64 *shape, int32 ndim)
 ONNXTensor *
 neurondb_onnx_run_inference(ONNXModelSession *session, ONNXTensor *input)
 {
-	OrtStatus *status;
+	OrtStatus *status = NULL;
 	OrtValue *input_tensor = NULL;
 	OrtValue *output_tensor = NULL;
 	OrtMemoryInfo *memory_info = NULL;
 	OrtTensorTypeAndShapeInfo *output_info = NULL;
-	ONNXTensor *output;
-	float *output_data;
-	int64 *output_dims;
+	ONNXTensor *output = NULL;
+	float *output_data = NULL;
+	int64 *output_dims = NULL;
 	size_t output_size, num_dims, i;
 	const char *input_names[] = { "input_ids" };
 	const char *output_names_embed[] = { "last_hidden_state" };
@@ -432,9 +432,9 @@ neurondb_onnx_run_inference(ONNXModelSession *session, ONNXTensor *input)
 
 	/* Create ONNX input tensor - need to cast int64* to int64_t* */
 	{
-		int64_t    *shape_cast = NULL;
+		int64_t *shape_cast = NULL;
 		int			i;
-		NDB_ALLOC(shape_cast, int64_t, input->ndim);
+		nalloc(shape_cast, int64_t, input->ndim);
 
 		for (i = 0; i < input->ndim; i++)
 			shape_cast[i] = (int64_t)input->shape[i];
@@ -447,7 +447,7 @@ neurondb_onnx_run_inference(ONNXModelSession *session, ONNXTensor *input)
 			ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT,
 			&input_tensor);
 
-		NDB_FREE(shape_cast);
+		nfree(shape_cast);
 	}
 	onnx_check_status(status, "CreateTensorWithDataAsOrtValue");
 
@@ -485,30 +485,30 @@ neurondb_onnx_run_inference(ONNXModelSession *session, ONNXTensor *input)
 
 	/* GetDimensions requires int64_t*, allocate temp array and copy to int64* */
 	{
-		NDB_DECLARE(int64_t *, dims_temp);
-		NDB_ALLOC(dims_temp, int64_t, num_dims);
+		int64_t *dims_temp = NULL;
+		nalloc(dims_temp, int64_t, num_dims);
 
 		status = g_ort_api->GetDimensions(
 			output_info, dims_temp, num_dims);
 		onnx_check_status(status, "GetDimensions");
 
 		/* Copy to PostgreSQL int64 */
-		NDB_ALLOC(output_dims, int64, num_dims);
+		nalloc(output_dims, int64, num_dims);
 		for (i = 0; i < num_dims; i++)
 			output_dims[i] = (int64)dims_temp[i];
 
-		NDB_FREE(dims_temp);
+		nfree(dims_temp);
 	}
 
 	{
-		float	   *output_data_alloc;
+		float *output_data_alloc = NULL;
 
 		output_size = 1;
 		for (i = 0; i < num_dims; i++)
 			output_size *= output_dims[i];
 
 		output = (ONNXTensor *) palloc0(sizeof(ONNXTensor));
-		NDB_ALLOC(output_data_alloc, float, output_size);
+		nalloc(output_data_alloc, float, output_size);
 		memcpy(output_data_alloc, output_data, output_size * sizeof(float));
 		output->data = output_data_alloc;
 		output->shape = output_dims;
@@ -536,10 +536,10 @@ neurondb_onnx_free_tensor(ONNXTensor *tensor)
 	if (!tensor)
 		return;
 	if (tensor->data)
-		NDB_FREE(tensor->data);
+		nfree(tensor->data);
 	if (tensor->shape)
-		NDB_FREE(tensor->shape);
-	NDB_FREE(tensor);
+		nfree(tensor->shape);
+	nfree(tensor);
 }
 
 /*
@@ -551,7 +551,7 @@ neurondb_onnx_free_tensor(ONNXTensor *tensor)
 static void
 onnx_cache_add(const char *model_name, ONNXModelSession *session)
 {
-	ONNXCacheEntry *entry;
+	ONNXCacheEntry *entry = NULL;
 
 	/* Evict oldest entry if cache at or above capacity. */
 	if (g_model_cache_count >= neurondb_onnx_cache_size)
@@ -583,7 +583,7 @@ onnx_cache_add(const char *model_name, ONNXModelSession *session)
 static ONNXModelSession *
 onnx_cache_get(const char *model_name)
 {
-	ONNXCacheEntry *entry;
+	ONNXCacheEntry *entry = NULL;
 
 	for (entry = g_model_cache_head; entry; entry = entry->next)
 	{
@@ -637,8 +637,8 @@ onnx_cache_evict_lru(void)
 			lru_entry->model_name)));
 
 	neurondb_onnx_unload_model(lru_entry->session);
-	NDB_FREE(lru_entry->model_name);
-	NDB_FREE(lru_entry);
+	nfree(lru_entry->model_name);
+	nfree(lru_entry);
 
 	g_model_cache_count--;
 }
@@ -719,13 +719,13 @@ neurondb_onnx_version(void)
 char **
 neurondb_onnx_get_providers(int *num_providers)
 {
-	NDB_DECLARE(char **, providers);
+	char **providers = NULL;
 	int count = 0;
 
 	Assert(num_providers != NULL);
 
 	/* Allocate extra entries for possible providers */
-	NDB_ALLOC(providers, char *, 5);
+	nalloc(providers, char *, 5);
 
 	providers[count++] = pstrdup("CPUExecutionProvider");
 #ifdef ORT_ENABLE_CUDA

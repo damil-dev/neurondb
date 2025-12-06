@@ -76,7 +76,7 @@ typedef struct ModelEntry
 	struct ModelEntry *next;
 }			ModelEntry;
 
-static ModelEntry * model_registry_head = NULL;
+static ModelEntry *model_registry_head = NULL;
 
 static ModelType
 parse_model_type(const char *t)
@@ -109,7 +109,7 @@ model_type_to_cstr(ModelType t)
 static ModelEntry *
 find_model(const char *name)
 {
-	ModelEntry *cur;
+	ModelEntry *cur = NULL;
 	volatile	ModelEntry *volatile_cur;
 
 
@@ -206,7 +206,7 @@ static ModelHandle *
 model_backend_load(const char *path, ModelType type)
 {
 	struct stat statbuf;
-	ModelHandle *hdl;
+	ModelHandle *hdl = NULL;
 
 	if (stat(path, &statbuf) != 0 || !S_ISREG(statbuf.st_mode))
 	{
@@ -247,8 +247,8 @@ model_backend_load(const char *path, ModelType type)
 		case MODEL_ONNX:
 			{
 				/* Try to actually load ONNX model */
-				NDB_DECLARE(ONNXModelSession *, session);
-				NDB_DECLARE(char *, model_name);
+				ONNXModelSession *session = NULL;
+				char *model_name = NULL;
 				char	   *last_slash = strrchr(path, '/');
 				char	   *last_dot = strrchr(path, '.');
 
@@ -266,7 +266,7 @@ model_backend_load(const char *path, ModelType type)
 						 */
 						size_t		name_len = last_dot - last_slash - 1;
 
-						NDB_ALLOC(model_name, char, name_len + 1);
+						nalloc(model_name, char, name_len + 1);
 						memcpy(model_name, last_slash + 1, name_len);
 						model_name[name_len] = '\0';
 					}
@@ -283,7 +283,7 @@ model_backend_load(const char *path, ModelType type)
 					{
 						size_t		name_len = last_dot - path;
 
-						NDB_ALLOC(model_name, char, name_len + 1);
+						nalloc(model_name, char, name_len + 1);
 						memcpy(model_name, path, name_len);
 						model_name[name_len] = '\0';
 					}
@@ -331,7 +331,7 @@ model_backend_load(const char *path, ModelType type)
 						 (unsigned long) hdl->model_size_bytes);
 #endif
 				if (model_name)
-					NDB_FREE(model_name);
+					nfree(model_name);
 			}
 			break;
 		case MODEL_TF:
@@ -401,11 +401,11 @@ model_backend_unload(ModelHandle * hdl, ModelType type)
 
 		if (hdl->load_path)
 		{
-			NDB_FREE(hdl->load_path);
+			nfree(hdl->load_path);
 			hdl->load_path = NULL;
 		}
 		memset(hdl, 0, sizeof(ModelHandle));
-		NDB_FREE(hdl);
+		nfree(hdl);
 	}
 }
 
@@ -414,15 +414,15 @@ PG_FUNCTION_INFO_V1(load_model);
 Datum
 load_model(PG_FUNCTION_ARGS)
 {
-	text	   *model_name;
-	text	   *model_path;
-	text	   *model_type;
-	char	   *name_str;
-	char	   *path_str;
-	char	   *type_str;
+	text *model_name = NULL;
+	text *model_path = NULL;
+	text *model_type = NULL;
+	char *name_str = NULL;
+	char *path_str = NULL;
+	char *type_str = NULL;
 	ModelType	t;
-	ModelHandle *handle;
-	ModelEntry *entry;
+	ModelHandle *handle = NULL;
+	ModelEntry *entry = NULL;
 	struct stat statbuf;
 
 	NDB_CHECK_NULL_ARG(0, "model_name");
@@ -506,12 +506,12 @@ PG_FUNCTION_INFO_V1(predict);
 Datum
 predict(PG_FUNCTION_ARGS)
 {
-	text	   *model_name;
-	Vector	   *input;
+	text *model_name = NULL;
+	Vector *input = NULL;
 
-	NDB_DECLARE(char *, name_str);
-	ModelEntry *m;
-	Vector	   *result;
+	char *name_str = NULL;
+	ModelEntry *m = NULL;
+	Vector *result = NULL;
 
 
 	if (PG_NARGS() != 2)
@@ -575,7 +575,7 @@ predict(PG_FUNCTION_ARGS)
 
 	if (TopMemoryContext == NULL || CurrentMemoryContext == NULL)
 	{
-		NDB_FREE(name_str);
+		nfree(name_str);
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
 				 errmsg("neurondb: predict() TopMemoryContext=%p, CurrentMemoryContext=%p",
@@ -605,7 +605,7 @@ predict(PG_FUNCTION_ARGS)
 			 * If getting parent fails, memory context is corrupted - abort
 			 * safely
 			 */
-			NDB_FREE(name_str);
+			nfree(name_str);
 			ereport(ERROR,
 					(errcode(ERRCODE_INTERNAL_ERROR),
 					 errmsg("neurondb: predict() MemoryContextGetParent failed - memory context corrupted")));
@@ -625,7 +625,7 @@ predict(PG_FUNCTION_ARGS)
 		/* First, validate that we can safely read the registry pointer */
 		volatile	ModelEntry *volatile_reg_head;
 		uintptr_t	ptr_val;
-		ModelEntry *safe_reg_head;
+		ModelEntry *safe_reg_head = NULL;
 
 		/* Assertions for crash tracking */
 		Assert(name_str != NULL);
@@ -679,7 +679,7 @@ predict(PG_FUNCTION_ARGS)
 	}
 	PG_CATCH();
 	{
-		NDB_FREE(name_str);
+		nfree(name_str);
 
 		/*
 		 * During function compilation or if registry is corrupted, return
@@ -693,7 +693,7 @@ predict(PG_FUNCTION_ARGS)
 
 	if (m == NULL)
 	{
-		NDB_FREE(name_str);
+		nfree(name_str);
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_OBJECT),
 				 errmsg("neurondb: Model '%s' not found; must load first.",
@@ -704,7 +704,7 @@ predict(PG_FUNCTION_ARGS)
 	Assert(m != NULL);
 	if (!m->loaded || m->model_handle == NULL)
 	{
-		NDB_FREE(name_str);
+		nfree(name_str);
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_OBJECT),
 				 errmsg("neurondb: predict() model '%s' not loaded (loaded=%d, handle=%p)",
@@ -714,7 +714,7 @@ predict(PG_FUNCTION_ARGS)
 	/* Defensive: Validate model handle */
 	if (m->model_handle->magic != MODEL_HANDLE_MAGIC)
 	{
-		NDB_FREE(name_str);
+		nfree(name_str);
 		ereport(ERROR,
 				(errcode(ERRCODE_DATA_CORRUPTED),
 				 errmsg("neurondb: predict() model '%s' handle magic invalid (expected 0x%x, got 0x%x)",
@@ -733,7 +733,7 @@ predict(PG_FUNCTION_ARGS)
 	/* Check if backend is actually available (not just a stub) */
 	if (strstr(m->model_handle->backend_msg, "stub") != NULL)
 	{
-		NDB_FREE(name_str);
+		nfree(name_str);
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 				 errmsg("neurondb: Model '%s' backend is not available. "
@@ -754,23 +754,23 @@ predict(PG_FUNCTION_ARGS)
 #ifdef HAVE_ONNX_RUNTIME
 				ONNXModelSession *session = (ONNXModelSession *) m->model_handle->opaque_backend_state;
 
-				NDB_DECLARE(ONNXTensor *, input_tensor);
-				NDB_DECLARE(ONNXTensor *, output_tensor);
+				ONNXTensor *input_tensor = NULL;
+				ONNXTensor *output_tensor = NULL;
 
 				if (session != NULL && session->is_loaded)
 				{
 					/* Convert Vector to ONNXTensor */
-					NDB_DECLARE(int64 *, shape);
-					NDB_DECLARE(float *, data);
-					NDB_ALLOC(input_tensor, ONNXTensor, 1);
+					int64 *shape = NULL;
+					float *data = NULL;
+					nalloc(input_tensor, ONNXTensor, 1);
 					memset(input_tensor, 0, sizeof(ONNXTensor));
 					input_tensor->ndim = 2;
-					NDB_ALLOC(shape, int64, 2);
+					nalloc(shape, int64, 2);
 					input_tensor->shape = shape;
 					input_tensor->shape[0] = 1; /* Batch size */
 					input_tensor->shape[1] = input->dim;
 					input_tensor->size = input->dim;
-					NDB_ALLOC(data, float, input->dim);
+					nalloc(data, float, input->dim);
 					input_tensor->data = data;
 					memcpy(input_tensor->data, input->data, sizeof(float) * input->dim);
 
@@ -808,7 +808,7 @@ predict(PG_FUNCTION_ARGS)
 								neurondb_onnx_free_tensor(input_tensor);
 								if (output_tensor)
 									neurondb_onnx_free_tensor(output_tensor);
-								NDB_FREE(name_str);
+								nfree(name_str);
 								ereport(ERROR,
 										(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 										 errmsg("neurondb: ONNX model output dimension %d is invalid",
@@ -816,9 +816,9 @@ predict(PG_FUNCTION_ARGS)
 							}
 
 							{
-								char	   *result_raw = NULL;
+								char *result_raw = NULL;
 								output_size = VECTOR_SIZE(output_dim);
-								NDB_ALLOC(result_raw, char, output_size);
+								nalloc(result_raw, char, output_size);
 								result = (Vector *) result_raw;
 								SET_VARSIZE(result, output_size);
 								result->dim = output_dim;
@@ -856,7 +856,7 @@ predict(PG_FUNCTION_ARGS)
 							neurondb_onnx_free_tensor(input_tensor);
 						if (output_tensor)
 							neurondb_onnx_free_tensor(output_tensor);
-						NDB_FREE(name_str);
+						nfree(name_str);
 						PG_RE_THROW();
 					}
 					PG_END_TRY();
@@ -895,7 +895,7 @@ predict(PG_FUNCTION_ARGS)
 	}
 
 	/* Free model name string */
-	NDB_FREE(name_str);
+	nfree(name_str);
 
 	PG_RETURN_VECTOR_P(result);
 }
@@ -906,20 +906,20 @@ PG_FUNCTION_INFO_V1(predict_batch);
 Datum
 predict_batch(PG_FUNCTION_ARGS)
 {
-	text	   *model_name;
-	ArrayType  *inputs;
-	char	   *name_str;
-	ModelEntry *m;
+	text *model_name = NULL;
+	ArrayType *inputs = NULL;
+	char *name_str = NULL;
+	ModelEntry *m = NULL;
 	int			ndim;
 	int64		nvecs;
-	ArrayType  *result_array;
-	Datum	   *input_datums;
-	bool	   *input_nulls;
+	ArrayType *result_array = NULL;
+	Datum *input_datums = NULL;
+	bool *input_nulls = NULL;
 	int			i;
 	Oid			vector_oid;
 
-	NDB_DECLARE(Datum *, output_datums);
-	NDB_DECLARE(bool *, output_nulls);
+	Datum *output_datums = NULL;
+	bool *output_nulls = NULL;
 
 	NDB_CHECK_NULL_ARG(0, "model_name");
 	NDB_CHECK_NULL_ARG(1, "inputs");
@@ -968,7 +968,7 @@ predict_batch(PG_FUNCTION_ARGS)
 	/* Check if backend is actually available (not just a stub) */
 	if (strstr(m->model_handle->backend_msg, "stub") != NULL)
 	{
-		NDB_FREE(name_str);
+		nfree(name_str);
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 				 errmsg("neurondb: Model '%s' backend is not available for batch inference. "
@@ -994,8 +994,8 @@ predict_batch(PG_FUNCTION_ARGS)
 					  NULL);
 
 	/* Allocate output array */
-	NDB_ALLOC(output_datums, Datum, nvecs);
-	NDB_ALLOC(output_nulls, bool, nvecs);
+	nalloc(output_datums, Datum, nvecs);
+	nalloc(output_nulls, bool, nvecs);
 
 	switch (m->type)
 	{
@@ -1011,11 +1011,11 @@ predict_batch(PG_FUNCTION_ARGS)
 					{
 						Vector	   *input_vec = (Vector *) DatumGetPointer(input_datums[i]);
 
-						NDB_DECLARE(ONNXTensor *, input_tensor);
-						NDB_DECLARE(ONNXTensor *, output_tensor);
-						NDB_DECLARE(Vector *, output_vec);
-						NDB_DECLARE(int64 *, shape);
-						NDB_DECLARE(float *, data);
+						ONNXTensor *input_tensor = NULL;
+						ONNXTensor *output_tensor = NULL;
+						Vector *output_vec = NULL;
+						int64 *shape = NULL;
+						float *data = NULL;
 
 						if (input_nulls[i] || input_vec == NULL)
 						{
@@ -1025,15 +1025,15 @@ predict_batch(PG_FUNCTION_ARGS)
 						}
 
 						/* Convert Vector to ONNXTensor */
-						NDB_ALLOC(input_tensor, ONNXTensor, 1);
+						nalloc(input_tensor, ONNXTensor, 1);
 						memset(input_tensor, 0, sizeof(ONNXTensor));
 						input_tensor->ndim = 2;
-						NDB_ALLOC(shape, int64, 2);
+						nalloc(shape, int64, 2);
 						input_tensor->shape = shape;
 						input_tensor->shape[0] = 1;
 						input_tensor->shape[1] = input_vec->dim;
 						input_tensor->size = input_vec->dim;
-						NDB_ALLOC(data, float, input_vec->dim);
+						nalloc(data, float, input_vec->dim);
 						input_tensor->data = data;
 						memcpy(input_tensor->data, input_vec->data, sizeof(float) * input_vec->dim);
 
@@ -1063,8 +1063,8 @@ predict_batch(PG_FUNCTION_ARGS)
 								{
 									int			output_size = VECTOR_SIZE(output_dim);
 
-									NDB_DECLARE(char *, output_vec_raw);
-									NDB_ALLOC(output_vec_raw, char, output_size);
+									char *output_vec_raw = NULL;
+									nalloc(output_vec_raw, char, output_size);
 									output_vec = (Vector *) output_vec_raw;
 									SET_VARSIZE(output_vec, output_size);
 									output_vec->dim = output_dim;
@@ -1231,7 +1231,7 @@ predict_batch(PG_FUNCTION_ARGS)
 								   'i');
 
 	/* Free model name string */
-	NDB_FREE(name_str);
+	nfree(name_str);
 
 	PG_RETURN_ARRAYTYPE_P(result_array);
 }
@@ -1243,7 +1243,7 @@ Datum
 list_models(PG_FUNCTION_ARGS)
 {
 	StringInfoData buf;
-	ModelEntry *cur;
+	ModelEntry *cur = NULL;
 	int			count = 0;
 
 	initStringInfo(&buf);
@@ -1312,13 +1312,13 @@ PG_FUNCTION_INFO_V1(finetune_model);
 Datum
 finetune_model(PG_FUNCTION_ARGS)
 {
-	text	   *model_name;
-	text	   *train_table;
-	text	   *config;
-	char	   *name_str;
-	char	   *table_str;
-	char	   *config_str;
-	ModelEntry *m;
+	text *model_name = NULL;
+	text *train_table = NULL;
+	text *config = NULL;
+	char *name_str = NULL;
+	char *table_str = NULL;
+	char *config_str = NULL;
+	ModelEntry *m = NULL;
 	Oid			typinput,
 				typioparam;
 	Datum		js;
@@ -1365,7 +1365,7 @@ finetune_model(PG_FUNCTION_ARGS)
 
 	/* Scan training table and acquire training data using SPI */
 	{
-		NDB_DECLARE(NdbSpiSession *, finetune_spi_session);
+		NdbSpiSession *finetune_spi_session = NULL;
 		MemoryContext oldcontext = CurrentMemoryContext;
 
 		NDB_SPI_SESSION_BEGIN(finetune_spi_session, oldcontext);
@@ -1375,7 +1375,7 @@ finetune_model(PG_FUNCTION_ARGS)
 		NDB_CHECK_SPI_TUPTABLE();
 		if (ret != SPI_OK_SELECT)
 		{
-			NDB_FREE(sql.data);
+			nfree(sql.data);
 			NDB_SPI_SESSION_END(finetune_spi_session);
 			ereport(ERROR,
 					(errcode(ERRCODE_INTERNAL_ERROR),
@@ -1402,7 +1402,7 @@ finetune_model(PG_FUNCTION_ARGS)
 					 m->model_handle->version);
 			m->loaded = true;
 		}
-		NDB_FREE(sql.data);
+		nfree(sql.data);
 		NDB_SPI_SESSION_END(finetune_spi_session);
 	}
 
@@ -1423,16 +1423,16 @@ PG_FUNCTION_INFO_V1(export_model);
 Datum
 export_model(PG_FUNCTION_ARGS)
 {
-	text	   *model_name;
-	text	   *output_path;
-	text	   *output_format;
-	char	   *name_str;
-	char	   *path_str;
-	char	   *fmt_str;
-	ModelEntry *m;
-	char	   *lastslash;
+	text *model_name = NULL;
+	text *output_path = NULL;
+	text *output_format = NULL;
+	char *name_str = NULL;
+	char *path_str = NULL;
+	char *fmt_str = NULL;
+	ModelEntry *m = NULL;
+	char *lastslash = NULL;
 	size_t		sz;
-	FILE	   *f;
+	FILE *f = NULL;
 
 	NDB_CHECK_NULL_ARG(0, "model_name");
 	NDB_CHECK_NULL_ARG(1, "output_path");
@@ -1542,8 +1542,8 @@ export_model(PG_FUNCTION_ARGS)
 
 	/* Export model data: read from original file and write to export file */
 	{
-		FILE	   *src_f = NULL;
-		NDB_DECLARE(char *, buffer);
+		FILE *src_f = NULL;
+		char *buffer = NULL;
 		size_t		bytes_read;
 		size_t		buffer_size = 8192; /* 8KB buffer for file copy */
 		const char *src_path = m->path;
@@ -1563,7 +1563,7 @@ export_model(PG_FUNCTION_ARGS)
 		}
 
 		/* Allocate buffer for file copy */
-		NDB_ALLOC(buffer, char, buffer_size);
+		nalloc(buffer, char, buffer_size);
 		if (buffer == NULL)
 		{
 			fclose(src_f);
@@ -1580,7 +1580,7 @@ export_model(PG_FUNCTION_ARGS)
 			{
 				int			saved_errno = errno;
 
-				NDB_FREE(buffer);
+				nfree(buffer);
 				fclose(src_f);
 				fclose(f);
 				ereport(ERROR,
@@ -1596,7 +1596,7 @@ export_model(PG_FUNCTION_ARGS)
 		{
 			int			saved_errno = errno;
 
-			NDB_FREE(buffer);
+			nfree(buffer);
 			fclose(src_f);
 			fclose(f);
 			ereport(ERROR,
@@ -1606,7 +1606,7 @@ export_model(PG_FUNCTION_ARGS)
 							   src_path, strerror(saved_errno))));
 		}
 
-		NDB_FREE(buffer);
+		nfree(buffer);
 		fclose(src_f);
 	}
 
@@ -1639,18 +1639,18 @@ Datum
 export_model_to_onnx(PG_FUNCTION_ARGS)
 {
 	int32		model_id;
-	text	   *output_path_text;
-	char	   *output_path;
-	char	   *algorithm;
-	bytea	   *model_data;
+	text *output_path_text = NULL;
+	char *output_path = NULL;
+	char *algorithm = NULL;
+	bytea *model_data = NULL;
 	StringInfoData sql;
 	int			ret;
-	FILE	   *temp_file;
-	char	   *temp_path;
+	FILE *temp_file = NULL;
+	char *temp_path = NULL;
 	int			cmd_ret;
 	char		cmd_buf[4096];
-	char	   *script_dir;
-	char	   *full_script_path;
+	char *script_dir = NULL;
+	char *full_script_path = NULL;
 
 	NDB_CHECK_NULL_ARG(0, "model_id");
 	NDB_CHECK_NULL_ARG(1, "output_path");
@@ -1670,7 +1670,7 @@ export_model_to_onnx(PG_FUNCTION_ARGS)
 
 	/* Query model from catalog */
 	{
-		NDB_DECLARE(NdbSpiSession *, export_spi_session);
+		NdbSpiSession *export_spi_session = NULL;
 		MemoryContext oldcontext = CurrentMemoryContext;
 
 		NDB_SPI_SESSION_BEGIN(export_spi_session, oldcontext);
@@ -1684,7 +1684,7 @@ export_model_to_onnx(PG_FUNCTION_ARGS)
 		NDB_CHECK_SPI_TUPTABLE();
 		if (ret != SPI_OK_SELECT)
 		{
-			NDB_FREE(sql.data);
+			nfree(sql.data);
 			NDB_SPI_SESSION_END(export_spi_session);
 			ereport(ERROR,
 					(errcode(ERRCODE_INTERNAL_ERROR),
@@ -1695,7 +1695,7 @@ export_model_to_onnx(PG_FUNCTION_ARGS)
 
 		if (SPI_processed == 0)
 		{
-			NDB_FREE(sql.data);
+			nfree(sql.data);
 			NDB_SPI_SESSION_END(export_spi_session);
 			ereport(ERROR,
 					(errcode(ERRCODE_UNDEFINED_OBJECT),
@@ -1709,14 +1709,14 @@ export_model_to_onnx(PG_FUNCTION_ARGS)
 
 		/* Extract model data and algorithm */
 		{
-			text	   *algorithm_text_ptr;
-			char	   *algorithm_text;
+			text *algorithm_text_ptr = NULL;
+			char *algorithm_text = NULL;
 
 			/* Safe access for complex types - validate before access */
 			if (SPI_tuptable == NULL || SPI_tuptable->vals == NULL ||
 				SPI_processed == 0 || SPI_tuptable->vals[0] == NULL || SPI_tuptable->tupdesc == NULL)
 			{
-				NDB_FREE(sql.data);
+				nfree(sql.data);
 				NDB_SPI_SESSION_END(export_spi_session);
 				ereport(ERROR,
 						(errcode(ERRCODE_INTERNAL_ERROR),
@@ -1726,7 +1726,7 @@ export_model_to_onnx(PG_FUNCTION_ARGS)
 			model_data = ndb_spi_get_bytea(export_spi_session, 0, 1, oldcontext);
 			if (model_data == NULL)
 			{
-				NDB_FREE(sql.data);
+				nfree(sql.data);
 				NDB_SPI_SESSION_END(export_spi_session);
 				ereport(ERROR,
 						(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
@@ -1738,7 +1738,7 @@ export_model_to_onnx(PG_FUNCTION_ARGS)
 			/* Validate model_data after copy */
 			if (model_data == NULL)
 			{
-				NDB_FREE(sql.data);
+				nfree(sql.data);
 				NDB_SPI_SESSION_END(export_spi_session);
 				ereport(ERROR,
 						(errcode(ERRCODE_OUT_OF_MEMORY),
@@ -1751,8 +1751,8 @@ export_model_to_onnx(PG_FUNCTION_ARGS)
 			algorithm_text_ptr = ndb_spi_get_text(export_spi_session, 0, 2, oldcontext);
 			if (algorithm_text_ptr == NULL)
 			{
-				NDB_FREE(model_data);
-				NDB_FREE(sql.data);
+				nfree(model_data);
+				nfree(sql.data);
 				NDB_SPI_SESSION_END(export_spi_session);
 				ereport(ERROR,
 						(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
@@ -1763,8 +1763,8 @@ export_model_to_onnx(PG_FUNCTION_ARGS)
 			algorithm_text = text_to_cstring(algorithm_text_ptr);
 			if (algorithm_text == NULL)
 			{
-				NDB_FREE(model_data);
-				NDB_FREE(sql.data);
+				nfree(model_data);
+				nfree(sql.data);
 				NDB_SPI_SESSION_END(export_spi_session);
 				ereport(ERROR,
 						(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
@@ -1775,8 +1775,8 @@ export_model_to_onnx(PG_FUNCTION_ARGS)
 			algorithm = pstrdup(algorithm_text);
 			if (algorithm == NULL)
 			{
-				NDB_FREE(model_data);
-				NDB_FREE(sql.data);
+				nfree(model_data);
+				nfree(sql.data);
 				NDB_SPI_SESSION_END(export_spi_session);
 				ereport(ERROR,
 						(errcode(ERRCODE_OUT_OF_MEMORY),
@@ -1786,7 +1786,7 @@ export_model_to_onnx(PG_FUNCTION_ARGS)
 			}
 		}
 
-		NDB_FREE(sql.data);
+		nfree(sql.data);
 		NDB_SPI_SESSION_END(export_spi_session);
 	}
 
@@ -1798,9 +1798,9 @@ export_model_to_onnx(PG_FUNCTION_ARGS)
 	{
 		int			saved_errno = errno;
 
-		NDB_FREE(model_data);
-		NDB_FREE(algorithm);
-		NDB_FREE(temp_path);
+		nfree(model_data);
+		nfree(algorithm);
+		nfree(temp_path);
 		ereport(ERROR,
 				(errcode(ERRCODE_IO_ERROR),
 				 errmsg("neurondb: Failed to create temp file '%s' (%s)",
@@ -1818,9 +1818,9 @@ export_model_to_onnx(PG_FUNCTION_ARGS)
 
 			fclose(temp_file);
 			unlink(temp_path);
-			NDB_FREE(temp_path);
-			NDB_FREE(algorithm);
-			NDB_FREE(model_data);
+			nfree(temp_path);
+			nfree(algorithm);
+			nfree(model_data);
 			ereport(ERROR,
 					(errcode(ERRCODE_IO_ERROR),
 					 errmsg("neurondb: export_model_to_onnx: failed to write model data to temp file '%s' (%s)",
@@ -1832,9 +1832,9 @@ export_model_to_onnx(PG_FUNCTION_ARGS)
 			int			saved_errno = errno;
 
 			unlink(temp_path);
-			NDB_FREE(temp_path);
-			NDB_FREE(algorithm);
-			NDB_FREE(model_data);
+			nfree(temp_path);
+			nfree(algorithm);
+			nfree(model_data);
 			ereport(ERROR,
 					(errcode(ERRCODE_IO_ERROR),
 					 errmsg("neurondb: export_model_to_onnx: failed to close temp file '%s' (%s)",
@@ -1874,11 +1874,11 @@ export_model_to_onnx(PG_FUNCTION_ARGS)
 		int			saved_errno = errno;
 
 		unlink(temp_path);
-		NDB_FREE(model_data);
-		NDB_FREE(algorithm);
-		NDB_FREE(temp_path);
-		NDB_FREE(script_dir);
-		NDB_FREE(full_script_path);
+		nfree(model_data);
+		nfree(algorithm);
+		nfree(temp_path);
+		nfree(script_dir);
+		nfree(full_script_path);
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_FILE),
 				 errmsg("neurondb: Python script not found or not executable: %s (%s)",
@@ -1898,11 +1898,11 @@ export_model_to_onnx(PG_FUNCTION_ARGS)
 	if (cmd_ret != 0)
 	{
 		unlink(temp_path);
-		NDB_FREE(model_data);
-		NDB_FREE(algorithm);
-		NDB_FREE(temp_path);
-		NDB_FREE(script_dir);
-		NDB_FREE(full_script_path);
+		nfree(model_data);
+		nfree(algorithm);
+		nfree(temp_path);
+		nfree(script_dir);
+		nfree(full_script_path);
 		ereport(ERROR,
 				(errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
 				 errmsg("neurondb: Failed to convert model to ONNX (exit code %d)",
@@ -1917,11 +1917,11 @@ export_model_to_onnx(PG_FUNCTION_ARGS)
 		 "neurondb: export_model_to_onnx: Model %d (algorithm=%s) exported to %s",
 		 model_id, algorithm, output_path);
 
-	NDB_FREE(model_data);
-	NDB_FREE(algorithm);
-	NDB_FREE(temp_path);
-	NDB_FREE(script_dir);
-	NDB_FREE(full_script_path);
+	nfree(model_data);
+	nfree(algorithm);
+	nfree(temp_path);
+	nfree(script_dir);
+	nfree(full_script_path);
 
 	PG_RETURN_BOOL(true);
 }
@@ -1933,20 +1933,20 @@ Datum
 import_model_from_onnx(PG_FUNCTION_ARGS)
 {
 	int32		model_id;
-	text	   *onnx_path_text;
-	text	   *algorithm_text;
-	char	   *onnx_path;
-	char	   *algorithm;
-	char	   *temp_path;
+	text *onnx_path_text = NULL;
+	text *algorithm_text = NULL;
+	char *onnx_path = NULL;
+	char *algorithm = NULL;
+	char *temp_path = NULL;
 	int			cmd_ret;
 	char		cmd_buf[4096];
-	char	   *script_dir;
-	char	   *full_script_path;
-	FILE	   *output_file;
-	bytea	   *model_data;
+	char *script_dir = NULL;
+	char *full_script_path = NULL;
+	FILE *output_file = NULL;
+	bytea *model_data = NULL;
 	size_t		file_size;
 
-	NDB_DECLARE(char *, file_data);
+	char *file_data = NULL;
 	int			ret;
 	StringInfoData update_sql = {0};
 
@@ -1975,8 +1975,8 @@ import_model_from_onnx(PG_FUNCTION_ARGS)
 	{
 		int			saved_errno = errno;
 
-		NDB_FREE(onnx_path);
-		NDB_FREE(algorithm);
+		nfree(onnx_path);
+		nfree(algorithm);
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_FILE),
 				 errmsg("neurondb: ONNX file not found or not readable: %s (%s)",
@@ -2010,10 +2010,10 @@ import_model_from_onnx(PG_FUNCTION_ARGS)
 	{
 		int			saved_errno = errno;
 
-		NDB_FREE(onnx_path);
-		NDB_FREE(algorithm);
-		NDB_FREE(script_dir);
-		NDB_FREE(full_script_path);
+		nfree(onnx_path);
+		nfree(algorithm);
+		nfree(script_dir);
+		nfree(full_script_path);
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_FILE),
 				 errmsg("neurondb: Python script not found or not executable: %s (%s)",
@@ -2037,11 +2037,11 @@ import_model_from_onnx(PG_FUNCTION_ARGS)
 	if (cmd_ret != 0)
 	{
 		unlink(temp_path);
-		NDB_FREE(onnx_path);
-		NDB_FREE(algorithm);
-		NDB_FREE(temp_path);
-		NDB_FREE(script_dir);
-		NDB_FREE(full_script_path);
+		nfree(onnx_path);
+		nfree(algorithm);
+		nfree(temp_path);
+		nfree(script_dir);
+		nfree(full_script_path);
 		ereport(ERROR,
 				(errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
 				 errmsg("neurondb: Failed to import ONNX model (exit code %d)",
@@ -2056,11 +2056,11 @@ import_model_from_onnx(PG_FUNCTION_ARGS)
 		int			saved_errno = errno;
 
 		unlink(temp_path);
-		NDB_FREE(onnx_path);
-		NDB_FREE(algorithm);
-		NDB_FREE(temp_path);
-		NDB_FREE(script_dir);
-		NDB_FREE(full_script_path);
+		nfree(onnx_path);
+		nfree(algorithm);
+		nfree(temp_path);
+		nfree(script_dir);
+		nfree(full_script_path);
 		ereport(ERROR,
 				(errcode(ERRCODE_IO_ERROR),
 				 errmsg("neurondb: Failed to read converted model file '%s' (%s)",
@@ -2074,19 +2074,19 @@ import_model_from_onnx(PG_FUNCTION_ARGS)
 
 	/* Read file data */
 	file_data = NULL;
-	NDB_ALLOC(file_data, char, file_size);
+	nalloc(file_data, char, file_size);
 	if (fread(file_data, 1, file_size, output_file) != file_size)
 	{
 		int			saved_errno = errno;
 
 		fclose(output_file);
 		unlink(temp_path);
-		NDB_FREE(file_data);
-		NDB_FREE(onnx_path);
-		NDB_FREE(algorithm);
-		NDB_FREE(temp_path);
-		NDB_FREE(script_dir);
-		NDB_FREE(full_script_path);
+		nfree(file_data);
+		nfree(onnx_path);
+		nfree(algorithm);
+		nfree(temp_path);
+		nfree(script_dir);
+		nfree(full_script_path);
 		ereport(ERROR,
 				(errcode(ERRCODE_IO_ERROR),
 				 errmsg("neurondb: Failed to read model data from '%s' (%s)",
@@ -2098,12 +2098,12 @@ import_model_from_onnx(PG_FUNCTION_ARGS)
 		int			saved_errno = errno;
 
 		unlink(temp_path);
-		NDB_FREE(file_data);
-		NDB_FREE(onnx_path);
-		NDB_FREE(algorithm);
-		NDB_FREE(temp_path);
-		NDB_FREE(script_dir);
-		NDB_FREE(full_script_path);
+		nfree(file_data);
+		nfree(onnx_path);
+		nfree(algorithm);
+		nfree(temp_path);
+		nfree(script_dir);
+		nfree(full_script_path);
 		ereport(WARNING,
 				(errcode(ERRCODE_IO_ERROR),
 				 errmsg("neurondb: import_model_from_onnx: failed to close temp file '%s' (%s)",
@@ -2113,17 +2113,17 @@ import_model_from_onnx(PG_FUNCTION_ARGS)
 
 	/* Create bytea from file data */
 	{
-		char	   *model_data_raw = NULL;
-		NDB_ALLOC(model_data_raw, char, VARHDRSZ + file_size);
+		char *model_data_raw = NULL;
+		nalloc(model_data_raw, char, VARHDRSZ + file_size);
 		model_data = (bytea *) model_data_raw;
 		SET_VARSIZE(model_data, VARHDRSZ + file_size);
 		memcpy(VARDATA(model_data), file_data, file_size);
 	}
-	NDB_FREE(file_data);
+	nfree(file_data);
 
 	/* Update model in catalog */
 	{
-		NDB_DECLARE(NdbSpiSession *, import_spi_session);
+		NdbSpiSession *import_spi_session = NULL;
 		MemoryContext oldcontext = CurrentMemoryContext;
 		Oid			argtypes[2];
 		Datum		values[2];
@@ -2158,16 +2158,16 @@ import_model_from_onnx(PG_FUNCTION_ARGS)
 				 ret);
 		}
 
-		NDB_FREE(update_sql.data);
+		nfree(update_sql.data);
 
 		if (ret != SPI_OK_UPDATE || SPI_processed == 0)
 		{
-			NDB_FREE(model_data);
+			nfree(model_data);
 			NDB_SPI_SESSION_END(import_spi_session);
-			NDB_FREE(onnx_path);
-			NDB_FREE(algorithm);
-			NDB_FREE(script_dir);
-			NDB_FREE(full_script_path);
+			nfree(onnx_path);
+			nfree(algorithm);
+			nfree(script_dir);
+			nfree(full_script_path);
 			ereport(ERROR,
 					(errcode(ERRCODE_INTERNAL_ERROR),
 					 errmsg("neurondb: Failed to update model %d with imported data",
@@ -2181,11 +2181,11 @@ import_model_from_onnx(PG_FUNCTION_ARGS)
 		 "neurondb: import_model_from_onnx: Model %d (algorithm=%s) imported from %s",
 		 model_id, algorithm, onnx_path);
 
-	NDB_FREE(model_data);
-	NDB_FREE(onnx_path);
-	NDB_FREE(algorithm);
-	NDB_FREE(script_dir);
-	NDB_FREE(full_script_path);
+	nfree(model_data);
+	nfree(onnx_path);
+	nfree(algorithm);
+	nfree(script_dir);
+	nfree(full_script_path);
 
 	PG_RETURN_BOOL(true);
 }

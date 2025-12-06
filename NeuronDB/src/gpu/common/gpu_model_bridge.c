@@ -491,12 +491,12 @@ ndb_gpu_try_train_model(const char *algorithm,
 			{
 				if (payload != NULL)
 				{
-					NDB_FREE(payload);
+					nfree(payload);
 					payload = NULL;
 				}
 				if (metadata != NULL)
 				{
-					NDB_FREE(metadata);
+					nfree(metadata);
 					metadata = NULL;
 				}
 				PG_RE_THROW();
@@ -509,12 +509,12 @@ ndb_gpu_try_train_model(const char *algorithm,
 				*errstr = pstrdup("Exception during GPU training");
 			if (payload != NULL)
 			{
-				NDB_FREE(payload);
+				nfree(payload);
 				payload = NULL;
 			}
 			if (metadata != NULL)
 			{
-				NDB_FREE(metadata);
+				nfree(metadata);
 				metadata = NULL;
 			}
 			FlushErrorState();
@@ -538,7 +538,7 @@ ndb_gpu_try_train_model(const char *algorithm,
 					 "gpu_model_bridge: LR direct path "
 					 "metadata: %s",
 					 meta_txt);
-				NDB_FREE(meta_txt);
+				nfree(meta_txt);
 			}
 			else
 			{
@@ -704,12 +704,12 @@ lr_fallback:;
 					*errstr = pstrdup("Exception during GPU training (CPU mode)");
 				if (payload != NULL)
 				{
-					NDB_FREE(payload);
+					nfree(payload);
 					payload = NULL;
 				}
 				if (metadata != NULL)
 				{
-					NDB_FREE(metadata);
+					nfree(metadata);
 					metadata = NULL;
 				}
 			}
@@ -718,12 +718,12 @@ lr_fallback:;
 			{
 				if (payload != NULL)
 				{
-					NDB_FREE(payload);
+					nfree(payload);
 					payload = NULL;
 				}
 				if (metadata != NULL)
 				{
-					NDB_FREE(metadata);
+					nfree(metadata);
 					metadata = NULL;
 				}
 				PG_RE_THROW();
@@ -736,12 +736,12 @@ lr_fallback:;
 				*errstr = pstrdup("Exception during GPU training");
 			if (payload != NULL)
 			{
-				NDB_FREE(payload);
+				nfree(payload);
 				payload = NULL;
 			}
 			if (metadata != NULL)
 			{
-				NDB_FREE(metadata);
+				nfree(metadata);
 				metadata = NULL;
 			}
 			FlushErrorState();
@@ -753,7 +753,7 @@ lr_fallback:;
 
 		if (gpu_rc == 0)
 		{
-			char	   *meta_txt = NULL;
+			char *meta_txt = NULL;
 
 			trained = true;
 			ndb_gpu_stats_record(true, elapsed_ms, 0.0, false);
@@ -781,7 +781,7 @@ lr_fallback:;
 						 "gpu_model_bridge: linear_regression direct path "
 						 "metadata: %s",
 						 meta_txt);
-					NDB_FREE(meta_txt);
+					nfree(meta_txt);
 				}
 				else
 				{
@@ -796,12 +796,12 @@ lr_fallback:;
 				/* result is NULL, free payload and metadata */
 				if (payload != NULL)
 				{
-					NDB_FREE(payload);
+					nfree(payload);
 					payload = NULL;
 				}
 				if (metadata != NULL)
 				{
-					NDB_FREE(metadata);
+					nfree(metadata);
 					metadata = NULL;
 				}
 			}
@@ -1105,7 +1105,7 @@ linreg_fallback:;
 			if (payload != NULL)
 			{
 				ereport(DEBUG2, (errmsg("gpu_model_bridge: freeing unused payload")));
-				NDB_FREE(payload);
+				nfree(payload);
 				ereport(DEBUG2, (errmsg("gpu_model_bridge: unused payload freed")));
 			}
 			ereport(DEBUG2, (errmsg("gpu_model_bridge: payload pointer set")));
@@ -1129,8 +1129,8 @@ linreg_fallback:;
 	if (!trained)
 	{
 		ereport(DEBUG1, (errmsg("gpu_model_bridge: trained is false, cleaning up")));
-		NDB_FREE(payload);
-		NDB_FREE(metadata);
+		nfree(payload);
+		nfree(metadata);
 		if (result != NULL)
 		{
 			ereport(DEBUG2, (errmsg("gpu_model_bridge: calling ndb_gpu_free_train_result")));
@@ -1165,7 +1165,7 @@ __asm__ __volatile__("":::"memory");
 void
 ndb_gpu_free_train_result(MLGpuTrainResult *result)
 {
-	char	   *tmp;
+	char *tmp = NULL;
 
 	if (result == NULL)
 		return;
@@ -1173,39 +1173,39 @@ ndb_gpu_free_train_result(MLGpuTrainResult *result)
 	if (result->spec.algorithm)
 	{
 		tmp = (char *) result->spec.algorithm;
-		NDB_FREE(tmp);
+		nfree(tmp);
 		result->spec.algorithm = NULL;
 	}
 	if (result->spec.training_table)
 	{
 		tmp = (char *) result->spec.training_table;
-		NDB_FREE(tmp);
+		nfree(tmp);
 		result->spec.training_table = NULL;
 	}
 	if (result->spec.training_column)
 	{
 		tmp = (char *) result->spec.training_column;
-		NDB_FREE(tmp);
+		nfree(tmp);
 		result->spec.training_column = NULL;
 	}
 	if (result->spec.project_name)
 	{
 		tmp = (char *) result->spec.project_name;
-		NDB_FREE(tmp);
+		nfree(tmp);
 		result->spec.project_name = NULL;
 	}
 	if (result->spec.model_name)
 	{
 		tmp = (char *) result->spec.model_name;
-		NDB_FREE(tmp);
+		nfree(tmp);
 		result->spec.model_name = NULL;
 	}
-	NDB_FREE(result->spec.model_data);
-	NDB_FREE(result->spec.metrics);
+	nfree(result->spec.model_data);
+	nfree(result->spec.metrics);
 	if (result->metadata && result->metadata != result->spec.metrics)
-		NDB_FREE(result->metadata);
+		nfree(result->metadata);
 	if (result->metrics && result->metrics != result->spec.metrics)
-		NDB_FREE(result->metrics);
+		nfree(result->metrics);
 
 	memset(result, 0, sizeof(MLGpuTrainResult));
 }

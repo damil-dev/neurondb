@@ -112,31 +112,28 @@ PG_FUNCTION_INFO_V1(train_naive_bayes_classifier);
 Datum
 train_naive_bayes_classifier(PG_FUNCTION_ARGS)
 {
-	text	   *table_name;
-	text	   *feature_col;
-	text	   *label_col;
-
-	NDB_DECLARE(char *, tbl_str);
-	NDB_DECLARE(char *, feat_str);
-	NDB_DECLARE(char *, label_str);
-	StringInfoData query = {0};
-
-	NDB_DECLARE(NdbSpiSession *, train_nb_spi_session);
-	MemoryContext oldcontext;
-	int			ret;
-	int			nvec = 0;
-	int			dim = 0;
-	GaussianNBModel model = {0};
-	int			valid = 0;
-	int			j,
-				class;
-	int			n_params;
-	int			idx;
-
-	NDB_DECLARE(Datum *, result_datums);
-	ArrayType  *result_array;
-	Oid			feat_type_oid;
+	ArrayType  *result_array = NULL;
 	bool		feat_is_array;
+	char	   *feat_str = NULL;
+	char	   *label_str = NULL;
+	char	   *tbl_str = NULL;
+	Datum	   *result_datums = NULL;
+	GaussianNBModel model = {0};
+	int			class;
+	int			dim = 0;
+	int			idx;
+	int			j;
+	int			n_params;
+	int			nvec = 0;
+	int			ret;
+	int			valid = 0;
+	MemoryContext oldcontext;
+	NdbSpiSession *train_nb_spi_session = NULL;
+	Oid			feat_type_oid;
+	StringInfoData query = {0};
+	text	   *feature_col = NULL;
+	text	   *label_col = NULL;
+	text	   *table_name = NULL;
 
 	table_name = PG_GETARG_TEXT_PP(0);
 	feature_col = PG_GETARG_TEXT_PP(1);
@@ -184,7 +181,7 @@ train_naive_bayes_classifier(PG_FUNCTION_ARGS)
 	/* Use shared training helper */
 	nb_train_from_spi_result(nvec, feat_type_oid, feat_is_array, &model, &valid, &dim);
 
-	NDB_FREE(query.data);
+	nfree(query.data);
 	NDB_SPI_SESSION_END(train_nb_spi_session);
 
 	/*
@@ -204,7 +201,7 @@ train_naive_bayes_classifier(PG_FUNCTION_ARGS)
 							n_classes)));
 
 		n_params = 2 + n_classes + (n_classes * dim) + (n_classes * dim);
-		NDB_ALLOC(result_datums, Datum, n_params);
+		nalloc(result_datums, Datum, n_params);
 
 		result_datums[0] = Float8GetDatum(n_classes);
 		result_datums[1] = Float8GetDatum(model.n_features);
@@ -232,18 +229,18 @@ train_naive_bayes_classifier(PG_FUNCTION_ARGS)
 								   FLOAT8PASSBYVAL,
 								   'd');
 
-	NDB_FREE(model.class_priors);
+	nfree(model.class_priors);
 	for (class = 0; class < 2; class++)
 	{
-		NDB_FREE(model.means[class]);
-		NDB_FREE(model.variances[class]);
+		nfree(model.means[class]);
+		nfree(model.variances[class]);
 	}
-	NDB_FREE(model.means);
-	NDB_FREE(model.variances);
-	NDB_FREE(result_datums);
-	NDB_FREE(tbl_str);
-	NDB_FREE(feat_str);
-	NDB_FREE(label_str);
+	nfree(model.means);
+	nfree(model.variances);
+	nfree(result_datums);
+	nfree(tbl_str);
+	nfree(feat_str);
+	nfree(label_str);
 
 	PG_RETURN_ARRAYTYPE_P(result_array);
 }
@@ -273,25 +270,25 @@ nb_train_from_spi_result(int nvec,
 						 int *out_valid,
 						 int *out_dim)
 {
-	NDB_DECLARE(float **, X);
-	NDB_DECLARE(double *, y);
+	float **X = NULL;
+	double *y = NULL;
 	int			valid = 0;
 	int			dim = 0;
 	int			i,
 				j,
 				class;
 
-	NDB_DECLARE(int *, class_counts);
-	NDB_DECLARE(double ***, class_samples);
-	NDB_DECLARE(int *, class_sizes);
+	int *class_counts = NULL;
+	double ***class_samples = NULL;
+	int *class_sizes = NULL;
 
 	if (nvec < 10)
 		ereport(ERROR,
 				(errcode(ERRCODE_INSUFFICIENT_RESOURCES),
 				 errmsg("neurondb: need at least 10 samples")));
 
-	NDB_ALLOC(X, float *, nvec);
-	NDB_ALLOC(y, double, nvec);
+	nalloc(X, float *, nvec);
+	nalloc(y, double, nvec);
 
 	for (i = 0; i < nvec; i++)
 	{
@@ -301,8 +298,8 @@ nb_train_from_spi_result(int nvec,
 		Datum		label_datum;
 		bool		feat_null;
 		bool		label_null;
-		Vector	   *vec;
-		ArrayType  *arr;
+		Vector *vec = NULL;
+		ArrayType *arr = NULL;
 		int			current_dim = 0;
 
 		/* Safe access to SPI_tuptable - validate before access */
@@ -356,7 +353,7 @@ nb_train_from_spi_result(int nvec,
 			else if (current_dim != dim)
 				continue;
 
-			NDB_ALLOC(X[valid], float, dim);
+			nalloc(X[valid], float, dim);
 
 			if (feat_type_oid == FLOAT8ARRAYOID)
 			{
@@ -384,7 +381,7 @@ nb_train_from_spi_result(int nvec,
 			else if (current_dim != dim)
 				continue;
 
-			NDB_ALLOC(X[valid], float, dim);
+			nalloc(X[valid], float, dim);
 			memcpy(X[valid], vec->data, sizeof(float) * dim);
 		}
 
@@ -407,29 +404,39 @@ nb_train_from_spi_result(int nvec,
 	out_model->n_features = dim;
 	out_model->class_priors = (double *) palloc0(sizeof(double) * 2);
 	NDB_CHECK_ALLOC(out_model->class_priors, "out_model->class_priors");
-	NDB_ALLOC(out_model->means, double *, 2);
-	NDB_ALLOC(out_model->variances, double *, 2);
-
-	NDB_ALLOC(class_counts, int, 2);
-	memset(class_counts, 0, sizeof(int) * 2);
-	NDB_ALLOC(class_sizes, int, 2);
-	memset(class_sizes, 0, sizeof(int) * 2);
-	NDB_ALLOC(class_samples, double **, 2);
-
-	for (i = 0; i < valid; i++)
 	{
-		class = (int) y[i];
-		if (class >= 0 && class < 2)
-			class_counts[class]++;
-	}
+		double **means_tmp = NULL;
+		double **variances_tmp = NULL;
+		nalloc(means_tmp, double *, 2);
+		nalloc(variances_tmp, double *, 2);
 
-	for (class = 0; class < 2; class++)
-	{
-		NDB_ALLOC(class_samples[class], double *, class_counts[class]);
-		NDB_ALLOC(out_model->means[class], double, dim);
-		memset(out_model->means[class], 0, sizeof(double) * dim);
-		NDB_ALLOC(out_model->variances[class], double, dim);
-		memset(out_model->variances[class], 0, sizeof(double) * dim);
+		nalloc(class_counts, int, 2);
+		memset(class_counts, 0, sizeof(int) * 2);
+		nalloc(class_sizes, int, 2);
+		memset(class_sizes, 0, sizeof(int) * 2);
+		nalloc(class_samples, double **, 2);
+
+		for (i = 0; i < valid; i++)
+		{
+			class = (int) y[i];
+			if (class >= 0 && class < 2)
+				class_counts[class]++;
+		}
+
+		for (class = 0; class < 2; class++)
+		{
+			double *means_row = NULL;
+			double *variances_row = NULL;
+			nalloc(class_samples[class], double *, class_counts[class]);
+			nalloc(means_row, double, dim);
+			memset(means_row, 0, sizeof(double) * dim);
+			nalloc(variances_row, double, dim);
+			memset(variances_row, 0, sizeof(double) * dim);
+			means_tmp[class] = means_row;
+			variances_tmp[class] = variances_row;
+		}
+		out_model->means = means_tmp;
+		out_model->variances = variances_tmp;
 	}
 
 	for (i = 0; i < valid; i++)
@@ -437,7 +444,7 @@ nb_train_from_spi_result(int nvec,
 		class = (int) y[i];
 		if (class >= 0 && class < 2)
 		{
-			NDB_ALLOC(class_samples[class][class_sizes[class]], double, dim);
+			nalloc(class_samples[class][class_sizes[class]], double, dim);
 			for (j = 0; j < dim; j++)
 				class_samples[class][class_sizes[class]][j] =
 					X[i][j];
@@ -516,18 +523,18 @@ nb_train_from_spi_result(int nvec,
 
 	/* Cleanup temporary arrays */
 	for (i = 0; i < valid; i++)
-		NDB_FREE(X[i]);
-	NDB_FREE(X);
-	NDB_FREE(y);
+		nfree(X[i]);
+	nfree(X);
+	nfree(y);
 	for (class = 0; class < 2; class++)
 	{
 		for (i = 0; i < class_sizes[class]; i++)
-			NDB_FREE(class_samples[class][i]);
-		NDB_FREE(class_samples[class]);
+			nfree(class_samples[class][i]);
+		nfree(class_samples[class]);
 	}
-	NDB_FREE(class_samples);
-	NDB_FREE(class_counts);
-	NDB_FREE(class_sizes);
+	nfree(class_samples);
+	nfree(class_counts);
+	nfree(class_sizes);
 
 	*out_valid = valid;
 	*out_dim = dim;
@@ -550,32 +557,32 @@ nb_free_model_and_metadata(GaussianNBModel * model,
 	if (model != NULL)
 	{
 		if (model->class_priors)
-			NDB_FREE(model->class_priors);
+			nfree(model->class_priors);
 		if (model->means)
 		{
 			for (i = 0; i < model->n_classes; i++)
 			{
 				if (model->means[i])
-					NDB_FREE(model->means[i]);
+					nfree(model->means[i]);
 			}
-			NDB_FREE(model->means);
+			nfree(model->means);
 		}
 		if (model->variances)
 		{
 			for (i = 0; i < model->n_classes; i++)
 			{
 				if (model->variances[i])
-					NDB_FREE(model->variances[i]);
+					nfree(model->variances[i]);
 			}
-			NDB_FREE(model->variances);
+			nfree(model->variances);
 		}
-		NDB_FREE(model);
+		nfree(model);
 	}
 
 	if (model_data)
-		NDB_FREE(model_data);
+		nfree(model_data);
 	if (metrics)
-		NDB_FREE(metrics);
+		nfree(metrics);
 }
 
 /*
@@ -589,7 +596,7 @@ nb_model_serialize_to_bytea(const GaussianNBModel * model)
 				j;
 	int			total_size;
 
-	NDB_DECLARE(bytea *, result);
+	bytea *result = NULL;
 
 	initStringInfo(&buf);
 
@@ -621,13 +628,13 @@ nb_model_serialize_to_bytea(const GaussianNBModel * model)
 
 	/* Convert to bytea */
 	{
-		char	   *result_raw = NULL;
+		char *result_raw = NULL;
 		total_size = VARHDRSZ + buf.len;
-		NDB_ALLOC(result_raw, char, total_size);
+		nalloc(result_raw, char, total_size);
 		result = (bytea *) result_raw;
 		SET_VARSIZE(result, total_size);
 		memcpy(VARDATA(result), buf.data, buf.len);
-		NDB_FREE(buf.data);
+		nfree(buf.data);
 	}
 
 	return result;
@@ -639,7 +646,7 @@ nb_model_serialize_to_bytea(const GaussianNBModel * model)
 static GaussianNBModel *
 nb_model_deserialize_from_bytea(const bytea * data)
 {
-	GaussianNBModel *model;
+	GaussianNBModel *model = NULL;
 	const char *buf;
 	int			offset = 0;
 	int			i,
@@ -694,41 +701,53 @@ nb_model_deserialize_from_bytea(const bytea * data)
 	}
 
 	/* Allocate arrays */
-	NDB_ALLOC(model->class_priors, double, model->n_classes);
-	memset(model->class_priors, 0, sizeof(double) * model->n_classes);
-	NDB_ALLOC(model->means, double *, model->n_classes);
-	NDB_ALLOC(model->variances, double *, model->n_classes);
-
-	/* Read class priors */
-	for (i = 0; i < model->n_classes; i++)
 	{
-		memcpy(&model->class_priors[i], buf + offset,
-			   sizeof(double));
-		offset += sizeof(double);
-	}
+		double *class_priors_tmp = NULL;
+		double **means_tmp = NULL;
+		double **variances_tmp = NULL;
+		nalloc(class_priors_tmp, double, model->n_classes);
+		memset(class_priors_tmp, 0, sizeof(double) * model->n_classes);
+		nalloc(means_tmp, double *, model->n_classes);
+		nalloc(variances_tmp, double *, model->n_classes);
 
-	/* Read means */
-	for (i = 0; i < model->n_classes; i++)
-	{
-		NDB_ALLOC(model->means[i], double, model->n_features);
-		for (j = 0; j < model->n_features; j++)
+		/* Read class priors */
+		for (i = 0; i < model->n_classes; i++)
 		{
-			memcpy(&model->means[i][j], buf + offset,
+			memcpy(&class_priors_tmp[i], buf + offset,
 				   sizeof(double));
 			offset += sizeof(double);
 		}
-	}
 
-	/* Read variances */
-	for (i = 0; i < model->n_classes; i++)
-	{
-		NDB_ALLOC(model->variances[i], double, model->n_features);
-		for (j = 0; j < model->n_features; j++)
+		/* Read means */
+		for (i = 0; i < model->n_classes; i++)
 		{
-			memcpy(&model->variances[i][j], buf + offset,
-				   sizeof(double));
-			offset += sizeof(double);
+			double *means_row = NULL;
+			nalloc(means_row, double, model->n_features);
+			for (j = 0; j < model->n_features; j++)
+			{
+				memcpy(&means_row[j], buf + offset,
+					   sizeof(double));
+				offset += sizeof(double);
+			}
+			means_tmp[i] = means_row;
 		}
+
+		/* Read variances */
+		for (i = 0; i < model->n_classes; i++)
+		{
+			double *variances_row = NULL;
+			nalloc(variances_row, double, model->n_features);
+			for (j = 0; j < model->n_features; j++)
+			{
+				memcpy(&variances_row[j], buf + offset,
+					   sizeof(double));
+				offset += sizeof(double);
+			}
+			variances_tmp[i] = variances_row;
+		}
+		model->class_priors = class_priors_tmp;
+		model->means = means_tmp;
+		model->variances = variances_tmp;
 	}
 
 	return model;
@@ -744,16 +763,16 @@ PG_FUNCTION_INFO_V1(train_naive_bayes_classifier_model_id);
 Datum
 train_naive_bayes_classifier_model_id(PG_FUNCTION_ARGS)
 {
-	text	   *table_name;
-	text	   *feature_col;
-	text	   *label_col;
+	text *table_name = NULL;
+	text *feature_col = NULL;
+	text *label_col = NULL;
 
-	NDB_DECLARE(char *, tbl_str);
-	NDB_DECLARE(char *, feat_str);
-	NDB_DECLARE(char *, label_str);
+	char *tbl_str = NULL;
+	char *feat_str = NULL;
+	char *label_str = NULL;
 	StringInfoData query = {0};
 
-	NDB_DECLARE(NdbSpiSession *, train_nb_model_spi_session);
+	NdbSpiSession *train_nb_model_spi_session = NULL;
 	int			ret;
 	int			nvec = 0;
 	int			dim = 0;
@@ -762,10 +781,10 @@ train_naive_bayes_classifier_model_id(PG_FUNCTION_ARGS)
 	int			n_classes = 0;	/* Save before SPI ends */
 	int			n_features = 0; /* Save before SPI ends */
 
-	NDB_DECLARE(bytea *, model_data);
+	bytea *model_data = NULL;
 	MLCatalogModelSpec spec;
 
-	NDB_DECLARE(Jsonb *, metrics);
+	Jsonb *metrics = NULL;
 	int32		model_id;
 	Oid			feat_type_oid;
 	bool		feat_is_array;
@@ -804,9 +823,9 @@ train_naive_bayes_classifier_model_id(PG_FUNCTION_ARGS)
 	{
 		ndb_spi_stringinfo_free(train_nb_model_spi_session, &query);
 		NDB_SPI_SESSION_END(train_nb_model_spi_session);
-		NDB_FREE(tbl_str);
-		NDB_FREE(feat_str);
-		NDB_FREE(label_str);
+		nfree(tbl_str);
+		nfree(feat_str);
+		nfree(label_str);
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
 				 errmsg("neurondb: query failed")));
@@ -848,9 +867,9 @@ train_naive_bayes_classifier_model_id(PG_FUNCTION_ARGS)
 	{
 		int			data_len = VARSIZE_ANY(model_data);
 
-		NDB_DECLARE(bytea *, copy);
-		NDB_DECLARE(char *, copy_raw);
-		NDB_ALLOC(copy_raw, char, data_len);
+		bytea *copy = NULL;
+		char *copy_raw = NULL;
+		nalloc(copy_raw, char, data_len);
 		copy = (bytea *) copy_raw;
 		memcpy(copy, model_data, data_len);
 		model_data = copy;
@@ -871,12 +890,12 @@ train_naive_bayes_classifier_model_id(PG_FUNCTION_ARGS)
 		metrics = ndb_jsonb_in_cstring(metrics_json.data);
 		if (metrics == NULL)
 		{
-			NDB_FREE(metrics_json.data);
+			nfree(metrics_json.data);
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
 					 errmsg("neurondb: failed to parse metrics JSON")));
 		}
-		NDB_FREE(metrics_json.data);
+		nfree(metrics_json.data);
 	}
 
 	/* Store model in catalog */
@@ -910,16 +929,16 @@ PG_FUNCTION_INFO_V1(predict_naive_bayes);
 Datum
 predict_naive_bayes(PG_FUNCTION_ARGS)
 {
-	ArrayType  *model_params;
-	Vector	   *features;
-	float8	   *params;
+	ArrayType *model_params = NULL;
+	Vector *features = NULL;
+	float8 *params = NULL;
 	int			n_params;
 	int			n_classes;
 	int			n_features;
 
-	NDB_DECLARE(double *, class_priors);
-	double	  **means = NULL;
-	double	  **variances = NULL;
+	double *class_priors = NULL;
+	double **means = NULL;
+	double **variances = NULL;
 	double		log_probs[2] = {0.0, 0.0};
 	int			predicted_class;
 	int			i,
@@ -973,9 +992,9 @@ predict_naive_bayes(PG_FUNCTION_ARGS)
 						n_features, features->dim)));
 
 	/* Extract model parameters */
-	NDB_ALLOC(class_priors, double, n_classes);
-	NDB_ALLOC(means, double *, n_classes);
-	NDB_ALLOC(variances, double *, n_classes);
+	nalloc(class_priors, double, n_classes);
+	nalloc(means, double *, n_classes);
+	nalloc(variances, double *, n_classes);
 
 	/* Read priors */
 	for (i = 0; i < n_classes; i++)
@@ -985,7 +1004,7 @@ predict_naive_bayes(PG_FUNCTION_ARGS)
 	idx = 2 + n_classes;
 	for (i = 0; i < n_classes; i++)
 	{
-		NDB_ALLOC(means[i], double, n_features);
+		nalloc(means[i], double, n_features);
 		for (j = 0; j < n_features; j++)
 			means[i][j] = params[idx++];
 	}
@@ -993,7 +1012,7 @@ predict_naive_bayes(PG_FUNCTION_ARGS)
 	/* Read variances */
 	for (i = 0; i < n_classes; i++)
 	{
-		NDB_ALLOC(variances[i], double, n_features);
+		nalloc(variances[i], double, n_features);
 		for (j = 0; j < n_features; j++)
 			variances[i][j] = params[idx++];
 	}
@@ -1016,14 +1035,14 @@ predict_naive_bayes(PG_FUNCTION_ARGS)
 	/* Return class with highest log probability */
 	predicted_class = (log_probs[1] > log_probs[0]) ? 1 : 0;
 
-	NDB_FREE(class_priors);
+	nfree(class_priors);
 	for (i = 0; i < n_classes; i++)
 	{
-		NDB_FREE(means[i]);
-		NDB_FREE(variances[i]);
+		nfree(means[i]);
+		nfree(variances[i]);
 	}
-	NDB_FREE(means);
-	NDB_FREE(variances);
+	nfree(means);
+	nfree(variances);
 
 	PG_RETURN_INT32(predicted_class);
 }
@@ -1039,11 +1058,11 @@ Datum
 predict_naive_bayes_model_id(PG_FUNCTION_ARGS)
 {
 	int32		model_id;
-	Vector	   *features;
+	Vector *features = NULL;
 
-	NDB_DECLARE(bytea *, model_data);
-	NDB_DECLARE(Jsonb *, metrics);
-	NDB_DECLARE(GaussianNBModel *, model);
+	bytea *model_data = NULL;
+	Jsonb *metrics = NULL;
+	GaussianNBModel *model = NULL;
 	double		log_probs[2] = {0.0, 0.0};
 	int			predicted_class;
 	int			i,
@@ -1065,7 +1084,7 @@ predict_naive_bayes_model_id(PG_FUNCTION_ARGS)
 	if (model_data == NULL)
 	{
 		if (metrics)
-			NDB_FREE(metrics);
+			nfree(metrics);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("Naive Bayes model %d has no model data",
@@ -1077,10 +1096,10 @@ predict_naive_bayes_model_id(PG_FUNCTION_ARGS)
 	{
 		int			data_len = VARSIZE_ANY(model_data);
 
-		NDB_DECLARE(bytea *, copy);
-		NDB_DECLARE(char *, copy_raw);
+		bytea *copy = NULL;
+		char *copy_raw = NULL;
 
-		NDB_ALLOC(copy_raw, char, data_len);
+		nalloc(copy_raw, char, data_len);
 		copy = (bytea *) copy_raw;
 
 		memcpy(copy, model_data, data_len);
@@ -1270,13 +1289,13 @@ static Datum
 nb_evaluate_naive_bayes_internal(FunctionCallInfo fcinfo)
 {
 	int32		model_id;
-	text	   *table_name;
-	text	   *feature_col;
-	text	   *label_col;
+	text *table_name = NULL;
+	text *feature_col = NULL;
+	text *label_col = NULL;
 
-	NDB_DECLARE(char *, tbl_str);
-	NDB_DECLARE(char *, feat_str);
-	NDB_DECLARE(char *, targ_str);
+	char *tbl_str = NULL;
+	char *feat_str = NULL;
+	char *targ_str = NULL;
 	int			ret;
 	int			nvec = 0;
 	int			i;
@@ -1299,15 +1318,15 @@ nb_evaluate_naive_bayes_internal(FunctionCallInfo fcinfo)
 	MemoryContext oldcontext;
 	StringInfoData query;
 
-	NDB_DECLARE(GaussianNBModel *, model);
+	GaussianNBModel *model = NULL;
 	StringInfoData jsonbuf;
 
-	NDB_DECLARE(Jsonb *, result_jsonb);
-	NDB_DECLARE(bytea *, gpu_payload);
-	NDB_DECLARE(Jsonb *, gpu_metrics);
+	Jsonb *result_jsonb = NULL;
+	bytea *gpu_payload = NULL;
+	Jsonb *gpu_metrics = NULL;
 	bool		is_gpu_model = false;
 
-	NDB_DECLARE(NdbSpiSession *, eval_nb_spi_session);
+	NdbSpiSession *eval_nb_spi_session = NULL;
 
 	if (PG_ARGISNULL(0))
 		ereport(ERROR,
@@ -1338,9 +1357,9 @@ nb_evaluate_naive_bayes_internal(FunctionCallInfo fcinfo)
 	if (!ml_catalog_fetch_model_payload(model_id,
 										&gpu_payload, NULL, &gpu_metrics))
 	{
-		NDB_FREE(tbl_str);
-		NDB_FREE(feat_str);
-		NDB_FREE(targ_str);
+		nfree(tbl_str);
+		nfree(feat_str);
+		nfree(targ_str);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("neurondb: evaluate_naive_bayes_by_model_id: "
@@ -1356,7 +1375,7 @@ nb_evaluate_naive_bayes_internal(FunctionCallInfo fcinfo)
 		PG_TRY();
 		{
 			/* Check for training_backend integer in metrics */
-			JsonbIterator *it;
+			JsonbIterator *it = NULL;
 			JsonbValue	v;
 			JsonbIteratorToken r;
 
@@ -1365,7 +1384,7 @@ nb_evaluate_naive_bayes_internal(FunctionCallInfo fcinfo)
 			{
 				if (r == WJB_KEY && v.type == jbvString)
 				{
-					NDB_DECLARE(char *, key);
+					char *key = NULL;
 					key = pnstrdup(v.val.string.val, v.val.string.len);
 
 					if (strcmp(key, "training_backend") == 0)
@@ -1378,7 +1397,7 @@ nb_evaluate_naive_bayes_internal(FunctionCallInfo fcinfo)
 							is_gpu = (backend == 1);
 						}
 					}
-					NDB_FREE(key);
+					nfree(key);
 				}
 			}
 		}
@@ -1394,15 +1413,15 @@ nb_evaluate_naive_bayes_internal(FunctionCallInfo fcinfo)
 	/* For CPU models, deserialize from bytea */
 	if (!is_gpu_model && gpu_payload != NULL)
 	{
-		NDB_DECLARE(bytea *, copy);
-		NDB_DECLARE(char *, copy_raw);
+		bytea *copy = NULL;
+		char *copy_raw = NULL;
 		int			data_len = VARSIZE_ANY(gpu_payload);
 
-		NDB_ALLOC(copy_raw, char, data_len);
+		nalloc(copy_raw, char, data_len);
 		copy = (bytea *) copy_raw;
 		memcpy(copy, gpu_payload, data_len);
 		model = nb_model_deserialize_from_bytea(copy);
-		NDB_FREE(copy);
+		nfree(copy);
 	}
 
 	/* Connect to SPI */
@@ -1429,11 +1448,11 @@ nb_evaluate_naive_bayes_internal(FunctionCallInfo fcinfo)
 	{
 		nb_free_model_and_metadata(model, NULL, gpu_metrics);
 		if (gpu_payload)
-			NDB_FREE(gpu_payload);
-		NDB_FREE(query.data);
-		NDB_FREE(tbl_str);
-		NDB_FREE(feat_str);
-		NDB_FREE(targ_str);
+			nfree(gpu_payload);
+		nfree(query.data);
+		nfree(tbl_str);
+		nfree(feat_str);
+		nfree(targ_str);
 		NDB_SPI_SESSION_END(eval_nb_spi_session);
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
@@ -1449,16 +1468,16 @@ nb_evaluate_naive_bayes_internal(FunctionCallInfo fcinfo)
 		int			check_ret;
 		int			total_rows = 0;
 
-		NDB_DECLARE(char *, tbl_str_copy);
-		NDB_DECLARE(char *, feat_str_copy);
-		NDB_DECLARE(char *, targ_str_copy);
+		char *tbl_str_copy = NULL;
+		char *feat_str_copy = NULL;
+		char *targ_str_copy = NULL;
 		int			expected_dim = 0;
 
 		if (model != NULL)
 			expected_dim = model->n_features;
 		else if (is_gpu_model && gpu_metrics != NULL)
 		{
-			NDB_DECLARE(char *, meta_txt);
+			char *meta_txt = NULL;
 
 			PG_TRY();
 			{
@@ -1468,7 +1487,7 @@ nb_evaluate_naive_bayes_internal(FunctionCallInfo fcinfo)
 				if (strstr(meta_txt, "\"n_features\"") != NULL ||
 					strstr(meta_txt, "\"feature_dim\"") != NULL)
 				{
-					char	   *dim_str;
+					char *dim_str = NULL;
 
 					dim_str = strstr(meta_txt,
 									 "\"n_features\"");
@@ -1485,12 +1504,12 @@ nb_evaluate_naive_bayes_internal(FunctionCallInfo fcinfo)
 					}
 				}
 				if (meta_txt != NULL)
-					NDB_FREE(meta_txt);
+					nfree(meta_txt);
 			}
 			PG_CATCH();
 			{
 				if (meta_txt != NULL)
-					NDB_FREE(meta_txt);
+					nfree(meta_txt);
 			}
 			PG_END_TRY();
 		}
@@ -1513,11 +1532,11 @@ nb_evaluate_naive_bayes_internal(FunctionCallInfo fcinfo)
 			if (!isnull)
 				total_rows = DatumGetInt64(count_datum);
 		}
-		NDB_FREE(check_query.data);
+		nfree(check_query.data);
 
 		nb_free_model_and_metadata(model, NULL, gpu_metrics);
 		if (gpu_payload)
-			NDB_FREE(gpu_payload);
+			nfree(gpu_payload);
 		model = NULL;
 
 		MemoryContextSwitchTo(oldcontext);
@@ -1525,10 +1544,10 @@ nb_evaluate_naive_bayes_internal(FunctionCallInfo fcinfo)
 		feat_str_copy = pstrdup(feat_str);
 		targ_str_copy = pstrdup(targ_str);
 
-		NDB_FREE(query.data);
-		NDB_FREE(tbl_str);
-		NDB_FREE(feat_str);
-		NDB_FREE(targ_str);
+		nfree(query.data);
+		nfree(tbl_str);
+		nfree(feat_str);
+		nfree(targ_str);
 		NDB_SPI_SESSION_END(eval_nb_spi_session);
 
 		if (total_rows == 0)
@@ -1574,8 +1593,8 @@ nb_evaluate_naive_bayes_internal(FunctionCallInfo fcinfo)
 #ifdef NDB_GPU_CUDA
 		const NdbCudaNbModelHeader *gpu_hdr;
 
-		NDB_DECLARE(int *, h_labels);
-		NDB_DECLARE(float *, h_features);
+		int *h_labels = NULL;
+		float *h_features = NULL;
 		int			gpu_valid_rows = 0;
 		size_t		payload_size;
 
@@ -1602,15 +1621,15 @@ nb_evaluate_naive_bayes_internal(FunctionCallInfo fcinfo)
 				labels_size > MaxAllocSize)
 				goto cpu_evaluation_path;
 
-			NDB_ALLOC(h_features, float, features_size / sizeof(float));
-			NDB_ALLOC(h_labels, int, labels_size / sizeof(int));
+			nalloc(h_features, float, features_size / sizeof(float));
+			nalloc(h_labels, int, labels_size / sizeof(int));
 
 			if (h_features == NULL || h_labels == NULL)
 			{
 				if (h_features)
-					NDB_FREE(h_features);
+					nfree(h_features);
 				if (h_labels)
-					NDB_FREE(h_labels);
+					nfree(h_labels);
 				goto cpu_evaluation_path;
 			}
 		}
@@ -1620,8 +1639,8 @@ nb_evaluate_naive_bayes_internal(FunctionCallInfo fcinfo)
 
 			if (tupdesc == NULL)
 			{
-				NDB_FREE(h_features);
-				NDB_FREE(h_labels);
+				nfree(h_features);
+				nfree(h_labels);
 				goto cpu_evaluation_path;
 			}
 
@@ -1632,9 +1651,9 @@ nb_evaluate_naive_bayes_internal(FunctionCallInfo fcinfo)
 				Datum		targ_datum;
 				bool		feat_null;
 				bool		targ_null;
-				Vector	   *vec;
-				ArrayType  *arr;
-				float	   *feat_row;
+				Vector *vec = NULL;
+				ArrayType *arr = NULL;
+				float *feat_row = NULL;
 
 				if (SPI_tuptable == NULL ||
 					SPI_tuptable->vals == NULL ||
@@ -1750,8 +1769,8 @@ nb_evaluate_naive_bayes_internal(FunctionCallInfo fcinfo)
 				HeapTuple	tuple = SPI_tuptable->vals[0];
 				Datum		feat_datum;
 				bool		feat_null;
-				Vector	   *vec;
-				ArrayType  *arr;
+				Vector *vec = NULL;
+				ArrayType *arr = NULL;
 
 				feat_datum = SPI_getbinval(tuple, tupdesc, 1, &feat_null);
 				if (!feat_null)
@@ -1771,12 +1790,12 @@ nb_evaluate_naive_bayes_internal(FunctionCallInfo fcinfo)
 				}
 			}
 
-			NDB_FREE(h_features);
-			NDB_FREE(h_labels);
+			nfree(h_features);
+			nfree(h_labels);
 			if (gpu_payload)
-				NDB_FREE(gpu_payload);
+				nfree(gpu_payload);
 			if (gpu_metrics)
-				NDB_FREE(gpu_metrics);
+				nfree(gpu_metrics);
 
 			/*
 			 * Do not free tbl_str/feat_str/targ_str before ereport, they are
@@ -1820,7 +1839,7 @@ nb_evaluate_naive_bayes_internal(FunctionCallInfo fcinfo)
 		{
 			int			rc;
 
-			NDB_DECLARE(char *, gpu_errstr);
+			char *gpu_errstr = NULL;
 
 			PG_TRY();
 			{
@@ -1842,18 +1861,18 @@ nb_evaluate_naive_bayes_internal(FunctionCallInfo fcinfo)
 					 * End SPI BEFORE creating JSONB to avoid memory context
 					 * issues
 					 */
-					NDB_FREE(query.data);
+					nfree(query.data);
 					NDB_SPI_SESSION_END(eval_nb_spi_session);
 
 					/* Free arrays allocated during GPU evaluation */
-					NDB_FREE(h_features);
-					NDB_FREE(h_labels);
+					nfree(h_features);
+					nfree(h_labels);
 					if (gpu_payload)
-						NDB_FREE(gpu_payload);
+						nfree(gpu_payload);
 					if (gpu_metrics)
-						NDB_FREE(gpu_metrics);
+						nfree(gpu_metrics);
 					if (gpu_errstr)
-						NDB_FREE(gpu_errstr);
+						nfree(gpu_errstr);
 
 					/* Switch to oldcontext to create JSONB */
 					MemoryContextSwitchTo(oldcontext);
@@ -1874,13 +1893,13 @@ nb_evaluate_naive_bayes_internal(FunctionCallInfo fcinfo)
 
 					/* Create JSONB in oldcontext using ndb_jsonb_in_cstring */
 					result_jsonb = ndb_jsonb_in_cstring(jsonbuf.data);
-					NDB_FREE(jsonbuf.data);
+					nfree(jsonbuf.data);
 
 					if (result_jsonb == NULL)
 					{
-						NDB_FREE(tbl_str);
-						NDB_FREE(feat_str);
-						NDB_FREE(targ_str);
+						nfree(tbl_str);
+						nfree(feat_str);
+						nfree(targ_str);
 						ereport(ERROR,
 								(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
 								 errmsg("neurondb: evaluate_naive_bayes_by_model_id: failed to parse metrics JSON")));
@@ -1890,27 +1909,27 @@ nb_evaluate_naive_bayes_internal(FunctionCallInfo fcinfo)
 					 * Free strings allocated before SPI_connect (in
 					 * oldcontext)
 					 */
-					NDB_FREE(tbl_str);
-					NDB_FREE(feat_str);
-					NDB_FREE(targ_str);
+					nfree(tbl_str);
+					nfree(feat_str);
+					nfree(targ_str);
 
 					PG_RETURN_JSONB_P(result_jsonb);
 				}
 				else
 				{
 					if (gpu_errstr)
-						NDB_FREE(gpu_errstr);
-					NDB_FREE(h_features);
-					NDB_FREE(h_labels);
+						nfree(gpu_errstr);
+					nfree(h_features);
+					nfree(h_labels);
 					goto cpu_evaluation_path;
 				}
 			}
 			PG_CATCH();
 			{
 				if (h_features)
-					NDB_FREE(h_features);
+					nfree(h_features);
 				if (h_labels)
-					NDB_FREE(h_labels);
+					nfree(h_labels);
 				goto cpu_evaluation_path;
 			}
 			PG_END_TRY();
@@ -1931,8 +1950,8 @@ cpu_evaluation_path:
 
 	/* CPU evaluation path */
 	{
-		NDB_DECLARE(float *, h_features);
-		NDB_DECLARE(double *, h_labels);
+		float *h_features = NULL;
+		double *h_labels = NULL;
 		valid_rows = 0;			/* Reset for CPU path */
 
 		if (model != NULL)
@@ -1964,8 +1983,8 @@ cpu_evaluation_path:
 							"invalid feature dimension %d",
 							feat_dim)));
 
-		NDB_ALLOC(h_features, float, (size_t) nvec * (size_t) feat_dim);
-		NDB_ALLOC(h_labels, double, (size_t) nvec);
+		nalloc(h_features, float, (size_t) nvec * (size_t) feat_dim);
+		nalloc(h_labels, double, (size_t) nvec);
 
 		{
 			TupleDesc	tupdesc = SPI_tuptable->tupdesc;
@@ -1978,9 +1997,9 @@ cpu_evaluation_path:
 				Datum		targ_datum;
 				bool		feat_null;
 				bool		targ_null;
-				Vector	   *vec;
-				ArrayType  *arr;
-				float	   *feat_row;
+				Vector *vec = NULL;
+				ArrayType *arr = NULL;
+				float *feat_row = NULL;
 
 				feat_datum = SPI_getbinval(tuple,
 										   tupdesc,
@@ -2072,8 +2091,8 @@ cpu_evaluation_path:
 				HeapTuple	tuple = SPI_tuptable->vals[0];
 				Datum		feat_datum;
 				bool		feat_null;
-				Vector	   *vec;
-				ArrayType  *arr;
+				Vector *vec = NULL;
+				ArrayType *arr = NULL;
 
 				feat_datum = SPI_getbinval(tuple, tupdesc, 1, &feat_null);
 				if (!feat_null)
@@ -2093,11 +2112,11 @@ cpu_evaluation_path:
 				}
 			}
 
-			NDB_FREE(h_features);
-			NDB_FREE(h_labels);
+			nfree(h_features);
+			nfree(h_labels);
 			nb_free_model_and_metadata(model, NULL, gpu_metrics);
 			if (gpu_payload)
-				NDB_FREE(gpu_payload);
+				nfree(gpu_payload);
 
 			/*
 			 * Do not free tbl_str / feat_str / targ_str before using them in
@@ -2140,13 +2159,13 @@ cpu_evaluation_path:
 
 		if (is_gpu_model && model == NULL)
 		{
-			NDB_FREE(h_features);
-			NDB_FREE(h_labels);
+			nfree(h_features);
+			nfree(h_labels);
 			if (gpu_payload)
-				NDB_FREE(gpu_payload);
+				nfree(gpu_payload);
 			if (gpu_metrics)
-				NDB_FREE(gpu_metrics);
-			NDB_FREE(query.data);
+				nfree(gpu_metrics);
+			nfree(query.data);
 			NDB_SPI_SESSION_END(eval_nb_spi_session);
 			ereport(ERROR,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
@@ -2190,11 +2209,11 @@ cpu_evaluation_path:
 				f1_score = 0.0;
 		}
 
-		NDB_FREE(h_features);
-		NDB_FREE(h_labels);
+		nfree(h_features);
+		nfree(h_labels);
 		nb_free_model_and_metadata(model, NULL, gpu_metrics);
 		if (gpu_payload)
-			NDB_FREE(gpu_payload);
+			nfree(gpu_payload);
 	}
 
 	/* Use valid_rows for accurate n_samples reporting */
@@ -2214,7 +2233,7 @@ cpu_evaluation_path:
 	result_jsonb = DatumGetJsonbP(DirectFunctionCall1(
 													  jsonb_in, CStringGetTextDatum(jsonbuf.data)));
 
-	NDB_FREE(jsonbuf.data);
+	nfree(jsonbuf.data);
 
 	/*
 	 * Copy result_jsonb to caller's context before SPI_finish(). This ensures
@@ -2226,13 +2245,13 @@ cpu_evaluation_path:
 	result_jsonb = (Jsonb *) PG_DETOAST_DATUM_COPY(JsonbPGetDatum(result_jsonb));
 
 	/* Now safe to finish SPI */
-	NDB_FREE(query.data);
+	nfree(query.data);
 	NDB_SPI_SESSION_END(eval_nb_spi_session);
 
 	/* Free strings allocated before SPI_connect (in oldcontext) */
-	NDB_FREE(tbl_str);
-	NDB_FREE(feat_str);
-	NDB_FREE(targ_str);
+	nfree(tbl_str);
+	nfree(feat_str);
+	nfree(targ_str);
 
 	/* Return result (already in oldcontext) */
 	PG_RETURN_JSONB_P(result_jsonb);
@@ -2258,10 +2277,10 @@ nb_gpu_release_state(NbGpuModelState * state)
 	if (state == NULL)
 		return;
 	if (state->model_blob)
-		NDB_FREE(state->model_blob);
+		nfree(state->model_blob);
 	if (state->metrics)
-		NDB_FREE(state->metrics);
-	NDB_FREE(state);
+		nfree(state->metrics);
+	nfree(state);
 }
 
 static bool
@@ -2270,7 +2289,7 @@ nb_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec,
 {
 	NbGpuModelState *state;
 
-	NDB_DECLARE(bytea *, payload);
+	bytea *payload = NULL;
 	int			rc;
 	const ndb_gpu_backend *backend;
 
@@ -2417,8 +2436,8 @@ nb_gpu_serialize(const MLGpuModel *model,
 {
 	const		NbGpuModelState *state;
 
-	NDB_DECLARE(bytea *, blob_copy);
-	NDB_DECLARE(Jsonb *, metrics_copy);
+	bytea *blob_copy = NULL;
+	Jsonb *metrics_copy = NULL;
 
 	if (errstr)
 		*errstr = NULL;
@@ -2440,9 +2459,9 @@ nb_gpu_serialize(const MLGpuModel *model,
 	/* Copy model blob to output */
 	{
 		int			blob_len = VARSIZE_ANY(state->model_blob);
-		NDB_DECLARE(char *, blob_copy_raw);
+		char *blob_copy_raw = NULL;
 
-		NDB_ALLOC(blob_copy_raw, char, blob_len);
+		nalloc(blob_copy_raw, char, blob_len);
 		blob_copy = (bytea *) blob_copy_raw;
 		memcpy(blob_copy, state->model_blob, blob_len);
 	}
@@ -2466,7 +2485,7 @@ nb_gpu_deserialize(MLGpuModel *model,
 				   const Jsonb * metadata,
 				   char **errstr)
 {
-	NDB_DECLARE(NbGpuModelState *, state);
+	NbGpuModelState *state = NULL;
 	const NdbCudaNbModelHeader *hdr;
 	size_t		payload_size;
 
@@ -2506,13 +2525,13 @@ nb_gpu_deserialize(MLGpuModel *model,
 	}
 
 	/* Allocate and populate state */
-	NDB_ALLOC(state, NbGpuModelState, 1);
+	nalloc(state, NbGpuModelState, 1);
 	memset(state, 0, sizeof(NbGpuModelState));
 	{
 		int			blob_len = VARSIZE_ANY(payload);
-		NDB_DECLARE(char *, model_blob_raw);
+		char *model_blob_raw = NULL;
 
-		NDB_ALLOC(model_blob_raw, char, blob_len);
+		nalloc(model_blob_raw, char, blob_len);
 		state->model_blob = (bytea *) model_blob_raw;
 		memcpy(state->model_blob, payload, blob_len);
 	}

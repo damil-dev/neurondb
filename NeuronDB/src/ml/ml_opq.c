@@ -62,11 +62,11 @@ pq_codebook_free(PQCodebook * codebook)
 		{
 			for (i = 0; i < codebook->ksub; i++)
 				if (codebook->centroids[sub][i] != NULL)
-					NDB_FREE(codebook->centroids[sub][i]);
-			NDB_FREE(codebook->centroids[sub]);
+					nfree(codebook->centroids[sub][i]);
+			nfree(codebook->centroids[sub]);
 		}
 	}
-	NDB_FREE(codebook->centroids);
+	nfree(codebook->centroids);
 }
 
 /*
@@ -96,18 +96,18 @@ PG_FUNCTION_INFO_V1(train_opq_rotation);
 Datum
 train_opq_rotation(PG_FUNCTION_ARGS)
 {
-	text	   *table_name;
-	text	   *vector_column;
+	text *table_name = NULL;
+	text *vector_column = NULL;
 	int			num_subspaces;
-	char	   *tbl_str;
-	char	   *col_str;
+	char *tbl_str = NULL;
+	char *col_str = NULL;
 	float	  **data;
 	int			nvec,
 				dim;
-	double	   *rotation_matrix;
+	double *rotation_matrix = NULL;
 	int			i;
-	ArrayType  *result;
-	Datum	   *result_datums;
+	ArrayType *result = NULL;
+	Datum *result_datums = NULL;
 
 	table_name = PG_GETARG_TEXT_PP(0);
 	vector_column = PG_GETARG_TEXT_PP(1);
@@ -131,8 +131,8 @@ train_opq_rotation(PG_FUNCTION_ARGS)
 
 	if (data == NULL || nvec == 0)
 	{
-		NDB_FREE(tbl_str);
-		NDB_FREE(col_str);
+		nfree(tbl_str);
+		nfree(col_str);
 		ereport(ERROR,
 				(errcode(ERRCODE_DATA_EXCEPTION),
 				 errmsg("No vectors found")));
@@ -140,17 +140,17 @@ train_opq_rotation(PG_FUNCTION_ARGS)
 
 	if (dim <= 0)
 	{
-		NDB_FREE(tbl_str);
-		NDB_FREE(col_str);
+		nfree(tbl_str);
+		nfree(col_str);
 		/* Free data array and rows if data is not NULL */
 		if (data != NULL)
 		{
 			for (i = 0; i < nvec; i++)
 			{
 				if (data[i] != NULL)
-					NDB_FREE(data[i]);
+					nfree(data[i]);
 			}
-			NDB_FREE(data);
+			nfree(data);
 		}
 		ereport(ERROR,
 				(errcode(ERRCODE_DATA_EXCEPTION),
@@ -170,11 +170,11 @@ train_opq_rotation(PG_FUNCTION_ARGS)
 	/* Compute PCA-based rotation matrix */
 	/* This is a practical approximation to full OPQ iterative optimization */
 	{
-		double	  **covariance = NULL;
-		double	  **eigenvectors = NULL;
+		double **covariance = NULL;
+		double **eigenvectors = NULL;
 
-		NDB_DECLARE(double *, eigenvalues);
-		NDB_DECLARE(double *, mean);
+		double *eigenvalues = NULL;
+		double *mean = NULL;
 		int			j,
 					k,
 					iter;
@@ -191,7 +191,7 @@ train_opq_rotation(PG_FUNCTION_ARGS)
 			mean[j] /= (double) nvec;
 
 		/* Compute covariance matrix */
-		NDB_ALLOC(covariance, double *, dim);
+		nalloc(covariance, double *, dim);
 		NDB_CHECK_ALLOC(covariance, "covariance");
 		for (i = 0; i < dim; i++)
 		{
@@ -222,19 +222,19 @@ train_opq_rotation(PG_FUNCTION_ARGS)
 		}
 
 		/* Compute eigenvectors using power iteration (PCA) */
-		NDB_ALLOC(eigenvectors, double *, dim);
+		nalloc(eigenvectors, double *, dim);
 		NDB_CHECK_ALLOC(eigenvectors, "eigenvectors");
-		NDB_ALLOC(eigenvalues, double, dim);
+		nalloc(eigenvalues, double, dim);
 		NDB_CHECK_ALLOC(eigenvalues, "eigenvalues");
 
 		for (i = 0; i < dim; i++)
 		{
-			double	   *eigvec;
+			double *eigvec = NULL;
 			double		norm;
 			double		prev_eigenvalue = 0.0;
 			int			max_iter = 100;
 
-			NDB_ALLOC(eigvec, double, dim);
+			nalloc(eigvec, double, dim);
 			NDB_CHECK_ALLOC(eigvec, "eigvec");
 
 			/* Initialize with random vector */
@@ -302,7 +302,7 @@ train_opq_rotation(PG_FUNCTION_ARGS)
 						covariance[j][k] -= eigenvalue * eigvec[j] * eigvec[k];
 				}
 
-				NDB_FREE(v_new);
+				nfree(v_new);
 			}
 
 			eigenvalues[i] = prev_eigenvalue;
@@ -313,10 +313,10 @@ train_opq_rotation(PG_FUNCTION_ARGS)
 		/* Check for integer overflow in size calculation */
 		if (dim > 0 && (size_t) dim > MaxAllocSize / sizeof(double) / (size_t) dim)
 		{
-			NDB_FREE(eigenvalues);
+			nfree(eigenvalues);
 			for (i = 0; i < dim; i++)
-				NDB_FREE(eigenvectors[i]);
-			NDB_FREE(eigenvectors);
+				nfree(eigenvectors[i]);
+			nfree(eigenvectors);
 			ereport(ERROR,
 					(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
 					 errmsg("neurondb: rotation_matrix allocation size exceeds MaxAllocSize")));
@@ -331,20 +331,20 @@ train_opq_rotation(PG_FUNCTION_ARGS)
 				rotation_matrix[i * dim + j] = eigenvectors[j][i];
 		}
 
-		NDB_FREE(mean);
+		nfree(mean);
 		if (covariance != NULL)
 		{
 			for (i = 0; i < dim; i++)
-				NDB_FREE(covariance[i]);
-			NDB_FREE(covariance);
+				nfree(covariance[i]);
+			nfree(covariance);
 		}
 		if (eigenvectors != NULL)
 		{
 			for (i = 0; i < dim; i++)
-				NDB_FREE(eigenvectors[i]);
-			NDB_FREE(eigenvectors);
+				nfree(eigenvectors[i]);
+			nfree(eigenvectors);
 		}
-		NDB_FREE(eigenvalues);
+		nfree(eigenvalues);
 
 		elog(DEBUG1,
 			 "OPQ: Computed PCA-based rotation matrix (dim=%d, subspaces=%d)",
@@ -352,7 +352,7 @@ train_opq_rotation(PG_FUNCTION_ARGS)
 	}
 
 	/* Build result array */
-	NDB_ALLOC(result_datums, Datum, dim * dim);
+	nalloc(result_datums, Datum, dim * dim);
 	NDB_CHECK_ALLOC(result_datums, "result_datums");
 	for (i = 0; i < dim * dim; i++)
 		result_datums[i] = Float8GetDatum(rotation_matrix[i]);
@@ -365,12 +365,12 @@ train_opq_rotation(PG_FUNCTION_ARGS)
 							 'd');
 
 	for (i = 0; i < nvec; i++)
-		NDB_FREE(data[i]);
-	NDB_FREE(data);
-	NDB_FREE(rotation_matrix);
-	NDB_FREE(result_datums);
-	NDB_FREE(tbl_str);
-	NDB_FREE(col_str);
+		nfree(data[i]);
+	nfree(data);
+	nfree(rotation_matrix);
+	nfree(result_datums);
+	nfree(tbl_str);
+	nfree(col_str);
 
 	PG_RETURN_ARRAYTYPE_P(result);
 }
@@ -400,17 +400,17 @@ PG_FUNCTION_INFO_V1(evaluate_opq_rotation_by_model_id);
 Datum
 apply_opq_rotation(PG_FUNCTION_ARGS)
 {
-	ArrayType  *vector_array;
-	ArrayType  *rotation_array;
-	float8	   *vector;
-	float8	   *rotation;
+	ArrayType *vector_array = NULL;
+	ArrayType *rotation_array = NULL;
+	float8 *vector = NULL;
+	float8 *rotation = NULL;
 	int			dim;
 	int			rotation_dim;
-	double	   *rotated;
+	double *rotated = NULL;
 	int			i,
 				j;
-	ArrayType  *result;
-	Datum	   *result_datums;
+	ArrayType *result = NULL;
+	Datum *result_datums = NULL;
 
 	vector_array = PG_GETARG_ARRAYTYPE_P(0);
 	rotation_array = PG_GETARG_ARRAYTYPE_P(1);
@@ -445,7 +445,7 @@ apply_opq_rotation(PG_FUNCTION_ARGS)
 		for (j = 0; j < dim; j++)
 			rotated[i] += rotation[i * dim + j] * vector[j];
 
-	NDB_ALLOC(result_datums, Datum, dim);
+	nalloc(result_datums, Datum, dim);
 	NDB_CHECK_ALLOC(result_datums, "result_datums");
 	for (i = 0; i < dim; i++)
 		result_datums[i] = Float8GetDatum(rotated[i]);
@@ -457,8 +457,8 @@ apply_opq_rotation(PG_FUNCTION_ARGS)
 							 FLOAT8PASSBYVAL,
 							 'd');
 
-	NDB_FREE(rotated);
-	NDB_FREE(result_datums);
+	nfree(rotated);
+	nfree(result_datums);
 
 	PG_RETURN_ARRAYTYPE_P(result);
 }
@@ -473,20 +473,20 @@ Datum
 predict_opq_rotation(PG_FUNCTION_ARGS)
 {
 	int32		model_id;
-	ArrayType  *vector_array;
+	ArrayType *vector_array = NULL;
 
-	NDB_DECLARE(bytea *, model_data);
-	NDB_DECLARE(Jsonb *, parameters);
-	float8	   *vector;
-	float8	   *rotation;
+	bytea *model_data = NULL;
+	Jsonb *parameters = NULL;
+	float8 *vector = NULL;
+	float8 *rotation = NULL;
 	int			dim;
 	int			rotation_dim;
-	double	   *rotated;
+	double *rotated = NULL;
 	int			i,
 				j;
-	ArrayType  *result;
-	Datum	   *result_datums;
-	JsonbIterator *it;
+	ArrayType *result = NULL;
+	Datum *result_datums = NULL;
+	JsonbIterator *it = NULL;
 	JsonbValue	v;
 	int			r;
 	bool		found_rotation = false;
@@ -533,10 +533,10 @@ predict_opq_rotation(PG_FUNCTION_ARGS)
 						 */
 						/* or we need to reconstruct from JSONB array */
 						found_rotation = true;
-						NDB_FREE(key);
+						nfree(key);
 						break;
 					}
-					NDB_FREE(key);
+					nfree(key);
 				}
 			}
 		}
@@ -567,11 +567,11 @@ predict_opq_rotation(PG_FUNCTION_ARGS)
 
 		if (data_size >= expected_size)
 		{
-			float8	   *rotation_tmp;
+			float8 *rotation_tmp = NULL;
 
 			/* Extract rotation matrix from model_data */
 			rotation_dim = dim;
-			NDB_ALLOC(rotation_tmp, float8, dim * dim);
+			nalloc(rotation_tmp, float8, dim * dim);
 			NDB_CHECK_ALLOC(rotation_tmp, "rotation_tmp");
 			memcpy(rotation_tmp, VARDATA(model_data), expected_size);
 			rotation = rotation_tmp;
@@ -580,11 +580,11 @@ predict_opq_rotation(PG_FUNCTION_ARGS)
 		}
 		else
 		{
-			float8	   *rotation_tmp;
+			float8 *rotation_tmp = NULL;
 
 			/* Size mismatch - use identity matrix as fallback */
 			rotation_dim = dim;
-			NDB_ALLOC(rotation_tmp, float8, dim * dim);
+			nalloc(rotation_tmp, float8, dim * dim);
 			NDB_CHECK_ALLOC(rotation_tmp, "rotation_tmp");
 			for (i = 0; i < dim; i++)
 			{
@@ -606,7 +606,7 @@ predict_opq_rotation(PG_FUNCTION_ARGS)
 		/* Extract rotation from JSONB array */
 		/* JSONB array format: [row0_col0, row0_col1, ..., row1_col0, ...] */
 		rotation_dim = dim;
-		NDB_ALLOC(rotation, float8, dim * dim);
+		nalloc(rotation, float8, dim * dim);
 		NDB_CHECK_ALLOC(rotation, "rotation");
 
 		/* Re-initialize iterator to extract array elements */
@@ -678,10 +678,10 @@ predict_opq_rotation(PG_FUNCTION_ARGS)
 									 idx);
 							}
 						}
-						NDB_FREE(key);
+						nfree(key);
 						break;
 					}
-					NDB_FREE(key);
+					nfree(key);
 				}
 			}
 		}
@@ -693,13 +693,13 @@ predict_opq_rotation(PG_FUNCTION_ARGS)
 			/* Free rotation if allocated */
 			if (rotation != NULL)
 			{
-				NDB_FREE(rotation);
+				nfree(rotation);
 				rotation = NULL;
 			}
 
 			/* Fall back to identity matrix */
 			rotation_dim = dim;
-			NDB_ALLOC(rotation, float8, dim * dim);
+			nalloc(rotation, float8, dim * dim);
 			NDB_CHECK_ALLOC(rotation, "rotation");
 			for (i = 0; i < dim; i++)
 			{
@@ -742,7 +742,7 @@ predict_opq_rotation(PG_FUNCTION_ARGS)
 	}
 
 	/* Build result array */
-	NDB_ALLOC(result_datums, Datum, dim);
+	nalloc(result_datums, Datum, dim);
 	NDB_CHECK_ALLOC(result_datums, "result_datums");
 	for (i = 0; i < dim; i++)
 		result_datums[i] = Float8GetDatum(rotated[i]);
@@ -754,13 +754,13 @@ predict_opq_rotation(PG_FUNCTION_ARGS)
 							 FLOAT8PASSBYVAL,
 							 'd');
 
-	NDB_FREE(rotated);
-	NDB_FREE(result_datums);
-	NDB_FREE(rotation);
+	nfree(rotated);
+	nfree(result_datums);
+	nfree(rotation);
 	if (model_data)
-		NDB_FREE(model_data);
+		nfree(model_data);
 	if (parameters)
-		NDB_FREE(parameters);
+		nfree(parameters);
 
 	PG_RETURN_ARRAYTYPE_P(result);
 }
@@ -775,21 +775,21 @@ Datum
 evaluate_opq_rotation_by_model_id(PG_FUNCTION_ARGS)
 {
 	int32		model_id;
-	text	   *table_name;
-	text	   *vector_col;
-	char	   *tbl_str;
-	char	   *vec_str;
+	text *table_name = NULL;
+	text *vector_col = NULL;
+	char *tbl_str = NULL;
+	char *vec_str = NULL;
 	StringInfoData query;
 	int			ret;
 	int			n_points = 0;
 	StringInfoData jsonbuf;
-	Jsonb	   *result;
+	Jsonb *result = NULL;
 	MemoryContext oldcontext;
 	double		avg_quantization_error;
 	int			subquantizers;
 	int			codebook_size;
 
-	NDB_DECLARE(NdbSpiSession *, spi_session);
+	NdbSpiSession *spi_session = NULL;
 	MemoryContext oldcontext_spi;
 
 	/* Validate arguments */
@@ -834,8 +834,8 @@ evaluate_opq_rotation_by_model_id(PG_FUNCTION_ARGS)
 	{
 		ndb_spi_stringinfo_free(spi_session, &query);
 		NDB_SPI_SESSION_END(spi_session);
-		NDB_FREE(tbl_str);
-		NDB_FREE(vec_str);
+		nfree(tbl_str);
+		nfree(vec_str);
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
 				 errmsg("neurondb: evaluate_opq_rotation_by_model_id: query failed")));
@@ -846,8 +846,8 @@ evaluate_opq_rotation_by_model_id(PG_FUNCTION_ARGS)
 	{
 		ndb_spi_stringinfo_free(spi_session, &query);
 		NDB_SPI_SESSION_END(spi_session);
-		NDB_FREE(tbl_str);
-		NDB_FREE(vec_str);
+		nfree(tbl_str);
+		nfree(vec_str);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("neurondb: evaluate_opq_rotation_by_model_id: need at least 2 vectors, got %d",
@@ -856,10 +856,10 @@ evaluate_opq_rotation_by_model_id(PG_FUNCTION_ARGS)
 
 	/* Load model and compute quantization metrics */
 	{
-		NDB_DECLARE(bytea *, model_payload);
-		NDB_DECLARE(Jsonb *, parameters);
-		NDB_DECLARE(Jsonb *, metrics);
-		char	   *cb_ptr;
+		bytea *model_payload = NULL;
+		Jsonb *parameters = NULL;
+		Jsonb *metrics = NULL;
+		char *cb_ptr = NULL;
 		int			m,
 					ksub,
 					dsub;
@@ -877,7 +877,7 @@ evaluate_opq_rotation_by_model_id(PG_FUNCTION_ARGS)
 										   &parameters,
 										   &metrics))
 		{
-			float	 ***centroids = NULL;
+			float ***centroids = NULL;
 
 			if (model_payload != NULL && VARSIZE(model_payload) > VARHDRSZ)
 			{
@@ -894,16 +894,16 @@ evaluate_opq_rotation_by_model_id(PG_FUNCTION_ARGS)
 				codebook_size = ksub;
 
 				/* Reconstruct centroids and compute error */
-				NDB_ALLOC(centroids, float **, m);
+				nalloc(centroids, float **, m);
 				for (sub = 0; sub < m; sub++)
 				{
-					NDB_DECLARE(float **, centroids_sub);
-					NDB_ALLOC(centroids_sub, float *, ksub);
+					float **centroids_sub = NULL;
+					nalloc(centroids_sub, float *, ksub);
 					centroids[sub] = centroids_sub;
 					for (c = 0; c < ksub; c++)
 					{
-						NDB_DECLARE(float *, centroids_sub_c);
-						NDB_ALLOC(centroids_sub_c, float, dsub);
+						float *centroids_sub_c = NULL;
+						nalloc(centroids_sub_c, float, dsub);
 						centroids[sub][c] = centroids_sub_c;
 						memcpy(centroids[sub][c], cb_ptr, sizeof(float) * dsub);
 						cb_ptr += sizeof(float) * dsub;
@@ -929,8 +929,8 @@ evaluate_opq_rotation_by_model_id(PG_FUNCTION_ARGS)
 					{
 						Datum		vec_datum;
 						bool		vec_null;
-						Vector	   *vec;
-						float	   *vec_data;
+						Vector *vec = NULL;
+						float *vec_data = NULL;
 						double		vector_error = 0.0;
 						int			start_dim;
 
@@ -1006,12 +1006,12 @@ evaluate_opq_rotation_by_model_id(PG_FUNCTION_ARGS)
 							for (c = 0; c < ksub; c++)
 							{
 								if (centroids[sub][c] != NULL)
-									NDB_FREE(centroids[sub][c]);
+									nfree(centroids[sub][c]);
 							}
-							NDB_FREE(centroids[sub]);
+							nfree(centroids[sub]);
 						}
 					}
-					NDB_FREE(centroids);
+					nfree(centroids);
 				}
 
 				if (valid_vectors > 0)
@@ -1024,11 +1024,11 @@ evaluate_opq_rotation_by_model_id(PG_FUNCTION_ARGS)
 				}
 
 				if (model_payload != NULL)
-					NDB_FREE(model_payload);
+					nfree(model_payload);
 				if (parameters != NULL)
-					NDB_FREE(parameters);
+					nfree(parameters);
 				if (metrics != NULL)
-					NDB_FREE(metrics);
+					nfree(metrics);
 			}
 			else
 			{
@@ -1056,10 +1056,10 @@ evaluate_opq_rotation_by_model_id(PG_FUNCTION_ARGS)
 					 avg_quantization_error, subquantizers, codebook_size, n_points);
 
 	result = DatumGetJsonbP(DirectFunctionCall1(jsonb_in, CStringGetTextDatum(jsonbuf.data)));
-	NDB_FREE(jsonbuf.data);
+	nfree(jsonbuf.data);
 
-	NDB_FREE(tbl_str);
-	NDB_FREE(vec_str);
+	nfree(tbl_str);
+	nfree(vec_str);
 
 	PG_RETURN_JSONB_P(result);
 }
@@ -1084,15 +1084,15 @@ static bytea *
 opq_model_serialize_to_bytea(const PQCodebook * codebook, const float *rotation_matrix, int dim)
 {
 	int			result_size;
-	bytea	   *result;
-	char	   *result_ptr;
-	char	   *result_raw;
+	bytea *result = NULL;
+	char *result_ptr = NULL;
+	char *result_raw = NULL;
 	int			sub,
 				i;
 
 	result_size = sizeof(int) * 4 + dim * dim * sizeof(float) +
 		codebook->m * codebook->ksub * codebook->dsub * sizeof(float);
-	NDB_ALLOC(result_raw, char, VARHDRSZ + result_size);
+	nalloc(result_raw, char, VARHDRSZ + result_size);
 	result = (bytea *) result_raw;
 	NDB_CHECK_ALLOC(result, "result");
 	SET_VARSIZE(result, VARHDRSZ + result_size);
@@ -1145,34 +1145,34 @@ opq_model_deserialize_from_bytea(const bytea * data, PQCodebook * codebook, floa
 		return -1;
 
 	{
-		float	   *rotation_matrix;
-		float	  ***centroids;
+		float *rotation_matrix = NULL;
+		float	  ***centroids = NULL;
 
 	/* Check for integer overflow in size calculation */
 	if (*dim_out > 0 && (size_t) * dim_out > MaxAllocSize / sizeof(float) / (size_t) * dim_out)
 	{
 		return -1;
 	}
-	NDB_ALLOC(rotation_matrix, float, *dim_out * *dim_out);
+	nalloc(rotation_matrix, float, *dim_out * *dim_out);
 	*rotation_matrix_out = rotation_matrix;
 	NDB_CHECK_ALLOC(rotation_matrix_out, "rotation_matrix_out");
 	memcpy(*rotation_matrix_out, buf + offset, sizeof(float) * *dim_out * *dim_out);
 	offset += sizeof(float) * *dim_out * *dim_out;
-	NDB_ALLOC(centroids, float **, codebook->m);
+	nalloc(centroids, float **, codebook->m);
 	codebook->centroids = centroids;
 	NDB_CHECK_ALLOC(codebook, "codebook");
 	for (sub = 0; sub < codebook->m; sub++)
 	{
 		float	  **sub_centroids;
 
-		NDB_ALLOC(sub_centroids, float *, codebook->ksub);
+		nalloc(sub_centroids, float *, codebook->ksub);
 		codebook->centroids[sub] = sub_centroids;
 		NDB_CHECK_ALLOC(codebook, "codebook");
 		for (i = 0; i < codebook->ksub; i++)
 		{
-			float	   *centroid_vec;
+			float *centroid_vec = NULL;
 
-			NDB_ALLOC(centroid_vec, float, codebook->dsub);
+			nalloc(centroid_vec, float, codebook->dsub);
 			codebook->centroids[sub][i] = centroid_vec;
 			NDB_CHECK_ALLOC(codebook, "codebook");
 			memcpy(codebook->centroids[sub][i], buf + offset, sizeof(float) * codebook->dsub);
@@ -1187,11 +1187,11 @@ opq_model_deserialize_from_bytea(const bytea * data, PQCodebook * codebook, floa
 static bool
 opq_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 {
-	OPQGpuModelState *state;
-	float	  **data = NULL;
+	OPQGpuModelState *state = NULL;
+	float **data = NULL;
 	PQCodebook	codebook;
 
-	NDB_DECLARE(float *, rotation_matrix);
+	float *rotation_matrix = NULL;
 	int			m = 8;
 	int			ksub = 256;
 	int			nvec = 0;
@@ -1199,10 +1199,10 @@ opq_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 	int			sub,
 				i;
 
-	NDB_DECLARE(bytea *, model_data);
-	NDB_DECLARE(Jsonb *, metrics);
+	bytea *model_data = NULL;
+	Jsonb *metrics = NULL;
 	StringInfoData metrics_json;
-	JsonbIterator *it;
+	JsonbIterator *it = NULL;
 	JsonbValue	v;
 	int			r;
 
@@ -1232,7 +1232,7 @@ opq_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 				else if (strcmp(key, "ksub") == 0 && v.type == jbvNumeric)
 					ksub = DatumGetInt32(DirectFunctionCall1(numeric_int4,
 															 NumericGetDatum(v.val.numeric)));
-				NDB_FREE(key);
+				nfree(key);
 			}
 		}
 	}
@@ -1261,13 +1261,13 @@ opq_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 		return false;
 	}
 
-	NDB_ALLOC(data, float *, nvec);
+	nalloc(data, float *, nvec);
 	NDB_CHECK_ALLOC(data, "data");
 	for (i = 0; i < nvec; i++)
 	{
-		NDB_DECLARE(float *, data_row);
+		float *data_row = NULL;
 
-		NDB_ALLOC(data_row, float, dim);
+		nalloc(data_row, float, dim);
 		data[i] = data_row;
 		NDB_CHECK_ALLOC(data, "data");
 		memcpy(data[i], &spec->feature_matrix[i * dim], sizeof(float) * dim);
@@ -1286,23 +1286,23 @@ opq_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 
 	/* Allocate centroids */
 	{
-		float	  ***centroids;
+		float	  ***centroids = NULL;
 
-		NDB_ALLOC(centroids, float **, m);
+		nalloc(centroids, float **, m);
 		codebook.centroids = centroids;
 		NDB_CHECK_ALLOC(codebook.centroids, "codebook.centroids");
 		for (sub = 0; sub < m; sub++)
 		{
 			float	  **sub_centroids;
 
-			NDB_ALLOC(sub_centroids, float *, ksub);
+			nalloc(sub_centroids, float *, ksub);
 			codebook.centroids[sub] = sub_centroids;
 			NDB_CHECK_ALLOC(codebook.centroids[sub], "codebook.centroids[sub]");
 			for (i = 0; i < ksub; i++)
 			{
-				float	   *centroid_vec;
+				float *centroid_vec = NULL;
 
-				NDB_ALLOC(centroid_vec, float, codebook.dsub);
+				nalloc(centroid_vec, float, codebook.dsub);
 				codebook.centroids[sub][i] = centroid_vec;
 				NDB_CHECK_ALLOC(codebook.centroids[sub][i], "codebook.centroids[sub][i]");
 			}
@@ -1312,15 +1312,15 @@ opq_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 	/* Train OPQ codebook (simplified - use identity rotation) */
 	for (sub = 0; sub < m; sub++)
 	{
-		float	  **subspace_data = NULL;
+		float **subspace_data = NULL;
 		int			start_dim = sub * codebook.dsub;
 
-		NDB_ALLOC(subspace_data, float *, nvec);
+		nalloc(subspace_data, float *, nvec);
 		NDB_CHECK_ALLOC(subspace_data, "subspace_data");
 		for (i = 0; i < nvec; i++)
 		{
-			NDB_DECLARE(float *, sub_vec);
-			NDB_ALLOC(sub_vec, float, codebook.dsub);
+			float *sub_vec = NULL;
+			nalloc(sub_vec, float, codebook.dsub);
 			subspace_data[i] = sub_vec;
 			NDB_CHECK_ALLOC(subspace_data, "subspace_data");
 			memcpy(subspace_data[i], &data[i][start_dim], sizeof(float) * codebook.dsub);
@@ -1339,8 +1339,8 @@ opq_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 		}
 
 		for (i = 0; i < nvec; i++)
-			NDB_FREE(subspace_data[i]);
-		NDB_FREE(subspace_data);
+			nfree(subspace_data[i]);
+		nfree(subspace_data);
 	}
 
 	/* Serialize model */
@@ -1353,16 +1353,16 @@ opq_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 					 m, ksub, codebook.dsub, dim, nvec);
 	metrics = DatumGetJsonbP(DirectFunctionCall1(jsonb_in,
 												 CStringGetTextDatum(metrics_json.data)));
-	NDB_FREE(metrics_json.data);
+	nfree(metrics_json.data);
 
 	state = (OPQGpuModelState *) palloc0(sizeof(OPQGpuModelState));
 	NDB_CHECK_ALLOC(state, "state");
 	state->model_blob = model_data;
 	state->metrics = metrics;
 	{
-		PQCodebook *codebook_ptr;
+		PQCodebook *codebook_ptr = NULL;
 
-		NDB_ALLOC(codebook_ptr, PQCodebook, 1);
+		nalloc(codebook_ptr, PQCodebook, 1);
 		state->codebook = codebook_ptr;
 		NDB_CHECK_ALLOC(state, "state");
 		*state->codebook = codebook;
@@ -1375,7 +1375,7 @@ opq_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 	state->n_samples = nvec;
 
 	if (model->backend_state != NULL)
-		NDB_FREE(model->backend_state);
+		nfree(model->backend_state);
 
 	model->backend_state = state;
 	model->gpu_ready = true;
@@ -1383,8 +1383,8 @@ opq_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 
 	/* Cleanup temp data */
 	for (i = 0; i < nvec; i++)
-		NDB_FREE(data[i]);
-	NDB_FREE(data);
+		nfree(data[i]);
+	nfree(data);
 
 	return true;
 }
@@ -1396,13 +1396,13 @@ opq_gpu_predict(const MLGpuModel *model, const float *input, int input_dim,
 	const		OPQGpuModelState *state;
 	PQCodebook *codebook;
 
-	NDB_DECLARE(float *, rotated_input);
+	float *rotated_input = NULL;
 	int			sub;
 	int			start_dim;
 	double		min_dist;
 	int			best_code;
 
-	NDB_DECLARE(float *, reconstructed);
+	float *reconstructed = NULL;
 	int			i,
 				j;
 
@@ -1449,7 +1449,7 @@ opq_gpu_predict(const MLGpuModel *model, const float *input, int input_dim,
 	{
 		PQCodebook	temp_codebook;
 
-		float	   *temp_rotation;
+		float *temp_rotation = NULL;
 		int			temp_dim = 0;
 
 		if (opq_model_deserialize_from_bytea(state->model_blob, &temp_codebook, &temp_rotation, &temp_dim) != 0)
@@ -1459,9 +1459,9 @@ opq_gpu_predict(const MLGpuModel *model, const float *input, int input_dim,
 			return false;
 		}
 		{
-			PQCodebook *codebook_ptr;
+			PQCodebook *codebook_ptr = NULL;
 
-			NDB_ALLOC(codebook_ptr, PQCodebook, 1);
+			nalloc(codebook_ptr, PQCodebook, 1);
 			((OPQGpuModelState *) state)->codebook = codebook_ptr;
 			NDB_CHECK_ALLOC(((OPQGpuModelState *) state)->codebook, "codebook");
 			*((OPQGpuModelState *) state)->codebook = temp_codebook;
@@ -1470,9 +1470,9 @@ opq_gpu_predict(const MLGpuModel *model, const float *input, int input_dim,
 	}
 
 	codebook = state->codebook;
-	NDB_ALLOC(rotated_input, float, state->dim);
+	nalloc(rotated_input, float, state->dim);
 	NDB_CHECK_ALLOC(rotated_input, "rotated_input");
-	NDB_ALLOC(reconstructed, float, state->dim);
+	nalloc(reconstructed, float, state->dim);
 	NDB_CHECK_ALLOC(reconstructed, "reconstructed");
 
 	/* Apply rotation */
@@ -1514,8 +1514,8 @@ opq_gpu_predict(const MLGpuModel *model, const float *input, int input_dim,
 			output[i] += state->rotation_matrix[j * state->dim + i] * reconstructed[j];
 	}
 
-	NDB_FREE(rotated_input);
-	NDB_FREE(reconstructed);
+	nfree(rotated_input);
+	nfree(reconstructed);
 
 	return true;
 }
@@ -1561,7 +1561,7 @@ opq_gpu_evaluate(const MLGpuModel *model, const MLGpuEvalSpec *spec,
 
 	metrics_json = DatumGetJsonbP(DirectFunctionCall1(jsonb_in,
 													  CStringGetTextDatum(buf.data)));
-	NDB_FREE(buf.data);
+	nfree(buf.data);
 
 	if (out != NULL)
 		out->payload = metrics_json;
@@ -1600,9 +1600,9 @@ opq_gpu_serialize(const MLGpuModel *model, bytea * *payload_out,
 
 	payload_size = VARSIZE(state->model_blob);
 	{
-		char	   *payload_copy_raw;
+		char *payload_copy_raw = NULL;
 
-		NDB_ALLOC(payload_copy_raw, char, payload_size);
+		nalloc(payload_copy_raw, char, payload_size);
 		payload_copy = (bytea *) payload_copy_raw;
 		NDB_CHECK_ALLOC(payload_copy, "payload_copy");
 		memcpy(payload_copy, state->model_blob, payload_size);
@@ -1611,7 +1611,7 @@ opq_gpu_serialize(const MLGpuModel *model, bytea * *payload_out,
 	if (payload_out != NULL)
 		*payload_out = payload_copy;
 	else
-		NDB_FREE(payload_copy);
+		nfree(payload_copy);
 
 	if (metadata_out != NULL && state->metrics != NULL)
 		*metadata_out = (Jsonb *) PG_DETOAST_DATUM_COPY(
@@ -1646,9 +1646,9 @@ opq_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 
 	payload_size = VARSIZE(payload);
 	{
-		char	   *payload_copy_raw;
+		char *payload_copy_raw = NULL;
 
-		NDB_ALLOC(payload_copy_raw, char, payload_size);
+		nalloc(payload_copy_raw, char, payload_size);
 		payload_copy = (bytea *) payload_copy_raw;
 		NDB_CHECK_ALLOC(payload_copy, "payload_copy");
 		memcpy(payload_copy, payload, payload_size);
@@ -1656,7 +1656,7 @@ opq_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 
 	if (opq_model_deserialize_from_bytea(payload_copy, &codebook, &rotation_matrix, &dim) != 0)
 	{
-		NDB_FREE(payload_copy);
+		nfree(payload_copy);
 		if (errstr != NULL)
 			*errstr = pstrdup("opq_gpu_deserialize: failed to deserialize");
 		return false;
@@ -1666,9 +1666,9 @@ opq_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 	NDB_CHECK_ALLOC(state, "state");
 	state->model_blob = payload_copy;
 	{
-		PQCodebook *codebook_ptr;
+		PQCodebook *codebook_ptr = NULL;
 
-		NDB_ALLOC(codebook_ptr, PQCodebook, 1);
+		nalloc(codebook_ptr, PQCodebook, 1);
 		state->codebook = codebook_ptr;
 		NDB_CHECK_ALLOC(state, "state");
 		*state->codebook = codebook;
@@ -1683,9 +1683,9 @@ opq_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 	if (metadata != NULL)
 	{
 		int			metadata_size = VARSIZE(metadata);
-		NDB_DECLARE(Jsonb *, metadata_copy);
-		NDB_DECLARE(char *, metadata_copy_raw);
-		NDB_ALLOC(metadata_copy_raw, char, metadata_size);
+		Jsonb *metadata_copy = NULL;
+		char *metadata_copy_raw = NULL;
+		nalloc(metadata_copy_raw, char, metadata_size);
 		metadata_copy = (Jsonb *) metadata_copy_raw;
 
 		NDB_CHECK_ALLOC(metadata_copy, "metadata_copy");
@@ -1703,7 +1703,7 @@ opq_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 				if (strcmp(key, "n_samples") == 0 && v.type == jbvNumeric)
 					state->n_samples = DatumGetInt32(DirectFunctionCall1(numeric_int4,
 																		 NumericGetDatum(v.val.numeric)));
-				NDB_FREE(key);
+				nfree(key);
 			}
 		}
 	}
@@ -1713,7 +1713,7 @@ opq_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 	}
 
 	if (model->backend_state != NULL)
-		NDB_FREE(model->backend_state);
+		nfree(model->backend_state);
 
 	model->backend_state = state;
 	model->gpu_ready = true;
@@ -1725,7 +1725,7 @@ opq_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 static void
 opq_gpu_destroy(MLGpuModel *model)
 {
-	OPQGpuModelState *state;
+	OPQGpuModelState *state = NULL;
 
 	if (model == NULL)
 		return;
@@ -1734,17 +1734,17 @@ opq_gpu_destroy(MLGpuModel *model)
 	{
 		state = (OPQGpuModelState *) model->backend_state;
 		if (state->model_blob != NULL)
-			NDB_FREE(state->model_blob);
+			nfree(state->model_blob);
 		if (state->metrics != NULL)
-			NDB_FREE(state->metrics);
+			nfree(state->metrics);
 		if (state->codebook != NULL)
 		{
 			pq_codebook_free(state->codebook);
-			NDB_FREE(state->codebook);
+			nfree(state->codebook);
 		}
 		if (state->rotation_matrix != NULL)
-			NDB_FREE(state->rotation_matrix);
-		NDB_FREE(state);
+			nfree(state->rotation_matrix);
+		nfree(state);
 		model->backend_state = NULL;
 	}
 

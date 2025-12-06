@@ -85,29 +85,42 @@ PG_FUNCTION_INFO_V1(hybrid_search);
 Datum
 hybrid_search(PG_FUNCTION_ARGS)
 {
-	FuncCallContext *funcctx;
+	FuncCallContext *funcctx = NULL;
 	HybridSearchState *state = NULL;
 
 	if (SRF_IS_FIRSTCALL())
 	{
 		MemoryContext oldcontext;
 		TupleDesc	tupdesc;
-		text	   *table_name = PG_GETARG_TEXT_PP(0);
-		Vector	   *query_vec;
-		text	   *query_text = PG_GETARG_TEXT_PP(2);
-		text	   *filters = PG_GETARG_TEXT_PP(3);
-		float8		vector_weight = PG_GETARG_FLOAT8(4);
-		int32		limit = PG_GETARG_INT32(5);
-		char	   *tbl_str;
-		char	   *txt_str;
-		char	   *filter_str;
+		text	   *table_name;
+		Vector *query_vec = NULL;
+		text	   *query_text;
+		text	   *filters;
+		float8		vector_weight;
+		int32		limit;
+
+		/* Validate argument count */
+		if (PG_NARGS() != 6)
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					 errmsg("neurondb: hybrid_search requires 6 arguments")));
+
+		char *tbl_str = NULL;
+		char *txt_str = NULL;
+		char *filter_str = NULL;
 		StringInfoData sql;
 		StringInfoData vec_lit;
 		int			spi_ret;
 		int			i;
-		int			proc;
 
-		NDB_DECLARE(NdbSpiSession *, session);
+		int			proc;
+		NdbSpiSession *session = NULL;
+
+		table_name = PG_GETARG_TEXT_PP(0);
+		query_text = PG_GETARG_TEXT_PP(2);
+		filters = PG_GETARG_TEXT_PP(3);
+		vector_weight = PG_GETARG_FLOAT8(4);
+		limit = PG_GETARG_INT32(5);
 
 		if (PG_ARGISNULL(1))
 			ereport(ERROR,
@@ -168,11 +181,11 @@ hybrid_search(PG_FUNCTION_ARGS)
 
 			if (!isfinite(val))
 			{
-				NDB_FREE(vec_lit.data);
+				nfree(vec_lit.data);
 				ndb_spi_session_end(&session);
-				NDB_FREE(tbl_str);
-				NDB_FREE(txt_str);
-				NDB_FREE(filter_str);
+				nfree(tbl_str);
+				nfree(txt_str);
+				nfree(filter_str);
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 						 errmsg("hybrid_search: non-finite value in vector at index %d", i)));
@@ -210,12 +223,12 @@ hybrid_search(PG_FUNCTION_ARGS)
 		spi_ret = ndb_spi_execute(session, sql.data, true, limit);
 		if (spi_ret != SPI_OK_SELECT)
 		{
-			NDB_FREE(sql.data);
-			NDB_FREE(vec_lit.data);
+			nfree(sql.data);
+			nfree(vec_lit.data);
 			ndb_spi_session_end(&session);
-			NDB_FREE(tbl_str);
-			NDB_FREE(txt_str);
-			NDB_FREE(filter_str);
+			nfree(tbl_str);
+			nfree(txt_str);
+			nfree(filter_str);
 			ereport(ERROR, (errmsg("Failed to execute hybrid search SQL")));
 		}
 
@@ -226,7 +239,7 @@ hybrid_search(PG_FUNCTION_ARGS)
 		oldcontext = MemoryContextSwitchTo(funcctx->multi_call_memory_ctx);
 
 		/* Allocate state */
-		NDB_ALLOC(state, HybridSearchState, 1);
+		nalloc(state, HybridSearchState, 1);
 		NDB_CHECK_ALLOC(state, "state");
 
 		if (get_call_result_type(fcinfo, NULL, &tupdesc) != TYPEFUNC_COMPOSITE)
@@ -243,8 +256,8 @@ hybrid_search(PG_FUNCTION_ARGS)
 		}
 		else
 		{
-			NDB_DECLARE(int64 *, ids);
-			NDB_DECLARE(float4 *, scores);
+			int64 *ids = NULL;
+			float4 *scores = NULL;
 
 			state->num_results = proc;
 			NBP_ALLOC(ids, int64, proc);
@@ -295,11 +308,11 @@ hybrid_search(PG_FUNCTION_ARGS)
 		funcctx->user_fctx = state;
 		funcctx->max_calls = proc;
 
-		NDB_FREE(sql.data);
-		NDB_FREE(vec_lit.data);
-		NDB_FREE(tbl_str);
-		NDB_FREE(txt_str);
-		NDB_FREE(filter_str);
+		nfree(sql.data);
+		nfree(vec_lit.data);
+		nfree(tbl_str);
+		nfree(txt_str);
+		nfree(filter_str);
 		ndb_spi_session_end(&session);
 		MemoryContextSwitchTo(oldcontext);
 	}
@@ -348,8 +361,17 @@ PG_FUNCTION_INFO_V1(reciprocal_rank_fusion);
 Datum
 reciprocal_rank_fusion(PG_FUNCTION_ARGS)
 {
-	ArrayType  *rankings = PG_GETARG_ARRAYTYPE_P(0);
-	float8		k = PG_GETARG_FLOAT8(1);
+	ArrayType  *rankings;
+	float8		k;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: reciprocal_rank_fusion requires 2 arguments")));
+
+	rankings = PG_GETARG_ARRAYTYPE_P(0);
+	k = PG_GETARG_FLOAT8(1);
 	int			n_rankers;
 	int			i;
 	int			j;
@@ -358,11 +380,11 @@ reciprocal_rank_fusion(PG_FUNCTION_ARGS)
 	char		elmalign;
 	ArrayType **rank_arrays;
 	int			item_count = 0;
-	HTAB	   *item_hash;
+	HTAB *item_hash = NULL;
 	HASHCTL		info;
-	Datum	   *result_datums = NULL;
-	bool	   *result_nulls = NULL;
-	ArrayType  *ret_array;
+	Datum *result_datums = NULL;
+	bool *result_nulls = NULL;
+	ArrayType *ret_array = NULL;
 
 	elog(DEBUG1,
 		 "neurondb: Computing Reciprocal Rank Fusion with k=%.2f",
@@ -395,8 +417,8 @@ reciprocal_rank_fusion(PG_FUNCTION_ARGS)
 		ArrayType  *ranker = rank_arrays[i];
 		int			count = ArrayGetNItems(ARR_NDIM(ranker), ARR_DIMS(ranker));
 		Oid			elemtype = ARR_ELEMTYPE(ranker);
-		Datum	   *ids;
-		bool	   *nulls;
+		Datum *ids = NULL;
+		bool *nulls = NULL;
 
 		get_typlenbyvalalign(elemtype, &elmlen, &elmbyval, &elmalign);
 
@@ -436,8 +458,8 @@ reciprocal_rank_fusion(PG_FUNCTION_ARGS)
 				entry->score += 1.0 / (k + (double) j + 1.0);
 			}
 		}
-		NDB_FREE(ids);
-		NDB_FREE(nulls);
+		nfree(ids);
+		nfree(nulls);
 	}
 
 	/* Output: sort the ids by score descending, return as text[] */
@@ -455,7 +477,7 @@ reciprocal_rank_fusion(PG_FUNCTION_ARGS)
 		}		   *cur;
 		struct
 		{
-			char	   *key;
+			char *key;
 			float8		score;
 		}		   *items;
 		HASH_SEQ_STATUS stat;
@@ -511,18 +533,18 @@ reciprocal_rank_fusion(PG_FUNCTION_ARGS)
 			result_datums[idx] =
 				PointerGetDatum(cstring_to_text(items[idx].key));
 			result_nulls[idx] = false;
-			NDB_FREE(items[idx].key);
+			nfree(items[idx].key);
 		}
 
-		NDB_FREE(items);
+		nfree(items);
 	}
 
 	ret_array = construct_array(
 								result_datums, item_count, TEXTOID, -1, false, 'i');
 
 	hash_destroy(item_hash);
-	NDB_FREE(result_datums);
-	NDB_FREE(result_nulls);
+	nfree(result_datums);
+	nfree(result_nulls);
 
 	PG_RETURN_ARRAYTYPE_P(ret_array);
 }
@@ -531,22 +553,28 @@ PG_FUNCTION_INFO_V1(semantic_keyword_search);
 Datum
 semantic_keyword_search(PG_FUNCTION_ARGS)
 {
-	text	   *table_name;
-	Vector	   *semantic_query;
-	text	   *keyword_query;
+	text *table_name = NULL;
+	Vector *semantic_query = NULL;
+	text *keyword_query = NULL;
 	int32		top_k;
-	char	   *tbl_str;
-	char	   *kw_str;
+	char *tbl_str = NULL;
+	char *kw_str = NULL;
 	StringInfoData sql;
 	StringInfoData vec_lit;
 	int			spi_ret;
-	ArrayType  *ret_array;
+	ArrayType *ret_array = NULL;
 	int			proc;
 	int			i;
 
-	NDB_DECLARE(Datum *, datums);
-	NDB_DECLARE(bool *, nulls);
-	NDB_DECLARE(NdbSpiSession *, session);
+	Datum *datums = NULL;
+	bool *nulls = NULL;
+	NdbSpiSession *session = NULL;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 4)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: semantic_keyword_search requires 4 arguments")));
 
 	table_name = PG_GETARG_TEXT_PP(0);
 	semantic_query = PG_GETARG_VECTOR_P(1);
@@ -605,10 +633,10 @@ semantic_keyword_search(PG_FUNCTION_ARGS)
 	spi_ret = ndb_spi_execute(session, sql.data, true, top_k);
 	if (spi_ret != SPI_OK_SELECT)
 	{
-		NDB_FREE(sql.data);
-		NDB_FREE(vec_lit.data);
-		NDB_FREE(tbl_str);
-		NDB_FREE(kw_str);
+		nfree(sql.data);
+		nfree(vec_lit.data);
+		nfree(tbl_str);
+		nfree(kw_str);
 		ndb_spi_session_end(&session);
 		ereport(ERROR,
 				(errmsg("Failed to execute semantic_keyword_search "
@@ -618,18 +646,18 @@ semantic_keyword_search(PG_FUNCTION_ARGS)
 	proc = SPI_processed;
 	if (proc == 0)
 	{
-		NDB_FREE(sql.data);
-		NDB_FREE(vec_lit.data);
-		NDB_FREE(tbl_str);
-		NDB_FREE(kw_str);
+		nfree(sql.data);
+		nfree(vec_lit.data);
+		nfree(tbl_str);
+		nfree(kw_str);
 		ndb_spi_session_end(&session);
 		ret_array = construct_empty_array(TEXTOID);
 		PG_RETURN_ARRAYTYPE_P(ret_array);
 	}
 
-	NDB_ALLOC(datums, Datum, proc);
+	nalloc(datums, Datum, proc);
 	NDB_CHECK_ALLOC(datums, "allocation");
-	NDB_ALLOC(nulls, bool, proc);
+	nalloc(nulls, bool, proc);
 	NDB_CHECK_ALLOC(nulls, "allocation");
 	for (i = 0; i < proc; i++)
 	{
@@ -647,12 +675,12 @@ semantic_keyword_search(PG_FUNCTION_ARGS)
 
 	ret_array = construct_array(datums, proc, TEXTOID, -1, false, 'i');
 
-	NDB_FREE(datums);
-	NDB_FREE(nulls);
-	NDB_FREE(sql.data);
-	NDB_FREE(vec_lit.data);
-	NDB_FREE(tbl_str);
-	NDB_FREE(kw_str);
+	nfree(datums);
+	nfree(nulls);
+	nfree(sql.data);
+	nfree(vec_lit.data);
+	nfree(tbl_str);
+	nfree(kw_str);
 	ndb_spi_session_end(&session);
 
 	PG_RETURN_ARRAYTYPE_P(ret_array);
@@ -662,26 +690,37 @@ PG_FUNCTION_INFO_V1(multi_vector_search);
 Datum
 multi_vector_search(PG_FUNCTION_ARGS)
 {
-	text	   *table_name = PG_GETARG_TEXT_PP(0);
-	ArrayType  *query_vectors = PG_GETARG_ARRAYTYPE_P(1);
-	text	   *agg_method = PG_GETARG_TEXT_PP(2);
-	int32		top_k = PG_GETARG_INT32(3);
+	text	   *table_name;
+	ArrayType  *query_vectors;
+	text	   *agg_method;
+	int32		top_k;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 4)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: multi_vector_search requires 4 arguments")));
+
+	table_name = PG_GETARG_TEXT_PP(0);
+	query_vectors = PG_GETARG_ARRAYTYPE_P(1);
+	agg_method = PG_GETARG_TEXT_PP(2);
+	top_k = PG_GETARG_INT32(3);
 	char	   *tbl_str = text_to_cstring(table_name);
 	char	   *agg_str = text_to_cstring(agg_method);
 	int			nvecs;
 	StringInfoData sql;
 	StringInfoData subquery;
-	Datum	   *vec_datums;
-	bool	   *vec_nulls;
+	Datum *vec_datums = NULL;
+	bool *vec_nulls = NULL;
 	Oid			vec_elemtype = ARR_ELEMTYPE(query_vectors);
 	int			i;
 	int			spi_ret;
 	int			proc;
-	ArrayType  *ret_array;
-	Datum	   *datums;
-	bool	   *nulls;
+	ArrayType *ret_array = NULL;
+	Datum *datums = NULL;
+	bool *nulls = NULL;
 
-	NDB_DECLARE(NdbSpiSession *, session);
+	NdbSpiSession *session = NULL;
 
 	nvecs = ArrayGetNItems(
 						   ARR_NDIM(query_vectors), ARR_DIMS(query_vectors));
@@ -708,8 +747,8 @@ multi_vector_search(PG_FUNCTION_ARGS)
 
 	if (nvecs < 1)
 	{
-		NDB_FREE(tbl_str);
-		NDB_FREE(agg_str);
+		nfree(tbl_str);
+		nfree(agg_str);
 		ndb_spi_session_end(&session);
 		ereport(ERROR,
 				(errmsg("multi_vector_search: at least one query "
@@ -721,10 +760,10 @@ multi_vector_search(PG_FUNCTION_ARGS)
 
 		if (first_vec->dim <= 0)
 		{
-			NDB_FREE(tbl_str);
-			NDB_FREE(agg_str);
-			NDB_FREE(vec_datums);
-			NDB_FREE(vec_nulls);
+			nfree(tbl_str);
+			nfree(agg_str);
+			nfree(vec_datums);
+			nfree(vec_nulls);
 			ndb_spi_session_end(&session);
 			ereport(ERROR,
 					(errmsg("query vectors must have positive "
@@ -755,11 +794,11 @@ multi_vector_search(PG_FUNCTION_ARGS)
 			if (i)
 				appendStringInfoString(&subquery, ", ");
 			appendStringInfo(&subquery, "'%s'::vector", lit.data);
-			NDB_FREE(lit.data);
+			nfree(lit.data);
 		}
 	}
-	NDB_FREE(vec_datums);
-	NDB_FREE(vec_nulls);
+	nfree(vec_datums);
+	nfree(vec_nulls);
 
 	initStringInfo(&sql);
 	appendStringInfo(&sql,
@@ -782,10 +821,10 @@ multi_vector_search(PG_FUNCTION_ARGS)
 	spi_ret = ndb_spi_execute(session, sql.data, true, top_k);
 	if (spi_ret != SPI_OK_SELECT)
 	{
-		NDB_FREE(sql.data);
-		NDB_FREE(subquery.data);
-		NDB_FREE(tbl_str);
-		NDB_FREE(agg_str);
+		nfree(sql.data);
+		nfree(subquery.data);
+		nfree(tbl_str);
+		nfree(agg_str);
 		ndb_spi_session_end(&session);
 		ereport(ERROR,
 				(errmsg("Failed to execute multi_vector_search SQL")));
@@ -793,19 +832,19 @@ multi_vector_search(PG_FUNCTION_ARGS)
 	proc = SPI_processed;
 	if (proc == 0)
 	{
-		NDB_FREE(sql.data);
-		NDB_FREE(subquery.data);
-		NDB_FREE(tbl_str);
-		NDB_FREE(agg_str);
+		nfree(sql.data);
+		nfree(subquery.data);
+		nfree(tbl_str);
+		nfree(agg_str);
 		ndb_spi_session_end(&session);
 		ret_array = construct_empty_array(TEXTOID);
 		PG_RETURN_ARRAYTYPE_P(ret_array);
 	}
 	datums = NULL;
 	nulls = NULL;
-	NDB_ALLOC(datums, Datum, proc);
+	nalloc(datums, Datum, proc);
 	NDB_CHECK_ALLOC(datums, "allocation");
-	NDB_ALLOC(nulls, bool, proc);
+	nalloc(nulls, bool, proc);
 	NDB_CHECK_ALLOC(nulls, "allocation");
 	for (i = 0; i < proc; i++)
 	{
@@ -821,12 +860,12 @@ multi_vector_search(PG_FUNCTION_ARGS)
 		nulls[i] = isnull;
 	}
 	ret_array = construct_array(datums, proc, TEXTOID, -1, false, 'i');
-	NDB_FREE(datums);
-	NDB_FREE(nulls);
-	NDB_FREE(sql.data);
-	NDB_FREE(subquery.data);
-	NDB_FREE(tbl_str);
-	NDB_FREE(agg_str);
+	nfree(datums);
+	nfree(nulls);
+	nfree(sql.data);
+	nfree(subquery.data);
+	nfree(tbl_str);
+	nfree(agg_str);
 	ndb_spi_session_end(&session);
 
 	PG_RETURN_ARRAYTYPE_P(ret_array);
@@ -836,22 +875,28 @@ PG_FUNCTION_INFO_V1(faceted_vector_search);
 Datum
 faceted_vector_search(PG_FUNCTION_ARGS)
 {
-	text	   *table_name;
-	Vector	   *query_vec;
-	text	   *facet_column;
+	text *table_name = NULL;
+	Vector *query_vec = NULL;
+	text *facet_column = NULL;
 	int32		per_facet_limit;
-	char	   *tbl_str;
-	char	   *facet_str;
+	char *tbl_str = NULL;
+	char *facet_str = NULL;
 	StringInfoData sql;
 	StringInfoData vec_lit;
 	int			spi_ret;
 	int			proc;
-	ArrayType  *ret_array;
-	Datum	   *datums;
-	bool	   *nulls;
+	ArrayType *ret_array = NULL;
+	Datum *datums = NULL;
+	bool *nulls = NULL;
 	int			i;
 
-	NDB_DECLARE(NdbSpiSession *, session);
+	NdbSpiSession *session = NULL;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 4)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: faceted_vector_search requires 4 arguments")));
 
 	table_name = PG_GETARG_TEXT_PP(0);
 	query_vec = PG_GETARG_VECTOR_P(1);
@@ -902,10 +947,10 @@ faceted_vector_search(PG_FUNCTION_ARGS)
 	spi_ret = ndb_spi_execute(session, sql.data, true, 0);
 	if (spi_ret != SPI_OK_SELECT)
 	{
-		NDB_FREE(sql.data);
-		NDB_FREE(vec_lit.data);
-		NDB_FREE(tbl_str);
-		NDB_FREE(facet_str);
+		nfree(sql.data);
+		nfree(vec_lit.data);
+		nfree(tbl_str);
+		nfree(facet_str);
 		ndb_spi_session_end(&session);
 		ereport(ERROR,
 				(errmsg("Failed to execute faceted_vector_search "
@@ -914,19 +959,19 @@ faceted_vector_search(PG_FUNCTION_ARGS)
 	proc = SPI_processed;
 	if (proc == 0)
 	{
-		NDB_FREE(sql.data);
-		NDB_FREE(vec_lit.data);
-		NDB_FREE(tbl_str);
-		NDB_FREE(facet_str);
+		nfree(sql.data);
+		nfree(vec_lit.data);
+		nfree(tbl_str);
+		nfree(facet_str);
 		ndb_spi_session_end(&session);
 		ret_array = construct_empty_array(TEXTOID);
 		PG_RETURN_ARRAYTYPE_P(ret_array);
 	}
 	datums = NULL;
 	nulls = NULL;
-	NDB_ALLOC(datums, Datum, proc);
+	nalloc(datums, Datum, proc);
 	NDB_CHECK_ALLOC(datums, "allocation");
-	NDB_ALLOC(nulls, bool, proc);
+	nalloc(nulls, bool, proc);
 	NDB_CHECK_ALLOC(nulls, "allocation");
 	for (i = 0; i < proc; i++)
 	{
@@ -942,12 +987,12 @@ faceted_vector_search(PG_FUNCTION_ARGS)
 		nulls[i] = isnull;
 	}
 	ret_array = construct_array(datums, proc, TEXTOID, -1, false, 'i');
-	NDB_FREE(datums);
-	NDB_FREE(nulls);
-	NDB_FREE(sql.data);
-	NDB_FREE(vec_lit.data);
-	NDB_FREE(tbl_str);
-	NDB_FREE(facet_str);
+	nfree(datums);
+	nfree(nulls);
+	nfree(sql.data);
+	nfree(vec_lit.data);
+	nfree(tbl_str);
+	nfree(facet_str);
 	ndb_spi_session_end(&session);
 
 	PG_RETURN_ARRAYTYPE_P(ret_array);
@@ -957,23 +1002,29 @@ PG_FUNCTION_INFO_V1(temporal_vector_search);
 Datum
 temporal_vector_search(PG_FUNCTION_ARGS)
 {
-	text	   *table_name;
-	Vector	   *query_vec;
-	text	   *timestamp_col;
+	text *table_name = NULL;
+	Vector *query_vec = NULL;
+	text *timestamp_col = NULL;
 	float8		decay_rate;
 	int32		top_k;
-	char	   *tbl_str;
-	char	   *ts_str;
+	char *tbl_str = NULL;
+	char *ts_str = NULL;
 	StringInfoData sql;
 	StringInfoData vec_lit;
 	int			spi_ret;
 	int			proc;
-	ArrayType  *ret_array;
-	Datum	   *datums;
-	bool	   *nulls;
+	ArrayType *ret_array = NULL;
+	Datum *datums = NULL;
+	bool *nulls = NULL;
 	int			i;
 
-	NDB_DECLARE(NdbSpiSession *, session);
+	NdbSpiSession *session = NULL;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 5)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: temporal_vector_search requires 5 arguments")));
 
 	table_name = PG_GETARG_TEXT_PP(0);
 	query_vec = PG_GETARG_VECTOR_P(1);
@@ -1028,10 +1079,10 @@ temporal_vector_search(PG_FUNCTION_ARGS)
 	spi_ret = ndb_spi_execute(session, sql.data, true, top_k);
 	if (spi_ret != SPI_OK_SELECT)
 	{
-		NDB_FREE(sql.data);
-		NDB_FREE(vec_lit.data);
-		NDB_FREE(tbl_str);
-		NDB_FREE(ts_str);
+		nfree(sql.data);
+		nfree(vec_lit.data);
+		nfree(tbl_str);
+		nfree(ts_str);
 		ndb_spi_session_end(&session);
 		ereport(ERROR,
 				(errmsg("Failed to execute temporal_vector_search "
@@ -1041,19 +1092,19 @@ temporal_vector_search(PG_FUNCTION_ARGS)
 	proc = SPI_processed;
 	if (proc == 0)
 	{
-		NDB_FREE(sql.data);
-		NDB_FREE(vec_lit.data);
-		NDB_FREE(tbl_str);
-		NDB_FREE(ts_str);
+		nfree(sql.data);
+		nfree(vec_lit.data);
+		nfree(tbl_str);
+		nfree(ts_str);
 		ndb_spi_session_end(&session);
 		ret_array = construct_empty_array(TEXTOID);
 		PG_RETURN_ARRAYTYPE_P(ret_array);
 	}
 	datums = NULL;
 	nulls = NULL;
-	NDB_ALLOC(datums, Datum, proc);
+	nalloc(datums, Datum, proc);
 	NDB_CHECK_ALLOC(datums, "allocation");
-	NDB_ALLOC(nulls, bool, proc);
+	nalloc(nulls, bool, proc);
 	NDB_CHECK_ALLOC(nulls, "allocation");
 	for (i = 0; i < proc; i++)
 	{
@@ -1069,12 +1120,12 @@ temporal_vector_search(PG_FUNCTION_ARGS)
 		nulls[i] = isnull;
 	}
 	ret_array = construct_array(datums, proc, TEXTOID, -1, false, 'i');
-	NDB_FREE(datums);
-	NDB_FREE(nulls);
-	NDB_FREE(sql.data);
-	NDB_FREE(vec_lit.data);
-	NDB_FREE(tbl_str);
-	NDB_FREE(ts_str);
+	nfree(datums);
+	nfree(nulls);
+	nfree(sql.data);
+	nfree(vec_lit.data);
+	nfree(tbl_str);
+	nfree(ts_str);
 	ndb_spi_session_end(&session);
 
 	PG_RETURN_ARRAYTYPE_P(ret_array);
@@ -1084,25 +1135,31 @@ PG_FUNCTION_INFO_V1(diverse_vector_search);
 Datum
 diverse_vector_search(PG_FUNCTION_ARGS)
 {
-	text	   *table_name;
-	Vector	   *query_vec;
+	text *table_name = NULL;
+	Vector *query_vec = NULL;
 	float8		lambda;
 	int32		top_k;
-	char	   *tbl_str;
+	char *tbl_str = NULL;
 	StringInfoData sql;
 	StringInfoData vec_lit;
 	int			spi_ret;
 	int			proc;
 	int			i,
 				j;
-	ArrayType  *ret_array;
-	Datum	   *datums = NULL;
-	bool	   *nulls = NULL;
+	ArrayType *ret_array = NULL;
+	Datum *datums = NULL;
+	bool *nulls = NULL;
 	int			n_candidates;
 	int			select_count = 0;
-	mmr_cand_t *cands;
+	mmr_cand_t *cands = NULL;
 
-	NDB_DECLARE(NdbSpiSession *, session);
+	NdbSpiSession *session = NULL;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 4)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: diverse_vector_search requires 4 arguments")));
 
 	table_name = PG_GETARG_TEXT_PP(0);
 	query_vec = PG_GETARG_VECTOR_P(1);
@@ -1144,9 +1201,9 @@ diverse_vector_search(PG_FUNCTION_ARGS)
 	spi_ret = ndb_spi_execute(session, sql.data, true, top_k * 10);
 	if (spi_ret != SPI_OK_SELECT)
 	{
-		NDB_FREE(sql.data);
-		NDB_FREE(vec_lit.data);
-		NDB_FREE(tbl_str);
+		nfree(sql.data);
+		nfree(vec_lit.data);
+		nfree(tbl_str);
 		ndb_spi_session_end(&session);
 		ereport(ERROR,
 				(errmsg("Failed to execute diverse_vector_search "
@@ -1156,9 +1213,9 @@ diverse_vector_search(PG_FUNCTION_ARGS)
 	proc = SPI_processed;
 	if (proc == 0)
 	{
-		NDB_FREE(sql.data);
-		NDB_FREE(vec_lit.data);
-		NDB_FREE(tbl_str);
+		nfree(sql.data);
+		nfree(vec_lit.data);
+		nfree(tbl_str);
 		ndb_spi_session_end(&session);
 		ret_array = construct_empty_array(TEXTOID);
 		PG_RETURN_ARRAYTYPE_P(ret_array);
@@ -1167,7 +1224,7 @@ diverse_vector_search(PG_FUNCTION_ARGS)
 		n_candidates = proc;
 
 	cands = NULL;
-	NDB_ALLOC(cands, mmr_cand_t, n_candidates);
+	nalloc(cands, mmr_cand_t, n_candidates);
 	NDB_CHECK_ALLOC(cands, "allocation");
 
 	for (i = 0; i < n_candidates; i++)
@@ -1194,9 +1251,9 @@ diverse_vector_search(PG_FUNCTION_ARGS)
 		cands[i].selected = false;
 	}
 
-	NDB_ALLOC(datums, Datum, top_k);
+	nalloc(datums, Datum, top_k);
 	NDB_CHECK_ALLOC(datums, "allocation");
-	NDB_ALLOC(nulls, bool, top_k);
+	nalloc(nulls, bool, top_k);
 	NDB_CHECK_ALLOC(nulls, "allocation");
 
 	for (i = 0; i < top_k && select_count < n_candidates; i++)
@@ -1263,7 +1320,7 @@ diverse_vector_search(PG_FUNCTION_ARGS)
 		construct_array(datums, select_count, TEXTOID, -1, false, 'i');
 	for (i = 0; i < n_candidates; i++)
 	{
-		NDB_FREE(cands[i].id);
+		nfree(cands[i].id);
 
 		/*
 		 * Only pfree detoasted vectors if address does not match the original
@@ -1277,15 +1334,15 @@ diverse_vector_search(PG_FUNCTION_ARGS)
 
 			if ((void *) cands[i].vec
 				!= (void *) DatumGetPointer(orig))
-				NDB_FREE(cands[i].vec);
+				nfree(cands[i].vec);
 		}
 	}
-	NDB_FREE(datums);
-	NDB_FREE(nulls);
-	NDB_FREE(cands);
-	NDB_FREE(sql.data);
-	NDB_FREE(vec_lit.data);
-	NDB_FREE(tbl_str);
+	nfree(datums);
+	nfree(nulls);
+	nfree(cands);
+	nfree(sql.data);
+	nfree(vec_lit.data);
+	nfree(tbl_str);
 	ndb_spi_session_end(&session);
 	PG_RETURN_ARRAYTYPE_P(ret_array);
 }

@@ -55,7 +55,7 @@ consistent_index_create(PG_FUNCTION_ARGS)
 	uint32		random_seed = PG_GETARG_INT32(2);
 	char	   *tbl_str = text_to_cstring(table_name);
 	char	   *col_str = text_to_cstring(vector_col);
-	char	   *index_tbl;
+	char *index_tbl = NULL;
 	Oid			relid;
 
 	elog(DEBUG1,
@@ -106,14 +106,14 @@ consistent_knn_search(PG_FUNCTION_ARGS)
 	Vector	   *query = PG_GETARG_VECTOR_P(0);
 	int32		k = PG_GETARG_INT32(1);
 	int64		snapshot_xmin = PG_GETARG_INT64(2);
-	FuncCallContext *funcctx;
+	FuncCallContext *funcctx = NULL;
 	TupleDesc	tupdesc;
 	Datum		values[2];
 	bool		nulls[2];
 	HeapTuple	tuple;
 	int			call_cntr;
 	int			max_calls;
-	char	   *vector_str;
+	char *vector_str = NULL;
 	char		sql[2048];
 	int			ret;
 
@@ -123,7 +123,7 @@ consistent_knn_search(PG_FUNCTION_ARGS)
 	{
 		MemoryContext oldcontext;
 
-		NDB_DECLARE(NdbSpiSession *, session);
+		NdbSpiSession *session = NULL;
 
 		funcctx = SRF_FIRSTCALL_INIT();
 
@@ -221,7 +221,7 @@ consistent_knn_search(PG_FUNCTION_ARGS)
 	if (call_cntr < max_calls)
 	{
 		NdbSpiSession *session = (NdbSpiSession *) funcctx->user_fctx;
-		SPITupleTable *tuptable;
+		SPITupleTable *tuptable = NULL;
 		HeapTuple	spi_tuple;
 		bool		isnull;
 
@@ -284,13 +284,13 @@ index_exists(const char *table, const char *col)
 static void
 build_hnsw_index(const char *table, const char *col, uint32 seed)
 {
-	char	   *index_table;
+	char *index_table = NULL;
 	StringInfoData sql;
 	int			ret;
 	Oid			argtypes[4];
 	Datum		values[4];
 
-	NDB_DECLARE(NdbSpiSession *, session);
+	NdbSpiSession *session = NULL;
 
 	elog(DEBUG1,
 		 "Building deterministic HNSW index: %s.%s (seed=%u)",
@@ -317,8 +317,8 @@ build_hnsw_index(const char *table, const char *col, uint32 seed)
 	ret = ndb_spi_execute(session, sql.data, false, 0);
 	if (ret != SPI_OK_UTILITY)
 	{
-		NDB_FREE(sql.data);
-		NDB_FREE(index_table);
+		nfree(sql.data);
+		nfree(index_table);
 		ndb_spi_session_end(&session);
 		elog(ERROR,
 			 "Failed to create index table '%s': %s",
@@ -327,14 +327,14 @@ build_hnsw_index(const char *table, const char *col, uint32 seed)
 	}
 
 	/* Use safe free/reinit to handle potential memory context changes */
-	NDB_FREE(sql.data);
+	nfree(sql.data);
 	initStringInfo(&sql);
 
 	/* Remove all rows in case we rebuild */
 	appendStringInfo(&sql, "TRUNCATE %s", index_table);
 	ndb_spi_execute(session, sql.data, false, 0);
 	/* Use safe free/reinit to handle potential memory context changes */
-	NDB_FREE(sql.data);
+	nfree(sql.data);
 	initStringInfo(&sql);
 
 	/*
@@ -354,15 +354,15 @@ build_hnsw_index(const char *table, const char *col, uint32 seed)
 	ret = ndb_spi_execute(session, sql.data, false, 0);
 	if (ret != SPI_OK_INSERT)
 	{
-		NDB_FREE(sql.data);
-		NDB_FREE(index_table);
+		nfree(sql.data);
+		nfree(index_table);
 		ndb_spi_session_end(&session);
 		elog(ERROR, "Failed to bulk insert vectors: %s", sql.data);
 	}
 
 	/* Store/Update metadata (example: in a metadata table) */
 	/* Use safe free/reinit to handle potential memory context changes */
-	NDB_FREE(sql.data);
+	nfree(sql.data);
 	initStringInfo(&sql);
 	appendStringInfo(&sql,
 					 "CREATE TABLE IF NOT EXISTS neurondb_hnsw_metadata ("
@@ -374,7 +374,7 @@ build_hnsw_index(const char *table, const char *col, uint32 seed)
 	ndb_spi_execute(session, sql.data, false, 0);
 
 	/* Use safe free/reinit to handle potential memory context changes */
-	NDB_FREE(sql.data);
+	nfree(sql.data);
 	initStringInfo(&sql);
 
 	appendStringInfo(&sql,
@@ -399,16 +399,16 @@ build_hnsw_index(const char *table, const char *col, uint32 seed)
 	ret = ndb_spi_execute_with_args(session, sql.data, 4, argtypes, values, NULL, false, 0);
 	if (ret != SPI_OK_INSERT && ret != SPI_OK_UPDATE)
 	{
-		NDB_FREE(sql.data);
-		NDB_FREE(index_table);
+		nfree(sql.data);
+		nfree(index_table);
 		ndb_spi_session_end(&session);
 		elog(ERROR, "Metadata insert/update failed (%d)", ret);
 	}
 
-	NDB_FREE(sql.data);
+	nfree(sql.data);
 
 	/* Done, cleanup */
-	NDB_FREE(index_table);
+	nfree(index_table);
 	ndb_spi_session_end(&session);
 }
 
@@ -419,7 +419,7 @@ build_hnsw_index(const char *table, const char *col, uint32 seed)
 static char *
 get_index_table(const char *table, const char *col, uint32 seed)
 {
-	NDB_DECLARE(char *, buf);
+	char *buf = NULL;
 	int			len = strlen(table) + strlen(col) + 32;
 
 	NBP_ALLOC(buf, char, len);
@@ -453,10 +453,10 @@ get_relid_from_name(const char *relname)
 static char *
 vector_to_sql_literal(Vector *v)
 {
-	char	   *out;
+	char *out = NULL;
 	int			n;
 
-	NDB_DECLARE(char *, quoted);
+	char *quoted = NULL;
 
 	out = vector_out_internal(v);
 	n = (int) strlen(out) + 4;

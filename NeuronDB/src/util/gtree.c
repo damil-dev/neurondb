@@ -49,7 +49,7 @@ gtree_create(const char *name, Size initial_cap)
 {
 	MemoryContext parent = CurrentMemoryContext;
 	MemoryContext ctx;
-	GTree	   *t;
+	GTree *t = NULL;
 
 	ctx = AllocSetContextCreate(parent, "gtree", ALLOCSET_DEFAULT_SIZES);
 	if (name != NULL)
@@ -235,7 +235,7 @@ gtree_set_root(GTree *t, int node_idx)
 void
 gtree_validate(const GTree *t)
 {
-	bool	   *seen;
+	bool *seen = NULL;
 	int			depth;
 
 	if (!t)
@@ -251,7 +251,7 @@ gtree_validate(const GTree *t)
 				(errmsg("gtree_validate: out of memory for seen "
 						"array")));
 	depth = gtree_depth_dfs(t, t->root, 0, seen);
-	NDB_FREE(seen);
+	nfree(seen);
 
 	if (depth > GTREE_MAX_DEPTH)
 		ereport(ERROR,

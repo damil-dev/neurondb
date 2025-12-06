@@ -54,21 +54,34 @@ ndb_hf_vision_complete(const NdbLLMConfig *cfg,
 					   const char *params_json,
 					   NdbLLMResp *out)
 {
-	StringInfoData url,
-				body;
-	char	   *resp = NULL;
-	int			code;
 	bool		ok = false;
+	bytea	   *image_bytea = NULL;
 	char	   *base64_data = NULL;
-	text	   *encoded_text = NULL;
+	char	   *image_bytea_raw = NULL;
 	char	   *quoted_prompt = NULL;
-	char	   *text_start;
-	char	   *text_end;
-	size_t		len;
+	char	   *resp = NULL;
+	char	   *text_end = NULL;
+	char	   *text_start = NULL;
+	char	   *text_tmp = NULL;
+	int			code;
 	HfEndpointKind kind;
+	size_t		len;
+	StringInfoData body;
+	StringInfoData url;
+	text	   *encoded_text = NULL;
 
 	if (!cfg || !image_data || image_size == 0 || !prompt || !out)
+	{
+		elog(WARNING, "neurondb: ndb_hf_vision_complete called with NULL or invalid parameters");
 		return -1;
+	}
+
+	/* Validate prompt is not empty */
+	if (strlen(prompt) == 0)
+	{
+		elog(WARNING, "neurondb: ndb_hf_vision_complete called with empty prompt");
+		return -1;
+	}
 
 	/* Validate API key is required for HuggingFace inference API */
 	if (!cfg->api_key || cfg->api_key[0] == '\0')
@@ -85,17 +98,15 @@ ndb_hf_vision_complete(const NdbLLMConfig *cfg,
 
 	/* Base64 encode image */
 	{
-		NDB_DECLARE(bytea *, image_bytea);
-		NDB_DECLARE(char *, image_bytea_raw);
-		NDB_ALLOC(image_bytea_raw, char, VARHDRSZ + image_size);
+		nalloc(image_bytea_raw, char, VARHDRSZ + image_size);
 		image_bytea = (bytea *) image_bytea_raw;
 
 		SET_VARSIZE(image_bytea, VARHDRSZ + image_size);
 		memcpy(VARDATA(image_bytea), image_data, image_size);
 		encoded_text = ndb_encode_base64(image_bytea);
 		base64_data = text_to_cstring(encoded_text);
-		NDB_FREE(image_bytea);
-		NDB_FREE(encoded_text);
+		nfree(image_bytea);
+		nfree(encoded_text);
 	}
 
 	quoted_prompt = ndb_json_quote_string(prompt);
@@ -154,19 +165,34 @@ ndb_hf_vision_complete(const NdbLLMConfig *cfg,
 	code = http_post_json(
 						  url.data, cfg->api_key, body.data, cfg->timeout_ms, &resp);
 
-	text_start = NULL;
-	text_end = NULL;
 	len = 0;
-	NDB_FREE(url.data);
-	NDB_FREE(body.data);
-	NDB_FREE(base64_data);
-	NDB_FREE(quoted_prompt);
+	nfree(url.data);
+	nfree(body.data);
+	nfree(base64_data);
+	nfree(quoted_prompt);
+
+	/* Validate HTTP response code */
+	if (code < 0)
+	{
+		elog(WARNING, "neurondb: ndb_hf_vision_complete: http_post_json failed");
+		if (resp)
+			nfree(resp);
+		return -1;
+	}
 
 	/* Handle all HTTP response types */
 	if (!handle_http_response(code, &resp, out))
 	{
+		elog(DEBUG1, "neurondb: ndb_hf_vision_complete: HTTP error status %d", code);
 		if (resp)
-			NDB_FREE(resp);
+			nfree(resp);
+		return -1;
+	}
+
+	/* Validate resp is not NULL before parsing */
+	if (resp == NULL)
+	{
+		elog(WARNING, "neurondb: ndb_hf_vision_complete: received NULL response");
 		return -1;
 	}
 
@@ -184,13 +210,30 @@ ndb_hf_vision_complete(const NdbLLMConfig *cfg,
 			if (text_end)
 			{
 				len = text_end - text_start;
-				NDB_ALLOC(out->text, char, len + 1);
-				strncpy(out->text, text_start, len);
-				out->text[len] = '\0';
-				ok = true;
+				if (len > 0)
+				{
+					nalloc(text_tmp, char, len + 1);
+					out->text = text_tmp;
+					if (out->text)
+					{
+						strncpy(out->text, text_start, len);
+						out->text[len] = '\0';
+						ok = true;
+					}
+					else
+					{
+						elog(WARNING, "neurondb: ndb_hf_vision_complete: failed to allocate memory for text");
+					}
+				}
 			}
 		}
 	}
+	
+	if (!ok)
+	{
+		elog(DEBUG1, "neurondb: ndb_hf_vision_complete: could not extract generated_text from response");
+	}
+	
 	out->json = resp;
 	out->http_status = code;
 	out->tokens_in = 0;
@@ -202,7 +245,7 @@ ndb_hf_vision_complete(const NdbLLMConfig *cfg,
 static text *
 ndb_encode_base64(bytea * data)
 {
-	List	   *funcname;
+	List *funcname = NULL;
 	Oid			argtypes[2];
 	Oid			encode_oid;
 	FmgrInfo	flinfo;
@@ -275,7 +318,7 @@ http_post_json(const char *url,
 		initStringInfo(&h);
 		appendStringInfo(&h, "Authorization: Bearer %s", api_key);
 		headers = curl_slist_append(headers, h.data);
-		NDB_FREE(h.data);
+		nfree(h.data);
 	}
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
@@ -291,7 +334,7 @@ http_post_json(const char *url,
 		curl_slist_free_all(headers);
 		curl_easy_cleanup(curl);
 		if (buf.data)
-			NDB_FREE(buf.data);
+			nfree(buf.data);
 		*out = NULL;
 		return -1;
 	}
@@ -340,7 +383,7 @@ handle_http_response(int http_status, char **json_ptr, NdbLLMResp *out)
 			/* Non-JSON response (e.g., plain text "Not Found") - wrap in JSON error format */
 			StringInfoData error_json;
 			StringInfoData error_msg;
-			char	   *quoted_error;
+			char *quoted_error = NULL;
 			
 			initStringInfo(&error_json);
 			initStringInfo(&error_msg);
@@ -354,9 +397,9 @@ handle_http_response(int http_status, char **json_ptr, NdbLLMResp *out)
 			/* Build proper JSON: {"error":"HTTP 404: Not Found"} */
 			appendStringInfo(&error_json, "{\"error\":%s}", quoted_error);
 			
-			NDB_FREE(quoted_error);
-			NDB_FREE(error_msg.data);
-			NDB_FREE(*json_ptr);
+			nfree(quoted_error);
+			nfree(error_msg.data);
+			nfree(*json_ptr);
 			*json_ptr = error_json.data;
 			if (out)
 				out->json = *json_ptr;
@@ -392,22 +435,35 @@ extract_hf_text(const char *json)
 	 * The response might also be { "error": ... }.
 	 */
 	const char *key;
-	char	   *p;
-	char	   *q;
+	char *p = NULL;
+	char *q = NULL;
 	size_t		len;
-	NDB_DECLARE(char *, out);
+	char *out = NULL;
 	const char *json_trimmed;
 
 	if (!json || json[0] == '\0')
+	{
+		elog(DEBUG1, "neurondb: extract_hf_text: NULL or empty JSON input");
 		return NULL;
+	}
 	
 	/* Trim leading whitespace */
 	json_trimmed = json;
 	while (*json_trimmed && isspace((unsigned char) *json_trimmed))
 		json_trimmed++;
 	
-	if (strncmp(json_trimmed, "{\"error\"", 8) == 0)
+	/* Validate JSON starts with valid character */
+	if (*json_trimmed != '{' && *json_trimmed != '[')
+	{
+		elog(DEBUG1, "neurondb: extract_hf_text: invalid JSON format (does not start with { or [)");
 		return NULL;
+	}
+	
+	if (strncmp(json_trimmed, "{\"error\"", 8) == 0)
+	{
+		elog(DEBUG1, "neurondb: extract_hf_text: response contains error");
+		return NULL;
+	}
 
 	/* Try OpenAI-compatible format first: choices[0].message.content */
 	key = "\"content\":";
@@ -417,13 +473,29 @@ extract_hf_text(const char *json)
 		/* Found OpenAI format, extract content */
 		p = strchr(p + strlen(key), '"');
 		if (!p)
+		{
+			elog(DEBUG1, "neurondb: extract_hf_text: could not find opening quote after content key");
 			return NULL;
+		}
 		p++;
 		q = strchr(p, '"');
 		if (!q)
+		{
+			elog(DEBUG1, "neurondb: extract_hf_text: could not find closing quote for content");
 			return NULL;
+		}
 		len = q - p;
-		NDB_ALLOC(out, char, len + 1);
+		if (len == 0)
+		{
+			elog(DEBUG1, "neurondb: extract_hf_text: empty content field");
+			return NULL;
+		}
+		nalloc(out, char, len + 1);
+		if (!out)
+		{
+			elog(WARNING, "neurondb: extract_hf_text: failed to allocate memory");
+			return NULL;
+		}
 		memcpy(out, p, len);
 		out[len] = '\0';
 		return out;
@@ -433,17 +505,36 @@ extract_hf_text(const char *json)
 	key = "\"generated_text\":";
 	p = strstr(json_trimmed, key);
 	if (!p)
+	{
+		elog(DEBUG1, "neurondb: extract_hf_text: could not find generated_text or content key");
 		return NULL;
+	}
 	/* Find the first quote after the key */
 	p = strchr(p + strlen(key), '"');
 	if (!p)
+	{
+		elog(DEBUG1, "neurondb: extract_hf_text: could not find opening quote after generated_text key");
 		return NULL;
+	}
 	p++;
 	q = strchr(p, '"');
 	if (!q)
+	{
+		elog(DEBUG1, "neurondb: extract_hf_text: could not find closing quote for generated_text");
 		return NULL;
+	}
 	len = q - p;
-	NDB_ALLOC(out, char, len + 1);
+	if (len == 0)
+	{
+		elog(DEBUG1, "neurondb: extract_hf_text: empty generated_text field");
+		return NULL;
+	}
+	nalloc(out, char, len + 1);
+	if (!out)
+	{
+		elog(WARNING, "neurondb: extract_hf_text: failed to allocate memory");
+		return NULL;
+	}
 	memcpy(out, p, len);
 	out[len] = '\0';
 	return out;
@@ -463,22 +554,25 @@ ndb_hf_complete(const NdbLLMConfig *cfg,
 	bool		tried_fallback = false;
 	bool		tried_chat_format = false;
 	bool		use_chat_format = false;
+	char	   *resp = NULL;
+	NdbLLMResp temp_resp = {0};
+	int			code;
 
 	initStringInfo(&url);
 	initStringInfo(&body);
 
 	if (prompt == NULL)
 	{
-		NDB_FREE(url.data);
-		NDB_FREE(body.data);
+		nfree(url.data);
+		nfree(body.data);
 		return -1;
 	}
 
 	/* Validate API key is required for HuggingFace inference API */
 	if (!cfg->api_key || cfg->api_key[0] == '\0')
 	{
-		NDB_FREE(url.data);
-		NDB_FREE(body.data);
+		nfree(url.data);
+		nfree(body.data);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("API key is required for HuggingFace but was not provided"),
@@ -532,7 +626,7 @@ build_url:
 							appendStringInfo(&url, "%s/hf-inference/models/%s",
 											 clean_endpoint.data, cfg->model);
 						}
-						NDB_FREE(clean_endpoint.data);
+						nfree(clean_endpoint.data);
 					}
 					else
 					{
@@ -699,14 +793,14 @@ build_url:
 		
 		appendStringInfoChar(&body, '}');
 		
-		NDB_FREE(model_quoted);
-		NDB_FREE(prompt_quoted);
+		nfree(model_quoted);
+		nfree(prompt_quoted);
 	}
 	else
 	{
 		/* Legacy inference API format */
 		/* Filter out "model" field from params_json since model is in URL path */
-		char	   *filtered_params = NULL;
+		char *filtered_params = NULL;
 		
 		if (params_json && params_json[0] != '\0' && strcmp(params_json, "{}") != 0)
 		{
@@ -790,7 +884,7 @@ build_url:
 							if (next && next <= end)
 							{
 								size_t		len = next - current;
-								
+
 								if (filtered.len > 1) /* Already has content */
 									appendStringInfoChar(&filtered, ',');
 								appendStringInfo(&filtered, "%.*s", (int) len, current);
@@ -802,10 +896,11 @@ build_url:
 							}
 							else
 							{
+								size_t		len = end - current + 1;
+
 								/* Copy rest */
 								if (filtered.len > 1)
 									appendStringInfoChar(&filtered, ',');
-								size_t		len = end - current + 1;
 								appendStringInfo(&filtered, "%.*s", (int) len, current);
 								break;
 							}
@@ -814,8 +909,9 @@ build_url:
 				}
 				else
 				{
-					/* No model field, just copy */
 					size_t		len = end - p + 1;
+
+					/* No model field, just copy */
 					appendStringInfo(&filtered, "%.*s", (int) len, p);
 				}
 			}
@@ -834,19 +930,26 @@ build_url:
 						 filtered_params);
 		
 		/* Free filtered_params if we allocated it */
-		if (filtered_params && filtered_params != "{}" && strcmp(filtered_params, "{}") != 0)
+		if (filtered_params != NULL && strcmp(filtered_params, "{}") != 0)
 		{
-			NDB_FREE(filtered_params);
+			nfree(filtered_params);
 		}
 	}
 
 	/* Use local resp variable and handle_http_response pattern like embed functions */
-	char	   *resp = NULL;
-	NdbLLMResp temp_resp = {0};
-	int			code;
-
 	code = http_post_json(url.data, cfg->api_key, body.data, cfg->timeout_ms, &resp);
 	status = code;
+
+	/* Validate HTTP response code */
+	if (code < 0)
+	{
+		elog(WARNING, "neurondb: ndb_hf_complete: http_post_json failed");
+		if (resp)
+			nfree(resp);
+		nfree(url.data);
+		nfree(body.data);
+		return -1;
+	}
 
 	/*
 	 * For router endpoints, handle different error cases:
@@ -886,7 +989,7 @@ build_url:
 			/* Free old JSON buffer from failed attempt */
 			if (resp)
 			{
-				NDB_FREE(resp);
+				nfree(resp);
 				resp = NULL;
 			}
 			goto build_url;
@@ -896,10 +999,20 @@ build_url:
 	/* Use handle_http_response to process response consistently with other functions */
 	if (!handle_http_response(code, &resp, &temp_resp))
 	{
+		elog(DEBUG1, "neurondb: ndb_hf_complete: HTTP error status %d", code);
 		if (resp)
-			NDB_FREE(resp);
-		NDB_FREE(url.data);
-		NDB_FREE(body.data);
+			nfree(resp);
+		nfree(url.data);
+		nfree(body.data);
+		return -1;
+	}
+
+	/* Validate resp is not NULL */
+	if (resp == NULL)
+	{
+		elog(WARNING, "neurondb: ndb_hf_complete: received NULL response");
+		nfree(url.data);
+		nfree(body.data);
 		return -1;
 	}
 
@@ -913,18 +1026,17 @@ build_url:
 	out->text = NULL;
 	if (code >= NDB_HTTP_STATUS_OK_MIN && code <= NDB_HTTP_STATUS_OK_MAX && resp)
 	{
-		char	   *t;
+		char *t = NULL;
 
 		/* Check for error in response first */
 		if (strncmp(resp, "{\"error\"", 8) == 0)
 		{
 			/* Error response from API */
-			ereport(WARNING,
-					(errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
-					 errmsg("HuggingFace API returned error in response"),
-					 errhint("Check the API response for details")));
-			NDB_FREE(url.data);
-			NDB_FREE(body.data);
+			elog(WARNING,
+				 "neurondb: HuggingFace API returned error in response: %s",
+				 resp);
+			nfree(url.data);
+			nfree(body.data);
 			return -1;
 		}
 
@@ -938,30 +1050,28 @@ build_url:
 		else
 		{
 			/* Could not extract generated text - this might be an error or unexpected format */
-			ereport(WARNING,
-					(errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
-					 errmsg("Could not extract generated text from HuggingFace API response"),
-					 errhint("The response format may be unexpected")));
-			NDB_FREE(url.data);
-			NDB_FREE(body.data);
+			elog(WARNING,
+				 "neurondb: Could not extract generated text from HuggingFace API response. Response: %.200s",
+				 resp);
+			nfree(url.data);
+			nfree(body.data);
 			return -1;
 		}
 	}
 	else if (code >= NDB_HTTP_STATUS_ERROR_MIN)
 	{
 		/* HTTP error response */
-		ereport(WARNING,
-				(errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
-				 errmsg("HuggingFace API returned HTTP error %d", code),
-				 errhint("Check API key, endpoint, and model availability")));
+		elog(WARNING,
+			 "neurondb: HuggingFace API returned HTTP error %d. Response: %.200s",
+			 code, resp ? resp : "(null)");
 	}
 
 	rc = (code >= NDB_HTTP_STATUS_OK_MIN && 
 		  code <= NDB_HTTP_STATUS_OK_MAX && 
 		  out->text != NULL) ? 0 : -1;
-	
-	NDB_FREE(url.data);
-	NDB_FREE(body.data);
+
+	nfree(url.data);
+	nfree(body.data);
 	return rc;
 }
 
@@ -972,14 +1082,24 @@ parse_hf_emb_vector(const char *json, float **vec_out, int *dim_out)
 	/* Response is: [[float, float, ...]] */
 	/* Error response is: {"error":"..."} */
 	const char *p;
-	float	   *vec = NULL;
+	float *vec = NULL;
 	int			n = 0;
 	int			cap = 32;
-	char	   *endptr;
+	char *endptr = NULL;
 	double		v;
 
 	if (!json)
+	{
+		elog(DEBUG1, "neurondb: parse_hf_emb_vector: NULL JSON input");
 		return false;
+	}
+
+	/* Validate output parameters */
+	if (vec_out == NULL || dim_out == NULL)
+	{
+		elog(WARNING, "neurondb: parse_hf_emb_vector: NULL output parameters");
+		return false;
+	}
 
 	/* Check for error response first */
 	if (strncmp(json, "{\"error\"", 8) == 0)
@@ -999,14 +1119,14 @@ parse_hf_emb_vector(const char *json, float **vec_out, int *dim_out)
 				{
 					size_t		err_len = err_end - err_start;
 
-					NDB_DECLARE(char *, err_msg);
+					char *err_msg = NULL;
 
-					NDB_ALLOC(err_msg, char, err_len + 1);
+					nalloc(err_msg, char, err_len + 1);
 
 					memcpy(err_msg, err_start, err_len);
 					err_msg[err_len] = '\0';
 					elog(DEBUG1, "neurondb: HF API error: %s", err_msg);
-					NDB_FREE(err_msg);
+					nfree(err_msg);
 				}
 			}
 		}
@@ -1017,9 +1137,12 @@ parse_hf_emb_vector(const char *json, float **vec_out, int *dim_out)
 	while (*p && *p != '[')
 		p++;
 	if (!*p)
+	{
+		elog(DEBUG1, "neurondb: parse_hf_emb_vector: could not find array start '['");
 		return false;
+	}
 	p++;
-	while (*p && isspace(*p))
+	while (*p && isspace((unsigned char) *p))
 		p++;
 
 	/*
@@ -1039,23 +1162,40 @@ parse_hf_emb_vector(const char *json, float **vec_out, int *dim_out)
 	}
 	else
 	{
+		elog(DEBUG1, "neurondb: parse_hf_emb_vector: invalid array format, expected '[' or number");
 		return false;
 	}
 
-	NDB_ALLOC(vec, float, cap);
+	nalloc(vec, float, cap);
+	if (!vec)
+	{
+		elog(WARNING, "neurondb: parse_hf_emb_vector: failed to allocate memory");
+		return false;
+	}
 
 	while (*p && *p != ']')
 	{
-		while (*p && (isspace(*p) || *p == ','))
+		while (*p && (isspace((unsigned char) *p) || *p == ','))
 			p++;
+		if (*p == ']')
+			break;
 		endptr = NULL;
 		v = strtod(p, &endptr);
 		if (endptr == p)
+		{
+			/* Could not parse number, stop parsing */
+			elog(DEBUG1, "neurondb: parse_hf_emb_vector: could not parse number at position %zu", (size_t)(p - json));
 			break;
+		}
 		if (n == cap)
 		{
 			cap *= 2;
 			vec = repalloc(vec, sizeof(float) * cap);
+			if (!vec)
+			{
+				elog(WARNING, "neurondb: parse_hf_emb_vector: failed to reallocate memory");
+				return false;
+			}
 		}
 		vec[n++] = (float) v;
 		p = endptr;
@@ -1068,7 +1208,8 @@ parse_hf_emb_vector(const char *json, float **vec_out, int *dim_out)
 	}
 	else
 	{
-		NDB_FREE(vec);
+		elog(DEBUG1, "neurondb: parse_hf_emb_vector: no valid numbers found in array");
+		nfree(vec);
 		return false;
 	}
 }
@@ -1092,16 +1233,35 @@ ndb_hf_embed(const NdbLLMConfig *cfg,
 
 	if (text == NULL)
 	{
-		NDB_FREE(url.data);
-		NDB_FREE(body.data);
+		elog(WARNING, "neurondb: ndb_hf_embed called with NULL text");
+		nfree(url.data);
+		nfree(body.data);
+		return -1;
+	}
+
+	/* Validate text is not empty */
+	if (strlen(text) == 0)
+	{
+		elog(WARNING, "neurondb: ndb_hf_embed called with empty text");
+		nfree(url.data);
+		nfree(body.data);
+		return -1;
+	}
+
+	/* Validate output parameters */
+	if (vec_out == NULL || dim_out == NULL)
+	{
+		elog(WARNING, "neurondb: ndb_hf_embed called with NULL output parameters");
+		nfree(url.data);
+		nfree(body.data);
 		return -1;
 	}
 
 	/* Validate API key is required for HuggingFace inference API */
 	if (!cfg->api_key || cfg->api_key[0] == '\0')
 	{
-		NDB_FREE(url.data);
-		NDB_FREE(body.data);
+		nfree(url.data);
+		nfree(body.data);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("API key is required for HuggingFace but was not provided"),
@@ -1151,35 +1311,58 @@ ndb_hf_embed(const NdbLLMConfig *cfg,
 	code = http_post_json(
 						  url.data, cfg->api_key, body.data, cfg->timeout_ms, &resp);
 	
+	/* Validate HTTP response code */
+	if (code < 0)
+	{
+		elog(WARNING, "neurondb: ndb_hf_embed: http_post_json failed");
+		if (resp)
+			nfree(resp);
+		nfree(url.data);
+		nfree(body.data);
+		return -1;
+	}
+	
 	/* Handle all HTTP response types */
 	if (!handle_http_response(code, &resp, &temp_resp))
 	{
+		elog(DEBUG1, "neurondb: ndb_hf_embed: HTTP error status %d", code);
 		if (resp)
-			NDB_FREE(resp);
-		NDB_FREE(url.data);
-		NDB_FREE(body.data);
+			nfree(resp);
+		nfree(url.data);
+		nfree(body.data);
+		return -1;
+	}
+	
+	/* Validate resp is not NULL */
+	if (resp == NULL)
+	{
+		elog(WARNING, "neurondb: ndb_hf_embed: received NULL response");
+		nfree(url.data);
+		nfree(body.data);
 		return -1;
 	}
 	
 	/* Check for error in response body (API may return 200 with error JSON) */
-	if (resp && strncmp(resp, "{\"error\"", 8) == 0)
+	if (strncmp(resp, "{\"error\"", 8) == 0)
 	{
-		NDB_FREE(resp);
-		NDB_FREE(url.data);
-		NDB_FREE(body.data);
+		elog(WARNING, "neurondb: ndb_hf_embed: API returned error in response: %.200s", resp);
+		nfree(resp);
+		nfree(url.data);
+		nfree(body.data);
 		return -1;
 	}
 	ok = parse_hf_emb_vector(resp, vec_out, dim_out);
 	if (!ok)
 	{
-		NDB_FREE(resp);
-		NDB_FREE(url.data);
-		NDB_FREE(body.data);
+		elog(DEBUG1, "neurondb: ndb_hf_embed: failed to parse embedding vector from response");
+		nfree(resp);
+		nfree(url.data);
+		nfree(body.data);
 		return -1;
 	}
-	NDB_FREE(resp);
-	NDB_FREE(url.data);
-	NDB_FREE(body.data);
+	nfree(resp);
+	nfree(url.data);
+	nfree(body.data);
 	return 0;
 }
 
@@ -1202,20 +1385,42 @@ parse_hf_emb_batch(const char *json,
 	int			vec_cap = 32;
 
 	if (!json)
+	{
+		elog(DEBUG1, "neurondb: parse_hf_emb_batch: NULL JSON input");
 		return false;
+	}
+
+	/* Validate output parameters */
+	if (vecs_out == NULL || dims_out == NULL || num_vecs_out == NULL)
+	{
+		elog(WARNING, "neurondb: parse_hf_emb_batch: NULL output parameters");
+		return false;
+	}
 
 	p = json;
 	/* Skip to first '[' (outer array) */
 	while (*p && *p != '[')
 		p++;
 	if (!*p)
+	{
+		elog(DEBUG1, "neurondb: parse_hf_emb_batch: could not find array start '['");
 		return false;
+	}
 	p++;
-	while (*p && isspace(*p))
+	while (*p && isspace((unsigned char) *p))
 		p++;
 
-	NDB_ALLOC(vecs, float *, cap);
-	NDB_ALLOC(dims, int, cap);
+	nalloc(vecs, float *, cap);
+	nalloc(dims, int, cap);
+	if (!vecs || !dims)
+	{
+		elog(WARNING, "neurondb: parse_hf_emb_batch: failed to allocate memory");
+		if (vecs)
+			nfree(vecs);
+		if (dims)
+			nfree(dims);
+		return false;
+	}
 
 	/* Parse array of arrays */
 	while (*p && *p != ']')
@@ -1232,12 +1437,17 @@ parse_hf_emb_batch(const char *json,
 		p++;
 
 		/* Parse vector elements */
-		NDB_ALLOC(vec, float, vec_cap);
+		nalloc(vec, float, vec_cap);
+		if (!vec)
+		{
+			elog(WARNING, "neurondb: parse_hf_emb_batch: failed to allocate memory for vector");
+			break;
+		}
 		vec_dim = 0;
 		while (*p && *p != ']')
 		{
 			/* Skip whitespace and commas */
-			while (*p && (isspace(*p) || *p == ','))
+			while (*p && (isspace((unsigned char) *p) || *p == ','))
 				p++;
 			if (*p == ']')
 				break;
@@ -1246,11 +1456,20 @@ parse_hf_emb_batch(const char *json,
 			endptr = NULL;
 			v = strtod(p, &endptr);
 			if (endptr == p)
+			{
+				/* Could not parse number, stop parsing this vector */
+				elog(DEBUG1, "neurondb: parse_hf_emb_batch: could not parse number");
 				break;
+			}
 			if (vec_dim == vec_cap)
 			{
 				vec_cap *= 2;
 				vec = repalloc(vec, sizeof(float) * vec_cap);
+				if (!vec)
+				{
+					elog(WARNING, "neurondb: parse_hf_emb_batch: failed to reallocate memory for vector");
+					break;
+				}
 			}
 			vec[vec_dim++] = (float) v;
 			p = endptr;
@@ -1268,6 +1487,12 @@ parse_hf_emb_batch(const char *json,
 				cap *= 2;
 				vecs = repalloc(vecs, sizeof(float *) * cap);
 				dims = repalloc(dims, sizeof(int) * cap);
+				if (!vecs || !dims)
+				{
+					elog(WARNING, "neurondb: parse_hf_emb_batch: failed to reallocate memory");
+					nfree(vec);
+					break;
+				}
 			}
 			vecs[num_vecs] = vec;
 			dims[num_vecs] = vec_dim;
@@ -1278,7 +1503,7 @@ parse_hf_emb_batch(const char *json,
 		}
 		else if (vec)
 		{
-			NDB_FREE(vec);
+			nfree(vec);
 			vec = NULL;
 		}
 	}
@@ -1293,9 +1518,9 @@ parse_hf_emb_batch(const char *json,
 	else
 	{
 		if (vecs)
-			NDB_FREE(vecs);
+			nfree(vecs);
 		if (dims)
-			NDB_FREE(dims);
+			nfree(dims);
 		return false;
 	}
 }
@@ -1327,10 +1552,34 @@ ndb_hf_embed_batch(const NdbLLMConfig *cfg,
 
 	if (texts == NULL || num_texts <= 0)
 	{
-		NDB_FREE(url.data);
-		NDB_FREE(body.data);
-		NDB_FREE(inputs_json.data);
+		elog(WARNING, "neurondb: ndb_hf_embed_batch called with NULL or invalid parameters");
+		nfree(url.data);
+		nfree(body.data);
+		nfree(inputs_json.data);
 		return -1;
+	}
+
+	/* Validate output parameters */
+	if (vecs_out == NULL || dims_out == NULL || num_success_out == NULL)
+	{
+		elog(WARNING, "neurondb: ndb_hf_embed_batch called with NULL output parameters");
+		nfree(url.data);
+		nfree(body.data);
+		nfree(inputs_json.data);
+		return -1;
+	}
+
+	/* Validate texts array elements */
+	for (i = 0; i < num_texts; i++)
+	{
+		if (texts[i] == NULL)
+		{
+			elog(DEBUG1, "neurondb: ndb_hf_embed_batch: NULL text at index %d, will use null in JSON", i);
+		}
+		else if (strlen(texts[i]) == 0)
+		{
+			elog(DEBUG1, "neurondb: ndb_hf_embed_batch: empty text at index %d, will use null in JSON", i);
+		}
 	}
 
 	/* Build JSON array of input texts */
@@ -1344,7 +1593,7 @@ ndb_hf_embed_batch(const NdbLLMConfig *cfg,
 			char	   *quoted = ndb_json_quote_string(texts[i]);
 
 			appendStringInfoString(&inputs_json, quoted);
-			NDB_FREE(quoted);
+			nfree(quoted);
 		}
 		else
 		{
@@ -1392,34 +1641,52 @@ ndb_hf_embed_batch(const NdbLLMConfig *cfg,
 	code = http_post_json(
 						  url.data, cfg->api_key, body.data, cfg->timeout_ms, &resp);
 
-	NDB_FREE(url.data);
-	NDB_FREE(body.data);
-	NDB_FREE(inputs_json.data);
+	nfree(url.data);
+	nfree(body.data);
+	nfree(inputs_json.data);
+
+	/* Validate HTTP response code */
+	if (code < 0)
+	{
+		elog(WARNING, "neurondb: ndb_hf_embed_batch: http_post_json failed");
+		if (resp)
+			nfree(resp);
+		return -1;
+	}
 
 	/* Handle all HTTP response types */
 	if (!handle_http_response(code, &resp, &temp_resp))
 	{
+		elog(DEBUG1, "neurondb: ndb_hf_embed_batch: HTTP error status %d", code);
 		if (resp)
-			NDB_FREE(resp);
+			nfree(resp);
+		return -1;
+	}
+
+	/* Validate resp is not NULL */
+	if (resp == NULL)
+	{
+		elog(WARNING, "neurondb: ndb_hf_embed_batch: received NULL response");
 		return -1;
 	}
 
 	ok = parse_hf_emb_batch(resp, &vecs, &dims, &num_vecs);
-	NDB_FREE(resp);
+	nfree(resp);
 
 	if (!ok)
 	{
+		elog(DEBUG1, "neurondb: ndb_hf_embed_batch: failed to parse batch embedding response");
 		if (vecs)
 		{
 			for (i = 0; i < num_vecs; i++)
 			{
 				if (vecs[i])
-					NDB_FREE(vecs[i]);
+					nfree(vecs[i]);
 			}
-			NDB_FREE(vecs);
+			nfree(vecs);
 		}
 		if (dims)
-			NDB_FREE(dims);
+			nfree(dims);
 		return -1;
 	}
 
@@ -1451,8 +1718,27 @@ ndb_hf_image_embed(const NdbLLMConfig *cfg,
 
 	if (image_data == NULL || image_size == 0)
 	{
-		NDB_FREE(url.data);
-		NDB_FREE(body.data);
+		elog(WARNING, "neurondb: ndb_hf_image_embed called with NULL or invalid image data");
+		nfree(url.data);
+		nfree(body.data);
+		return -1;
+	}
+
+	/* Validate output parameters */
+	if (vec_out == NULL || dim_out == NULL)
+	{
+		elog(WARNING, "neurondb: ndb_hf_image_embed called with NULL output parameters");
+		nfree(url.data);
+		nfree(body.data);
+		return -1;
+	}
+
+	/* Validate image size is reasonable */
+	if (image_size > 100 * 1024 * 1024) /* 100MB max */
+	{
+		elog(WARNING, "neurondb: ndb_hf_image_embed: image size %zu exceeds maximum (100MB)", image_size);
+		nfree(url.data);
+		nfree(body.data);
 		return -1;
 	}
 
@@ -1461,10 +1747,10 @@ ndb_hf_image_embed(const NdbLLMConfig *cfg,
 	 * encode()
 	 */
 	{
-		bytea	   *image_bytea = NULL;
+		bytea *image_bytea = NULL;
 
-		NDB_DECLARE(char *, image_bytea_raw);
-		NDB_ALLOC(image_bytea_raw, char, VARHDRSZ + image_size);
+		char *image_bytea_raw = NULL;
+		nalloc(image_bytea_raw, char, VARHDRSZ + image_size);
 		image_bytea = (bytea *) image_bytea_raw;
 		SET_VARSIZE(image_bytea, VARHDRSZ + image_size);
 		memcpy(VARDATA(image_bytea), image_data, image_size);
@@ -1473,8 +1759,8 @@ ndb_hf_image_embed(const NdbLLMConfig *cfg,
 		encoded_text = ndb_encode_base64(image_bytea);
 		base64_data = text_to_cstring(encoded_text);
 
-		NDB_FREE(image_bytea);
-		NDB_FREE(encoded_text);
+		nfree(image_bytea);
+		nfree(encoded_text);
 	}
 
 	/* Build URL and JSON body for HuggingFace CLIP API */
@@ -1519,23 +1805,43 @@ ndb_hf_image_embed(const NdbLLMConfig *cfg,
 	code = http_post_json(
 						  url.data, cfg->api_key, body.data, cfg->timeout_ms, &resp);
 
-	NDB_FREE(url.data);
-	NDB_FREE(body.data);
-	NDB_FREE(base64_data);
+	nfree(url.data);
+	nfree(body.data);
+	nfree(base64_data);
+
+	/* Validate HTTP response code */
+	if (code < 0)
+	{
+		elog(WARNING, "neurondb: ndb_hf_image_embed: http_post_json failed");
+		if (resp)
+			nfree(resp);
+		return -1;
+	}
 
 	/* Handle all HTTP response types */
 	if (!handle_http_response(code, &resp, &temp_resp))
 	{
+		elog(DEBUG1, "neurondb: ndb_hf_image_embed: HTTP error status %d", code);
 		if (resp)
-			NDB_FREE(resp);
+			nfree(resp);
+		return -1;
+	}
+
+	/* Validate resp is not NULL */
+	if (resp == NULL)
+	{
+		elog(WARNING, "neurondb: ndb_hf_image_embed: received NULL response");
 		return -1;
 	}
 
 	ok = parse_hf_emb_vector(resp, vec_out, dim_out);
-	NDB_FREE(resp);
+	nfree(resp);
 
 	if (!ok)
+	{
+		elog(DEBUG1, "neurondb: ndb_hf_image_embed: failed to parse embedding vector");
 		return -1;
+	}
 	return 0;
 }
 
@@ -1563,17 +1869,45 @@ ndb_hf_multimodal_embed(const NdbLLMConfig *cfg,
 
 	if (text_input == NULL || image_data == NULL || image_size == 0)
 	{
-		NDB_FREE(url.data);
-		NDB_FREE(body.data);
+		elog(WARNING, "neurondb: ndb_hf_multimodal_embed called with NULL or invalid parameters");
+		nfree(url.data);
+		nfree(body.data);
+		return -1;
+	}
+
+	/* Validate text is not empty */
+	if (strlen(text_input) == 0)
+	{
+		elog(WARNING, "neurondb: ndb_hf_multimodal_embed called with empty text");
+		nfree(url.data);
+		nfree(body.data);
+		return -1;
+	}
+
+	/* Validate output parameters */
+	if (vec_out == NULL || dim_out == NULL)
+	{
+		elog(WARNING, "neurondb: ndb_hf_multimodal_embed called with NULL output parameters");
+		nfree(url.data);
+		nfree(body.data);
+		return -1;
+	}
+
+	/* Validate image size is reasonable */
+	if (image_size > 100 * 1024 * 1024) /* 100MB max */
+	{
+		elog(WARNING, "neurondb: ndb_hf_multimodal_embed: image size %zu exceeds maximum (100MB)", image_size);
+		nfree(url.data);
+		nfree(body.data);
 		return -1;
 	}
 
 	/* Base64 encode image */
 	{
-		bytea	   *image_bytea = NULL;
+		bytea *image_bytea = NULL;
 
-		NDB_DECLARE(char *, image_bytea_raw);
-		NDB_ALLOC(image_bytea_raw, char, VARHDRSZ + image_size);
+		char *image_bytea_raw = NULL;
+		nalloc(image_bytea_raw, char, VARHDRSZ + image_size);
 		image_bytea = (bytea *) image_bytea_raw;
 		SET_VARSIZE(image_bytea, VARHDRSZ + image_size);
 		memcpy(VARDATA(image_bytea), image_data, image_size);
@@ -1581,8 +1915,8 @@ ndb_hf_multimodal_embed(const NdbLLMConfig *cfg,
 		encoded_text = ndb_encode_base64(image_bytea);
 		base64_data = text_to_cstring(encoded_text);
 
-		NDB_FREE(image_bytea);
-		NDB_FREE(encoded_text);
+		nfree(image_bytea);
+		nfree(encoded_text);
 	}
 
 	/* Quote text for JSON */
@@ -1631,24 +1965,44 @@ ndb_hf_multimodal_embed(const NdbLLMConfig *cfg,
 	code = http_post_json(
 						  url.data, cfg->api_key, body.data, cfg->timeout_ms, &resp);
 
-	NDB_FREE(url.data);
-	NDB_FREE(body.data);
-	NDB_FREE(base64_data);
-	NDB_FREE(quoted_text);
+	nfree(url.data);
+	nfree(body.data);
+	nfree(base64_data);
+	nfree(quoted_text);
+
+	/* Validate HTTP response code */
+	if (code < 0)
+	{
+		elog(WARNING, "neurondb: ndb_hf_multimodal_embed: http_post_json failed");
+		if (resp)
+			nfree(resp);
+		return -1;
+	}
 
 	/* Handle all HTTP response types */
 	if (!handle_http_response(code, &resp, &temp_resp))
 	{
+		elog(DEBUG1, "neurondb: ndb_hf_multimodal_embed: HTTP error status %d", code);
 		if (resp)
-			NDB_FREE(resp);
+			nfree(resp);
+		return -1;
+	}
+
+	/* Validate resp is not NULL */
+	if (resp == NULL)
+	{
+		elog(WARNING, "neurondb: ndb_hf_multimodal_embed: received NULL response");
 		return -1;
 	}
 
 	ok = parse_hf_emb_vector(resp, vec_out, dim_out);
-	NDB_FREE(resp);
+	nfree(resp);
 
 	if (!ok)
+	{
+		elog(DEBUG1, "neurondb: ndb_hf_multimodal_embed: failed to parse embedding vector");
 		return -1;
+	}
 	return 0;
 }
 
@@ -1660,30 +2014,65 @@ parse_hf_scores(const char *json, float **scores_out, int ndocs)
 	 * parse for the first float array in the string.
 	 */
 	const char *scores_key = "\"scores\"";
-	char	   *ps;
-	float	   *scores;
+	char *ps = NULL;
+	float *scores = NULL;
 	int			n = 0;
-	char	   *endptr;
+	char *endptr = NULL;
 	double		v;
 
 	if (!json)
+	{
+		elog(DEBUG1, "neurondb: parse_hf_scores: NULL JSON input");
 		return false;
+	}
+
+	/* Validate output parameters */
+	if (scores_out == NULL)
+	{
+		elog(WARNING, "neurondb: parse_hf_scores: NULL output parameter");
+		return false;
+	}
+
+	/* Validate ndocs is positive */
+	if (ndocs <= 0)
+	{
+		elog(WARNING, "neurondb: parse_hf_scores: invalid ndocs: %d", ndocs);
+		return false;
+	}
+
 	ps = strstr(json, scores_key);
 	if (!ps)
+	{
+		elog(DEBUG1, "neurondb: parse_hf_scores: could not find scores key");
 		return false;
+	}
 	ps = strchr(ps, '[');
 	if (!ps)
+	{
+		elog(DEBUG1, "neurondb: parse_hf_scores: could not find array start after scores key");
 		return false;
+	}
 	ps++;
-	NDB_ALLOC(scores, float, ndocs);
+	nalloc(scores, float, ndocs);
+	if (!scores)
+	{
+		elog(WARNING, "neurondb: parse_hf_scores: failed to allocate memory");
+		return false;
+	}
 	while (*ps && *ps != ']' && n < ndocs)
 	{
-		while (*ps && (isspace(*ps) || *ps == ','))
+		while (*ps && (isspace((unsigned char) *ps) || *ps == ','))
 			ps++;
+		if (*ps == ']')
+			break;
 		endptr = NULL;
 		v = strtod(ps, &endptr);
 		if (endptr == ps)
+		{
+			/* Could not parse number, stop parsing */
+			elog(DEBUG1, "neurondb: parse_hf_scores: could not parse number at position %zu", (size_t)(ps - json));
 			break;
+		}
 		scores[n++] = (float) v;
 		ps = endptr;
 	}
@@ -1692,7 +2081,8 @@ parse_hf_scores(const char *json, float **scores_out, int ndocs)
 		*scores_out = scores;
 		return true;
 	}
-	NDB_FREE(scores);
+	elog(DEBUG1, "neurondb: parse_hf_scores: parsed %d scores, expected %d", n, ndocs);
+	nfree(scores);
 	return false;
 }
 
@@ -1719,16 +2109,48 @@ ndb_hf_rerank(const NdbLLMConfig *cfg,
 	/* Validate inputs */
 	if (query == NULL || docs == NULL || ndocs <= 0)
 	{
-		NDB_FREE(url.data);
-		NDB_FREE(body.data);
+		elog(WARNING, "neurondb: ndb_hf_rerank called with NULL or invalid parameters");
+		nfree(url.data);
+		nfree(body.data);
 		return -1;
+	}
+
+	/* Validate query is not empty */
+	if (strlen(query) == 0)
+	{
+		elog(WARNING, "neurondb: ndb_hf_rerank called with empty query");
+		nfree(url.data);
+		nfree(body.data);
+		return -1;
+	}
+
+	/* Validate output parameter */
+	if (scores_out == NULL)
+	{
+		elog(WARNING, "neurondb: ndb_hf_rerank called with NULL scores_out");
+		nfree(url.data);
+		nfree(body.data);
+		return -1;
+	}
+
+	/* Validate docs array elements */
+	for (i = 0; i < ndocs; i++)
+	{
+		if (docs[i] == NULL)
+		{
+			elog(DEBUG1, "neurondb: ndb_hf_rerank: NULL doc at index %d, will use null in JSON", i);
+		}
+		else if (strlen(docs[i]) == 0)
+		{
+			elog(DEBUG1, "neurondb: ndb_hf_rerank: empty doc at index %d, will use null in JSON", i);
+		}
 	}
 
 	/* Validate API key is required for HuggingFace inference API */
 	if (!cfg->api_key || cfg->api_key[0] == '\0')
 	{
-		NDB_FREE(url.data);
-		NDB_FREE(body.data);
+		nfree(url.data);
+		nfree(body.data);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("API key is required for HuggingFace but was not provided"),
@@ -1786,23 +2208,49 @@ ndb_hf_rerank(const NdbLLMConfig *cfg,
 	code = http_post_json(
 						  url.data, cfg->api_key, body.data, cfg->timeout_ms, &resp);
 
+	/* Validate HTTP response code */
+	if (code < 0)
+	{
+		elog(WARNING, "neurondb: ndb_hf_rerank: http_post_json failed");
+		if (resp)
+			nfree(resp);
+		nfree(url.data);
+		nfree(body.data);
+		nfree(docs_json.data);
+		return -1;
+	}
+
 	/* Handle all HTTP response types */
 	if (!handle_http_response(code, &resp, &temp_resp))
 	{
+		elog(DEBUG1, "neurondb: ndb_hf_rerank: HTTP error status %d", code);
 		if (resp)
-			NDB_FREE(resp);
-		NDB_FREE(url.data);
-		NDB_FREE(body.data);
-		NDB_FREE(docs_json.data);
+			nfree(resp);
+		nfree(url.data);
+		nfree(body.data);
+		nfree(docs_json.data);
+		return -1;
+	}
+
+	/* Validate resp is not NULL */
+	if (resp == NULL)
+	{
+		elog(WARNING, "neurondb: ndb_hf_rerank: received NULL response");
+		nfree(url.data);
+		nfree(body.data);
+		nfree(docs_json.data);
 		return -1;
 	}
 
 	ok = parse_hf_scores(resp, scores_out, ndocs);
-	NDB_FREE(resp);
-	NDB_FREE(url.data);
-	NDB_FREE(body.data);
-	NDB_FREE(docs_json.data);
+	nfree(resp);
+	nfree(url.data);
+	nfree(body.data);
+	nfree(docs_json.data);
 	if (!ok)
+	{
+		elog(DEBUG1, "neurondb: ndb_hf_rerank: failed to parse scores from response");
 		return -1;
+	}
 	return 0;
 }

@@ -4472,8 +4472,9 @@ COMMENT ON FUNCTION hybrid_rank IS 'Compute weighted hybrid ranking score';
 -- Tenant and security functions
 CREATE FUNCTION create_tenant_worker(
     tenant_id text,
-    worker_type text DEFAULT 'all'
-) RETURNS boolean
+    worker_type text,
+    config text
+) RETURNS integer
     AS 'MODULE_PATHNAME', 'create_tenant_worker'
     LANGUAGE C VOLATILE;
 COMMENT ON FUNCTION create_tenant_worker IS 'Create dedicated background worker for tenant';
@@ -5972,6 +5973,26 @@ BEGIN
 END;
 $$;
 COMMENT ON FUNCTION neurondb.drop_model IS 'Delete a trained model';
+
+CREATE OR REPLACE FUNCTION neurondb.drop_model(model_name text)
+RETURNS boolean
+LANGUAGE plpgsql AS $$
+DECLARE
+	rows_deleted integer;
+	model_id_val integer;
+BEGIN
+	-- Extract model_id from model_name (format: 'model_<id>')
+	IF model_name ~ '^model_[0-9]+$' THEN
+		model_id_val := substring(model_name from 'model_([0-9]+)')::integer;
+		DELETE FROM neurondb.ml_models WHERE model_id = model_id_val;
+		GET DIAGNOSTICS rows_deleted = ROW_COUNT;
+		RETURN rows_deleted > 0;
+	ELSE
+		RAISE EXCEPTION 'Invalid model name format: %. Expected format: model_<id>', model_name;
+	END IF;
+END;
+$$;
+COMMENT ON FUNCTION neurondb.drop_model(text) IS 'Delete a trained model by name (format: model_<id>)';
 
 CREATE OR REPLACE FUNCTION neurondb.create_index(
 	table_name text,

@@ -156,7 +156,7 @@ hnswInitSearchState(const float4 * query, int dim, int efSearch, int k)
 	HnswSearchElement *visited = NULL;
 	HnswSearchElement *results = NULL;
 
-	NDB_ALLOC(state, HnswSearchState, 1);
+	nalloc(state, HnswSearchState, 1);
 	NDB_CHECK_ALLOC(state, "state");
 	state->query = query;
 	state->dim = dim;
@@ -164,18 +164,18 @@ hnswInitSearchState(const float4 * query, int dim, int efSearch, int k)
 	state->k = k;
 
 	state->candidateCapacity = efSearch * 2;
-	NDB_ALLOC(candidates, HnswSearchElement, state->candidateCapacity);
+	nalloc(candidates, HnswSearchElement, state->candidateCapacity);
 	state->candidates = candidates;
 	NDB_CHECK_ALLOC(state->candidates, "state->candidates");
 	state->candidateCount = 0;
 
 	state->visitedCapacity = efSearch * 4;
-	NDB_ALLOC(visited, HnswSearchElement, state->visitedCapacity);
+	nalloc(visited, HnswSearchElement, state->visitedCapacity);
 	state->visited = visited;
 	NDB_CHECK_ALLOC(state->visited, "state->visited");
 	state->visitedCount = 0;
 
-	NDB_ALLOC(results, HnswSearchElement, k);
+	nalloc(results, HnswSearchElement, k);
 	state->results = results;
 	NDB_CHECK_ALLOC(state->results, "state->results");
 	state->resultCount = 0;
@@ -189,10 +189,10 @@ hnswInitSearchState(const float4 * query, int dim, int efSearch, int k)
 static void
 hnswFreeSearchState(HnswSearchState * state)
 {
-	NDB_FREE(state->candidates);
-	NDB_FREE(state->visited);
-	NDB_FREE(state->results);
-	NDB_FREE(state);
+	nfree(state->candidates);
+	nfree(state->visited);
+	nfree(state->results);
+	nfree(state);
 }
 
 /*
@@ -498,9 +498,9 @@ hnswSearchLayerGreedy(Relation index,
 		Buffer		buf;
 		Page		page;
 		HnswNode	node;
-		BlockNumber *neighbors;
+		BlockNumber *neighbors = NULL;
 		int16		neighborCount;
-		float4	   *nodeVector;
+		float4 *nodeVector = NULL;
 		float4		bestDist;
 		int			i;
 
@@ -578,7 +578,7 @@ hnswSearchLayerGreedy(Relation index,
 				Buffer		neighborBuf;
 				Page		neighborPage;
 				HnswNode	neighborNode;
-				float4	   *neighborVector;
+				float4 *neighborVector = NULL;
 				float4		neighborDist;
 
 				neighborBuf = ReadBuffer(index, neighbors[i]);
@@ -657,8 +657,8 @@ hnswSearchLayer0(Relation index,
 	BlockNumber block;
 	float4		distance;
 	int			i;
-	BlockNumber *results_ptr;
-	float4	   *distances_ptr;
+	BlockNumber *results_ptr = NULL;
+	float4 *distances_ptr = NULL;
 
 	state = hnswInitSearchState(query, dim, efSearch, k);
 
@@ -674,9 +674,9 @@ hnswSearchLayer0(Relation index,
 		Buffer		buf;
 		Page		page;
 		HnswNode	node;
-		BlockNumber *neighbors;
+		BlockNumber *neighbors = NULL;
 		int16		neighborCount;
-		float4	   *nodeVector;
+		float4 *nodeVector = NULL;
 		float4		neighborDist;
 		float4		furthestDist;
 		int			j;
@@ -817,8 +817,8 @@ hnswSearchLayer0(Relation index,
 	*resultCount = state->resultCount;
 	if (*resultCount > 0)
 	{
-		NDB_ALLOC(results_ptr, BlockNumber, *resultCount);
-		NDB_ALLOC(distances_ptr, float4, *resultCount);
+		nalloc(results_ptr, BlockNumber, *resultCount);
+		nalloc(distances_ptr, float4, *resultCount);
 		*results = results_ptr;
 		*distances = distances_ptr;
 		NDB_CHECK_ALLOC(*results, "*results");

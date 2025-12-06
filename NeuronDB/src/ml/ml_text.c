@@ -131,28 +131,28 @@ simple_tokenize(const char *input, char **tokens, int *num_tokens)
 Datum
 neurondb_text_classify(PG_FUNCTION_ARGS)
 {
-	FuncCallContext *funcctx;
+	FuncCallContext *funcctx = NULL;
 	int32		model_id = PG_GETARG_INT32(0);
 	text	   *input_text = PG_GETARG_TEXT_PP(1);
 
 	if (SRF_IS_FIRSTCALL())
 	{
 		MemoryContext oldcontext;
-		char	   *input_str;
+		char *input_str = NULL;
 		char	   *tokens[MAX_TOKENS];
 		int			num_tokens = 0;
 
-		NDB_DECLARE(ClassifyResult *, results);
+		ClassifyResult *results = NULL;
 		int			n_categories = 0;
 		int			ret;
 		char		qry[256];
 		char	  **categories;
-		int		   *category_counts;
+		int *category_counts = NULL;
 		int			i,
 					t,
 					r;
 
-		NDB_DECLARE(NdbSpiSession *, spi_session);
+		NdbSpiSession *spi_session = NULL;
 
 		funcctx = SRF_FIRSTCALL_INIT();
 		oldcontext =
@@ -183,8 +183,8 @@ neurondb_text_classify(PG_FUNCTION_ARGS)
 		{
 			NDB_SPI_SESSION_END(spi_session);
 			for (t = 0; t < num_tokens; t++)
-				NDB_FREE(tokens[t]);
-			NDB_FREE(input_str);
+				nfree(tokens[t]);
+			nfree(input_str);
 			ereport(ERROR,
 					(errmsg("Could not fetch model word lists")));
 		}
@@ -216,15 +216,15 @@ neurondb_text_classify(PG_FUNCTION_ARGS)
 			{
 				categories[n_categories++] = pstrdup(cat);
 			}
-			NDB_FREE(cat);
+			nfree(cat);
 		}
 
 		if (n_categories == 0)
 		{
 			NDB_SPI_SESSION_END(spi_session);
 			for (t = 0; t < num_tokens; t++)
-				NDB_FREE(tokens[t]);
-			NDB_FREE(input_str);
+				nfree(tokens[t]);
+			nfree(input_str);
 			ereport(ERROR,
 					(errmsg("No categories found for model_id %d",
 							model_id)));
@@ -234,10 +234,10 @@ neurondb_text_classify(PG_FUNCTION_ARGS)
 		for (r = 0; r < (int) SPI_processed; r++)
 		{
 			TupleDesc	tupdesc;
-			text	   *cat_text;
-			char	   *cat;
-			text	   *word_text;
-			char	   *word;
+			text *cat_text = NULL;
+			char *cat = NULL;
+			text *word_text = NULL;
+			char *word = NULL;
 
 			/* Safe access to SPI_tuptable - validate before access */
 			if (SPI_tuptable == NULL || SPI_tuptable->vals == NULL ||
@@ -255,22 +255,22 @@ neurondb_text_classify(PG_FUNCTION_ARGS)
 			if (cat_text == NULL)
 				continue;
 			cat = text_to_cstring(cat_text);
-			NDB_FREE(cat_text);
+			nfree(cat_text);
 
 			/* Safe access for word - validate tupdesc has at least 2 columns */
 			if (tupdesc->natts < 2)
 			{
-				NDB_FREE(cat);
+				nfree(cat);
 				continue;
 			}
 			word_text = ndb_spi_get_text(spi_session, r, 2, oldcontext);
 			if (word_text == NULL)
 			{
-				NDB_FREE(cat);
+				nfree(cat);
 				continue;
 			}
 			word = text_to_cstring(word_text);
-			NDB_FREE(word_text);
+			nfree(word_text);
 
 			for (t = 0; t < num_tokens; t++)
 			{
@@ -287,12 +287,12 @@ neurondb_text_classify(PG_FUNCTION_ARGS)
 					}
 				}
 			}
-			NDB_FREE(cat);
-			NDB_FREE(word);
+			nfree(cat);
+			nfree(word);
 		}
 
 		for (t = 0; t < num_tokens; t++)
-			NDB_FREE(tokens[t]);
+			nfree(tokens[t]);
 		{
 			/* Calculate confidences */
 			int			total_count = 0;
@@ -317,10 +317,10 @@ neurondb_text_classify(PG_FUNCTION_ARGS)
 				else
 					results[i].confidence =
 						(1.0f / (float4) n_categories);
-				NDB_FREE(categories[i]);
+				nfree(categories[i]);
 			}
-			NDB_FREE(categories);
-			NDB_FREE(category_counts);
+			nfree(categories);
+			nfree(category_counts);
 
 			funcctx->user_fctx = results;
 			funcctx->max_calls = n_categories;
@@ -368,7 +368,7 @@ neurondb_text_classify(PG_FUNCTION_ARGS)
 		else
 		{
 			if (funcctx->max_calls > 0 && funcctx->user_fctx)
-				NDB_FREE(results);
+				nfree(results);
 			SRF_RETURN_DONE(funcctx);
 		}
 	}
@@ -378,28 +378,28 @@ neurondb_text_classify(PG_FUNCTION_ARGS)
 Datum
 neurondb_sentiment_analysis(PG_FUNCTION_ARGS)
 {
-	FuncCallContext *funcctx;
+	FuncCallContext *funcctx = NULL;
 	text	   *input_text = PG_GETARG_TEXT_PP(0);
 	text	   *model_text = PG_ARGISNULL(1) ? NULL : PG_GETARG_TEXT_PP(1);
 
 	if (SRF_IS_FIRSTCALL())
 	{
 		MemoryContext oldcontext;
-		char	   *input_str;
+		char *input_str = NULL;
 
-		NDB_DECLARE(char *, model_name);
+		char *model_name = NULL;
 		char	   *tokens[MAX_TOKENS];
 		int			num_tokens = 0;
 		int			pos = 0,
 					neg = 0,
 					neu = 0;
-		SentimentResult *result;
+		SentimentResult *result = NULL;
 		int			ret;
 		char		qry[256];
 		int			t,
 					r;
 
-		NDB_DECLARE(NdbSpiSession *, spi_session);
+		NdbSpiSession *spi_session = NULL;
 
 		funcctx = SRF_FIRSTCALL_INIT();
 		oldcontext =
@@ -428,8 +428,8 @@ neurondb_sentiment_analysis(PG_FUNCTION_ARGS)
 		{
 			NDB_SPI_SESSION_END(spi_session);
 			for (t = 0; t < num_tokens; t++)
-				NDB_FREE(tokens[t]);
-			NDB_FREE(model_name);
+				nfree(tokens[t]);
+			nfree(model_name);
 			ereport(ERROR,
 					(errmsg("Could not execute sentiment lexicon "
 							"fetch")));
@@ -458,16 +458,16 @@ neurondb_sentiment_analysis(PG_FUNCTION_ARGS)
 					else
 						neu++;	/* treat unknown as neutral */
 				}
-				NDB_FREE(w);
-				NDB_FREE(pol);
+				nfree(w);
+				nfree(pol);
 				if (found)
 					break;
 			}
 			if (!found)
 				neu++;
-			NDB_FREE(tokens[t]);
+			nfree(tokens[t]);
 		}
-		NDB_FREE(model_name);
+		nfree(model_name);
 
 		NDB_SPI_SESSION_END(spi_session);
 
@@ -547,7 +547,7 @@ neurondb_sentiment_analysis(PG_FUNCTION_ARGS)
 			}
 			tuple = heap_form_tuple(
 									funcctx->tuple_desc, values, nulls);
-			NDB_FREE(result);
+			nfree(result);
 			SRF_RETURN_NEXT(funcctx, HeapTupleGetDatum(tuple));
 		}
 		else
@@ -564,7 +564,7 @@ neurondb_sentiment_analysis(PG_FUNCTION_ARGS)
 Datum
 neurondb_named_entity_recognition(PG_FUNCTION_ARGS)
 {
-	FuncCallContext *funcctx;
+	FuncCallContext *funcctx = NULL;
 	text	   *input_text = PG_GETARG_TEXT_PP(0);
 	ArrayType  *entity_types_array =
 		PG_ARGISNULL(1) ? NULL : PG_GETARG_ARRAYTYPE_P(1);
@@ -572,16 +572,16 @@ neurondb_named_entity_recognition(PG_FUNCTION_ARGS)
 	if (SRF_IS_FIRSTCALL())
 	{
 		MemoryContext oldcontext;
-		char	   *input_str;
+		char *input_str = NULL;
 		char	   *tokens[MAX_TOKENS];
 		int			num_tokens = 0;
-		NERResult  *entities;
+		NERResult *entities = NULL;
 		int			n_entities = 0;
 		int			ret,
 					t,
 					r;
 
-		NDB_DECLARE(NdbSpiSession *, spi_session);
+		NdbSpiSession *spi_session = NULL;
 
 		funcctx = SRF_FIRSTCALL_INIT();
 		oldcontext =
@@ -599,7 +599,7 @@ neurondb_named_entity_recognition(PG_FUNCTION_ARGS)
 		{
 			NDB_SPI_SESSION_END(spi_session);
 			for (t = 0; t < num_tokens; t++)
-				NDB_FREE(tokens[t]);
+				nfree(tokens[t]);
 			ereport(ERROR,
 					(errmsg("NER entity table fetch failed")));
 		}
@@ -636,23 +636,23 @@ neurondb_named_entity_recognition(PG_FUNCTION_ARGS)
 						t + 1;
 					n_entities++;
 				}
-				NDB_FREE(dbent);
-				NDB_FREE(type);
+				nfree(dbent);
+				nfree(type);
 			}
-			NDB_FREE(tokens[t]);
+			nfree(tokens[t]);
 		}
 		NDB_SPI_SESSION_END(spi_session);
 
 		/* Optional: filter by entity_type list arg */
 		if (entity_types_array != NULL && n_entities > 0)
 		{
-			Datum	   *datum_array;
-			bool	   *nulls;
+			Datum *datum_array = NULL;
+			bool *nulls = NULL;
 			int			n_types;
 			int			k = 0,
 						e,
 						i;
-			NERResult  *filtered;
+			NERResult *filtered = NULL;
 
 			deconstruct_array(entity_types_array,
 							  TEXTOID,
@@ -680,7 +680,7 @@ neurondb_named_entity_recognition(PG_FUNCTION_ARGS)
 					{
 						keep = true;
 					}
-					NDB_FREE(etype);
+					nfree(etype);
 					if (keep)
 						break;
 				}
@@ -689,7 +689,7 @@ neurondb_named_entity_recognition(PG_FUNCTION_ARGS)
 					filtered[k++] = entities[e];
 				}
 			}
-			NDB_FREE(entities);
+			nfree(entities);
 			entities = filtered;
 			n_entities = k;
 		}
@@ -755,7 +755,7 @@ neurondb_named_entity_recognition(PG_FUNCTION_ARGS)
 		else
 		{
 			if (funcctx->max_calls > 0 && funcctx->user_fctx)
-				NDB_FREE(entities);
+				nfree(entities);
 			SRF_RETURN_DONE(funcctx);
 		}
 	}
@@ -774,14 +774,14 @@ neurondb_text_summarize(PG_FUNCTION_ARGS)
 	text	   *input_text = PG_GETARG_TEXT_PP(0);
 	int32		max_length = PG_ARGISNULL(1) ? 128 : PG_GETARG_INT32(1);
 	text	   *method_text = PG_ARGISNULL(2) ? NULL : PG_GETARG_TEXT_PP(2);
-	char	   *text_str;
-	char	   *method;
+	char *text_str = NULL;
+	char *method = NULL;
 	int			len;
 	char		summary[MAX_SUMMARY];
 	int			i;
 	MemoryContext oldcontext;
 
-	NDB_DECLARE(NdbSpiSession *, spi_session);
+	NdbSpiSession *spi_session = NULL;
 
 	text_str = text_to_cstring(input_text);
 	len = (int) strlen(text_str);
@@ -839,8 +839,8 @@ neurondb_text_summarize(PG_FUNCTION_ARGS)
 		{
 			NDB_SPI_SESSION_END(spi_session);
 			for (s = 0; s < n_sentences; s++)
-				NDB_FREE(sentence_ptrs[s]);
-			NDB_FREE(method);
+				nfree(sentence_ptrs[s]);
+			nfree(method);
 			ereport(ERROR,
 					(errmsg("could not query stopword table")));
 		}
@@ -885,7 +885,7 @@ neurondb_text_summarize(PG_FUNCTION_ARGS)
 					}
 					if (!is_stop)
 						scores[s]++;
-					NDB_FREE(stoks[tokidx]);
+					nfree(stoks[tokidx]);
 				}
 			}
 
@@ -934,10 +934,10 @@ neurondb_text_summarize(PG_FUNCTION_ARGS)
 				summary[0] = '\0';
 
 			for (i = 0; i < n_sentences; i++)
-				NDB_FREE(sentence_ptrs[i]);
+				nfree(sentence_ptrs[i]);
 			for (i = 0; i < n_stopwords; i++)
-				NDB_FREE(stopwords[i]);
-			NDB_FREE(stopwords);
+				nfree(stopwords[i]);
+			nfree(stopwords);
 		}
 		NDB_SPI_SESSION_END(spi_session);
 	}
@@ -955,7 +955,7 @@ neurondb_text_summarize(PG_FUNCTION_ARGS)
 			summary[j - 1] = '\0';
 		strlcat(summary, " [abs]", sizeof(summary));
 	}
-	NDB_FREE(method);
+	nfree(method);
 	PG_RETURN_TEXT_P(cstring_to_text(summary));
 }
 
@@ -977,8 +977,7 @@ text_model_serialize_to_bytea(int vocab_size, int feature_dim, const char *task_
 {
 	StringInfoData buf;
 	int			total_size;
-	bytea	   *result;
-	int			task_len;
+		bytea *result = NULL;	int			task_len;
 
 	initStringInfo(&buf);
 	appendBinaryStringInfo(&buf, (char *) &vocab_size, sizeof(int));
@@ -992,7 +991,7 @@ text_model_serialize_to_bytea(int vocab_size, int feature_dim, const char *task_
 	NDB_CHECK_ALLOC(result, "result");
 	SET_VARSIZE(result, total_size);
 	memcpy(VARDATA(result), buf.data, buf.len);
-	NDB_FREE(buf.data);
+	nfree(buf.data);
 
 	return result;
 }
@@ -1026,16 +1025,16 @@ text_model_deserialize_from_bytea(const bytea * data, int *vocab_size_out, int *
 static bool
 text_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 {
-	TextGpuModelState *state;
+	TextGpuModelState *state = NULL;
 	int			vocab_size = 1000;
 	int			feature_dim = 128;
 	char		task_type[32] = "classification";
 	int			nvec = 0;
 
-	NDB_DECLARE(bytea *, model_data);
-	NDB_DECLARE(Jsonb *, metrics);
+	bytea *model_data = NULL;
+	Jsonb *metrics = NULL;
 	StringInfoData metrics_json;
-	JsonbIterator *it;
+	JsonbIterator *it = NULL;
 	JsonbValue	v;
 	int			r;
 
@@ -1067,7 +1066,7 @@ text_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 																	NumericGetDatum(v.val.numeric)));
 				else if (strcmp(key, "task_type") == 0 && v.type == jbvString)
 					strncpy(task_type, v.val.string.val, sizeof(task_type) - 1);
-				NDB_FREE(key);
+				nfree(key);
 			}
 		}
 	}
@@ -1098,7 +1097,7 @@ text_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 					 vocab_size, feature_dim, task_type, nvec);
 	metrics = DatumGetJsonbP(DirectFunctionCall1(jsonb_in,
 												 CStringGetDatum(metrics_json.data)));
-	NDB_FREE(metrics_json.data);
+	nfree(metrics_json.data);
 
 	state = (TextGpuModelState *) palloc0(sizeof(TextGpuModelState));
 	NDB_CHECK_ALLOC(state, "state");
@@ -1110,7 +1109,7 @@ text_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 	strncpy(state->task_type, task_type, sizeof(state->task_type) - 1);
 
 	if (model->backend_state != NULL)
-		NDB_FREE(model->backend_state);
+		nfree(model->backend_state);
 
 	model->backend_state = state;
 	model->gpu_ready = true;
@@ -1210,7 +1209,7 @@ text_gpu_evaluate(const MLGpuModel *model, const MLGpuEvalSpec *spec,
 
 	metrics_json = DatumGetJsonbP(DirectFunctionCall1(jsonb_in,
 													  CStringGetDatum(buf.data)));
-	NDB_FREE(buf.data);
+	nfree(buf.data);
 
 	if (out != NULL)
 		out->payload = metrics_json;
@@ -1255,7 +1254,7 @@ text_gpu_serialize(const MLGpuModel *model, bytea * *payload_out,
 	if (payload_out != NULL)
 		*payload_out = payload_copy;
 	else
-		NDB_FREE(payload_copy);
+		nfree(payload_copy);
 
 	if (metadata_out != NULL && state->metrics != NULL)
 		*metadata_out = (Jsonb *) PG_DETOAST_DATUM_COPY(
@@ -1294,7 +1293,7 @@ text_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 
 	if (text_model_deserialize_from_bytea(payload_copy, &vocab_size, &feature_dim, task_type, sizeof(task_type)) != 0)
 	{
-		NDB_FREE(payload_copy);
+		nfree(payload_copy);
 		if (errstr != NULL)
 			*errstr = pstrdup("text_gpu_deserialize: failed to deserialize");
 		return false;
@@ -1328,7 +1327,7 @@ text_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 				if (strcmp(key, "n_samples") == 0 && v.type == jbvNumeric)
 					state->n_samples = DatumGetInt32(DirectFunctionCall1(numeric_int4,
 																		 NumericGetDatum(v.val.numeric)));
-				NDB_FREE(key);
+				nfree(key);
 			}
 		}
 	}
@@ -1338,7 +1337,7 @@ text_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 	}
 
 	if (model->backend_state != NULL)
-		NDB_FREE(model->backend_state);
+		nfree(model->backend_state);
 
 	model->backend_state = state;
 	model->gpu_ready = true;
@@ -1350,7 +1349,7 @@ text_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 static void
 text_gpu_destroy(MLGpuModel *model)
 {
-	TextGpuModelState *state;
+	TextGpuModelState *state = NULL;
 
 	if (model == NULL)
 		return;
@@ -1359,10 +1358,10 @@ text_gpu_destroy(MLGpuModel *model)
 	{
 		state = (TextGpuModelState *) model->backend_state;
 		if (state->model_blob != NULL)
-			NDB_FREE(state->model_blob);
+			nfree(state->model_blob);
 		if (state->metrics != NULL)
-			NDB_FREE(state->metrics);
-		NDB_FREE(state);
+			nfree(state->metrics);
+		nfree(state);
 		model->backend_state = NULL;
 	}
 

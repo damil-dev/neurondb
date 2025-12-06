@@ -298,7 +298,7 @@
  * ----------
  */
 /* Index GUC Variables */
-#define NDB_GUC_EF_CONSTRUCTION             "neurondb_ef_construction"
+#define NDB_GUC_EF_CONSTRUCTION             "neurondb.ef_construction"
 #define NDB_GUC_EF_SEARCH                   "neurondb_ef_search"
 #define NDB_GUC_VECTOR_DIM_LIMIT            "neurondb_vector_dim_limit"
 #define NDB_GUC_IVF_PROBES                  "neurondb.ivf_probes"

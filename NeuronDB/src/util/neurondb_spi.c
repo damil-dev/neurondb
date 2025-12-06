@@ -43,14 +43,14 @@ struct NdbSpiSession
 NdbSpiSession *
 ndb_spi_session_begin(MemoryContext parent_context, bool assume_spi_connected)
 {
-	NDB_DECLARE(NdbSpiSession *, session);
+	NdbSpiSession *session = NULL;
 	MemoryContext oldcontext;
 
 	if (parent_context == NULL)
 		parent_context = CurrentMemoryContext;
 
 	oldcontext = MemoryContextSwitchTo(parent_context);
-	NDB_ALLOC(session, NdbSpiSession, 1);
+	nalloc(session, NdbSpiSession, 1);
 
 	MemoryContextSwitchTo(oldcontext);
 
@@ -66,7 +66,7 @@ ndb_spi_session_begin(MemoryContext parent_context, bool assume_spi_connected)
 	{
 		if (SPI_connect() != SPI_OK_CONNECT)
 		{
-			NDB_FREE(session);
+			nfree(session);
 			ereport(ERROR,
 					(errcode(ERRCODE_INTERNAL_ERROR),
 					 errmsg("neurondb: SPI_connect failed in ndb_spi_session_begin")));
@@ -97,7 +97,7 @@ ndb_spi_session_end(NdbSpiSession **session)
 		elog(DEBUG1, "neurondb: SPI session: not finishing SPI (caller connected it)");
 	}
 
-	NDB_FREE(*session);
+	nfree(*session);
 }
 
 bool
@@ -122,6 +122,7 @@ ndb_spi_execute(NdbSpiSession *session,
 				bool read_only,
 				long tcount)
 {
+	const char *error_msg = NULL;
 	int			ret;
 	MemoryContext oldcontext;
 
@@ -150,7 +151,7 @@ ndb_spi_execute(NdbSpiSession *session,
 
 		if (ret < 0)
 		{
-			const char *error_msg = "unknown SPI error";
+			error_msg = "unknown SPI error";
 
 			switch (ret)
 			{
@@ -223,6 +224,7 @@ ndb_spi_execute_with_args(NdbSpiSession *session,
 						  bool read_only,
 						  long tcount)
 {
+	const char *error_msg = NULL;
 	int			ret;
 	MemoryContext oldcontext;
 
@@ -252,7 +254,7 @@ ndb_spi_execute_with_args(NdbSpiSession *session,
 
 		if (ret < 0)
 		{
-			const char *error_msg = "unknown SPI error";
+			error_msg = "unknown SPI error";
 
 			switch (ret)
 			{
@@ -337,7 +339,7 @@ ndb_spi_stringinfo_init(NdbSpiSession *session, StringInfoData * str)
  *   str - StringInfo structure to free
  *
  * Notes:
- *   The function uses NDB_FREE which is context-aware through chunk headers,
+ *   The function uses nfree which is context-aware through chunk headers,
  *   so explicit context switching is not required. Safe to call even if
  *   str or str->data is NULL.
  */
@@ -347,7 +349,7 @@ ndb_spi_stringinfo_free(NdbSpiSession *session, StringInfoData * str)
 	if (session == NULL || str == NULL || str->data == NULL)
 		return;
 
-	NDB_FREE(str->data);
+	nfree(str->data);
 }
 
 /*
@@ -402,8 +404,8 @@ ndb_spi_get_int32(NdbSpiSession *session,
 				  int col_idx,
 				  int32 * out_value)
 {
-	Datum		datum;
 	bool		isnull;
+	Datum		datum;
 	Oid			type_oid;
 
 	if (session == NULL || out_value == NULL)
@@ -467,7 +469,7 @@ ndb_spi_get_int32(NdbSpiSession *session,
  * Notes:
  *   The function copies the datum to the destination context to ensure it
  *   remains valid after SPI context cleanup. The result must be freed by
- *   the caller using pfree or NDB_FREE.
+ *   the caller using pfree or nfree.
  */
 text *
 ndb_spi_get_text(NdbSpiSession *session,
@@ -475,10 +477,10 @@ ndb_spi_get_text(NdbSpiSession *session,
 				 int col_idx,
 				 MemoryContext dest_context)
 {
-	Datum		datum;
 	bool		isnull;
-	text	   *result = NULL;
+	Datum		datum;
 	MemoryContext oldcontext;
+	text	   *result = NULL;
 
 	if (session == NULL)
 		return NULL;
@@ -529,7 +531,7 @@ ndb_spi_get_text(NdbSpiSession *session,
  * Notes:
  *   The function copies the datum to the destination context to ensure it
  *   remains valid after SPI context cleanup. The result must be freed by
- *   the caller using pfree or NDB_FREE.
+ *   the caller using pfree or nfree.
  */
 Jsonb *
 ndb_spi_get_jsonb(NdbSpiSession *session,
@@ -537,8 +539,8 @@ ndb_spi_get_jsonb(NdbSpiSession *session,
 				  int col_idx,
 				  MemoryContext dest_context)
 {
-	Datum		datum;
 	bool		isnull;
+	Datum		datum;
 	Jsonb	   *result = NULL;
 	MemoryContext oldcontext;
 
@@ -591,7 +593,7 @@ ndb_spi_get_jsonb(NdbSpiSession *session,
  * Notes:
  *   The function copies the datum to the destination context to ensure it
  *   remains valid after SPI context cleanup. The result must be freed by
- *   the caller using pfree or NDB_FREE.
+ *   the caller using pfree or nfree.
  */
 bytea *
 ndb_spi_get_bytea(NdbSpiSession *session,
@@ -599,9 +601,9 @@ ndb_spi_get_bytea(NdbSpiSession *session,
 				  int col_idx,
 				  MemoryContext dest_context)
 {
-	Datum		datum;
 	bool		isnull;
 	bytea	   *result = NULL;
+	Datum		datum;
 	MemoryContext oldcontext;
 
 	if (session == NULL)

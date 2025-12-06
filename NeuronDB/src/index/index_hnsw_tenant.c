@@ -60,9 +60,9 @@ hnsw_tenant_create(PG_FUNCTION_ARGS)
 	int32		quota_max = PG_GETARG_INT32(3);
 	int16		ef_search = PG_GETARG_INT16(4);
 	int16		max_level = PG_GETARG_INT16(5);
-	char	   *tbl_str;
-	char	   *col_str;
-	char	   *index_tbl;
+	char *tbl_str = NULL;
+	char *col_str = NULL;
+	char *index_tbl = NULL;
 
 	tbl_str = text_to_cstring(table_name);
 	col_str = text_to_cstring(column_name);
@@ -80,7 +80,7 @@ hnsw_tenant_create(PG_FUNCTION_ARGS)
 		 "neurondb: Created tenant-aware HNSW on %s.%s (tenant %d, quota=%d, ef=%d, max_level=%d, idx_tbl=%s)",
 		 tbl_str, col_str, tenant_id, quota_max, ef_search, max_level, index_tbl);
 
-	NDB_FREE(index_tbl);
+	nfree(index_tbl);
 	PG_RETURN_BOOL(true);
 }
 
@@ -94,24 +94,24 @@ PG_FUNCTION_INFO_V1(hnsw_tenant_search);
 Datum
 hnsw_tenant_search(PG_FUNCTION_ARGS)
 {
-	FuncCallContext *funcctx;
+	FuncCallContext *funcctx = NULL;
 	TupleDesc	tupdesc;
 	MemoryContext oldcontext;
 
 	if (SRF_IS_FIRSTCALL())
 	{
-		char	   *tbl_str;
-		char	   *col_str;
-		char	   *index_tbl;
+		char *tbl_str = NULL;
+		char *col_str = NULL;
+		char *index_tbl = NULL;
 		int			ret;
 		StringInfoData sql;
-		text	   *table_name;
-		Vector	   *query;
+		text *table_name = NULL;
+		Vector *query = NULL;
 		int32		tenant_id;
 		int32		k;
 		int16		ef_search = 100;	/* Default for demonstration */
 
-		NDB_DECLARE(NdbSpiSession *, lookup_session);
+		NdbSpiSession *lookup_session = NULL;
 
 		/*
 		 * Read function arguments according to SQL signature: table_name,
@@ -122,8 +122,8 @@ hnsw_tenant_search(PG_FUNCTION_ARGS)
 		k = PG_GETARG_INT32(2);
 		{
 			text	   *tenant_id_text = PG_GETARG_TEXT_PP(3);
-			char	   *tenant_id_str;
-			char	   *endptr;
+			char *tenant_id_str = NULL;
+			char *endptr = NULL;
 			long		tenant_id_long;
 
 			if (tenant_id_text == NULL)
@@ -179,7 +179,7 @@ hnsw_tenant_search(PG_FUNCTION_ARGS)
 			values[1] = Int32GetDatum(tenant_id);
 
 			ret = ndb_spi_execute_with_args(lookup_session, lookup_sql.data, 2, argtypes, values, NULL, true, 1);
-			NDB_FREE(lookup_sql.data);
+			nfree(lookup_sql.data);
 
 			if (ret == SPI_OK_SELECT && SPI_processed > 0)
 			{
@@ -226,7 +226,7 @@ hnsw_tenant_search(PG_FUNCTION_ARGS)
 						 index_tbl, tenant_id, k);
 
 		{
-			NDB_DECLARE(NdbSpiSession *, session);
+			NdbSpiSession *session = NULL;
 			session = ndb_spi_session_begin(funcctx->multi_call_memory_ctx, false);
 			if (session == NULL)
 				elog(ERROR, "failed to begin SPI session");
@@ -250,7 +250,7 @@ hnsw_tenant_search(PG_FUNCTION_ARGS)
 
 			MemoryContextSwitchTo(oldcontext);
 
-			NDB_FREE(index_tbl);
+			nfree(index_tbl);
 		}
 	}
 
@@ -259,7 +259,7 @@ hnsw_tenant_search(PG_FUNCTION_ARGS)
 	if (funcctx->call_cntr < funcctx->max_calls)
 	{
 		NdbSpiSession *session = (NdbSpiSession *) funcctx->user_fctx;
-		SPITupleTable *tuptable;
+		SPITupleTable *tuptable = NULL;
 		HeapTuple	spi_tuple;
 		Datum		values[2];
 		bool		nulls[2];
@@ -300,17 +300,17 @@ hnsw_tenant_quota(PG_FUNCTION_ARGS)
 	int32		tenant_id = PG_GETARG_INT32(0);
 	int32		used = 0;
 	int32		total = 0;
-	text	   *result_txt;
-	Jsonb	   *result_jsonb;
-	char	   *result;
+	text *result_txt = NULL;
+	Jsonb *result_jsonb = NULL;
+	char *result = NULL;
 
 	result_jsonb = get_tenant_quota_json(tenant_id, &used, &total);
 
 	result = JsonbToCString(NULL, &result_jsonb->root, VARSIZE(result_jsonb));
 	result_txt = cstring_to_text(result);
 
-	NDB_FREE(result_jsonb);
-	NDB_FREE(result);
+	nfree(result_jsonb);
+	nfree(result);
 
 	PG_RETURN_TEXT_P(result_txt);
 }
@@ -324,7 +324,7 @@ ensure_hnsw_tenant_metadata_table(void)
 	int			ret;
 	StringInfoData sql;
 
-	NDB_DECLARE(NdbSpiSession *, session);
+	NdbSpiSession *session = NULL;
 	session = ndb_spi_session_begin(CurrentMemoryContext, false);
 	if (session == NULL)
 		elog(ERROR, "failed to begin SPI session in ensure_hnsw_tenant_metadata_table");
@@ -341,12 +341,12 @@ ensure_hnsw_tenant_metadata_table(void)
 	ret = ndb_spi_execute(session, sql.data, false, 0);
 	if (ret != SPI_OK_UTILITY && ret != SPI_OK_SELECT)
 	{
-		NDB_FREE(sql.data);
+		nfree(sql.data);
 		ndb_spi_session_end(&session);
 		elog(ERROR, "Failed to create metadata table: %s", sql.data);
 	}
 
-	NDB_FREE(sql.data);
+	nfree(sql.data);
 	ndb_spi_session_end(&session);
 }
 
@@ -360,7 +360,7 @@ upsert_tenant_hnsw_metadata(const char *tbl, const char *col, int32 tenant_id,
 	int			ret;
 	StringInfoData sql;
 
-	NDB_DECLARE(NdbSpiSession *, session);
+	NdbSpiSession *session = NULL;
 	session = ndb_spi_session_begin(CurrentMemoryContext, false);
 	if (session == NULL)
 		elog(ERROR, "failed to begin SPI session in upsert_tenant_hnsw_metadata");
@@ -389,13 +389,13 @@ upsert_tenant_hnsw_metadata(const char *tbl, const char *col, int32 tenant_id,
 		ret = ndb_spi_execute_with_args(session, sql.data, 6, argtypes, values, NULL, false, 0);
 		if (ret != SPI_OK_INSERT && ret != SPI_OK_UPDATE)
 		{
-			NDB_FREE(sql.data);
+			nfree(sql.data);
 			ndb_spi_session_end(&session);
 			elog(ERROR, "ndb_spi_execute_with_args failed in upsert_tenant_hnsw_metadata: ret=%d sql=%s",
 				 ret, sql.data);
 		}
 
-		NDB_FREE(sql.data);
+		nfree(sql.data);
 		ndb_spi_session_end(&session);
 	}
 }
@@ -407,7 +407,7 @@ static char *
 get_hnsw_tenant_table(const char *table, const char *col, int32 tenant_id)
 {
 	int			n;
-	char	   *buf;
+	char *buf = NULL;
 
 	n = strlen(table) + strlen(col) + 48;
 	buf = (char *) palloc(n);
@@ -422,14 +422,14 @@ get_hnsw_tenant_table(const char *table, const char *col, int32 tenant_id)
 static void
 maybe_build_hnsw_index(const char *tbl, const char *col, int32 tenant_id)
 {
-	char	   *idx_tbl;
+	char *idx_tbl = NULL;
 	int			ret;
 	StringInfoData sql;
 
 	idx_tbl = get_hnsw_tenant_table(tbl, col, tenant_id);
 
 	{
-		NDB_DECLARE(NdbSpiSession *, session);
+		NdbSpiSession *session = NULL;
 		session = ndb_spi_session_begin(CurrentMemoryContext, false);
 		if (session == NULL)
 			elog(ERROR, "failed to begin SPI session in maybe_build_hnsw_index");
@@ -444,16 +444,16 @@ maybe_build_hnsw_index(const char *tbl, const char *col, int32 tenant_id)
 		ret = ndb_spi_execute(session, sql.data, false, 0);
 		if (ret != SPI_OK_UTILITY)
 		{
-			NDB_FREE(sql.data);
-			NDB_FREE(idx_tbl);
+			nfree(sql.data);
+			nfree(idx_tbl);
 			ndb_spi_session_end(&session);
 			elog(ERROR, "Failed creating index table: %s", sql.data);
 		}
 
-		NDB_FREE(sql.data);
+		nfree(sql.data);
 		ndb_spi_session_end(&session);
 	}
-	NDB_FREE(idx_tbl);
+	nfree(idx_tbl);
 }
 
 /*
@@ -471,7 +471,7 @@ get_tenant_quota_json(int32 tenant_id, int32 * used, int32 * total)
 	(void) b;
 
 	{
-		NDB_DECLARE(NdbSpiSession *, session);
+		NdbSpiSession *session = NULL;
 		session = ndb_spi_session_begin(CurrentMemoryContext, false);
 		if (session == NULL)
 			elog(ERROR, "failed to begin SPI session in get_tenant_quota_json");
@@ -485,7 +485,7 @@ get_tenant_quota_json(int32 tenant_id, int32 * used, int32 * total)
 		ret = ndb_spi_execute(session, sql.data, true, 1);
 		if (ret != SPI_OK_SELECT)
 		{
-			NDB_FREE(sql.data);
+			nfree(sql.data);
 			ndb_spi_session_end(&session);
 			elog(ERROR, "Failed to read quota for tenant %d", tenant_id);
 		}
@@ -504,7 +504,7 @@ get_tenant_quota_json(int32 tenant_id, int32 * used, int32 * total)
 			*used = 0;
 			*total = 0;
 		}
-		NDB_FREE(sql.data);
+		nfree(sql.data);
 		ndb_spi_session_end(&session);
 	}
 

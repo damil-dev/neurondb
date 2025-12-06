@@ -26,7 +26,7 @@ Datum
 encrypt_postquantum(PG_FUNCTION_ARGS)
 {
 	Vector	   *input = (Vector *) PG_GETARG_POINTER(0);
-	bytea	   *result;
+	bytea *result = NULL;
 	Size		result_size;
 
 	elog(DEBUG1,
@@ -60,9 +60,9 @@ set_access_mask(PG_FUNCTION_ARGS)
 	text	   *role_name = PG_GETARG_TEXT_PP(0);
 	text	   *allowed_metrics = PG_GETARG_TEXT_PP(1);
 	text	   *allowed_indexes = PG_GETARG_TEXT_PP(2);
-	char	   *role_str;
-	char	   *metrics_str;
-	char	   *indexes_str;
+	char *role_str = NULL;
+	char *metrics_str = NULL;
+	char *indexes_str = NULL;
 
 	role_str = text_to_cstring(role_name);
 	metrics_str = text_to_cstring(allowed_metrics);
@@ -81,8 +81,8 @@ federated_vector_query(PG_FUNCTION_ARGS)
 {
 	text	   *remote_host = PG_GETARG_TEXT_PP(0);
 	text	   *query = PG_GETARG_TEXT_PP(1);
-	char	   *host_str;
-	char	   *query_str;
+	char *host_str = NULL;
+	char *query_str = NULL;
 
 	host_str = text_to_cstring(remote_host);
 

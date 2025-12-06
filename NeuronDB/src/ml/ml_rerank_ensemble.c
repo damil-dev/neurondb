@@ -91,22 +91,22 @@ PG_FUNCTION_INFO_V1(rerank_ensemble_weighted);
 Datum
 rerank_ensemble_weighted(PG_FUNCTION_ARGS)
 {
-	ArrayType  *doc_ids_array;
-	ArrayType  *score_matrix_array;
-	ArrayType  *weights_array;
+	ArrayType *doc_ids_array = NULL;
+	ArrayType *score_matrix_array = NULL;
+	ArrayType *weights_array = NULL;
 	bool		normalize;
-	int32	   *doc_ids;
-	float8	   *score_matrix;
-	float8	   *weights;
+	int32 *doc_ids = NULL;
+	float8 *score_matrix = NULL;
+	float8 *weights = NULL;
 	int			num_docs;
 	int			num_systems;
-	DocScore   *doc_scores;
-	double	   *normalized_scores;
+	DocScore *doc_scores = NULL;
+	double *normalized_scores = NULL;
 	double		weight_sum;
 	int			i,
 				s;
-	ArrayType  *result;
-	Datum	   *result_datums;
+	ArrayType *result = NULL;
+	Datum *result_datums = NULL;
 	int16		typlen;
 	bool		typbyval;
 	char		typalign;
@@ -170,8 +170,7 @@ rerank_ensemble_weighted(PG_FUNCTION_ARGS)
 	else
 	{
 		/* Equal weights */
-		NDB_DECLARE(float8 *, weights);
-		NDB_ALLOC(weights, float8, num_systems);
+		nalloc(weights, float8, num_systems);
 		NDB_CHECK_ALLOC(weights, "weights");
 		for (s = 0; s < num_systems; s++)
 			weights[s] = 1.0 / num_systems;
@@ -184,7 +183,7 @@ rerank_ensemble_weighted(PG_FUNCTION_ARGS)
 		 num_docs);
 
 	/* Normalize scores if requested */
-	NDB_ALLOC(normalized_scores, double, num_systems * num_docs);
+	nalloc(normalized_scores, double, num_systems * num_docs);
 
 	if (normalize)
 	{
@@ -233,7 +232,7 @@ rerank_ensemble_weighted(PG_FUNCTION_ARGS)
 	}
 
 	/* Compute ensemble scores (weighted sum) */
-	NDB_ALLOC(doc_scores, DocScore, num_docs);
+	nalloc(doc_scores, DocScore, num_docs);
 	NDB_CHECK_ALLOC(doc_scores, "doc_scores");
 
 	for (i = 0; i < num_docs; i++)
@@ -252,7 +251,7 @@ rerank_ensemble_weighted(PG_FUNCTION_ARGS)
 	qsort(doc_scores, num_docs, sizeof(DocScore), docscore_cmp);
 
 	/* Build result array */
-	NDB_ALLOC(result_datums, Datum, num_docs);
+	nalloc(result_datums, Datum, num_docs);
 	NDB_CHECK_ALLOC(result_datums, "result_datums");
 	for (i = 0; i < num_docs; i++)
 		result_datums[i] = Int32GetDatum(doc_scores[i].doc_id);
@@ -261,11 +260,11 @@ rerank_ensemble_weighted(PG_FUNCTION_ARGS)
 	result = construct_array(
 							 result_datums, num_docs, INT4OID, typlen, typbyval, typalign);
 
-	NDB_FREE(normalized_scores);
-	NDB_FREE(doc_scores);
-	NDB_FREE(result_datums);
+	nfree(normalized_scores);
+	nfree(doc_scores);
+	nfree(result_datums);
 	if (weights_array == NULL)
-		NDB_FREE(weights);
+		nfree(weights);
 
 	PG_RETURN_ARRAYTYPE_P(result);
 }
@@ -288,20 +287,20 @@ PG_FUNCTION_INFO_V1(rerank_ensemble_borda);
 Datum
 rerank_ensemble_borda(PG_FUNCTION_ARGS)
 {
-	ArrayType  *ranked_lists_array;
+	ArrayType *ranked_lists_array = NULL;
 	int			ndim;
-	int		   *dims;
+	int *dims = NULL;
 	int			num_systems;
 	int			max_docs;
-	int32	   *ranked_lists;
-	DocScore   *doc_scores;
-	int		   *doc_id_map;
+	int32 *ranked_lists = NULL;
+	DocScore *doc_scores = NULL;
+	int *doc_id_map = NULL;
 	int			num_unique_docs;
 	int			s,
 				i,
 				rank;
-	ArrayType  *result;
-	Datum	   *result_datums;
+	ArrayType *result = NULL;
+	Datum *result_datums = NULL;
 	int16		typlen;
 	bool		typbyval;
 	char		typalign;
@@ -325,7 +324,7 @@ rerank_ensemble_borda(PG_FUNCTION_ARGS)
 		 max_docs);
 
 	/* Collect unique doc IDs */
-	NDB_ALLOC(doc_id_map, int, num_systems * max_docs);
+	nalloc(doc_id_map, int, num_systems * max_docs);
 	NDB_CHECK_ALLOC(doc_id_map, "doc_id_map");
 	num_unique_docs = 0;
 
@@ -358,7 +357,7 @@ rerank_ensemble_borda(PG_FUNCTION_ARGS)
 	}
 
 	/* Initialize scores */
-	NDB_ALLOC(doc_scores, DocScore, num_unique_docs);
+	nalloc(doc_scores, DocScore, num_unique_docs);
 	NDB_CHECK_ALLOC(doc_scores, "doc_scores");
 	for (i = 0; i < num_unique_docs; i++)
 	{
@@ -393,7 +392,7 @@ rerank_ensemble_borda(PG_FUNCTION_ARGS)
 	/* Sort by Borda score */
 	qsort(doc_scores, num_unique_docs, sizeof(DocScore), docscore_cmp);
 
-	NDB_ALLOC(result_datums, Datum, num_unique_docs);
+	nalloc(result_datums, Datum, num_unique_docs);
 	NDB_CHECK_ALLOC(result_datums, "result_datums");
 	for (i = 0; i < num_unique_docs; i++)
 		result_datums[i] = Int32GetDatum(doc_scores[i].doc_id);
@@ -406,9 +405,9 @@ rerank_ensemble_borda(PG_FUNCTION_ARGS)
 							 typbyval,
 							 typalign);
 
-	NDB_FREE(doc_id_map);
-	NDB_FREE(doc_scores);
-	NDB_FREE(result_datums);
+	nfree(doc_id_map);
+	nfree(doc_scores);
+	nfree(result_datums);
 
 	PG_RETURN_ARRAYTYPE_P(result);
 }

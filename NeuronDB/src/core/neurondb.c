@@ -57,8 +57,8 @@ extern void neurondb_worker_fini(void);
 Vector *
 new_vector(int dim)
 {
-	Vector	   *result;
 	int			size;
+	Vector	   *result = NULL;
 
 	if (dim < 1)
 		ereport(ERROR,
@@ -98,8 +98,8 @@ new_vector(int dim)
 Vector *
 copy_vector(Vector *vector)
 {
-	Vector	   *result;
 	int			size;
+	Vector	   *result = NULL;
 
 	if (vector == NULL)
 		ereport(ERROR,
@@ -147,12 +147,12 @@ copy_vector(Vector *vector)
 Vector *
 vector_in_internal(char *str, int *out_dim, bool check)
 {
+	char	   *endptr = NULL;
 	char	   *ptr = str;
-	float4	   *data;
-	int			dim = 0;
+	float4	   *data = NULL;
 	int			capacity = 16;
-	Vector	   *result;
-	char	   *endptr;
+	int			dim = 0;
+	Vector	   *result = NULL;
 
 	while (isspace((unsigned char) *ptr))
 		ptr++;
@@ -203,7 +203,7 @@ vector_in_internal(char *str, int *out_dim, bool check)
 
 	result = new_vector(dim);
 	memcpy(result->data, data, sizeof(float4) * dim);
-	NDB_FREE(data);
+	nfree(data);
 
 	if (out_dim)
 		*out_dim = dim;
@@ -235,8 +235,17 @@ PG_FUNCTION_INFO_V1(vector_in);
 Datum
 vector_in(PG_FUNCTION_ARGS)
 {
-	char	   *str = PG_GETARG_CSTRING(0);
-	Vector	   *result = vector_in_internal(str, NULL, true);
+	char	   *str;
+	Vector	   *result;
+
+	/* Validate minimum argument count */
+	if (PG_NARGS() < 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_in requires at least 1 argument")));
+
+	str = PG_GETARG_CSTRING(0);
+	result = vector_in_internal(str, NULL, true);
 
 	if (PG_NARGS() >= 3)
 	{
@@ -259,7 +268,13 @@ Datum
 vector_out(PG_FUNCTION_ARGS)
 {
 	Vector	   *vector;
-	char	   *result;
+	char *result = NULL;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_out requires 1 argument")));
 
 	vector = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(vector);
@@ -272,10 +287,18 @@ PG_FUNCTION_INFO_V1(vector_recv);
 Datum
 vector_recv(PG_FUNCTION_ARGS)
 {
-	StringInfo	buf = (StringInfo) PG_GETARG_POINTER(0);
-	Vector	   *result;
+	StringInfo	buf;
+	Vector *result = NULL;
 	int16		dim;
 	int			i;
+
+	/* Validate minimum argument count */
+	if (PG_NARGS() < 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_recv requires at least 1 argument")));
+
+	buf = (StringInfo) PG_GETARG_POINTER(0);
 
 	dim = pq_getmsgint(buf, sizeof(int16));
 	result = new_vector(dim);
@@ -323,7 +346,15 @@ PG_FUNCTION_INFO_V1(vector_dims);
 Datum
 vector_dims(PG_FUNCTION_ARGS)
 {
-	Vector	   *vector = PG_GETARG_VECTOR_P(0);
+	Vector	   *vector;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_dims requires 1 argument")));
+
+	vector = PG_GETARG_VECTOR_P(0);
 
 	NDB_CHECK_VECTOR_VALID(vector);
 
@@ -337,6 +368,12 @@ vector_norm(PG_FUNCTION_ARGS)
 	Vector	   *vector;
 	double		sum = 0.0;
 	int			i;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_norm requires 1 argument")));
 
 	vector = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(vector);
@@ -408,7 +445,7 @@ normalize_vector(Vector *v)
 Vector *
 normalize_vector_new(Vector *v)
 {
-	Vector	   *result;
+	Vector *result = NULL;
 
 	if (v == NULL)
 		ereport(ERROR,
@@ -425,7 +462,13 @@ Datum
 vector_normalize(PG_FUNCTION_ARGS)
 {
 	Vector	   *v;
-	Vector	   *result;
+	Vector *result = NULL;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_normalize requires 1 argument")));
 
 	v = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(v);
@@ -439,9 +482,15 @@ Datum
 vector_concat(PG_FUNCTION_ARGS)
 {
 	Vector	   *a;
-	Vector	   *b;
-	Vector	   *result;
+	Vector *b = NULL;
+	Vector *result = NULL;
 	int			new_dim;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_concat requires 2 arguments")));
 
 	a = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(a);
@@ -473,9 +522,15 @@ Datum
 vector_add(PG_FUNCTION_ARGS)
 {
 	Vector	   *a;
-	Vector	   *b;
-	Vector	   *result;
+	Vector *b = NULL;
+	Vector *result = NULL;
 	int			i;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_add requires 2 arguments")));
 
 	a = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(a);
@@ -514,9 +569,15 @@ Datum
 vector_sub(PG_FUNCTION_ARGS)
 {
 	Vector	   *a;
-	Vector	   *b;
-	Vector	   *result;
+	Vector *b = NULL;
+	Vector *result = NULL;
 	int			i;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_sub requires 2 arguments")));
 
 	a = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(a);
@@ -556,8 +617,14 @@ vector_mul(PG_FUNCTION_ARGS)
 {
 	Vector	   *v;
 	float8		scalar;
-	Vector	   *result;
+	Vector *result = NULL;
 	int			i;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_mul requires 2 arguments")));
 
 	v = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(v);
@@ -592,13 +659,21 @@ PG_FUNCTION_INFO_V1(array_to_vector);
 Datum
 array_to_vector(PG_FUNCTION_ARGS)
 {
-	ArrayType  *array = PG_GETARG_ARRAYTYPE_P(0);
-	Vector	   *result;
+	ArrayType  *array;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: array_to_vector requires 1 argument")));
+
+	array = PG_GETARG_ARRAYTYPE_P(0);
+	Vector *result = NULL;
 	int16		typlen;
 	bool		typbyval;
 	char		typalign;
-	Datum	   *elems;
-	bool	   *nulls;
+	Datum *elems = NULL;
+	bool *nulls = NULL;
 	int			nelems;
 	int			i;
 	Oid			elem_type;
@@ -667,13 +742,21 @@ PG_FUNCTION_INFO_V1(vector_typmod_in);
 Datum
 vector_typmod_in(PG_FUNCTION_ARGS)
 {
-	ArrayType  *ta = (ArrayType *) PG_GETARG_POINTER(0);
-	Datum	   *elem_values;
+	ArrayType  *ta;
+
+	/* Validate minimum argument count */
+	if (PG_NARGS() < 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_typmod_in requires at least 1 argument")));
+
+	ta = (ArrayType *) PG_GETARG_POINTER(0);
+	Datum *elem_values = NULL;
 	int			nelems;
 	int16		typlen;
 	bool		typbyval;
 	char		typalign;
-	char	   *s;
+	char *s = NULL;
 	long		dim;
 
 	get_typlenbyvalalign(CSTRINGOID, &typlen, &typbyval, &typalign);
@@ -706,7 +789,15 @@ PG_FUNCTION_INFO_V1(vector_typmod_out);
 Datum
 vector_typmod_out(PG_FUNCTION_ARGS)
 {
-	int32		typmod = PG_GETARG_INT32(0);
+	int32		typmod;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_typmod_out requires 1 argument")));
+
+	typmod = PG_GETARG_INT32(0);
 	StringInfoData buf;
 
 	if (typmod < 0)
@@ -721,9 +812,15 @@ Datum
 vector_to_array(PG_FUNCTION_ARGS)
 {
 	Vector	   *vec;
-	Datum	   *elems;
-	ArrayType  *result;
+	Datum *elems = NULL;
+	ArrayType *result = NULL;
 	int			i;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_to_array requires 1 argument")));
 
 	vec = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(vec);
@@ -736,7 +833,7 @@ vector_to_array(PG_FUNCTION_ARGS)
 	result = construct_array(
 							 elems, vec->dim, FLOAT4OID, sizeof(float4), true, 'i');
 
-	NDB_FREE(elems);
+	nfree(elems);
 
 	PG_RETURN_ARRAYTYPE_P(result);
 }

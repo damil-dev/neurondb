@@ -5,7 +5,7 @@
  *
  * Provides memory context validation and management functions.
  * Note: Safe pointer freeing functionality has been moved to neurondb_macros.h
- * (use NDB_FREE() instead of ndb_safe_pfree()).
+ * (use nfree() instead of ndb_safe_pfree()).
  *
  * Copyright (c) 2024-2025, neurondb, Inc.
  *
@@ -83,12 +83,12 @@ ndb_safe_context_cleanup(MemoryContext context, MemoryContext oldcontext)
 
 typedef struct NdbPointerEntry
 {
-	void	   *ptr;
+	void *ptr;
 	MemoryContext context;
 	const char *alloc_func;
 }			NdbPointerEntry;
 
-static NdbPointerEntry * ptr_tracker = NULL;
+static NdbPointerEntry *ptr_tracker = NULL;
 static int	ptr_tracker_size = 0;
 	static int	ptr_tracker_count = 0;
 

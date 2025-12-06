@@ -67,7 +67,7 @@ rerank_flash(PG_FUNCTION_ARGS)
 {
 	text	   *query_text = PG_GETARG_TEXT_PP(0);
 	ArrayType  *candidates_array = PG_GETARG_ARRAYTYPE_P(1);
-	FuncCallContext *funcctx;
+	FuncCallContext *funcctx = NULL;
 	ReturnSetInfo *rsinfo = (ReturnSetInfo *) fcinfo->resultinfo;
 
 	if (rsinfo == NULL || !IsA(rsinfo, ReturnSetInfo))
@@ -78,8 +78,8 @@ rerank_flash(PG_FUNCTION_ARGS)
 	if (SRF_IS_FIRSTCALL())
 	{
 		MemoryContext oldcontext;
-		Datum	   *candidate_datums;
-		bool	   *candidate_nulls;
+		Datum *candidate_datums = NULL;
+		bool *candidate_nulls = NULL;
 		int			ncandidates;
 
 		funcctx = SRF_FIRSTCALL_INIT();
@@ -130,7 +130,7 @@ rerank_long_context(PG_FUNCTION_ARGS)
 	ArrayType  *candidates_array = PG_GETARG_ARRAYTYPE_P(1);
 	int			top_k = PG_GETARG_INT32(2);
 	int			max_tokens = PG_GETARG_INT32(3);
-	FuncCallContext *funcctx;
+	FuncCallContext *funcctx = NULL;
 	ReturnSetInfo *rsinfo = (ReturnSetInfo *) fcinfo->resultinfo;
 
 	if (rsinfo == NULL || !IsA(rsinfo, ReturnSetInfo))
@@ -142,18 +142,18 @@ rerank_long_context(PG_FUNCTION_ARGS)
 	{
 		MemoryContext oldcontext;
 		TupleDesc	tupdesc;
-		Datum	   *candidate_datums;
-		bool	   *candidate_nulls;
+		Datum *candidate_datums = NULL;
+		bool *candidate_nulls = NULL;
 		int			ncandidates;
-		char	   *query_str;
+		char *query_str = NULL;
 		int			i;
 
-		NDB_DECLARE(float *, scores);
+		float *scores = NULL;
 		const char **docs = NULL;
 		NdbLLMConfig cfg;
 		NdbLLMCallOptions call_opts;
 		int			api_result;
-		RerankState *state;
+		RerankState *state = NULL;
 
 		funcctx = SRF_FIRSTCALL_INIT();
 		oldcontext = MemoryContextSwitchTo(funcctx->multi_call_memory_ctx);
@@ -286,7 +286,7 @@ rerank_long_context(PG_FUNCTION_ARGS)
 		}
 		pfree((void *) docs);
 		if (scores)
-			NDB_FREE(scores);
+			nfree(scores);
 
 		tupdesc = CreateTemplateTupleDesc(2);
 		TupleDescInitEntry(tupdesc, (AttrNumber) 1, "idx", INT4OID, -1, 0);

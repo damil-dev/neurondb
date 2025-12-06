@@ -48,8 +48,8 @@ typedef struct Queue
 static Queue *
 queue_create(void)
 {
-	NDB_DECLARE(Queue *, q);
-	NDB_ALLOC(q, Queue, 1);
+	Queue *q = NULL;
+	nalloc(q, Queue, 1);
 
 	q->front = NULL;
 	q->rear = NULL;
@@ -60,8 +60,8 @@ queue_create(void)
 static void
 queue_enqueue(Queue * q, int32 node_idx)
 {
-	NDB_DECLARE(QueueNode *, node);
-	NDB_ALLOC(node, QueueNode, 1);
+	QueueNode *node = NULL;
+	nalloc(node, QueueNode, 1);
 
 	node->node_idx = node_idx;
 	node->next = NULL;
@@ -82,7 +82,7 @@ queue_enqueue(Queue * q, int32 node_idx)
 static int32
 queue_dequeue(Queue * q)
 {
-	QueueNode  *node;
+	QueueNode *node = NULL;
 	int32		node_idx;
 
 	if (q->front == NULL)
@@ -95,7 +95,7 @@ queue_dequeue(Queue * q)
 	if (q->front == NULL)
 		q->rear = NULL;
 
-	NDB_FREE(node);
+	nfree(node);
 	q->size--;
 	return node_idx;
 }
@@ -105,7 +105,7 @@ queue_free(Queue * q)
 {
 	while (q->front != NULL)
 		queue_dequeue(q);
-	NDB_FREE(q);
+	nfree(q);
 }
 
 typedef struct StackNode
@@ -123,8 +123,8 @@ typedef struct Stack
 static Stack *
 stack_create(void)
 {
-	NDB_DECLARE(Stack *, s);
-	NDB_ALLOC(s, Stack, 1);
+	Stack *s = NULL;
+	nalloc(s, Stack, 1);
 
 	s->top = NULL;
 	s->size = 0;
@@ -134,8 +134,8 @@ stack_create(void)
 static void
 stack_push(Stack * s, int32 node_idx)
 {
-	NDB_DECLARE(StackNode *, node);
-	NDB_ALLOC(node, StackNode, 1);
+	StackNode *node = NULL;
+	nalloc(node, StackNode, 1);
 
 	node->node_idx = node_idx;
 	node->next = s->top;
@@ -146,7 +146,7 @@ stack_push(Stack * s, int32 node_idx)
 static int32
 stack_pop(Stack * s)
 {
-	StackNode  *node;
+	StackNode *node = NULL;
 	int32		node_idx;
 
 	if (s->top == NULL)
@@ -156,7 +156,7 @@ stack_pop(Stack * s)
 	node_idx = node->node_idx;
 	s->top = node->next;
 
-	NDB_FREE(node);
+	nfree(node);
 	s->size--;
 	return node_idx;
 }
@@ -166,7 +166,7 @@ stack_free(Stack * s)
 {
 	while (s->top != NULL)
 		stack_pop(s);
-	NDB_FREE(s);
+	nfree(s);
 }
 
 /*
@@ -180,7 +180,7 @@ vgraph_bfs(PG_FUNCTION_ARGS)
 	VectorGraph *graph = (VectorGraph *) PG_GETARG_POINTER(0);
 	int32		start_node_idx = PG_GETARG_INT32(1);
 	int32		max_depth = PG_ARGISNULL(2) ? -1 : PG_GETARG_INT32(2);
-	FuncCallContext *funcctx;
+	FuncCallContext *funcctx = NULL;
 	typedef struct bfs_fctx
 	{
 		int32	   *visited;
@@ -196,19 +196,18 @@ vgraph_bfs(PG_FUNCTION_ARGS)
 
 	if (SRF_IS_FIRSTCALL())
 	{
-		MemoryContext oldcontext;
-		bfs_fctx   *fctx;
-		GraphEdge  *edges;
-		int32		i;
+		bfs_fctx *fctx = NULL;
+		GraphEdge *edges = NULL;
 		int32		current_node;
+		int32		i;
 		int32		max_result_size;
-
-		NDB_DECLARE(int32 *, visited);
-		NDB_DECLARE(int32 *, depth);
-		NDB_DECLARE(int32 *, parent);
-		NDB_DECLARE(int32 *, result_nodes);
-		NDB_DECLARE(int32 *, result_depths);
-		NDB_DECLARE(int32 *, result_parents);
+		int32	   *depth = NULL;
+		int32	   *parent = NULL;
+		int32	   *result_depths = NULL;
+		int32	   *result_nodes = NULL;
+		int32	   *result_parents = NULL;
+		int32	   *visited = NULL;
+		MemoryContext oldcontext;
 
 		funcctx = SRF_FIRSTCALL_INIT();
 		oldcontext = MemoryContextSwitchTo(funcctx->multi_call_memory_ctx);
@@ -221,11 +220,10 @@ vgraph_bfs(PG_FUNCTION_ARGS)
 							start_node_idx,
 							graph->num_nodes - 1)));
 
-		fctx = NULL;
-		NDB_ALLOC(fctx, bfs_fctx, 1);
-		NDB_ALLOC(visited, int32, graph->num_nodes);
-		NDB_ALLOC(depth, int32, graph->num_nodes);
-		NDB_ALLOC(parent, int32, graph->num_nodes);
+		nalloc(fctx, bfs_fctx, 1);
+		nalloc(visited, int32, graph->num_nodes);
+		nalloc(depth, int32, graph->num_nodes);
+		nalloc(parent, int32, graph->num_nodes);
 		memset(visited, 0, sizeof(int32) * graph->num_nodes);
 		memset(depth, 0, sizeof(int32) * graph->num_nodes);
 		memset(parent, 0, sizeof(int32) * graph->num_nodes);
@@ -248,9 +246,9 @@ vgraph_bfs(PG_FUNCTION_ARGS)
 		queue_enqueue(fctx->queue, start_node_idx);
 
 		max_result_size = graph->num_nodes;
-		NDB_ALLOC(result_nodes, int32, max_result_size);
-		NDB_ALLOC(result_depths, int32, max_result_size);
-		NDB_ALLOC(result_parents, int32, max_result_size);
+		nalloc(result_nodes, int32, max_result_size);
+		nalloc(result_depths, int32, max_result_size);
+		nalloc(result_parents, int32, max_result_size);
 		fctx->result_nodes = result_nodes;
 		fctx->result_depths = result_depths;
 		fctx->result_parents = result_parents;
@@ -274,9 +272,11 @@ vgraph_bfs(PG_FUNCTION_ARGS)
 			/* Explore neighbors */
 			for (i = 0; i < graph->num_edges; i++)
 			{
+				int32		neighbor;
+
 				if (edges[i].src_idx == current_node)
 				{
-					int32		neighbor = edges[i].dst_idx;
+					neighbor = edges[i].dst_idx;
 
 					if (!fctx->visited[neighbor])
 					{
@@ -306,7 +306,7 @@ vgraph_bfs(PG_FUNCTION_ARGS)
 
 	funcctx = SRF_PERCALL_SETUP();
 	{
-		bfs_fctx   *fctx;
+		bfs_fctx *fctx = NULL;
 		HeapTuple	tuple;
 		Datum		values[3];
 		bool		nulls[3] = {false, false, false};
@@ -338,7 +338,7 @@ vgraph_dfs(PG_FUNCTION_ARGS)
 {
 	VectorGraph *graph = (VectorGraph *) PG_GETARG_POINTER(0);
 	int32		start_node_idx = PG_GETARG_INT32(1);
-	FuncCallContext *funcctx;
+	FuncCallContext *funcctx = NULL;
 	typedef struct dfs_fctx
 	{
 		int32	   *visited;
@@ -356,22 +356,21 @@ vgraph_dfs(PG_FUNCTION_ARGS)
 
 	if (SRF_IS_FIRSTCALL())
 	{
-		MemoryContext oldcontext;
-		dfs_fctx   *fctx;
-		GraphEdge  *edges;
-		Stack	   *stack;
+		dfs_fctx *fctx = NULL;
+		GraphEdge *edges = NULL;
 		int32		current_node;
 		int32		i;
 		int32		max_result_size;
-
-		NDB_DECLARE(int32 *, visited);
-		NDB_DECLARE(int32 *, discovery_time);
-		NDB_DECLARE(int32 *, finish_time);
-		NDB_DECLARE(int32 *, parent);
-		NDB_DECLARE(int32 *, result_nodes);
-		NDB_DECLARE(int32 *, result_discovery);
-		NDB_DECLARE(int32 *, result_finish);
-		NDB_DECLARE(int32 *, result_parents);
+		int32	   *discovery_time = NULL;
+		int32	   *finish_time = NULL;
+		int32	   *parent = NULL;
+		int32	   *result_discovery = NULL;
+		int32	   *result_finish = NULL;
+		int32	   *result_nodes = NULL;
+		int32	   *result_parents = NULL;
+		int32	   *visited = NULL;
+		MemoryContext oldcontext;
+		Stack	   *stack = NULL;
 
 		funcctx = SRF_FIRSTCALL_INIT();
 		oldcontext = MemoryContextSwitchTo(funcctx->multi_call_memory_ctx);
@@ -384,12 +383,11 @@ vgraph_dfs(PG_FUNCTION_ARGS)
 							start_node_idx,
 							graph->num_nodes - 1)));
 
-		fctx = NULL;
-		NDB_ALLOC(fctx, dfs_fctx, 1);
-		NDB_ALLOC(visited, int32, graph->num_nodes);
-		NDB_ALLOC(discovery_time, int32, graph->num_nodes);
-		NDB_ALLOC(finish_time, int32, graph->num_nodes);
-		NDB_ALLOC(parent, int32, graph->num_nodes);
+		nalloc(fctx, dfs_fctx, 1);
+		nalloc(visited, int32, graph->num_nodes);
+		nalloc(discovery_time, int32, graph->num_nodes);
+		nalloc(finish_time, int32, graph->num_nodes);
+		nalloc(parent, int32, graph->num_nodes);
 		/* Initialize arrays to zero */
 		memset(visited, 0, sizeof(int32) * graph->num_nodes);
 		memset(discovery_time, 0, sizeof(int32) * graph->num_nodes);
@@ -413,10 +411,10 @@ vgraph_dfs(PG_FUNCTION_ARGS)
 		fctx->time_counter = 0;
 
 		max_result_size = graph->num_nodes;
-		NDB_ALLOC(result_nodes, int32, max_result_size);
-		NDB_ALLOC(result_discovery, int32, max_result_size);
-		NDB_ALLOC(result_finish, int32, max_result_size);
-		NDB_ALLOC(result_parents, int32, max_result_size);
+		nalloc(result_nodes, int32, max_result_size);
+		nalloc(result_discovery, int32, max_result_size);
+		nalloc(result_finish, int32, max_result_size);
+		nalloc(result_parents, int32, max_result_size);
 		fctx->result_nodes = result_nodes;
 		fctx->result_discovery = result_discovery;
 		fctx->result_finish = result_finish;
@@ -459,9 +457,11 @@ vgraph_dfs(PG_FUNCTION_ARGS)
 			/* Explore neighbors (in reverse order for correct DFS order) */
 			for (i = graph->num_edges - 1; i >= 0; i--)
 			{
+				int32		neighbor;
+
 				if (edges[i].src_idx == current_node)
 				{
-					int32		neighbor = edges[i].dst_idx;
+					neighbor = edges[i].dst_idx;
 
 					if (!fctx->visited[neighbor])
 					{
@@ -489,7 +489,7 @@ vgraph_dfs(PG_FUNCTION_ARGS)
 
 	funcctx = SRF_PERCALL_SETUP();
 	{
-		dfs_fctx   *fctx;
+		dfs_fctx *fctx = NULL;
 		HeapTuple	tuple;
 		Datum		values[4];
 		bool		nulls[4] = {false, false, false, false};
@@ -524,7 +524,7 @@ vgraph_pagerank(PG_FUNCTION_ARGS)
 	float8		damping_factor = PG_ARGISNULL(1) ? 0.85 : PG_GETARG_FLOAT8(1);
 	int32		max_iterations = PG_ARGISNULL(2) ? 100 : PG_GETARG_INT32(2);
 	float8		tolerance = PG_ARGISNULL(3) ? 1e-6 : PG_GETARG_FLOAT8(3);
-	FuncCallContext *funcctx;
+	FuncCallContext *funcctx = NULL;
 	typedef struct pagerank_fctx
 	{
 		double	   *scores;
@@ -538,20 +538,19 @@ vgraph_pagerank(PG_FUNCTION_ARGS)
 
 	if (SRF_IS_FIRSTCALL())
 	{
-		MemoryContext oldcontext;
-		pagerank_fctx *fctx;
-		GraphEdge  *edges;
-		int32		i;
-		int32		iter;
+		pagerank_fctx *fctx = NULL;
+		GraphEdge *edges = NULL;
+		double		damping_sum;
 		double		diff;
 		double		initial_score;
-		double		damping_sum;
-
-		NDB_DECLARE(double *, scores);
-		NDB_DECLARE(double *, new_scores);
-		NDB_DECLARE(int32 *, out_degree);
-		NDB_DECLARE(int32 *, result_nodes);
-		NDB_DECLARE(double *, result_scores);
+		double	   *new_scores = NULL;
+		double	   *result_scores = NULL;
+		double	   *scores = NULL;
+		int32		i;
+		int32		iter;
+		int32	   *out_degree = NULL;
+		int32	   *result_nodes = NULL;
+		MemoryContext oldcontext;
 
 		funcctx = SRF_FIRSTCALL_INIT();
 		oldcontext = MemoryContextSwitchTo(funcctx->multi_call_memory_ctx);
@@ -561,11 +560,10 @@ vgraph_pagerank(PG_FUNCTION_ARGS)
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("damping_factor must be between 0 and 1")));
 
-		fctx = NULL;
-		NDB_ALLOC(fctx, pagerank_fctx, 1);
-		NDB_ALLOC(scores, double, graph->num_nodes);
-		NDB_ALLOC(new_scores, double, graph->num_nodes);
-		NDB_ALLOC(out_degree, int32, graph->num_nodes);
+		nalloc(fctx, pagerank_fctx, 1);
+		nalloc(scores, double, graph->num_nodes);
+		nalloc(new_scores, double, graph->num_nodes);
+		nalloc(out_degree, int32, graph->num_nodes);
 		/* Initialize arrays to zero */
 		memset(scores, 0, sizeof(double) * graph->num_nodes);
 		memset(new_scores, 0, sizeof(double) * graph->num_nodes);
@@ -601,8 +599,11 @@ vgraph_pagerank(PG_FUNCTION_ARGS)
 			/* Distribute PageRank */
 			for (i = 0; i < graph->num_edges; i++)
 			{
-				int32		src = edges[i].src_idx;
-				int32		dst = edges[i].dst_idx;
+				int32		dst;
+				int32		src;
+
+				src = edges[i].src_idx;
+				dst = edges[i].dst_idx;
 
 				if (src >= 0 && src < graph->num_nodes
 					&& dst >= 0 && dst < graph->num_nodes)
@@ -620,7 +621,9 @@ vgraph_pagerank(PG_FUNCTION_ARGS)
 			diff = 0.0;
 			for (i = 0; i < graph->num_nodes; i++)
 			{
-				double		change = fabs(fctx->new_scores[i] - fctx->scores[i]);
+				double		change;
+
+				change = fabs(fctx->new_scores[i] - fctx->scores[i]);
 
 				if (change > diff)
 					diff = change;
@@ -629,7 +632,9 @@ vgraph_pagerank(PG_FUNCTION_ARGS)
 			/* Swap scores */
 			for (i = 0; i < graph->num_nodes; i++)
 			{
-				double		temp = fctx->scores[i];
+				double		temp;
+
+				temp = fctx->scores[i];
 
 				fctx->scores[i] = fctx->new_scores[i];
 				fctx->new_scores[i] = temp;
@@ -640,8 +645,8 @@ vgraph_pagerank(PG_FUNCTION_ARGS)
 		}
 
 		/* Prepare results */
-		NDB_ALLOC(result_nodes, int32, graph->num_nodes);
-		NDB_ALLOC(result_scores, double, graph->num_nodes);
+		nalloc(result_nodes, int32, graph->num_nodes);
+		nalloc(result_scores, double, graph->num_nodes);
 		fctx->result_nodes = result_nodes;
 		fctx->result_scores = result_scores;
 		fctx->result_count = graph->num_nodes;
@@ -668,7 +673,7 @@ vgraph_pagerank(PG_FUNCTION_ARGS)
 
 	funcctx = SRF_PERCALL_SETUP();
 	{
-		pagerank_fctx *fctx;
+		pagerank_fctx *fctx = NULL;
 		HeapTuple	tuple;
 		Datum		values[2];
 		bool		nulls[2] = {false, false};
@@ -699,7 +704,7 @@ vgraph_community_detection(PG_FUNCTION_ARGS)
 {
 	VectorGraph *graph = (VectorGraph *) PG_GETARG_POINTER(0);
 	int32		max_iterations = PG_ARGISNULL(1) ? 10 : PG_GETARG_INT32(1);
-	FuncCallContext *funcctx;
+	FuncCallContext *funcctx = NULL;
 	typedef struct community_fctx
 	{
 		int32	   *communities;
@@ -712,25 +717,23 @@ vgraph_community_detection(PG_FUNCTION_ARGS)
 
 	if (SRF_IS_FIRSTCALL())
 	{
-		MemoryContext oldcontext;
-		community_fctx *fctx;
-		GraphEdge  *edges;
+		community_fctx *fctx = NULL;
+		GraphEdge *edges = NULL;
+		double		modularity;
+		double	   *result_modularity = NULL;
+		double		total_edges;
+		int32	   *communities = NULL;
 		int32		i;
 		int32		iter;
-		double		total_edges;
-		double		modularity;
-
-		NDB_DECLARE(int32 *, communities);
-		NDB_DECLARE(int32 *, result_nodes);
-		NDB_DECLARE(int32 *, result_communities);
-		NDB_DECLARE(double *, result_modularity);
+		int32	   *result_communities = NULL;
+		int32	   *result_nodes = NULL;
+		MemoryContext oldcontext;
 
 		funcctx = SRF_FIRSTCALL_INIT();
 		oldcontext = MemoryContextSwitchTo(funcctx->multi_call_memory_ctx);
 
-		fctx = NULL;
-		NDB_ALLOC(fctx, community_fctx, 1);
-		NDB_ALLOC(communities, int32, graph->num_nodes);
+		nalloc(fctx, community_fctx, 1);
+		nalloc(communities, int32, graph->num_nodes);
 		fctx->communities = communities;
 		edges = VGRAPH_EDGES(graph);
 
@@ -744,14 +747,20 @@ vgraph_community_detection(PG_FUNCTION_ARGS)
 		for (iter = 0; iter < max_iterations; iter++)
 		{
 			bool		changed = false;
+			double		best_modularity;
+			int32		best_community;
 			int32		j;
+			int32		k;
+			int32		neighbor_community;
+			int32		old_comm;
 
 			/* For each node, try moving to neighbor's community */
 			for (i = 0; i < graph->num_nodes; i++)
 			{
-				int32		best_community = fctx->communities[i];
-				double		best_modularity = 0.0;
-				int32		neighbor_community;
+				double		mod;
+
+				best_community = fctx->communities[i];
+				best_modularity = 0.0;
 
 				/* Check neighbors */
 				for (j = 0; j < graph->num_edges; j++)
@@ -764,28 +773,24 @@ vgraph_community_detection(PG_FUNCTION_ARGS)
 						if (neighbor_community != fctx->communities[i])
 						{
 							/* Try this community */
-							int32		old_comm = fctx->communities[i];
+							old_comm = fctx->communities[i];
 
 							fctx->communities[i] = neighbor_community;
 
 							/* Compute modularity (simplified) */
+							mod = 0.0;
+							for (k = 0; k < graph->num_edges; k++)
 							{
-								double		mod = 0.0;
-								int32		k;
+								if (fctx->communities[edges[k].src_idx]
+									== fctx->communities[edges[k].dst_idx])
+									mod += 1.0;
+							}
+							mod = mod / total_edges;
 
-								for (k = 0; k < graph->num_edges; k++)
-								{
-									if (fctx->communities[edges[k].src_idx]
-										== fctx->communities[edges[k].dst_idx])
-										mod += 1.0;
-								}
-								mod = mod / total_edges;
-
-								if (mod > best_modularity)
-								{
-									best_modularity = mod;
-									best_community = neighbor_community;
-								}
+							if (mod > best_modularity)
+							{
+								best_modularity = mod;
+								best_community = neighbor_community;
 							}
 
 							fctx->communities[i] = old_comm;
@@ -819,9 +824,9 @@ vgraph_community_detection(PG_FUNCTION_ARGS)
 		}
 
 		/* Prepare results */
-		NDB_ALLOC(result_nodes, int32, graph->num_nodes);
-		NDB_ALLOC(result_communities, int32, graph->num_nodes);
-		NDB_ALLOC(result_modularity, double, graph->num_nodes);
+		nalloc(result_nodes, int32, graph->num_nodes);
+		nalloc(result_communities, int32, graph->num_nodes);
+		nalloc(result_modularity, double, graph->num_nodes);
 		fctx->result_nodes = result_nodes;
 		fctx->result_communities = result_communities;
 		fctx->result_modularity = result_modularity;
@@ -850,7 +855,7 @@ vgraph_community_detection(PG_FUNCTION_ARGS)
 
 	funcctx = SRF_PERCALL_SETUP();
 	{
-		community_fctx *fctx;
+		community_fctx *fctx = NULL;
 		HeapTuple	tuple;
 		Datum		values[3];
 		bool		nulls[3] = {false, false, false};

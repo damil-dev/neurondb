@@ -200,7 +200,7 @@ fp8_e5m2_to_float(uint8_t fp8)
 static FP8Vector *
 quantize_vector_fp8(Vector *v, uint8_t format)
 {
-	FP8Vector  *result;
+	FP8Vector *result = NULL;
 	int			size;
 	int			i;
 
@@ -238,7 +238,7 @@ quantize_vector_fp8(Vector *v, uint8_t format)
 static Vector *
 dequantize_fp8_vector(FP8Vector * fp8_vec)
 {
-	Vector	   *result;
+	Vector *result = NULL;
 	int			i;
 
 	result = new_vector(fp8_vec->dim);
@@ -261,7 +261,7 @@ PG_FUNCTION_INFO_V1(quantize_fp8_e4m3);
 Datum
 quantize_fp8_e4m3(PG_FUNCTION_ARGS)
 {
-	FP8Vector  *result;
+	FP8Vector *result = NULL;
 	Vector	   *v = PG_GETARG_VECTOR_P(0);
 
 	NDB_CHECK_VECTOR_VALID(v);
@@ -277,7 +277,7 @@ PG_FUNCTION_INFO_V1(quantize_fp8_e5m2);
 Datum
 quantize_fp8_e5m2(PG_FUNCTION_ARGS)
 {
-	FP8Vector  *result;
+	FP8Vector *result = NULL;
 	Vector	   *v = PG_GETARG_VECTOR_P(0);
 
 	NDB_CHECK_VECTOR_VALID(v);
@@ -294,7 +294,7 @@ Datum
 dequantize_fp8(PG_FUNCTION_ARGS)
 {
 	FP8Vector  *fp8_vec = (FP8Vector *) PG_GETARG_POINTER(0);
-	Vector	   *result;
+	Vector *result = NULL;
 
 	result = dequantize_fp8_vector(fp8_vec);
 	PG_RETURN_POINTER(result);
@@ -307,12 +307,12 @@ PG_FUNCTION_INFO_V1(auto_quantize);
 Datum
 auto_quantize(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
-	text	   *target_compression;
+	Vector *v = NULL;
+	text *target_compression = NULL;
 
-	char	   *compression_str;
-	VectorI4   *result_int4;
-	FP8Vector  *result_fp8;
+	char *compression_str = NULL;
+	VectorI4 *result_int4 = NULL;
+	FP8Vector *result_fp8 = NULL;
 	Datum		result;
 
 	v = PG_GETARG_VECTOR_P(0);
@@ -347,6 +347,6 @@ auto_quantize(PG_FUNCTION_ARGS)
 		result = (Datum) 0;		/* Not reached */
 	}
 
-	NDB_FREE(compression_str);
+	nfree(compression_str);
 	PG_RETURN_DATUM(result);
 }

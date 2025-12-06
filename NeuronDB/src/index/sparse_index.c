@@ -80,7 +80,7 @@ sparse_index_create(PG_FUNCTION_ARGS)
 	StringInfoData sql;
 	int			ret;
 
-	NDB_DECLARE(NdbSpiSession *, session);
+	NdbSpiSession *session = NULL;
 
 	elog(INFO,
 		 "neurondb: Creating sparse index %s on %s.%s (min_freq=%d)",
@@ -105,7 +105,7 @@ sparse_index_create(PG_FUNCTION_ARGS)
 	ret = ndb_spi_execute(session, sql.data, false, 0);
 	if (ret != SPI_OK_UTILITY)
 	{
-		NDB_FREE(sql.data);
+		nfree(sql.data);
 		ndb_spi_session_end(&session);
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
@@ -114,7 +114,7 @@ sparse_index_create(PG_FUNCTION_ARGS)
 
 	/* Build inverted index by scanning table */
 	/* Use safe free/reinit to handle potential memory context changes */
-	NDB_FREE(sql.data);
+	nfree(sql.data);
 	initStringInfo(&sql);
 	appendStringInfo(&sql,
 					 "SELECT ctid, %s FROM %s WHERE %s IS NOT NULL",
@@ -125,7 +125,7 @@ sparse_index_create(PG_FUNCTION_ARGS)
 	ret = ndb_spi_execute(session, sql.data, true, 0);
 	if (ret != SPI_OK_SELECT)
 	{
-		NDB_FREE(sql.data);
+		nfree(sql.data);
 		ndb_spi_session_end(&session);
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
@@ -140,7 +140,7 @@ sparse_index_create(PG_FUNCTION_ARGS)
 	 * with doc IDs and weights 4. Store in metadata table
 	 */
 
-	NDB_FREE(sql.data);
+	nfree(sql.data);
 	ndb_spi_session_end(&session);
 
 	elog(INFO, "neurondb: Sparse index %s created successfully", idx_str);
@@ -157,11 +157,11 @@ sparse_index_search(PG_FUNCTION_ARGS)
 {
 	ReturnSetInfo *rsinfo = (ReturnSetInfo *) fcinfo->resultinfo;
 	TupleDesc	tupdesc;
-	Tuplestorestate *tupstore;
+	Tuplestorestate *tupstore = NULL;
 	MemoryContext per_query_ctx;
 	MemoryContext oldcontext;
 
-	NDB_DECLARE(NdbSpiSession *, session2);
+	NdbSpiSession *session2 = NULL;
 
 	PG_GETARG_TEXT_PP(0);		/* index_name - reserved for future use */
 

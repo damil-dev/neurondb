@@ -101,24 +101,24 @@ PG_FUNCTION_INFO_V1(ltr_rerank_pointwise);
 Datum
 ltr_rerank_pointwise(PG_FUNCTION_ARGS)
 {
-	ArrayType  *doc_ids_array;
-	ArrayType  *feature_matrix_array;
-	ArrayType  *weights_array;
+	ArrayType *doc_ids_array = NULL;
+	ArrayType *feature_matrix_array = NULL;
+	ArrayType *weights_array = NULL;
 	double		bias;
-	int32	   *doc_ids;
-	float8	   *feature_matrix;
-	float8	   *weights;
+	int32 *doc_ids = NULL;
+	float8 *feature_matrix = NULL;
+	float8 *weights = NULL;
 	int			num_docs;
 	int			num_features;
-	NDB_DECLARE(DocLTRScore *, doc_scores);
+	DocLTRScore *doc_scores = NULL;
 	int			i,
 				f;
 #if defined(NEURONDB_HAS_AVX2) || defined(NEURONDB_HAS_NEON)
-	NDB_DECLARE(float *, features_f);
-	NDB_DECLARE(float *, weights_f);
+	float *features_f = NULL;
+	float *weights_f = NULL;
 #endif
-	ArrayType  *result;
-	NDB_DECLARE(Datum *, result_datums);
+	ArrayType *result = NULL;
+	Datum *result_datums = NULL;
 	int16		typlen;
 	bool		typbyval;
 	char		typalign;
@@ -171,11 +171,11 @@ ltr_rerank_pointwise(PG_FUNCTION_ARGS)
 		 num_features);
 
 	/* Compute LTR scores using SIMD-optimized dot product */
-	NDB_ALLOC(doc_scores, DocLTRScore, num_docs);
+	nalloc(doc_scores, DocLTRScore, num_docs);
 
 #if defined(NEURONDB_HAS_AVX2) || defined(NEURONDB_HAS_NEON)
-	NDB_ALLOC(features_f, float, num_features);
-	NDB_ALLOC(weights_f, float, num_features);
+	nalloc(features_f, float, num_features);
+	nalloc(weights_f, float, num_features);
 
 	/* Convert weights once */
 	for (f = 0; f < num_features; f++)
@@ -207,15 +207,15 @@ ltr_rerank_pointwise(PG_FUNCTION_ARGS)
 	}
 
 #if defined(NEURONDB_HAS_AVX2) || defined(NEURONDB_HAS_NEON)
-	NDB_FREE(features_f);
-	NDB_FREE(weights_f);
+	nfree(features_f);
+	nfree(weights_f);
 #endif
 
 	/* Sort by LTR score (descending) */
 	qsort(doc_scores, num_docs, sizeof(DocLTRScore), doc_ltr_score_cmp);
 
 	/* Build result array */
-	NDB_ALLOC(result_datums, Datum, num_docs);
+	nalloc(result_datums, Datum, num_docs);
 	for (i = 0; i < num_docs; i++)
 		result_datums[i] = Int32GetDatum(doc_scores[i].doc_id);
 
@@ -223,8 +223,8 @@ ltr_rerank_pointwise(PG_FUNCTION_ARGS)
 	result = construct_array(
 							 result_datums, num_docs, INT4OID, typlen, typbyval, typalign);
 
-	NDB_FREE(doc_scores);
-	NDB_FREE(result_datums);
+	nfree(doc_scores);
+	nfree(result_datums);
 
 	PG_RETURN_ARRAYTYPE_P(result);
 }
@@ -241,18 +241,18 @@ PG_FUNCTION_INFO_V1(ltr_score_features);
 Datum
 ltr_score_features(PG_FUNCTION_ARGS)
 {
-	ArrayType  *feature_matrix_array;
-	ArrayType  *weights_array;
+	ArrayType *feature_matrix_array = NULL;
+	ArrayType *weights_array = NULL;
 	double		bias;
-	float8	   *feature_matrix;
-	float8	   *weights;
+	float8 *feature_matrix = NULL;
+	float8 *weights = NULL;
 	int			num_docs;
 	int			num_features;
-	NDB_DECLARE(double *, scores);
+	double *scores = NULL;
 	int			i,
 				f;
-	ArrayType  *result;
-	NDB_DECLARE(Datum *, result_datums);
+	ArrayType *result = NULL;
+	Datum *result_datums = NULL;
 
 	feature_matrix_array = PG_GETARG_ARRAYTYPE_P(0);
 	weights_array = PG_GETARG_ARRAYTYPE_P(1);
@@ -275,7 +275,7 @@ ltr_score_features(PG_FUNCTION_ARGS)
 	feature_matrix = (float8 *) ARR_DATA_PTR(feature_matrix_array);
 	weights = (float8 *) ARR_DATA_PTR(weights_array);
 
-	NDB_ALLOC(scores, double, num_docs);
+	nalloc(scores, double, num_docs);
 
 	/* Compute scores */
 	for (i = 0; i < num_docs; i++)
@@ -286,7 +286,7 @@ ltr_score_features(PG_FUNCTION_ARGS)
 				* weights[f];
 	}
 
-	NDB_ALLOC(result_datums, Datum, num_docs);
+	nalloc(result_datums, Datum, num_docs);
 	for (i = 0; i < num_docs; i++)
 		result_datums[i] = Float8GetDatum(scores[i]);
 
@@ -297,8 +297,8 @@ ltr_score_features(PG_FUNCTION_ARGS)
 							 FLOAT8PASSBYVAL,
 							 'd');
 
-	NDB_FREE(scores);
-	NDB_FREE(result_datums);
+	nfree(scores);
+	nfree(result_datums);
 
 	PG_RETURN_ARRAYTYPE_P(result);
 }

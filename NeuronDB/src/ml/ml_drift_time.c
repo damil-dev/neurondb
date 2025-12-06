@@ -79,26 +79,26 @@ PG_FUNCTION_INFO_V1(monitor_drift_timeseries);
 Datum
 monitor_drift_timeseries(PG_FUNCTION_ARGS)
 {
-	text	   *table_name;
-	text	   *vector_column;
-	text	   *timestamp_column;
-	text	   *window_size_text;
-	char	   *tbl_str;
-	char	   *col_str;
-	char	   *ts_col_str;
-	char	   *window_str;
+	text *table_name = NULL;
+	text *vector_column = NULL;
+	text *timestamp_column = NULL;
+	text *window_size_text = NULL;
+	char *tbl_str = NULL;
+	char *col_str = NULL;
+	char *ts_col_str = NULL;
+	char *window_str = NULL;
 	int			ret;
 	StringInfoData sql;
 	MemoryContext oldcontext;
 	MemoryContext drift_context;
 
-	NDB_DECLARE(Vector *, baseline_centroid);
-	NDB_DECLARE(Vector *, current_centroid);
+	Vector *baseline_centroid = NULL;
+	Vector *current_centroid = NULL;
 	float		drift_distance = 0.0f;
 	int			n_baseline = 0;
 	int			n_current = 0;
 
-	NDB_DECLARE(NdbSpiSession *, spi_session);
+	NdbSpiSession *spi_session = NULL;
 	MemoryContext oldcontext_spi;
 
 	/* Defensive: validate inputs */
@@ -284,7 +284,7 @@ monitor_drift_timeseries(PG_FUNCTION_ARGS)
 	/* Cleanup and return */
 	MemoryContextSwitchTo(oldcontext);
 	{
-		Jsonb	   *result_jsonb;
+		Jsonb *result_jsonb = NULL;
 		StringInfoData result_json;
 
 		initStringInfo(&result_json);
@@ -297,16 +297,16 @@ monitor_drift_timeseries(PG_FUNCTION_ARGS)
 							 "{\"drift_distance\":%.6f,\"baseline_samples\":%d,\"current_samples\":%d,\"window_size\":%s}",
 							 drift_distance, n_baseline, n_current,
 							 window_quoted_str);
-			NDB_FREE(window_quoted_str);
+			nfree(window_quoted_str);
 		}
 
 		result_jsonb = DatumGetJsonbP(DirectFunctionCall1(jsonb_in,
 														  CStringGetTextDatum(result_json.data)));
 
-		NDB_FREE(tbl_str);
-		NDB_FREE(col_str);
-		NDB_FREE(ts_col_str);
-		NDB_FREE(window_str);
+		nfree(tbl_str);
+		nfree(col_str);
+		nfree(ts_col_str);
+		nfree(window_str);
 		MemoryContextDelete(drift_context);
 
 		PG_RETURN_JSONB_P(result_jsonb);

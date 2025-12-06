@@ -56,13 +56,13 @@
 static float **
 als_alloc_matrix(int nrow, int ncol)
 {
-	NDB_DECLARE(float **, mat);
+	float **mat = NULL;
 	int			i;
 
-	NDB_ALLOC(mat, float *, nrow);
+	nalloc(mat, float *, nrow);
 	for (i = 0; i < nrow; ++i)
 	{
-		NDB_ALLOC(mat[i], float, ncol);
+		nalloc(mat[i], float, ncol);
 		memset(mat[i], 0, sizeof(float) * ncol);
 	}
 	return mat;
@@ -78,9 +78,9 @@ als_free_matrix(float **mat, int nrow)
 	for (i = 0; i < nrow; ++i)
 	{
 		if (mat[i])
-			NDB_FREE(mat[i]);
+			nfree(mat[i]);
 	}
-	NDB_FREE(mat);
+	nfree(mat);
 }
 
 static float
@@ -146,7 +146,7 @@ train_collaborative_filter(PG_FUNCTION_ARGS)
 
 	int			ret;
 
-	NDB_DECLARE(NdbSpiSession *, train_als_spi_session);
+	NdbSpiSession *train_als_spi_session = NULL;
 	MemoryContext oldcontext = NULL,
 				model_mcxt = NULL;
 	int			n_row,
@@ -154,13 +154,13 @@ train_collaborative_filter(PG_FUNCTION_ARGS)
 				max_user_id = 0,
 				max_item_id = 0;
 
-	NDB_DECLARE(int *, user_ids);
-	NDB_DECLARE(int *, item_ids);
+	int *user_ids = NULL;
+	int *item_ids = NULL;
 	int			n_ratings = 0;
 
-	NDB_DECLARE(float *, ratings);
-	NDB_DECLARE(float **, P);
-	NDB_DECLARE(float **, Q);
+	float *ratings = NULL;
+	float **P = NULL;
+	float **Q = NULL;
 	StringInfoData sql = {0};
 	SPIPlanPtr	plan = NULL;
 
@@ -190,7 +190,7 @@ train_collaborative_filter(PG_FUNCTION_ARGS)
 		NDB_CHECK_SPI_TUPTABLE();
 	if (ret != SPI_OK_SELECT)
 	{
-		NDB_FREE(sql.data);
+		nfree(sql.data);
 		NDB_SPI_SESSION_END(train_als_spi_session);
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
@@ -202,7 +202,7 @@ train_collaborative_filter(PG_FUNCTION_ARGS)
 	n_row = SPI_processed;
 	if (n_row <= 1)
 	{
-		NDB_FREE(sql.data);
+		nfree(sql.data);
 		NDB_SPI_SESSION_END(train_als_spi_session);
 		ereport(ERROR,
 				(errcode(ERRCODE_INSUFFICIENT_RESOURCES),
@@ -211,9 +211,9 @@ train_collaborative_filter(PG_FUNCTION_ARGS)
 				 errhint("Add more rating data to the table.")));
 	}
 
-	NDB_ALLOC(user_ids, int, n_row);
-	NDB_ALLOC(item_ids, int, n_row);
-	NDB_ALLOC(ratings, float, n_row);
+	nalloc(user_ids, int, n_row);
+	nalloc(item_ids, int, n_row);
+	nalloc(ratings, float, n_row);
 	n_ratings = n_row;
 
 	for (i = 0; i < n_row; ++i)
@@ -251,10 +251,10 @@ train_collaborative_filter(PG_FUNCTION_ARGS)
 
 			if (isnull[0] || isnull[1])
 			{
-				NDB_FREE(sql.data);
-				NDB_FREE(user_ids);
-				NDB_FREE(item_ids);
-				NDB_FREE(ratings);
+				nfree(sql.data);
+				nfree(user_ids);
+				nfree(item_ids);
+				nfree(ratings);
 				NDB_SPI_SESSION_END(train_als_spi_session);
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
@@ -287,10 +287,10 @@ train_collaborative_filter(PG_FUNCTION_ARGS)
 
 			if (isnull[2])
 			{
-				NDB_FREE(sql.data);
-				NDB_FREE(user_ids);
-				NDB_FREE(item_ids);
-				NDB_FREE(ratings);
+				nfree(sql.data);
+				nfree(user_ids);
+				nfree(item_ids);
+				nfree(ratings);
 				NDB_SPI_SESSION_END(train_als_spi_session);
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
@@ -400,7 +400,7 @@ train_collaborative_filter(PG_FUNCTION_ARGS)
 		 * Use safe free/reinit - ml_catalog_register_model uses
 		 * SPI_connect/finish
 		 */
-		NDB_FREE(sql.data);
+		nfree(sql.data);
 		initStringInfo(&sql);
 		appendStringInfo(&sql,
 						 "CREATE TABLE IF NOT EXISTS neurondb_cf_user_factors "
@@ -412,7 +412,7 @@ train_collaborative_filter(PG_FUNCTION_ARGS)
 		 * SPI_tuptable
 		 */
 		/* Use safe free/reinit to handle potential memory context changes */
-		NDB_FREE(sql.data);
+		nfree(sql.data);
 		initStringInfo(&sql);
 		appendStringInfo(&sql,
 						 "CREATE TABLE IF NOT EXISTS neurondb_cf_item_factors "
@@ -425,7 +425,7 @@ train_collaborative_filter(PG_FUNCTION_ARGS)
 		 */
 
 		/* Use safe free/reinit to handle potential memory context changes */
-		NDB_FREE(sql.data);
+		nfree(sql.data);
 		initStringInfo(&sql);
 		appendStringInfo(&sql,
 						 "DELETE FROM neurondb_cf_user_factors WHERE model_id = %d",
@@ -433,7 +433,7 @@ train_collaborative_filter(PG_FUNCTION_ARGS)
 		ndb_spi_execute_safe(sql.data, false, 0);
 		/* DELETE doesn't return a result set, so don't check SPI_tuptable */
 		/* Use safe free/reinit to handle potential memory context changes */
-		NDB_FREE(sql.data);
+		nfree(sql.data);
 		initStringInfo(&sql);
 		appendStringInfo(&sql,
 						 "DELETE FROM neurondb_cf_item_factors WHERE model_id = %d",
@@ -446,7 +446,7 @@ train_collaborative_filter(PG_FUNCTION_ARGS)
 			Datum		values[3];
 			char		nulls[3] = {false, false, false};
 
-			NDB_DECLARE(ArrayType *, array);
+			ArrayType *array = NULL;
 			int			j;
 
 			plan = SPI_prepare(
@@ -496,7 +496,7 @@ train_collaborative_filter(PG_FUNCTION_ARGS)
 			Datum		values[3];
 			char		nulls[3] = {false, false, false};
 
-			NDB_DECLARE(ArrayType *, array);
+			ArrayType *array = NULL;
 			int			j;
 
 			plan = SPI_prepare(
@@ -545,23 +545,23 @@ train_collaborative_filter(PG_FUNCTION_ARGS)
 		als_free_matrix(Q, max_item_id + 1);
 
 		if (user_ids)
-			NDB_FREE(user_ids);
+			nfree(user_ids);
 		if (item_ids)
-			NDB_FREE(item_ids);
+			nfree(item_ids);
 		if (ratings)
-			NDB_FREE(ratings);
+			nfree(ratings);
 		if (table_name_str)
-			NDB_FREE(table_name_str);
+			nfree(table_name_str);
 		if (user_col_str)
-			NDB_FREE(user_col_str);
+			nfree(user_col_str);
 		if (item_col_str)
-			NDB_FREE(item_col_str);
+			nfree(item_col_str);
 		if (rating_col_str)
-			NDB_FREE(rating_col_str);
+			nfree(rating_col_str);
 		if (model_mcxt)
 			MemoryContextDelete(model_mcxt);
 
-		NDB_FREE(sql.data);
+		nfree(sql.data);
 		NDB_SPI_SESSION_END(train_als_spi_session);
 		elog(INFO, "Collaborative filter model created, model_id=%d", model_id);
 		PG_RETURN_INT32(model_id);
@@ -574,7 +574,7 @@ als_load_user_factors(int32 model_id, int32 user_id, float **factors, int *n_fac
 {
 	StringInfoData query = {0};
 
-	NDB_DECLARE(NdbSpiSession *, load_user_factors_spi_session);
+	NdbSpiSession *load_user_factors_spi_session = NULL;
 	MemoryContext oldcontext;
 	int			ret;
 	int			n_rows;
@@ -592,7 +592,7 @@ als_load_user_factors(int32 model_id, int32 user_id, float **factors, int *n_fac
 	NDB_CHECK_SPI_TUPTABLE();
 	if (ret != SPI_OK_SELECT)
 	{
-		NDB_FREE(query.data);
+		nfree(query.data);
 		NDB_SPI_SESSION_END(load_user_factors_spi_session);
 		return false;
 	}
@@ -600,7 +600,7 @@ als_load_user_factors(int32 model_id, int32 user_id, float **factors, int *n_fac
 	n_rows = SPI_processed;
 	if (n_rows != 1)
 	{
-		NDB_FREE(query.data);
+		nfree(query.data);
 		NDB_SPI_SESSION_END(load_user_factors_spi_session);
 		return false;
 	}
@@ -611,21 +611,21 @@ als_load_user_factors(int32 model_id, int32 user_id, float **factors, int *n_fac
 		TupleDesc	tupdesc = SPI_tuptable->tupdesc;
 		Datum		factors_datum;
 		bool		factors_null;
-		ArrayType  *factors_array;
+		ArrayType *factors_array = NULL;
 		Oid			elmtype;
 		int16		typlen;
 		bool		typbyval;
 		char		typalign;
 		int			n_dims;
-		Datum	   *elems;
-		bool	   *nulls;
+		Datum *elems = NULL;
+		bool *nulls = NULL;
 		int			n_elems;
 		int			i;
 
 		factors_datum = SPI_getbinval(tuple, tupdesc, 1, &factors_null);
 		if (factors_null)
 		{
-			NDB_FREE(query.data);
+			nfree(query.data);
 			NDB_SPI_SESSION_END(load_user_factors_spi_session);
 			return false;
 		}
@@ -634,7 +634,7 @@ als_load_user_factors(int32 model_id, int32 user_id, float **factors, int *n_fac
 		n_dims = ARR_NDIM(factors_array);
 		if (n_dims != 1)
 		{
-			NDB_FREE(query.data);
+			nfree(query.data);
 			NDB_SPI_SESSION_END(load_user_factors_spi_session);
 			return false;
 		}
@@ -647,10 +647,10 @@ als_load_user_factors(int32 model_id, int32 user_id, float **factors, int *n_fac
 
 		/* Allocate in parent context before SPI_finish() */
 		*n_factors = n_elems;
-		NDB_FREE(query.data);
+		nfree(query.data);
 		NDB_SPI_SESSION_END(load_user_factors_spi_session);
 
-		NDB_ALLOC(*factors, float, n_elems);
+		nalloc(*factors, float, n_elems);
 		for (i = 0; i < n_elems; i++)
 			(*factors)[i] = DatumGetFloat4(elems[i]);
 	}
@@ -663,7 +663,7 @@ als_load_item_factors(int32 model_id, int32 item_id, float ***factors, int *n_it
 {
 	StringInfoData query = {0};
 
-	NDB_DECLARE(NdbSpiSession *, load_item_factors_spi_session);
+	NdbSpiSession *load_item_factors_spi_session = NULL;
 	MemoryContext oldcontext;
 	int			ret;
 	int			n_rows;
@@ -681,7 +681,7 @@ als_load_item_factors(int32 model_id, int32 item_id, float ***factors, int *n_it
 	NDB_CHECK_SPI_TUPTABLE();
 	if (ret != SPI_OK_SELECT)
 	{
-		NDB_FREE(query.data);
+		nfree(query.data);
 		NDB_SPI_SESSION_END(load_item_factors_spi_session);
 		return false;
 	}
@@ -689,7 +689,7 @@ als_load_item_factors(int32 model_id, int32 item_id, float ***factors, int *n_it
 	n_rows = SPI_processed;
 	if (n_rows != 1)
 	{
-		NDB_FREE(query.data);
+		nfree(query.data);
 		NDB_SPI_SESSION_END(load_item_factors_spi_session);
 		return false;
 	}
@@ -698,7 +698,7 @@ als_load_item_factors(int32 model_id, int32 item_id, float ***factors, int *n_it
 	if (SPI_tuptable == NULL || SPI_tuptable->vals == NULL ||
 		SPI_processed == 0 || SPI_tuptable->vals[0] == NULL || SPI_tuptable->tupdesc == NULL)
 	{
-		NDB_FREE(query.data);
+		nfree(query.data);
 		NDB_SPI_SESSION_END(load_item_factors_spi_session);
 		return false;
 	}
@@ -707,21 +707,21 @@ als_load_item_factors(int32 model_id, int32 item_id, float ***factors, int *n_it
 		TupleDesc	tupdesc = SPI_tuptable->tupdesc;
 		Datum		factors_datum;
 		bool		factors_null;
-		ArrayType  *factors_array;
+		ArrayType *factors_array = NULL;
 		Oid			elmtype;
 		int16		typlen;
 		bool		typbyval;
 		char		typalign;
 		int			n_dims;
-		Datum	   *elems;
-		bool	   *nulls;
+		Datum *elems = NULL;
+		bool *nulls = NULL;
 		int			n_elems;
 		int			i;
 
 		factors_datum = SPI_getbinval(tuple, tupdesc, 1, &factors_null);
 		if (factors_null)
 		{
-			NDB_FREE(query.data);
+			nfree(query.data);
 			NDB_SPI_SESSION_END(load_item_factors_spi_session);
 			return false;
 		}
@@ -730,7 +730,7 @@ als_load_item_factors(int32 model_id, int32 item_id, float ***factors, int *n_it
 		n_dims = ARR_NDIM(factors_array);
 		if (n_dims != 1)
 		{
-			NDB_FREE(query.data);
+			nfree(query.data);
 			NDB_SPI_SESSION_END(load_item_factors_spi_session);
 			return false;
 		}
@@ -744,11 +744,11 @@ als_load_item_factors(int32 model_id, int32 item_id, float ***factors, int *n_it
 		/* Allocate in parent context before SPI_finish() */
 		*n_items_total = 1;
 		*n_factors = n_elems;
-		NDB_FREE(query.data);
+		nfree(query.data);
 		NDB_SPI_SESSION_END(load_item_factors_spi_session);
 
-		NDB_ALLOC(*factors, float *, 1);
-		NDB_ALLOC((*factors)[0], float, n_elems);
+		nalloc(*factors, float *, 1);
+		nalloc((*factors)[0], float, n_elems);
 
 		for (i = 0; i < n_elems; i++)
 			(*factors)[0][i] = DatumGetFloat4(elems[i]);
@@ -770,8 +770,8 @@ predict_collaborative_filter(PG_FUNCTION_ARGS)
 	int32		user_id = PG_GETARG_INT32(1);
 	int32		item_id = PG_GETARG_INT32(2);
 
-	NDB_DECLARE(float *, user_factors);
-	NDB_DECLARE(float **, item_factors);
+	float *user_factors = NULL;
+	float **item_factors = NULL;
 	int			n_factors = 0;
 	int			n_items_total = 0;
 	float		prediction = 0.0;
@@ -789,7 +789,7 @@ predict_collaborative_filter(PG_FUNCTION_ARGS)
 	/* Load item factors */
 	if (!als_load_item_factors(model_id, item_id, &item_factors, &n_items_total, &n_factors))
 	{
-		NDB_FREE(user_factors);
+		nfree(user_factors);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("collaborative_filter: no factors found for item %d in model %d",
@@ -810,10 +810,10 @@ predict_collaborative_filter(PG_FUNCTION_ARGS)
 	if (prediction > 5.0)
 		prediction = 5.0;
 
-	NDB_FREE(user_factors);
+	nfree(user_factors);
 	for (i = 0; i < n_items_total; i++)
-		NDB_FREE(item_factors[i]);
-	NDB_FREE(item_factors);
+		nfree(item_factors[i]);
+	nfree(item_factors);
 
 	PG_RETURN_FLOAT8(prediction);
 }
@@ -828,14 +828,14 @@ Datum
 evaluate_collaborative_filter_by_model_id(PG_FUNCTION_ARGS)
 {
 	int32		model_id;
-	text	   *table_name;
-	text	   *user_col;
-	text	   *item_col;
-	text	   *rating_col;
-	char	   *tbl_str;
-	char	   *user_str;
-	char	   *item_str;
-	char	   *rating_str;
+	text *table_name = NULL;
+	text *user_col = NULL;
+	text *item_col = NULL;
+	text *rating_col = NULL;
+	char *tbl_str = NULL;
+	char *user_str = NULL;
+	char *item_str = NULL;
+	char *rating_str = NULL;
 	StringInfoData query;
 	int			ret;
 	int			n_ratings = 0;
@@ -843,7 +843,7 @@ evaluate_collaborative_filter_by_model_id(PG_FUNCTION_ARGS)
 	double		mae = 0.0;
 	int			i;
 	StringInfoData jsonbuf;
-	Jsonb	   *result;
+	Jsonb *result = NULL;
 	MemoryContext oldcontext = CurrentMemoryContext;
 	double		rmse;
 
@@ -878,7 +878,7 @@ evaluate_collaborative_filter_by_model_id(PG_FUNCTION_ARGS)
 	{
 		MemoryContext oldcontext_local = CurrentMemoryContext;
 
-		NDB_DECLARE(NdbSpiSession *, eval_cf_spi_session);
+		NdbSpiSession *eval_cf_spi_session = NULL;
 
 		Assert(oldcontext_local != NULL);
 		NDB_SPI_SESSION_BEGIN(eval_cf_spi_session, oldcontext_local);
@@ -893,12 +893,12 @@ evaluate_collaborative_filter_by_model_id(PG_FUNCTION_ARGS)
 		NDB_CHECK_SPI_TUPTABLE();
 		if (ret != SPI_OK_SELECT)
 		{
-			NDB_FREE(query.data);
+			nfree(query.data);
 			NDB_SPI_SESSION_END(eval_cf_spi_session);
-			NDB_FREE(tbl_str);
-			NDB_FREE(user_str);
-			NDB_FREE(item_str);
-			NDB_FREE(rating_str);
+			nfree(tbl_str);
+			nfree(user_str);
+			nfree(item_str);
+			nfree(rating_str);
 			ereport(ERROR,
 					(errcode(ERRCODE_INTERNAL_ERROR),
 					 errmsg("neurondb: evaluate_collaborative_filter_by_model_id: query failed"),
@@ -909,12 +909,12 @@ evaluate_collaborative_filter_by_model_id(PG_FUNCTION_ARGS)
 		n_ratings = SPI_processed;
 		if (n_ratings < 2)
 		{
-			NDB_FREE(query.data);
+			nfree(query.data);
 			NDB_SPI_SESSION_END(eval_cf_spi_session);
-			NDB_FREE(tbl_str);
-			NDB_FREE(user_str);
-			NDB_FREE(item_str);
-			NDB_FREE(rating_str);
+			nfree(tbl_str);
+			nfree(user_str);
+			nfree(item_str);
+			nfree(rating_str);
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("neurondb: evaluate_collaborative_filter_by_model_id: need at least 2 ratings"),
@@ -1017,7 +1017,7 @@ evaluate_collaborative_filter_by_model_id(PG_FUNCTION_ARGS)
 			}
 		}
 
-		NDB_FREE(query.data);
+		nfree(query.data);
 		NDB_SPI_SESSION_END(eval_cf_spi_session);
 	}
 
@@ -1052,12 +1052,12 @@ evaluate_collaborative_filter_by_model_id(PG_FUNCTION_ARGS)
 					 mse, mae, rmse, n_ratings);
 
 	result = ndb_jsonb_in_cstring(jsonbuf.data);
-	NDB_FREE(jsonbuf.data);
+	nfree(jsonbuf.data);
 
-	NDB_FREE(tbl_str);
-	NDB_FREE(user_str);
-	NDB_FREE(item_str);
-	NDB_FREE(rating_str);
+	nfree(tbl_str);
+	nfree(user_str);
+	nfree(item_str);
+	nfree(rating_str);
 
 	PG_RETURN_JSONB_P(result);
 }
@@ -1074,25 +1074,25 @@ recommend_items(PG_FUNCTION_ARGS)
 	int32		user_id = PG_GETARG_INT32(1);
 	int32		n_items = PG_ARGISNULL(2) ? 10 : PG_GETARG_INT32(2);
 
-	NDB_DECLARE(float *, user_factors);
+	float *user_factors = NULL;
 	int			n_factors = 0;
 
-	NDB_DECLARE(int *, item_ids);
-	NDB_DECLARE(float **, item_factors);
+	int *item_ids = NULL;
+	float **item_factors = NULL;
 	int			n_items_total = 0;
 	int			i,
 				j;
 
-	NDB_DECLARE(int32 *, top_items);
-	NDB_DECLARE(float *, top_scores);
+	int32 *top_items = NULL;
+	float *top_scores = NULL;
 	StringInfoData sql = {0};
 
-	NDB_DECLARE(NdbSpiSession *, predict_cf_spi_session);
+	NdbSpiSession *predict_cf_spi_session = NULL;
 	MemoryContext oldcontext = CurrentMemoryContext;
 	int			ret = 0;
 
-	NDB_DECLARE(ArrayType *, result_array);
-	NDB_DECLARE(Datum *, elems);
+	ArrayType *result_array = NULL;
+	Datum *elems = NULL;
 
 	NDB_SPI_SESSION_BEGIN(predict_cf_spi_session, oldcontext);
 
@@ -1119,7 +1119,7 @@ recommend_items(PG_FUNCTION_ARGS)
 	NDB_CHECK_SPI_TUPTABLE();
 	if (ret != SPI_OK_SELECT)
 	{
-		NDB_FREE(sql.data);
+		nfree(sql.data);
 		NDB_SPI_SESSION_END(predict_cf_spi_session);
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
@@ -1129,7 +1129,7 @@ recommend_items(PG_FUNCTION_ARGS)
 	}
 	if (SPI_processed != 1)
 	{
-		NDB_FREE(sql.data);
+		nfree(sql.data);
 		NDB_SPI_SESSION_END(predict_cf_spi_session);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
@@ -1142,7 +1142,7 @@ recommend_items(PG_FUNCTION_ARGS)
 	if (SPI_tuptable == NULL || SPI_tuptable->vals == NULL ||
 		SPI_processed == 0 || SPI_tuptable->vals[0] == NULL || SPI_tuptable->tupdesc == NULL)
 	{
-		NDB_FREE(sql.data);
+		nfree(sql.data);
 		NDB_SPI_SESSION_END(predict_cf_spi_session);
 		PG_RETURN_NULL();
 	}
@@ -1154,7 +1154,7 @@ recommend_items(PG_FUNCTION_ARGS)
 
 		if (isnull)
 		{
-			NDB_FREE(sql.data);
+			nfree(sql.data);
 			NDB_SPI_SESSION_END(predict_cf_spi_session);
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
@@ -1167,7 +1167,7 @@ recommend_items(PG_FUNCTION_ARGS)
 
 			n_factors = ArrayGetNItems(
 									   ARR_NDIM(user_vec), ARR_DIMS(user_vec));
-			NDB_ALLOC(user_factors, float, n_factors);
+			nalloc(user_factors, float, n_factors);
 			memcpy(user_factors,
 				   ARR_DATA_PTR(user_vec),
 				   sizeof(float) * n_factors);
@@ -1175,7 +1175,7 @@ recommend_items(PG_FUNCTION_ARGS)
 	}
 
 	/* Use safe free/reinit to handle potential memory context changes */
-	NDB_FREE(sql.data);
+	nfree(sql.data);
 	initStringInfo(&sql);
 	appendStringInfo(&sql,
 					 "SELECT item_id, factors FROM neurondb_cf_item_factors WHERE model_id = %d",
@@ -1186,9 +1186,9 @@ recommend_items(PG_FUNCTION_ARGS)
 		NDB_CHECK_SPI_TUPTABLE();
 	if (ret != SPI_OK_SELECT)
 	{
-		NDB_FREE(sql.data);
+		nfree(sql.data);
 		if (user_factors)
-			NDB_FREE(user_factors);
+			nfree(user_factors);
 		NDB_SPI_SESSION_END(predict_cf_spi_session);
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
@@ -1199,9 +1199,9 @@ recommend_items(PG_FUNCTION_ARGS)
 	n_items_total = SPI_processed;
 	if (n_items_total < 1)
 	{
-		NDB_FREE(sql.data);
+		nfree(sql.data);
 		if (user_factors)
-			NDB_FREE(user_factors);
+			nfree(user_factors);
 		NDB_SPI_SESSION_END(predict_cf_spi_session);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
@@ -1209,18 +1209,18 @@ recommend_items(PG_FUNCTION_ARGS)
 				 errdetail("Model %d has no item factors", model_id),
 				 errhint("Ensure the model was trained successfully.")));
 	}
-	NDB_ALLOC(item_ids, int, n_items_total);
-	NDB_ALLOC(item_factors, float *, n_items_total);
+	nalloc(item_ids, int, n_items_total);
+	nalloc(item_factors, float *, n_items_total);
 
 	for (i = 0; i < n_items_total; ++i)
 	{
 		HeapTuple	itup = SPI_tuptable->vals[i];
 		int			item_id = 0;
 
-		NDB_DECLARE(float *, fac);
+		float *fac = NULL;
 		int			item_n_factors = 0;
 
-		NDB_DECLARE(ArrayType *, arr_f);
+		ArrayType *arr_f = NULL;
 		bool		isnull_fac = false;
 		Datum		facdatum;
 
@@ -1244,11 +1244,11 @@ recommend_items(PG_FUNCTION_ARGS)
 		if (item_n_factors != n_factors)
 		{
 			for (j = 0; j < i; ++j)
-				NDB_FREE(item_factors[j]);
-			NDB_FREE(item_ids);
-			NDB_FREE(item_factors);
-			NDB_FREE(user_factors);
-			NDB_FREE(sql.data);
+				nfree(item_factors[j]);
+			nfree(item_ids);
+			nfree(item_factors);
+			nfree(user_factors);
+			nfree(sql.data);
 			NDB_SPI_SESSION_END(predict_cf_spi_session);
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
@@ -1256,14 +1256,14 @@ recommend_items(PG_FUNCTION_ARGS)
 					 errdetail("Item %d has %d factors but expected %d", item_id, item_n_factors, n_factors),
 					 errhint("This indicates corrupted model data. Retrain the model.")));
 		}
-		NDB_ALLOC(fac, float, n_factors);
+		nalloc(fac, float, n_factors);
 		memcpy(fac, ARR_DATA_PTR(arr_f), sizeof(float) * n_factors);
 		item_ids[i] = item_id;
 		item_factors[i] = fac;
 	}
 
-	NDB_ALLOC(top_items, int32, n_items);
-	NDB_ALLOC(top_scores, float, n_items);
+	nalloc(top_items, int32, n_items);
+	nalloc(top_scores, float, n_items);
 
 	for (i = 0; i < n_items; ++i)
 	{
@@ -1290,14 +1290,14 @@ recommend_items(PG_FUNCTION_ARGS)
 	}
 
 	if (user_factors)
-		NDB_FREE(user_factors);
+		nfree(user_factors);
 	for (i = 0; i < n_items_total; ++i)
 		if (item_factors[i])
-			NDB_FREE(item_factors[i]);
+			nfree(item_factors[i]);
 	if (item_factors)
-		NDB_FREE(item_factors);
+		nfree(item_factors);
 	if (item_ids)
-		NDB_FREE(item_ids);
+		nfree(item_ids);
 
 	for (i = 0; i < n_items - 1; ++i)
 	{
@@ -1316,7 +1316,7 @@ recommend_items(PG_FUNCTION_ARGS)
 		}
 	}
 
-	NDB_ALLOC(elems, Datum, n_items);
+	nalloc(elems, Datum, n_items);
 	for (i = 0; i < n_items; ++i)
 	{
 		elems[i] = Int32GetDatum(top_items[i]);
@@ -1325,10 +1325,10 @@ recommend_items(PG_FUNCTION_ARGS)
 	result_array = construct_array(
 								   elems, n_items, INT4OID, sizeof(int32), true, 'i');
 
-	NDB_FREE(sql.data);
-	NDB_FREE(elems);
-	NDB_FREE(top_items);
-	NDB_FREE(top_scores);
+	nfree(sql.data);
+	nfree(elems);
+	nfree(top_items);
+	nfree(top_scores);
 	NDB_SPI_SESSION_END(predict_cf_spi_session);
 
 	PG_RETURN_ARRAYTYPE_P(result_array);
@@ -1353,16 +1353,16 @@ recommend_content_based(PG_FUNCTION_ARGS)
 				item_count,
 				n_factors;
 
-	NDB_DECLARE(int32 *, other_ids);
-	NDB_DECLARE(float **, other_factors);
+	int32 *other_ids = NULL;
+	float **other_factors = NULL;
 	int			target_idx = -1;
 
-	NDB_DECLARE(float *, target_vec);
+	float *target_vec = NULL;
 
-	NDB_DECLARE(ArrayType *, result_array);
-	NDB_DECLARE(Datum *, elems);
-	NDB_DECLARE(int32 *, top_items);
-	NDB_DECLARE(float *, top_sims);
+	ArrayType *result_array = NULL;
+	Datum *elems = NULL;
+	int32 *top_items = NULL;
+	float *top_sims = NULL;
 
 	if (n_recommendations < RECO_MIN_RESULT
 		|| n_recommendations > RECO_MAX_RESULT)
@@ -1373,7 +1373,7 @@ recommend_content_based(PG_FUNCTION_ARGS)
 						RECO_MAX_RESULT)));
 
 	{
-		NDB_DECLARE(NdbSpiSession *, content_spi_session);
+		NdbSpiSession *content_spi_session = NULL;
 		MemoryContext oldcontext = CurrentMemoryContext;
 		StringInfoData sql = {0};
 
@@ -1387,9 +1387,9 @@ recommend_content_based(PG_FUNCTION_ARGS)
 		NDB_CHECK_SPI_TUPTABLE();
 		if (ret != SPI_OK_SELECT)
 		{
-			NDB_FREE(sql.data);
+			nfree(sql.data);
 			if (features_table_str)
-				NDB_FREE(features_table_str);
+				nfree(features_table_str);
 			NDB_SPI_SESSION_END(content_spi_session);
 			ereport(ERROR,
 					(errcode(ERRCODE_INTERNAL_ERROR),
@@ -1400,9 +1400,9 @@ recommend_content_based(PG_FUNCTION_ARGS)
 		item_count = SPI_processed;
 		if (item_count < 2)
 		{
-			NDB_FREE(sql.data);
+			nfree(sql.data);
 			if (features_table_str)
-				NDB_FREE(features_table_str);
+				nfree(features_table_str);
 			NDB_SPI_SESSION_END(content_spi_session);
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
@@ -1410,8 +1410,8 @@ recommend_content_based(PG_FUNCTION_ARGS)
 					 errdetail("Found %d items but need at least 2 for content-based recommendations", item_count),
 					 errhint("Ensure the features table contains at least 2 items.")));
 		}
-		NDB_ALLOC(other_ids, int32, item_count);
-		NDB_ALLOC(other_factors, float *, item_count);
+		nalloc(other_ids, int32, item_count);
+		nalloc(other_factors, float *, item_count);
 
 		n_factors = 0;
 		for (i = 0; i < item_count; ++i)
@@ -1428,16 +1428,16 @@ recommend_content_based(PG_FUNCTION_ARGS)
 
 			if (isnull_item || isnull_feat)
 			{
-				NDB_FREE(sql.data);
+				nfree(sql.data);
 				if (features_table_str)
-					NDB_FREE(features_table_str);
+					nfree(features_table_str);
 				for (j = 0; j < i; ++j)
 					if (other_factors[j])
-						NDB_FREE(other_factors[j]);
+						nfree(other_factors[j]);
 				if (other_factors)
-					NDB_FREE(other_factors);
+					nfree(other_factors);
 				if (other_ids)
-					NDB_FREE(other_ids);
+					nfree(other_ids);
 				NDB_SPI_SESSION_END(content_spi_session);
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
@@ -1454,16 +1454,16 @@ recommend_content_based(PG_FUNCTION_ARGS)
 					n_factors = nf;
 				if (nf != n_factors)
 				{
-					NDB_FREE(sql.data);
+					nfree(sql.data);
 					if (features_table_str)
-						NDB_FREE(features_table_str);
+						nfree(features_table_str);
 					for (j = 0; j < i; ++j)
 						if (other_factors[j])
-							NDB_FREE(other_factors[j]);
+							nfree(other_factors[j]);
 					if (other_factors)
-						NDB_FREE(other_factors);
+						nfree(other_factors);
 					if (other_ids)
-						NDB_FREE(other_ids);
+						nfree(other_ids);
 					NDB_SPI_SESSION_END(content_spi_session);
 					ereport(ERROR,
 							(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
@@ -1472,9 +1472,9 @@ recommend_content_based(PG_FUNCTION_ARGS)
 							 errhint("Ensure all feature vectors have the same dimension.")));
 				}
 				{
-					float	   *vec;
+					float *vec = NULL;
 
-					NDB_ALLOC(vec, float, n_factors);
+					nalloc(vec, float, n_factors);
 					memcpy(vec,
 						   ARR_DATA_PTR(arr),
 						   sizeof(float) * n_factors);
@@ -1490,16 +1490,16 @@ recommend_content_based(PG_FUNCTION_ARGS)
 		}
 		if (target_idx == -1)
 		{
-			NDB_FREE(sql.data);
+			nfree(sql.data);
 			if (features_table_str)
-				NDB_FREE(features_table_str);
+				nfree(features_table_str);
 			for (j = 0; j < item_count; ++j)
 				if (other_factors[j])
-					NDB_FREE(other_factors[j]);
+					nfree(other_factors[j]);
 			if (other_factors)
-				NDB_FREE(other_factors);
+				nfree(other_factors);
 			if (other_ids)
-				NDB_FREE(other_ids);
+				nfree(other_ids);
 			NDB_SPI_SESSION_END(content_spi_session);
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
@@ -1508,8 +1508,8 @@ recommend_content_based(PG_FUNCTION_ARGS)
 					 errhint("Verify the item_id exists in the features table.")));
 		}
 
-		NDB_ALLOC(top_items, int32, n_recommendations);
-		NDB_ALLOC(top_sims, float, n_recommendations);
+		nalloc(top_items, int32, n_recommendations);
+		nalloc(top_sims, float, n_recommendations);
 		for (i = 0; i < n_recommendations; ++i)
 		{
 			top_items[i] = -1;
@@ -1565,7 +1565,7 @@ recommend_content_based(PG_FUNCTION_ARGS)
 					top_items[i] = top_items[j];
 					top_items[j] = t2;
 				}
-		NDB_ALLOC(elems, Datum, n_recommendations);
+		nalloc(elems, Datum, n_recommendations);
 		for (i = 0; i < n_recommendations; ++i)
 			elems[i] = Int32GetDatum(top_items[i]);
 		result_array = construct_array(elems,
@@ -1577,20 +1577,20 @@ recommend_content_based(PG_FUNCTION_ARGS)
 
 		for (i = 0; i < item_count; ++i)
 			if (other_factors[i])
-				NDB_FREE(other_factors[i]);
+				nfree(other_factors[i]);
 		if (other_factors)
-			NDB_FREE(other_factors);
+			nfree(other_factors);
 		if (other_ids)
-			NDB_FREE(other_ids);
+			nfree(other_ids);
 		if (features_table_str)
-			NDB_FREE(features_table_str);
+			nfree(features_table_str);
 		if (elems)
-			NDB_FREE(elems);
+			nfree(elems);
 		if (top_items)
-			NDB_FREE(top_items);
+			nfree(top_items);
 		if (top_sims)
-			NDB_FREE(top_sims);
-		NDB_FREE(sql.data);
+			nfree(top_sims);
+		nfree(sql.data);
 		NDB_SPI_SESSION_END(content_spi_session);
 		PG_RETURN_ARRAYTYPE_P(result_array);
 	}
@@ -1619,7 +1619,7 @@ user_similarity(PG_FUNCTION_ARGS)
 				sxy = 0.0f;
 	float		r = 0.0f;
 
-	NDB_DECLARE(NdbSpiSession *, user_sim_spi_session);
+	NdbSpiSession *user_sim_spi_session = NULL;
 	MemoryContext oldcontext = CurrentMemoryContext;
 
 	NDB_SPI_SESSION_BEGIN(user_sim_spi_session, oldcontext);
@@ -1641,9 +1641,9 @@ user_similarity(PG_FUNCTION_ARGS)
 		NDB_CHECK_SPI_TUPTABLE();
 		if (ret != SPI_OK_SELECT)
 		{
-			NDB_FREE(sql.data);
+			nfree(sql.data);
 			if (ratings_table_str)
-				NDB_FREE(ratings_table_str);
+				nfree(ratings_table_str);
 			NDB_SPI_SESSION_END(user_sim_spi_session);
 			ereport(ERROR,
 					(errcode(ERRCODE_INTERNAL_ERROR),
@@ -1655,9 +1655,9 @@ user_similarity(PG_FUNCTION_ARGS)
 		count = SPI_processed;
 		if (count < 2)
 		{
-			NDB_FREE(sql.data);
+			nfree(sql.data);
 			if (ratings_table_str)
-				NDB_FREE(ratings_table_str);
+				nfree(ratings_table_str);
 			NDB_SPI_SESSION_END(user_sim_spi_session);
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
@@ -1692,9 +1692,9 @@ user_similarity(PG_FUNCTION_ARGS)
 				r = 0.0f;
 		}
 
-		NDB_FREE(sql.data);
+		nfree(sql.data);
 		if (ratings_table_str)
-			NDB_FREE(ratings_table_str);
+			nfree(ratings_table_str);
 		NDB_SPI_SESSION_END(user_sim_spi_session);
 		PG_RETURN_FLOAT8((double) r);
 	}
@@ -1731,7 +1731,7 @@ recommend_hybrid(PG_FUNCTION_ARGS)
 	}
 
 	{
-		char	   *content_table_str;
+		char *content_table_str = NULL;
 		int			ret;
 		int			i;
 		int			j;
@@ -1740,27 +1740,27 @@ recommend_hybrid(PG_FUNCTION_ARGS)
 		TupleDesc	tupdesc;
 		bool		isnull;
 		Datum		arr;
-		ArrayType  *user_vec;
+		ArrayType *user_vec = NULL;
 		int			n_factors;
 
-		NDB_DECLARE(float *, user_factors);
+		float *user_factors = NULL;
 		int			n_items_total;
 
-		NDB_DECLARE(int32 *, item_ids);
-		float	  **item_factors = NULL;
+		int32 *item_ids = NULL;
+		float **item_factors = NULL;
 		int			n_feat_items;
 
-		NDB_DECLARE(int32 *, feat_item_ids);
-		float	  **content_factors = NULL;
+		int32 *feat_item_ids = NULL;
+		float **content_factors = NULL;
 		int			nf_content;
 		int			ntop;
 
-		NDB_DECLARE(int32 *, top_items);
-		NDB_DECLARE(float *, top_scores);
-		NDB_DECLARE(Datum *, elems);
-		ArrayType  *result_array;
+		int32 *top_items = NULL;
+		float *top_scores = NULL;
+		Datum *elems = NULL;
+		ArrayType *result_array = NULL;
 
-		NDB_DECLARE(NdbSpiSession *, hybrid_spi_session);
+		NdbSpiSession *hybrid_spi_session = NULL;
 		MemoryContext oldcontext;
 
 		oldcontext = CurrentMemoryContext;
@@ -1779,9 +1779,9 @@ recommend_hybrid(PG_FUNCTION_ARGS)
 		NDB_CHECK_SPI_TUPTABLE();
 		if (ret != SPI_OK_SELECT)
 		{
-			NDB_FREE(sql.data);
+			nfree(sql.data);
 			if (content_table_str)
-				NDB_FREE(content_table_str);
+				nfree(content_table_str);
 			NDB_SPI_SESSION_END(hybrid_spi_session);
 			ereport(ERROR,
 					(errcode(ERRCODE_INTERNAL_ERROR),
@@ -1791,9 +1791,9 @@ recommend_hybrid(PG_FUNCTION_ARGS)
 		}
 		if (SPI_processed != 1)
 		{
-			NDB_FREE(sql.data);
+			nfree(sql.data);
 			if (content_table_str)
-				NDB_FREE(content_table_str);
+				nfree(content_table_str);
 			NDB_SPI_SESSION_END(hybrid_spi_session);
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
@@ -1807,9 +1807,9 @@ recommend_hybrid(PG_FUNCTION_ARGS)
 		arr = SPI_getbinval(tuple, tupdesc, 1, &isnull);
 		if (isnull)
 		{
-			NDB_FREE(sql.data);
+			nfree(sql.data);
 			if (content_table_str)
-				NDB_FREE(content_table_str);
+				nfree(content_table_str);
 			NDB_SPI_SESSION_END(hybrid_spi_session);
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
@@ -1820,14 +1820,14 @@ recommend_hybrid(PG_FUNCTION_ARGS)
 		user_vec = DatumGetArrayTypeP(arr);
 		n_factors =
 			ArrayGetNItems(ARR_NDIM(user_vec), ARR_DIMS(user_vec));
-		NDB_ALLOC(user_factors, float, n_factors);
+		nalloc(user_factors, float, n_factors);
 		memcpy(user_factors,
 			   ARR_DATA_PTR(user_vec),
 			   sizeof(float) * n_factors);
 
 		/* load item factors */
 		/* Use safe free/reinit to handle potential memory context changes */
-		NDB_FREE(sql.data);
+		nfree(sql.data);
 		initStringInfo(&sql);
 		appendStringInfo(&sql,
 						 "SELECT item_id, factors FROM neurondb_cf_item_factors WHERE model_id = %d",
@@ -1836,11 +1836,11 @@ recommend_hybrid(PG_FUNCTION_ARGS)
 		NDB_CHECK_SPI_TUPTABLE();
 		if (ret != SPI_OK_SELECT)
 		{
-			NDB_FREE(sql.data);
+			nfree(sql.data);
 			if (user_factors)
-				NDB_FREE(user_factors);
+				nfree(user_factors);
 			if (content_table_str)
-				NDB_FREE(content_table_str);
+				nfree(content_table_str);
 			NDB_SPI_SESSION_END(hybrid_spi_session);
 			ereport(ERROR,
 					(errcode(ERRCODE_INTERNAL_ERROR),
@@ -1851,11 +1851,11 @@ recommend_hybrid(PG_FUNCTION_ARGS)
 		n_items_total = SPI_processed;
 		if (n_items_total < 1)
 		{
-			NDB_FREE(sql.data);
+			nfree(sql.data);
 			if (user_factors)
-				NDB_FREE(user_factors);
+				nfree(user_factors);
 			if (content_table_str)
-				NDB_FREE(content_table_str);
+				nfree(content_table_str);
 			NDB_SPI_SESSION_END(hybrid_spi_session);
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
@@ -1863,8 +1863,8 @@ recommend_hybrid(PG_FUNCTION_ARGS)
 					 errdetail("No items found for model %d", cf_model_id),
 					 errhint("Verify the model contains item factors.")));
 		}
-		NDB_ALLOC(item_ids, int32, n_items_total);
-		NDB_ALLOC(item_factors, float *, n_items_total);
+		nalloc(item_ids, int32, n_items_total);
+		nalloc(item_factors, float *, n_items_total);
 		for (i = 0; i < n_items_total; ++i)
 		{
 			HeapTuple	tup2 = SPI_tuptable->vals[i];
@@ -1873,9 +1873,9 @@ recommend_hybrid(PG_FUNCTION_ARGS)
 			bool		isnull_fac = false;
 			int			id;
 			Datum		facdatum;
-			ArrayType  *facarr;
+			ArrayType *facarr = NULL;
 			int			nf;
-			float	   *vec;
+			float *vec = NULL;
 
 			id = DatumGetInt32(
 							   SPI_getbinval(tup2, desc, 1, &isnull_id));
@@ -1887,17 +1887,17 @@ recommend_hybrid(PG_FUNCTION_ARGS)
 				for (j = 0; j < i; ++j)
 				{
 					if (item_factors[j])
-						NDB_FREE(item_factors[j]);
+						nfree(item_factors[j]);
 				}
 				if (item_factors)
-					NDB_FREE(item_factors);
+					nfree(item_factors);
 				if (item_ids)
-					NDB_FREE(item_ids);
+					nfree(item_ids);
 				if (user_factors)
-					NDB_FREE(user_factors);
+					nfree(user_factors);
 				if (content_table_str)
-					NDB_FREE(content_table_str);
-				NDB_FREE(sql.data);
+					nfree(content_table_str);
+				nfree(sql.data);
 				NDB_SPI_SESSION_END(hybrid_spi_session);
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
@@ -1905,7 +1905,7 @@ recommend_hybrid(PG_FUNCTION_ARGS)
 						 errdetail("Item %d has %d factors but expected %d", id, nf, n_factors),
 						 errhint("This indicates corrupted model data. Retrain the model.")));
 			}
-			NDB_ALLOC(vec, float, n_factors);
+			nalloc(vec, float, n_factors);
 			memcpy(vec,
 				   ARR_DATA_PTR(facarr),
 				   sizeof(float) * n_factors);
@@ -1914,7 +1914,7 @@ recommend_hybrid(PG_FUNCTION_ARGS)
 		}
 
 		/* Use safe free/reinit to handle potential memory context changes */
-		NDB_FREE(sql.data);
+		nfree(sql.data);
 		initStringInfo(&sql);
 		appendStringInfo(&sql,
 						 "SELECT item_id, features FROM %s",
@@ -1925,16 +1925,16 @@ recommend_hybrid(PG_FUNCTION_ARGS)
 		{
 			for (i = 0; i < n_items_total; ++i)
 				if (item_factors[i])
-					NDB_FREE(item_factors[i]);
+					nfree(item_factors[i]);
 			if (item_factors)
-				NDB_FREE(item_factors);
+				nfree(item_factors);
 			if (item_ids)
-				NDB_FREE(item_ids);
+				nfree(item_ids);
 			if (user_factors)
-				NDB_FREE(user_factors);
+				nfree(user_factors);
 			if (content_table_str)
-				NDB_FREE(content_table_str);
-			NDB_FREE(sql.data);
+				nfree(content_table_str);
+			nfree(sql.data);
 			NDB_SPI_SESSION_END(hybrid_spi_session);
 			ereport(ERROR,
 					(errcode(ERRCODE_INTERNAL_ERROR),
@@ -1943,8 +1943,8 @@ recommend_hybrid(PG_FUNCTION_ARGS)
 					 errhint("Verify the content table exists and is accessible.")));
 		}
 		n_feat_items = SPI_processed;
-		NDB_ALLOC(feat_item_ids, int32, n_feat_items);
-		NDB_ALLOC(content_factors, float *, n_feat_items);
+		nalloc(feat_item_ids, int32, n_feat_items);
+		nalloc(content_factors, float *, n_feat_items);
 		nf_content = 0;
 
 		for (i = 0; i < n_feat_items; ++i)
@@ -1959,7 +1959,7 @@ recommend_hybrid(PG_FUNCTION_ARGS)
 				SPI_getbinval(tupf, descf, 2, &isnull_feat);
 			ArrayType  *a = DatumGetArrayTypeP(arr_tmp);
 			int			nf = ArrayGetNItems(ARR_NDIM(a), ARR_DIMS(a));
-			float	   *vec;
+			float *vec = NULL;
 
 			if (i == 0)
 				nf_content = nf;
@@ -1967,23 +1967,23 @@ recommend_hybrid(PG_FUNCTION_ARGS)
 			{
 				for (j = 0; j < i; ++j)
 					if (content_factors[j])
-						NDB_FREE(content_factors[j]);
+						nfree(content_factors[j]);
 				for (j = 0; j < n_items_total; ++j)
 					if (item_factors[j])
-						NDB_FREE(item_factors[j]);
+						nfree(item_factors[j]);
 				if (content_factors)
-					NDB_FREE(content_factors);
+					nfree(content_factors);
 				if (feat_item_ids)
-					NDB_FREE(feat_item_ids);
+					nfree(feat_item_ids);
 				if (item_factors)
-					NDB_FREE(item_factors);
+					nfree(item_factors);
 				if (item_ids)
-					NDB_FREE(item_ids);
+					nfree(item_ids);
 				if (user_factors)
-					NDB_FREE(user_factors);
+					nfree(user_factors);
 				if (content_table_str)
-					NDB_FREE(content_table_str);
-				NDB_FREE(sql.data);
+					nfree(content_table_str);
+				nfree(sql.data);
 				NDB_SPI_SESSION_END(hybrid_spi_session);
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
@@ -1991,7 +1991,7 @@ recommend_hybrid(PG_FUNCTION_ARGS)
 						 errdetail("Row %d has %d features but expected %d", i + 1, nf, nf_content),
 						 errhint("Ensure all content feature vectors have the same dimension.")));
 			}
-			NDB_ALLOC(vec, float, nf_content);
+			nalloc(vec, float, nf_content);
 			memcpy(vec,
 				   ARR_DATA_PTR(a),
 				   sizeof(float) * nf_content);
@@ -2000,8 +2000,8 @@ recommend_hybrid(PG_FUNCTION_ARGS)
 		}
 
 		ntop = Min(n_items, n_items_total);
-		NDB_ALLOC(top_items, int32, ntop);
-		NDB_ALLOC(top_scores, float, ntop);
+		nalloc(top_items, int32, ntop);
+		nalloc(top_scores, float, ntop);
 
 		for (i = 0; i < ntop; ++i)
 		{
@@ -2071,36 +2071,36 @@ recommend_hybrid(PG_FUNCTION_ARGS)
 			}
 		}
 
-		NDB_ALLOC(elems, Datum, ntop);
+		nalloc(elems, Datum, ntop);
 		for (i = 0; i < ntop; ++i)
 			elems[i] = Int32GetDatum(top_items[i]);
 		result_array = construct_array(
 									   elems, ntop, INT4OID, sizeof(int32), true, 'i');
 		if (top_items)
-			NDB_FREE(top_items);
+			nfree(top_items);
 		if (top_scores)
-			NDB_FREE(top_scores);
+			nfree(top_scores);
 		for (i = 0; i < n_feat_items; ++i)
 			if (content_factors[i])
-				NDB_FREE(content_factors[i]);
+				nfree(content_factors[i]);
 		for (i = 0; i < n_items_total; ++i)
 			if (item_factors[i])
-				NDB_FREE(item_factors[i]);
+				nfree(item_factors[i]);
 		if (content_factors)
-			NDB_FREE(content_factors);
+			nfree(content_factors);
 		if (feat_item_ids)
-			NDB_FREE(feat_item_ids);
+			nfree(feat_item_ids);
 		if (item_factors)
-			NDB_FREE(item_factors);
+			nfree(item_factors);
 		if (item_ids)
-			NDB_FREE(item_ids);
+			nfree(item_ids);
 		if (user_factors)
-			NDB_FREE(user_factors);
+			nfree(user_factors);
 		if (content_table_str)
-			NDB_FREE(content_table_str);
+			nfree(content_table_str);
 		if (elems)
-			NDB_FREE(elems);
-		NDB_FREE(sql.data);
+			nfree(elems);
+		nfree(sql.data);
 		NDB_SPI_SESSION_END(hybrid_spi_session);
 		PG_RETURN_ARRAYTYPE_P(result_array);
 	}
@@ -2113,8 +2113,8 @@ recommend_hybrid(PG_FUNCTION_ARGS)
 
 typedef struct RecommenderGpuModelState
 {
-	bytea	   *model_blob;
-	Jsonb	   *metrics;
+	bytea *model_blob;
+	Jsonb *metrics;
 	float	  **user_factors;
 	float	  **item_factors;
 	int			n_users;
@@ -2130,7 +2130,7 @@ recommender_model_serialize_to_bytea(float **user_factors, int n_users, float **
 	StringInfoData buf;
 	int			total_size;
 
-	NDB_DECLARE(bytea *, result);
+	bytea *result = NULL;
 	int			u,
 				i,
 				f;
@@ -2150,10 +2150,14 @@ recommender_model_serialize_to_bytea(float **user_factors, int n_users, float **
 			appendBinaryStringInfo(&buf, (char *) &item_factors[i][f], sizeof(float));
 
 	total_size = VARHDRSZ + buf.len;
-	NDB_ALLOC(result, bytea, total_size);
+	nalloc(result, bytea, total_size);
 	SET_VARSIZE(result, total_size);
 	memcpy(VARDATA(result), buf.data, buf.len);
-	NDB_FREE(buf.data);
+	nfree(buf.data);
+
+	return result;
+	memcpy(VARDATA(result), buf.data, buf.len);
+	nfree(buf.data);
 
 	return result;
 }
@@ -2166,8 +2170,8 @@ recommender_model_deserialize_from_bytea(const bytea * data, float ***user_facto
 	int			u,
 				i,
 				f;
-	float	  **user_factors = NULL;
-	float	  **item_factors = NULL;
+	float **user_factors = NULL;
+	float **item_factors = NULL;
 
 	if (data == NULL || VARSIZE(data) < VARHDRSZ + sizeof(int) * 3 + sizeof(float))
 		return -1;
@@ -2185,10 +2189,10 @@ recommender_model_deserialize_from_bytea(const bytea * data, float ***user_facto
 	if (*n_users_out < 1 || *n_users_out > 1000000 || *n_items_out < 1 || *n_items_out > 1000000 || *n_factors_out < 1 || *n_factors_out > 1000)
 		return -1;
 
-	NDB_ALLOC(user_factors, float *, *n_users_out);
+	nalloc(user_factors, float *, *n_users_out);
 	for (u = 0; u < *n_users_out; u++)
 	{
-		NDB_ALLOC(user_factors[u], float, *n_factors_out);
+		nalloc(user_factors[u], float, *n_factors_out);
 		for (f = 0; f < *n_factors_out; f++)
 		{
 			memcpy(&user_factors[u][f], buf + offset, sizeof(float));
@@ -2196,10 +2200,10 @@ recommender_model_deserialize_from_bytea(const bytea * data, float ***user_facto
 		}
 	}
 
-	NDB_ALLOC(item_factors, float *, *n_items_out);
+	nalloc(item_factors, float *, *n_items_out);
 	for (i = 0; i < *n_items_out; i++)
 	{
-		NDB_ALLOC(item_factors[i], float, *n_factors_out);
+		nalloc(item_factors[i], float, *n_factors_out);
 		for (f = 0; f < *n_factors_out; f++)
 		{
 			memcpy(&item_factors[i][f], buf + offset, sizeof(float));
@@ -2222,26 +2226,26 @@ recommender_model_free(float **user_factors, int n_users, float **item_factors, 
 	{
 		for (u = 0; u < n_users; u++)
 			if (user_factors[u] != NULL)
-				NDB_FREE(user_factors[u]);
-		NDB_FREE(user_factors);
+				nfree(user_factors[u]);
+		nfree(user_factors);
 	}
 
 	if (item_factors != NULL)
 	{
 		for (i = 0; i < n_items; i++)
 			if (item_factors[i] != NULL)
-				NDB_FREE(item_factors[i]);
-		NDB_FREE(item_factors);
+				nfree(item_factors[i]);
+		nfree(item_factors);
 	}
 }
 
 static bool
 recommender_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 {
-	RecommenderGpuModelState *state;
+	RecommenderGpuModelState *state = NULL;
 
-	NDB_DECLARE(float **, user_factors);
-	NDB_DECLARE(float **, item_factors);
+	float **user_factors = NULL;
+	float **item_factors = NULL;
 	int			n_users = 100;
 	int			n_items = 1000;
 	int			n_factors = 20;
@@ -2252,10 +2256,10 @@ recommender_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errs
 				i,
 				f;
 
-	NDB_DECLARE(bytea *, model_data);
-	NDB_DECLARE(Jsonb *, metrics);
+	bytea *model_data = NULL;
+	Jsonb *metrics = NULL;
 	StringInfoData metrics_json;
-	JsonbIterator *it;
+	JsonbIterator *it = NULL;
 	JsonbValue	v;
 	int			r;
 
@@ -2291,7 +2295,7 @@ recommender_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errs
 				else if (strcmp(key, "lambda") == 0 && v.type == jbvNumeric)
 					lambda = (float) DatumGetFloat8(DirectFunctionCall1(numeric_float8,
 																		NumericGetDatum(v.val.numeric)));
-				NDB_FREE(key);
+				nfree(key);
 			}
 		}
 	}
@@ -2319,18 +2323,18 @@ recommender_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errs
 	(void) dim;					/* Suppress unused variable warning */
 
 	/* Initialize user and item factors (ALS) */
-	NDB_ALLOC(user_factors, float *, n_users);
+	nalloc(user_factors, float *, n_users);
 	for (u = 0; u < n_users; u++)
 	{
-		NDB_ALLOC(user_factors[u], float, n_factors);
+		nalloc(user_factors[u], float, n_factors);
 		for (f = 0; f < n_factors; f++)
 			user_factors[u][f] = (float) rand() / RAND_MAX * 0.1f;
 	}
 
-	NDB_ALLOC(item_factors, float *, n_items);
+	nalloc(item_factors, float *, n_items);
 	for (i = 0; i < n_items; i++)
 	{
-		NDB_ALLOC(item_factors[i], float, n_factors);
+		nalloc(item_factors[i], float, n_factors);
 		for (f = 0; f < n_factors; f++)
 			item_factors[i][f] = (float) rand() / RAND_MAX * 0.1f;
 	}
@@ -2344,7 +2348,7 @@ recommender_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errs
 					 "{\"storage\":\"cpu\",\"n_users\":%d,\"n_items\":%d,\"n_factors\":%d,\"lambda\":%.6f,\"n_samples\":%d}",
 					 n_users, n_items, n_factors, lambda, nvec);
 	metrics = ndb_jsonb_in_cstring(metrics_json.data);
-	NDB_FREE(metrics_json.data);
+	nfree(metrics_json.data);
 
 	state = (RecommenderGpuModelState *) palloc0(sizeof(RecommenderGpuModelState));
 	NDB_CHECK_ALLOC(state, "state");
@@ -2359,7 +2363,7 @@ recommender_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errs
 	state->lambda = lambda;
 
 	if (model->backend_state != NULL)
-		NDB_FREE(model->backend_state);
+		nfree(model->backend_state);
 
 	model->backend_state = state;
 	model->gpu_ready = true;
@@ -2374,8 +2378,8 @@ recommender_gpu_predict(const MLGpuModel *model, const float *input, int input_d
 {
 	const		RecommenderGpuModelState *state;
 
-	NDB_DECLARE(float **, user_factors);
-	NDB_DECLARE(float **, item_factors);
+	float **user_factors = NULL;
+	float **item_factors = NULL;
 	int			n_users = 0,
 				n_items = 0,
 				n_factors = 0;
@@ -2483,7 +2487,7 @@ recommender_gpu_evaluate(const MLGpuModel *model, const MLGpuEvalSpec *spec,
 					 state->n_samples > 0 ? state->n_samples : 0);
 
 	metrics_json = ndb_jsonb_in_cstring(buf.data);
-	NDB_FREE(buf.data);
+	nfree(buf.data);
 
 	if (out != NULL)
 		out->payload = metrics_json;
@@ -2497,7 +2501,7 @@ recommender_gpu_serialize(const MLGpuModel *model, bytea * *payload_out,
 {
 	const		RecommenderGpuModelState *state;
 
-	NDB_DECLARE(bytea *, payload_copy);
+	bytea *payload_copy = NULL;
 	int			payload_size;
 
 	if (errstr != NULL)
@@ -2522,13 +2526,13 @@ recommender_gpu_serialize(const MLGpuModel *model, bytea * *payload_out,
 	}
 
 	payload_size = VARSIZE(state->model_blob);
-	NDB_ALLOC(payload_copy, bytea, payload_size);
+	nalloc(payload_copy, bytea, payload_size);
 	memcpy(payload_copy, state->model_blob, payload_size);
 
 	if (payload_out != NULL)
 		*payload_out = payload_copy;
 	else
-		NDB_FREE(payload_copy);
+		nfree(payload_copy);
 
 	if (metadata_out != NULL && state->metrics != NULL)
 		*metadata_out = (Jsonb *) PG_DETOAST_DATUM_COPY(
@@ -2543,16 +2547,16 @@ recommender_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 {
 	RecommenderGpuModelState *state;
 
-	NDB_DECLARE(bytea *, payload_copy);
+	bytea *payload_copy = NULL;
 	int			payload_size;
 
-	NDB_DECLARE(float **, user_factors);
-	NDB_DECLARE(float **, item_factors);
+	float **user_factors = NULL;
+	float **item_factors = NULL;
 	int			n_users = 0,
 				n_items = 0,
 				n_factors = 0;
 	float		lambda = 0.0f;
-	JsonbIterator *it;
+	JsonbIterator *it = NULL;
 	JsonbValue	v;
 	int			r;
 
@@ -2566,13 +2570,13 @@ recommender_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 	}
 
 	payload_size = VARSIZE(payload);
-	NDB_ALLOC(payload_copy, bytea, payload_size);
+	nalloc(payload_copy, bytea, payload_size);
 	memcpy(payload_copy, payload, payload_size);
 
 	if (recommender_model_deserialize_from_bytea(payload_copy,
 												 &user_factors, &n_users, &item_factors, &n_items, &n_factors, &lambda) != 0)
 	{
-		NDB_FREE(payload_copy);
+		nfree(payload_copy);
 		if (errstr != NULL)
 			*errstr = pstrdup("recommender_gpu_deserialize: failed to deserialize");
 		return false;
@@ -2593,9 +2597,9 @@ recommender_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 	{
 		int			metadata_size = VARSIZE(metadata);
 
-		NDB_DECLARE(Jsonb *, metadata_copy);
+		Jsonb *metadata_copy = NULL;
 
-		NDB_ALLOC(metadata_copy, Jsonb, metadata_size);
+		nalloc(metadata_copy, Jsonb, metadata_size);
 		memcpy(metadata_copy, metadata, metadata_size);
 		state->metrics = metadata_copy;
 
@@ -2610,7 +2614,7 @@ recommender_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 				if (strcmp(key, "n_samples") == 0 && v.type == jbvNumeric)
 					state->n_samples = DatumGetInt32(DirectFunctionCall1(numeric_int4,
 																		 NumericGetDatum(v.val.numeric)));
-				NDB_FREE(key);
+				nfree(key);
 			}
 		}
 	}
@@ -2620,7 +2624,7 @@ recommender_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 	}
 
 	if (model->backend_state != NULL)
-		NDB_FREE(model->backend_state);
+		nfree(model->backend_state);
 
 	model->backend_state = state;
 	model->gpu_ready = true;
@@ -2632,7 +2636,7 @@ recommender_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 static void
 recommender_gpu_destroy(MLGpuModel *model)
 {
-	RecommenderGpuModelState *state;
+	RecommenderGpuModelState *state = NULL;
 
 	if (model == NULL)
 		return;
@@ -2641,15 +2645,15 @@ recommender_gpu_destroy(MLGpuModel *model)
 	{
 		state = (RecommenderGpuModelState *) model->backend_state;
 		if (state->model_blob != NULL)
-			NDB_FREE(state->model_blob);
+			nfree(state->model_blob);
 		if (state->metrics != NULL)
-			NDB_FREE(state->metrics);
+			nfree(state->metrics);
 		if (state->user_factors != NULL || state->item_factors != NULL)
 		{
 			recommender_model_free(state->user_factors, state->n_users,
 								   state->item_factors, state->n_items);
 		}
-		NDB_FREE(state);
+		nfree(state);
 		model->backend_state = NULL;
 	}
 

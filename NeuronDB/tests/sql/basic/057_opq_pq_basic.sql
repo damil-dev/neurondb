@@ -1,5 +1,8 @@
 -- Basic tests for OPQ rotation and PQ quantization fixes
 
+-- Cleanup from previous runs
+DROP TABLE IF EXISTS opq_pq_test CASCADE;
+
 -- Setup test data
 CREATE TABLE opq_pq_test (
 	id serial PRIMARY KEY,

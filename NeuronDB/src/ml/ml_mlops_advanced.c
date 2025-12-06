@@ -43,9 +43,19 @@ PG_FUNCTION_INFO_V1(create_ab_test);
 Datum
 create_ab_test(PG_FUNCTION_ARGS)
 {
-	text	   *experiment_name = PG_GETARG_TEXT_PP(0);
-	ArrayType  *model_ids = PG_GETARG_ARRAYTYPE_P(1);
-	ArrayType  *traffic_split = PG_GETARG_ARRAYTYPE_P(2);
+	text	   *experiment_name;
+	ArrayType  *model_ids;
+	ArrayType  *traffic_split;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 3)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: create_ab_test requires 3 arguments")));
+
+	experiment_name = PG_GETARG_TEXT_PP(0);
+	model_ids = PG_GETARG_ARRAYTYPE_P(1);
+	traffic_split = PG_GETARG_ARRAYTYPE_P(2);
 
 	char	   *name = text_to_cstring(experiment_name);
 	int			n_models;
@@ -71,10 +81,10 @@ create_ab_test(PG_FUNCTION_ARGS)
 
 	/* Defensive: validate model IDs and traffic splits */
 	{
-		Datum	   *model_elems;
-		bool	   *model_nulls;
-		Datum	   *split_elems;
-		bool	   *split_nulls;
+		Datum *model_elems = NULL;
+		bool *model_nulls = NULL;
+		Datum *split_elems = NULL;
+		bool *split_nulls = NULL;
 		int			model_nelems;
 		int			split_nelems;
 		float		total_split = 0.0f;
@@ -102,7 +112,7 @@ create_ab_test(PG_FUNCTION_ARGS)
 		{
 			if (split_nulls[i])
 			{
-				NDB_FREE(name);
+				nfree(name);
 				ereport(ERROR,
 						(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
 						 errmsg("create_ab_test: traffic_split cannot contain NULL")));
@@ -110,7 +120,7 @@ create_ab_test(PG_FUNCTION_ARGS)
 			total_split += DatumGetFloat8(split_elems[i]);
 			if (DatumGetFloat8(split_elems[i]) < 0.0 || DatumGetFloat8(split_elems[i]) > 1.0)
 			{
-				NDB_FREE(name);
+				nfree(name);
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 						 errmsg("create_ab_test: traffic_split values must be between 0 and 1")));
@@ -119,7 +129,7 @@ create_ab_test(PG_FUNCTION_ARGS)
 
 		if (fabs(total_split - 1.0) > 0.001)
 		{
-			NDB_FREE(name);
+			nfree(name);
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("create_ab_test: traffic_split must sum to 1.0 (got %.4f)",
@@ -131,10 +141,10 @@ create_ab_test(PG_FUNCTION_ARGS)
 	{
 		int			ret;
 		StringInfoData sql;
-		Jsonb	   *experiment_config;
+		Jsonb *experiment_config = NULL;
 		StringInfoData config_json;
 
-		NDB_DECLARE(NdbSpiSession *, spi_session);
+		NdbSpiSession *spi_session = NULL;
 		MemoryContext oldcontext = CurrentMemoryContext;
 
 		NDB_SPI_SESSION_BEGIN(spi_session, oldcontext);
@@ -149,11 +159,11 @@ create_ab_test(PG_FUNCTION_ARGS)
 			appendStringInfo(&config_json,
 							 "{\"name\":%s,\"model_ids\":[",
 							 name_str);
-			NDB_FREE(name_str);
+			nfree(name_str);
 		}
 		{
-			Datum	   *elems;
-			bool	   *nulls;
+			Datum *elems = NULL;
+			bool *nulls = NULL;
 			int			nelems;
 			int			i;
 
@@ -175,8 +185,8 @@ create_ab_test(PG_FUNCTION_ARGS)
 		}
 		appendStringInfoString(&config_json, "],\"traffic_split\":[");
 		{
-			Datum	   *elems;
-			bool	   *nulls;
+			Datum *elems = NULL;
+			bool *nulls = NULL;
 			int			nelems;
 			int			i;
 
@@ -218,8 +228,8 @@ create_ab_test(PG_FUNCTION_ARGS)
 							 "VALUES (%s, %s::text, NULL) "
 							 "RETURNING experiment_id",
 							 name_str, config_str);
-			NDB_FREE(name_str);
-			NDB_FREE(config_str);
+			nfree(name_str);
+			nfree(config_str);
 		}
 
 		ret = ndb_spi_execute(spi_session, sql.data, true, 1);
@@ -237,7 +247,7 @@ create_ab_test(PG_FUNCTION_ARGS)
 			if (experiment_id <= 0)
 			{
 				NDB_SPI_SESSION_END(spi_session);
-				NDB_FREE(name);
+				nfree(name);
 				ereport(ERROR,
 						(errcode(ERRCODE_INTERNAL_ERROR),
 						 errmsg("create_ab_test: failed to create experiment")));
@@ -260,7 +270,7 @@ create_ab_test(PG_FUNCTION_ARGS)
 					 experiment_id,
 					 n_models);
 
-	NDB_FREE(name);
+	nfree(name);
 
 	PG_RETURN_TEXT_P(cstring_to_text(result.data));
 }
@@ -273,20 +283,32 @@ PG_FUNCTION_INFO_V1(log_prediction);
 Datum
 log_prediction(PG_FUNCTION_ARGS)
 {
-	int32		model_id = PG_GETARG_INT32(0);
-	text	   *input_data = PG_GETARG_TEXT_PP(1);
-	text	   *prediction = PG_GETARG_TEXT_PP(2);
-	float8		confidence = PG_ARGISNULL(3) ? 1.0 : PG_GETARG_FLOAT8(3);
-	int32		latency_ms = PG_ARGISNULL(4) ? 0 : PG_GETARG_INT32(4);
+	int32		model_id;
+	text	   *input_data;
+	text	   *prediction;
+	float8		confidence;
+	int32		latency_ms;
 
-	char	   *input_str;
-	char	   *pred_str;
+	/* Validate minimum argument count */
+	if (PG_NARGS() < 3)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: log_prediction requires at least 3 arguments")));
+
+	model_id = PG_GETARG_INT32(0);
+	input_data = PG_GETARG_TEXT_PP(1);
+	prediction = PG_GETARG_TEXT_PP(2);
+	confidence = PG_ARGISNULL(3) ? 1.0 : PG_GETARG_FLOAT8(3);
+	latency_ms = PG_ARGISNULL(4) ? 0 : PG_GETARG_INT32(4);
+
+	char *input_str = NULL;
+	char *pred_str = NULL;
 	int			ret;
 	StringInfoData sql;
-	Jsonb	   *input_jsonb;
+	Jsonb *input_jsonb = NULL;
 	StringInfoData input_json;
 
-	NDB_DECLARE(NdbSpiSession *, spi_session);
+	NdbSpiSession *spi_session = NULL;
 	MemoryContext oldcontext;
 
 	/* Defensive: validate inputs */
@@ -295,8 +317,8 @@ log_prediction(PG_FUNCTION_ARGS)
 
 	if (model_id <= 0)
 	{
-		NDB_FREE(input_str);
-		NDB_FREE(pred_str);
+		nfree(input_str);
+		nfree(pred_str);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("log_prediction: model_id must be positive")));
@@ -304,8 +326,8 @@ log_prediction(PG_FUNCTION_ARGS)
 
 	if (confidence < 0.0 || confidence > 1.0)
 	{
-		NDB_FREE(input_str);
-		NDB_FREE(pred_str);
+		nfree(input_str);
+		nfree(pred_str);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("log_prediction: confidence must be between 0 and 1")));
@@ -313,8 +335,8 @@ log_prediction(PG_FUNCTION_ARGS)
 
 	if (latency_ms < 0)
 	{
-		NDB_FREE(input_str);
-		NDB_FREE(pred_str);
+		nfree(input_str);
+		nfree(pred_str);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("log_prediction: latency_ms cannot be negative")));
@@ -335,7 +357,7 @@ log_prediction(PG_FUNCTION_ARGS)
 		appendStringInfo(&input_json,
 						 "{\"input\":%s,\"confidence\":%.4f,\"latency_ms\":%d}",
 						 input_quoted_str, confidence, latency_ms);
-		NDB_FREE(input_quoted_str);
+		nfree(input_quoted_str);
 	}
 	input_jsonb = DatumGetJsonbP(DirectFunctionCall1(jsonb_in, CStringGetTextDatum(input_json.data)));
 	 /* silence unused */ (void) input_jsonb;
@@ -354,8 +376,8 @@ log_prediction(PG_FUNCTION_ARGS)
 						 "(model_id, input_features, prediction, predicted_at) "
 						 "VALUES (%d, %s::jsonb, %s::float, NOW())",
 						 model_id, json_quoted_str, pred_quoted_str);
-		NDB_FREE(pred_quoted_str);
-		NDB_FREE(json_quoted_str);
+		nfree(pred_quoted_str);
+		nfree(json_quoted_str);
 	}
 
 	ret = ndb_spi_execute(spi_session, sql.data, false, 0);
@@ -365,16 +387,16 @@ log_prediction(PG_FUNCTION_ARGS)
 	if (ret != SPI_OK_INSERT && ret != SPI_OK_INSERT_RETURNING)
 	{
 		NDB_SPI_SESSION_END(spi_session);
-		NDB_FREE(input_str);
-		NDB_FREE(pred_str);
+		nfree(input_str);
+		nfree(pred_str);
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
 				 errmsg("log_prediction: failed to insert prediction log")));
 	}
 
 	NDB_SPI_SESSION_END(spi_session);
-	NDB_FREE(input_str);
-	NDB_FREE(pred_str);
+	nfree(input_str);
+	nfree(pred_str);
 
 	PG_RETURN_BOOL(true);
 }
@@ -387,10 +409,19 @@ PG_FUNCTION_INFO_V1(monitor_model_performance);
 Datum
 monitor_model_performance(PG_FUNCTION_ARGS)
 {
-	int32		model_id = PG_GETARG_INT32(0);
-	text	   *time_window = PG_ARGISNULL(1) ? NULL : PG_GETARG_TEXT_PP(1);
+	int32		model_id;
+	text	   *time_window;
 
-	char	   *window;
+	/* Validate minimum argument count */
+	if (PG_NARGS() < 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: monitor_model_performance requires at least 1 argument")));
+
+	model_id = PG_GETARG_INT32(0);
+	time_window = PG_ARGISNULL(1) ? NULL : PG_GETARG_TEXT_PP(1);
+
+	char *window = NULL;
 	StringInfoData result;
 	int			predictions_count = 0;
 	float		accuracy = 0.0f;
@@ -403,7 +434,7 @@ monitor_model_performance(PG_FUNCTION_ARGS)
 	/* Defensive: validate model_id */
 	if (model_id <= 0)
 	{
-		NDB_FREE(window);
+		nfree(window);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("monitor_model_performance: model_id must be positive")));
@@ -414,7 +445,7 @@ monitor_model_performance(PG_FUNCTION_ARGS)
 		int			ret;
 		StringInfoData sql;
 
-		NDB_DECLARE(NdbSpiSession *, spi_session);
+		NdbSpiSession *spi_session = NULL;
 		MemoryContext oldcontext = CurrentMemoryContext;
 
 		NDB_SPI_SESSION_BEGIN(spi_session, oldcontext);
@@ -488,16 +519,16 @@ monitor_model_performance(PG_FUNCTION_ARGS)
 
 		/* Estimate accuracy from model metrics if available */
 		{
-			NDB_DECLARE(bytea *, model_data);
-			NDB_DECLARE(Jsonb *, parameters);
-			NDB_DECLARE(Jsonb *, metrics);
+			bytea *model_data = NULL;
+			Jsonb *parameters = NULL;
+			Jsonb *metrics = NULL;
 
 			if (ml_catalog_fetch_model_payload(model_id, &model_data,
 											   &parameters, &metrics))
 			{
 				if (metrics != NULL)
 				{
-					JsonbIterator *it;
+					JsonbIterator *it = NULL;
 					JsonbValue	v;
 					int			r;
 
@@ -516,7 +547,7 @@ monitor_model_performance(PG_FUNCTION_ARGS)
 																  DirectFunctionCall1(numeric_float8,
 																					  NumericGetDatum(v.val.numeric)));
 							}
-							NDB_FREE(key);
+							nfree(key);
 						}
 					}
 				}
@@ -540,7 +571,7 @@ monitor_model_performance(PG_FUNCTION_ARGS)
 					 "\"error_rate\": %.4f}",
 					 window, predictions_count, accuracy, avg_latency, p95_latency, error_rate);
 
-	NDB_FREE(window);
+	nfree(window);
 
 	PG_RETURN_TEXT_P(cstring_to_text(result.data));
 }
@@ -553,10 +584,21 @@ PG_FUNCTION_INFO_V1(detect_model_drift);
 Datum
 detect_model_drift(PG_FUNCTION_ARGS)
 {
-	int32		model_id = PG_GETARG_INT32(0);
-	text	   *baseline_period = PG_GETARG_TEXT_PP(1);
-	text	   *current_period = PG_GETARG_TEXT_PP(2);
-	float8		threshold = PG_ARGISNULL(3) ? 0.05 : PG_GETARG_FLOAT8(3);
+	int32		model_id;
+	text	   *baseline_period;
+	text	   *current_period;
+	float8		threshold;
+
+	/* Validate minimum argument count */
+	if (PG_NARGS() < 3)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: detect_model_drift requires at least 3 arguments")));
+
+	model_id = PG_GETARG_INT32(0);
+	baseline_period = PG_GETARG_TEXT_PP(1);
+	current_period = PG_GETARG_TEXT_PP(2);
+	threshold = PG_ARGISNULL(3) ? 0.05 : PG_GETARG_FLOAT8(3);
 
 	char	   *baseline = text_to_cstring(baseline_period);
 	char	   *current = text_to_cstring(current_period);
@@ -567,8 +609,8 @@ detect_model_drift(PG_FUNCTION_ARGS)
 	/* Defensive: validate model_id */
 	if (model_id <= 0)
 	{
-		NDB_FREE(baseline);
-		NDB_FREE(current);
+		nfree(baseline);
+		nfree(current);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("detect_model_drift: model_id must be positive")));
@@ -576,8 +618,8 @@ detect_model_drift(PG_FUNCTION_ARGS)
 
 	if (threshold < 0.0 || threshold > 1.0)
 	{
-		NDB_FREE(baseline);
-		NDB_FREE(current);
+		nfree(baseline);
+		nfree(current);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("detect_model_drift: threshold must be between 0 and 1")));
@@ -590,7 +632,7 @@ detect_model_drift(PG_FUNCTION_ARGS)
 		float		baseline_accuracy = 0.0f;
 		float		current_accuracy = 0.0f;
 
-		NDB_DECLARE(NdbSpiSession *, spi_session);
+		NdbSpiSession *spi_session = NULL;
 		MemoryContext oldcontext = CurrentMemoryContext;
 
 		NDB_SPI_SESSION_BEGIN(spi_session, oldcontext);
@@ -609,7 +651,7 @@ detect_model_drift(PG_FUNCTION_ARGS)
 							 "WHERE m.model_id = %d AND p.predicted_at >= NOW() - INTERVAL '%s' - INTERVAL '%s' "
 							 "AND p.predicted_at < NOW() - INTERVAL '%s'",
 							 model_id, baseline_str, baseline_str, baseline_str);
-			NDB_FREE(baseline_str);
+			nfree(baseline_str);
 		}
 
 		ret = ndb_spi_execute(spi_session, sql.data, true, 1);
@@ -648,7 +690,7 @@ detect_model_drift(PG_FUNCTION_ARGS)
 							 "JOIN neurondb.ml_trained_models m ON p.model_id = m.model_id "
 							 "WHERE m.model_id = %d AND p.predicted_at >= NOW() - INTERVAL '%s'",
 							 model_id, current_str);
-			NDB_FREE(current_str);
+			nfree(current_str);
 		}
 
 		ret = ndb_spi_execute(spi_session, sql.data, true, 1);
@@ -693,8 +735,8 @@ detect_model_drift(PG_FUNCTION_ARGS)
 					 drift_score,
 					 threshold);
 
-	NDB_FREE(baseline);
-	NDB_FREE(current);
+	nfree(baseline);
+	nfree(current);
 
 	PG_RETURN_TEXT_P(cstring_to_text(result.data));
 }
@@ -707,9 +749,19 @@ PG_FUNCTION_INFO_V1(create_model_version);
 Datum
 create_model_version(PG_FUNCTION_ARGS)
 {
-	int32		model_id = PG_GETARG_INT32(0);
-	text	   *version_tag = PG_GETARG_TEXT_PP(1);
-	text	   *description = PG_ARGISNULL(2) ? NULL : PG_GETARG_TEXT_PP(2);
+	int32		model_id;
+	text	   *version_tag;
+	text	   *description;
+
+	/* Validate minimum argument count */
+	if (PG_NARGS() < 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: create_model_version requires at least 2 arguments")));
+
+	model_id = PG_GETARG_INT32(0);
+	version_tag = PG_GETARG_TEXT_PP(1);
+	description = PG_ARGISNULL(2) ? NULL : PG_GETARG_TEXT_PP(2);
 
 	char	   *tag = text_to_cstring(version_tag);
 	char	   *desc = description ? text_to_cstring(description) : pstrdup("");
@@ -719,8 +771,8 @@ create_model_version(PG_FUNCTION_ARGS)
 	/* Defensive: validate model_id */
 	if (model_id <= 0)
 	{
-		NDB_FREE(tag);
-		NDB_FREE(desc);
+		nfree(tag);
+		nfree(desc);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("create_model_version: model_id must be positive")));
@@ -728,16 +780,16 @@ create_model_version(PG_FUNCTION_ARGS)
 
 	/* Create version by copying model with new version tag */
 	{
-		NDB_DECLARE(bytea *, model_data);
-		NDB_DECLARE(Jsonb *, parameters);
-		NDB_DECLARE(Jsonb *, metrics);
+		bytea *model_data = NULL;
+		Jsonb *parameters = NULL;
+		Jsonb *metrics = NULL;
 
 		/* Fetch current model */
 		if (!ml_catalog_fetch_model_payload(model_id, &model_data,
 											&parameters, &metrics))
 		{
-			NDB_FREE(tag);
-			NDB_FREE(desc);
+			nfree(tag);
+			nfree(desc);
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("create_model_version: model %d not found", model_id)));
@@ -746,7 +798,7 @@ create_model_version(PG_FUNCTION_ARGS)
 		/* Register new version in catalog */
 		{
 			MLCatalogModelSpec spec;
-			Jsonb	   *version_params;
+			Jsonb *version_params = NULL;
 			StringInfoData params_json;
 
 			initStringInfo(&params_json);
@@ -761,8 +813,8 @@ create_model_version(PG_FUNCTION_ARGS)
 				appendStringInfo(&params_json,
 								 "{\"version_tag\":%s,\"description\":%s,\"base_model_id\":%d}",
 								 tag_str, desc_str, model_id);
-				NDB_FREE(tag_str);
-				NDB_FREE(desc_str);
+				nfree(tag_str);
+				nfree(desc_str);
 			}
 			version_params = DatumGetJsonbP(DirectFunctionCall1(jsonb_in,
 																CStringGetTextDatum(params_json.data)));
@@ -782,7 +834,7 @@ create_model_version(PG_FUNCTION_ARGS)
 			spec.num_features = 0;
 
 			version_id = ml_catalog_register_model(&spec);
-			NDB_FREE(params_json.data);
+			nfree(params_json.data);
 		}
 	}
 
@@ -793,8 +845,8 @@ create_model_version(PG_FUNCTION_ARGS)
 					 version_id,
 					 desc);
 
-	NDB_FREE(tag);
-	NDB_FREE(desc);
+	nfree(tag);
+	nfree(desc);
 
 	PG_RETURN_TEXT_P(cstring_to_text(result.data));
 }
@@ -855,7 +907,7 @@ set_feature_flag(PG_FUNCTION_ARGS)
 					 enabled ? "enabled" : "disabled",
 					 rollout_percentage);
 
-	NDB_FREE(name);
+	nfree(name);
 
 	PG_RETURN_TEXT_P(cstring_to_text(result.data));
 }
@@ -882,8 +934,8 @@ track_experiment_metric(PG_FUNCTION_ARGS)
 	(void) value;
 	(void) var;
 
-	NDB_FREE(metric);
-	NDB_FREE(var);
+	nfree(metric);
+	nfree(var);
 
 	PG_RETURN_BOOL(true);
 }
@@ -937,8 +989,8 @@ audit_model_access(PG_FUNCTION_ARGS)
 	(void) action_str;
 	(void) user;
 
-	NDB_FREE(action_str);
-	NDB_FREE(user);
+	nfree(action_str);
+	nfree(user);
 
 	PG_RETURN_BOOL(true);
 }

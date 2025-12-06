@@ -50,16 +50,16 @@ PG_FUNCTION_INFO_V1(neurondb_transform_data);
 Datum
 neurondb_chunk_text(PG_FUNCTION_ARGS)
 {
-	text	   *input_text;
+	text *input_text = NULL;
 	int32		chunk_size;
 	int32		overlap;
-	text	   *separator_text;
-	char	   *input_str;
-	char	   *separator;
+	text *separator_text = NULL;
+	char *input_str = NULL;
+	char *separator = NULL;
 	int			input_len;
 	int			chunk_count = 0;
-	Datum	   *chunk_datums;
-	ArrayType  *result_array;
+	Datum *chunk_datums = NULL;
+	ArrayType *result_array = NULL;
 	int			i,
 				start,
 				end,
@@ -92,11 +92,11 @@ neurondb_chunk_text(PG_FUNCTION_ARGS)
 	/* Conservative estimate of number of chunks */
 	if (input_len == 0)
 	{
-		NDB_ALLOC(chunk_datums, Datum, 1);
+		nalloc(chunk_datums, Datum, 1);
 		chunk_datums[0] = CStringGetTextDatum("");
 		result_array = construct_array(
 									   chunk_datums, 1, TEXTOID, -1, false, TYPALIGN_INT);
-		NDB_FREE(chunk_datums);
+		nfree(chunk_datums);
 		PG_RETURN_ARRAYTYPE_P(result_array);
 	}
 
@@ -105,7 +105,7 @@ neurondb_chunk_text(PG_FUNCTION_ARGS)
 	if (max_chunks < 1)
 		max_chunks = 1;
 
-	NDB_ALLOC(chunk_datums, Datum, max_chunks);
+	nalloc(chunk_datums, Datum, max_chunks);
 
 	start = 0;
 	while (start < input_len)
@@ -139,15 +139,15 @@ neurondb_chunk_text(PG_FUNCTION_ARGS)
 			break;
 
 		{
-			NDB_DECLARE(char *, chunk_buf);
+			char *chunk_buf = NULL;
 
-			NDB_ALLOC(chunk_buf, char, chunk_len + 1);
+			nalloc(chunk_buf, char, chunk_len + 1);
 
 			memcpy(chunk_buf, input_str + start, chunk_len);
 			chunk_buf[chunk_len] = '\0';
 			chunk_datums[chunk_count++] =
 				CStringGetTextDatum(chunk_buf);
-			NDB_FREE(chunk_buf);
+			nfree(chunk_buf);
 		}
 
 		if (end == input_len)
@@ -159,10 +159,10 @@ neurondb_chunk_text(PG_FUNCTION_ARGS)
 	}
 	result_array = construct_array(
 								   chunk_datums, chunk_count, TEXTOID, -1, false, TYPALIGN_INT);
-	NDB_FREE(chunk_datums);
+	nfree(chunk_datums);
 	if (separator_text)
-		NDB_FREE(separator);
-	NDB_FREE(input_str);
+		nfree(separator);
+	nfree(input_str);
 	PG_RETURN_ARRAYTYPE_P(result_array);
 }
 
@@ -173,18 +173,19 @@ neurondb_chunk_text(PG_FUNCTION_ARGS)
 Datum
 neurondb_embed_text(PG_FUNCTION_ARGS)
 {
-	text	   *model_text;
-	text	   *input_text;
+	text *model_text = NULL;
+	text *input_text = NULL;
 	bool		use_gpu;
 
-	char	   *model_name;
-	char	   *input_str;
+	char *model_name = NULL;
+	char *input_str = NULL;
 	NdbLLMConfig cfg;
 	NdbLLMCallOptions call_opts;
 
-	NDB_DECLARE(float *, vec_data);
-	NDB_DECLARE(Vector *, result);
+	float *vec_data = NULL;
+	Vector *result = NULL;
 	int			dim = 0;
+	char *result_raw = NULL;
 
 	if (PG_NARGS() < 2 || PG_NARGS() > 3)
 		ereport(ERROR,
@@ -228,27 +229,25 @@ neurondb_embed_text(PG_FUNCTION_ARGS)
 	if (ndb_llm_route_embed(&cfg, &call_opts, input_str, &vec_data, &dim) != 0 ||
 		vec_data == NULL || dim <= 0)
 	{
-		NDB_FREE(model_name);
-		NDB_FREE(input_str);
+		nfree(model_name);
+		nfree(input_str);
 		ereport(ERROR,
 				(errcode(ERRCODE_EXTERNAL_ROUTINE_INVOCATION_EXCEPTION),
 				 errmsg("neurondb_embed_text: embedding generation failed"),
 				 errdetail("Real model implementation required. Embedding generation failed for model '%s'", model_name)));
 	}
 
-	NDB_DECLARE(char *, result_raw);
-
 	/* Create result vector */
-	NDB_ALLOC(result_raw, char, VARHDRSZ + sizeof(int16) * 2 + dim * sizeof(float));
+	nalloc(result_raw, char, VARHDRSZ + sizeof(int16) * 2 + dim * sizeof(float));
 	result = (Vector *) result_raw;
 	SET_VARSIZE(result, VARHDRSZ + sizeof(int16) * 2 + dim * sizeof(float));
 	result->dim = dim;
 	result->unused = 0;
 	memcpy(result->data, vec_data, dim * sizeof(float));
 
-	NDB_FREE(vec_data);
-	NDB_FREE(model_name);
-	NDB_FREE(input_str);
+	nfree(vec_data);
+	nfree(model_name);
+	nfree(input_str);
 
 	PG_RETURN_POINTER(result);
 }
@@ -291,8 +290,8 @@ simple_bm25(const char *query, const char *doc)
 	if (total > 0)
 		score /= total;
 
-	NDB_FREE(doc_lc);
-	NDB_FREE(query_lc);
+	nfree(doc_lc);
+	nfree(query_lc);
 	return score + 0.5f;		/* Base for sort stability */
 }
 
@@ -343,8 +342,8 @@ simple_cosine(const char *query, const char *doc)
 	}
 	if (qcount == 0)
 		qcount = 1;
-	NDB_FREE(doc_lc);
-	NDB_FREE(query_lc);
+	nfree(doc_lc);
+	nfree(query_lc);
 	return (float) score / qcount + 0.5f;	/* stabilization */
 }
 
@@ -353,17 +352,16 @@ levenshtein(const char *s1, const char *s2)
 {
 	int			len1 = strlen(s1),
 				len2 = strlen(s2);
-	NDB_DECLARE(int *, v0);
-	NDB_DECLARE(int *, v1);
-	NDB_ALLOC(v0, int, len2 + 1);
-	NDB_ALLOC(v1, int, len2 + 1);
-
+	int *v0 = NULL;
+	int *v1 = NULL;
 	int			i,
 				j,
 				cost,
 				min1,
 				min2,
 				min3;
+	nalloc(v0, int, len2 + 1);
+	nalloc(v1, int, len2 + 1);
 
 	for (j = 0; j <= len2; j++)
 		v0[j] = j;
@@ -388,8 +386,8 @@ levenshtein(const char *s1, const char *s2)
 		int			result;
 
 		result = v1[len2];
-		NDB_FREE(v0);
-		NDB_FREE(v1);
+		nfree(v0);
+		nfree(v1);
 		return result;
 	}
 }
@@ -437,18 +435,18 @@ doc_with_score_cmp(const void *a, const void *b)
 Datum
 neurondb_rank_documents(PG_FUNCTION_ARGS)
 {
-	text	   *query_text;
-	ArrayType  *documents_array;
-	text	   *algorithm_text;
+	text *query_text = NULL;
+	ArrayType *documents_array = NULL;
+	text *algorithm_text = NULL;
 
-	char	   *query;
-	char	   *algorithm;
+	char *query = NULL;
+	char *algorithm = NULL;
 	int			ndims,
 				nelems,
 			   *dims;
-	Datum	   *elem_values;
-	bool	   *elem_nulls;
-	doc_with_score *ranklist;
+	Datum *elem_values = NULL;
+	bool *elem_nulls = NULL;
+	doc_with_score *ranklist = NULL;
 	int			i,
 				limit = 10,
 				count = 0;
@@ -480,7 +478,7 @@ neurondb_rank_documents(PG_FUNCTION_ARGS)
 					  &elem_values,
 					  &elem_nulls,
 					  &nelems);
-	NDB_ALLOC(ranklist, doc_with_score, nelems);
+	nalloc(ranklist, doc_with_score, nelems);
 	for (i = 0; i < nelems; i++)
 	{
 		if (elem_nulls[i])
@@ -529,12 +527,12 @@ neurondb_rank_documents(PG_FUNCTION_ARGS)
 	for (i = 0; i < nelems; i++)
 	{
 		if (ranklist[i].doc)
-			NDB_FREE(ranklist[i].doc);
+			nfree(ranklist[i].doc);
 	}
-	NDB_FREE(ranklist);
+	nfree(ranklist);
 	if (algorithm_text)
-		NDB_FREE(algorithm);
-	NDB_FREE(query);
+		nfree(algorithm);
+	nfree(query);
 
 	PG_RETURN_JSONB_P(DatumGetJsonbP(DirectFunctionCall1(
 														 jsonb_in, CStringGetTextDatum(json_result.data))));
@@ -548,20 +546,20 @@ neurondb_rank_documents(PG_FUNCTION_ARGS)
 Datum
 neurondb_transform_data(PG_FUNCTION_ARGS)
 {
-	text	   *pipeline_text;
-	ArrayType  *input_array;
+	text *pipeline_text = NULL;
+	ArrayType *input_array = NULL;
 
-	char	   *pipeline_name;
+	char *pipeline_name = NULL;
 	int			ndims,
 				nelems,
 			   *dims;
 	Oid			element_type;
 
-	NDB_DECLARE(Datum *, elem_values);
-	NDB_DECLARE(bool *, elem_nulls);
-	float8	   *transformed_data;
-	Datum	   *result_datums;
-	ArrayType  *result_array;
+	Datum *elem_values = NULL;
+	bool *elem_nulls = NULL;
+	float8 *transformed_data = NULL;
+	Datum *result_datums = NULL;
+	ArrayType *result_array = NULL;
 	int			i;
 	float8		sum = 0.0,
 				sum_sq = 0.0,
@@ -620,8 +618,8 @@ neurondb_transform_data(PG_FUNCTION_ARGS)
 	mean = sum / nelems;
 	stddev = sqrt((sum_sq / nelems) - (mean * mean));
 
-	NDB_ALLOC(transformed_data, float8, nelems);
-	NDB_ALLOC(result_datums, Datum, nelems);
+	nalloc(transformed_data, float8, nelems);
+	nalloc(result_datums, Datum, nelems);
 
 	if (strcmp(pipeline_name, "normalize") == 0)
 	{
@@ -680,8 +678,8 @@ neurondb_transform_data(PG_FUNCTION_ARGS)
 	}
 	else
 	{
-		NDB_FREE(transformed_data);
-		NDB_FREE(result_datums);
+		nfree(transformed_data);
+		nfree(result_datums);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("unsupported transformation pipeline: "
@@ -701,9 +699,9 @@ neurondb_transform_data(PG_FUNCTION_ARGS)
 								   FLOAT8PASSBYVAL,
 								   'd');
 
-	NDB_FREE(result_datums);
-	NDB_FREE(transformed_data);
-	NDB_FREE(pipeline_name);
+	nfree(result_datums);
+	nfree(transformed_data);
+	nfree(pipeline_name);
 
 	PG_RETURN_ARRAYTYPE_P(result_array);
 }

@@ -410,29 +410,10 @@ def restart_postgresql(
 	verbose: bool = False
 ) -> Tuple[bool, str]:
 	"""
-	Attempt to restart PostgreSQL using various methods.
+	Attempt to restart PostgreSQL using pg_ctl.
 	Returns (success, message).
 	"""
-	# Method 1: Try systemctl (if running as systemd service)
-	try:
-		result = subprocess.run(
-			["systemctl", "restart", "postgresql"],
-			stdout=subprocess.PIPE,
-			stderr=subprocess.PIPE,
-			text=True,
-			timeout=30
-		)
-		if result.returncode == 0:
-			# Wait a bit for PostgreSQL to start
-			time.sleep(3)
-			# Verify connection
-			conn_ok, _, _ = check_postgresql_connection(dbname, psql_path, host, port)
-			if conn_ok:
-				return True, "Restarted via systemctl"
-	except (subprocess.TimeoutExpired, FileNotFoundError, Exception):
-		pass
-	
-	# Method 2: Try pg_ctl restart
+	# Method 1: Try pg_ctl restart
 	pg_ctl = find_pg_ctl()
 	pgdata = find_pg_data_dir(host, port)
 	
@@ -440,7 +421,7 @@ def restart_postgresql(
 		try:
 			# Try restart first
 			result = subprocess.run(
-				[pg_ctl, "restart", "-D", pgdata, "-w"],
+				[pg_ctl, "restart", "-D", pgdata, "-w", "-l", "pg.log"],
 				stdout=subprocess.PIPE,
 				stderr=subprocess.PIPE,
 				text=True,
@@ -469,7 +450,7 @@ def restart_postgresql(
 			time.sleep(1)
 			# Start
 			result = subprocess.run(
-				[pg_ctl, "start", "-D", pgdata, "-w", "-l", os.path.join(pgdata, "postgresql.log")],
+				[pg_ctl, "start", "-D", pgdata, "-w", "-l", "pg.log"],
 				stdout=subprocess.PIPE,
 				stderr=subprocess.PIPE,
 				text=True,
@@ -484,7 +465,7 @@ def restart_postgresql(
 			if verbose:
 				print(f"pg_ctl stop/start failed: {e}", file=sys.stderr)
 	
-	# Method 3: Try killing and restarting (last resort)
+	# Method 2: Try killing and restarting (last resort)
 	if pg_ctl and pgdata:
 		try:
 			# Kill all postgres processes (careful!)
@@ -497,7 +478,7 @@ def restart_postgresql(
 			time.sleep(2)
 			# Start
 			result = subprocess.run(
-				[pg_ctl, "start", "-D", pgdata, "-w", "-l", os.path.join(pgdata, "postgresql.log")],
+				[pg_ctl, "start", "-D", pgdata, "-w", "-l", "pg.log"],
 				stdout=subprocess.PIPE,
 				stderr=subprocess.PIPE,
 				text=True,

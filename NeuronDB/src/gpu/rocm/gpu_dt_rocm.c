@@ -43,7 +43,7 @@ dt_free_tree(DTNode *node)
 		dt_free_tree(node->left);
 		dt_free_tree(node->right);
 	}
-	NDB_FREE(node);
+	nfree(node);
 }
 
 /*
@@ -154,9 +154,9 @@ ndb_rocm_dt_pack_model(const DTModel *model,
 	nodes_bytes = sizeof(NdbCudaDtNode) * (size_t) node_count;
 	payload_bytes = header_bytes + nodes_bytes;
 
-	NDB_DECLARE(bytea *, blob);
-	NDB_DECLARE(char *, blob_raw);
-	NDB_ALLOC(blob_raw, char, VARHDRSZ + payload_bytes);
+	bytea *blob = NULL;
+	char *blob_raw = NULL;
+	nalloc(blob_raw, char, VARHDRSZ + payload_bytes);
 	blob = (bytea *) blob_raw;
 	SET_VARSIZE(blob, VARHDRSZ + payload_bytes);
 	base = VARDATA(blob);
@@ -173,7 +173,7 @@ ndb_rocm_dt_pack_model(const DTModel *model,
 									model->root, nodes, &node_idx, &node_count)
 		< 0)
 	{
-		NDB_FREE(blob);
+		nfree(blob);
 		if (errstr)
 			*errstr = pstrdup(
 							  "failed to serialize decision tree nodes");
@@ -189,7 +189,7 @@ ndb_rocm_dt_pack_model(const DTModel *model,
 		JsonbParseState *state = NULL;
 		JsonbValue	k,
 					v;
-		Jsonb	   *metrics_json;
+		Jsonb *metrics_json = NULL;
 
 		(void) pushJsonbValue(&state, WJB_BEGIN_OBJECT, NULL);
 
@@ -333,13 +333,13 @@ dt_build_tree_gpu(const float *features,
 	int			best_feature = -1;
 	float		best_threshold = 0.0f;
 	double		best_gain = -DBL_MAX;
-	NDB_DECLARE(int *, left_indices);
-	NDB_DECLARE(int *, right_indices);
+	int *left_indices = NULL;
+	int *right_indices = NULL;
 	int			left_count = 0;
 	int			right_count = 0;
-	NDB_DECLARE(int *, label_ints);
-	NDB_DECLARE(int *, left_counts);
-	NDB_DECLARE(int *, right_counts);
+	int *label_ints = NULL;
+	int *left_counts = NULL;
+	int *right_counts = NULL;
 	double		left_sum = 0.0;
 	double		left_sumsq = 0.0;
 	int			left_count_reg = 0;
@@ -347,7 +347,7 @@ dt_build_tree_gpu(const float *features,
 	double		right_sumsq = 0.0;
 	int			right_count_reg = 0;
 	int			majority;
-	int		   *parent_counts;
+	int *parent_counts = NULL;
 	double		parent_imp;
 	double		left_var;
 	double		right_var;
@@ -357,8 +357,8 @@ dt_build_tree_gpu(const float *features,
 		*errstr = NULL;
 
 	/* Allocate node */
-	NDB_DECLARE(DTNode *, node);
-	NDB_ALLOC(node, DTNode, 1);
+	DTNode *node = NULL;
+	nalloc(node, DTNode, 1);
 
 	/* Stopping criteria */
 	if (max_depth <= 0 || n_samples < min_samples_split)
@@ -366,10 +366,10 @@ dt_build_tree_gpu(const float *features,
 		node->is_leaf = true;
 		if (is_classification)
 		{
-			NDB_DECLARE(int *, class_counts);
+			int *class_counts = NULL;
 
 			/* Count classes for majority vote */
-			NDB_ALLOC(class_counts, int, class_count);
+			nalloc(class_counts, int, class_count);
 
 			for (i = 0; i < n_samples; i++)
 			{
@@ -385,7 +385,7 @@ dt_build_tree_gpu(const float *features,
 					majority = i;
 			}
 			node->leaf_value = (double) majority;
-			NDB_FREE(class_counts);
+			nfree(class_counts);
 		}
 		else
 		{
@@ -400,14 +400,14 @@ dt_build_tree_gpu(const float *features,
 	}
 
 	/* Allocate working arrays */
-	NDB_ALLOC(left_indices, int, n_samples);
-	NDB_ALLOC(right_indices, int, n_samples);
+	nalloc(left_indices, int, n_samples);
+	nalloc(right_indices, int, n_samples);
 
 	if (is_classification)
 	{
-		NDB_ALLOC(label_ints, int, n_samples);
-		NDB_ALLOC(left_counts, int, class_count);
-		NDB_ALLOC(right_counts, int, class_count);
+		nalloc(label_ints, int, n_samples);
+		nalloc(left_counts, int, class_count);
+		nalloc(right_counts, int, class_count);
 
 		/* Convert labels to integers */
 		for (i = 0; i < n_samples; i++)
@@ -470,8 +470,8 @@ dt_build_tree_gpu(const float *features,
 					continue;
 
 				/* Compute parent impurity from all samples in current node */
-				NDB_DECLARE(int *, parent_counts);
-				NDB_ALLOC(parent_counts, int, class_count);
+				int *parent_counts = NULL;
+				nalloc(parent_counts, int, class_count);
 				for (i = 0; i < n_samples; i++)
 				{
 					int			label = label_ints[i];
@@ -480,7 +480,7 @@ dt_build_tree_gpu(const float *features,
 						parent_counts[label]++;
 				}
 				parent_imp = dt_compute_gini(parent_counts, class_count, n_samples);
-				NDB_FREE(parent_counts);
+				nfree(parent_counts);
 
 				/* Compute Gini impurity */
 				left_imp = dt_compute_gini(left_counts, class_count, left_total);
@@ -534,11 +534,11 @@ dt_build_tree_gpu(const float *features,
 
 	/* Clean up working arrays */
 	if (label_ints)
-		NDB_FREE(label_ints);
+		nfree(label_ints);
 	if (left_counts)
-		NDB_FREE(left_counts);
+		nfree(left_counts);
 	if (right_counts)
-		NDB_FREE(right_counts);
+		nfree(right_counts);
 
 	/* If no good split found, make leaf */
 	if (best_feature < 0 || best_gain <= 0.0)
@@ -546,9 +546,9 @@ dt_build_tree_gpu(const float *features,
 		node->is_leaf = true;
 		if (is_classification)
 		{
-			NDB_DECLARE(int *, class_counts);
+			int *class_counts = NULL;
 
-			NDB_ALLOC(class_counts, int, class_count);
+			nalloc(class_counts, int, class_count);
 
 			for (i = 0; i < n_samples; i++)
 			{
@@ -564,7 +564,7 @@ dt_build_tree_gpu(const float *features,
 					majority = i;
 			}
 			node->leaf_value = (double) majority;
-			NDB_FREE(class_counts);
+			nfree(class_counts);
 		}
 		else
 		{
@@ -574,8 +574,8 @@ dt_build_tree_gpu(const float *features,
 				sum += labels[indices[i]];
 			node->leaf_value = (n_samples > 0) ? (sum / (double) n_samples) : 0.0;
 		}
-		NDB_FREE(left_indices);
-		NDB_FREE(right_indices);
+		nfree(left_indices);
+		nfree(right_indices);
 		return node;
 	}
 
@@ -596,8 +596,8 @@ dt_build_tree_gpu(const float *features,
 		node->is_leaf = true;
 		if (is_classification)
 		{
-			NDB_DECLARE(int *, class_counts);
-			NDB_ALLOC(class_counts, int, class_count);
+			int *class_counts = NULL;
+			nalloc(class_counts, int, class_count);
 
 			for (i = 0; i < n_samples; i++)
 			{
@@ -613,7 +613,7 @@ dt_build_tree_gpu(const float *features,
 					majority = i;
 			}
 			node->leaf_value = (double) majority;
-			NDB_FREE(class_counts);
+			nfree(class_counts);
 		}
 		else
 		{
@@ -623,8 +623,8 @@ dt_build_tree_gpu(const float *features,
 				sum += labels[indices[i]];
 			node->leaf_value = (n_samples > 0) ? (sum / (double) n_samples) : 0.0;
 		}
-		NDB_FREE(left_indices);
-		NDB_FREE(right_indices);
+		nfree(left_indices);
+		nfree(right_indices);
 		return node;
 	}
 
@@ -638,9 +638,9 @@ dt_build_tree_gpu(const float *features,
 								   class_count, errstr);
 	if (node->left == NULL)
 	{
-		NDB_FREE(left_indices);
-		NDB_FREE(right_indices);
-		NDB_FREE(node);
+		nfree(left_indices);
+		nfree(right_indices);
+		nfree(node);
 		return NULL;
 	}
 
@@ -650,14 +650,14 @@ dt_build_tree_gpu(const float *features,
 	if (node->right == NULL)
 	{
 		dt_free_tree(node->left);
-		NDB_FREE(left_indices);
-		NDB_FREE(right_indices);
-		NDB_FREE(node);
+		nfree(left_indices);
+		nfree(right_indices);
+		nfree(node);
 		return NULL;
 	}
 
-	NDB_FREE(left_indices);
-	NDB_FREE(right_indices);
+	nfree(left_indices);
+	nfree(right_indices);
 	return node;
 }
 
@@ -675,7 +675,7 @@ ndb_rocm_dt_train(const float *features,
 	int			min_samples_split = 2;
 	bool		is_classification = true;
 	int			class_count = 2;
-	NDB_DECLARE(DTModel *, model);
+	DTModel *model = NULL;
 	DTNode	   *root = NULL;
 	int			i;
 	int			rc = -1;
@@ -829,8 +829,8 @@ ndb_rocm_dt_train(const float *features,
 	}
 
 	/* Create index array */
-	NDB_DECLARE(int *, indices);
-	NDB_ALLOC(indices, int, n_samples);
+	int *indices = NULL;
+	nalloc(indices, int, n_samples);
 	for (i = 0; i < n_samples; i++)
 		indices[i] = i;
 
@@ -841,13 +841,13 @@ ndb_rocm_dt_train(const float *features,
 	{
 		if (errstr && *errstr == NULL)
 			*errstr = pstrdup("HIP DT train: failed to build tree");
-		NDB_FREE(indices);
+		nfree(indices);
 		return -1;
 	}
 
 	/* Create model structure */
-	NDB_DECLARE(DTModel *, model);
-	NDB_ALLOC(model, DTModel, 1);
+	DTModel *model = NULL;
+	nalloc(model, DTModel, 1);
 
 	model->model_id = 0;		/* Will be set by catalog */
 	model->n_features = feature_dim;
@@ -862,13 +862,13 @@ ndb_rocm_dt_train(const float *features,
 		if (errstr && *errstr == NULL)
 			*errstr = pstrdup("HIP DT train: model packing failed");
 		dt_free_tree(root);
-		NDB_FREE(model);
-		NDB_FREE(indices);
+		nfree(model);
+		nfree(indices);
 		return -1;
 	}
 
-	NDB_FREE(indices);
-	NDB_FREE(model);			/* Note: root is now owned by packed model */
+	nfree(indices);
+	nfree(model);			/* Note: root is now owned by packed model */
 
 	rc = 0;
 	return rc;
@@ -1098,8 +1098,8 @@ ndb_rocm_dt_evaluate_batch(const bytea * model_data,
 	}
 
 	/* Allocate predictions array */
-	NDB_DECLARE(int *, predictions);
-	NDB_ALLOC(predictions, int, n_samples);
+	int *predictions = NULL;
+	nalloc(predictions, int, n_samples);
 
 	/* Batch predict */
 	rc = ndb_rocm_dt_predict_batch(model_data,
@@ -1111,7 +1111,7 @@ ndb_rocm_dt_evaluate_batch(const bytea * model_data,
 
 	if (rc != 0)
 	{
-		NDB_FREE(predictions);
+		nfree(predictions);
 		return -1;
 	}
 
@@ -1163,7 +1163,7 @@ ndb_rocm_dt_evaluate_batch(const bytea * model_data,
 	else
 		*f1_out = 0.0;
 
-	NDB_FREE(predictions);
+	nfree(predictions);
 
 	return 0;
 }

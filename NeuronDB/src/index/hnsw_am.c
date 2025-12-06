@@ -287,7 +287,7 @@ PG_FUNCTION_INFO_V1(hnsw_handler);
 Datum
 hnsw_handler(PG_FUNCTION_ARGS)
 {
-	IndexAmRoutine *amroutine;
+	IndexAmRoutine *amroutine = NULL;
 
 	amroutine = makeNode(IndexAmRoutine);
 	amroutine->amstrategies = 0;
@@ -346,7 +346,7 @@ hnswbuild(Relation heap, Relation index, IndexInfo * indexInfo)
 	HnswBuildState buildstate = {0};
 	Buffer		metaBuffer;
 	Page		metaPage = NULL;  /* Suppress unused variable warning */
-	HnswOptions *options;
+	HnswOptions *options = NULL;
 	IndexBuildResult *result = NULL;
 	int			m,
 				ef_construction,
@@ -382,7 +382,7 @@ hnswbuild(Relation heap, Relation index, IndexInfo * indexInfo)
 
 		HnswOptions *cached_opts = NULL;
 		hnswLoadOptions(index, &opts);
-		NDB_ALLOC(cached_opts, HnswOptions, 1);
+		nalloc(cached_opts, HnswOptions, 1);
 		*cached_opts = opts;
 		options = cached_opts;
 		indexInfo->ii_AmCache = (void *) options;
@@ -402,7 +402,7 @@ hnswbuild(Relation heap, Relation index, IndexInfo * indexInfo)
 												  (void *) &buildstate, NULL);
 
 	{
-		NDB_ALLOC(result, IndexBuildResult, 1);
+		nalloc(result, IndexBuildResult, 1);
 		result->heap_tuples = buildstate.indtuples;
 		result->index_tuples = buildstate.indtuples;
 
@@ -527,14 +527,12 @@ hnswinsert(Relation index,
 			ReleaseBuffer(metaBuffer);
 			metaBuffer = InvalidBuffer;
 		}
-		NDB_FREE(vectorData);
-		vectorData = NULL;
+		nfree(vectorData);
 		PG_RE_THROW();
 	}
 	PG_END_TRY();
 
-	NDB_FREE(vectorData);
-	vectorData = NULL;
+	nfree(vectorData);
 
 	return true;
 }
@@ -566,11 +564,11 @@ hnswbulkdelete(IndexVacuumInfo * info,
 	bool		foundNewEntry;
 	ItemId		itemId;
 
-	NDB_DECLARE(IndexBulkDeleteResult *, new_stats);
+	IndexBulkDeleteResult *new_stats = NULL;
 
 	if (stats == NULL)
 	{
-		NDB_ALLOC(new_stats, IndexBulkDeleteResult, 1);
+		nalloc(new_stats, IndexBulkDeleteResult, 1);
 		memset(new_stats, 0, sizeof(IndexBulkDeleteResult));
 		stats = new_stats;
 	}
@@ -722,11 +720,11 @@ hnswbulkdelete(IndexVacuumInfo * info,
 static IndexBulkDeleteResult *
 hnswvacuumcleanup(IndexVacuumInfo * info, IndexBulkDeleteResult * stats)
 {
-	NDB_DECLARE(IndexBulkDeleteResult *, new_stats);
+	IndexBulkDeleteResult *new_stats = NULL;
 
 	if (stats == NULL)
 	{
-		NDB_ALLOC(new_stats, IndexBulkDeleteResult, 1);
+		nalloc(new_stats, IndexBulkDeleteResult, 1);
 		memset(new_stats, 0, sizeof(IndexBulkDeleteResult));
 		stats = new_stats;
 	}
@@ -791,7 +789,7 @@ hnswoptions(Datum reloptions, bool validate)
 		{"ef_search", RELOPT_TYPE_INT, offsetof(HnswOptions, ef_search)}
 	};
 	HnswOptions *opts;
-	bytea	   *result;
+	bytea *result;
 
 	/* Lazy initialization: ensure relopt_kind_hnsw is registered */
 	if (relopt_kind_hnsw == 0)
@@ -807,6 +805,14 @@ hnswoptions(Datum reloptions, bool validate)
 	if (validate && result != NULL)
 	{
 		opts = (HnswOptions *) VARDATA(result);
+
+		/* Set defaults for uninitialized values */
+		if (opts->m == 0)
+			opts->m = HNSW_DEFAULT_M;
+		if (opts->ef_construction == 0)
+			opts->ef_construction = HNSW_DEFAULT_EF_CONSTRUCTION;
+		if (opts->ef_search == 0)
+			opts->ef_search = HNSW_DEFAULT_EF_SEARCH;
 
 		/* Validate m */
 		if (opts->m < HNSW_MIN_M || opts->m > HNSW_MAX_M)
@@ -876,10 +882,10 @@ hnswbeginscan(Relation index, int nkeys, int norderbys)
 {
 	IndexScanDesc scan;
 
-	NDB_DECLARE(HnswScanOpaque, so);
+	HnswScanOpaque so = NULL;
 
 	scan = RelationGetIndexScan(index, nkeys, norderbys);
-	NDB_ALLOC(so, HnswScanOpaqueData, 1);
+	nalloc(so, HnswScanOpaqueData, 1);
 	so->efSearch = HNSW_DEFAULT_EF_SEARCH;
 	so->strategy = 1;
 	so->firstCall = true;
@@ -937,7 +943,7 @@ hnswrescan(IndexScanDesc scan,
 
 	if (norderbys > 0 && orderbys[0].sk_argument != 0)
 	{
-		float4	   *vectorData;
+		float4 *vectorData = NULL;
 		int			dim;
 		Oid			queryType;
 		MemoryContext oldctx;
@@ -950,18 +956,18 @@ hnswrescan(IndexScanDesc scan,
 
 		if (vectorData != NULL)
 		{
-			char	   *queryVector_raw = NULL;
+			char *queryVector_raw = NULL;
 			if (so->queryVector)
 			{
-				NDB_FREE(so->queryVector);
+				nfree(so->queryVector);
 				so->queryVector = NULL;
 			}
-			NDB_ALLOC(queryVector_raw, char, VECTOR_SIZE(dim));
+			nalloc(queryVector_raw, char, VECTOR_SIZE(dim));
 			so->queryVector = (Vector *) queryVector_raw;
 			SET_VARSIZE(so->queryVector, VECTOR_SIZE(dim));
 			so->queryVector->dim = dim;
 			memcpy(so->queryVector->data, vectorData, dim * sizeof(float4));
-			NDB_FREE(vectorData);
+			nfree(vectorData);
 			vectorData = NULL;
 		}
 		/* Get k from GUC or default to 10 */
@@ -1059,21 +1065,21 @@ hnswendscan(IndexScanDesc scan)
 
 	if (so->results)
 	{
-		NDB_FREE(so->results);
+		nfree(so->results);
 		so->results = NULL;
 	}
 	if (so->distances)
 	{
-		NDB_FREE(so->distances);
+		nfree(so->distances);
 		so->distances = NULL;
 	}
 	if (so->queryVector)
 	{
-		NDB_FREE(so->queryVector);
+		nfree(so->queryVector);
 		so->queryVector = NULL;
 	}
 
-	NDB_FREE(so);
+	nfree(so);
 	so = NULL;
 }
 
@@ -1348,7 +1354,7 @@ hnswCacheTypeOids(void)
 		return;
 
 	{
-		List	   *names;
+		List *names = NULL;
 
 		names = list_make2(makeString("public"), makeString("vector"));
 		cached_vectorOid = LookupTypeNameOid(NULL, makeTypeNameFromNameList(names), true);
@@ -1403,7 +1409,7 @@ hnswExtractVectorData(Datum value, Oid typeOid, int *out_dim, MemoryContext ctx)
 				bitOid;
 	int			i;
 
-	NDB_DECLARE(float4 *, result);
+	float4 *result = NULL;
 
 	/* Cache OIDs on first call */
 	hnswCacheTypeOids();
@@ -1422,7 +1428,7 @@ hnswExtractVectorData(Datum value, Oid typeOid, int *out_dim, MemoryContext ctx)
 		NDB_CHECK_VECTOR_VALID(v);
 		*out_dim = v->dim;
 		NDB_CHECK_ALLOC_SIZE((size_t) v->dim * sizeof(float4), "vector data");
-		NDB_ALLOC(result, float4, v->dim);
+		nalloc(result, float4, v->dim);
 		NDB_CHECK_ALLOC(result, "vector data");
 		for (i = 0; i < v->dim; i++)
 			result[i] = v->data[i];
@@ -1438,7 +1444,7 @@ hnswExtractVectorData(Datum value, Oid typeOid, int *out_dim, MemoryContext ctx)
 					 errmsg("hnsw: invalid halfvec dimension %d", hv->dim)));
 		*out_dim = hv->dim;
 		NDB_CHECK_ALLOC_SIZE((size_t) hv->dim * sizeof(float4), "halfvec data");
-		NDB_ALLOC(result, float4, hv->dim);
+		nalloc(result, float4, hv->dim);
 		NDB_CHECK_ALLOC(result, "halfvec data");
 		for (i = 0; i < hv->dim; i++)
 			result[i] = fp16_to_float(hv->data[i]);
@@ -1458,7 +1464,7 @@ hnswExtractVectorData(Datum value, Oid typeOid, int *out_dim, MemoryContext ctx)
 
 			*out_dim = sv->total_dim;
 			NDB_CHECK_ALLOC_SIZE((size_t) sv->total_dim * sizeof(float4), "sparsevec data");
-			NDB_ALLOC(result, float4, sv->total_dim);
+			nalloc(result, float4, sv->total_dim);
 			NDB_CHECK_ALLOC(result, "sparsevec data");
 
 			/* Zero-initialize buffer: sparsevec only stores non-zero entries */
@@ -1479,7 +1485,7 @@ hnswExtractVectorData(Datum value, Oid typeOid, int *out_dim, MemoryContext ctx)
 		NDB_CHECK_NULL(bit_vec, "bit vector");
 		{
 			int			nbits;
-			bits8	   *bit_data;
+			bits8 *bit_data = NULL;
 
 			nbits = VARBITLEN(bit_vec);
 			if (nbits <= 0 || nbits > 32767)
@@ -1489,7 +1495,7 @@ hnswExtractVectorData(Datum value, Oid typeOid, int *out_dim, MemoryContext ctx)
 			bit_data = VARBITS(bit_vec);
 			*out_dim = nbits;
 			NDB_CHECK_ALLOC_SIZE((size_t) nbits * sizeof(float4), "bit vector data");
-			NDB_ALLOC(result, float4, nbits);
+			nalloc(result, float4, nbits);
 			NDB_CHECK_ALLOC(result, "bit vector data");
 			for (i = 0; i < nbits; i++)
 			{
@@ -1559,23 +1565,23 @@ hnswSearch(Relation index,
 	int			i,
 				j;
 
-	NDB_DECLARE(BlockNumber *, candidates);
-	NDB_DECLARE(float4 *, candidateDists);
+	BlockNumber *candidates = NULL;
+	float4 *candidateDists = NULL;
 	int			candidateCount = 0;
 
-	NDB_DECLARE(BlockNumber *, visited);
+	BlockNumber *visited = NULL;
 	int			visitedCount = 0;
 	int			visitedCapacity = 0;
 
-	NDB_DECLARE(bool *, visitedSet);
-	BlockNumber *neighbors;
+	bool *visitedSet = NULL;
+	BlockNumber *neighbors = NULL;
 	int16		neighborCount;
 
-	NDB_DECLARE(BlockNumber *, topK);
-	NDB_DECLARE(float4 *, topKDists);
+	BlockNumber *topK = NULL;
+	float4 *topKDists = NULL;
 	int			topKCount = 0;
 
-	NDB_DECLARE(int *, indices);
+	int *indices = NULL;
 	int			minIdx,
 				temp;
 	int			l,
@@ -1607,7 +1613,7 @@ hnswSearch(Relation index,
 		}
 
 		visitedCapacity = (efSearch > 1 ? efSearch * 2 : 32);
-		NDB_ALLOC(visited, BlockNumber, visitedCapacity);
+		nalloc(visited, BlockNumber, visitedCapacity);
 
 		/* Allocate visitedSet with overflow checking */
 		numBlocks = RelationGetNumberOfBlocks(index);
@@ -1620,13 +1626,13 @@ hnswSearch(Relation index,
 						 errmsg("hnsw: visitedSet size calculation overflow (%u blocks)",
 								numBlocks)));
 			}
-			NDB_ALLOC(visitedSet, bool, numBlocks);
+			nalloc(visitedSet, bool, numBlocks);
 			memset(visitedSet, 0, visitedSetSize);
 		}
 		visitedCount = 0;
 
-		NDB_ALLOC(candidates, BlockNumber, efSearch);
-		NDB_ALLOC(candidateDists, float4, efSearch);
+		nalloc(candidates, BlockNumber, efSearch);
+		nalloc(candidateDists, float4, efSearch);
 		candidateCount = 0;
 
 		for (level = currentLevel; level > 0; level--)
@@ -1689,7 +1695,7 @@ hnswSearch(Relation index,
 						Buffer		neighborBuf;
 						Page		neighborPage;
 						HnswNode	neighbor;
-						float4	   *neighborVector;
+						float4 *neighborVector = NULL;
 						float4		neighborDist;
 
 						if (neighbors[i] == InvalidBlockNumber)
@@ -1749,10 +1755,10 @@ hnswSearch(Relation index,
 			*results = NULL;
 			*distances = NULL;
 			*resultCount = 0;
-			NDB_FREE(visited);
-			NDB_FREE(visitedSet);
-			NDB_FREE(candidates);
-			NDB_FREE(candidateDists);
+			nfree(visited);
+			nfree(visitedSet);
+			nfree(candidates);
+			nfree(candidateDists);
 			return;
 		}
 
@@ -1767,10 +1773,10 @@ hnswSearch(Relation index,
 			*results = NULL;
 			*distances = NULL;
 			*resultCount = 0;
-			NDB_FREE(visited);
-			NDB_FREE(visitedSet);
-			NDB_FREE(candidates);
-			NDB_FREE(candidateDists);
+			nfree(visited);
+			nfree(visitedSet);
+			nfree(candidates);
+			nfree(candidateDists);
 			return;
 		}
 
@@ -1782,10 +1788,10 @@ hnswSearch(Relation index,
 			*results = NULL;
 			*distances = NULL;
 			*resultCount = 0;
-			NDB_FREE(visited);
-			NDB_FREE(visitedSet);
-			NDB_FREE(candidates);
-			NDB_FREE(candidateDists);
+			nfree(visited);
+			nfree(visitedSet);
+			nfree(candidates);
+			nfree(candidateDists);
 			return;
 		}
 
@@ -1795,10 +1801,10 @@ hnswSearch(Relation index,
 			*results = NULL;
 			*distances = NULL;
 			*resultCount = 0;
-			NDB_FREE(visited);
-			NDB_FREE(visitedSet);
-			NDB_FREE(candidates);
-			NDB_FREE(candidateDists);
+			nfree(visited);
+			nfree(visitedSet);
+			nfree(candidates);
+			nfree(candidateDists);
 			return;
 		}
 
@@ -1809,10 +1815,10 @@ hnswSearch(Relation index,
 			*results = NULL;
 			*distances = NULL;
 			*resultCount = 0;
-			NDB_FREE(visited);
-			NDB_FREE(visitedSet);
-			NDB_FREE(candidates);
-			NDB_FREE(candidateDists);
+			nfree(visited);
+			nfree(visitedSet);
+			nfree(candidates);
+			nfree(candidateDists);
 			return;
 		}
 
@@ -1869,7 +1875,7 @@ hnswSearch(Relation index,
 				Buffer		neighborBuf;
 				Page		neighborPage;
 				HnswNode	neighbor;
-				float4	   *neighborVector;
+				float4 *neighborVector = NULL;
 				float4		neighborDist;
 
 				if (neighbors[j] == InvalidBlockNumber)
@@ -1968,7 +1974,7 @@ hnswSearch(Relation index,
 			UnlockReleaseBuffer(nodeBuf);
 		}
 
-		NDB_ALLOC(indices, int, candidateCount);
+		nalloc(indices, int, candidateCount);
 		for (i = 0; i < candidateCount; i++)
 		{
 			CHECK_FOR_INTERRUPTS();
@@ -1998,28 +2004,28 @@ hnswSearch(Relation index,
 		}
 
 		topKCount = Min(k, candidateCount);
-		NDB_ALLOC(topK, BlockNumber, topKCount);
-		NDB_ALLOC(topKDists, float4, topKCount);
+		nalloc(topK, BlockNumber, topKCount);
+		nalloc(topKDists, float4, topKCount);
 		for (i = 0; i < topKCount; i++)
 		{
 			topK[i] = candidates[indices[i]];
 			topKDists[i] = candidateDists[indices[i]];
 		}
 
-		NDB_FREE(indices);
+		nfree(indices);
 		indices = NULL;
 
 		*results = topK;
 		*distances = topKDists;
 		*resultCount = topKCount;
 
-		NDB_FREE(candidates);
+		nfree(candidates);
 		candidates = NULL;
-		NDB_FREE(candidateDists);
+		nfree(candidateDists);
 		candidateDists = NULL;
-		NDB_FREE(visited);
+		nfree(visited);
 		visited = NULL;
-		NDB_FREE(visitedSet);
+		nfree(visitedSet);
 		visitedSet = NULL;
 	}
 	PG_CATCH();
@@ -2032,37 +2038,37 @@ hnswSearch(Relation index,
 		}
 		if (candidates)
 		{
-			NDB_FREE(candidates);
+			nfree(candidates);
 			candidates = NULL;
 		}
 		if (candidateDists)
 		{
-			NDB_FREE(candidateDists);
+			nfree(candidateDists);
 			candidateDists = NULL;
 		}
 		if (visited)
 		{
-			NDB_FREE(visited);
+			nfree(visited);
 			visited = NULL;
 		}
 		if (visitedSet)
 		{
-			NDB_FREE(visitedSet);
+			nfree(visitedSet);
 			visitedSet = NULL;
 		}
 		if (topK)
 		{
-			NDB_FREE(topK);
+			nfree(topK);
 			topK = NULL;
 		}
 		if (topKDists)
 		{
-			NDB_FREE(topKDists);
+			nfree(topKDists);
 			topKDists = NULL;
 		}
 		if (indices)
 		{
-			NDB_FREE(indices);
+			nfree(indices);
 			indices = NULL;
 		}
 		*results = NULL;
@@ -2115,7 +2121,7 @@ hnswInsertNode(Relation index,
 	{
 		bool		overflow = false;
 		int			m = metaPage->m;  /* Use m from meta page */
-		BlockNumber *neighbors;
+		BlockNumber *neighbors = NULL;
 		int			l;
 
 		nodeSize = hnswComputeNodeSizeSafe(dim, level, m, &overflow);
@@ -2126,7 +2132,7 @@ hnswInsertNode(Relation index,
 					 errmsg("hnsw: node size calculation overflow (dim=%d, level=%d, m=%d)",
 							dim, level, m)));
 		}
-		NDB_ALLOC(node_raw, char, nodeSize);
+		nalloc(node_raw, char, nodeSize);
 		node = (HnswNode) node_raw;
 		ItemPointerCopy(heapPtr, &node->heapPtr);
 		node->level = level;
@@ -2153,8 +2159,8 @@ hnswInsertNode(Relation index,
 		Buffer		entryBuf;
 		Page		entryPage;
 		HnswNode	entryNode;
-		float4	   *entryVector;
-		BlockNumber *entryNeighbors;
+		float4 *entryVector = NULL;
+		BlockNumber *entryNeighbors = NULL;
 		int16		entryNeighborCount;
 		bool		improved = true;
 		int			iterations = 0;
@@ -2319,7 +2325,7 @@ hnswInsertNode(Relation index,
 			ReleaseBuffer(buf);
 			buf = InvalidBuffer;
 		}
-		NDB_FREE(node);
+		nfree(node);
 		node = NULL;
 		PG_RE_THROW();
 	}
@@ -2334,8 +2340,8 @@ hnswInsertNode(Relation index,
 		/* Skip neighbor linking if this is the first node in the index */
 		if (metaPage->entryPoint != InvalidBlockNumber && entryLevel >= 0)
 		{
-			NDB_DECLARE(BlockNumber **, selectedNeighborsPerLevel);
-			NDB_DECLARE(int *, selectedCountPerLevel);
+			BlockNumber **selectedNeighborsPerLevel = NULL;
+			int *selectedCountPerLevel = NULL;
 			int			currentLevel;
 			int			maxLevel = Min(level, entryLevel);
 			Buffer		newNodeBuf = InvalidBuffer;
@@ -2352,16 +2358,16 @@ hnswInsertNode(Relation index,
 						 errmsg("hnsw: invalid block number %u after insert", blkno)));
 			}
 
-			NDB_ALLOC(selectedNeighborsPerLevel, BlockNumber *, maxLevel + 1);
-			NDB_ALLOC(selectedCountPerLevel, int, maxLevel + 1);
+			nalloc(selectedNeighborsPerLevel, BlockNumber *, maxLevel + 1);
+			nalloc(selectedCountPerLevel, int, maxLevel + 1);
 
 			/* Step 5a: Search for neighbors at each level */
 			for (currentLevel = maxLevel; currentLevel >= 0; currentLevel--)
 			{
-				NDB_DECLARE(BlockNumber *, candidates);
-				NDB_DECLARE(float4 *, candidateDistances);
-				NDB_DECLARE(BlockNumber *, selectedNeighbors);
-				NDB_DECLARE(float4 *, selectedDistances);
+				BlockNumber *candidates = NULL;
+				float4 *candidateDistances = NULL;
+				BlockNumber *selectedNeighbors = NULL;
+				float4 *selectedDistances = NULL;
 				int			candidateCount = 0;
 				int			selectedCount;
 
@@ -2380,8 +2386,8 @@ hnswInsertNode(Relation index,
 				selectedCount = Min(m, candidateCount);
 				if (selectedCount > 0)
 				{
-					NDB_ALLOC(selectedNeighbors, BlockNumber, selectedCount);
-					NDB_ALLOC(selectedDistances, float4, selectedCount);
+					nalloc(selectedNeighbors, BlockNumber, selectedCount);
+					nalloc(selectedDistances, float4, selectedCount);
 				}
 				else
 				{
@@ -2449,7 +2455,7 @@ hnswInsertNode(Relation index,
 						Buffer		neighborBuf;
 						Page		neighborPage;
 						HnswNode	neighborNode;
-						BlockNumber *neighborNeighbors;
+						BlockNumber *neighborNeighbors = NULL;
 						int16		neighborNeighborCount;
 						int			insertPos;
 						bool		needsPruning = false;
@@ -2510,8 +2516,8 @@ hnswInsertNode(Relation index,
 				{
 					float4	   *neighborVector = HnswGetVector(neighborNode);
 					int16		pruneCount = neighborNode->neighborCount[currentLevel];
-					float4	   *neighborDists = NULL;
-					int		   *neighborIndices = NULL;
+					float4 *neighborDists = NULL;
+					int *neighborIndices = NULL;
 
 					/* Ensure pruneCount is within valid bounds */
 					if (pruneCount > m * 2)
@@ -2519,8 +2525,8 @@ hnswInsertNode(Relation index,
 					if (pruneCount < 0)
 						pruneCount = 0;
 
-					NDB_ALLOC(neighborDists, float4, pruneCount);
-					NDB_ALLOC(neighborIndices, int, pruneCount);
+					nalloc(neighborDists, float4, pruneCount);
+					nalloc(neighborIndices, int, pruneCount);
 
 					for (j = 0; j < pruneCount; j++)
 					{
@@ -2534,7 +2540,7 @@ hnswInsertNode(Relation index,
 							Buffer		otherBuf;
 							Page		otherPage;
 							HnswNode	otherNode;
-							float4	   *otherVector;
+							float4 *otherVector = NULL;
 
 							if (!hnswValidateBlockNumber(neighborNeighbors[j], index))
 							{
@@ -2598,9 +2604,9 @@ hnswInsertNode(Relation index,
 					/* Neighbors array for this level has exactly m*2 slots,
 					 * so no need to clear beyond that. */
 
-					NDB_FREE(neighborDists);
+					nfree(neighborDists);
 					neighborDists = NULL;
-					NDB_FREE(neighborIndices);
+					nfree(neighborIndices);
 					neighborIndices = NULL;
 					MarkBufferDirty(neighborBuf);
 				}
@@ -2610,23 +2616,23 @@ hnswInsertNode(Relation index,
 
 			if (selectedNeighbors)
 			{
-				NDB_FREE(selectedNeighbors);
+				nfree(selectedNeighbors);
 				selectedNeighbors = NULL;
 			}
 			if (selectedDistances)
 			{
-				NDB_FREE(selectedDistances);
+				nfree(selectedDistances);
 				selectedDistances = NULL;
 			}
 
 			if (candidates)
 			{
-				NDB_FREE(candidates);
+				nfree(candidates);
 				candidates = NULL;
 			}
 			if (candidateDistances)
 			{
-				NDB_FREE(candidateDistances);
+				nfree(candidateDistances);
 				candidateDistances = NULL;
 			}
 			}
@@ -2659,7 +2665,7 @@ hnswInsertNode(Relation index,
 	if (level > metaPage->maxLevel)
 		metaPage->maxLevel = level;
 
-	NDB_FREE(node);
+	nfree(node);
 	node = NULL;
 }
 

@@ -72,7 +72,7 @@ mdl_http(PG_FUNCTION_ARGS)
 	char	   *method_str = text_to_cstring(method);
 	char	   *body_str = text_to_cstring(body);
 	curl_buffer cb;
-	CURL	   *curl;
+	CURL *curl = NULL;
 	CURLcode	res;
 	long		http_code = 0;
 	int			attempt;
@@ -211,7 +211,7 @@ mdl_http(PG_FUNCTION_ARGS)
 			appendStringInfo(&result_json,
 							 "{\"status\":\"success\",\"data\":\"%s\"}",
 							 response.data);
-			NDB_FREE(response.data);
+			nfree(response.data);
 			response = result_json;
 		}
 		else if (response.len == 0)
@@ -246,7 +246,7 @@ mdl_llm(PG_FUNCTION_ARGS)
 	int32		estimated_cost_microcents;
 	StringInfoData result;
 
-	NDB_DECLARE(NdbSpiSession *, spi_session);
+	NdbSpiSession *spi_session = NULL;
 	MemoryContext oldcontext;
 
 	elog(DEBUG1,
@@ -359,7 +359,7 @@ mdl_cache(PG_FUNCTION_ARGS)
 	time_t		expires_at;
 	bool		success = false;
 
-	NDB_DECLARE(NdbSpiSession *, spi_session);
+	NdbSpiSession *spi_session = NULL;
 	MemoryContext oldcontext;
 
 	elog(DEBUG1,
@@ -432,7 +432,7 @@ mdl_trace(PG_FUNCTION_ARGS)
 	Datum		values[3];
 	Oid			argtypes[3] = {TEXTOID, TEXTOID, TEXTOID};
 
-	NDB_DECLARE(NdbSpiSession *, spi_session);
+	NdbSpiSession *spi_session = NULL;
 	MemoryContext oldcontext;
 
 	elog(DEBUG1,

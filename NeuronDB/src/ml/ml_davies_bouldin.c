@@ -53,12 +53,13 @@ static void compute_cluster_centroids(float **data, int *assignments, int nvec,
 static inline double
 euclidean_distance(const float *a, const float *b, int dim)
 {
+	double		diff;
 	double		sum = 0.0;
 	int			i;
 
 	for (i = 0; i < dim; i++)
 	{
-		double		diff = (double) a[i] - (double) b[i];
+		diff = (double) a[i] - (double) b[i];
 
 		sum += diff * diff;
 	}
@@ -126,29 +127,39 @@ PG_FUNCTION_INFO_V1(davies_bouldin_index);
 Datum
 davies_bouldin_index(PG_FUNCTION_ARGS)
 {
-	text	   *table_name;
-	text	   *vector_col;
-	text	   *cluster_col;
-	char	   *tbl_str;
-	char	   *col_str;
-	char	   *cluster_str;
-	int			nvec = 0;
-	int			i,
-				j,
-				c;
-	float	  **data = NULL;
-	int			dim = 0;
-	int			*assignments = NULL;
-	int			*cluster_sizes = NULL;
-	float	  **centroids = NULL;
+	bool		isnull;
+	char	   *cluster_str = NULL;
+	char	   *col_str = NULL;
+	char	   *tbl_str = NULL;
+	double		centroid_dist;
+	double		cluster_scatter_val;
 	double		davies_bouldin = 0.0;
-	double		*cluster_scatter = NULL;
-	int			num_clusters = 0;
+	double		diff;
+	double		max_ratio;
+	double		ratio;
+	double		sum_dbi;
+	double	   *cluster_scatter = NULL;
+	Datum		cluster_datum;
+	float	   **centroids = NULL;
+	float	   **data = NULL;
+	int			c;
+	int			dim = 0;
+	int			i;
+	int			j;
 	int			max_cluster_id = -1;
+	int			nvec = 0;
+	int			num_clusters = 0;
+	int			ret;
+	int			valid_clusters;
+	int		   *assignments = NULL;
+	int		   *cluster_sizes = NULL;
+	int32		cluster_id;
 	MemoryContext oldcontext;
 	NdbSpiSession *spi_session = NULL;
 	StringInfoData sql;
-	int			ret;
+	text	   *cluster_col = NULL;
+	text	   *table_name = NULL;
+	text	   *vector_col = NULL;
 
 	if (PG_ARGISNULL(0) || PG_ARGISNULL(1) || PG_ARGISNULL(2))
 		ereport(ERROR,
@@ -174,9 +185,9 @@ davies_bouldin_index(PG_FUNCTION_ARGS)
 	if (!data || nvec < 1)
 	{
 		NDB_SPI_SESSION_END(spi_session);
-		NDB_FREE(tbl_str);
-		NDB_FREE(col_str);
-		NDB_FREE(cluster_str);
+		nfree(tbl_str);
+		nfree(col_str);
+		nfree(cluster_str);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("neurondb: davies_bouldin_index: no valid vectors found in table")));
@@ -192,11 +203,11 @@ davies_bouldin_index(PG_FUNCTION_ARGS)
 		ndb_spi_stringinfo_free(spi_session, &sql);
 		NDB_SPI_SESSION_END(spi_session);
 		for (i = 0; i < nvec; i++)
-			NDB_FREE(data[i]);
-		NDB_FREE(data);
-		NDB_FREE(tbl_str);
-		NDB_FREE(col_str);
-		NDB_FREE(cluster_str);
+			nfree(data[i]);
+		nfree(data);
+		nfree(tbl_str);
+		nfree(col_str);
+		nfree(cluster_str);
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
 				 errmsg("neurondb: davies_bouldin_index: failed to fetch cluster assignments")));
@@ -207,11 +218,11 @@ davies_bouldin_index(PG_FUNCTION_ARGS)
 		ndb_spi_stringinfo_free(spi_session, &sql);
 		NDB_SPI_SESSION_END(spi_session);
 		for (i = 0; i < nvec; i++)
-			NDB_FREE(data[i]);
-		NDB_FREE(data);
-		NDB_FREE(tbl_str);
-		NDB_FREE(col_str);
-		NDB_FREE(cluster_str);
+			nfree(data[i]);
+		nfree(data);
+		nfree(tbl_str);
+		nfree(col_str);
+		nfree(cluster_str);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("neurondb: davies_bouldin_index: vector count (%d) does not match cluster count (%d)",
@@ -219,12 +230,9 @@ davies_bouldin_index(PG_FUNCTION_ARGS)
 	}
 
 	/* Extract cluster assignments and find max cluster ID */
-	NDB_ALLOC(assignments, int, nvec);
+	nalloc(assignments, int, nvec);
 	for (i = 0; i < nvec; i++)
 	{
-		int32		cluster_id;
-		bool		isnull;
-		Datum		cluster_datum;
 
 		if (SPI_tuptable == NULL || SPI_tuptable->vals == NULL ||
 			i >= SPI_processed || SPI_tuptable->vals[i] == NULL ||
@@ -233,12 +241,12 @@ davies_bouldin_index(PG_FUNCTION_ARGS)
 			ndb_spi_stringinfo_free(spi_session, &sql);
 			NDB_SPI_SESSION_END(spi_session);
 			for (j = 0; j < nvec; j++)
-				NDB_FREE(data[j]);
-			NDB_FREE(data);
-			NDB_FREE(assignments);
-			NDB_FREE(tbl_str);
-			NDB_FREE(col_str);
-			NDB_FREE(cluster_str);
+				nfree(data[j]);
+			nfree(data);
+			nfree(assignments);
+			nfree(tbl_str);
+			nfree(col_str);
+			nfree(cluster_str);
 			ereport(ERROR,
 					(errcode(ERRCODE_INTERNAL_ERROR),
 					 errmsg("neurondb: davies_bouldin_index: invalid SPI result at row %d", i)));
@@ -254,12 +262,12 @@ davies_bouldin_index(PG_FUNCTION_ARGS)
 			ndb_spi_stringinfo_free(spi_session, &sql);
 			NDB_SPI_SESSION_END(spi_session);
 			for (j = 0; j < nvec; j++)
-				NDB_FREE(data[j]);
-			NDB_FREE(data);
-			NDB_FREE(assignments);
-			NDB_FREE(tbl_str);
-			NDB_FREE(col_str);
-			NDB_FREE(cluster_str);
+				nfree(data[j]);
+			nfree(data);
+			nfree(assignments);
+			nfree(tbl_str);
+			nfree(col_str);
+			nfree(cluster_str);
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("neurondb: davies_bouldin_index: NULL cluster assignment at row %d", i)));
@@ -277,12 +285,12 @@ davies_bouldin_index(PG_FUNCTION_ARGS)
 	if (max_cluster_id < 0)
 	{
 		for (i = 0; i < nvec; i++)
-			NDB_FREE(data[i]);
-		NDB_FREE(data);
-		NDB_FREE(assignments);
-		NDB_FREE(tbl_str);
-		NDB_FREE(col_str);
-		NDB_FREE(cluster_str);
+			nfree(data[i]);
+		nfree(data);
+		nfree(assignments);
+		nfree(tbl_str);
+		nfree(col_str);
+		nfree(cluster_str);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("neurondb: davies_bouldin_index: no valid cluster assignments found")));
@@ -291,12 +299,12 @@ davies_bouldin_index(PG_FUNCTION_ARGS)
 	num_clusters = max_cluster_id + 1;
 
 	/* Allocate cluster structures */
-	NDB_ALLOC(cluster_sizes, int, num_clusters);
-	NDB_ALLOC(cluster_scatter, double, num_clusters);
-	NDB_ALLOC(centroids, float *, num_clusters);
+	nalloc(cluster_sizes, int, num_clusters);
+	nalloc(cluster_scatter, double, num_clusters);
+	nalloc(centroids, float *, num_clusters);
 	for (c = 0; c < num_clusters; c++)
 	{
-		NDB_ALLOC(centroids[c], float, dim);
+		nalloc(centroids[c], float, dim);
 	}
 
 	/* Compute cluster centroids */
@@ -311,67 +319,68 @@ davies_bouldin_index(PG_FUNCTION_ARGS)
 	{
 		c = assignments[i];
 		if (c >= 0 && c < num_clusters && cluster_sizes[c] > 0)
-			cluster_scatter[c] += euclidean_distance(data[i], centroids[c], dim);
+		{
+			diff = euclidean_distance(data[i], centroids[c], dim);
+			cluster_scatter[c] += diff;
+		}
 	}
 
 	for (c = 0; c < num_clusters; c++)
 	{
 		if (cluster_sizes[c] > 0)
-			cluster_scatter[c] /= (double) cluster_sizes[c];
+		{
+			cluster_scatter_val = cluster_scatter[c];
+			cluster_scatter[c] = cluster_scatter_val / (double) cluster_sizes[c];
+		}
 	}
 
 	/* Compute Davies-Bouldin index */
+	valid_clusters = 0;
+	sum_dbi = 0.0;
+
+	for (i = 0; i < num_clusters; i++)
 	{
-		int			valid_clusters = 0;
-		double		sum_dbi = 0.0;
+		max_ratio = 0.0;
 
-		for (i = 0; i < num_clusters; i++)
+		/* Skip clusters with less than 2 points */
+		if (cluster_sizes[i] < 2)
+			continue;
+
+		for (j = 0; j < num_clusters; j++)
 		{
-			double		max_ratio = 0.0;
-
-			/* Skip clusters with less than 2 points */
-			if (cluster_sizes[i] < 2)
+			if (i == j || cluster_sizes[j] < 2)
 				continue;
 
-			for (j = 0; j < num_clusters; j++)
-			{
-				double		centroid_dist;
-				double		ratio;
+			centroid_dist = euclidean_distance(centroids[i], centroids[j], dim);
+			if (centroid_dist < 1e-10)
+				continue;
 
-				if (i == j || cluster_sizes[j] < 2)
-					continue;
-
-				centroid_dist = euclidean_distance(centroids[i], centroids[j], dim);
-				if (centroid_dist < 1e-10)
-					continue;
-
-				ratio = (cluster_scatter[i] + cluster_scatter[j]) / centroid_dist;
-				if (ratio > max_ratio)
-					max_ratio = ratio;
-			}
-			sum_dbi += max_ratio;
-			valid_clusters++;
+			ratio = (cluster_scatter[i] + cluster_scatter[j]) / centroid_dist;
+			if (ratio > max_ratio)
+				max_ratio = ratio;
 		}
-
-		if (valid_clusters > 0)
-			davies_bouldin = sum_dbi / (double) valid_clusters;
-		else
-			davies_bouldin = 0.0;	/* No valid clusters */
+		sum_dbi += max_ratio;
+		valid_clusters++;
 	}
+
+	if (valid_clusters > 0)
+		davies_bouldin = sum_dbi / (double) valid_clusters;
+	else
+		davies_bouldin = 0.0;	/* No valid clusters */
 
 	/* Cleanup */
 	for (i = 0; i < nvec; i++)
-		NDB_FREE(data[i]);
-	NDB_FREE(data);
-	NDB_FREE(assignments);
-	NDB_FREE(cluster_sizes);
-	NDB_FREE(cluster_scatter);
+		nfree(data[i]);
+	nfree(data);
+	nfree(assignments);
+	nfree(cluster_sizes);
+	nfree(cluster_scatter);
 	for (c = 0; c < num_clusters; c++)
-		NDB_FREE(centroids[c]);
-	NDB_FREE(centroids);
-	NDB_FREE(tbl_str);
-	NDB_FREE(col_str);
-	NDB_FREE(cluster_str);
+		nfree(centroids[c]);
+	nfree(centroids);
+	nfree(tbl_str);
+	nfree(col_str);
+	nfree(cluster_str);
 
 	PG_RETURN_FLOAT8(davies_bouldin);
 }

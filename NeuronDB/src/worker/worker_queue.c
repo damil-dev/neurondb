@@ -68,15 +68,15 @@ get_guc_bool(const char *name, bool default_val)
 
 typedef struct NeuranqSharedState
 {
-	LWLock *lock;
-	int64 jobs_processed;
-	int64 jobs_failed;
-	int64 total_latency_ms;
+	LWLock	   *lock;
+	int64		jobs_processed;
+	int64		jobs_failed;
+	int64		total_latency_ms;
 	TimestampTz last_heartbeat;
-	pid_t worker_pid;
-	int active_tenants;
-	int64 tenant_jobs[NEURANQ_MAX_TENANTS];
-} NeuranqSharedState;
+	pid_t		worker_pid;
+	int			active_tenants;
+	int64		tenant_jobs[NEURANQ_MAX_TENANTS];
+}			NeuranqSharedState;
 
 static NeuranqSharedState *volatile neuranq_state = NULL;
 
@@ -269,7 +269,7 @@ static void
 process_job_batch(void)
 {
 	int ret;
-	NDB_DECLARE(NdbSpiSession *, session);
+	NdbSpiSession *session = NULL;
 
 	StartTransactionCommand();
 	PushActiveSnapshot(GetTransactionSnapshot());
@@ -319,8 +319,8 @@ process_job_batch(void)
 			{
 				bool isnull;
 				int64 job_id;
-				char *job_type;
-				char *payload;
+				char *job_type = NULL;
+				char *payload = NULL;
 				int tenant_id;
 				int retry_count;
 				bool success;

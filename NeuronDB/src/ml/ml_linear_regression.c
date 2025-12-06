@@ -125,18 +125,19 @@ static Jsonb * evaluate_linear_regression_by_model_id_jsonb(int32 model_id,
 static bool
 matrix_invert(double **matrix, int n, double **result)
 {
-	NDB_DECLARE(double **, augmented);
-	int			i,
-				j,
-				k;
-	double		pivot,
-				factor;
+	double		factor;
+	double		pivot;
+	double	   **augmented = NULL;
+	double	   *temp = NULL;
+	int			i;
+	int			j;
+	int			k;
 
-	NDB_ALLOC(augmented, double *, n);
+	nalloc(augmented, double *, n);
 
 	for (i = 0; i < n; i++)
 	{
-		NDB_ALLOC(augmented[i], double, 2 * n);
+		nalloc(augmented[i], double, 2 * n);
 
 		for (j = 0; j < n; j++)
 		{
@@ -156,7 +157,7 @@ matrix_invert(double **matrix, int n, double **result)
 			{
 				if (fabs(augmented[k][i]) > 1e-10)
 				{
-					double	   *temp = augmented[i];
+					temp = augmented[i];
 
 					augmented[i] = augmented[k];
 					augmented[k] = temp;
@@ -168,8 +169,8 @@ matrix_invert(double **matrix, int n, double **result)
 			if (!found)
 			{
 				for (j = 0; j < n; j++)
-					NDB_FREE(augmented[j]);
-				NDB_FREE(augmented);
+					nfree(augmented[j]);
+				nfree(augmented);
 
 				return false;
 			}
@@ -195,8 +196,8 @@ matrix_invert(double **matrix, int n, double **result)
 			result[i][j] = augmented[i][j + n];
 
 	for (i = 0; i < n; i++)
-		NDB_FREE(augmented[i]);
-	NDB_FREE(augmented);
+		nfree(augmented[i]);
+	nfree(augmented);
 
 	return true;
 }
@@ -221,8 +222,8 @@ linreg_dataset_free(LinRegDataset * dataset)
 	Assert(dataset != NULL);
 	if (dataset == NULL)
 		return;
-	NDB_FREE(dataset->features);
-	NDB_FREE(dataset->targets);
+	nfree(dataset->features);
+	nfree(dataset->targets);
 
 	linreg_dataset_init(dataset);
 }
@@ -239,7 +240,7 @@ linreg_dataset_load_limited(const char *quoted_tbl,
 							LinRegDataset * dataset,
 							int max_rows)
 {
-	NDB_DECLARE(NdbSpiSession *, spi_session);
+	NdbSpiSession *spi_session = NULL;
 	MemoryContext oldcontext;
 	int			ret;
 	int			n_samples = 0;
@@ -265,10 +266,10 @@ linreg_dataset_load_limited(const char *quoted_tbl,
 
 	/* Use centralized SQL query function */
 	{
-		char	   *query_str;
+		char *query_str = NULL;
 		query_str = (char *) ndb_sql_get_load_dataset_limited(quoted_feat, quoted_target, quoted_tbl, max_rows);
 		ret = ndb_spi_execute(spi_session, query_str, true, 0);
-		NDB_FREE(query_str);
+		nfree(query_str);
 	}
 	if (ret != SPI_OK_SELECT)
 	{
@@ -344,8 +345,14 @@ linreg_dataset_load_limited(const char *quoted_tbl,
 	}
 
 	MemoryContextSwitchTo(oldcontext);
-	NDB_ALLOC(dataset->features, float, (size_t) n_samples * (size_t) feature_dim);
-	NDB_ALLOC(dataset->targets, double, (size_t) n_samples);
+	{
+		float *features_tmp = NULL;
+		double *targets_tmp = NULL;
+		nalloc(features_tmp, float, (size_t) n_samples * (size_t) feature_dim);
+		nalloc(targets_tmp, double, (size_t) n_samples);
+		dataset->features = features_tmp;
+		dataset->targets = targets_tmp;
+	}
 
 	for (i = 0; i < n_samples; i++)
 	{
@@ -355,8 +362,8 @@ linreg_dataset_load_limited(const char *quoted_tbl,
 		Datum		targ_datum;
 		bool		feat_null;
 		bool		targ_null;
-		Vector	   *vec;
-		float	   *row;
+		Vector *vec = NULL;
+		float *row = NULL;
 
 		if (SPI_tuptable == NULL || SPI_tuptable->vals == NULL ||
 			i >= SPI_processed || SPI_tuptable->vals[i] == NULL)
@@ -481,14 +488,22 @@ linreg_stream_accum_init(LinRegStreamAccum * accum, int dim)
 	accum->y_sq_sum = 0.0;
 	accum->initialized = false;
 
-	NDB_ALLOC(accum->XtX, double *, dim_with_intercept);
-
-	for (i = 0; i < dim_with_intercept; i++)
 	{
-		NDB_ALLOC(accum->XtX[i], double, dim_with_intercept);
-	}
+		double **XtX_tmp = NULL;
+		double *Xty_tmp = NULL;
+		nalloc(XtX_tmp, double *, dim_with_intercept);
 
-	NDB_ALLOC(accum->Xty, double, dim_with_intercept);
+		for (i = 0; i < dim_with_intercept; i++)
+		{
+			double *XtX_row = NULL;
+			nalloc(XtX_row, double, dim_with_intercept);
+			XtX_tmp[i] = XtX_row;
+		}
+
+		nalloc(Xty_tmp, double, dim_with_intercept);
+		accum->XtX = XtX_tmp;
+		accum->Xty = Xty_tmp;
+	}
 
 	accum->initialized = true;
 }
@@ -513,12 +528,12 @@ linreg_stream_accum_free(LinRegStreamAccum * accum)
 
 		for (i = 0; i < dim_with_intercept; i++)
 		{
-			NDB_FREE(accum->XtX[i]);
+			nfree(accum->XtX[i]);
 		}
-		NDB_FREE(accum->XtX);
+		nfree(accum->XtX);
 	}
 
-	NDB_FREE(accum->Xty);
+	nfree(accum->Xty);
 
 	memset(accum, 0, sizeof(LinRegStreamAccum));
 }
@@ -537,7 +552,7 @@ linreg_stream_accum_add_row(LinRegStreamAccum * accum,
 	int			j;
 	int			dim_with_intercept;
 
-	NDB_DECLARE(double *, xi);
+	double *xi = NULL;
 
 	if (accum == NULL || !accum->initialized)
 		ereport(ERROR,
@@ -551,7 +566,7 @@ linreg_stream_accum_add_row(LinRegStreamAccum * accum,
 
 	dim_with_intercept = accum->feature_dim + 1;
 
-	NDB_ALLOC(xi, double, dim_with_intercept);
+	nalloc(xi, double, dim_with_intercept);
 
 	xi[0] = 1.0;
 	for (i = 0; i < accum->feature_dim; i++)
@@ -569,7 +584,7 @@ linreg_stream_accum_add_row(LinRegStreamAccum * accum,
 	accum->y_sum += target;
 	accum->y_sq_sum += target * target;
 
-	NDB_FREE(xi);
+	nfree(xi);
 }
 
 /*
@@ -594,7 +609,7 @@ linreg_stream_process_chunk(const char *quoted_tbl,
 	bool		feat_is_array = false;
 	TupleDesc	tupdesc;
 
-	NDB_DECLARE(float *, row_buffer);
+	float *row_buffer = NULL;
 
 	if (quoted_tbl == NULL || quoted_feat == NULL || quoted_target == NULL)
 		ereport(ERROR,
@@ -627,12 +642,12 @@ linreg_stream_process_chunk(const char *quoted_tbl,
 	 */
 	/* This is non-deterministic but efficient for large datasets */
 	{
-		NDB_DECLARE(char *, query_str);
+		char *query_str = NULL;
 
 		query_str = (char *) ndb_sql_get_load_dataset_chunk(quoted_feat, quoted_target, quoted_tbl, chunk_size, offset);
 		ret = ndb_spi_execute_safe(query_str, true, 0);
 		NDB_CHECK_SPI_TUPTABLE();
-		NDB_FREE(query_str);
+		nfree(query_str);
 	}
 	if (ret != SPI_OK_SELECT)
 	{
@@ -657,7 +672,7 @@ linreg_stream_process_chunk(const char *quoted_tbl,
 			feat_is_array = true;
 	}
 
-	NDB_ALLOC(row_buffer, float, accum->feature_dim);
+	nalloc(row_buffer, float, accum->feature_dim);
 
 	for (i = 0; i < n_rows; i++)
 	{
@@ -667,8 +682,8 @@ linreg_stream_process_chunk(const char *quoted_tbl,
 		bool		feat_null;
 		bool		targ_null;
 		double		target;
-		Vector	   *vec;
-		ArrayType  *arr;
+		Vector *vec = NULL;
+		ArrayType *arr = NULL;
 		int			j;
 
 		if (SPI_tuptable == NULL || SPI_tuptable->vals == NULL ||
@@ -694,7 +709,7 @@ linreg_stream_process_chunk(const char *quoted_tbl,
 			arr = DatumGetArrayTypeP(feat_datum);
 			if (ARR_NDIM(arr) != 1 || ARR_DIMS(arr)[0] != accum->feature_dim)
 			{
-				NDB_FREE(row_buffer);
+				nfree(row_buffer);
 
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
@@ -720,7 +735,7 @@ linreg_stream_process_chunk(const char *quoted_tbl,
 			vec = DatumGetVector(feat_datum);
 			if (vec->dim != accum->feature_dim)
 			{
-				NDB_FREE(row_buffer);
+				nfree(row_buffer);
 
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
@@ -746,7 +761,7 @@ linreg_stream_process_chunk(const char *quoted_tbl,
 		(*rows_processed)++;
 	}
 
-	NDB_FREE(row_buffer);
+	nfree(row_buffer);
 }
 
 /*
@@ -809,7 +824,7 @@ linreg_model_serialize(const LinRegModel *model, uint8 training_backend)
 static LinRegModel *
 linreg_model_deserialize(const bytea * data, uint8 * training_backend_out)
 {
-	NDB_DECLARE(LinRegModel *, model);
+	LinRegModel *model = NULL;
 	StringInfoData buf = {0};
 	int			i;
 	uint8		training_backend = 0;
@@ -826,7 +841,7 @@ linreg_model_deserialize(const bytea * data, uint8 * training_backend_out)
 	/* Read training_backend first */
 	training_backend = (uint8) pq_getmsgbyte(&buf);
 
-	NDB_ALLOC(model, LinRegModel, 1);
+	nalloc(model, LinRegModel, 1);
 
 	model->n_features = pq_getmsgint(&buf, 4);
 	model->n_samples = pq_getmsgint(&buf, 4);
@@ -838,7 +853,7 @@ linreg_model_deserialize(const bytea * data, uint8 * training_backend_out)
 	/* Validate deserialized values */
 	if (model->n_features <= 0 || model->n_features > 10000)
 	{
-		NDB_FREE(model);
+		nfree(model);
 
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
@@ -849,7 +864,7 @@ linreg_model_deserialize(const bytea * data, uint8 * training_backend_out)
 	}
 	if (model->n_samples < 0 || model->n_samples > 100000000)
 	{
-		NDB_FREE(model);
+		nfree(model);
 
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
@@ -861,10 +876,12 @@ linreg_model_deserialize(const bytea * data, uint8 * training_backend_out)
 
 	if (model->n_features > 0)
 	{
-		NDB_ALLOC(model->coefficients, double, model->n_features);
+		double *coefficients_tmp = NULL;
+		nalloc(coefficients_tmp, double, model->n_features);
 
 		for (i = 0; i < model->n_features; i++)
-			model->coefficients[i] = pq_getmsgfloat8(&buf);
+			coefficients_tmp[i] = pq_getmsgfloat8(&buf);
+		model->coefficients = coefficients_tmp;
 	}
 
 	/* Return training_backend if output parameter provided */
@@ -884,7 +901,7 @@ static bool
 linreg_metadata_is_gpu(Jsonb * metadata)
 {
 	bool		is_gpu = false;
-	JsonbIterator *it;
+	JsonbIterator *it = NULL;
 	JsonbValue	v;
 	JsonbIteratorToken r;
 
@@ -909,7 +926,7 @@ linreg_metadata_is_gpu(Jsonb * metadata)
 					is_gpu = (backend == 1);
 				}
 			}
-			NDB_FREE(key);
+			nfree(key);
 		}
 	}
 
@@ -924,9 +941,9 @@ linreg_try_gpu_predict_catalog(int32 model_id,
 							   const Vector *feature_vec,
 							   double *result_out)
 {
-	NDB_DECLARE(bytea *, payload);
-	NDB_DECLARE(Jsonb *, metrics);
-	NDB_DECLARE(char *, gpu_err);
+	bytea *payload = NULL;
+	Jsonb *metrics = NULL;
+	char *gpu_err = NULL;
 	double		prediction = 0.0;
 	bool		success = false;
 
@@ -946,7 +963,7 @@ linreg_try_gpu_predict_catalog(int32 model_id,
 	/* Check if this is a GPU model using training_backend */
 	{
 		bool		is_gpu_model = false;
-		JsonbIterator *it;
+		JsonbIterator *it = NULL;
 		JsonbValue	v;
 		JsonbIteratorToken r;
 
@@ -969,7 +986,7 @@ linreg_try_gpu_predict_catalog(int32 model_id,
 							is_gpu_model = (backend == 1);
 						}
 					}
-					NDB_FREE(key);
+					nfree(key);
 				}
 			}
 		}
@@ -990,9 +1007,9 @@ linreg_try_gpu_predict_catalog(int32 model_id,
 	}
 
 cleanup:
-	NDB_FREE(payload);
-	NDB_FREE(metrics);
-	NDB_FREE(gpu_err);
+	nfree(payload);
+	nfree(metrics);
+	nfree(gpu_err);
 
 	return success;
 }
@@ -1003,8 +1020,8 @@ cleanup:
 static bool
 linreg_load_model_from_catalog(int32 model_id, LinRegModel **out)
 {
-	NDB_DECLARE(bytea *, payload);
-	NDB_DECLARE(Jsonb *, metrics);
+	bytea *payload = NULL;
+	Jsonb *metrics = NULL;
 
 	if (out == NULL)
 		return false;
@@ -1016,7 +1033,7 @@ linreg_load_model_from_catalog(int32 model_id, LinRegModel **out)
 
 	if (payload == NULL)
 	{
-		NDB_FREE(metrics);
+		nfree(metrics);
 
 		return false;
 	}
@@ -1028,7 +1045,7 @@ linreg_load_model_from_catalog(int32 model_id, LinRegModel **out)
 
 		if (metrics != NULL)
 		{
-			JsonbIterator *it;
+			JsonbIterator *it = NULL;
 			JsonbValue	v;
 			JsonbIteratorToken r;
 
@@ -1049,15 +1066,15 @@ linreg_load_model_from_catalog(int32 model_id, LinRegModel **out)
 							is_gpu_model = (backend == 1);
 						}
 					}
-					NDB_FREE(key);
+					nfree(key);
 				}
 			}
 		}
 
 		if (is_gpu_model)
 		{
-			NDB_FREE(payload);
-			NDB_FREE(metrics);
+			nfree(payload);
+			nfree(metrics);
 
 			return false;
 		}
@@ -1076,8 +1093,8 @@ linreg_load_model_from_catalog(int32 model_id, LinRegModel **out)
 	}
 	PG_END_TRY();
 
-	NDB_FREE(payload);
-	NDB_FREE(metrics);
+	nfree(payload);
+	nfree(metrics);
 
 	return (*out != NULL);
 }
@@ -1093,13 +1110,13 @@ PG_FUNCTION_INFO_V1(train_linear_regression);
 Datum
 train_linear_regression(PG_FUNCTION_ARGS)
 {
-	text	   *table_name;
-	text	   *feature_col;
-	text	   *target_col;
+	text *table_name = NULL;
+	text *feature_col = NULL;
+	text *target_col = NULL;
 
-	NDB_DECLARE(char *, tbl_str);
-	NDB_DECLARE(char *, feat_str);
-	NDB_DECLARE(char *, targ_str);
+	char *tbl_str = NULL;
+	char *feat_str = NULL;
+	char *targ_str = NULL;
 	int			nvec = 0;
 	int			dim = 0;
 	LinRegDataset dataset;
@@ -1108,8 +1125,8 @@ train_linear_regression(PG_FUNCTION_ARGS)
 	const char *quoted_target;
 	MLGpuTrainResult gpu_result;
 
-	NDB_DECLARE(char *, gpu_err);
-	NDB_DECLARE(Jsonb *, gpu_hyperparams);
+	char *gpu_err = NULL;
+	Jsonb *gpu_hyperparams = NULL;
 	int32		model_id = 0;
 	MemoryContext oldcontext;
 
@@ -1140,7 +1157,7 @@ train_linear_regression(PG_FUNCTION_ARGS)
 		Oid			feat_type_oid = InvalidOid;
 		bool		feat_is_array = false;
 
-		NDB_DECLARE(NdbSpiSession *, check_spi_session);
+		NdbSpiSession *check_spi_session = NULL;
 		MemoryContext check_oldcontext;
 
 		check_oldcontext = CurrentMemoryContext;
@@ -1149,18 +1166,18 @@ train_linear_regression(PG_FUNCTION_ARGS)
 
 		/* Get feature dimension from first row - use centralized SQL query */
 		{
-			NDB_DECLARE(char *, check_query);
+			char *check_query = NULL;
 
 			check_query = (char *) ndb_sql_get_check_dataset(quoted_feat, quoted_target, quoted_tbl);
 			ret = ndb_spi_execute(check_spi_session, check_query, true, 0);
-			NDB_FREE(check_query);
+			nfree(check_query);
 		}
 		if (ret != SPI_OK_SELECT || SPI_processed == 0)
 		{
 			NDB_SPI_SESSION_END(check_spi_session);
-			NDB_FREE(tbl_str);
-			NDB_FREE(feat_str);
-			NDB_FREE(targ_str);
+			nfree(tbl_str);
+			nfree(feat_str);
+			nfree(targ_str);
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("neurondb: train_linear_regression: no valid rows found"),
@@ -1180,9 +1197,9 @@ train_linear_regression(PG_FUNCTION_ARGS)
 			if (first_tuple == NULL)
 			{
 				NDB_SPI_SESSION_END(check_spi_session);
-				NDB_FREE(tbl_str);
-				NDB_FREE(feat_str);
-				NDB_FREE(targ_str);
+				nfree(tbl_str);
+				nfree(feat_str);
+				nfree(targ_str);
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 						 errmsg("neurondb: train_linear_regression: first tuple is NULL")));
@@ -1202,9 +1219,9 @@ train_linear_regression(PG_FUNCTION_ARGS)
 					if (ARR_NDIM(arr) != 1)
 					{
 						NDB_SPI_SESSION_END(check_spi_session);
-						NDB_FREE(tbl_str);
-						NDB_FREE(feat_str);
-						NDB_FREE(targ_str);
+						nfree(tbl_str);
+						nfree(feat_str);
+						nfree(targ_str);
 						ereport(ERROR,
 								(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 								 errmsg("neurondb: train_linear_regression: features array must be 1-D"),
@@ -1220,9 +1237,9 @@ train_linear_regression(PG_FUNCTION_ARGS)
 					if (vec == NULL)
 					{
 						NDB_SPI_SESSION_END(check_spi_session);
-						NDB_FREE(tbl_str);
-						NDB_FREE(feat_str);
-						NDB_FREE(targ_str);
+						nfree(tbl_str);
+						nfree(feat_str);
+						nfree(targ_str);
 						ereport(ERROR,
 								(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 								 errmsg("neurondb: train_linear_regression: failed to get vector from datum")));
@@ -1235,9 +1252,9 @@ train_linear_regression(PG_FUNCTION_ARGS)
 		if (dim <= 0)
 		{
 			NDB_SPI_SESSION_END(check_spi_session);
-			NDB_FREE(tbl_str);
-			NDB_FREE(feat_str);
-			NDB_FREE(targ_str);
+			nfree(tbl_str);
+			nfree(feat_str);
+			nfree(targ_str);
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("neurondb: train_linear_regression: could not determine feature dimension"),
@@ -1247,11 +1264,11 @@ train_linear_regression(PG_FUNCTION_ARGS)
 
 		/* Get row count - use centralized SQL query */
 		{
-			NDB_DECLARE(char *, count_query);
+			char *count_query = NULL;
 
 			count_query = (char *) ndb_sql_get_count_dataset(quoted_feat, quoted_target, quoted_tbl);
 			ret = ndb_spi_execute(check_spi_session, count_query, true, 0);
-			NDB_FREE(count_query);
+			nfree(count_query);
 		}
 		if (ret == SPI_OK_SELECT && SPI_processed > 0
 			&& SPI_tuptable != NULL && SPI_tuptable->vals != NULL
@@ -1273,9 +1290,9 @@ train_linear_regression(PG_FUNCTION_ARGS)
 
 		if (nvec < 10)
 		{
-			NDB_FREE(tbl_str);
-			NDB_FREE(feat_str);
-			NDB_FREE(targ_str);
+			nfree(tbl_str);
+			nfree(feat_str);
+			nfree(targ_str);
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("neurondb: train_linear_regression: need at least 10 samples, got %d",
@@ -1330,12 +1347,12 @@ train_linear_regression(PG_FUNCTION_ARGS)
 			gpu_hyperparams = ndb_jsonb_in_cstring(hyperbuf.data);
 			if (gpu_hyperparams == NULL)
 			{
-				NDB_FREE(hyperbuf.data);
+				nfree(hyperbuf.data);
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
 						 errmsg("neurondb: failed to parse hyperparams JSON")));
 			}
-			NDB_FREE(hyperbuf.data);
+			nfree(hyperbuf.data);
 			hyperbuf.data = NULL;
 
 			{
@@ -1370,10 +1387,10 @@ train_linear_regression(PG_FUNCTION_ARGS)
 				MLCatalogModelSpec spec;
 				LinRegModel linreg_model;
 
-				NDB_DECLARE(bytea *, unified_model_data);
-				NDB_DECLARE(Jsonb *, updated_metrics);
-				char	   *base;
-				NdbCudaLinRegModelHeader *hdr;
+				bytea *unified_model_data = NULL;
+				Jsonb *updated_metrics = NULL;
+				char *base = NULL;
+				NdbCudaLinRegModelHeader *hdr = NULL;
 				int			i;
 				size_t		expected_size;
 				uint32		payload_size;
@@ -1432,9 +1449,11 @@ train_linear_regression(PG_FUNCTION_ARGS)
 					/* Copy coefficients, converting from float to double */
 					if (linreg_model.n_features > 0)
 					{
-						NDB_ALLOC(linreg_model.coefficients, double, linreg_model.n_features);
+						double *coefficients_tmp = NULL;
+						nalloc(coefficients_tmp, double, linreg_model.n_features);
 						for (i = 0; i < linreg_model.n_features; i++)
-							linreg_model.coefficients[i] = (double) coef_src_float[i];
+							coefficients_tmp[i] = (double) coef_src_float[i];
+						linreg_model.coefficients = coefficients_tmp;
 					}
 				}
 
@@ -1447,7 +1466,7 @@ train_linear_regression(PG_FUNCTION_ARGS)
 
 				if (linreg_model.coefficients != NULL)
 				{
-					NDB_FREE(linreg_model.coefficients);
+					nfree(linreg_model.coefficients);
 					linreg_model.coefficients = NULL;
 				}
 
@@ -1469,12 +1488,12 @@ train_linear_regression(PG_FUNCTION_ARGS)
 					updated_metrics = ndb_jsonb_in_cstring(metrics_buf.data);
 					if (updated_metrics == NULL)
 					{
-						NDB_FREE(metrics_buf.data);
+						nfree(metrics_buf.data);
 						ereport(ERROR,
 								(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
 								 errmsg("neurondb: failed to parse metrics JSON")));
 					}
-					NDB_FREE(metrics_buf.data);
+					nfree(metrics_buf.data);
 				}
 
 				spec = gpu_result.spec;
@@ -1615,14 +1634,14 @@ train_linear_regression(PG_FUNCTION_ARGS)
 				model_id = ml_catalog_register_model(&spec);
 #endif
 
-				NDB_FREE(gpu_err);
-				NDB_FREE(gpu_hyperparams);
+				nfree(gpu_err);
+				nfree(gpu_hyperparams);
 
 				ndb_gpu_free_train_result(&gpu_result);
 				linreg_dataset_free(&dataset);
-				NDB_FREE(tbl_str);
-				NDB_FREE(feat_str);
-				NDB_FREE(targ_str);
+				nfree(tbl_str);
+				nfree(feat_str);
+				nfree(targ_str);
 
 				PG_RETURN_INT32(model_id);
 			}
@@ -1630,9 +1649,9 @@ train_linear_regression(PG_FUNCTION_ARGS)
 			{
 				if (gpu_err != NULL)
 				{
-					NDB_FREE(gpu_err);
+					nfree(gpu_err);
 				}
-				NDB_FREE(gpu_hyperparams);
+				nfree(gpu_hyperparams);
 
 				ndb_gpu_free_train_result(&gpu_result);
 				linreg_dataset_free(&dataset);
@@ -1646,16 +1665,16 @@ train_linear_regression(PG_FUNCTION_ARGS)
 		/* CPU training path using streaming accumulator */
 		{
 			LinRegStreamAccum stream_accum;
-			double	  **XtX_inv = NULL;
+			double **XtX_inv = NULL;
 
-			NDB_DECLARE(double *, beta);
+			double *beta = NULL;
 			int			i,
 						j;
 			int			dim_with_intercept;
 
-			NDB_DECLARE(LinRegModel *, model);
-			bytea	   *model_blob;
-			Jsonb	   *metrics_json;
+			LinRegModel *model = NULL;
+			bytea *model_blob = NULL;
+			Jsonb *metrics_json = NULL;
 			StringInfoData metricsbuf = {0};
 			int			chunk_size;
 			int			offset = 0;
@@ -1676,7 +1695,7 @@ train_linear_regression(PG_FUNCTION_ARGS)
 			/* Process data in chunks */
 
 			{
-				NDB_DECLARE(NdbSpiSession *, stream_spi_session);
+				NdbSpiSession *stream_spi_session = NULL;
 				MemoryContext stream_oldcontext;
 
 				stream_oldcontext = CurrentMemoryContext;
@@ -1708,9 +1727,9 @@ train_linear_regression(PG_FUNCTION_ARGS)
 			if (stream_accum.n_samples < 10)
 			{
 				linreg_stream_accum_free(&stream_accum);
-				NDB_FREE(tbl_str);
-				NDB_FREE(feat_str);
-				NDB_FREE(targ_str);
+				nfree(tbl_str);
+				nfree(feat_str);
+				nfree(targ_str);
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 						 errmsg("neurondb: train_linear_regression: insufficient samples processed (%d)",
@@ -1721,18 +1740,18 @@ train_linear_regression(PG_FUNCTION_ARGS)
 
 			/* Allocate matrices for inversion */
 			XtX_inv = NULL;
-			NDB_ALLOC(XtX_inv, double *, dim_with_intercept);
+			nalloc(XtX_inv, double *, dim_with_intercept);
 
 			/* palloc0 already initializes to NULL, so XtX_inv[i] are all NULL */
 			/* Allocate each row */
 			for (i = 0; i < dim_with_intercept; i++)
 			{
 				/* XtX_inv[i] is already NULL from palloc0 above */
-				NDB_ALLOC(XtX_inv[i], double, dim_with_intercept);
+				nalloc(XtX_inv[i], double, dim_with_intercept);
 			}
 
 			beta = NULL;
-			NDB_ALLOC(beta, double, dim_with_intercept);
+			nalloc(beta, double, dim_with_intercept);
 
 			/*
 			 * Add small regularization (ridge) to diagonal to handle
@@ -1762,14 +1781,14 @@ train_linear_regression(PG_FUNCTION_ARGS)
 				if (!matrix_invert(stream_accum.XtX, dim_with_intercept, XtX_inv))
 				{
 					for (i = 0; i < dim_with_intercept; i++)
-						NDB_FREE(XtX_inv[i]);
-					NDB_FREE(XtX_inv);
-					NDB_FREE(beta);
+						nfree(XtX_inv[i]);
+					nfree(XtX_inv);
+					nfree(beta);
 
 					linreg_stream_accum_free(&stream_accum);
-					NDB_FREE(tbl_str);
-					NDB_FREE(feat_str);
-					NDB_FREE(targ_str);
+					nfree(tbl_str);
+					nfree(feat_str);
+					nfree(targ_str);
 					ereport(ERROR,
 							(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 							 errmsg("neurondb: linear_regression: matrix is singular even after regularization"),
@@ -1791,15 +1810,19 @@ train_linear_regression(PG_FUNCTION_ARGS)
 			}
 
 			/* Build LinRegModel */
-			NDB_ALLOC(model, LinRegModel, 1);
+			nalloc(model, LinRegModel, 1);
 
 			model->n_features = dim;
 			model->n_samples = stream_accum.n_samples;
 			model->intercept = beta[0];
-			NDB_ALLOC(model->coefficients, double, dim);
+			{
+				double *coefficients_tmp = NULL;
+				nalloc(coefficients_tmp, double, dim);
 
-			for (i = 0; i < dim; i++)
-				model->coefficients[i] = beta[i + 1];
+				for (i = 0; i < dim; i++)
+					coefficients_tmp[i] = beta[i + 1];
+				model->coefficients = coefficients_tmp;
+			}
 
 			/*
 			 * Compute metrics (R², MSE, MAE) using second pass through
@@ -1833,7 +1856,7 @@ train_linear_regression(PG_FUNCTION_ARGS)
 
 				/* Metrics computation uses new SPI session */
 				{
-					NDB_DECLARE(NdbSpiSession *, metrics_spi_session);
+					NdbSpiSession *metrics_spi_session = NULL;
 					MemoryContext metrics_oldcontext;
 
 					metrics_oldcontext = CurrentMemoryContext;
@@ -1847,7 +1870,7 @@ train_linear_regression(PG_FUNCTION_ARGS)
 						int			metrics_n_rows;
 						TupleDesc	metrics_tupdesc;
 
-						NDB_DECLARE(float *, metrics_row_buffer);
+						float *metrics_row_buffer = NULL;
 						int			metrics_i;
 
 						initStringInfo(&metrics_query);
@@ -1874,19 +1897,19 @@ train_linear_regression(PG_FUNCTION_ARGS)
 						NDB_CHECK_SPI_TUPTABLE();
 						if (metrics_ret != SPI_OK_SELECT)
 						{
-							NDB_FREE(metrics_query.data);
+							nfree(metrics_query.data);
 							break;
 						}
 						NDB_CHECK_SPI_TUPTABLE();
 						metrics_n_rows = SPI_processed;
 						if (metrics_n_rows == 0)
 						{
-							NDB_FREE(metrics_query.data);
+							nfree(metrics_query.data);
 							break;
 						}
 
 						metrics_tupdesc = SPI_tuptable->tupdesc;
-						NDB_ALLOC(metrics_row_buffer, float, dim);
+						nalloc(metrics_row_buffer, float, dim);
 
 						for (metrics_i = 0; metrics_i < metrics_n_rows && (metrics_offset + metrics_i) < metrics_chunk_size; metrics_i++)
 						{
@@ -1898,8 +1921,8 @@ train_linear_regression(PG_FUNCTION_ARGS)
 							double		metrics_y_true;
 							double		metrics_y_pred;
 							double		metrics_error;
-							Vector	   *metrics_vec;
-							ArrayType  *metrics_arr;
+							Vector *metrics_vec = NULL;
+							ArrayType *metrics_arr = NULL;
 							int			metrics_j;
 							Oid			metrics_feat_type_oid = SPI_gettypeid(metrics_tupdesc, 1);
 							bool		metrics_feat_is_array = (metrics_feat_type_oid == FLOAT8ARRAYOID || metrics_feat_type_oid == FLOAT4ARRAYOID);
@@ -1960,8 +1983,8 @@ train_linear_regression(PG_FUNCTION_ARGS)
 							ss_res += metrics_error * metrics_error;
 						}
 
-						NDB_FREE(metrics_row_buffer);
-						NDB_FREE(metrics_query.data);
+						nfree(metrics_row_buffer);
+						nfree(metrics_query.data);
 
 						metrics_offset += metrics_n_rows;
 						if (metrics_offset >= metrics_chunk_size)
@@ -1990,18 +2013,18 @@ train_linear_regression(PG_FUNCTION_ARGS)
 			/* Validate model before serialization */
 			if (model->n_features <= 0 || model->n_features > 10000)
 			{
-				NDB_FREE(model->coefficients);
-				NDB_FREE(model);
+				nfree(model->coefficients);
+				nfree(model);
 
 				for (i = 0; i < dim_with_intercept; i++)
-					NDB_FREE(XtX_inv[i]);
-				NDB_FREE(XtX_inv);
-				NDB_FREE(beta);
+					nfree(XtX_inv[i]);
+				nfree(XtX_inv);
+				nfree(beta);
 
 				linreg_stream_accum_free(&stream_accum);
-				NDB_FREE(tbl_str);
-				NDB_FREE(feat_str);
-				NDB_FREE(targ_str);
+				nfree(tbl_str);
+				nfree(feat_str);
+				nfree(targ_str);
 
 				ereport(ERROR,
 						(errcode(ERRCODE_INTERNAL_ERROR),
@@ -2040,12 +2063,12 @@ train_linear_regression(PG_FUNCTION_ARGS)
 			metrics_json = ndb_jsonb_in_cstring(metricsbuf.data);
 			if (metrics_json == NULL)
 			{
-				NDB_FREE(metricsbuf.data);
+				nfree(metricsbuf.data);
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
 						 errmsg("neurondb: failed to parse metrics JSON")));
 			}
-			NDB_FREE(metricsbuf.data);
+			nfree(metricsbuf.data);
 			metricsbuf.data = NULL;
 
 			/* Register in catalog */
@@ -2075,16 +2098,16 @@ train_linear_regression(PG_FUNCTION_ARGS)
 			}
 
 			for (i = 0; i < dim_with_intercept; i++)
-				NDB_FREE(XtX_inv[i]);
-			NDB_FREE(XtX_inv);
-			NDB_FREE(beta);
-			NDB_FREE(model->coefficients);
-			NDB_FREE(model);
+				nfree(XtX_inv[i]);
+			nfree(XtX_inv);
+			nfree(beta);
+			nfree(model->coefficients);
+			nfree(model);
 
 			linreg_stream_accum_free(&stream_accum);
-			NDB_FREE(tbl_str);
-			NDB_FREE(feat_str);
-			NDB_FREE(targ_str);
+			nfree(tbl_str);
+			nfree(feat_str);
+			nfree(targ_str);
 
 			PG_RETURN_INT32(model_id);
 		}
@@ -2102,9 +2125,9 @@ Datum
 predict_linear_regression_model_id(PG_FUNCTION_ARGS)
 {
 	int32		model_id;
-	Vector	   *features;
+	Vector *features = NULL;
 
-	NDB_DECLARE(LinRegModel *, model);
+	LinRegModel *model = NULL;
 	double		prediction;
 	int			i;
 
@@ -2136,8 +2159,8 @@ predict_linear_regression_model_id(PG_FUNCTION_ARGS)
 	if (!linreg_load_model_from_catalog(model_id, &model))
 	{
 		/* Check if model is GPU-only */
-		NDB_DECLARE(bytea *, payload);
-		NDB_DECLARE(Jsonb *, metrics);
+		bytea *payload = NULL;
+		Jsonb *metrics = NULL;
 		bool		is_gpu = false;
 
 		if (ml_catalog_fetch_model_payload(model_id, &payload, NULL, &metrics))
@@ -2147,7 +2170,7 @@ predict_linear_regression_model_id(PG_FUNCTION_ARGS)
 
 			if (metrics != NULL)
 			{
-				JsonbIterator *it;
+				JsonbIterator *it = NULL;
 				JsonbValue	v;
 				JsonbIteratorToken r;
 
@@ -2168,13 +2191,13 @@ predict_linear_regression_model_id(PG_FUNCTION_ARGS)
 								is_gpu = (backend == 1);
 							}
 						}
-						NDB_FREE(key);
+						nfree(key);
 					}
 				}
 			}
 
-			NDB_FREE(payload);
-			NDB_FREE(metrics);
+			nfree(payload);
+			nfree(metrics);
 		}
 
 		if (is_gpu)
@@ -2213,8 +2236,8 @@ predict_linear_regression_model_id(PG_FUNCTION_ARGS)
 
 	if (model != NULL)
 	{
-		NDB_FREE(model->coefficients);
-		NDB_FREE(model);
+		nfree(model->coefficients);
+		nfree(model);
 	}
 
 	PG_RETURN_FLOAT8(prediction);
@@ -2230,11 +2253,11 @@ PG_FUNCTION_INFO_V1(predict_linear_regression);
 Datum
 predict_linear_regression(PG_FUNCTION_ARGS)
 {
-	ArrayType  *coef_array;
-	Vector	   *features;
+	ArrayType *coef_array = NULL;
+	Vector *features = NULL;
 	int			ncoef;
-	float8	   *coef;
-	float	   *x;
+	float8 *coef = NULL;
+	float *x = NULL;
 	int			dim;
 	double		prediction;
 	int			i;
@@ -2284,19 +2307,19 @@ PG_FUNCTION_INFO_V1(evaluate_linear_regression);
 Datum
 evaluate_linear_regression(PG_FUNCTION_ARGS)
 {
-	text	   *table_name;
-	text	   *feature_col;
-	text	   *target_col;
-	ArrayType  *coef_array;
+	text *table_name = NULL;
+	text *feature_col = NULL;
+	text *target_col = NULL;
+	ArrayType *coef_array = NULL;
 
-	NDB_DECLARE(char *, tbl_str);
-	NDB_DECLARE(char *, feat_str);
-	NDB_DECLARE(char *, targ_str);
+	char *tbl_str = NULL;
+	char *feat_str = NULL;
+	char *targ_str = NULL;
 	StringInfoData query = {0};
 	int			ret;
 	int			nvec = 0;
 	int			ncoef;
-	float8	   *coef;
+	float8 *coef = NULL;
 	double		mse = 0.0;
 	double		mae = 0.0;
 	double		ss_tot = 0.0;
@@ -2306,11 +2329,11 @@ evaluate_linear_regression(PG_FUNCTION_ARGS)
 	double		rmse;
 	int			i;
 
-	NDB_DECLARE(Datum *, result_datums);
-	ArrayType  *result_array;
+	Datum *result_datums = NULL;
+	ArrayType *result_array = NULL;
 	MemoryContext oldcontext;
 
-	NDB_DECLARE(NdbSpiSession *, eval_spi_session);
+	NdbSpiSession *eval_spi_session = NULL;
 
 	table_name = PG_GETARG_TEXT_PP(0);
 	feature_col = PG_GETARG_TEXT_PP(1);
@@ -2349,14 +2372,14 @@ evaluate_linear_regression(PG_FUNCTION_ARGS)
 					 targ_str);
 
 	ret = ndb_spi_execute(eval_spi_session, query.data, true, 0);
-	NDB_FREE(query.data);
+	nfree(query.data);
 	query.data = NULL;
 	if (ret != SPI_OK_SELECT)
 	{
 		NDB_SPI_SESSION_END(eval_spi_session);
-		NDB_FREE(tbl_str);
-		NDB_FREE(feat_str);
-		NDB_FREE(targ_str);
+		nfree(tbl_str);
+		nfree(feat_str);
+		nfree(targ_str);
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
 				 errmsg("neurondb: evaluate_linear_regression: query failed"),
@@ -2389,7 +2412,7 @@ evaluate_linear_regression(PG_FUNCTION_ARGS)
 		Datum		targ_datum;
 		bool		feat_null;
 		bool		targ_null;
-		Vector	   *vec;
+		Vector *vec = NULL;
 		double		y_true;
 		double		y_pred;
 		double		error;
@@ -2427,7 +2450,7 @@ evaluate_linear_regression(PG_FUNCTION_ARGS)
 	/* Build result array: [r_squared, mse, mae, rmse] */
 	MemoryContextSwitchTo(oldcontext);
 
-	NDB_ALLOC(result_datums, Datum, 4);
+	nalloc(result_datums, Datum, 4);
 
 	result_datums[0] = Float8GetDatum(r_squared);
 	result_datums[1] = Float8GetDatum(mse);
@@ -2441,10 +2464,10 @@ evaluate_linear_regression(PG_FUNCTION_ARGS)
 								   FLOAT8PASSBYVAL,
 								   'd');
 
-	NDB_FREE(result_datums);
-	NDB_FREE(tbl_str);
-	NDB_FREE(feat_str);
-	NDB_FREE(targ_str);
+	nfree(result_datums);
+	nfree(tbl_str);
+	nfree(feat_str);
+	nfree(targ_str);
 
 	PG_RETURN_ARRAYTYPE_P(result_array);
 }
@@ -2452,10 +2475,10 @@ evaluate_linear_regression(PG_FUNCTION_ARGS)
 Jsonb *
 evaluate_linear_regression_by_model_id_jsonb(int32 model_id, text * table_name, text * feature_col, text * label_col)
 {
-	NDB_DECLARE(LinRegModel *, model);
-	NDB_DECLARE(char *, tbl_str);
-	NDB_DECLARE(char *, feat_str);
-	NDB_DECLARE(char *, targ_str);
+	LinRegModel *model = NULL;
+	char *tbl_str = NULL;
+	char *feat_str = NULL;
+	char *targ_str = NULL;
 	StringInfoData query = {0};
 	StringInfoData jsonbuf = {0};
 	int			ret;
@@ -2471,24 +2494,24 @@ evaluate_linear_regression_by_model_id_jsonb(int32 model_id, text * table_name, 
 	double		rmse;
 	int			i;
 
-	NDB_DECLARE(Jsonb *, result);
+	Jsonb *result = NULL;
 	MemoryContext oldcontext;
 
 	Oid			feat_type_oid;
 	bool		feat_is_array;
 
-	NDB_DECLARE(bytea *, gpu_payload);
-	NDB_DECLARE(Jsonb *, gpu_metrics);
+	bytea *gpu_payload = NULL;
+	Jsonb *gpu_metrics = NULL;
 	bool		is_gpu_model = false;
 
 	MemoryContext currctx;
 
-	NDB_DECLARE(double *, model_coefficients_ptr);
-	NDB_DECLARE(NdbSpiSession *, eval_jsonb_spi_session);
+	double *model_coefficients_ptr = NULL;
+	NdbSpiSession *eval_jsonb_spi_session = NULL;
 
 #ifdef NDB_GPU_CUDA
-	NDB_DECLARE(float *, h_features);
-	NDB_DECLARE(double *, h_targets);
+	float *h_features = NULL;
+	double *h_targets = NULL;
 	int			valid_rows = 0;
 #endif
 
@@ -2524,21 +2547,21 @@ evaluate_linear_regression_by_model_id_jsonb(int32 model_id, text * table_name, 
 					 targ_str);
 
 	ret = ndb_spi_execute(eval_jsonb_spi_session, query.data, true, 0);
-	NDB_FREE(query.data);
+	nfree(query.data);
 	query.data = NULL;
 	if (ret != SPI_OK_SELECT)
 	{
 		NDB_SPI_SESSION_END(eval_jsonb_spi_session);
-		NDB_FREE(tbl_str);
-		NDB_FREE(feat_str);
-		NDB_FREE(targ_str);
+		nfree(tbl_str);
+		nfree(feat_str);
+		nfree(targ_str);
 		if (model != NULL)
 		{
-			NDB_FREE(model->coefficients);
-			NDB_FREE(model);
+			nfree(model->coefficients);
+			nfree(model);
 		}
-		NDB_FREE(gpu_payload);
-		NDB_FREE(gpu_metrics);
+		nfree(gpu_payload);
+		nfree(gpu_metrics);
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
 				 errmsg("neurondb: evaluate_linear_regression_by_model_id_jsonb: query failed"),
@@ -2552,14 +2575,14 @@ evaluate_linear_regression_by_model_id_jsonb(int32 model_id, text * table_name, 
 		NDB_SPI_SESSION_END(eval_jsonb_spi_session);
 		if (model != NULL)
 		{
-			NDB_FREE(model->coefficients);
-			NDB_FREE(model);
+			nfree(model->coefficients);
+			nfree(model);
 		}
-		NDB_FREE(gpu_payload);
-		NDB_FREE(gpu_metrics);
-		NDB_FREE(tbl_str);
-		NDB_FREE(feat_str);
-		NDB_FREE(targ_str);
+		nfree(gpu_payload);
+		nfree(gpu_metrics);
+		nfree(tbl_str);
+		nfree(feat_str);
+		nfree(targ_str);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("neurondb: evaluate_linear_regression_by_model_id_jsonb: need at least 2 samples, got %d",
@@ -2592,11 +2615,11 @@ evaluate_linear_regression_by_model_id_jsonb(int32 model_id, text * table_name, 
 		if (VARSIZE(gpu_payload) - VARHDRSZ < sizeof(NdbCudaLinRegModelHeader))
 		{
 			NDB_SPI_SESSION_END(eval_jsonb_spi_session);
-			NDB_FREE(gpu_payload);
-			NDB_FREE(gpu_metrics);
-			NDB_FREE(tbl_str);
-			NDB_FREE(feat_str);
-			NDB_FREE(targ_str);
+			nfree(gpu_payload);
+			nfree(gpu_metrics);
+			nfree(tbl_str);
+			nfree(feat_str);
+			nfree(targ_str);
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("neurondb: evaluate_linear_regression_by_model_id_jsonb: GPU payload too small"),
@@ -2608,8 +2631,8 @@ evaluate_linear_regression_by_model_id_jsonb(int32 model_id, text * table_name, 
 		feat_dim = gpu_hdr->feature_dim;
 
 		/* Allocate host buffers for features and targets */
-		NDB_ALLOC(h_features, float, (size_t) nvec * (size_t) feat_dim);
-		NDB_ALLOC(h_targets, double, nvec);
+		nalloc(h_features, float, (size_t) nvec * (size_t) feat_dim);
+		nalloc(h_targets, double, nvec);
 
 		/*
 		 * Extract features and targets from SPI results - optimized batch
@@ -2625,9 +2648,9 @@ evaluate_linear_regression_by_model_id_jsonb(int32 model_id, text * table_name, 
 				Datum		targ_datum;
 				bool		feat_null;
 				bool		targ_null;
-				Vector	   *vec;
-				ArrayType  *arr;
-				float	   *feat_row;
+				Vector *vec = NULL;
+				ArrayType *arr = NULL;
+				float *feat_row = NULL;
 
 				feat_datum = SPI_getbinval(tuple, tupdesc, 1, &feat_null);
 				targ_datum = SPI_getbinval(tuple, tupdesc, 2, &targ_null);
@@ -2683,13 +2706,13 @@ evaluate_linear_regression_by_model_id_jsonb(int32 model_id, text * table_name, 
 
 		if (valid_rows < 2)
 		{
-			NDB_FREE(h_features);
-			NDB_FREE(h_targets);
-			NDB_FREE(gpu_payload);
-			NDB_FREE(gpu_metrics);
-			NDB_FREE(tbl_str);
-			NDB_FREE(feat_str);
-			NDB_FREE(targ_str);
+			nfree(h_features);
+			nfree(h_targets);
+			nfree(gpu_payload);
+			nfree(gpu_metrics);
+			nfree(tbl_str);
+			nfree(feat_str);
+			nfree(targ_str);
 			NDB_SPI_SESSION_END(eval_jsonb_spi_session);
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
@@ -2708,7 +2731,7 @@ evaluate_linear_regression_by_model_id_jsonb(int32 model_id, text * table_name, 
 			double		gpu_rmse = 0.0;
 			double		gpu_r_squared = 0.0;
 
-			NDB_DECLARE(char *, gpu_err);
+			char *gpu_err = NULL;
 			int			eval_rc;
 
 			eval_rc = ndb_cuda_linreg_evaluate(gpu_payload,
@@ -2731,13 +2754,13 @@ evaluate_linear_regression_by_model_id_jsonb(int32 model_id, text * table_name, 
 				r_squared = gpu_r_squared;
 				nvec = valid_rows;
 
-				NDB_FREE(h_features);
-				NDB_FREE(h_targets);
-				NDB_FREE(gpu_payload);
-				NDB_FREE(gpu_metrics);
-				NDB_FREE(tbl_str);
-				NDB_FREE(feat_str);
-				NDB_FREE(targ_str);
+				nfree(h_features);
+				nfree(h_targets);
+				nfree(gpu_payload);
+				nfree(gpu_metrics);
+				nfree(tbl_str);
+				nfree(feat_str);
+				nfree(targ_str);
 
 				NDB_SPI_SESSION_END(eval_jsonb_spi_session);
 
@@ -2751,7 +2774,7 @@ evaluate_linear_regression_by_model_id_jsonb(int32 model_id, text * table_name, 
 
 					/* Use ndb_jsonb_in_cstring to parse JSON string to JSONB */
 					result = ndb_jsonb_in_cstring(jsonbuf.data);
-					NDB_FREE(jsonbuf.data);
+					nfree(jsonbuf.data);
 					jsonbuf.data = NULL;
 
 					if (result == NULL)
@@ -2770,9 +2793,9 @@ evaluate_linear_regression_by_model_id_jsonb(int32 model_id, text * table_name, 
 				elog(WARNING,
 					 "neurondb: evaluate_linear_regression_by_model_id_jsonb: GPU evaluation kernel failed: %s, falling back to CPU",
 					 gpu_err ? gpu_err : "unknown error");
-				NDB_FREE(gpu_err);
-				NDB_FREE(h_features);
-				NDB_FREE(h_targets);
+				nfree(gpu_err);
+				nfree(h_features);
+				nfree(h_targets);
 
 				/* Fall through to CPU path */
 			}
@@ -2787,18 +2810,18 @@ evaluate_linear_regression_by_model_id_jsonb(int32 model_id, text * table_name, 
 		const NdbCudaLinRegModelHeader *gpu_hdr;
 		const float *gpu_coefficients;
 
-		NDB_DECLARE(double *, cpu_coefficients);
+		double *cpu_coefficients = NULL;
 		double		cpu_intercept = 0.0;
 		int			feat_dim;
 
 		if (VARSIZE(gpu_payload) - VARHDRSZ < sizeof(NdbCudaLinRegModelHeader))
 		{
 			NDB_SPI_SESSION_END(eval_jsonb_spi_session);
-			NDB_FREE(gpu_payload);
-			NDB_FREE(gpu_metrics);
-			NDB_FREE(tbl_str);
-			NDB_FREE(feat_str);
-			NDB_FREE(targ_str);
+			nfree(gpu_payload);
+			nfree(gpu_metrics);
+			nfree(tbl_str);
+			nfree(feat_str);
+			nfree(targ_str);
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("neurondb: evaluate_linear_regression_by_model_id_jsonb: GPU payload too small for CPU fallback"),
@@ -2812,13 +2835,13 @@ evaluate_linear_regression_by_model_id_jsonb(int32 model_id, text * table_name, 
 		cpu_intercept = gpu_hdr->intercept;
 
 		/* Convert coefficients from float to double */
-		NDB_ALLOC(cpu_coefficients, double, feat_dim);
+		nalloc(cpu_coefficients, double, feat_dim);
 
 		for (i = 0; i < feat_dim; i++)
 			cpu_coefficients[i] = (double) gpu_coefficients[i];
 
 		/* Create temporary CPU model structure */
-		NDB_ALLOC(model, LinRegModel, 1);
+		nalloc(model, LinRegModel, 1);
 
 		model->n_features = feat_dim;
 		model->intercept = cpu_intercept;
@@ -2829,11 +2852,11 @@ evaluate_linear_regression_by_model_id_jsonb(int32 model_id, text * table_name, 
 	if (model == NULL)
 	{
 		NDB_SPI_SESSION_END(eval_jsonb_spi_session);
-		NDB_FREE(gpu_payload);
-		NDB_FREE(gpu_metrics);
-		NDB_FREE(tbl_str);
-		NDB_FREE(feat_str);
-		NDB_FREE(targ_str);
+		nfree(gpu_payload);
+		nfree(gpu_metrics);
+		nfree(tbl_str);
+		nfree(feat_str);
+		nfree(targ_str);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("neurondb: evaluate_linear_regression_by_model_id_jsonb: CPU model evaluation requires model data"),
@@ -2868,8 +2891,8 @@ evaluate_linear_regression_by_model_id_jsonb(int32 model_id, text * table_name, 
 		Datum		targ_datum;
 		bool		feat_null;
 		bool		targ_null;
-		Vector	   *vec;
-		ArrayType  *arr;
+		Vector *vec = NULL;
+		ArrayType *arr = NULL;
 		double		y_true;
 		double		y_pred;
 		double		error;
@@ -2893,14 +2916,14 @@ evaluate_linear_regression_by_model_id_jsonb(int32 model_id, text * table_name, 
 				NDB_SPI_SESSION_END(eval_jsonb_spi_session);
 				if (model != NULL)
 				{
-					NDB_FREE(model->coefficients);
-					NDB_FREE(model);
+					nfree(model->coefficients);
+					nfree(model);
 				}
-				NDB_FREE(gpu_payload);
-				NDB_FREE(gpu_metrics);
-				NDB_FREE(tbl_str);
-				NDB_FREE(feat_str);
-				NDB_FREE(targ_str);
+				nfree(gpu_payload);
+				nfree(gpu_metrics);
+				nfree(tbl_str);
+				nfree(feat_str);
+				nfree(targ_str);
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 						 errmsg("neurondb: features array must be 1-D"),
@@ -2921,14 +2944,14 @@ evaluate_linear_regression_by_model_id_jsonb(int32 model_id, text * table_name, 
 			NDB_SPI_SESSION_END(eval_jsonb_spi_session);
 			if (model != NULL)
 			{
-				NDB_FREE(model->coefficients);
-				NDB_FREE(model);
+				nfree(model->coefficients);
+				nfree(model);
 			}
-			NDB_FREE(gpu_payload);
-			NDB_FREE(gpu_metrics);
-			NDB_FREE(tbl_str);
-			NDB_FREE(feat_str);
-			NDB_FREE(targ_str);
+			nfree(gpu_payload);
+			nfree(gpu_metrics);
+			nfree(tbl_str);
+			nfree(feat_str);
+			nfree(targ_str);
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("neurondb: feature dimension mismatch (expected %d, got %d)",
@@ -3000,7 +3023,7 @@ evaluate_linear_regression_by_model_id_jsonb(int32 model_id, text * table_name, 
 
 	/* Use ndb_jsonb_in_cstring */
 	result = ndb_jsonb_in_cstring(jsonbuf.data);
-	NDB_FREE(jsonbuf.data);
+	nfree(jsonbuf.data);
 	jsonbuf.data = NULL;
 
 	if (result == NULL)
@@ -3012,21 +3035,21 @@ evaluate_linear_regression_by_model_id_jsonb(int32 model_id, text * table_name, 
 
 	if (result == NULL)
 	{
-		NDB_FREE(jsonbuf.data);
+		nfree(jsonbuf.data);
 		jsonbuf.data = NULL;
-		NDB_FREE(model_coefficients_ptr);
-		NDB_FREE(model);
-		NDB_FREE(gpu_payload);
-		NDB_FREE(gpu_metrics);
-		NDB_FREE(tbl_str);
-		NDB_FREE(feat_str);
-		NDB_FREE(targ_str);
+		nfree(model_coefficients_ptr);
+		nfree(model);
+		nfree(gpu_payload);
+		nfree(gpu_metrics);
+		nfree(tbl_str);
+		nfree(feat_str);
+		nfree(targ_str);
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
 				 errmsg("neurondb: evaluate_linear_regression_by_model_id_jsonb: JSONB result is NULL")));
 	}
 
-	NDB_FREE(jsonbuf.data);
+	nfree(jsonbuf.data);
 	jsonbuf.data = NULL;
 
 	/*
@@ -3037,14 +3060,14 @@ evaluate_linear_regression_by_model_id_jsonb(int32 model_id, text * table_name, 
 	if (oldcontext && currctx != oldcontext)
 		MemoryContextSwitchTo(oldcontext);
 
-	/* Cleanup - NDB_FREE handles NULL checks */
-	NDB_FREE(model_coefficients_ptr);
-	NDB_FREE(model);
-	NDB_FREE(gpu_payload);
-	NDB_FREE(gpu_metrics);
-	NDB_FREE(tbl_str);
-	NDB_FREE(feat_str);
-	NDB_FREE(targ_str);
+	/* Cleanup - nfree handles NULL checks */
+	nfree(model_coefficients_ptr);
+	nfree(model);
+	nfree(gpu_payload);
+	nfree(gpu_metrics);
+	nfree(tbl_str);
+	nfree(feat_str);
+	nfree(targ_str);
 
 	return result;
 }
@@ -3062,10 +3085,10 @@ Datum
 evaluate_linear_regression_by_model_id(PG_FUNCTION_ARGS)
 {
 	int32		model_id;
-	text	   *table_name;
-	text	   *feature_col;
-	text	   *label_col;
-	Jsonb	   *result;
+	text *table_name = NULL;
+	text *feature_col = NULL;
+	text *label_col = NULL;
+	Jsonb *result = NULL;
 
 	if (PG_NARGS() != 4)
 		ereport(ERROR,
@@ -3112,17 +3135,17 @@ linreg_gpu_release_state(LinRegGpuModelState * state)
 	Assert(state != NULL);
 	if (state == NULL)
 		return;
-	NDB_FREE(state->model_blob);
-	NDB_FREE(state->metrics);
-	NDB_FREE(state);
+	nfree(state->model_blob);
+	nfree(state->metrics);
+	nfree(state);
 }
 
 static bool
 linreg_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 {
-	NDB_DECLARE(LinRegGpuModelState *, state);
-	NDB_DECLARE(bytea *, payload);
-	NDB_DECLARE(Jsonb *, metrics);
+	LinRegGpuModelState *state = NULL;
+	bytea *payload = NULL;
+	Jsonb *metrics = NULL;
 	int			rc;
 
 	if (errstr != NULL)
@@ -3149,8 +3172,8 @@ linreg_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 							  errstr);
 	if (rc != 0 || payload == NULL)
 	{
-		NDB_FREE(payload);
-		NDB_FREE(metrics);
+		nfree(payload);
+		nfree(metrics);
 		return false;
 	}
 
@@ -3160,7 +3183,7 @@ linreg_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 		model->backend_state = NULL;
 	}
 
-	NDB_ALLOC(state, LinRegGpuModelState, 1);
+	nalloc(state, LinRegGpuModelState, 1);
 
 	state->model_blob = payload;
 	state->feature_dim = spec->feature_dim;
@@ -3257,12 +3280,12 @@ linreg_gpu_evaluate(const MLGpuModel *model,
 		metrics_json = ndb_jsonb_in_cstring(buf.data);
 		if (metrics_json == NULL)
 		{
-			NDB_FREE(buf.data);
+			nfree(buf.data);
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
 					 errmsg("neurondb: failed to parse metrics JSON")));
 		}
-		NDB_FREE(buf.data);
+		nfree(buf.data);
 		buf.data = NULL;
 	}
 
@@ -3321,9 +3344,11 @@ linreg_gpu_serialize(const MLGpuModel *model,
 	/* Convert float coefficients to double */
 	if (linreg_model.n_features > 0)
 	{
-		NDB_ALLOC(linreg_model.coefficients, double, linreg_model.n_features);
+		double *coefficients_tmp = NULL;
+		nalloc(coefficients_tmp, double, linreg_model.n_features);
 		for (i = 0; i < linreg_model.n_features; i++)
-			linreg_model.coefficients[i] = (double) coef_src_float[i];
+			coefficients_tmp[i] = (double) coef_src_float[i];
+		linreg_model.coefficients = coefficients_tmp;
 	}
 
 	/* Serialize using unified format with training_backend=1 (GPU) */
@@ -3331,14 +3356,14 @@ linreg_gpu_serialize(const MLGpuModel *model,
 
 	if (linreg_model.coefficients != NULL)
 	{
-		NDB_FREE(linreg_model.coefficients);
+		nfree(linreg_model.coefficients);
 		linreg_model.coefficients = NULL;
 	}
 
 	if (payload_out != NULL)
 		*payload_out = unified_payload;
 	else if (unified_payload != NULL)
-		NDB_FREE(unified_payload);
+		nfree(unified_payload);
 
 	/* Update metrics to use training_backend=1 */
 	if (metadata_out != NULL)
@@ -3358,12 +3383,12 @@ linreg_gpu_serialize(const MLGpuModel *model,
 		*metadata_out = ndb_jsonb_in_cstring(metrics_buf.data);
 		if (*metadata_out == NULL)
 		{
-			NDB_FREE(metrics_buf.data);
+			nfree(metrics_buf.data);
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
 					 errmsg("neurondb: failed to parse metadata JSON")));
 		}
-		NDB_FREE(metrics_buf.data);
+		nfree(metrics_buf.data);
 	}
 
 	return true;
@@ -3381,8 +3406,8 @@ linreg_gpu_deserialize(MLGpuModel *model,
 					   const Jsonb * metadata,
 					   char **errstr)
 {
-	NDB_DECLARE(LinRegGpuModelState *, state);
-	NDB_DECLARE(bytea *, payload_copy);
+	LinRegGpuModelState *state = NULL;
+	bytea *payload_copy = NULL;
 	int			payload_size;
 
 	if (errstr != NULL)
@@ -3391,11 +3416,11 @@ linreg_gpu_deserialize(MLGpuModel *model,
 		return false;
 
 	payload_size = VARSIZE(payload);
-	NDB_ALLOC(payload_copy, bytea, payload_size);
+	nalloc(payload_copy, bytea, payload_size);
 
 	memcpy(payload_copy, payload, payload_size);
 
-	NDB_ALLOC(state, LinRegGpuModelState, 1);
+	nalloc(state, LinRegGpuModelState, 1);
 
 	state->model_blob = payload_copy;
 	state->feature_dim = -1;

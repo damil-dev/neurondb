@@ -84,9 +84,9 @@ train_subspace_kmeans(float **subspace_data,
 					  float **centroids,
 					  int max_iters)
 {
-	int		   *assignments = NULL;
+	int *assignments = NULL;
 
-	NDB_DECLARE(int *, counts);
+	int *counts = NULL;
 	bool		changed = true;
 	int			iter,
 				i,
@@ -160,10 +160,10 @@ train_subspace_kmeans(float **subspace_data,
 			}
 			/* If a centroid got no points, it remains from old pass */
 		}
-		NDB_FREE(counts);
+		nfree(counts);
 	}
 
-	NDB_FREE(assignments);
+	nfree(assignments);
 }
 
 /*
@@ -194,21 +194,23 @@ PG_FUNCTION_INFO_V1(train_pq_codebook);
 Datum
 train_pq_codebook(PG_FUNCTION_ARGS)
 {
-	text	   *table_name;
-	text	   *column_name;
+	text *table_name = NULL;
+	text *column_name = NULL;
 	int			m,
 				ksub;
 	char	   *tbl_str,
 			   *col_str;
-	float	  **data = NULL;	/* Training data array [nvec][dim] */
+	float **data = NULL;	/* Training data array [nvec][dim] */
 	int			nvec = 0,
 				dim = 0;
 	PQCodebook	codebook;
 	int			sub,
 				i;
-	bytea	   *result;
+	bytea *result = NULL;
 	int			result_size;
-	char	   *result_ptr;
+	char *result_ptr = NULL;
+	float ***centroids = NULL;
+	char *result_raw = NULL;
 
 	/* Argument parsing and validation */
 	table_name = PG_GETARG_TEXT_PP(0);
@@ -245,8 +247,8 @@ train_pq_codebook(PG_FUNCTION_ARGS)
 
 	if (data == NULL || nvec <= 0)
 	{
-		NDB_FREE(tbl_str);
-		NDB_FREE(col_str);
+		nfree(tbl_str);
+		nfree(col_str);
 		ereport(ERROR,
 				(errcode(ERRCODE_DATA_EXCEPTION),
 				 errmsg("No training vectors found in table '%s' column '%s'",
@@ -256,17 +258,17 @@ train_pq_codebook(PG_FUNCTION_ARGS)
 
 	if (dim <= 0)
 	{
-		NDB_FREE(tbl_str);
-		NDB_FREE(col_str);
+		nfree(tbl_str);
+		nfree(col_str);
 		/* Free data array and rows if data is not NULL */
 		if (data != NULL)
 		{
 			for (int idx = 0; idx < nvec; idx++)
 			{
 				if (data[idx] != NULL)
-					NDB_FREE(data[idx]);
+					nfree(data[idx]);
 			}
-			NDB_FREE(data);
+			nfree(data);
 		}
 		ereport(ERROR,
 				(errcode(ERRCODE_DATA_EXCEPTION),
@@ -289,18 +291,17 @@ train_pq_codebook(PG_FUNCTION_ARGS)
 	 * Allocate centroids 3D array: [m][ksub][dsub], each float* properly
 	 * allocated
 	 */
-	float	 ***centroids = NULL;
-	NDB_ALLOC(centroids, float **, m);
+	nalloc(centroids, float **, m);
 	codebook.centroids = centroids;
 	for (sub = 0; sub < m; sub++)
 	{
-		NDB_DECLARE(float **, sub_centroids);
-		NDB_ALLOC(sub_centroids, float *, ksub);
+		float **sub_centroids = NULL;
+		nalloc(sub_centroids, float *, ksub);
 		codebook.centroids[sub] = sub_centroids;
 		for (i = 0; i < ksub; i++)
 		{
-			NDB_DECLARE(float *, centroid_vec);
-			NDB_ALLOC(centroid_vec, float, codebook.dsub);
+			float *centroid_vec = NULL;
+			nalloc(centroid_vec, float, codebook.dsub);
 			codebook.centroids[sub][i] = centroid_vec;
 		}
 	}
@@ -311,7 +312,7 @@ train_pq_codebook(PG_FUNCTION_ARGS)
 	 */
 	for (sub = 0; sub < m; sub++)
 	{
-		float	  **subspace_data = NULL;
+		float **subspace_data = NULL;
 		int			start_dim = sub * codebook.dsub;
 
 		elog(DEBUG1,
@@ -325,11 +326,11 @@ train_pq_codebook(PG_FUNCTION_ARGS)
 		 * Extract subspace vectors from data (copy block of contiguous
 		 * floats)
 		 */
-		NDB_ALLOC(subspace_data, float *, nvec);
+		nalloc(subspace_data, float *, nvec);
 		for (i = 0; i < nvec; i++)
 		{
-			NDB_DECLARE(float *, sub_vec);
-			NDB_ALLOC(sub_vec, float, codebook.dsub);
+			float *sub_vec = NULL;
+			nalloc(sub_vec, float, codebook.dsub);
 			subspace_data[i] = sub_vec;
 			memcpy(subspace_data[i],
 				   &data[i][start_dim],
@@ -346,16 +347,15 @@ train_pq_codebook(PG_FUNCTION_ARGS)
 
 		/* Release subspace data for this subspace */
 		for (i = 0; i < nvec; i++)
-			NDB_FREE(subspace_data[i]);
-		NDB_FREE(subspace_data);
+			nfree(subspace_data[i]);
+		nfree(subspace_data);
 	}
 
 	/* Serialization step: compute total serialized length for bytea */
 	result_size = sizeof(int) * 3 + /* header: m, ksub, dsub */
 		m * ksub * codebook.dsub * sizeof(float);	/* centroids */
 
-	char	   *result_raw = NULL;
-	NDB_ALLOC(result_raw, char, VARHDRSZ + result_size);
+	nalloc(result_raw, char, VARHDRSZ + result_size);
 	result = (bytea *) result_raw;
 	SET_VARSIZE(result, VARHDRSZ + result_size);
 	result_ptr = VARDATA(result);
@@ -385,17 +385,17 @@ train_pq_codebook(PG_FUNCTION_ARGS)
 	for (sub = 0; sub < m; sub++)
 	{
 		for (i = 0; i < ksub; i++)
-			NDB_FREE(codebook.centroids[sub][i]);
-		NDB_FREE(codebook.centroids[sub]);
+			nfree(codebook.centroids[sub][i]);
+		nfree(codebook.centroids[sub]);
 	}
-	NDB_FREE(codebook.centroids);
+	nfree(codebook.centroids);
 
 	for (i = 0; i < nvec; i++)
-		NDB_FREE(data[i]);
-	NDB_FREE(data);
+		nfree(data[i]);
+	nfree(data);
 
-	NDB_FREE(tbl_str);
-	NDB_FREE(col_str);
+	nfree(tbl_str);
+	nfree(col_str);
 
 	PG_RETURN_BYTEA_P(result);
 }
@@ -420,19 +420,19 @@ PG_FUNCTION_INFO_V1(evaluate_pq_codebook_by_model_id);
 Datum
 pq_encode_vector(PG_FUNCTION_ARGS)
 {
-	ArrayType  *vec_array;
-	bytea	   *codebook_bytea;
-	float4	   *vec_data;
+	ArrayType *vec_array = NULL;
+	bytea *codebook_bytea = NULL;
+	float4 *vec_data = NULL;
 	int			dim,
 				m,
 				ksub,
 				dsub;
-	char	   *cb_ptr;
-	float	 ***centroids = NULL;
+	char *cb_ptr = NULL;
+	float ***centroids = NULL;
 
-	NDB_DECLARE(int16 *, codes);	/* array of length m */
-	ArrayType  *result;
-	Datum	   *result_datums;
+	int16 *codes = NULL;	/* array of length m */
+	ArrayType *result = NULL;
+	Datum *result_datums = NULL;
 	int			sub,
 				c,
 				d;
@@ -463,23 +463,23 @@ pq_encode_vector(PG_FUNCTION_ARGS)
 						m,
 						dsub)));
 
-	NDB_ALLOC(centroids, float **, m);
+	nalloc(centroids, float **, m);
 	for (sub = 0; sub < m; sub++)
 	{
-		NDB_DECLARE(float **, sub_centroids);
-		NDB_ALLOC(sub_centroids, float *, ksub);
+		float **sub_centroids = NULL;
+		nalloc(sub_centroids, float *, ksub);
 		centroids[sub] = sub_centroids;
 		for (c = 0; c < ksub; c++)
 		{
-			NDB_DECLARE(float *, centroid_vec);
-			NDB_ALLOC(centroid_vec, float, dsub);
+			float *centroid_vec = NULL;
+			nalloc(centroid_vec, float, dsub);
 			centroids[sub][c] = centroid_vec;
 			memcpy(centroids[sub][c], cb_ptr, sizeof(float) * dsub);
 			cb_ptr += sizeof(float) * dsub;
 		}
 	}
 
-		NDB_ALLOC(codes, int16, m);
+		nalloc(codes, int16, m);
 	for (sub = 0; sub < m; sub++)
 	{
 		int			start_dim = sub * dsub;
@@ -506,7 +506,7 @@ pq_encode_vector(PG_FUNCTION_ARGS)
 		codes[sub] = (int16) best;
 	}
 
-		NDB_ALLOC(result_datums, Datum, m);
+		nalloc(result_datums, Datum, m);
 	for (sub = 0; sub < m; sub++)
 		result_datums[sub] = Int16GetDatum(codes[sub]);
 
@@ -517,12 +517,12 @@ pq_encode_vector(PG_FUNCTION_ARGS)
 		for (sub = 0; sub < m; sub++)
 	{
 		for (c = 0; c < ksub; c++)
-			NDB_FREE(centroids[sub][c]);
-		NDB_FREE(centroids[sub]);
+			nfree(centroids[sub][c]);
+		nfree(centroids[sub]);
 	}
-	NDB_FREE(centroids);
-	NDB_FREE(codes);
-	NDB_FREE(result_datums);
+	nfree(centroids);
+	nfree(codes);
+	nfree(result_datums);
 
 	PG_RETURN_ARRAYTYPE_P(result);
 }
@@ -537,21 +537,21 @@ Datum
 predict_pq_codebook(PG_FUNCTION_ARGS)
 {
 	int32		model_id;
-	ArrayType  *vector_array;
+	ArrayType *vector_array = NULL;
 
-	NDB_DECLARE(bytea *, model_data);
-	NDB_DECLARE(Jsonb *, parameters);
-	float4	   *vec_data;
+	bytea *model_data = NULL;
+	Jsonb *parameters = NULL;
+	float4 *vec_data = NULL;
 	int			dim;
 	int			m,
 				ksub,
 				dsub;
-	char	   *cb_ptr;
-	float	 ***centroids = NULL;
+	char *cb_ptr = NULL;
+	float ***centroids = NULL;
 
-	NDB_DECLARE(int16 *, codes);
-	ArrayType  *result;
-	Datum	   *result_datums;
+	int16 *codes = NULL;
+	ArrayType *result = NULL;
+	Datum *result_datums = NULL;
 	int			sub,
 				c,
 				d;
@@ -609,16 +609,16 @@ predict_pq_codebook(PG_FUNCTION_ARGS)
 						m * dsub)));
 
 	/* Reconstruct centroids 3D array from codebook */
-	NDB_ALLOC(centroids, float **, m);
+	nalloc(centroids, float **, m);
 	for (sub = 0; sub < m; sub++)
 	{
-		NDB_DECLARE(float **, sub_centroids);
-		NDB_ALLOC(sub_centroids, float *, ksub);
+		float **sub_centroids = NULL;
+		nalloc(sub_centroids, float *, ksub);
 		centroids[sub] = sub_centroids;
 		for (c = 0; c < ksub; c++)
 		{
-			NDB_DECLARE(float *, centroid_vec);
-			NDB_ALLOC(centroid_vec, float, dsub);
+			float *centroid_vec = NULL;
+			nalloc(centroid_vec, float, dsub);
 			centroids[sub][c] = centroid_vec;
 			memcpy(centroids[sub][c], cb_ptr, sizeof(float) * dsub);
 			cb_ptr += sizeof(float) * dsub;
@@ -626,7 +626,7 @@ predict_pq_codebook(PG_FUNCTION_ARGS)
 	}
 
 	/* Compute PQ codes for each subspace */
-	NDB_ALLOC(codes, int16, m);
+	nalloc(codes, int16, m);
 	for (sub = 0; sub < m; sub++)
 	{
 		start_dim = sub * dsub;
@@ -655,7 +655,7 @@ predict_pq_codebook(PG_FUNCTION_ARGS)
 	}
 
 	/* Build result array */
-	NDB_ALLOC(result_datums, Datum, m);
+	nalloc(result_datums, Datum, m);
 	for (sub = 0; sub < m; sub++)
 		result_datums[sub] = Int16GetDatum(codes[sub]);
 
@@ -664,16 +664,16 @@ predict_pq_codebook(PG_FUNCTION_ARGS)
 	for (sub = 0; sub < m; sub++)
 	{
 		for (c = 0; c < ksub; c++)
-			NDB_FREE(centroids[sub][c]);
-		NDB_FREE(centroids[sub]);
+			nfree(centroids[sub][c]);
+		nfree(centroids[sub]);
 	}
-	NDB_FREE(centroids);
-	NDB_FREE(codes);
-	NDB_FREE(result_datums);
+	nfree(centroids);
+	nfree(codes);
+	nfree(result_datums);
 	if (model_data)
-		NDB_FREE(model_data);
+		nfree(model_data);
 	if (parameters)
-		NDB_FREE(parameters);
+		nfree(parameters);
 
 	PG_RETURN_ARRAYTYPE_P(result);
 }
@@ -688,22 +688,22 @@ Datum
 evaluate_pq_codebook_by_model_id(PG_FUNCTION_ARGS)
 {
 	int32		model_id;
-	text	   *table_name;
-	text	   *vector_col;
-	char	   *tbl_str;
-	char	   *vec_str;
+	text *table_name = NULL;
+	text *vector_col = NULL;
+	char *tbl_str = NULL;
+	char *vec_str = NULL;
 	StringInfoData query;
 	int			ret;
 	int			n_points = 0;
 	StringInfoData jsonbuf;
-	Jsonb	   *result;
+	Jsonb *result = NULL;
 	MemoryContext oldcontext;
 	double		avg_quantization_error;
 	int			subquantizers;
 	int			codebook_size;
 	int			bits_per_code;
 
-	NDB_DECLARE(NdbSpiSession *, spi_session);
+	NdbSpiSession *spi_session = NULL;
 	MemoryContext oldcontext_spi;
 
 	/* Validate arguments */
@@ -746,8 +746,8 @@ evaluate_pq_codebook_by_model_id(PG_FUNCTION_ARGS)
 	{
 		ndb_spi_stringinfo_free(spi_session, &query);
 		NDB_SPI_SESSION_END(spi_session);
-		NDB_FREE(tbl_str);
-		NDB_FREE(vec_str);
+		nfree(tbl_str);
+		nfree(vec_str);
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
 				 errmsg("neurondb: evaluate_pq_codebook_by_model_id: query failed")));
@@ -758,8 +758,8 @@ evaluate_pq_codebook_by_model_id(PG_FUNCTION_ARGS)
 	{
 		ndb_spi_stringinfo_free(spi_session, &query);
 		NDB_SPI_SESSION_END(spi_session);
-		NDB_FREE(tbl_str);
-		NDB_FREE(vec_str);
+		nfree(tbl_str);
+		nfree(vec_str);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("neurondb: evaluate_pq_codebook_by_model_id: need at least 2 vectors, got %d",
@@ -768,10 +768,10 @@ evaluate_pq_codebook_by_model_id(PG_FUNCTION_ARGS)
 
 	/* Load model and compute quantization metrics */
 	{
-		NDB_DECLARE(bytea *, model_payload);
-		NDB_DECLARE(Jsonb *, parameters);
-		NDB_DECLARE(Jsonb *, metrics);
-		char	   *cb_ptr;
+		bytea *model_payload = NULL;
+		Jsonb *parameters = NULL;
+		Jsonb *metrics = NULL;
+		char *cb_ptr = NULL;
 		int			m,
 					ksub,
 					dsub;
@@ -782,7 +782,7 @@ evaluate_pq_codebook_by_model_id(PG_FUNCTION_ARGS)
 		double		total_error = 0.0;
 		int			valid_vectors = 0;
 		TupleDesc	tupdesc = SPI_tuptable->tupdesc;
-		float	 ***centroids = NULL;
+		float ***centroids = NULL;
 
 		/* Load model from catalog */
 		if (ml_catalog_fetch_model_payload(model_id,
@@ -808,16 +808,16 @@ evaluate_pq_codebook_by_model_id(PG_FUNCTION_ARGS)
 					bits_per_code = 1;
 
 				/* Reconstruct centroids */
-				NDB_ALLOC(centroids, float **, m);
+				nalloc(centroids, float **, m);
 				for (sub = 0; sub < m; sub++)
 				{
-					NDB_DECLARE(float **, centroids_sub);
-					NDB_ALLOC(centroids_sub, float *, ksub);
+					float **centroids_sub = NULL;
+					nalloc(centroids_sub, float *, ksub);
 					centroids[sub] = centroids_sub;
 					for (c = 0; c < ksub; c++)
 					{
-						NDB_DECLARE(float *, centroids_sub_c);
-						NDB_ALLOC(centroids_sub_c, float, dsub);
+						float *centroids_sub_c = NULL;
+						nalloc(centroids_sub_c, float, dsub);
 						centroids[sub][c] = centroids_sub_c;
 						memcpy(centroids[sub][c], cb_ptr, sizeof(float) * dsub);
 						cb_ptr += sizeof(float) * dsub;
@@ -921,12 +921,12 @@ evaluate_pq_codebook_by_model_id(PG_FUNCTION_ARGS)
 							for (c = 0; c < ksub; c++)
 							{
 								if (centroids[sub][c] != NULL)
-									NDB_FREE(centroids[sub][c]);
+									nfree(centroids[sub][c]);
 							}
-							NDB_FREE(centroids[sub]);
+							nfree(centroids[sub]);
 						}
 					}
-					NDB_FREE(centroids);
+					nfree(centroids);
 				}
 
 				/* Calculate average quantization error */
@@ -940,11 +940,11 @@ evaluate_pq_codebook_by_model_id(PG_FUNCTION_ARGS)
 				}
 
 				if (model_payload != NULL)
-					NDB_FREE(model_payload);
+					nfree(model_payload);
 				if (parameters != NULL)
-					NDB_FREE(parameters);
+					nfree(parameters);
 				if (metrics != NULL)
-					NDB_FREE(metrics);
+					nfree(metrics);
 			}
 			else
 			{
@@ -976,10 +976,10 @@ evaluate_pq_codebook_by_model_id(PG_FUNCTION_ARGS)
 					 avg_quantization_error, subquantizers, codebook_size, bits_per_code, n_points);
 
 	result = DatumGetJsonbP(DirectFunctionCall1(jsonb_in, CStringGetTextDatum(jsonbuf.data)));
-	NDB_FREE(jsonbuf.data);
+	nfree(jsonbuf.data);
 
-	NDB_FREE(tbl_str);
-	NDB_FREE(vec_str);
+	nfree(tbl_str);
+	nfree(vec_str);
 
 	PG_RETURN_JSONB_P(result);
 }
@@ -1007,15 +1007,15 @@ pq_asymmetric_distance(PG_FUNCTION_ARGS)
 {
 	ArrayType  *query_array,
 			   *codes_array;
-	bytea	   *codebook_bytea;
-	float4	   *query_data;
-	int16	   *codes;
+	bytea *codebook_bytea = NULL;
+	float4 *query_data = NULL;
+	int16 *codes = NULL;
 	int			dim,
 				m,
 				ksub,
 				dsub;
-	char	   *cb_ptr;
-	float	 ***centroids = NULL;
+	char *cb_ptr = NULL;
+	float ***centroids = NULL;
 	double		total_dist = 0.0;
 	int			sub,
 				d;
@@ -1045,16 +1045,16 @@ pq_asymmetric_distance(PG_FUNCTION_ARGS)
 						m,
 						dsub)));
 
-	NDB_ALLOC(centroids, float **, m);
+	nalloc(centroids, float **, m);
 	for (sub = 0; sub < m; sub++)
 	{
-		NDB_DECLARE(float **, sub_centroids);
-		NDB_ALLOC(sub_centroids, float *, ksub);
+		float **sub_centroids = NULL;
+		nalloc(sub_centroids, float *, ksub);
 		centroids[sub] = sub_centroids;
 		for (int c = 0; c < ksub; c++)
 		{
-			NDB_DECLARE(float *, centroid_vec);
-			NDB_ALLOC(centroid_vec, float, dsub);
+			float *centroid_vec = NULL;
+			nalloc(centroid_vec, float, dsub);
 			centroids[sub][c] = centroid_vec;
 			memcpy(centroids[sub][c], cb_ptr, sizeof(float) * dsub);
 			cb_ptr += sizeof(float) * dsub;
@@ -1088,10 +1088,10 @@ pq_asymmetric_distance(PG_FUNCTION_ARGS)
 		for (sub = 0; sub < m; sub++)
 	{
 		for (int c = 0; c < ksub; c++)
-			NDB_FREE(centroids[sub][c]);
-		NDB_FREE(centroids[sub]);
+			nfree(centroids[sub][c]);
+		nfree(centroids[sub]);
 	}
-	NDB_FREE(centroids);
+	nfree(centroids);
 
 	PG_RETURN_FLOAT4((float4) sqrt(total_dist));
 }
@@ -1114,15 +1114,15 @@ static bytea *
 pq_codebook_serialize_to_bytea(const PQCodebook * codebook)
 {
 	int			result_size;
-	bytea	   *result;
-	char	   *result_ptr;
+	bytea *result = NULL;
+	char *result_ptr = NULL;
 	int			sub,
 				i;
 
 	{
-		char	   *result_raw = NULL;
+		char *result_raw = NULL;
 		result_size = sizeof(int) * 3 + codebook->m * codebook->ksub * codebook->dsub * sizeof(float);
-		NDB_ALLOC(result_raw, char, VARHDRSZ + result_size);
+		nalloc(result_raw, char, VARHDRSZ + result_size);
 		result = (bytea *) result_raw;
 		SET_VARSIZE(result, VARHDRSZ + result_size);
 		result_ptr = VARDATA(result);
@@ -1168,18 +1168,18 @@ pq_codebook_deserialize_from_bytea(const bytea * data, PQCodebook * codebook)
 		return -1;
 
 	{
-		float	 ***centroids = NULL;
-		NDB_ALLOC(centroids, float **, codebook->m);
+		float ***centroids = NULL;
+		nalloc(centroids, float **, codebook->m);
 		codebook->centroids = centroids;
 		for (sub = 0; sub < codebook->m; sub++)
 		{
-			float	 **sub_centroids = NULL;
-			NDB_ALLOC(sub_centroids, float *, codebook->ksub);
+			float **sub_centroids = NULL;
+			nalloc(sub_centroids, float *, codebook->ksub);
 			codebook->centroids[sub] = sub_centroids;
 			for (i = 0; i < codebook->ksub; i++)
 			{
-				float	   *centroid_vec = NULL;
-				NDB_ALLOC(centroid_vec, float, codebook->dsub);
+				float *centroid_vec = NULL;
+				nalloc(centroid_vec, float, codebook->dsub);
 				codebook->centroids[sub][i] = centroid_vec;
 				memcpy(codebook->centroids[sub][i], buf + offset, sizeof(float) * codebook->dsub);
 				offset += sizeof(float) * codebook->dsub;
@@ -1205,18 +1205,18 @@ pq_codebook_free(PQCodebook * codebook)
 		{
 			for (i = 0; i < codebook->ksub; i++)
 				if (codebook->centroids[sub][i] != NULL)
-					NDB_FREE(codebook->centroids[sub][i]);
-			NDB_FREE(codebook->centroids[sub]);
+					nfree(codebook->centroids[sub][i]);
+			nfree(codebook->centroids[sub]);
 		}
 	}
-	NDB_FREE(codebook->centroids);
+	nfree(codebook->centroids);
 }
 
 static bool
 product_quantization_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 {
-	ProductQuantizationGpuModelState *state;
-	float	  **data = NULL;
+	ProductQuantizationGpuModelState *state = NULL;
+	float **data = NULL;
 	PQCodebook	codebook;
 	int			m = 8;
 	int			ksub = 256;
@@ -1225,10 +1225,10 @@ product_quantization_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, ch
 	int			sub,
 				i;
 
-	NDB_DECLARE(bytea *, model_data);
-	NDB_DECLARE(Jsonb *, metrics);
+	bytea *model_data = NULL;
+	Jsonb *metrics = NULL;
 	StringInfoData metrics_json;
-	JsonbIterator *it;
+	JsonbIterator *it = NULL;
 	JsonbValue	v;
 	int			r;
 
@@ -1258,7 +1258,7 @@ product_quantization_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, ch
 				else if (strcmp(key, "ksub") == 0 && v.type == jbvNumeric)
 					ksub = DatumGetInt32(DirectFunctionCall1(numeric_int4,
 															 NumericGetDatum(v.val.numeric)));
-				NDB_FREE(key);
+				nfree(key);
 			}
 		}
 	}
@@ -1287,11 +1287,11 @@ product_quantization_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, ch
 		return false;
 	}
 
-	NDB_ALLOC(data, float *, nvec);
+	nalloc(data, float *, nvec);
 	for (i = 0; i < nvec; i++)
 	{
-		NDB_DECLARE(float *, data_row);
-		NDB_ALLOC(data_row, float, dim);
+		float *data_row = NULL;
+		nalloc(data_row, float, dim);
 		data[i] = data_row;
 		memcpy(data[i], &spec->feature_matrix[i * dim], sizeof(float) * dim);
 	}
@@ -1303,18 +1303,18 @@ product_quantization_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, ch
 
 	/* Allocate centroids */
 	{
-		float	 ***centroids = NULL;
-		NDB_ALLOC(centroids, float **, m);
+		float ***centroids = NULL;
+		nalloc(centroids, float **, m);
 		codebook.centroids = centroids;
 		for (sub = 0; sub < m; sub++)
 		{
-			NDB_DECLARE(float **, sub_centroids);
-			NDB_ALLOC(sub_centroids, float *, ksub);
+			float **sub_centroids = NULL;
+			nalloc(sub_centroids, float *, ksub);
 			codebook.centroids[sub] = sub_centroids;
 			for (i = 0; i < ksub; i++)
 			{
-				NDB_DECLARE(float *, centroid_vec);
-				NDB_ALLOC(centroid_vec, float, codebook.dsub);
+				float *centroid_vec = NULL;
+				nalloc(centroid_vec, float, codebook.dsub);
 				codebook.centroids[sub][i] = centroid_vec;
 			}
 		}
@@ -1323,14 +1323,14 @@ product_quantization_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, ch
 	/* Train PQ codebook */
 	for (sub = 0; sub < m; sub++)
 	{
-		float	  **subspace_data = NULL;
+		float **subspace_data = NULL;
 		int			start_dim = sub * codebook.dsub;
 
-		NDB_ALLOC(subspace_data, float *, nvec);
+		nalloc(subspace_data, float *, nvec);
 		for (i = 0; i < nvec; i++)
 		{
-			NDB_DECLARE(float *, sub_vec);
-			NDB_ALLOC(sub_vec, float, codebook.dsub);
+			float *sub_vec = NULL;
+			nalloc(sub_vec, float, codebook.dsub);
 			subspace_data[i] = sub_vec;
 			memcpy(subspace_data[i], &data[i][start_dim], sizeof(float) * codebook.dsub);
 		}
@@ -1338,8 +1338,8 @@ product_quantization_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, ch
 		train_subspace_kmeans(subspace_data, nvec, codebook.dsub, ksub, codebook.centroids[sub], 100);
 
 		for (i = 0; i < nvec; i++)
-			NDB_FREE(subspace_data[i]);
-		NDB_FREE(subspace_data);
+			nfree(subspace_data[i]);
+		nfree(subspace_data);
 	}
 
 	/* Serialize model */
@@ -1352,14 +1352,14 @@ product_quantization_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, ch
 					 m, ksub, codebook.dsub, dim, nvec);
 	metrics = DatumGetJsonbP(DirectFunctionCall1(jsonb_in,
 												 CStringGetTextDatum(metrics_json.data)));
-	NDB_FREE(metrics_json.data);
+	nfree(metrics_json.data);
 
 	state = (ProductQuantizationGpuModelState *) palloc0(sizeof(ProductQuantizationGpuModelState));
 	state->model_blob = model_data;
 	state->metrics = metrics;
 	{
 		PQCodebook *codebook_ptr = NULL;
-		NDB_ALLOC(codebook_ptr, PQCodebook, 1);
+		nalloc(codebook_ptr, PQCodebook, 1);
 		state->codebook = codebook_ptr;
 		*state->codebook = codebook;
 	}
@@ -1370,7 +1370,7 @@ product_quantization_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, ch
 	state->n_samples = nvec;
 
 	if (model->backend_state != NULL)
-		NDB_FREE(model->backend_state);
+		nfree(model->backend_state);
 
 	model->backend_state = state;
 	model->gpu_ready = true;
@@ -1378,8 +1378,8 @@ product_quantization_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, ch
 
 	/* Cleanup temp data */
 	for (i = 0; i < nvec; i++)
-		NDB_FREE(data[i]);
-	NDB_FREE(data);
+		nfree(data[i]);
+	nfree(data);
 
 	return true;
 }
@@ -1394,7 +1394,7 @@ product_quantization_gpu_predict(const MLGpuModel *model, const float *input, in
 	int			start_dim;
 	double		min_dist;
 	int			best_code;
-	float	   *reconstructed;
+	float	   *reconstructed = NULL;
 
 	if (errstr != NULL)
 		*errstr = NULL;
@@ -1447,14 +1447,14 @@ product_quantization_gpu_predict(const MLGpuModel *model, const float *input, in
 		}
 		{
 			PQCodebook *codebook_ptr = NULL;
-			NDB_ALLOC(codebook_ptr, PQCodebook, 1);
+			nalloc(codebook_ptr, PQCodebook, 1);
 			((ProductQuantizationGpuModelState *) state)->codebook = codebook_ptr;
 			*((ProductQuantizationGpuModelState *) state)->codebook = temp_codebook;
 		}
 	}
 
 	codebook = state->codebook;
-	NDB_ALLOC(reconstructed, float, state->dim);
+	nalloc(reconstructed, float, state->dim);
 
 	/* Encode and reconstruct */
 	for (sub = 0; sub < codebook->m; sub++)
@@ -1480,7 +1480,7 @@ product_quantization_gpu_predict(const MLGpuModel *model, const float *input, in
 	}
 
 	memcpy(output, reconstructed, sizeof(float) * state->dim);
-	NDB_FREE(reconstructed);
+	nfree(reconstructed);
 
 	return true;
 }
@@ -1526,7 +1526,7 @@ product_quantization_gpu_evaluate(const MLGpuModel *model, const MLGpuEvalSpec *
 
 	metrics_json = DatumGetJsonbP(DirectFunctionCall1(jsonb_in,
 													  CStringGetTextDatum(buf.data)));
-	NDB_FREE(buf.data);
+	nfree(buf.data);
 
 	if (out != NULL)
 		out->payload = metrics_json;
@@ -1564,9 +1564,9 @@ product_quantization_gpu_serialize(const MLGpuModel *model, bytea * *payload_out
 	}
 
 	{
-		char	   *payload_copy_raw = NULL;
+		char *payload_copy_raw = NULL;
 		payload_size = VARSIZE(state->model_blob);
-		NDB_ALLOC(payload_copy_raw, char, payload_size);
+		nalloc(payload_copy_raw, char, payload_size);
 		payload_copy = (bytea *) payload_copy_raw;
 		memcpy(payload_copy, state->model_blob, payload_size);
 	}
@@ -1574,7 +1574,7 @@ product_quantization_gpu_serialize(const MLGpuModel *model, bytea * *payload_out
 	if (payload_out != NULL)
 		*payload_out = payload_copy;
 	else
-		NDB_FREE(payload_copy);
+		nfree(payload_copy);
 
 	if (metadata_out != NULL && state->metrics != NULL)
 		*metadata_out = (Jsonb *) PG_DETOAST_DATUM_COPY(
@@ -1602,16 +1602,16 @@ product_quantization_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 	}
 
 	{
-		char	   *payload_copy_raw = NULL;
+		char *payload_copy_raw = NULL;
 		payload_size = VARSIZE(payload);
-		NDB_ALLOC(payload_copy_raw, char, payload_size);
+		nalloc(payload_copy_raw, char, payload_size);
 		payload_copy = (bytea *) payload_copy_raw;
 		memcpy(payload_copy, payload, payload_size);
 	}
 
 	if (pq_codebook_deserialize_from_bytea(payload_copy, &codebook) != 0)
 	{
-		NDB_FREE(payload_copy);
+		nfree(payload_copy);
 		if (errstr != NULL)
 			*errstr = pstrdup("product_quantization_gpu_deserialize: failed to deserialize");
 		return false;
@@ -1621,7 +1621,7 @@ product_quantization_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 	state->model_blob = payload_copy;
 	{
 		PQCodebook *codebook_ptr = NULL;
-		NDB_ALLOC(codebook_ptr, PQCodebook, 1);
+		nalloc(codebook_ptr, PQCodebook, 1);
 		state->codebook = codebook_ptr;
 		*state->codebook = codebook;
 	}
@@ -1634,11 +1634,11 @@ product_quantization_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 	if (metadata != NULL)
 	{
 		int			metadata_size;
-		Jsonb	   *metadata_copy = NULL;
-		char	   *metadata_copy_raw = NULL;
+		Jsonb *metadata_copy = NULL;
+		char *metadata_copy_raw = NULL;
 
 		metadata_size = VARSIZE(metadata);
-		NDB_ALLOC(metadata_copy_raw, char, metadata_size);
+		nalloc(metadata_copy_raw, char, metadata_size);
 		metadata_copy = (Jsonb *) metadata_copy_raw;
 
 		memcpy(metadata_copy, metadata, metadata_size);
@@ -1663,7 +1663,7 @@ product_quantization_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 					else if (strcmp(key, "dim") == 0 && v_local.type == jbvNumeric)
 						state->dim = DatumGetInt32(DirectFunctionCall1(numeric_int4,
 																	   NumericGetDatum(v_local.val.numeric)));
-					NDB_FREE(key);
+					nfree(key);
 				}
 			}
 		}
@@ -1674,7 +1674,7 @@ product_quantization_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 	}
 
 	if (model->backend_state != NULL)
-		NDB_FREE(model->backend_state);
+		nfree(model->backend_state);
 
 	model->backend_state = state;
 	model->gpu_ready = true;
@@ -1686,7 +1686,7 @@ product_quantization_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 static void
 product_quantization_gpu_destroy(MLGpuModel *model)
 {
-	ProductQuantizationGpuModelState *state;
+	ProductQuantizationGpuModelState *state = NULL;
 
 	if (model == NULL)
 		return;
@@ -1695,15 +1695,15 @@ product_quantization_gpu_destroy(MLGpuModel *model)
 	{
 		state = (ProductQuantizationGpuModelState *) model->backend_state;
 		if (state->model_blob != NULL)
-			NDB_FREE(state->model_blob);
+			nfree(state->model_blob);
 		if (state->metrics != NULL)
-			NDB_FREE(state->metrics);
+			nfree(state->metrics);
 		if (state->codebook != NULL)
 		{
 			pq_codebook_free(state->codebook);
-			NDB_FREE(state->codebook);
+			nfree(state->codebook);
 		}
-		NDB_FREE(state);
+		nfree(state);
 		model->backend_state = NULL;
 	}
 

@@ -149,28 +149,28 @@ PG_FUNCTION_INFO_V1(evaluate_hierarchical_by_model_id);
 Datum
 cluster_hierarchical(PG_FUNCTION_ARGS)
 {
-	text	   *table_name;
-	text	   *vector_column;
+	text *table_name = NULL;
+	text *vector_column = NULL;
 	int			num_clusters;
-	text	   *linkage_text;
-	char	   *tbl_str;
-	char	   *col_str;
-	char	   *linkage;
+	text *linkage_text = NULL;
+	char *tbl_str = NULL;
+	char *col_str = NULL;
+	char *linkage = NULL;
 	float	  **data;
 	int			nvec;
 	int			dim;
 
-	NDB_DECLARE(ClusterNode *, clusters);
-	NDB_DECLARE(int *, cluster_assignments);
+	ClusterNode *clusters = NULL;
+	int *cluster_assignments = NULL;
 	int			n_active_clusters;
 	int			iter,
 				i,
 				j,
 				k,
 				d;
-	ArrayType  *result;
+	ArrayType *result = NULL;
 
-	NDB_DECLARE(Datum *, result_datums);
+	Datum *result_datums = NULL;
 	int16		typlen;
 	bool		typbyval;
 	char		typalign;
@@ -208,8 +208,8 @@ cluster_hierarchical(PG_FUNCTION_ARGS)
 
 	if (data == NULL || nvec == 0)
 	{
-		NDB_FREE(tbl_str);
-		NDB_FREE(col_str);
+		nfree(tbl_str);
+		nfree(col_str);
 		ereport(ERROR,
 				(errcode(ERRCODE_DATA_EXCEPTION),
 				 errmsg("No vectors found")));
@@ -217,17 +217,17 @@ cluster_hierarchical(PG_FUNCTION_ARGS)
 
 	if (dim <= 0)
 	{
-		NDB_FREE(tbl_str);
-		NDB_FREE(col_str);
+		nfree(tbl_str);
+		nfree(col_str);
 		/* Free data array and rows if data is not NULL */
 		if (data != NULL)
 		{
 			for (int idx = 0; idx < nvec; idx++)
 			{
 				if (data[idx] != NULL)
-					NDB_FREE(data[idx]);
+					nfree(data[idx]);
 			}
-			NDB_FREE(data);
+			nfree(data);
 		}
 		ereport(ERROR,
 				(errcode(ERRCODE_DATA_EXCEPTION),
@@ -258,18 +258,18 @@ cluster_hierarchical(PG_FUNCTION_ARGS)
 
 			/* Sample the data */
 			{
-				NDB_DECLARE(float **, sampled_data);
+				float **sampled_data = NULL;
 				int			sample_step;
 				int			sampled_idx = 0;
 				int			sample_j;
 
-				NDB_ALLOC(sampled_data, float *, max_hierarchical_points);
+				nalloc(sampled_data, float *, max_hierarchical_points);
 				sample_step = original_nvec / max_hierarchical_points;
 
 				for (sample_j = 0; sample_j < original_nvec && sampled_idx < max_hierarchical_points; sample_j += sample_step)
 				{
-					NDB_DECLARE(float *, sampled_row);
-					NDB_ALLOC(sampled_row, float, dim);
+					float *sampled_row = NULL;
+					nalloc(sampled_row, float, dim);
 					sampled_data[sampled_idx] = sampled_row;
 					memcpy(sampled_data[sampled_idx], data[sample_j], sizeof(float) * dim);
 					sampled_idx++;
@@ -277,8 +277,8 @@ cluster_hierarchical(PG_FUNCTION_ARGS)
 
 				/* Free original data */
 				for (sample_j = 0; sample_j < original_nvec; sample_j++)
-					NDB_FREE(data[sample_j]);
-				NDB_FREE(data);
+					nfree(data[sample_j]);
+				nfree(data);
 
 				/* Use sampled data */
 				data = sampled_data;
@@ -297,20 +297,20 @@ cluster_hierarchical(PG_FUNCTION_ARGS)
 	}
 
 	/* Initialize clusters: each point as singleton cluster */
-	NDB_ALLOC(clusters, ClusterNode, nvec);
+	nalloc(clusters, ClusterNode, nvec);
 	for (i = 0; i < nvec; i++)
 	{
 		clusters[i].id = i;
 		clusters[i].size = 1;
 		{
-			NDB_DECLARE(int *, members);
-			NDB_ALLOC(members, int, 1);
+			int *members = NULL;
+			nalloc(members, int, 1);
 			clusters[i].members = members;
 			clusters[i].members[0] = i;
 		}
 		{
-			NDB_DECLARE(double *, centroid);
-			NDB_ALLOC(centroid, double, dim);
+			double *centroid = NULL;
+			nalloc(centroid, double, dim);
 			clusters[i].centroid = centroid;
 			for (d = 0; d < dim; d++)
 				clusters[i].centroid[d] = (double) data[i][d];
@@ -360,17 +360,17 @@ cluster_hierarchical(PG_FUNCTION_ARGS)
 		{
 			int			new_size;
 
-			NDB_DECLARE(int *, new_members);
+			int *new_members = NULL;
 
 			new_size = clusters[merge_i].size + clusters[merge_j].size;
-			NDB_ALLOC(new_members, int, new_size);
+			nalloc(new_members, int, new_size);
 
 			for (k = 0; k < clusters[merge_i].size; k++)
 				new_members[k] = clusters[merge_i].members[k];
 			for (k = 0; k < clusters[merge_j].size; k++)
 				new_members[clusters[merge_i].size + k] = clusters[merge_j].members[k];
 
-			NDB_FREE(clusters[merge_i].members);
+			nfree(clusters[merge_i].members);
 			clusters[merge_i].members = new_members;
 			clusters[merge_i].size = new_size;
 
@@ -380,8 +380,8 @@ cluster_hierarchical(PG_FUNCTION_ARGS)
 							 dim,
 							 clusters[merge_i].centroid);
 
-			NDB_FREE(clusters[merge_j].members);
-			NDB_FREE(clusters[merge_j].centroid);
+			nfree(clusters[merge_j].members);
+			nfree(clusters[merge_j].centroid);
 			clusters[merge_j].size = 0;
 			clusters[merge_j].members = NULL;
 			clusters[merge_j].centroid = NULL;
@@ -396,7 +396,7 @@ cluster_hierarchical(PG_FUNCTION_ARGS)
 	}
 
 	/* Assign cluster labels: 1-based */
-	NDB_ALLOC(cluster_assignments, int, nvec);
+	nalloc(cluster_assignments, int, nvec);
 	{
 		int			cluster_id = 1;
 
@@ -412,7 +412,7 @@ cluster_hierarchical(PG_FUNCTION_ARGS)
 	}
 
 	/* Build result array */
-	NDB_ALLOC(result_datums, Datum, nvec);
+	nalloc(result_datums, Datum, nvec);
 	for (i = 0; i < nvec; i++)
 		result_datums[i] = Int32GetDatum(cluster_assignments[i]);
 
@@ -422,20 +422,20 @@ cluster_hierarchical(PG_FUNCTION_ARGS)
 	/* Free memory */
 	for (i = 0; i < nvec; i++)
 	{
-		NDB_FREE(data[i]);
+		nfree(data[i]);
 		if (clusters[i].size > 0)
 		{
-			NDB_FREE(clusters[i].members);
-			NDB_FREE(clusters[i].centroid);
+			nfree(clusters[i].members);
+			nfree(clusters[i].centroid);
 		}
 	}
-	NDB_FREE(data);
-	NDB_FREE(clusters);
-	NDB_FREE(cluster_assignments);
-	NDB_FREE(result_datums);
-	NDB_FREE(tbl_str);
-	NDB_FREE(col_str);
-	NDB_FREE(linkage);
+	nfree(data);
+	nfree(clusters);
+	nfree(cluster_assignments);
+	nfree(result_datums);
+	nfree(tbl_str);
+	nfree(col_str);
+	nfree(linkage);
 
 	PG_RETURN_ARRAYTYPE_P(result);
 }
@@ -450,11 +450,11 @@ Datum
 predict_hierarchical_cluster(PG_FUNCTION_ARGS)
 {
 	int32		model_id;
-	ArrayType  *features_array;
+	ArrayType *features_array = NULL;
 	int			n_features;
 	int			cluster_id = -1;
 
-	NDB_DECLARE(float *, features);
+	float *features = NULL;
 
 	model_id = PG_GETARG_INT32(0);
 	features_array = PG_GETARG_ARRAYTYPE_P(1);
@@ -466,8 +466,8 @@ predict_hierarchical_cluster(PG_FUNCTION_ARGS)
 		int16		typlen;
 		bool		typbyval;
 		char		typalign;
-		Datum	   *elems;
-		bool	   *nulls;
+		Datum *elems = NULL;
+		bool *nulls = NULL;
 		int			n_elems;
 		int			i;
 
@@ -475,7 +475,7 @@ predict_hierarchical_cluster(PG_FUNCTION_ARGS)
 		deconstruct_array(features_array, elmtype, typlen, typbyval, typalign,
 						  &elems, &nulls, &n_elems);
 
-		NDB_ALLOC(features, float, n_elems);
+		nalloc(features, float, n_elems);
 		n_features = n_elems;
 		(void) n_features;		/* Not used in simplified implementation */
 
@@ -485,10 +485,10 @@ predict_hierarchical_cluster(PG_FUNCTION_ARGS)
 
 	/* Load model from catalog and find closest cluster */
 	{
-		NDB_DECLARE(bytea *, model_data);
-		NDB_DECLARE(Jsonb *, parameters);
-		NDB_DECLARE(Jsonb *, metrics);
-		float	  **cluster_centers = NULL;
+		bytea *model_data = NULL;
+		Jsonb *parameters = NULL;
+		Jsonb *metrics = NULL;
+		float **cluster_centers = NULL;
 		int			n_clusters = 0;
 		int			model_dim = 0;
 		char		linkage[16] = "average";
@@ -499,7 +499,7 @@ predict_hierarchical_cluster(PG_FUNCTION_ARGS)
 		/* Fetch model from catalog */
 		if (!ml_catalog_fetch_model_payload(model_id, &model_data, &parameters, &metrics))
 		{
-			NDB_FREE(features);
+			nfree(features);
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("neurondb: predict_hierarchical_by_model_id: model %d not found", model_id)));
@@ -507,7 +507,7 @@ predict_hierarchical_cluster(PG_FUNCTION_ARGS)
 
 		if (model_data == NULL)
 		{
-			NDB_FREE(features);
+			nfree(features);
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("neurondb: predict_hierarchical_by_model_id: model %d has no data", model_id)));
@@ -521,7 +521,7 @@ predict_hierarchical_cluster(PG_FUNCTION_ARGS)
 													  linkage,
 													  sizeof(linkage)) != 0)
 		{
-			NDB_FREE(features);
+			nfree(features);
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("neurondb: predict_hierarchical_by_model_id: failed to deserialize model %d", model_id)));
@@ -534,10 +534,10 @@ predict_hierarchical_cluster(PG_FUNCTION_ARGS)
 			if (cluster_centers != NULL)
 			{
 				for (c = 0; c < n_clusters; c++)
-					NDB_FREE(cluster_centers[c]);
-				NDB_FREE(cluster_centers);
+					nfree(cluster_centers[c]);
+				nfree(cluster_centers);
 			}
-			NDB_FREE(features);
+			nfree(features);
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("neurondb: predict_hierarchical_by_model_id: feature dimension mismatch: model expects %d, got %d",
@@ -562,12 +562,12 @@ predict_hierarchical_cluster(PG_FUNCTION_ARGS)
 		if (cluster_centers != NULL)
 		{
 			for (c = 0; c < n_clusters; c++)
-				NDB_FREE(cluster_centers[c]);
-			NDB_FREE(cluster_centers);
+				nfree(cluster_centers[c]);
+			nfree(cluster_centers);
 		}
 	}
 
-	NDB_FREE(features);
+	nfree(features);
 
 	PG_RETURN_INT32(cluster_id);
 }
@@ -582,22 +582,22 @@ Datum
 evaluate_hierarchical_by_model_id(PG_FUNCTION_ARGS)
 {
 	int32		model_id;
-	text	   *table_name;
-	text	   *feature_col;
+	text *table_name = NULL;
+	text *feature_col = NULL;
 	int32		n_clusters;
-	char	   *tbl_str;
-	char	   *feat_str;
+	char *tbl_str = NULL;
+	char *feat_str = NULL;
 	StringInfoData query;
 	int			ret;
 	int			n_points = 0;
 	StringInfoData jsonbuf;
-	Jsonb	   *result;
+	Jsonb *result = NULL;
 	MemoryContext oldcontext;
 	double		silhouette_score;
 	double		calinski_harabasz;
 	int			n_clusters_found;
 
-	NDB_DECLARE(NdbSpiSession *, spi_session);
+	NdbSpiSession *spi_session = NULL;
 	MemoryContext oldcontext_spi;
 
 	/* Validate arguments */
@@ -649,8 +649,8 @@ evaluate_hierarchical_by_model_id(PG_FUNCTION_ARGS)
 	{
 		ndb_spi_stringinfo_free(spi_session, &query);
 		NDB_SPI_SESSION_END(spi_session);
-		NDB_FREE(tbl_str);
-		NDB_FREE(feat_str);
+		nfree(tbl_str);
+		nfree(feat_str);
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
 				 errmsg("neurondb: evaluate_hierarchical_by_model_id: query failed")));
@@ -661,8 +661,8 @@ evaluate_hierarchical_by_model_id(PG_FUNCTION_ARGS)
 	{
 		ndb_spi_stringinfo_free(spi_session, &query);
 		NDB_SPI_SESSION_END(spi_session);
-		NDB_FREE(tbl_str);
-		NDB_FREE(feat_str);
+		nfree(tbl_str);
+		nfree(feat_str);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("neurondb: evaluate_hierarchical_by_model_id: need at least %d points for %d clusters, got %d",
@@ -671,12 +671,12 @@ evaluate_hierarchical_by_model_id(PG_FUNCTION_ARGS)
 
 	/* Load model to get centroids */
 	{
-		NDB_DECLARE(bytea *, model_payload);
-		NDB_DECLARE(Jsonb *, model_parameters);
-		float	  **centers = NULL;
+		bytea *model_payload = NULL;
+		Jsonb *model_parameters = NULL;
+		float **centers = NULL;
 		int			model_dim = 0;
 		char		linkage_str[16] = "average";
-		float	  **data = NULL;
+		float **data = NULL;
 		int			i,
 					j,
 					c,
@@ -706,16 +706,16 @@ evaluate_hierarchical_by_model_id(PG_FUNCTION_ARGS)
 					if (data != NULL && n_points > 0 && dim == model_dim)
 					{
 						/* Allocate arrays */
-						NDB_DECLARE(int *, assignments);
-						NDB_DECLARE(int *, cluster_sizes);
-						NDB_DECLARE(double *, a_scores);
-						NDB_DECLARE(double *, b_scores);
-						NDB_DECLARE(double *, cluster_means);
-						NDB_ALLOC(assignments, int, n_points);
-						NDB_ALLOC(cluster_sizes, int, n_clusters_found);
-						NDB_ALLOC(a_scores, double, n_points);
-						NDB_ALLOC(b_scores, double, n_points);
-						NDB_ALLOC(cluster_means, double, n_clusters_found * dim);
+						int *assignments = NULL;
+						int *cluster_sizes = NULL;
+						double *a_scores = NULL;
+						double *b_scores = NULL;
+						double *cluster_means = NULL;
+						nalloc(assignments, int, n_points);
+						nalloc(cluster_sizes, int, n_clusters_found);
+						nalloc(a_scores, double, n_points);
+						nalloc(b_scores, double, n_points);
+						nalloc(cluster_means, double, n_clusters_found * dim);
 
 						/* Assign points to nearest centroids */
 						for (i = 0; i < n_points; i++)
@@ -877,16 +877,16 @@ evaluate_hierarchical_by_model_id(PG_FUNCTION_ARGS)
 						}
 
 						for (i = 0; i < n_points; i++)
-							NDB_FREE(data[i]);
-						NDB_FREE(data);
+							nfree(data[i]);
+						nfree(data);
 						for (c = 0; c < n_clusters_found; c++)
-							NDB_FREE(centers[c]);
-						NDB_FREE(centers);
-						NDB_FREE(assignments);
-						NDB_FREE(cluster_sizes);
-						NDB_FREE(a_scores);
-						NDB_FREE(b_scores);
-						NDB_FREE(cluster_means);
+							nfree(centers[c]);
+						nfree(centers);
+						nfree(assignments);
+						nfree(cluster_sizes);
+						nfree(a_scores);
+						nfree(b_scores);
+						nfree(cluster_means);
 					}
 					else
 					{
@@ -894,12 +894,12 @@ evaluate_hierarchical_by_model_id(PG_FUNCTION_ARGS)
 						if (data != NULL)
 						{
 							for (i = 0; i < n_points; i++)
-								NDB_FREE(data[i]);
-							NDB_FREE(data);
+								nfree(data[i]);
+							nfree(data);
 						}
 						for (c = 0; c < n_clusters_found; c++)
-							NDB_FREE(centers[c]);
-						NDB_FREE(centers);
+							nfree(centers[c]);
+						nfree(centers);
 						silhouette_score = 0.0;
 						calinski_harabasz = 0.0;
 						n_clusters_found = n_clusters;
@@ -919,9 +919,9 @@ evaluate_hierarchical_by_model_id(PG_FUNCTION_ARGS)
 				n_clusters_found = n_clusters;
 			}
 			if (model_payload)
-				NDB_FREE(model_payload);
+				nfree(model_payload);
 			if (model_parameters)
-				NDB_FREE(model_parameters);
+				nfree(model_parameters);
 		}
 		else
 		{
@@ -943,10 +943,10 @@ evaluate_hierarchical_by_model_id(PG_FUNCTION_ARGS)
 					 silhouette_score, calinski_harabasz, n_clusters_found, n_points);
 
 	result = DatumGetJsonbP(DirectFunctionCall1(jsonb_in, CStringGetTextDatum(jsonbuf.data)));
-	NDB_FREE(jsonbuf.data);
+	nfree(jsonbuf.data);
 
-	NDB_FREE(tbl_str);
-	NDB_FREE(feat_str);
+	nfree(tbl_str);
+	nfree(feat_str);
 
 	PG_RETURN_JSONB_P(result);
 }
@@ -957,8 +957,8 @@ evaluate_hierarchical_by_model_id(PG_FUNCTION_ARGS)
 
 typedef struct HierarchicalGpuModelState
 {
-	bytea	   *model_blob;
-	Jsonb	   *metrics;
+	bytea *model_blob;
+	Jsonb *metrics;
 	int			n_clusters;
 	int			dim;
 	int			n_samples;
@@ -972,7 +972,7 @@ hierarchical_model_serialize_to_bytea(float **cluster_centers, int n_clusters, i
 	int			i,
 				j;
 	int			total_size;
-	bytea	   *result;
+	bytea *result = NULL;
 	int			linkage_len;
 
 	initStringInfo(&buf);
@@ -988,12 +988,12 @@ hierarchical_model_serialize_to_bytea(float **cluster_centers, int n_clusters, i
 
 	total_size = VARHDRSZ + buf.len;
 	{
-		NDB_DECLARE(char *, result_bytes);
-		NDB_ALLOC(result_bytes, char, total_size);
+		char *result_bytes = NULL;
+		nalloc(result_bytes, char, total_size);
 		result = (bytea *) result_bytes;
 		SET_VARSIZE(result, total_size);
 		memcpy(VARDATA(result), buf.data, buf.len);
-		NDB_FREE(buf.data);
+		nfree(buf.data);
 	}
 
 	return result;
@@ -1006,7 +1006,7 @@ hierarchical_model_deserialize_from_bytea(const bytea * data, float ***centers_o
 	int			offset = 0;
 	int			i,
 				j;
-	float	  **centers = NULL;
+	float **centers = NULL;
 	int			linkage_len;
 
 	if (data == NULL || VARSIZE(data) < VARHDRSZ + sizeof(int) * 3)
@@ -1029,11 +1029,11 @@ hierarchical_model_deserialize_from_bytea(const bytea * data, float ***centers_o
 	if (*n_clusters_out < 0 || *n_clusters_out > 10000 || *dim_out <= 0 || *dim_out > 100000)
 		return -1;
 
-	NDB_ALLOC(centers, float *, *n_clusters_out);
+	nalloc(centers, float *, *n_clusters_out);
 	for (i = 0; i < *n_clusters_out; i++)
 	{
-		NDB_DECLARE(float *, center_row);
-		NDB_ALLOC(center_row, float, *dim_out);
+		float *center_row = NULL;
+		nalloc(center_row, float, *dim_out);
 		centers[i] = center_row;
 		for (j = 0; j < *dim_out; j++)
 		{
@@ -1049,11 +1049,11 @@ hierarchical_model_deserialize_from_bytea(const bytea * data, float ***centers_o
 static bool
 hierarchical_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 {
-	NDB_DECLARE(HierarchicalGpuModelState *, state);
-	NDB_DECLARE(float **, data);
-	NDB_DECLARE(int *, cluster_assignments);
-	NDB_DECLARE(float **, cluster_centers);
-	NDB_DECLARE(int *, cluster_sizes);
+	HierarchicalGpuModelState *state = NULL;
+	float **data = NULL;
+	int *cluster_assignments = NULL;
+	float **cluster_centers = NULL;
+	int *cluster_sizes = NULL;
 	int			num_clusters = 8;
 	char		linkage[16] = "average";
 	int			nvec = 0;
@@ -1062,16 +1062,16 @@ hierarchical_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **err
 				c,
 				d;
 
-	NDB_DECLARE(ClusterNode *, clusters);
+	ClusterNode *clusters = NULL;
 	int			n_active_clusters = 0;
 	int			iter,
 				j,
 				k;
 
-	NDB_DECLARE(bytea *, model_data);
-	NDB_DECLARE(Jsonb *, metrics);
+	bytea *model_data = NULL;
+	Jsonb *metrics = NULL;
 	StringInfoData metrics_json;
-	JsonbIterator *it;
+	JsonbIterator *it = NULL;
 	JsonbValue	v;
 	int			r;
 
@@ -1100,7 +1100,7 @@ hierarchical_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **err
 																	 NumericGetDatum(v.val.numeric)));
 				else if (strcmp(key, "linkage") == 0 && v.type == jbvString)
 					strncpy(linkage, v.val.string.val, sizeof(linkage) - 1);
-				NDB_FREE(key);
+				nfree(key);
 			}
 		}
 	}
@@ -1136,30 +1136,30 @@ hierarchical_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **err
 	if (nvec > 10000)
 		nvec = 10000;
 
-	NDB_ALLOC(data, float *, nvec);
+	nalloc(data, float *, nvec);
 	for (i = 0; i < nvec; i++)
 	{
-		NDB_DECLARE(float *, data_row);
-		NDB_ALLOC(data_row, float, dim);
+		float *data_row = NULL;
+		nalloc(data_row, float, dim);
 		data[i] = data_row;
 		memcpy(data[i], &spec->feature_matrix[i * dim], sizeof(float) * dim);
 	}
 
 	/* Initialize clusters: each point as singleton */
-	NDB_ALLOC(clusters, ClusterNode, nvec);
+	nalloc(clusters, ClusterNode, nvec);
 	for (i = 0; i < nvec; i++)
 	{
-		NDB_DECLARE(int *, members);
-		NDB_DECLARE(double *, centroid);
+		int *members = NULL;
+		double *centroid = NULL;
 		clusters[i].id = i;
 		clusters[i].size = 1;
 		{
-			NDB_ALLOC(members, int, 1);
+			nalloc(members, int, 1);
 			clusters[i].members = members;
 			clusters[i].members[0] = i;
 		}
 		{
-			NDB_ALLOC(centroid, double, dim);
+			nalloc(centroid, double, dim);
 			clusters[i].centroid = centroid;
 			for (d = 0; d < dim; d++)
 				clusters[i].centroid[d] = (double) data[i][d];
@@ -1209,22 +1209,22 @@ hierarchical_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **err
 		{
 			int			new_size = clusters[merge_i].size + clusters[merge_j].size;
 
-			NDB_DECLARE(int *, new_members);
-			NDB_ALLOC(new_members, int, new_size);
+			int *new_members = NULL;
+			nalloc(new_members, int, new_size);
 
 			for (k = 0; k < clusters[merge_i].size; k++)
 				new_members[k] = clusters[merge_i].members[k];
 			for (k = 0; k < clusters[merge_j].size; k++)
 				new_members[clusters[merge_i].size + k] = clusters[merge_j].members[k];
 
-			NDB_FREE(clusters[merge_i].members);
+			nfree(clusters[merge_i].members);
 			clusters[merge_i].members = new_members;
 			clusters[merge_i].size = new_size;
 
 			compute_centroid(data, clusters[merge_i].members, clusters[merge_i].size, dim, clusters[merge_i].centroid);
 
-			NDB_FREE(clusters[merge_j].members);
-			NDB_FREE(clusters[merge_j].centroid);
+			nfree(clusters[merge_j].members);
+			nfree(clusters[merge_j].centroid);
 			clusters[merge_j].size = 0;
 			clusters[merge_j].members = NULL;
 			clusters[merge_j].centroid = NULL;
@@ -1234,17 +1234,17 @@ hierarchical_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **err
 	}
 
 	/* Extract cluster centroids */
-	NDB_ALLOC(cluster_assignments, int, nvec);
-	NDB_ALLOC(cluster_centers, float *, num_clusters);
-	NDB_ALLOC(cluster_sizes, int, num_clusters);
+	nalloc(cluster_assignments, int, nvec);
+	nalloc(cluster_centers, float *, num_clusters);
+	nalloc(cluster_sizes, int, num_clusters);
 
 	c = 0;
 	for (i = 0; i < nvec && c < num_clusters; i++)
 	{
 		if (clusters[i].size > 0)
 		{
-			NDB_DECLARE(float *, center_row);
-			NDB_ALLOC(center_row, float, dim);
+			float *center_row = NULL;
+			nalloc(center_row, float, dim);
 			cluster_centers[c] = center_row;
 			for (d = 0; d < dim; d++)
 				cluster_centers[c][d] = (float) clusters[i].centroid[d];
@@ -1270,9 +1270,9 @@ hierarchical_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **err
 					 num_clusters, linkage, dim, nvec);
 	metrics = DatumGetJsonbP(DirectFunctionCall1(jsonb_in,
 												 CStringGetTextDatum(metrics_json.data)));
-	NDB_FREE(metrics_json.data);
+	nfree(metrics_json.data);
 
-	NDB_ALLOC(state, HierarchicalGpuModelState, 1);
+	nalloc(state, HierarchicalGpuModelState, 1);
 	state->model_blob = model_data;
 	state->metrics = metrics;
 	state->n_clusters = num_clusters;
@@ -1281,7 +1281,7 @@ hierarchical_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **err
 	strncpy(state->linkage, linkage, sizeof(state->linkage) - 1);
 
 	if (model->backend_state != NULL)
-		NDB_FREE(model->backend_state);
+		nfree(model->backend_state);
 
 	model->backend_state = state;
 	model->gpu_ready = true;
@@ -1289,19 +1289,19 @@ hierarchical_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **err
 
 	for (i = 0; i < nvec; i++)
 	{
-		NDB_FREE(data[i]);
+		nfree(data[i]);
 		if (clusters[i].members != NULL)
-			NDB_FREE(clusters[i].members);
+			nfree(clusters[i].members);
 		if (clusters[i].centroid != NULL)
-			NDB_FREE(clusters[i].centroid);
+			nfree(clusters[i].centroid);
 	}
 	for (c = 0; c < num_clusters; c++)
-		NDB_FREE(cluster_centers[c]);
-	NDB_FREE(data);
-	NDB_FREE(clusters);
-	NDB_FREE(cluster_centers);
-	NDB_FREE(cluster_sizes);
-	NDB_FREE(cluster_assignments);
+		nfree(cluster_centers[c]);
+	nfree(data);
+	nfree(clusters);
+	nfree(cluster_centers);
+	nfree(cluster_sizes);
+	nfree(cluster_assignments);
 
 	return true;
 }
@@ -1311,7 +1311,7 @@ hierarchical_gpu_predict(const MLGpuModel *model, const float *input, int input_
 						 float *output, int output_dim, char **errstr)
 {
 	const		HierarchicalGpuModelState *state;
-	float	  **centers = NULL;
+	float **centers = NULL;
 	int			n_clusters = 0;
 	int			dim = 0;
 	char		linkage[16];
@@ -1361,8 +1361,8 @@ hierarchical_gpu_predict(const MLGpuModel *model, const float *input, int input_
 	if (input_dim != dim)
 	{
 		for (c = 0; c < n_clusters; c++)
-			NDB_FREE(centers[c]);
-		NDB_FREE(centers);
+			nfree(centers[c]);
+		nfree(centers);
 		if (errstr != NULL)
 			*errstr = pstrdup("hierarchical_gpu_predict: dimension mismatch");
 		return false;
@@ -1382,8 +1382,8 @@ hierarchical_gpu_predict(const MLGpuModel *model, const float *input, int input_
 	output[0] = (float) best_cluster;
 
 	for (c = 0; c < n_clusters; c++)
-		NDB_FREE(centers[c]);
-	NDB_FREE(centers);
+		nfree(centers[c]);
+	nfree(centers);
 
 	return true;
 }
@@ -1420,7 +1420,7 @@ hierarchical_gpu_evaluate(const MLGpuModel *model, const MLGpuEvalSpec *spec,
 
 	metrics_json = DatumGetJsonbP(DirectFunctionCall1(jsonb_in,
 													  CStringGetTextDatum(buf.data)));
-	NDB_FREE(buf.data);
+	nfree(buf.data);
 
 	if (out != NULL)
 		out->payload = metrics_json;
@@ -1434,7 +1434,7 @@ hierarchical_gpu_serialize(const MLGpuModel *model, bytea * *payload_out,
 {
 	const		HierarchicalGpuModelState *state;
 
-	NDB_DECLARE(bytea *, payload_copy);
+	bytea *payload_copy = NULL;
 	int			payload_size;
 
 	if (errstr != NULL)
@@ -1459,9 +1459,9 @@ hierarchical_gpu_serialize(const MLGpuModel *model, bytea * *payload_out,
 	}
 
 	{
-		NDB_DECLARE(char *, payload_bytes);
+		char *payload_bytes = NULL;
 		payload_size = VARSIZE(state->model_blob);
-		NDB_ALLOC(payload_bytes, char, payload_size);
+		nalloc(payload_bytes, char, payload_size);
 		payload_copy = (bytea *) payload_bytes;
 		memcpy(payload_copy, state->model_blob, payload_size);
 	}
@@ -1469,7 +1469,7 @@ hierarchical_gpu_serialize(const MLGpuModel *model, bytea * *payload_out,
 	if (payload_out != NULL)
 		*payload_out = payload_copy;
 	else
-		NDB_FREE(payload_copy);
+		nfree(payload_copy);
 
 	if (metadata_out != NULL && state->metrics != NULL)
 		*metadata_out = (Jsonb *) PG_DETOAST_DATUM_COPY(
@@ -1482,15 +1482,15 @@ static bool
 hierarchical_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 							 const Jsonb * metadata, char **errstr)
 {
-	NDB_DECLARE(HierarchicalGpuModelState *, state);
-	NDB_DECLARE(bytea *, payload_copy);
+	HierarchicalGpuModelState *state = NULL;
+	bytea *payload_copy = NULL;
 	int			payload_size;
 
-	NDB_DECLARE(float **, centers);
+	float **centers = NULL;
 	int			n_clusters = 0;
 	int			dim = 0;
 	char		linkage[16];
-	JsonbIterator *it;
+	JsonbIterator *it = NULL;
 	JsonbValue	v;
 	int			r;
 
@@ -1504,9 +1504,9 @@ hierarchical_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 	}
 
 	{
-		NDB_DECLARE(char *, payload_bytes);
+		char *payload_bytes = NULL;
 		payload_size = VARSIZE(payload);
-		NDB_ALLOC(payload_bytes, char, payload_size);
+		nalloc(payload_bytes, char, payload_size);
 		payload_copy = (bytea *) payload_bytes;
 		memcpy(payload_copy, payload, payload_size);
 	}
@@ -1514,17 +1514,17 @@ hierarchical_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 	if (hierarchical_model_deserialize_from_bytea(payload_copy,
 												  &centers, &n_clusters, &dim, linkage, sizeof(linkage)) != 0)
 	{
-		NDB_FREE(payload_copy);
+		nfree(payload_copy);
 		if (errstr != NULL)
 			*errstr = pstrdup("hierarchical_gpu_deserialize: failed to deserialize");
 		return false;
 	}
 
 	for (int c = 0; c < n_clusters; c++)
-		NDB_FREE(centers[c]);
-	NDB_FREE(centers);
+		nfree(centers[c]);
+	nfree(centers);
 
-	NDB_ALLOC(state, HierarchicalGpuModelState, 1);
+	nalloc(state, HierarchicalGpuModelState, 1);
 	state->model_blob = payload_copy;
 	state->n_clusters = n_clusters;
 	state->dim = dim;
@@ -1535,11 +1535,11 @@ hierarchical_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 	{
 		int			metadata_size;
 
-		NDB_DECLARE(char *, metadata_bytes);
-		Jsonb	   *metadata_copy;
+		char *metadata_bytes = NULL;
+		Jsonb *metadata_copy = NULL;
 
 		metadata_size = VARSIZE(metadata);
-		NDB_ALLOC(metadata_bytes, char, metadata_size);
+		nalloc(metadata_bytes, char, metadata_size);
 		metadata_copy = (Jsonb *) metadata_bytes;
 
 		memcpy(metadata_copy, metadata, metadata_size);
@@ -1556,7 +1556,7 @@ hierarchical_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 				if (strcmp(key, "n_samples") == 0 && v.type == jbvNumeric)
 					state->n_samples = DatumGetInt32(DirectFunctionCall1(numeric_int4,
 																		 NumericGetDatum(v.val.numeric)));
-				NDB_FREE(key);
+				nfree(key);
 			}
 		}
 	}
@@ -1566,7 +1566,7 @@ hierarchical_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 	}
 
 	if (model->backend_state != NULL)
-		NDB_FREE(model->backend_state);
+		nfree(model->backend_state);
 
 	model->backend_state = state;
 	model->gpu_ready = true;
@@ -1578,7 +1578,7 @@ hierarchical_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 static void
 hierarchical_gpu_destroy(MLGpuModel *model)
 {
-	HierarchicalGpuModelState *state;
+	HierarchicalGpuModelState *state = NULL;
 
 	if (model == NULL)
 		return;
@@ -1587,10 +1587,10 @@ hierarchical_gpu_destroy(MLGpuModel *model)
 	{
 		state = (HierarchicalGpuModelState *) model->backend_state;
 		if (state->model_blob != NULL)
-			NDB_FREE(state->model_blob);
+			nfree(state->model_blob);
 		if (state->metrics != NULL)
-			NDB_FREE(state->metrics);
-		NDB_FREE(state);
+			nfree(state->metrics);
+		nfree(state);
 		model->backend_state = NULL;
 	}
 

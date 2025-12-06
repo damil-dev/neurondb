@@ -164,8 +164,8 @@ ndb_rocm_rf_pack_model(const struct RFModel *model,
 			*errstr = pstrdup("ROCm RF pack: payload size exceeds MaxAllocSize");
 		return -1;
 	}
-	NDB_DECLARE(bytea *, blob);
-	NDB_DECLARE(char *, blob_raw);
+	bytea *blob = NULL;
+	char *blob_raw = NULL;
 
 	if (VARHDRSZ + payload_bytes > MaxAllocSize)
 	{
@@ -173,7 +173,7 @@ ndb_rocm_rf_pack_model(const struct RFModel *model,
 			*errstr = pstrdup("ROCm RF pack: total size exceeds MaxAllocSize");
 		return -1;
 	}
-	NDB_ALLOC(blob_raw, char, VARHDRSZ + payload_bytes);
+	nalloc(blob_raw, char, VARHDRSZ + payload_bytes);
 	blob = (bytea *) blob_raw;
 	if (blob == NULL)
 	{
@@ -301,7 +301,7 @@ ndb_rocm_rf_predict(const bytea * model_data,
 	{
 		if (errstr)
 			*errstr = pstrdup("ROCm RF inference failed");
-		NDB_FREE(votes);
+		nfree(votes);
 		return -1;
 	}
 
@@ -320,7 +320,7 @@ ndb_rocm_rf_predict(const bytea * model_data,
 		best_class = model_hdr->majority_class;
 
 	*class_out = best_class;
-	NDB_FREE(votes);
+	nfree(votes);
 	return 0;
 }
 
@@ -337,14 +337,14 @@ ndb_rocm_rf_train(const float *features,
 {
 	const int	default_n_trees = 32;
 	int			n_trees = default_n_trees;
-	NDB_DECLARE(int *, label_ints);
-	NDB_DECLARE(int *, class_counts);
-	NDB_DECLARE(int *, best_left_counts);
-	NDB_DECLARE(int *, best_right_counts);
-	NDB_DECLARE(int *, tmp_left_counts);
-	NDB_DECLARE(int *, tmp_right_counts);
-	NDB_DECLARE(bytea *, payload);
-	NDB_DECLARE(char *, payload_raw);
+	int *label_ints = NULL;
+	int *class_counts = NULL;
+	int *best_left_counts = NULL;
+	int *best_right_counts = NULL;
+	int *tmp_left_counts = NULL;
+	int *tmp_right_counts = NULL;
+	bytea *payload = NULL;
+	char *payload_raw = NULL;
 	Jsonb	   *metrics_json = NULL;
 	float	   *d_features = NULL;
 	int		   *d_labels = NULL;
@@ -398,12 +398,12 @@ ndb_rocm_rf_train(const float *features,
 			return -1;
 		}
 
-		NDB_ALLOC(label_ints, int, n_samples);
-		NDB_ALLOC(class_counts, int, class_count);
-		NDB_ALLOC(tmp_left_counts, int, class_count);
-		NDB_ALLOC(tmp_right_counts, int, class_count);
-		NDB_ALLOC(best_left_counts, int, class_count);
-		NDB_ALLOC(best_right_counts, int, class_count);
+		nalloc(label_ints, int, n_samples);
+		nalloc(class_counts, int, class_count);
+		nalloc(tmp_left_counts, int, class_count);
+		nalloc(tmp_right_counts, int, class_count);
+		nalloc(best_left_counts, int, class_count);
+		nalloc(best_right_counts, int, class_count);
 		if (label_ints == NULL || class_counts == NULL ||
 			tmp_left_counts == NULL || tmp_right_counts == NULL ||
 			best_left_counts == NULL || best_right_counts == NULL)
@@ -479,10 +479,10 @@ ndb_rocm_rf_train(const float *features,
 		size_t		header_bytes = sizeof(NdbCudaRfModelHeader)
 			+ sizeof(NdbCudaRfTreeHeader) * n_trees;
 		size_t		payload_bytes = header_bytes + sizeof(NdbCudaRfNode) * total_nodes;
-		char	   *base;
+		char *base = NULL;
 		NdbCudaRfModelHeader model_hdr;
-		NdbCudaRfTreeHeader *tree_hdrs;
-		NdbCudaRfNode *nodes;
+		NdbCudaRfTreeHeader *tree_hdrs = NULL;
+		NdbCudaRfNode *nodes = NULL;
 
 		if (payload_bytes > MaxAllocSize || VARHDRSZ + payload_bytes > MaxAllocSize)
 		{
@@ -491,7 +491,7 @@ ndb_rocm_rf_train(const float *features,
 			goto gpu_fail;
 		}
 
-		NDB_ALLOC(payload_raw, char, VARHDRSZ + payload_bytes);
+		nalloc(payload_raw, char, VARHDRSZ + payload_bytes);
 		payload = (bytea *) payload_raw;
 		SET_VARSIZE(payload, VARHDRSZ + payload_bytes);
 		base = VARDATA(payload);
@@ -684,22 +684,22 @@ cleanup:
 	if (rc != 0)
 	{
 		if (payload != NULL)
-			NDB_FREE(payload);
+			nfree(payload);
 		if (metrics_json != NULL)
-			NDB_FREE(metrics_json);
+			nfree(metrics_json);
 	}
 	if (label_ints != NULL)
-		NDB_FREE(label_ints);
+		nfree(label_ints);
 	if (class_counts != NULL)
-		NDB_FREE(class_counts);
+		nfree(class_counts);
 	if (tmp_left_counts != NULL)
-		NDB_FREE(tmp_left_counts);
+		nfree(tmp_left_counts);
 	if (tmp_right_counts != NULL)
-		NDB_FREE(tmp_right_counts);
+		nfree(tmp_right_counts);
 	if (best_left_counts != NULL)
-		NDB_FREE(best_left_counts);
+		nfree(best_left_counts);
 	if (best_right_counts != NULL)
-		NDB_FREE(best_right_counts);
+		nfree(best_right_counts);
 
 	return rc;
 }

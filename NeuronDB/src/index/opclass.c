@@ -54,9 +54,15 @@ Datum
 vector_l2_distance_op(PG_FUNCTION_ARGS)
 {
 	Vector	   *a;
-	Vector	   *b;
+	Vector *b = NULL;
 	float4		result;
 	float4		l2_distance_simd(Vector *a, Vector *b);
+
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_l2_distance_op requires 2 arguments")));
 
 	a = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(a);
@@ -87,11 +93,17 @@ PG_FUNCTION_INFO_V1(vector_cosine_distance_op);
 Datum
 vector_cosine_distance_op(PG_FUNCTION_ARGS)
 {
-	Vector	   *a;
-	Vector	   *b;
+	Vector *a = NULL;
+	Vector *b = NULL;
 	float4		result;
 
 	float4		cosine_distance_simd(Vector *a, Vector *b);
+
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_cosine_distance_op requires 2 arguments")));
 
 	a = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(a);
@@ -120,11 +132,17 @@ PG_FUNCTION_INFO_V1(vector_inner_product_distance_op);
 Datum
 vector_inner_product_distance_op(PG_FUNCTION_ARGS)
 {
-	Vector	   *a;
-	Vector	   *b;
+	Vector *a = NULL;
+	Vector *b = NULL;
 	float4		result;
 
 	float4		inner_product_simd(Vector *a, Vector *b);
+
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_inner_product_distance_op requires 2 arguments")));
 
 	a = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(a);
@@ -159,15 +177,21 @@ PG_FUNCTION_INFO_V1(vector_l2_less);
 Datum
 vector_l2_less(PG_FUNCTION_ARGS)
 {
-	Vector	   *a;
-	Vector	   *b;
-	Vector	   *query;
+	Vector *a = NULL;
+	Vector *b = NULL;
+	Vector *query = NULL;
 	float4		dist_a;
 	float4		dist_b;
 
 	int			i;
 	double		sum_a = 0.0,
 				sum_b = 0.0;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 3)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_l2_less requires 3 arguments")));
 
 	a = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(a);
@@ -205,15 +229,21 @@ PG_FUNCTION_INFO_V1(vector_l2_less_equal);
 Datum
 vector_l2_less_equal(PG_FUNCTION_ARGS)
 {
-	Vector	   *a;
-	Vector	   *b;
-	Vector	   *query;
+	Vector *a = NULL;
+	Vector *b = NULL;
+	Vector *query = NULL;
 	float4		dist_a;
 	float4		dist_b;
 
 	int			i;
 	double		sum_a = 0.0,
 				sum_b = 0.0;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 3)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_l2_less_equal requires 3 arguments")));
 
 	a = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(a);
@@ -251,15 +281,22 @@ PG_FUNCTION_INFO_V1(vector_l2_equal);
 Datum
 vector_l2_equal(PG_FUNCTION_ARGS)
 {
-	Vector	   *a;
-	Vector	   *b;
-	Vector	   *query;
+	Vector *a = NULL;
+	Vector *b = NULL;
+	Vector *query = NULL;
 	float4		dist_a;
 	float4		dist_b;
 
 	int			i;
 	double		sum_a = 0.0,
 				sum_b = 0.0;
+
+	
+	/* Validate argument count */
+	if (PG_NARGS() != 3)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_l2_equal requires 3 arguments")));
 
 	a = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(a);
@@ -298,15 +335,22 @@ PG_FUNCTION_INFO_V1(vector_l2_greater);
 Datum
 vector_l2_greater(PG_FUNCTION_ARGS)
 {
-	Vector	   *a;
-	Vector	   *b;
-	Vector	   *query;
+	Vector *a = NULL;
+	Vector *b = NULL;
+	Vector *query = NULL;
 	float4		dist_a;
 	float4		dist_b;
 
 	int			i;
 	double		sum_a = 0.0,
 				sum_b = 0.0;
+
+	
+	/* Validate argument count */
+	if (PG_NARGS() != 3)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_l2_greater requires 3 arguments")));
 
 	a = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(a);
@@ -344,15 +388,22 @@ PG_FUNCTION_INFO_V1(vector_l2_greater_equal);
 Datum
 vector_l2_greater_equal(PG_FUNCTION_ARGS)
 {
-	Vector	   *a;
-	Vector	   *b;
-	Vector	   *query;
+	Vector *a = NULL;
+	Vector *b = NULL;
+	Vector *query = NULL;
 	float4		dist_a;
 	float4		dist_b;
 
 	int			i;
 	double		sum_a = 0.0,
 				sum_b = 0.0;
+
+	
+	/* Validate argument count */
+	if (PG_NARGS() != 3)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_l2_greater_equal requires 3 arguments")));
 
 	a = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(a);
@@ -461,11 +512,18 @@ PG_FUNCTION_INFO_V1(vector_cosine_less);
 Datum
 vector_cosine_less(PG_FUNCTION_ARGS)
 {
-	Vector	   *a;
-	Vector	   *b;
-	Vector	   *query;
+	Vector *a = NULL;
+	Vector *b = NULL;
+	Vector *query = NULL;
 	float4		dist_a;
 	float4		dist_b;
+
+	
+	/* Validate argument count */
+	if (PG_NARGS() != 3)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_cosine_less requires 3 arguments")));
 
 	a = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(a);
@@ -499,11 +557,18 @@ PG_FUNCTION_INFO_V1(vector_cosine_less_equal);
 Datum
 vector_cosine_less_equal(PG_FUNCTION_ARGS)
 {
-	Vector	   *a;
-	Vector	   *b;
-	Vector	   *query;
+	Vector *a = NULL;
+	Vector *b = NULL;
+	Vector *query = NULL;
 	float4		dist_a;
 	float4		dist_b;
+
+	
+	/* Validate argument count */
+	if (PG_NARGS() != 3)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_cosine_less_equal requires 3 arguments")));
 
 	a = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(a);
@@ -534,11 +599,18 @@ PG_FUNCTION_INFO_V1(vector_cosine_greater);
 Datum
 vector_cosine_greater(PG_FUNCTION_ARGS)
 {
-	Vector	   *a;
-	Vector	   *b;
-	Vector	   *query;
+	Vector *a = NULL;
+	Vector *b = NULL;
+	Vector *query = NULL;
 	float4		dist_a;
 	float4		dist_b;
+
+	
+	/* Validate argument count */
+	if (PG_NARGS() != 3)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_cosine_greater requires 3 arguments")));
 
 	a = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(a);
@@ -569,11 +641,18 @@ PG_FUNCTION_INFO_V1(vector_cosine_greater_equal);
 Datum
 vector_cosine_greater_equal(PG_FUNCTION_ARGS)
 {
-	Vector	   *a;
-	Vector	   *b;
-	Vector	   *query;
+	Vector *a = NULL;
+	Vector *b = NULL;
+	Vector *query = NULL;
 	float4		dist_a;
 	float4		dist_b;
+
+	
+	/* Validate argument count */
+	if (PG_NARGS() != 3)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_cosine_greater_equal requires 3 arguments")));
 
 	a = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(a);
@@ -607,11 +686,18 @@ PG_FUNCTION_INFO_V1(vector_inner_product_less);
 Datum
 vector_inner_product_less(PG_FUNCTION_ARGS)
 {
-	Vector	   *a;
-	Vector	   *b;
-	Vector	   *query;
+	Vector *a = NULL;
+	Vector *b = NULL;
+	Vector *query = NULL;
 	float4		dist_a;
 	float4		dist_b;
+
+	
+	/* Validate argument count */
+	if (PG_NARGS() != 3)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_inner_product_less requires 3 arguments")));
 
 	a = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(a);
@@ -642,11 +728,18 @@ PG_FUNCTION_INFO_V1(vector_inner_product_less_equal);
 Datum
 vector_inner_product_less_equal(PG_FUNCTION_ARGS)
 {
-	Vector	   *a;
-	Vector	   *b;
-	Vector	   *query;
+	Vector *a = NULL;
+	Vector *b = NULL;
+	Vector *query = NULL;
 	float4		dist_a;
 	float4		dist_b;
+
+	
+	/* Validate argument count */
+	if (PG_NARGS() != 3)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_inner_product_less_equal requires 3 arguments")));
 
 	a = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(a);
@@ -677,11 +770,18 @@ PG_FUNCTION_INFO_V1(vector_inner_product_greater);
 Datum
 vector_inner_product_greater(PG_FUNCTION_ARGS)
 {
-	Vector	   *a;
-	Vector	   *b;
-	Vector	   *query;
+	Vector *a = NULL;
+	Vector *b = NULL;
+	Vector *query = NULL;
 	float4		dist_a;
 	float4		dist_b;
+
+	
+	/* Validate argument count */
+	if (PG_NARGS() != 3)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_inner_product_greater requires 3 arguments")));
 
 	a = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(a);
@@ -712,11 +812,18 @@ PG_FUNCTION_INFO_V1(vector_inner_product_greater_equal);
 Datum
 vector_inner_product_greater_equal(PG_FUNCTION_ARGS)
 {
-	Vector	   *a;
-	Vector	   *b;
-	Vector	   *query;
+	Vector *a = NULL;
+	Vector *b = NULL;
+	Vector *query = NULL;
 	float4		dist_a;
 	float4		dist_b;
+
+	
+	/* Validate argument count */
+	if (PG_NARGS() != 3)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_inner_product_greater_equal requires 3 arguments")));
 
 	a = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(a);
@@ -747,6 +854,13 @@ PG_FUNCTION_INFO_V1(neurondb_has_opclass);
 Datum
 neurondb_has_opclass(PG_FUNCTION_ARGS)
 {
+	
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: neurondb_has_opclass requires 1 argument")));
+
 	text	   *opclass_name = PG_GETARG_TEXT_PP(0);
 	char	   *name = text_to_cstring(opclass_name);
 	bool		exists = false;
@@ -754,11 +868,11 @@ neurondb_has_opclass(PG_FUNCTION_ARGS)
 	StringInfoData query;
 
 	/* Connect to SPI */
-	NDB_DECLARE(NdbSpiSession *, session);
+	NdbSpiSession *session = NULL;
 	session = ndb_spi_session_begin(CurrentMemoryContext, false);
 	if (session == NULL)
 	{
-		NDB_FREE(name);
+		nfree(name);
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
 				 errmsg("neurondb: neurondb_has_opclass: failed to begin SPI session")));
@@ -773,7 +887,7 @@ neurondb_has_opclass(PG_FUNCTION_ARGS)
 					 name);
 
 	ret = ndb_spi_execute(session, query.data, true, 0);
-	NDB_FREE(query.data);
+	nfree(query.data);
 
 	if (ret == SPI_OK_SELECT && SPI_processed > 0)
 	{
@@ -787,7 +901,7 @@ neurondb_has_opclass(PG_FUNCTION_ARGS)
 		 name,
 		 exists ? "found" : "not found");
 
-	NDB_FREE(name);
+	nfree(name);
 
 	PG_RETURN_BOOL(exists);
 }

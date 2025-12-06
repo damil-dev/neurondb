@@ -53,7 +53,7 @@ typedef struct EntrypointCache
 	CacheEntry	entries[MAX_CACHE_ENTRIES];
 }			EntrypointCache;
 
-static EntrypointCache * ep_cache = NULL;
+static EntrypointCache *ep_cache = NULL;
 static int	cache_size = MAX_CACHE_ENTRIES;
 
 /*

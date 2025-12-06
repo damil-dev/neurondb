@@ -78,7 +78,7 @@ static ExprState * ndb_compile_rls_policies(List * policies, Relation rel, EStat
 RLSFilterState *
 ndb_rls_init(Relation rel, EState * estate)
 {
-	RLSFilterState *state;
+	RLSFilterState *state = NULL;
 
 	state = (RLSFilterState *) palloc0(sizeof(RLSFilterState));
 	state->rel = rel;
@@ -152,7 +152,7 @@ ndb_rls_check_item(RLSFilterState *state, ItemPointer tid)
 	bool		result;
 	HeapTupleData tupleData;
 	HeapTuple	tuple = &tupleData;
-	TupleTableSlot *slot;
+	TupleTableSlot *slot = NULL;
 	Snapshot	snapshot;
 	bool		found;
 
@@ -200,7 +200,7 @@ ndb_rls_end(RLSFilterState *state)
 		state->slot = NULL;
 	}
 
-	NDB_FREE(state);
+	nfree(state);
 }
 
 /*
@@ -250,7 +250,7 @@ static ExprState *
 ndb_compile_rls_policies(List * policies, Relation rel, EState * estate)
 {
 	List	   *qualList = NIL;
-	ListCell   *lc;
+	ListCell *lc = NULL;
 	Expr	   *combinedQual = NULL;
 	ExprState  *qualState = NULL;
 
@@ -263,9 +263,9 @@ ndb_compile_rls_policies(List * policies, Relation rel, EState * estate)
 		HeapTuple	policyTuple = (HeapTuple) lfirst(lc);
 		Datum		qualDatum;
 		bool		isnull;
-		text	   *qualText;
-		char	   *qualStr;
-		Expr	   *qualExpr;
+		text *qualText = NULL;
+		char *qualStr = NULL;
+		Expr *qualExpr = NULL;
 
 		/* Get USING expression */
 		qualDatum = heap_getattr(policyTuple,
@@ -291,14 +291,14 @@ ndb_compile_rls_policies(List * policies, Relation rel, EState * estate)
 			/* Use SPI to parse and evaluate the qual */
 			/* For production, policies should store compiled Expr nodes */
 			/* For now, return NULL to indicate we need SPI-based evaluation */
-			NDB_FREE(qualStr);
+			nfree(qualStr);
 			continue;			/* Skip complex parsing for now - would need
 								 * full query context */
 		}
 
 		/* Add to qual list */
 		qualList = lappend(qualList, qualExpr);
-		NDB_FREE(qualStr);
+		nfree(qualStr);
 	}
 
 	/* Combine quals with OR (any policy can allow access) */
@@ -363,7 +363,7 @@ neurondb_test_rls(PG_FUNCTION_ARGS)
 bool
 ndb_index_scan_rls_filter(IndexScanDesc scan, ItemPointer tid)
 {
-	RLSFilterState *rlsState;
+	RLSFilterState *rlsState = NULL;
 	bool		passes;
 
 	/* Get or create RLS state (cached in scan->opaque) */
@@ -480,7 +480,7 @@ neurondb_create_tenant_policy(PG_FUNCTION_ARGS)
 	char	   *column_str = text_to_cstring(tenant_column);
 	StringInfoData query;
 
-	NDB_DECLARE(NdbSpiSession *, session);
+	NdbSpiSession *session = NULL;
 	int			ret;
 
 	initStringInfo(&query);
@@ -501,9 +501,9 @@ neurondb_create_tenant_policy(PG_FUNCTION_ARGS)
 		if (ret < 0)
 		{
 			ndb_spi_session_end(&session);
-			NDB_FREE(query.data);
-			NDB_FREE(table_str);
-			NDB_FREE(column_str);
+			nfree(query.data);
+			nfree(table_str);
+			nfree(column_str);
 			ereport(ERROR,
 					(errcode(ERRCODE_INTERNAL_ERROR),
 					 errmsg("Failed to create RLS policy")));
@@ -512,17 +512,17 @@ neurondb_create_tenant_policy(PG_FUNCTION_ARGS)
 	}
 	else
 	{
-		NDB_FREE(query.data);
-		NDB_FREE(table_str);
-		NDB_FREE(column_str);
+		nfree(query.data);
+		nfree(table_str);
+		nfree(column_str);
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
 				 errmsg("failed to begin SPI session")));
 	}
 
-	NDB_FREE(query.data);
-	NDB_FREE(table_str);
-	NDB_FREE(column_str);
+	nfree(query.data);
+	nfree(table_str);
+	nfree(column_str);
 
 	PG_RETURN_VOID();
 }

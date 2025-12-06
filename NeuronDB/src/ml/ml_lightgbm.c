@@ -126,8 +126,7 @@ lightgbm_model_serialize_to_bytea(int n_estimators, int max_depth, float learnin
 {
 	StringInfoData buf;
 	int			total_size;
-	bytea	   *result;
-	int			type_len;
+		bytea *result = NULL;	int			type_len;
 
 	initStringInfo(&buf);
 	appendBinaryStringInfo(&buf, (char *) &n_estimators, sizeof(int));
@@ -142,7 +141,7 @@ lightgbm_model_serialize_to_bytea(int n_estimators, int max_depth, float learnin
 	result = (bytea *) palloc(total_size);
 	SET_VARSIZE(result, total_size);
 	memcpy(VARDATA(result), buf.data, buf.len);
-	NDB_FREE(buf.data);
+	nfree(buf.data);
 
 	return result;
 }
@@ -180,7 +179,7 @@ lightgbm_model_deserialize_from_bytea(const bytea * data, int *n_estimators_out,
 static bool
 lightgbm_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 {
-	LightGBMGpuModelState *state;
+	LightGBMGpuModelState *state = NULL;
 	int			n_estimators = 100;
 	int			max_depth = -1;
 	float		learning_rate = 0.1f;
@@ -188,10 +187,10 @@ lightgbm_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 	int			nvec = 0;
 	int			dim = 0;
 
-	NDB_DECLARE(bytea *, model_data);
-	NDB_DECLARE(Jsonb *, metrics);
+	bytea *model_data = NULL;
+	Jsonb *metrics = NULL;
 	StringInfoData metrics_json;
-	JsonbIterator *it;
+	JsonbIterator *it = NULL;
 	JsonbValue	v;
 	int			r;
 
@@ -226,7 +225,7 @@ lightgbm_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 																			   NumericGetDatum(v.val.numeric)));
 				else if (strcmp(key, "boosting_type") == 0 && v.type == jbvString)
 					strncpy(boosting_type, v.val.string.val, sizeof(boosting_type) - 1);
-				NDB_FREE(key);
+				nfree(key);
 			}
 		}
 	}
@@ -260,7 +259,7 @@ lightgbm_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 					 n_estimators, max_depth, learning_rate, dim, boosting_type, nvec);
 	metrics = DatumGetJsonbP(DirectFunctionCall1(jsonb_in,
 												 CStringGetDatum(metrics_json.data)));
-	NDB_FREE(metrics_json.data);
+	nfree(metrics_json.data);
 
 	state = (LightGBMGpuModelState *) palloc0(sizeof(LightGBMGpuModelState));
 	state->model_blob = model_data;
@@ -273,7 +272,7 @@ lightgbm_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 	strncpy(state->boosting_type, boosting_type, sizeof(state->boosting_type) - 1);
 
 	if (model->backend_state != NULL)
-		NDB_FREE(model->backend_state);
+		nfree(model->backend_state);
 
 	model->backend_state = state;
 	model->gpu_ready = true;
@@ -365,7 +364,7 @@ lightgbm_gpu_evaluate(const MLGpuModel *model, const MLGpuEvalSpec *spec,
 
 	metrics_json = DatumGetJsonbP(DirectFunctionCall1(jsonb_in,
 													  CStringGetDatum(buf.data)));
-	NDB_FREE(buf.data);
+	nfree(buf.data);
 
 	if (out != NULL)
 		out->payload = metrics_json;
@@ -409,7 +408,7 @@ lightgbm_gpu_serialize(const MLGpuModel *model, bytea * *payload_out,
 	if (payload_out != NULL)
 		*payload_out = payload_copy;
 	else
-		NDB_FREE(payload_copy);
+		nfree(payload_copy);
 
 	if (metadata_out != NULL && state->metrics != NULL)
 		*metadata_out = (Jsonb *) PG_DETOAST_DATUM_COPY(
@@ -449,7 +448,7 @@ lightgbm_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 
 	if (lightgbm_model_deserialize_from_bytea(payload_copy, &n_estimators, &max_depth, &learning_rate, &n_features, boosting_type, sizeof(boosting_type)) != 0)
 	{
-		NDB_FREE(payload_copy);
+		nfree(payload_copy);
 		if (errstr != NULL)
 			*errstr = pstrdup("lightgbm_gpu_deserialize: failed to deserialize");
 		return false;
@@ -483,7 +482,7 @@ lightgbm_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 				if (strcmp(key, "n_samples") == 0 && v.type == jbvNumeric)
 					state->n_samples = DatumGetInt32(DirectFunctionCall1(numeric_int4,
 																		 NumericGetDatum(v.val.numeric)));
-				NDB_FREE(key);
+				nfree(key);
 			}
 		}
 	}
@@ -493,7 +492,7 @@ lightgbm_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 	}
 
 	if (model->backend_state != NULL)
-		NDB_FREE(model->backend_state);
+		nfree(model->backend_state);
 
 	model->backend_state = state;
 	model->gpu_ready = true;
@@ -505,7 +504,7 @@ lightgbm_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 static void
 lightgbm_gpu_destroy(MLGpuModel *model)
 {
-	LightGBMGpuModelState *state;
+	LightGBMGpuModelState *state = NULL;
 
 	if (model == NULL)
 		return;
@@ -514,10 +513,10 @@ lightgbm_gpu_destroy(MLGpuModel *model)
 	{
 		state = (LightGBMGpuModelState *) model->backend_state;
 		if (state->model_blob != NULL)
-			NDB_FREE(state->model_blob);
+			nfree(state->model_blob);
 		if (state->metrics != NULL)
-			NDB_FREE(state->metrics);
-		NDB_FREE(state);
+			nfree(state->metrics);
+		nfree(state);
 		model->backend_state = NULL;
 	}
 

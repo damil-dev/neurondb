@@ -77,20 +77,20 @@ PG_FUNCTION_INFO_V1(mmr_rerank);
 Datum
 mmr_rerank(PG_FUNCTION_ARGS)
 {
-	ArrayType  *query_array;
-	ArrayType  *candidates_array;
+	ArrayType *query_array = NULL;
+	ArrayType *candidates_array = NULL;
 	float		lambda;
 	int			top_k;
-	float	   *query;
+	float *query = NULL;
 	int			query_dim;
-	NDB_DECLARE(float **, candidates);
+	float **candidates = NULL;
 	int			n_candidates;
 	int			dim;
-	NDB_DECLARE(bool *, selected);
-	NDB_DECLARE(int *, result_indices);
-	NDB_DECLARE(double *, query_scores);
-	ArrayType  *result;
-	NDB_DECLARE(Datum *, result_datums);
+	bool *selected = NULL;
+	int *result_indices = NULL;
+	double *query_scores = NULL;
+	ArrayType *result = NULL;
+	Datum *result_datums = NULL;
 	int			selected_count;
 	int			i,
 				j;
@@ -141,7 +141,7 @@ mmr_rerank(PG_FUNCTION_ARGS)
 		top_k = n_candidates;
 
 	/* Parse candidate vectors */
-	NDB_ALLOC(candidates, float *, n_candidates);
+	nalloc(candidates, float *, n_candidates);
 	{
 		float	   *data = (float *) ARR_DATA_PTR(candidates_array);
 
@@ -150,13 +150,13 @@ mmr_rerank(PG_FUNCTION_ARGS)
 	}
 
 	/* Compute query-candidate similarities */
-	NDB_ALLOC(query_scores, double, n_candidates);
+	nalloc(query_scores, double, n_candidates);
 	for (i = 0; i < n_candidates; i++)
 		query_scores[i] = cosine_similarity(query, candidates[i], dim);
 
 	/* MMR algorithm */
-	NDB_ALLOC(selected, bool, n_candidates);
-	NDB_ALLOC(result_indices, int, top_k);
+	nalloc(selected, bool, n_candidates);
+	nalloc(result_indices, int, top_k);
 	selected_count = 0;
 
 	while (selected_count < top_k)
@@ -206,7 +206,7 @@ mmr_rerank(PG_FUNCTION_ARGS)
 	}
 
 	/* Build result array (1-based indices) */
-	NDB_ALLOC(result_datums, Datum, selected_count);
+	nalloc(result_datums, Datum, selected_count);
 	for (i = 0; i < selected_count; i++)
 		result_datums[i] = Int32GetDatum(result_indices[i] + 1);
 
@@ -218,11 +218,11 @@ mmr_rerank(PG_FUNCTION_ARGS)
 							 typbyval,
 							 typalign);
 
-	NDB_FREE(candidates);
-	NDB_FREE(query_scores);
-	NDB_FREE(selected);
-	NDB_FREE(result_indices);
-	NDB_FREE(result_datums);
+	nfree(candidates);
+	nfree(query_scores);
+	nfree(selected);
+	nfree(result_indices);
+	nfree(result_datums);
 
 	PG_RETURN_ARRAYTYPE_P(result);
 }
@@ -238,21 +238,21 @@ PG_FUNCTION_INFO_V1(mmr_rerank_with_scores);
 Datum
 mmr_rerank_with_scores(PG_FUNCTION_ARGS)
 {
-	ArrayType  *query_array;
-	ArrayType  *candidates_array;
+	ArrayType *query_array = NULL;
+	ArrayType *candidates_array = NULL;
 	float		lambda;
 	int			top_k;
-	float	   *query;
+	float *query = NULL;
 	int			query_dim;
-	NDB_DECLARE(float **, candidates);
+	float **candidates = NULL;
 	int			n_candidates;
 	int			dim;
-	NDB_DECLARE(bool *, selected);
-	NDB_DECLARE(int *, result_indices);
-	NDB_DECLARE(double *, result_scores);
-	NDB_DECLARE(double *, query_scores);
-	ArrayType  *result;
-	NDB_DECLARE(Datum *, result_datums);
+	bool *selected = NULL;
+	int *result_indices = NULL;
+	double *result_scores = NULL;
+	double *query_scores = NULL;
+	ArrayType *result = NULL;
+	Datum *result_datums = NULL;
 	int			selected_count;
 	int			i,
 				j;
@@ -288,7 +288,7 @@ mmr_rerank_with_scores(PG_FUNCTION_ARGS)
 	if (top_k < 1 || top_k > n_candidates)
 		top_k = n_candidates;
 
-	NDB_ALLOC(candidates, float *, n_candidates);
+	nalloc(candidates, float *, n_candidates);
 	{
 		float	   *data = (float *) ARR_DATA_PTR(candidates_array);
 
@@ -296,13 +296,13 @@ mmr_rerank_with_scores(PG_FUNCTION_ARGS)
 			candidates[i] = &data[i * dim];
 	}
 
-	NDB_ALLOC(query_scores, double, n_candidates);
+	nalloc(query_scores, double, n_candidates);
 	for (i = 0; i < n_candidates; i++)
 		query_scores[i] = cosine_similarity(query, candidates[i], dim);
 
-	NDB_ALLOC(selected, bool, n_candidates);
-	NDB_ALLOC(result_indices, int, top_k);
-	NDB_ALLOC(result_scores, double, top_k);
+	nalloc(selected, bool, n_candidates);
+	nalloc(result_indices, int, top_k);
+	nalloc(result_scores, double, top_k);
 	selected_count = 0;
 
 	/* MMR algorithm with score tracking */
@@ -351,7 +351,7 @@ mmr_rerank_with_scores(PG_FUNCTION_ARGS)
 	}
 
 	/* Build result array: flat array [idx1, score1, idx2, score2, ...] */
-	NDB_ALLOC(result_datums, Datum, selected_count * 2);
+	nalloc(result_datums, Datum, selected_count * 2);
 	for (i = 0; i < selected_count; i++)
 	{
 		result_datums[i * 2] = Int32GetDatum(result_indices[i] + 1);
@@ -366,12 +366,12 @@ mmr_rerank_with_scores(PG_FUNCTION_ARGS)
 							 true,
 							 'i');
 
-	NDB_FREE(candidates);
-	NDB_FREE(query_scores);
-	NDB_FREE(selected);
-	NDB_FREE(result_indices);
-	NDB_FREE(result_scores);
-	NDB_FREE(result_datums);
+	nfree(candidates);
+	nfree(query_scores);
+	nfree(selected);
+	nfree(result_indices);
+	nfree(result_scores);
+	nfree(result_datums);
 
 	PG_RETURN_ARRAYTYPE_P(result);
 }

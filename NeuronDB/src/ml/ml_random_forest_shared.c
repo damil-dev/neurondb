@@ -211,7 +211,7 @@ rf_build_metrics_json(const RFMetricsSpec *spec)
 {
 	StringInfoData buf;
 	bool		first = true;
-	Jsonb	   *result;
+	Jsonb *result = NULL;
 	Datum		jsonb_datum;
 
 	elog(DEBUG1, "neurondb: rf_build_metrics_json: function entry");
@@ -359,7 +359,7 @@ rf_build_metrics_json(const RFMetricsSpec *spec)
 	{
 		ereport(DEBUG2,
 				(errmsg("rf_build_metrics_json: about to free buf.data")));
-		NDB_FREE(buf.data);
+		nfree(buf.data);
 		ereport(DEBUG2,
 				(errmsg("rf_build_metrics_json: buf.data freed")));
 	}

@@ -36,6 +36,12 @@ vector_get(PG_FUNCTION_ARGS)
 	Vector	   *v;
 	int32		idx;
 
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_get requires 2 arguments")));
+
 	v = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(v);
 	idx = PG_GETARG_INT32(1);
@@ -61,7 +67,13 @@ vector_set(PG_FUNCTION_ARGS)
 	Vector	   *v;
 	int32		idx;
 	float4		val;
-	Vector	   *result;
+	Vector *result = NULL;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 3)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_set requires 3 arguments")));
 
 	v = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(v);
@@ -83,11 +95,17 @@ PG_FUNCTION_INFO_V1(vector_slice);
 Datum
 vector_slice(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
+	Vector *v = NULL;
 	int32		start;
 	int32		end;
-	Vector	   *result;
+	Vector *result = NULL;
 	int			new_dim;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 3)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_slice requires 3 arguments")));
 
 	v = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(v);
@@ -113,7 +131,13 @@ vector_append(PG_FUNCTION_ARGS)
 	Vector	   *v;
 	float4		val;
 
-	Vector	   *result;
+	Vector *result = NULL;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_append requires 2 arguments")));
 
 	v = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(v);
@@ -133,7 +157,13 @@ vector_prepend(PG_FUNCTION_ARGS)
 {
 	float4		val;
 	Vector	   *v;
-	Vector	   *result;
+	Vector *result = NULL;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_prepend requires 2 arguments")));
 
 	val = PG_GETARG_FLOAT4(0);
 	v = PG_GETARG_VECTOR_P(1);
@@ -151,9 +181,15 @@ Datum
 vector_abs(PG_FUNCTION_ARGS)
 {
 	Vector	   *v;
-	Vector	   *result;
+	Vector *result = NULL;
 
 	int			i;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_abs requires 1 argument")));
 
 	v = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(v);
@@ -170,9 +206,15 @@ Datum
 vector_square(PG_FUNCTION_ARGS)
 {
 	Vector	   *v;
-	Vector	   *result;
+	Vector *result = NULL;
 
 	int			i;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_square requires 1 argument")));
 
 	v = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(v);
@@ -189,9 +231,15 @@ Datum
 vector_sqrt(PG_FUNCTION_ARGS)
 {
 	Vector	   *v;
-	Vector	   *result;
+	Vector *result = NULL;
 
 	int			i;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_sqrt requires 1 argument")));
 
 	v = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(v);
@@ -214,11 +262,17 @@ PG_FUNCTION_INFO_V1(vector_pow);
 Datum
 vector_pow(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
+	Vector *v = NULL;
 	float8		exp;
 
-	Vector	   *result;
+	Vector *result = NULL;
 	int			i;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_pow requires 2 arguments")));
 
 	v = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(v);
@@ -239,9 +293,15 @@ Datum
 vector_hadamard(PG_FUNCTION_ARGS)
 {
 	Vector	   *a;
-	Vector	   *b;
-	Vector	   *result;
+	Vector *b = NULL;
+	Vector *result = NULL;
 	int			i;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_hadamard requires 2 arguments")));
 
 	a = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(a);
@@ -265,9 +325,15 @@ Datum
 vector_divide(PG_FUNCTION_ARGS)
 {
 	Vector	   *a;
-	Vector	   *b;
-	Vector	   *result;
+	Vector *b = NULL;
+	Vector *result = NULL;
 	int			i;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_divide requires 2 arguments")));
 
 	a = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(a);
@@ -300,6 +366,12 @@ vector_mean(PG_FUNCTION_ARGS)
 	double		sum = 0.0;
 	int			i;
 
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_mean requires 1 argument")));
+
 	v = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(v);
 
@@ -328,6 +400,12 @@ vector_variance(PG_FUNCTION_ARGS)
 	double		mean = 0.0;
 	double		variance = 0.0;
 	int			i;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_variance requires 1 argument")));
 
 	v = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(v);
@@ -366,6 +444,12 @@ vector_stddev(PG_FUNCTION_ARGS)
 	double		variance = 0.0;
 	int			i;
 
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_stddev requires 1 argument")));
+
 	v = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(v);
 
@@ -402,6 +486,12 @@ vector_min(PG_FUNCTION_ARGS)
 	float4		min_val;
 	int			i;
 
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_min requires 1 argument")));
+
 	v = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(v);
 
@@ -430,6 +520,12 @@ vector_max(PG_FUNCTION_ARGS)
 	Vector	   *v;
 	float4		max_val;
 	int			i;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_max requires 1 argument")));
 
 	v = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(v);
@@ -461,6 +557,12 @@ vector_sum(PG_FUNCTION_ARGS)
 
 	int			i;
 
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_sum requires 1 argument")));
+
 	v = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(v);
 
@@ -477,6 +579,12 @@ vector_eq(PG_FUNCTION_ARGS)
 	Vector	   *a;
 	Vector	   *b;
 	int			i;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_eq requires 2 arguments")));
 
 	a = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(a);
@@ -528,6 +636,12 @@ vector_hash(PG_FUNCTION_ARGS)
 	uint32		hash = 5381;	/* DJB hash seed */
 	int			i;
 
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_hash requires 1 argument")));
+
 	v = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(v);
 
@@ -563,11 +677,17 @@ PG_FUNCTION_INFO_V1(vector_clip);
 Datum
 vector_clip(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
+	Vector *v = NULL;
 	float4		min_val;
 	float4		max_val;
-	Vector	   *result;
+	Vector *result = NULL;
 	int			i;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 3)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_clip requires 3 arguments")));
 
 	v = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(v);
@@ -600,11 +720,17 @@ PG_FUNCTION_INFO_V1(vector_standardize);
 Datum
 vector_standardize(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
-	Vector	   *result;
+	Vector *v = NULL;
+	Vector *result = NULL;
 	double		mean = 0.0;
 	double		stddev = 0.0;
 	int			i;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_standardize requires 1 argument")));
 
 	v = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(v);
@@ -651,12 +777,18 @@ PG_FUNCTION_INFO_V1(vector_minmax_normalize);
 Datum
 vector_minmax_normalize(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
-	Vector	   *result;
+	Vector *v = NULL;
+	Vector *result = NULL;
 	float4		min_val;
 	float4		max_val;
 	float4		range;
 	int			i;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_minmax_normalize requires 1 argument")));
 
 	v = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(v);

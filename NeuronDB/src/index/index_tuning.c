@@ -49,8 +49,8 @@ index_tune_hnsw(PG_FUNCTION_ARGS)
 {
 	text	   *table_name = PG_GETARG_TEXT_P(0);
 	text	   *column_name = PG_GETARG_TEXT_P(1);
-	char	   *tbl_name;
-	char	   *col_name;
+	char *tbl_name = NULL;
+	char *col_name = NULL;
 	StringInfoData sql;
 	int			ret;
 	int64		row_count = 0;
@@ -59,9 +59,9 @@ index_tune_hnsw(PG_FUNCTION_ARGS)
 	int			recommended_m = 16;
 	int			recommended_ef_construction = 64;
 	StringInfoData json_buf;
-	Jsonb	   *result_jsonb;
+	Jsonb *result_jsonb = NULL;
 
-	NDB_DECLARE(NdbSpiSession *, session);
+	NdbSpiSession *session = NULL;
 
 	tbl_name = text_to_cstring(table_name);
 	col_name = text_to_cstring(column_name);
@@ -93,7 +93,7 @@ index_tune_hnsw(PG_FUNCTION_ARGS)
 
 	/* Get vector dimension */
 	/* Use safe free/reinit to handle potential memory context changes */
-	NDB_FREE(sql.data);
+	nfree(sql.data);
 	initStringInfo(&sql);
 	appendStringInfo(&sql,
 					 "SELECT vector_dims(%s) FROM %s LIMIT 1",
@@ -197,10 +197,10 @@ index_tune_hnsw(PG_FUNCTION_ARGS)
 	result_jsonb = DatumGetJsonbP(DirectFunctionCall1(
 													  jsonb_in, CStringGetTextDatum(json_buf.data)));
 
-	NDB_FREE(json_buf.data);
-	NDB_FREE(tbl_name);
-	NDB_FREE(col_name);
-	NDB_FREE(sql.data);
+	nfree(json_buf.data);
+	nfree(tbl_name);
+	nfree(col_name);
+	nfree(sql.data);
 	ndb_spi_session_end(&session);
 
 	PG_RETURN_POINTER(result_jsonb);
@@ -215,17 +215,17 @@ index_tune_ivf(PG_FUNCTION_ARGS)
 {
 	text	   *table_name = PG_GETARG_TEXT_P(0);
 	text	   *column_name = PG_GETARG_TEXT_P(1);
-	char	   *tbl_name;
-	char	   *col_name;
+	char *tbl_name = NULL;
+	char *col_name = NULL;
 	StringInfoData sql;
 	int			ret;
 	int64		row_count = 0;
 	int32		vector_dim = 0;
 	int			recommended_lists = 100;
 	StringInfoData json_buf;
-	Jsonb	   *result_jsonb;
+	Jsonb *result_jsonb = NULL;
 
-	NDB_DECLARE(NdbSpiSession *, session);
+	NdbSpiSession *session = NULL;
 
 	tbl_name = text_to_cstring(table_name);
 	col_name = text_to_cstring(column_name);
@@ -257,7 +257,7 @@ index_tune_ivf(PG_FUNCTION_ARGS)
 
 	/* Get vector dimension */
 	/* Use safe free/reinit to handle potential memory context changes */
-	NDB_FREE(sql.data);
+	nfree(sql.data);
 	initStringInfo(&sql);
 	appendStringInfo(&sql,
 					 "SELECT vector_dims(%s) FROM %s LIMIT 1",
@@ -307,10 +307,10 @@ index_tune_ivf(PG_FUNCTION_ARGS)
 	result_jsonb = DatumGetJsonbP(DirectFunctionCall1(
 													  jsonb_in, CStringGetTextDatum(json_buf.data)));
 
-	NDB_FREE(json_buf.data);
-	NDB_FREE(tbl_name);
-	NDB_FREE(col_name);
-	NDB_FREE(sql.data);
+	nfree(json_buf.data);
+	nfree(tbl_name);
+	nfree(col_name);
+	nfree(sql.data);
 	ndb_spi_session_end(&session);
 
 	PG_RETURN_POINTER(result_jsonb);
@@ -325,8 +325,8 @@ index_recommend_type(PG_FUNCTION_ARGS)
 {
 	text	   *table_name = PG_GETARG_TEXT_P(0);
 	text	   *column_name = PG_GETARG_TEXT_P(1);
-	char	   *tbl_name;
-	char	   *col_name;
+	char *tbl_name = NULL;
+	char *col_name = NULL;
 	StringInfoData sql;
 	int			ret;
 	int64		row_count = 0;
@@ -334,11 +334,11 @@ index_recommend_type(PG_FUNCTION_ARGS)
 	double		memory_budget_mb = 0.0;
 	char	   *recommended_type = "hnsw";
 	StringInfoData json_buf;
-	Jsonb	   *result_jsonb;
-	Jsonb	   *hnsw_params;
-	Jsonb	   *ivf_params;
+	Jsonb *result_jsonb = NULL;
+	Jsonb *hnsw_params = NULL;
+	Jsonb *ivf_params = NULL;
 
-	NDB_DECLARE(NdbSpiSession *, session);
+	NdbSpiSession *session = NULL;
 
 	tbl_name = text_to_cstring(table_name);
 	col_name = text_to_cstring(column_name);
@@ -370,7 +370,7 @@ index_recommend_type(PG_FUNCTION_ARGS)
 
 	/* Estimate update frequency (check for recent updates) */
 	/* Use safe free/reinit to handle potential memory context changes */
-	NDB_FREE(sql.data);
+	nfree(sql.data);
 	initStringInfo(&sql);
 	appendStringInfo(&sql,
 					 "SELECT COUNT(*) FROM %s WHERE "
@@ -448,10 +448,10 @@ index_recommend_type(PG_FUNCTION_ARGS)
 	result_jsonb = DatumGetJsonbP(DirectFunctionCall1(
 													  jsonb_in, CStringGetTextDatum(json_buf.data)));
 
-	NDB_FREE(json_buf.data);
-	NDB_FREE(tbl_name);
-	NDB_FREE(col_name);
-	NDB_FREE(sql.data);
+	nfree(json_buf.data);
+	nfree(tbl_name);
+	nfree(col_name);
+	nfree(sql.data);
 	ndb_spi_session_end(&session);
 
 	PG_RETURN_POINTER(result_jsonb);
@@ -465,7 +465,7 @@ Datum
 index_tune_query_params(PG_FUNCTION_ARGS)
 {
 	text	   *index_name = PG_GETARG_TEXT_P(0);
-	char	   *idx_name;
+	char *idx_name = NULL;
 	StringInfoData sql;
 	int			ret;
 	double		avg_latency = 0.0;
@@ -474,9 +474,9 @@ index_tune_query_params(PG_FUNCTION_ARGS)
 	int			recommended_probes = 10;
 	char	   *index_type = "hnsw";
 	StringInfoData json_buf;
-	Jsonb	   *result_jsonb;
+	Jsonb *result_jsonb = NULL;
 
-	NDB_DECLARE(NdbSpiSession *, session);
+	NdbSpiSession *session = NULL;
 
 	idx_name = text_to_cstring(index_name);
 
@@ -511,13 +511,13 @@ index_tune_query_params(PG_FUNCTION_ARGS)
 				index_type = "hnsw";
 			else if (strcmp(amname, "ivfflat") == 0)
 				index_type = "ivf";
-			NDB_FREE(amname);
+			nfree(amname);
 		}
 	}
 
 	/* Get query performance metrics */
 	/* Use safe free/reinit to handle potential memory context changes */
-	NDB_FREE(sql.data);
+	nfree(sql.data);
 	initStringInfo(&sql);
 	appendStringInfo(&sql,
 					 "SELECT AVG(latency_ms) as avg_latency, "
@@ -608,9 +608,9 @@ index_tune_query_params(PG_FUNCTION_ARGS)
 	result_jsonb = DatumGetJsonbP(DirectFunctionCall1(
 													  jsonb_in, CStringGetTextDatum(json_buf.data)));
 
-	NDB_FREE(json_buf.data);
-	NDB_FREE(idx_name);
-	NDB_FREE(sql.data);
+	nfree(json_buf.data);
+	nfree(idx_name);
+	nfree(sql.data);
 	ndb_spi_session_end(&session);
 
 	PG_RETURN_POINTER(result_jsonb);
