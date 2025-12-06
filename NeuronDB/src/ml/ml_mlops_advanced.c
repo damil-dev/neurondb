@@ -859,8 +859,17 @@ PG_FUNCTION_INFO_V1(rollback_model);
 Datum
 rollback_model(PG_FUNCTION_ARGS)
 {
-	int32		model_id = PG_GETARG_INT32(0);
-	int32		target_version = PG_GETARG_INT32(1);
+	int32		model_id;
+	int32		target_version;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: rollback_model requires 2 arguments")));
+
+	model_id = PG_GETARG_INT32(0);
+	target_version = PG_GETARG_INT32(1);
 
 	StringInfoData result;
 
@@ -885,10 +894,19 @@ PG_FUNCTION_INFO_V1(set_feature_flag);
 Datum
 set_feature_flag(PG_FUNCTION_ARGS)
 {
-	text	   *flag_name = PG_GETARG_TEXT_PP(0);
-	bool		enabled = PG_GETARG_BOOL(1);
-	float8		rollout_percentage =
-		PG_ARGISNULL(2) ? 100.0 : PG_GETARG_FLOAT8(2);
+	text	   *flag_name;
+	bool		enabled;
+	float8		rollout_percentage;
+
+	/* Validate minimum argument count */
+	if (PG_NARGS() < 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: set_feature_flag requires at least 2 arguments")));
+
+	flag_name = PG_GETARG_TEXT_PP(0);
+	enabled = PG_GETARG_BOOL(1);
+	rollout_percentage = PG_ARGISNULL(2) ? 100.0 : PG_GETARG_FLOAT8(2);
 
 	char	   *name = text_to_cstring(flag_name);
 	StringInfoData result;
@@ -920,10 +938,21 @@ PG_FUNCTION_INFO_V1(track_experiment_metric);
 Datum
 track_experiment_metric(PG_FUNCTION_ARGS)
 {
-	int32		experiment_id = PG_GETARG_INT32(0);
-	text	   *metric_name = PG_GETARG_TEXT_PP(1);
-	float8		value = PG_GETARG_FLOAT8(2);
-	text	   *variant = PG_ARGISNULL(3) ? NULL : PG_GETARG_TEXT_PP(3);
+	int32		experiment_id;
+	text	   *metric_name;
+	float8		value;
+	text	   *variant;
+
+	/* Validate minimum argument count */
+	if (PG_NARGS() < 3)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: track_experiment_metric requires at least 3 arguments")));
+
+	experiment_id = PG_GETARG_INT32(0);
+	metric_name = PG_GETARG_TEXT_PP(1);
+	value = PG_GETARG_FLOAT8(2);
+	variant = PG_ARGISNULL(3) ? NULL : PG_GETARG_TEXT_PP(3);
 
 	char	   *metric = text_to_cstring(metric_name);
 	char	   *var = variant ? text_to_cstring(variant) : pstrdup("control");
