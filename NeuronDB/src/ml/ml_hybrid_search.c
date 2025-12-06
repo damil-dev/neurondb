@@ -107,23 +107,23 @@ PG_FUNCTION_INFO_V1(hybrid_search_fusion);
 Datum
 hybrid_search_fusion(PG_FUNCTION_ARGS)
 {
-	ArrayType  *doc_ids_array;
-	ArrayType  *semantic_scores_array;
-	ArrayType  *lexical_scores_array;
+	ArrayType *doc_ids_array = NULL;
+	ArrayType *semantic_scores_array = NULL;
+	ArrayType *lexical_scores_array = NULL;
 	double		semantic_weight;
 	bool		normalize;
-	int32	   *doc_ids;
-	float8	   *semantic_scores;
-	float8	   *lexical_scores;
+	int32 *doc_ids = NULL;
+	float8 *semantic_scores = NULL;
+	float8 *lexical_scores = NULL;
 	int			num_docs;
-	HybridScore *scores;
+	HybridScore *scores = NULL;
 	double		sem_min,
 				sem_max,
 				lex_min,
 				lex_max;
 	int			i;
-	ArrayType  *result;
-	Datum	   *result_datums;
+	ArrayType *result = NULL;
+	Datum *result_datums = NULL;
 	int16		typlen;
 	bool		typbyval;
 	char		typalign;
@@ -242,8 +242,8 @@ hybrid_search_fusion(PG_FUNCTION_ARGS)
 	result = construct_array(
 							 result_datums, num_docs, INT4OID, typlen, typbyval, typalign);
 
-	NDB_FREE(scores);
-	NDB_FREE(result_datums);
+	nfree(scores);
+	nfree(result_datums);
 
 	PG_RETURN_ARRAYTYPE_P(result);
 }

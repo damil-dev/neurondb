@@ -199,7 +199,7 @@ register_hybrid_scan_planner_hook(void)
 __attribute__((unused)) static Node *
 hybrid_create_scan_state(CustomScan * cscan)
 {
-	HybridScanState *state;
+	HybridScanState *state = NULL;
 
 	state = (HybridScanState *) newNode(
 										sizeof(HybridScanState), T_CustomScanState);
@@ -274,8 +274,8 @@ hybrid_begin(CustomScanState * node, EState * estate, int eflags)
 	/* Try to find vector and FTS indexes on this relation */
 	/* If not in plan, scan all indexes as fallback */
 	{
-		List	   *indexOidList;
-		ListCell   *lc;
+		List *indexOidList = NULL;
+		ListCell *lc = NULL;
 
 		indexOidList = RelationGetIndexList(heapRel);
 		foreach(lc, indexOidList)
@@ -331,8 +331,14 @@ hybrid_begin(CustomScanState * node, EState * estate, int eflags)
 	}
 
 	/* Allocate candidate arrays */
-	NDB_ALLOC(state->candidates, TupleTableSlot *, state->k);
-	NDB_ALLOC(state->scores, float4, state->k);
+	{
+		TupleTableSlot **candidates_tmp = NULL;
+		float4 *scores_tmp = NULL;
+		nalloc(candidates_tmp, TupleTableSlot *, state->k);
+		nalloc(scores_tmp, float4, state->k);
+		state->candidates = candidates_tmp;
+		state->scores = scores_tmp;
+	}
 	NDB_CHECK_ALLOC(state, "state");
 
 	/* Open vector index scan if available */
@@ -399,11 +405,11 @@ hybrid_exec(CustomScanState * node)
 	HybridScanState *state = (HybridScanState *) node;
 	TupleTableSlot *slot = node->ss.ss_ScanTupleSlot;
 	Relation	heapRel = node->ss.ss_currentRelation;
-	NDB_DECLARE(ItemPointerData *, vectorItems);
-	NDB_DECLARE(float4 *, vectorDistances);
+	ItemPointerData *vectorItems = NULL;
+	float4 *vectorDistances = NULL;
 	int			vectorCount = 0;
-	NDB_DECLARE(ItemPointerData *, ftsItems);
-	NDB_DECLARE(float4 *, ftsScores);
+	ItemPointerData *ftsItems = NULL;
+	float4 *ftsScores = NULL;
 	int			ftsCount = 0;
 	int			i;
 
@@ -414,9 +420,9 @@ hybrid_exec(CustomScanState * node)
 		if (state->vectorScan && !state->vectorDone)
 		{
 			/* Collect vector candidates */
-			NDB_ALLOC(vectorItems, ItemPointerData, state->k);
+			nalloc(vectorItems, ItemPointerData, state->k);
 			NDB_CHECK_ALLOC(vectorItems, "vectorItems");
-			NDB_ALLOC(vectorDistances, float4, state->k);
+			nalloc(vectorDistances, float4, state->k);
 			NDB_CHECK_ALLOC(vectorDistances, "vectorDistances");
 
 			while (vectorCount < state->k)
@@ -459,9 +465,9 @@ hybrid_exec(CustomScanState * node)
 		if (state->ftsScan && !state->ftsDone)
 		{
 			/* Collect FTS candidates */
-			NDB_ALLOC(ftsItems, ItemPointerData, state->k);
+			nalloc(ftsItems, ItemPointerData, state->k);
 			NDB_CHECK_ALLOC(ftsItems, "ftsItems");
-			NDB_ALLOC(ftsScores, float4, state->k);
+			nalloc(ftsScores, float4, state->k);
 			NDB_CHECK_ALLOC(ftsScores, "ftsScores");
 
 			while (ftsCount < state->k)
@@ -506,13 +512,13 @@ hybrid_exec(CustomScanState * node)
 			int			mergedCount = 0;
 			int			maxCandidates = vectorCount + ftsCount;
 
-			NDB_DECLARE(ItemPointerData *, mergedItems);
-			NDB_DECLARE(float4 *, mergedScores);
+			ItemPointerData *mergedItems = NULL;
+			float4 *mergedScores = NULL;
 
 			/* Allocate arrays for merged candidates */
-			NDB_ALLOC(mergedItems, ItemPointerData, maxCandidates);
+			nalloc(mergedItems, ItemPointerData, maxCandidates);
 			NDB_CHECK_ALLOC(mergedItems, "mergedItems");
-			NDB_ALLOC(mergedScores, float4, maxCandidates);
+			nalloc(mergedScores, float4, maxCandidates);
 			NDB_CHECK_ALLOC(mergedScores, "mergedScores");
 
 			/* Create a hash table or sorted list for deduplication */
@@ -581,9 +587,9 @@ hybrid_exec(CustomScanState * node)
 
 			/* Sort by score (descending) */
 			{
-				NDB_DECLARE(int *, indices);
+				int *indices = NULL;
 
-				NDB_ALLOC(indices, int, mergedCount);
+				nalloc(indices, int, mergedCount);
 
 				NDB_CHECK_ALLOC(indices, "indices");
 				for (i = 0; i < mergedCount; i++)
@@ -597,7 +603,7 @@ hybrid_exec(CustomScanState * node)
 				for (i = 0; i < state->candidateCount; i++)
 				{
 					int			idx = indices[i];
-					TupleTableSlot *candidateSlot;
+					TupleTableSlot *candidateSlot = NULL;
 
 					candidateSlot = MakeTupleTableSlot(node->ss.ss_currentRelation->rd_att,
 													   &TTSOpsHeapTuple);
@@ -622,22 +628,22 @@ hybrid_exec(CustomScanState * node)
 					state->scores[i] = mergedScores[idx];
 				}
 
-				NDB_FREE(indices);
+				nfree(indices);
 			}
 
-			NDB_FREE(mergedItems);
-			NDB_FREE(mergedScores);
+			nfree(mergedItems);
+			nfree(mergedScores);
 		}
 
 		/* Free temporary arrays */
 		if (vectorItems)
-			NDB_FREE(vectorItems);
+			nfree(vectorItems);
 		if (vectorDistances)
-			NDB_FREE(vectorDistances);
+			nfree(vectorDistances);
 		if (ftsItems)
-			NDB_FREE(ftsItems);
+			nfree(ftsItems);
 		if (ftsScores)
-			NDB_FREE(ftsScores);
+			nfree(ftsScores);
 	}
 
 	/* Return next result */
@@ -682,16 +688,16 @@ hybrid_end(CustomScanState * node)
 			if (state->candidates[i])
 				ExecDropSingleTupleTableSlot(state->candidates[i]);
 		}
-		NDB_FREE(state->candidates);
+		nfree(state->candidates);
 	}
 	if (state->scores)
-		NDB_FREE(state->scores);
+		nfree(state->scores);
 
 	/* Free query strings */
 	if (state->queryVector)
-		NDB_FREE(state->queryVector);
+		nfree(state->queryVector);
 	if (state->ftsQuery)
-		NDB_FREE(state->ftsQuery);
+		nfree(state->ftsQuery);
 }
 
 /*

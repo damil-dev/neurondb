@@ -1,6 +1,9 @@
 -- Basic tests for GPU search functions
 -- Tests the fixed GPU HNSW and IVF search functions
 
+-- Cleanup from previous runs
+DROP TABLE IF EXISTS gpu_search_test CASCADE;
+
 -- Setup test data
 CREATE TABLE gpu_search_test (
 	id serial PRIMARY KEY,

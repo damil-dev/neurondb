@@ -36,11 +36,12 @@ rebuild_hnsw_safe(PG_FUNCTION_ARGS)
 {
 	text	   *index_name = PG_GETARG_TEXT_PP(0);
 	bool		resume = PG_GETARG_BOOL(1);
-	char	   *idx_str;
+	char *idx_str = NULL;
 	int64		vectors_processed = 0;
 	int64		checkpoint_id = 0;
 
-	NDB_DECLARE(NdbSpiSession *, session);
+	NdbSpiSession *session = NULL;
+	NdbSpiSession *session2 = NULL;
 
 	idx_str = text_to_cstring(index_name);
 
@@ -54,8 +55,6 @@ rebuild_hnsw_safe(PG_FUNCTION_ARGS)
 				(errcode(ERRCODE_INTERNAL_ERROR),
 				 errmsg("neurondb: failed to begin SPI session in "
 						"rebuild_hnsw_safe")));
-
-	NDB_DECLARE(NdbSpiSession *, session2);
 
 	if (resume)
 	{
@@ -130,7 +129,7 @@ rebuild_hnsw_safe(PG_FUNCTION_ARGS)
 				vectors_processed = 0;
 			}
 		}
-		NDB_FREE(sql.data);
+		nfree(sql.data);
 	}
 
 	ndb_spi_session_end(&session);
@@ -181,10 +180,10 @@ save_rebuild_checkpoint(PG_FUNCTION_ARGS)
 	text	   *index_name = PG_GETARG_TEXT_PP(0);
 	int64		vector_offset = PG_GETARG_INT64(1);
 	text	   *state_json = PG_GETARG_TEXT_PP(2);
-	char	   *idx_str;
-	char	   *state_str;
+	char *idx_str = NULL;
+	char *state_str = NULL;
 
-	NDB_DECLARE(NdbSpiSession *, session2);
+	NdbSpiSession *session2 = NULL;
 
 	idx_str = text_to_cstring(index_name);
 	state_str = text_to_cstring(state_json);
@@ -214,10 +213,10 @@ Datum
 load_rebuild_checkpoint(PG_FUNCTION_ARGS)
 {
 	text	   *index_name = PG_GETARG_TEXT_PP(0);
-	text	   *checkpoint_data;
-	char	   *idx_str;
+	text *checkpoint_data = NULL;
+	char *idx_str = NULL;
 
-	NDB_DECLARE(NdbSpiSession *, session3);
+	NdbSpiSession *session3 = NULL;
 
 	idx_str = text_to_cstring(index_name);
 

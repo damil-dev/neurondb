@@ -50,9 +50,9 @@ PG_FUNCTION_INFO_V1(auto_route_query);
 Datum
 auto_route_query(PG_FUNCTION_ARGS)
 {
-	text	   *query;
+	text *query = NULL;
 	int32		embedding_length;
-	char	   *query_str = NULL;
+	char *query_str = NULL;
 	bool		use_ann = false;
 
 	if (PG_ARGISNULL(0))
@@ -85,7 +85,7 @@ auto_route_query(PG_FUNCTION_ARGS)
 		 embedding_length);
 
 	if (query_str)
-		NDB_FREE(query_str);
+		nfree(query_str);
 
 	PG_RETURN_BOOL(use_ann);
 }
@@ -97,15 +97,15 @@ PG_FUNCTION_INFO_V1(learn_from_query);
 Datum
 learn_from_query(PG_FUNCTION_ARGS)
 {
-	text	   *query;
+	text *query = NULL;
 	float4		actual_recall;
 	int32		latency_ms;
-	char	   *query_str = NULL;
+	char *query_str = NULL;
 	uint64		fingerprint = 5381ULL;	/* djb2 init */
 	int			i;
 	bool		found = false;
 
-	NDB_DECLARE(NdbSpiSession *, session);
+	NdbSpiSession *session = NULL;
 
 	if (PG_ARGISNULL(0))
 		ereport(ERROR, (errmsg("learn_from_query: query is NULL")));
@@ -178,7 +178,7 @@ learn_from_query(PG_FUNCTION_ARGS)
 		}
 
 		if (sql.data)
-			NDB_FREE(sql.data);
+			nfree(sql.data);
 	}
 
 	if (found)
@@ -207,7 +207,7 @@ learn_from_query(PG_FUNCTION_ARGS)
 		{
 			ndb_spi_session_end(&session);
 			if (query_str)
-				NDB_FREE(query_str);
+				nfree(query_str);
 			ereport(ERROR,
 					(errmsg("learn_from_query: NULL detected in "
 							"stats fields")));
@@ -256,17 +256,17 @@ learn_from_query(PG_FUNCTION_ARGS)
 			if (ndb_spi_execute(session, usql.data, false, 0) != SPI_OK_UPDATE)
 			{
 				if (usql.data)
-					NDB_FREE(usql.data);
+					nfree(usql.data);
 				ndb_spi_session_end(&session);
 				if (query_str)
-					NDB_FREE(query_str);
+					nfree(query_str);
 				ereport(ERROR,
 						(errmsg("learn_from_query: failed to "
 								"UPDATE "
 								"neurondb_query_history")));
 			}
 			if (usql.data)
-				NDB_FREE(usql.data);
+				nfree(usql.data);
 		}
 	}
 	else
@@ -289,20 +289,20 @@ learn_from_query(PG_FUNCTION_ARGS)
 		if (ndb_spi_execute(session, isql.data, false, 0) != SPI_OK_INSERT)
 		{
 			if (isql.data)
-				NDB_FREE(isql.data);
+				nfree(isql.data);
 			ndb_spi_session_end(&session);
 			if (query_str)
-				NDB_FREE(query_str);
+				nfree(query_str);
 			ereport(ERROR,
 					(errmsg("learn_from_query: failed to INSERT "
 							"neurondb_query_history")));
 		}
 		if (isql.data)
-			NDB_FREE(isql.data);
+			nfree(isql.data);
 	}
 
 	if (query_str)
-		NDB_FREE(query_str);
+		nfree(query_str);
 
 	ndb_spi_session_end(&session);
 
@@ -369,7 +369,7 @@ PG_FUNCTION_INFO_V1(scale_precision);
 Datum
 scale_precision(PG_FUNCTION_ARGS)
 {
-	Vector	   *input;
+	Vector *input = NULL;
 	float4		memory_pressure;
 	float4		recall_target;
 	int			target_precision;
@@ -423,7 +423,7 @@ scale_precision(PG_FUNCTION_ARGS)
 
 	if (target_precision == 8)
 	{
-		int8_t	   *int8buf = NULL;
+		int8_t *int8buf = NULL;
 		int			k;
 
 		int8buf = (int8_t *) palloc0(sizeof(int8_t) * input->dim);
@@ -436,7 +436,7 @@ scale_precision(PG_FUNCTION_ARGS)
 		for (k = 0; k < input->dim; k++)
 			result->data[k] = (float4) int8buf[k];
 
-		NDB_FREE(int8buf);
+		nfree(int8buf);
 	}
 	else if (target_precision == 16)
 	{
@@ -464,11 +464,11 @@ PG_FUNCTION_INFO_V1(prefetch_entry_points);
 Datum
 prefetch_entry_points(PG_FUNCTION_ARGS)
 {
-	text	   *index_name;
-	char	   *idx_str = NULL;
+	text *index_name = NULL;
+	char *idx_str = NULL;
 	int			prefetched_count = 0;
 
-	NDB_DECLARE(NdbSpiSession *, session);
+	NdbSpiSession *session = NULL;
 
 	if (PG_ARGISNULL(0))
 		ereport(ERROR,
@@ -491,7 +491,7 @@ prefetch_entry_points(PG_FUNCTION_ARGS)
 	if (session == NULL)
 	{
 		if (idx_str)
-			NDB_FREE(idx_str);
+			nfree(idx_str);
 		ereport(ERROR,
 				(errmsg("prefetch_entry_points: failed to begin SPI session")));
 	}
@@ -536,13 +536,13 @@ prefetch_entry_points(PG_FUNCTION_ARGS)
 			}
 		}
 		if (sql.data)
-			NDB_FREE(sql.data);
+			nfree(sql.data);
 	}
 
 	ndb_spi_session_end(&session);
 
 	if (idx_str)
-		NDB_FREE(idx_str);
+		nfree(idx_str);
 
 	elog(DEBUG1,
 		 "neurondb:prefetch_entry_points: prefetched_count=%d",

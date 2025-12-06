@@ -219,10 +219,10 @@ temporal_rerank_results(ItemPointer * items,
 			timestamps[idx] = sort_items[idx].timestamp;
 		}
 
-		NDB_FREE(sort_items);
+		nfree(sort_items);
 	}
 
-	NDB_FREE(scores);
+	nfree(scores);
 
 }
 
@@ -271,7 +271,7 @@ neurondb_temporal_filter(PG_FUNCTION_ARGS)
 static TemporalConfig *
 temporal_create_config(float4 decayRate, float4 recencyWeight)
 {
-	TemporalConfig *config;
+	TemporalConfig *config = NULL;
 
 	config = (TemporalConfig *) palloc0(sizeof(TemporalConfig));
 	NDB_CHECK_ALLOC(config, "config");
@@ -309,7 +309,7 @@ temporal_integrate_hnsw_search(Relation heapRel,
 	snapshot = GetActiveSnapshot();
 	if (snapshot == NULL)
 		snapshot = GetTransactionSnapshot();
-		tupdesc = RelationGetDescr(heapRel);
+	tupdesc = RelationGetDescr(heapRel);
 
 	if (timestampColumnName != NULL && strlen(timestampColumnName) > 0)
 	{
@@ -382,8 +382,8 @@ temporal_integrate_hnsw_search(Relation heapRel,
 
 	temporal_rerank_results(items, distances, timestamps, resultCount, config);
 
-	NDB_FREE(timestamps);
-	NDB_FREE(config);
+	nfree(timestamps);
+	nfree(config);
 }
 
 static TimestampTz

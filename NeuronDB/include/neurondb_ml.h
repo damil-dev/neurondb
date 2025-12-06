@@ -21,5 +21,6 @@ float	  **neurondb_fetch_vectors_from_table(const char *table,
 											  const char *col,
 											  int *out_count,
 											  int *out_dim);
+void		neurondb_free_vectors(float **data, int nvec);
 
 #endif							/* NEURONDB_ML_H */

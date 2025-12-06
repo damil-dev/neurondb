@@ -61,7 +61,7 @@ generate_grid_combinations(Jsonb * param_grid,
 	{
 		if (r == WJB_KEY)
 		{
-			char	   *key;
+			char *key = NULL;
 			JsonbValue	vals_array;
 
 			key = pnstrdup(v.val.string.val, v.val.string.len);
@@ -82,7 +82,7 @@ generate_grid_combinations(Jsonb * param_grid,
 					lappend(*param_names, pstrdup(key));
 				*value_lists = lappend(*value_lists, values);
 			}
-			NDB_FREE(key);
+			nfree(key);
 		}
 	}
 
@@ -94,16 +94,15 @@ generate_grid_combinations(Jsonb * param_grid,
 
 	{
 		int			n_params = list_length(*param_names);
-		int		   *indices;
-		bool		done = false;
+		int *indices = NULL;		bool		done = false;
 
 		indices = (int *) palloc0(sizeof(int) * n_params);
 
 		do
 		{
 			List	   *one_comb = NIL;
-			ListCell   *name_cell;
-			ListCell   *values_cell;
+			ListCell *name_cell = NULL;
+			ListCell *values_cell = NULL;
 			int			pi = 0;
 
 			forboth(name_cell,
@@ -139,7 +138,7 @@ generate_grid_combinations(Jsonb * param_grid,
 			}
 		} while (!done);
 
-		NDB_FREE(indices);
+		nfree(indices);
 	}
 }
 
@@ -149,10 +148,10 @@ generate_grid_combinations(Jsonb * param_grid,
 static Jsonb *
 build_param_jsonb(List * param_names, List * param_values)
 {
-	NDB_DECLARE(JsonbParseState *, state);
-	ListCell   *ncell;
-	ListCell   *vcell;
-	Jsonb	   *result;
+	JsonbParseState *state = NULL;
+	ListCell *ncell = NULL;
+	ListCell *vcell = NULL;
+	Jsonb *result = NULL;
 
 	(void) pushJsonbValue(&state, WJB_BEGIN_OBJECT, NULL);
 
@@ -160,7 +159,7 @@ build_param_jsonb(List * param_names, List * param_values)
 	{
 		char	   *key = (char *) lfirst(ncell);
 		JsonbValue	k;
-		JsonbValue *v;
+		JsonbValue *v = NULL;
 
 		k.type = jbvString;
 		k.val.string.len = strlen(key);
@@ -187,7 +186,7 @@ actual_crossval(const char *algo, Jsonb * param_json, int folds)
 	int			ret;
 	StringInfoData cmd;
 
-	NDB_DECLARE(NdbSpiSession *, spi_session);
+	NdbSpiSession *spi_session = NULL;
 	MemoryContext oldcontext = CurrentMemoryContext;
 
 	NDB_SPI_SESSION_BEGIN(spi_session, oldcontext);
@@ -282,27 +281,27 @@ actual_crossval(const char *algo, Jsonb * param_json, int folds)
 Datum
 neurondb_grid_search(PG_FUNCTION_ARGS)
 {
-	FuncCallContext *funcctx;
+	FuncCallContext *funcctx = NULL;
 	typedef struct grid_search_ctx
 	{
-		List	   *all_results;
+		List *all_results;
 		int			curr;
 	}			grid_search_ctx;
 
 	if (SRF_IS_FIRSTCALL())
 	{
 		MemoryContext oldcontext;
-		text	   *algorithm_text;
-		Jsonb	   *param_grid;
+		text *algorithm_text = NULL;
+		Jsonb *param_grid = NULL;
 		int32		cv_folds;
-		char	   *algo;
+		char *algo = NULL;
 		List	   *param_names = NIL;
 		List	   *value_lists = NIL;
 		List	   *combinations = NIL;
-		grid_search_ctx *ctx;
+		grid_search_ctx *ctx = NULL;
 		List	   *all_results = NIL;
 		int			model_id = 1;
-		ListCell   *comb_cell;
+		ListCell *comb_cell = NULL;
 		TupleDesc	tupdesc = NULL;
 		Oid			argtypes[3] = {JSONBOID, FLOAT8OID, INT4OID};
 
@@ -352,7 +351,7 @@ neurondb_grid_search(PG_FUNCTION_ARGS)
 
 			list_free_deep(param_values);
 			if (jbcomb)
-				NDB_FREE(jbcomb);
+				nfree(jbcomb);
 		}
 		list_free_deep(combinations);
 		list_free_deep(param_names);
@@ -380,10 +379,12 @@ neurondb_grid_search(PG_FUNCTION_ARGS)
 		else
 		{
 			list_free_deep(ctx->all_results);
-			NDB_FREE(ctx);
+			nfree(ctx);
 			SRF_RETURN_DONE(funcctx);
 		}
 	}
+	/* Should never reach here, but satisfy compiler */
+	return (Datum) 0;
 }
 
 /*
@@ -403,7 +404,7 @@ random_sample_parameters(Jsonb * param_distributions,
 	{
 		if (r == WJB_KEY)
 		{
-			char	   *key;
+			char *key = NULL;
 			JsonbValue	arr_value;
 
 			key = pnstrdup(v.val.string.val, v.val.string.len);
@@ -431,7 +432,7 @@ random_sample_parameters(Jsonb * param_distributions,
 										   copyObject(picked));
 				}
 			}
-			NDB_FREE(key);
+			nfree(key);
 		}
 	}
 }
@@ -444,22 +445,22 @@ random_sample_parameters(Jsonb * param_distributions,
 Datum
 neurondb_random_search(PG_FUNCTION_ARGS)
 {
-	FuncCallContext *funcctx;
+	FuncCallContext *funcctx = NULL;
 	typedef struct random_search_ctx
 	{
-		List	   *results;
+		List *results;
 		int			curr;
 	}			random_search_ctx;
 
 	if (SRF_IS_FIRSTCALL())
 	{
 		MemoryContext oldcontext;
-		text	   *algorithm_text;
-		Jsonb	   *param_distributions;
+		text *algorithm_text = NULL;
+		Jsonb *param_distributions = NULL;
 		int32		n_iter;
 		int32		cv_folds;
-		char	   *algo;
-		random_search_ctx *ctx;
+		char *algo = NULL;
+		random_search_ctx *ctx = NULL;
 		List	   *results = NIL;
 		int			model_id = 1;
 		TupleDesc	tupdesc = NULL;
@@ -518,7 +519,7 @@ neurondb_random_search(PG_FUNCTION_ARGS)
 				list_free_deep(names);
 				list_free_deep(vals);
 				if (jbcomb)
-					NDB_FREE(jbcomb);
+					nfree(jbcomb);
 			}
 		}
 		ctx->results = results;
@@ -544,10 +545,12 @@ neurondb_random_search(PG_FUNCTION_ARGS)
 		else
 		{
 			list_free_deep(ctx->results);
-			NDB_FREE(ctx);
+			nfree(ctx);
 			SRF_RETURN_DONE(funcctx);
 		}
 	}
+	/* Should never reach here, but satisfy compiler */
+	return (Datum) 0;
 }
 
 /*
@@ -568,7 +571,7 @@ bayes_sample_parameters(Jsonb * param_space,
 	{
 		if (r == WJB_KEY)
 		{
-			char	   *key;
+			char *key = NULL;
 			JsonbValue	arr_value;
 
 			key = pnstrdup(v.val.string.val, v.val.string.len);
@@ -586,7 +589,7 @@ bayes_sample_parameters(Jsonb * param_space,
 				*values_list = lappend(
 									   *values_list, copyObject(picked));
 			}
-			NDB_FREE(key);
+			nfree(key);
 		}
 	}
 }
@@ -599,10 +602,10 @@ bayes_sample_parameters(Jsonb * param_space,
 Datum
 neurondb_bayesian_optimize(PG_FUNCTION_ARGS)
 {
-	FuncCallContext *funcctx;
+	FuncCallContext *funcctx = NULL;
 	typedef struct bayes_opt_ctx
 	{
-		List	   *results;
+		List *results;
 		int			best_model_idx;
 		int			curr;
 	}			bayes_opt_ctx;
@@ -610,13 +613,13 @@ neurondb_bayesian_optimize(PG_FUNCTION_ARGS)
 	if (SRF_IS_FIRSTCALL())
 	{
 		MemoryContext oldcontext;
-		text	   *algorithm_text;
-		Jsonb	   *param_space;
+		text *algorithm_text = NULL;
+		Jsonb *param_space = NULL;
 		int32		n_calls;
-		text	   *acquisition_text;
-		char	   *algo;
-		char	   *acquisition;
-		bayes_opt_ctx *ctx;
+		text *acquisition_text = NULL;
+		char *algo = NULL;
+		char *acquisition = NULL;
+		bayes_opt_ctx *ctx = NULL;
 		List	   *results = NIL;
 		int			model_id = 1;
 		float8		best_score = -HUGE_VAL;
@@ -660,7 +663,7 @@ neurondb_bayesian_optimize(PG_FUNCTION_ARGS)
 			bayes_sample_parameters(param_space, i, &names, &vals);
 
 			{
-				Jsonb	   *jbcomb;
+				Jsonb *jbcomb = NULL;
 				float8		score;
 				Datum		values[3];
 				bool		nulls[3] = {false, false, false};
@@ -688,7 +691,7 @@ neurondb_bayesian_optimize(PG_FUNCTION_ARGS)
 				list_free_deep(names);
 				list_free_deep(vals);
 				if (jbcomb)
-					NDB_FREE(jbcomb);
+					nfree(jbcomb);
 			}
 		}
 		ctx->results = results;
@@ -713,8 +716,10 @@ neurondb_bayesian_optimize(PG_FUNCTION_ARGS)
 		else
 		{
 			list_free_deep(ctx->results);
-			NDB_FREE(ctx);
+			nfree(ctx);
 			SRF_RETURN_DONE(funcctx);
 		}
 	}
+	/* Should never reach here, but satisfy compiler */
+	return (Datum) 0;
 }

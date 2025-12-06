@@ -37,7 +37,7 @@ typedef struct ANNBufferControl
 	ANNBufferEntry entries[FLEXIBLE_ARRAY_MEMBER];
 }			ANNBufferControl;
 
-static ANNBufferControl * ann_buffer_control = NULL;
+static ANNBufferControl *ann_buffer_control = NULL;
 
 static void
 __attribute__((unused))

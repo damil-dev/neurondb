@@ -117,7 +117,7 @@ neuranllm_main(Datum main_arg)
 				int			ret;
 				uint64		table_check_processed;
 
-				NDB_DECLARE(NdbSpiSession *, session);
+				NdbSpiSession *session = NULL;
 
 				session = ndb_spi_session_begin(CurrentMemoryContext, false);
 				if (session == NULL)
@@ -264,7 +264,7 @@ process_llm_job(int job_id, const char *job_type, const char *payload)
 	NdbLLMResp	resp;
 	StringInfoData result_json;
 	NdbLLMCallOptions call_opts;
-	char	   *error_msg = NULL;
+	char *error_msg = NULL;
 	int			rc = -1;
 
 	job_ctx = AllocSetContextCreate(
@@ -395,9 +395,9 @@ process_llm_job(int job_id, const char *job_type, const char *payload)
 									   result_json.data,
 									   NULL);
 
-					NDB_FREE(vec_str);
+					nfree(vec_str);
 					vec_str = NULL;
-					NDB_FREE(vec);
+					nfree(vec);
 					vec = NULL;
 				}
 				else
@@ -442,17 +442,17 @@ process_llm_job(int job_id, const char *job_type, const char *payload)
 
 	if (result_json.data)
 	{
-		NDB_FREE(result_json.data);
+		nfree(result_json.data);
 		result_json.data = NULL;
 	}
 	if (resp.json)
 	{
-		NDB_FREE(resp.json);
+		nfree(resp.json);
 		resp.json = NULL;
 	}
 	if (error_msg)
 	{
-		NDB_FREE(error_msg);
+		nfree(error_msg);
 		error_msg = NULL;
 	}
 

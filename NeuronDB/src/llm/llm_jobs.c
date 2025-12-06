@@ -41,7 +41,7 @@ ndb_llm_job_enqueue(const char *job_type, const char *payload)
 	Oid			argtypes[2] = {TEXTOID, JSONBOID};
 	Datum		values[2];
 
-	NDB_DECLARE(NdbSpiSession *, session);
+	NdbSpiSession *session = NULL;
 
 	/* Validate inputs */
 	if (!job_type || strlen(job_type) == 0)
@@ -96,7 +96,7 @@ ndb_llm_job_enqueue(const char *job_type, const char *payload)
 											 &isnull));
 		if (isnull)
 		{
-			NDB_FREE(query.data);
+			nfree(query.data);
 			ndb_spi_session_end(&session);
 			ereport(ERROR,
 					(errmsg("Job ID returned as NULL after "
@@ -105,13 +105,13 @@ ndb_llm_job_enqueue(const char *job_type, const char *payload)
 	}
 	else
 	{
-		NDB_FREE(query.data);
+		nfree(query.data);
 		ndb_spi_session_end(&session);
 		ereport(ERROR,
 				(errmsg("Failed to insert llm job: %s", query.data)));
 	}
 
-	NDB_FREE(query.data);
+	nfree(query.data);
 	ndb_spi_session_end(&session);
 	return job_id;
 }
@@ -128,7 +128,7 @@ ndb_llm_job_acquire(int *job_id, char **job_type, char **payload)
 	bool		found = false;
 	StringInfoData query;
 
-	NDB_DECLARE(NdbSpiSession *, session);
+	NdbSpiSession *session = NULL;
 
 	/* Must be called within an active transaction */
 	if (!IsTransactionState())
@@ -186,7 +186,7 @@ ndb_llm_job_acquire(int *job_id, char **job_type, char **payload)
 		}
 	}
 
-	NDB_FREE(query.data);
+	nfree(query.data);
 	ndb_spi_session_end(&session);
 	return found;
 }
@@ -209,7 +209,7 @@ ndb_llm_job_update(int job_id,
 	Datum		values[4];
 	bool		ok = false;
 
-	NDB_DECLARE(NdbSpiSession *, session);
+	NdbSpiSession *session = NULL;
 
 	if (job_id <= 0)
 		ereport(ERROR,
@@ -256,7 +256,7 @@ ndb_llm_job_update(int job_id,
 				ok = true;
 		}
 	}
-	NDB_FREE(query.data);
+	nfree(query.data);
 	ndb_spi_session_end(&session);
 	return ok;
 }
@@ -272,7 +272,7 @@ ndb_llm_job_prune(int max_age_days)
 	StringInfoData query;
 	int			days;
 
-	NDB_DECLARE(NdbSpiSession *, session);
+	NdbSpiSession *session = NULL;
 
 	days = (max_age_days > 0) ? max_age_days : 7;
 	session = ndb_spi_session_begin(CurrentMemoryContext, false);
@@ -293,7 +293,7 @@ ndb_llm_job_prune(int max_age_days)
 		deleted = SPI_processed;
 	}
 
-	NDB_FREE(query.data);
+	nfree(query.data);
 	ndb_spi_session_end(&session);
 	return deleted;
 }
@@ -310,7 +310,7 @@ ndb_llm_job_count_status(const char *status)
 	Oid			argtypes[1] = {TEXTOID};
 	Datum		values[1];
 
-	NDB_DECLARE(NdbSpiSession *, session);
+	NdbSpiSession *session = NULL;
 
 	if (!status || strlen(status) == 0)
 		ereport(ERROR,
@@ -341,7 +341,7 @@ ndb_llm_job_count_status(const char *status)
 		if (isnull)
 			count = 0;
 	}
-	NDB_FREE(query.data);
+	nfree(query.data);
 	ndb_spi_session_end(&session);
 	return count;
 }
@@ -359,7 +359,7 @@ ndb_llm_job_retry_failed(int max_retries)
 	Oid			argtypes[1] = {INT4OID};
 	Datum		values[1];
 
-	NDB_DECLARE(NdbSpiSession *, session);
+	NdbSpiSession *session = NULL;
 
 	if (max_retries < 1)
 		ereport(ERROR, (errmsg("max_retries must be >= 1")));
@@ -386,7 +386,7 @@ ndb_llm_job_retry_failed(int max_retries)
 		== SPI_OK_UPDATE)
 		retried = SPI_processed;
 
-	NDB_FREE(query.data);
+	nfree(query.data);
 	ndb_spi_session_end(&session);
 	return retried;
 }
@@ -401,7 +401,7 @@ ndb_llm_job_clear(void)
 {
 	StringInfoData query;
 
-	NDB_DECLARE(NdbSpiSession *, session);
+	NdbSpiSession *session = NULL;
 	session = ndb_spi_session_begin(CurrentMemoryContext, false);
 	if (session == NULL)
 		ereport(ERROR,
@@ -414,11 +414,11 @@ ndb_llm_job_clear(void)
 
 	if (ndb_spi_execute(session, query.data, false, 0) != SPI_OK_UTILITY)
 	{
-		NDB_FREE(query.data);
+		nfree(query.data);
 		ndb_spi_session_end(&session);
 		ereport(ERROR, (errmsg("Failed to truncate llm jobs table")));
 	}
 
-	NDB_FREE(query.data);
+	nfree(query.data);
 	ndb_spi_session_end(&session);
 }

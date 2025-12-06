@@ -31,9 +31,9 @@ PG_FUNCTION_INFO_V1(vector_cross_product);
 Datum
 vector_cross_product(PG_FUNCTION_ARGS)
 {
-	Vector	   *a;
-	Vector	   *b;
-	Vector	   *result;
+	Vector *a = NULL;
+	Vector *b = NULL;
+	Vector *result = NULL;
 
 	if (PG_NARGS() != 2)
 		ereport(ERROR,
@@ -79,9 +79,9 @@ PG_FUNCTION_INFO_V1(vector_percentile);
 Datum
 vector_percentile(PG_FUNCTION_ARGS)
 {
-	Vector	   *vec;
+	Vector *vec = NULL;
 	float8		p;
-	float4	   *sorted;
+	float4 *sorted = NULL;
 	float4		result;
 	int			i;
 	int			j;
@@ -115,7 +115,7 @@ vector_percentile(PG_FUNCTION_ARGS)
 
 	/* Copy and sort */
 	sorted = NULL;
-	NDB_ALLOC(sorted, float4, vec->dim);
+	nalloc(sorted, float4, vec->dim);
 	if (sorted == NULL)
 		ereport(ERROR,
 				(errcode(ERRCODE_OUT_OF_MEMORY),
@@ -143,7 +143,7 @@ vector_percentile(PG_FUNCTION_ARGS)
 	if (idx >= vec->dim)
 		idx = vec->dim - 1;
 	result = sorted[idx];
-	NDB_FREE(sorted);
+	nfree(sorted);
 
 	PG_RETURN_FLOAT4(result);
 }
@@ -172,12 +172,12 @@ PG_FUNCTION_INFO_V1(vector_quantile);
 Datum
 vector_quantile(PG_FUNCTION_ARGS)
 {
-	Vector	   *vec;
-	ArrayType  *quantiles_arr;
-	ArrayType  *result;
-	Datum	   *elems;
-	bool	   *nulls;
-	float8	   *quantiles;
+	Vector *vec = NULL;
+	ArrayType *quantiles_arr = NULL;
+	ArrayType *result = NULL;
+	Datum *elems = NULL;
+	bool *nulls = NULL;
+	float8 *quantiles = NULL;
 	int			n_quantiles;
 	int			i;
 
@@ -226,8 +226,8 @@ vector_quantile(PG_FUNCTION_ARGS)
 
 	elems = NULL;
 	nulls = NULL;
-	NDB_ALLOC(elems, Datum, n_quantiles);
-	NDB_ALLOC(nulls, bool, n_quantiles);
+	nalloc(elems, Datum, n_quantiles);
+	nalloc(nulls, bool, n_quantiles);
 	if (elems == NULL || nulls == NULL)
 		ereport(ERROR,
 				(errcode(ERRCODE_OUT_OF_MEMORY),
@@ -250,8 +250,8 @@ vector_quantile(PG_FUNCTION_ARGS)
 	}
 
 	result = construct_array(elems, n_quantiles, FLOAT4OID, sizeof(float4), true, 'i');
-	NDB_FREE(elems);
-	NDB_FREE(nulls);
+	nfree(elems);
+	nfree(nulls);
 
 	PG_RETURN_ARRAYTYPE_P(result);
 }
@@ -260,10 +260,10 @@ PG_FUNCTION_INFO_V1(vector_scale);
 Datum
 vector_scale(PG_FUNCTION_ARGS)
 {
-	Vector	   *vec;
-	ArrayType  *scale_arr;
-	Vector	   *result;
-	float4	   *scales;
+	Vector *vec = NULL;
+	ArrayType *scale_arr = NULL;
+	Vector *result = NULL;
+	float4 *scales = NULL;
 	int			i;
 
 	if (PG_NARGS() != 2)
@@ -324,9 +324,9 @@ PG_FUNCTION_INFO_V1(vector_translate);
 Datum
 vector_translate(PG_FUNCTION_ARGS)
 {
-	Vector	   *vec;
-	Vector	   *offset;
-	Vector	   *result;
+	Vector *vec = NULL;
+	Vector *offset = NULL;
+	Vector *result = NULL;
 	int			i;
 
 	if (PG_NARGS() != 2)
@@ -371,10 +371,10 @@ PG_FUNCTION_INFO_V1(vector_filter);
 Datum
 vector_filter(PG_FUNCTION_ARGS)
 {
-	Vector	   *vec;
-	ArrayType  *mask_arr;
-	Vector	   *result;
-	bool	   *mask;
+	Vector *vec = NULL;
+	ArrayType *mask_arr = NULL;
+	Vector *result = NULL;
+	bool *mask = NULL;
 	int			dim;
 	int			i;
 	int			j;
@@ -446,10 +446,10 @@ PG_FUNCTION_INFO_V1(vector_where);
 Datum
 vector_where(PG_FUNCTION_ARGS)
 {
-	Vector	   *condition;
-	Vector	   *value;
+	Vector *condition = NULL;
+	Vector *value = NULL;
 	float4		else_value;
-	Vector	   *result;
+	Vector *result = NULL;
 	int			i;
 
 	if (PG_NARGS() != 3)

@@ -67,7 +67,7 @@ typedef struct RfGpuModelCacheEntry
 	NdbCudaRfGpuModel *gpu_model;
 }			RfGpuModelCacheEntry;
 
-static HTAB * rf_gpu_model_cache = NULL;
+static HTAB *rf_gpu_model_cache = NULL;
 static bool rf_cache_initialized = false;
 
 static void rf_gpu_cache_init(void);
@@ -216,7 +216,7 @@ ndb_cuda_rf_pack_model(const RFModel *model,
 		return -1;
 	}
 
-	NDB_ALLOC(blob_raw, char, VARHDRSZ + payload_bytes);
+	nalloc(blob_raw, char, VARHDRSZ + payload_bytes);
 	blob = (bytea *) blob_raw;
 	SET_VARSIZE(blob, VARHDRSZ + payload_bytes);
 	base = VARDATA(blob);
@@ -285,14 +285,14 @@ ndb_cuda_rf_train(const float *features,
 {
 	const int	default_n_trees = 32;
 	int			n_trees = default_n_trees;
-	NDB_DECLARE(int *, label_ints);
-	NDB_DECLARE(int *, class_counts);
-	NDB_DECLARE(int *, best_left_counts);
-	NDB_DECLARE(int *, best_right_counts);
-	NDB_DECLARE(int *, tmp_left_counts);
-	NDB_DECLARE(int *, tmp_right_counts);
-	NDB_DECLARE(bytea *, payload);
-	NDB_DECLARE(char *, payload_raw);
+	int *label_ints = NULL;
+	int *class_counts = NULL;
+	int *best_left_counts = NULL;
+	int *best_right_counts = NULL;
+	int *tmp_left_counts = NULL;
+	int *tmp_right_counts = NULL;
+	bytea *payload = NULL;
+	char *payload_raw = NULL;
 	Jsonb	   *metrics_json = NULL;
 	float	   *d_features = NULL;
 	int		   *d_labels = NULL;
@@ -350,12 +350,12 @@ ndb_cuda_rf_train(const float *features,
 				*errstr = pstrdup("CUDA RF train: allocation size exceeds MaxAllocSize");
 			return -1;
 		}
-		NDB_ALLOC(label_ints, int, n_samples);
-		NDB_ALLOC(class_counts, int, class_count);
-		NDB_ALLOC(tmp_left_counts, int, class_count);
-		NDB_ALLOC(tmp_right_counts, int, class_count);
-		NDB_ALLOC(best_left_counts, int, class_count);
-		NDB_ALLOC(best_right_counts, int, class_count);
+		nalloc(label_ints, int, n_samples);
+		nalloc(class_counts, int, class_count);
+		nalloc(tmp_left_counts, int, class_count);
+		nalloc(tmp_right_counts, int, class_count);
+		nalloc(best_left_counts, int, class_count);
+		nalloc(best_right_counts, int, class_count);
 		if (label_ints == NULL || class_counts == NULL ||
 			tmp_left_counts == NULL || tmp_right_counts == NULL ||
 			best_left_counts == NULL || best_right_counts == NULL)
@@ -363,17 +363,17 @@ ndb_cuda_rf_train(const float *features,
 			if (errstr)
 				*errstr = pstrdup("CUDA RF train: palloc failed");
 			if (label_ints)
-				NDB_FREE(label_ints);
+				nfree(label_ints);
 			if (class_counts)
-				NDB_FREE(class_counts);
+				nfree(class_counts);
 			if (tmp_left_counts)
-				NDB_FREE(tmp_left_counts);
+				nfree(tmp_left_counts);
 			if (tmp_right_counts)
-				NDB_FREE(tmp_right_counts);
+				nfree(tmp_right_counts);
 			if (best_left_counts)
-				NDB_FREE(best_left_counts);
+				nfree(best_left_counts);
 			if (best_right_counts)
-				NDB_FREE(best_right_counts);
+				nfree(best_right_counts);
 			return -1;
 		}
 	}
@@ -397,12 +397,12 @@ ndb_cuda_rf_train(const float *features,
 
 	{
 		NdbCudaRfModelHeader model_hdr;
-		NdbCudaRfTreeHeader *tree_hdrs;
-		NdbCudaRfNode *nodes;
+		NdbCudaRfTreeHeader *tree_hdrs = NULL;
+		NdbCudaRfNode *nodes = NULL;
 		int			total_nodes = n_trees * 3;
 		size_t		header_bytes;
 		size_t		payload_bytes;
-		char	   *base;
+		char *base = NULL;
 		int			majority_class = 0;
 		int			best_count = class_counts[0];
 		double		majority_fraction;
@@ -476,7 +476,7 @@ ndb_cuda_rf_train(const float *features,
 				*errstr = pstrdup("CUDA RF train: payload size exceeds MaxAllocSize");
 			goto gpu_fail;
 		}
-		NDB_ALLOC(payload_raw, char, VARHDRSZ + payload_bytes);
+		nalloc(payload_raw, char, VARHDRSZ + payload_bytes);
 		payload = (bytea *) payload_raw;
 		SET_VARSIZE(payload, VARHDRSZ + payload_bytes);
 		base = VARDATA(payload);
@@ -686,19 +686,19 @@ gpu_cleanup:
 	if (d_right_counts)
 		cudaFree(d_right_counts);
 	if (label_ints)
-		NDB_FREE(label_ints);
+		nfree(label_ints);
 	if (class_counts)
-		NDB_FREE(class_counts);
+		nfree(class_counts);
 	if (tmp_left_counts)
-		NDB_FREE(tmp_left_counts);
+		nfree(tmp_left_counts);
 	if (tmp_right_counts)
-		NDB_FREE(tmp_right_counts);
+		nfree(tmp_right_counts);
 	if (best_left_counts)
-		NDB_FREE(best_left_counts);
+		nfree(best_left_counts);
 	if (best_right_counts)
-		NDB_FREE(best_right_counts);
+		nfree(best_right_counts);
 	if (metrics_json)
-		NDB_FREE(metrics_json);
+		nfree(metrics_json);
 
 	return rc;
 
@@ -901,7 +901,7 @@ ndb_cuda_rf_predict(const bytea * model_data,
 	}
 
 	if (votes)
-		NDB_FREE(votes);
+		nfree(votes);
 
 	return 0;
 }
@@ -941,7 +941,7 @@ static void
 rf_gpu_cache_cleanup(int code, Datum arg)
 {
 	HASH_SEQ_STATUS status;
-	RfGpuModelCacheEntry *entry;
+	RfGpuModelCacheEntry *entry = NULL;
 
 	(void) code;
 	(void) arg;
@@ -999,7 +999,7 @@ ndb_cuda_rf_model_upload(const NdbCudaRfNode *nodes,
 						sizeof(NdbCudaRfNode) * (size_t) total_nodes);
 	if (status != cudaSuccess)
 	{
-		NDB_FREE(model);
+		nfree(model);
 		return -1;
 	}
 
@@ -1009,7 +1009,7 @@ ndb_cuda_rf_model_upload(const NdbCudaRfNode *nodes,
 	if (status != cudaSuccess)
 	{
 		cudaFree(model->d_nodes);
-		NDB_FREE(model);
+		nfree(model);
 		return -1;
 	}
 
@@ -1022,7 +1022,7 @@ ndb_cuda_rf_model_upload(const NdbCudaRfNode *nodes,
 	{
 		cudaFree(model->d_nodes);
 		cudaFree(model->d_trees);
-		NDB_FREE(model);
+		nfree(model);
 		return -1;
 	}
 
@@ -1035,7 +1035,7 @@ ndb_cuda_rf_model_upload(const NdbCudaRfNode *nodes,
 	{
 		cudaFree(model->d_nodes);
 		cudaFree(model->d_trees);
-		NDB_FREE(model);
+		nfree(model);
 		return -1;
 	}
 
@@ -1065,7 +1065,7 @@ ndb_cuda_rf_model_free(NdbCudaRfGpuModel *model)
 		cudaFree(model->d_trees);
 
 	model->is_valid = false;
-	NDB_FREE(model);
+	nfree(model);
 }
 
 /*
@@ -1375,7 +1375,7 @@ ndb_cuda_rf_predict_batch(const bytea * model_data,
 	{
 		cudaFree(d_features);
 		cudaFree(d_votes);
-		NDB_FREE(h_votes);
+		nfree(h_votes);
 		if (errstr)
 			*errstr = psprintf("failed to copy features to GPU: %s",
 							   cudaGetErrorString(status));
@@ -1393,7 +1393,7 @@ ndb_cuda_rf_predict_batch(const bytea * model_data,
 	{
 		cudaFree(d_features);
 		cudaFree(d_votes);
-		NDB_FREE(h_votes);
+		nfree(h_votes);
 		if (errstr)
 			*errstr = psprintf("batch prediction failed: %s",
 							   cudaGetErrorString(cudaGetLastError()));
@@ -1409,7 +1409,7 @@ ndb_cuda_rf_predict_batch(const bytea * model_data,
 	{
 		cudaFree(d_features);
 		cudaFree(d_votes);
-		NDB_FREE(h_votes);
+		nfree(h_votes);
 		if (errstr)
 			*errstr = psprintf("failed to copy votes from GPU: %s",
 							   cudaGetErrorString(status));
@@ -1437,7 +1437,7 @@ ndb_cuda_rf_predict_batch(const bytea * model_data,
 
 	cudaFree(d_features);
 	cudaFree(d_votes);
-	NDB_FREE(h_votes);
+	nfree(h_votes);
 
 	return 0;
 }
@@ -1457,10 +1457,10 @@ ndb_cuda_rf_evaluate_batch(const bytea * model_data,
 						   double *f1_out,
 						   char **errstr)
 {
-	NDB_DECLARE(int *, predictions);
-	NDB_DECLARE(int *, tp);
-	NDB_DECLARE(int *, fp);
-	NDB_DECLARE(int *, fn);
+	int *predictions = NULL;
+	int *tp = NULL;
+	int *fp = NULL;
+	int *fn = NULL;
 	int			class_count;
 	int			i;
 	int			total_correct = 0;
@@ -1505,10 +1505,10 @@ ndb_cuda_rf_evaluate_batch(const bytea * model_data,
 	}
 
 	/* Allocate predictions array */
-	NDB_ALLOC(predictions, int, n_samples);
-	NDB_ALLOC(tp, int, class_count);
-	NDB_ALLOC(fp, int, class_count);
-	NDB_ALLOC(fn, int, class_count);
+	nalloc(predictions, int, n_samples);
+	nalloc(tp, int, class_count);
+	nalloc(fp, int, class_count);
+	nalloc(fn, int, class_count);
 
 	/* Batch predict */
 	rc = ndb_cuda_rf_predict_batch(model_data,
@@ -1520,10 +1520,10 @@ ndb_cuda_rf_evaluate_batch(const bytea * model_data,
 
 	if (rc != 0)
 	{
-		NDB_FREE(predictions);
-		NDB_FREE(tp);
-		NDB_FREE(fp);
-		NDB_FREE(fn);
+		nfree(predictions);
+		nfree(tp);
+		nfree(fp);
+		nfree(fn);
 		return -1;
 	}
 
@@ -1591,10 +1591,10 @@ ndb_cuda_rf_evaluate_batch(const bytea * model_data,
 		*f1_out = 0.0;
 	}
 
-	NDB_FREE(predictions);
-	NDB_FREE(tp);
-	NDB_FREE(fp);
-	NDB_FREE(fn);
+	nfree(predictions);
+	nfree(tp);
+	nfree(fp);
+	nfree(fn);
 
 	return 0;
 }

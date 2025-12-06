@@ -95,7 +95,7 @@ typedef struct PrometheusMetrics
 
 }			PrometheusMetrics;
 
-static PrometheusMetrics * prom_metrics = NULL;
+static PrometheusMetrics *prom_metrics = NULL;
 
 /* Forward declarations */
 static void prometheus_worker_main(Datum arg);
@@ -491,7 +491,7 @@ send_metrics(int socket)
 		ssize_t __w = write(socket, metrics.data, metrics.len);
 		(void) __w;
 	}
-	NDB_FREE(metrics.data);
+	nfree(metrics.data);
 }
 
 /*

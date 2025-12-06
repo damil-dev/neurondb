@@ -378,7 +378,7 @@ neurondb_gpu_get_device_count(void)
 GPUDeviceInfo *
 neurondb_gpu_get_device_info(int device_id)
 {
-	GPUDeviceInfo *info;
+	GPUDeviceInfo *info = NULL;
 	NDBGpuDeviceInfo native;
 
 	info = (GPUDeviceInfo *) palloc0(sizeof(GPUDeviceInfo));
@@ -543,7 +543,7 @@ neurondb_gpu_info(PG_FUNCTION_ARGS)
 	MemoryContext oldcontext;
 	Datum		values[7];
 	bool		nulls[7] = {false, false, false, false, false, false, false};
-	GPUDeviceInfo *info;
+	GPUDeviceInfo *info = NULL;
 
 	if (rsinfo == NULL || !IsA(rsinfo, ReturnSetInfo))
 		ereport(ERROR,
@@ -586,7 +586,7 @@ neurondb_gpu_info(PG_FUNCTION_ARGS)
 	tuplestore_putvalues(rsinfo->setResult, rsinfo->setDesc, values, nulls);
 
 	if (info)
-		NDB_FREE(info);
+		nfree(info);
 
 	return (Datum) 0;
 }

@@ -80,8 +80,8 @@ call_model_predict(int32 model_id, float *features, int n_features)
 				prediction = DatumGetFloat8(result);
 		}
 
-	NDB_FREE(sql.data);
-	NDB_FREE(features_str.data);
+	nfree(sql.data);
+	nfree(features_str.data);
 
 	return prediction;
 }
@@ -105,16 +105,16 @@ Datum
 calculate_shap_values(PG_FUNCTION_ARGS)
 {
 	int32		model_id;
-	ArrayType  *instance;
+	ArrayType *instance = NULL;
 	int			n_samples;
-	float	   *features;
+	float *features = NULL;
 	int			n_features;
 
-	NDB_DECLARE(double *, shap_values);
+	double *shap_values = NULL;
 	int			i,
 				j;
-	ArrayType  *result;
-	Datum	   *result_datums;
+	ArrayType *result = NULL;
+	Datum *result_datums = NULL;
 	StringInfoData query;
 	int			ret;
 
@@ -127,8 +127,8 @@ calculate_shap_values(PG_FUNCTION_ARGS)
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("n_samples must be positive")));
 
-	NDB_DECLARE(NdbSpiSession *, spi_session);
-	NDB_DECLARE(double *, shap_values);
+	NdbSpiSession *spi_session = NULL;
+	double *shap_values = NULL;
 
 	/* Extract features from array */
 	n_features = ARR_DIMS(instance)[0];
@@ -139,7 +139,7 @@ calculate_shap_values(PG_FUNCTION_ARGS)
 	NDB_SPI_SESSION_BEGIN(spi_session, oldcontext);
 
 	/* Initialize SHAP values */
-	NDB_ALLOC(shap_values, double, n_features);
+	nalloc(shap_values, double, n_features);
 
 	/* Kernel SHAP: approximate Shapley values using sampling */
 	/* For each feature, estimate its contribution */
@@ -152,8 +152,8 @@ calculate_shap_values(PG_FUNCTION_ARGS)
 		{
 			int			k;
 
-			NDB_DECLARE(float *, perturbed);
-			NDB_ALLOC(perturbed, float, n_features);
+			float *perturbed = NULL;
+			nalloc(perturbed, float, n_features);
 			double		pred_with,
 						pred_without;
 
@@ -178,7 +178,7 @@ calculate_shap_values(PG_FUNCTION_ARGS)
 			sum_contrib += pred_with - pred_without;
 			valid_samples++;
 
-			NDB_FREE(perturbed);
+			nfree(perturbed);
 		}
 
 		if (valid_samples > 0)
@@ -186,8 +186,8 @@ calculate_shap_values(PG_FUNCTION_ARGS)
 	}
 
 	/* Build result array */
-	NDB_DECLARE(Datum *, result_datums);
-	NDB_ALLOC(result_datums, Datum, n_features);
+	Datum *result_datums = NULL;
+	nalloc(result_datums, Datum, n_features);
 	for (i = 0; i < n_features; i++)
 		result_datums[i] = Float8GetDatum(shap_values[i]);
 
@@ -198,8 +198,8 @@ calculate_shap_values(PG_FUNCTION_ARGS)
 							 FLOAT8PASSBYVAL,
 							 'd');
 
-	NDB_FREE(shap_values);
-	NDB_FREE(result_datums);
+	nfree(shap_values);
+	nfree(result_datums);
 	NDB_SPI_SESSION_END(spi_session);
 
 	PG_RETURN_ARRAYTYPE_P(result);
@@ -225,20 +225,20 @@ Datum
 explain_with_lime(PG_FUNCTION_ARGS)
 {
 	int32		model_id;
-	ArrayType  *instance;
+	ArrayType *instance = NULL;
 	int			n_samples;
 	int			n_features;
-	float	   *features;
+	float *features = NULL;
 	int			feature_dim;
 
-	NDB_DECLARE(float *, perturbed_features);
-	NDB_DECLARE(double *, predictions);
-	NDB_DECLARE(double *, weights);
-	NDB_DECLARE(double *, coefficients);
+	float *perturbed_features = NULL;
+	double *predictions = NULL;
+	double *weights = NULL;
+	double *coefficients = NULL;
 	int			i,
 				j;
 	StringInfoData jsonbuf;
-	Jsonb	   *result;
+	Jsonb *result = NULL;
 
 	model_id = PG_GETARG_INT32(0);
 	instance = PG_GETARG_ARRAYTYPE_P(1);
@@ -253,20 +253,20 @@ explain_with_lime(PG_FUNCTION_ARGS)
 	feature_dim = ARR_DIMS(instance)[0];
 	features = (float *) ARR_DATA_PTR(instance);
 
-	NDB_DECLARE(NdbSpiSession *, spi_session);
+	NdbSpiSession *spi_session = NULL;
 	MemoryContext oldcontext = CurrentMemoryContext;
 
 	NDB_SPI_SESSION_BEGIN(spi_session, oldcontext);
 
 	/* Allocate arrays */
-	NDB_DECLARE(float *, perturbed_features);
-	NDB_DECLARE(double *, predictions);
-	NDB_DECLARE(double *, weights);
-	NDB_DECLARE(double *, coefficients);
-	NDB_ALLOC(perturbed_features, float, feature_dim * n_samples);
-	NDB_ALLOC(predictions, double, n_samples);
-	NDB_ALLOC(weights, double, n_samples);
-	NDB_ALLOC(coefficients, double, feature_dim);
+	float *perturbed_features = NULL;
+	double *predictions = NULL;
+	double *weights = NULL;
+	double *coefficients = NULL;
+	nalloc(perturbed_features, float, feature_dim * n_samples);
+	nalloc(predictions, double, n_samples);
+	nalloc(weights, double, n_samples);
+	nalloc(coefficients, double, feature_dim);
 
 	/* Generate perturbed samples and get predictions */
 	for (i = 0; i < n_samples; i++)
@@ -329,10 +329,10 @@ explain_with_lime(PG_FUNCTION_ARGS)
 	result = DatumGetJsonbP(
 							DirectFunctionCall1(jsonb_in, CStringGetTextDatum(jsonbuf.data)));
 
-	NDB_FREE(perturbed_features);
-	NDB_FREE(predictions);
-	NDB_FREE(weights);
-	NDB_FREE(coefficients);
+	nfree(perturbed_features);
+	nfree(predictions);
+	nfree(weights);
+	nfree(coefficients);
 	ndb_spi_stringinfo_free(spi_session, &jsonbuf);
 	NDB_SPI_SESSION_END(spi_session);
 
@@ -360,24 +360,24 @@ Datum
 feature_importance(PG_FUNCTION_ARGS)
 {
 	int32		model_id;
-	text	   *table_name;
-	text	   *feature_column;
-	text	   *target_column;
-	text	   *metric_text;
-	char	   *tbl_str;
-	char	   *feat_col_str;
-	char	   *targ_col_str;
-	char	   *metric;
+	text *table_name = NULL;
+	text *feature_column = NULL;
+	text *target_column = NULL;
+	text *metric_text = NULL;
+	char *tbl_str = NULL;
+	char *feat_col_str = NULL;
+	char *targ_col_str = NULL;
+	char *metric = NULL;
 	float	  **features;
-	double	   *targets;
+	double *targets = NULL;
 	int			n_samples;
 	int			n_features;
 	double		baseline_score;
-	double	   *importance;
+	double *importance = NULL;
 	int			i,
 				j;
-	ArrayType  *result;
-	Datum	   *result_datums;
+	ArrayType *result = NULL;
+	Datum *result_datums = NULL;
 	StringInfoData query;
 	int			ret;
 
@@ -393,7 +393,7 @@ feature_importance(PG_FUNCTION_ARGS)
 	targ_col_str = text_to_cstring(target_column);
 	metric = text_to_cstring(metric_text);
 
-	NDB_DECLARE(NdbSpiSession *, spi_session);
+	NdbSpiSession *spi_session = NULL;
 	MemoryContext oldcontext = CurrentMemoryContext;
 
 	NDB_SPI_SESSION_BEGIN(spi_session, oldcontext);
@@ -411,10 +411,10 @@ feature_importance(PG_FUNCTION_ARGS)
 	{
 		ndb_spi_stringinfo_free(spi_session, &query);
 		NDB_SPI_SESSION_END(spi_session);
-		NDB_FREE(tbl_str);
-		NDB_FREE(feat_col_str);
-		NDB_FREE(targ_col_str);
-		NDB_FREE(metric);
+		nfree(tbl_str);
+		nfree(feat_col_str);
+		nfree(targ_col_str);
+		nfree(metric);
 		ereport(ERROR,
 				(errcode(ERRCODE_DATA_EXCEPTION),
 				 errmsg("Failed to load test data")));
@@ -427,9 +427,9 @@ feature_importance(PG_FUNCTION_ARGS)
 
 	/* Try to get feature count from model metadata */
 	{
-		NDB_DECLARE(MLCatalogModelSpec *, model_spec);
-		NDB_DECLARE(Jsonb *, model_metadata);
-		JsonbIterator *it;
+		MLCatalogModelSpec *model_spec = NULL;
+		Jsonb *model_metadata = NULL;
+		JsonbIterator *it = NULL;
 		JsonbValue	v;
 		int			r;
 		bool		found = false;
@@ -461,7 +461,7 @@ feature_importance(PG_FUNCTION_ARGS)
 								found = true;
 							}
 						}
-						NDB_FREE(key);
+						nfree(key);
 					}
 				}
 			}
@@ -491,13 +491,13 @@ feature_importance(PG_FUNCTION_ARGS)
 		}
 
 		if (model_spec)
-			NDB_FREE(model_spec);
+			nfree(model_spec);
 	}
 
-	NDB_DECLARE(float **, features);
-	NDB_DECLARE(double *, targets);
-	NDB_ALLOC(features, float *, n_samples);
-	NDB_ALLOC(targets, double, n_samples);
+	float **features = NULL;
+	double *targets = NULL;
+	nalloc(features, float *, n_samples);
+	nalloc(targets, double, n_samples);
 
 	for (i = 0; i < n_samples; i++)
 	{
@@ -514,7 +514,7 @@ feature_importance(PG_FUNCTION_ARGS)
 		{
 			continue;
 		}
-		NDB_DECLARE(ArrayType *, feat_array);
+		ArrayType *feat_array = NULL;
 		double		target = 0.0;
 
 		/* Safe access for features - validate tupdesc has at least 1 column */
@@ -549,8 +549,8 @@ feature_importance(PG_FUNCTION_ARGS)
 	baseline_score /= n_samples;
 
 	/* Permutation importance: shuffle each feature and measure impact */
-	NDB_DECLARE(double *, importance);
-	NDB_ALLOC(importance, double, n_features);
+	double *importance = NULL;
+	nalloc(importance, double, n_features);
 
 	for (i = 0; i < n_features; i++)
 	{
@@ -593,8 +593,8 @@ feature_importance(PG_FUNCTION_ARGS)
 	}
 
 	/* Build result array */
-	NDB_DECLARE(Datum *, result_datums);
-	NDB_ALLOC(result_datums, Datum, n_features);
+	Datum *result_datums = NULL;
+	nalloc(result_datums, Datum, n_features);
 	for (i = 0; i < n_features; i++)
 		result_datums[i] = Float8GetDatum(importance[i]);
 
@@ -605,15 +605,15 @@ feature_importance(PG_FUNCTION_ARGS)
 							 FLOAT8PASSBYVAL,
 							 'd');
 
-	NDB_FREE(features);
-	NDB_FREE(targets);
-	NDB_FREE(importance);
-	NDB_FREE(result_datums);
+	nfree(features);
+	nfree(targets);
+	nfree(importance);
+	nfree(result_datums);
 	ndb_spi_stringinfo_free(spi_session, &query);
-	NDB_FREE(tbl_str);
-	NDB_FREE(feat_col_str);
-	NDB_FREE(targ_col_str);
-	NDB_FREE(metric);
+	nfree(tbl_str);
+	nfree(feat_col_str);
+	nfree(targ_col_str);
+	nfree(metric);
 	NDB_SPI_SESSION_END(spi_session);
 
 	PG_RETURN_ARRAYTYPE_P(result);

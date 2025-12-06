@@ -44,15 +44,24 @@ PG_FUNCTION_INFO_V1(vectorp_in);
 Datum
 vectorp_in(PG_FUNCTION_ARGS)
 {
-	char	   *str = PG_GETARG_CSTRING(0);
-	VectorPacked *result;
+	char	   *endptr = NULL;
+	char	   *ptr = NULL;
+	char	   *str;
+
 	float4	   *temp_data = NULL;
-	int			dim;
 	int			capacity;
-	char	   *ptr;
-	char	   *endptr;
-	uint32		fingerprint;
+
+	/* Validate minimum argument count */
+	if (PG_NARGS() < 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vectorp_in requires at least 1 argument")));
+
+	str = PG_GETARG_CSTRING(0);
+	int			dim;
 	int			size;
+	uint32		fingerprint;
+	VectorPacked *result = NULL;
 
 	dim = 0;
 	capacity = 16;
@@ -64,7 +73,7 @@ vectorp_in(PG_FUNCTION_ARGS)
 	if (*ptr == '[')
 		ptr++;
 
-	NDB_ALLOC(temp_data, float4, capacity);
+	nalloc(temp_data, float4, capacity);
 
 	while (*ptr && *ptr != ']')
 	{
@@ -111,7 +120,7 @@ vectorp_in(PG_FUNCTION_ARGS)
 	result->flags = 0;
 
 	memcpy(result->data, temp_data, sizeof(float4) * dim);
-	NDB_FREE(temp_data);
+	nfree(temp_data);
 
 	PG_RETURN_POINTER(result);
 }
@@ -120,7 +129,15 @@ PG_FUNCTION_INFO_V1(vectorp_out);
 Datum
 vectorp_out(PG_FUNCTION_ARGS)
 {
-	VectorPacked *vec = (VectorPacked *) PG_GETARG_POINTER(0);
+	VectorPacked *vec;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vectorp_out requires 1 argument")));
+
+	vec = (VectorPacked *) PG_GETARG_POINTER(0);
 	StringInfoData buf;
 	int			i;
 
@@ -142,16 +159,16 @@ PG_FUNCTION_INFO_V1(vecmap_in);
 Datum
 vecmap_in(PG_FUNCTION_ARGS)
 {
+	char	   *endptr = NULL;
+	char	   *ptr = NULL;
 	char	   *str = PG_GETARG_CSTRING(0);
-	VectorMap  *result;
-	int32		dim;
-	int32		nnz;
-	int32	   *indices;
-	float4	   *values;
-	char	   *ptr;
-	char	   *endptr;
+	float4	   *values = NULL;
 	int			i;
 	int			size;
+	int32		dim;
+	int32		nnz;
+	int32	   *indices = NULL;
+	VectorMap  *result = NULL;
 
 	dim = 0;
 	nnz = 0;
@@ -206,10 +223,8 @@ vecmap_in(PG_FUNCTION_ARGS)
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("nnz cannot exceed dim")));
 
-	indices = NULL;
-	values = NULL;
-	NDB_ALLOC(indices, int32, nnz);
-	NDB_ALLOC(values, float4, nnz);
+	nalloc(indices, int32, nnz);
+	nalloc(values, float4, nnz);
 
 	while (isspace((unsigned char) *ptr) || *ptr == ',')
 		ptr++;
@@ -305,8 +320,8 @@ vecmap_in(PG_FUNCTION_ARGS)
 	memcpy(VECMAP_INDICES(result), indices, sizeof(int32) * nnz);
 	memcpy(VECMAP_VALUES(result), values, sizeof(float4) * nnz);
 
-	NDB_FREE(indices);
-	NDB_FREE(values);
+	nfree(indices);
+	nfree(values);
 
 	PG_RETURN_POINTER(result);
 }
@@ -315,7 +330,15 @@ PG_FUNCTION_INFO_V1(vecmap_out);
 Datum
 vecmap_out(PG_FUNCTION_ARGS)
 {
-	VectorMap  *vec = (VectorMap *) PG_GETARG_POINTER(0);
+	VectorMap  *vec;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vecmap_out requires 1 argument")));
+
+	vec = (VectorMap *) PG_GETARG_POINTER(0);
 	StringInfoData buf;
 	int32	   *indices;
 	float4	   *values;
@@ -354,14 +377,22 @@ PG_FUNCTION_INFO_V1(sparsevec_in);
 Datum
 sparsevec_in(PG_FUNCTION_ARGS)
 {
-	char	   *str = PG_GETARG_CSTRING(0);
-	VectorMap  *result;
+	char	   *str;
+
+	/* Validate minimum argument count */
+	if (PG_NARGS() < 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: sparsevec_in requires at least 1 argument")));
+
+	str = PG_GETARG_CSTRING(0);
+	VectorMap *result = NULL;
 	int32		dim = 0;
 	int32		nnz = 0;
-	int32	   *indices;
-	float4	   *values;
-	char	   *ptr;
-	char	   *endptr;
+	int32 *indices = NULL;
+	float4 *values = NULL;
+	char *ptr = NULL;
+	char *endptr = NULL;
 	int			i;
 	int			size;
 	int			capacity;
@@ -378,10 +409,8 @@ sparsevec_in(PG_FUNCTION_ARGS)
 	ptr++;
 
 	capacity = 16;
-	indices = NULL;
-	values = NULL;
-	NDB_ALLOC(indices, int32, capacity);
-	NDB_ALLOC(values, float4, capacity);
+	nalloc(indices, int32, capacity);
+	nalloc(values, float4, capacity);
 
 	while (*ptr && *ptr != '}')
 	{
@@ -481,8 +510,8 @@ sparsevec_in(PG_FUNCTION_ARGS)
 	memcpy(VECMAP_INDICES(result), indices, sizeof(int32) * nnz);
 	memcpy(VECMAP_VALUES(result), values, sizeof(float4) * nnz);
 
-	NDB_FREE(indices);
-	NDB_FREE(values);
+	nfree(indices);
+	nfree(values);
 
 	PG_RETURN_POINTER(result);
 }
@@ -491,10 +520,18 @@ PG_FUNCTION_INFO_V1(sparsevec_out);
 Datum
 sparsevec_out(PG_FUNCTION_ARGS)
 {
-	VectorMap  *vec = (VectorMap *) PG_GETARG_POINTER(0);
+	VectorMap  *vec;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: sparsevec_out requires 1 argument")));
+
+	vec = (VectorMap *) PG_GETARG_POINTER(0);
 	StringInfoData buf;
-	int32	   *indices;
-	float4	   *values;
+	int32 *indices = NULL;
+	float4 *values = NULL;
 	int			i;
 
 	if (vec == NULL)
@@ -524,8 +561,16 @@ PG_FUNCTION_INFO_V1(sparsevec_recv);
 Datum
 sparsevec_recv(PG_FUNCTION_ARGS)
 {
-	StringInfo	buf = (StringInfo) PG_GETARG_POINTER(0);
-	VectorMap  *result;
+	StringInfo	buf;
+
+	/* Validate minimum argument count */
+	if (PG_NARGS() < 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: sparsevec_recv requires at least 1 argument")));
+
+	buf = (StringInfo) PG_GETARG_POINTER(0);
+	VectorMap *result = NULL;
 	int32		dim;
 	int32		nnz;
 	int			size;
@@ -563,7 +608,15 @@ PG_FUNCTION_INFO_V1(sparsevec_send);
 Datum
 sparsevec_send(PG_FUNCTION_ARGS)
 {
-	VectorMap  *vec = (VectorMap *) PG_GETARG_POINTER(0);
+	VectorMap  *vec;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: sparsevec_send requires 1 argument")));
+
+	vec = (VectorMap *) PG_GETARG_POINTER(0);
 	StringInfoData buf;
 	int32	   *indices;
 	float4	   *values;
@@ -589,8 +642,17 @@ PG_FUNCTION_INFO_V1(sparsevec_eq);
 Datum
 sparsevec_eq(PG_FUNCTION_ARGS)
 {
-	VectorMap  *a = (VectorMap *) PG_GETARG_POINTER(0);
-	VectorMap  *b = (VectorMap *) PG_GETARG_POINTER(1);
+	VectorMap  *a;
+	VectorMap  *b;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: sparsevec_eq requires 2 arguments")));
+
+	a = (VectorMap *) PG_GETARG_POINTER(0);
+	b = (VectorMap *) PG_GETARG_POINTER(1);
 	int32	   *a_indices,
 			   *b_indices;
 	float4	   *a_values,
@@ -636,9 +698,17 @@ PG_FUNCTION_INFO_V1(sparsevec_hash);
 Datum
 sparsevec_hash(PG_FUNCTION_ARGS)
 {
-	VectorMap  *v = (VectorMap *) PG_GETARG_POINTER(0);
-	int32	   *indices;
-	float4	   *values;
+	VectorMap  *v;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: sparsevec_hash requires 1 argument")));
+
+	v = (VectorMap *) PG_GETARG_POINTER(0);
+	int32 *indices = NULL;
+	float4 *values = NULL;
 	uint32		hash = 5381;
 	int			i;
 
@@ -688,8 +758,16 @@ PG_FUNCTION_INFO_V1(sparsevec_l2_norm);
 Datum
 sparsevec_l2_norm(PG_FUNCTION_ARGS)
 {
-	VectorMap  *v = (VectorMap *) PG_GETARG_POINTER(0);
-	float4	   *values;
+	VectorMap  *v;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: sparsevec_l2_norm requires 1 argument")));
+
+	v = (VectorMap *) PG_GETARG_POINTER(0);
+	float4 *values = NULL;
 	double		sum = 0.0;
 	int			i;
 
@@ -710,11 +788,19 @@ PG_FUNCTION_INFO_V1(sparsevec_l2_normalize);
 Datum
 sparsevec_l2_normalize(PG_FUNCTION_ARGS)
 {
-	VectorMap  *v = (VectorMap *) PG_GETARG_POINTER(0);
-	VectorMap  *result;
-	float4	   *values;
-	float4	   *result_values;
-	int32	   *result_indices;
+	VectorMap  *v;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: sparsevec_l2_normalize requires 1 argument")));
+
+	v = (VectorMap *) PG_GETARG_POINTER(0);
+	VectorMap *result = NULL;
+	float4 *values = NULL;
+	float4 *result_values = NULL;
+	int32 *result_indices = NULL;
 	double		norm = 0.0;
 	int			i;
 	int			size;
@@ -760,8 +846,16 @@ PG_FUNCTION_INFO_V1(rtext_in);
 Datum
 rtext_in(PG_FUNCTION_ARGS)
 {
-	char	   *str = PG_GETARG_CSTRING(0);
-	RetrievableText *result;
+	char	   *str;
+
+	/* Validate minimum argument count */
+	if (PG_NARGS() < 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: rtext_in requires at least 1 argument")));
+
+	str = PG_GETARG_CSTRING(0);
+	RetrievableText *result = NULL;
 	int			text_len;
 	int			size;
 
@@ -785,10 +879,18 @@ PG_FUNCTION_INFO_V1(rtext_out);
 Datum
 rtext_out(PG_FUNCTION_ARGS)
 {
-	RetrievableText *rt = (RetrievableText *) PG_GETARG_POINTER(0);
-	char	   *result = NULL;
+	RetrievableText *rt;
 
-	NDB_ALLOC(result, char, rt->text_len + 1);
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: rtext_out requires 1 argument")));
+
+	rt = (RetrievableText *) PG_GETARG_POINTER(0);
+	char *result = NULL;
+
+	nalloc(result, char, rt->text_len + 1);
 	memcpy(result, RTEXT_DATA(rt), rt->text_len);
 	result[rt->text_len] = '\0';
 
@@ -799,13 +901,21 @@ PG_FUNCTION_INFO_V1(vgraph_in);
 Datum
 vgraph_in(PG_FUNCTION_ARGS)
 {
-	char	   *str = PG_GETARG_CSTRING(0);
-	VectorGraph *result;
+	char	   *str;
+
+	/* Validate minimum argument count */
+	if (PG_NARGS() < 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vgraph_in requires at least 1 argument")));
+
+	str = PG_GETARG_CSTRING(0);
+	VectorGraph *result = NULL;
 	int32		num_nodes;
 	int32		num_edges;
-	GraphEdge  *edges;
-	char	   *ptr;
-	char	   *endptr;
+	GraphEdge *edges = NULL;
+	char *ptr = NULL;
+	char *endptr = NULL;
 	int			size;
 	int			edge_capacity;
 
@@ -843,8 +953,7 @@ vgraph_in(PG_FUNCTION_ARGS)
 				(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
 				 errmsg("vgraph must specify nodes")));
 
-	edges = NULL;
-	NDB_ALLOC(edges, GraphEdge, edge_capacity);
+	nalloc(edges, GraphEdge, edge_capacity);
 
 	while (isspace((unsigned char) *ptr) || *ptr == ',')
 		ptr++;
@@ -963,7 +1072,7 @@ vgraph_in(PG_FUNCTION_ARGS)
 
 	memcpy(VGRAPH_EDGES(result), edges, sizeof(GraphEdge) * num_edges);
 
-	NDB_FREE(edges);
+	nfree(edges);
 
 	PG_RETURN_POINTER(result);
 }
@@ -1000,7 +1109,15 @@ PG_FUNCTION_INFO_V1(vectorp_dims);
 Datum
 vectorp_dims(PG_FUNCTION_ARGS)
 {
-	VectorPacked *vec = (VectorPacked *) PG_GETARG_POINTER(0);
+	VectorPacked *vec;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vectorp_dims requires 1 argument")));
+
+	vec = (VectorPacked *) PG_GETARG_POINTER(0);
 
 	PG_RETURN_INT32(vec->dim);
 }
@@ -1009,7 +1126,15 @@ PG_FUNCTION_INFO_V1(vectorp_validate);
 Datum
 vectorp_validate(PG_FUNCTION_ARGS)
 {
-	VectorPacked *vec = (VectorPacked *) PG_GETARG_POINTER(0);
+	VectorPacked *vec;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vectorp_validate requires 1 argument")));
+
+	vec = (VectorPacked *) PG_GETARG_POINTER(0);
 	uint32		expected_fp;
 	uint32		dim;
 
@@ -1039,12 +1164,12 @@ vector_compute_stats(VacAttrStats * stats, AnalyzeAttrFetchFunc fetchfunc, int s
 	int			null_cnt = 0;
 	int			nonnull_cnt = 0;
 	int			dim = 0;
-	float	   *norms = NULL;
-	float	   *dim_means = NULL;
-	float	   *dim_mins = NULL;
-	float	   *dim_maxs = NULL;
+	float *norms = NULL;
+	float *dim_means = NULL;
+	float *dim_mins = NULL;
+	float *dim_maxs = NULL;
 	int			max_sample_dims = 10;
-	Vector	   *vec;
+	Vector *vec = NULL;
 	float		vec_norm;
 	float		min_norm = FLT_MAX;
 	float		max_norm = 0.0f;
@@ -1062,12 +1187,12 @@ vector_compute_stats(VacAttrStats * stats, AnalyzeAttrFetchFunc fetchfunc, int s
 
 	sample_size = samplerows;
 
-	NDB_ALLOC(norms, float, sample_size);
+	nalloc(norms, float, sample_size);
 	if (max_sample_dims > 0)
 	{
-		NDB_ALLOC(dim_means, float, max_sample_dims);
-		NDB_ALLOC(dim_mins, float, max_sample_dims);
-		NDB_ALLOC(dim_maxs, float, max_sample_dims);
+		nalloc(dim_means, float, max_sample_dims);
+		nalloc(dim_mins, float, max_sample_dims);
+		nalloc(dim_maxs, float, max_sample_dims);
 		memset(dim_means, 0, sizeof(float) * max_sample_dims);
 		for (i = 0; i < max_sample_dims; i++)
 		{
@@ -1152,20 +1277,28 @@ vector_compute_stats(VacAttrStats * stats, AnalyzeAttrFetchFunc fetchfunc, int s
 	}
 
 	if (norms)
-		NDB_FREE(norms);
+		nfree(norms);
 	if (dim_means)
-		NDB_FREE(dim_means);
+		nfree(dim_means);
 	if (dim_mins)
-		NDB_FREE(dim_mins);
+		nfree(dim_mins);
 	if (dim_maxs)
-		NDB_FREE(dim_maxs);
+		nfree(dim_maxs);
 }
 
 PG_FUNCTION_INFO_V1(vector_analyze);
 Datum
 vector_analyze(PG_FUNCTION_ARGS)
 {
-	VacAttrStats *stats = (VacAttrStats *) PG_GETARG_POINTER(0);
+	VacAttrStats *stats;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_analyze requires 1 argument")));
+
+	stats = (VacAttrStats *) PG_GETARG_POINTER(0);
 
 	if (!stats)
 		PG_RETURN_BOOL(false);
@@ -1190,11 +1323,19 @@ PG_FUNCTION_INFO_V1(binaryvec_in);
 Datum
 binaryvec_in(PG_FUNCTION_ARGS)
 {
-	char	   *str = PG_GETARG_CSTRING(0);
-	BinaryVec  *result;
+	char	   *str;
+
+	/* Validate minimum argument count */
+	if (PG_NARGS() < 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: binaryvec_in requires at least 1 argument")));
+
+	str = PG_GETARG_CSTRING(0);
+	BinaryVec *result = NULL;
 	int			dim = 0;
 	char	   *ptr = str;
-	char	   *count_ptr;
+	char *count_ptr = NULL;
 	int			bit_index;
 	int			bit_value;
 
@@ -1321,7 +1462,15 @@ PG_FUNCTION_INFO_V1(binaryvec_out);
 Datum
 binaryvec_out(PG_FUNCTION_ARGS)
 {
-	BinaryVec  *bv = (BinaryVec *) PG_GETARG_VARLENA_P(0);
+	BinaryVec  *bv;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: binaryvec_out requires 1 argument")));
+
+	bv = (BinaryVec *) PG_GETARG_VARLENA_P(0);
 	StringInfoData buf;
 	int			i;
 	int			byte_index;
@@ -1354,8 +1503,17 @@ PG_FUNCTION_INFO_V1(binaryvec_hamming_distance);
 Datum
 binaryvec_hamming_distance(PG_FUNCTION_ARGS)
 {
-	BinaryVec  *bv1 = (BinaryVec *) PG_GETARG_VARLENA_P(0);
-	BinaryVec  *bv2 = (BinaryVec *) PG_GETARG_VARLENA_P(1);
+	BinaryVec  *bv1;
+	BinaryVec  *bv2;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: binaryvec_hamming_distance requires 2 arguments")));
+
+	bv1 = (BinaryVec *) PG_GETARG_VARLENA_P(0);
+	bv2 = (BinaryVec *) PG_GETARG_VARLENA_P(1);
 	int			distance = 0;
 	int			i;
 

@@ -70,8 +70,8 @@ ndb_cuda_ridge_pack_model(const RidgeModel *model,
 	char	   *base;
 	NdbCudaRidgeModelHeader *hdr;
 	float	   *coef_dest;
-	NDB_DECLARE(bytea *, blob);
-	NDB_DECLARE(char *, blob_raw);
+	bytea *blob = NULL;
+	char *blob_raw = NULL;
 
 	if (errstr)
 		*errstr = NULL;
@@ -84,7 +84,7 @@ ndb_cuda_ridge_pack_model(const RidgeModel *model,
 
 	payload_bytes = sizeof(NdbCudaRidgeModelHeader)
 		+ sizeof(float) * (size_t) model->n_features;
-	NDB_ALLOC(blob_raw, char, VARHDRSZ + payload_bytes);
+	nalloc(blob_raw, char, VARHDRSZ + payload_bytes);
 	blob = (bytea *) blob_raw;
 	SET_VARSIZE(blob, VARHDRSZ + payload_bytes);
 	base = VARDATA(blob);
@@ -110,7 +110,7 @@ ndb_cuda_ridge_pack_model(const RidgeModel *model,
 	if (metrics != NULL)
 	{
 		StringInfoData buf;
-		Jsonb	   *metrics_json;
+		Jsonb *metrics_json = NULL;
 
 		initStringInfo(&buf);
 		appendStringInfo(&buf,
@@ -131,7 +131,7 @@ ndb_cuda_ridge_pack_model(const RidgeModel *model,
 
 		metrics_json = DatumGetJsonbP(DirectFunctionCall1(
 														  jsonb_in, CStringGetTextDatum(buf.data)));
-		NDB_FREE(buf.data);
+		nfree(buf.data);
 		*metrics = metrics_json;
 	}
 
@@ -157,12 +157,12 @@ ndb_cuda_ridge_train(const float *features,
 	double	   *d_Xty;
 	double	   *d_XtX_inv;
 	double	   *d_beta;
-	NDB_DECLARE(double *, h_XtX);
-	NDB_DECLARE(double *, h_Xty);
-	NDB_DECLARE(double *, h_XtX_inv);
-	NDB_DECLARE(double *, h_beta);
-	bytea	   *payload;
-	Jsonb	   *metrics_json;
+	double *h_XtX = NULL;
+	double *h_Xty = NULL;
+	double *h_XtX_inv = NULL;
+	double *h_beta = NULL;
+	bytea *payload = NULL;
+	Jsonb *metrics_json = NULL;
 	cudaError_t status;
 	size_t		feature_bytes;
 	size_t		target_bytes;
@@ -298,10 +298,10 @@ ndb_cuda_ridge_train(const float *features,
 	Xty_bytes = sizeof(double) * (size_t) dim_with_intercept;
 	beta_bytes = sizeof(double) * (size_t) dim_with_intercept;
 
-	NDB_ALLOC(h_XtX, double, dim_with_intercept * dim_with_intercept);
-	NDB_ALLOC(h_Xty, double, dim_with_intercept);
-	NDB_ALLOC(h_XtX_inv, double, dim_with_intercept * dim_with_intercept);
-	NDB_ALLOC(h_beta, double, dim_with_intercept);
+	nalloc(h_XtX, double, dim_with_intercept * dim_with_intercept);
+	nalloc(h_Xty, double, dim_with_intercept);
+	nalloc(h_XtX_inv, double, dim_with_intercept * dim_with_intercept);
+	nalloc(h_beta, double, dim_with_intercept);
 
 	/* Compute X'X and X'y on GPU */
 	{
@@ -493,9 +493,9 @@ cpu_fallback:
 	for (i = 0; i < n_samples; i++)
 	{
 		const float *row = features + (i * feature_dim);
-		double	   *xi;
+		double *xi = NULL;
 
-		NDB_ALLOC(xi, double, dim_with_intercept);
+		nalloc(xi, double, dim_with_intercept);
 
 		xi[0] = 1.0;			/* intercept */
 		for (j = 1; j < dim_with_intercept; j++)
@@ -511,7 +511,7 @@ cpu_fallback:
 			h_Xty[j] += xi[j] * targets[i];
 		}
 
-		NDB_FREE(xi);
+		nfree(xi);
 	}
 
 	/* Add Ridge penalty (λI) to diagonal (excluding intercept) */
@@ -531,10 +531,10 @@ matrix_inversion:
 		bool		invert_success = true;
 
 		/* Create augmented matrix [A | I] */
-		NDB_ALLOC(augmented, double *, dim_with_intercept);
+		nalloc(augmented, double *, dim_with_intercept);
 		for (row = 0; row < dim_with_intercept; row++)
 		{
-			NDB_ALLOC(augmented[row], double, 2 * dim_with_intercept);
+			nalloc(augmented[row], double, 2 * dim_with_intercept);
 			for (col = 0; col < dim_with_intercept; col++)
 			{
 				augmented[row][col] = h_XtX[row * dim_with_intercept + col];
@@ -593,15 +593,15 @@ matrix_inversion:
 		}
 
 		for (row = 0; row < dim_with_intercept; row++)
-			NDB_FREE(augmented[row]);
-		NDB_FREE(augmented);
+			nfree(augmented[row]);
+		nfree(augmented);
 
 		if (!invert_success)
 		{
-			NDB_FREE(h_XtX);
-			NDB_FREE(h_Xty);
-			NDB_FREE(h_XtX_inv);
-			NDB_FREE(h_beta);
+			nfree(h_XtX);
+			nfree(h_Xty);
+			nfree(h_XtX_inv);
+			nfree(h_beta);
 			if (d_XtX)
 				cudaFree(d_XtX);
 			if (d_Xty)
@@ -694,13 +694,13 @@ build_model:
 		double		ss_res = 0.0;
 		double		mse = 0.0;
 		double		mae = 0.0;
-		NDB_DECLARE(double *, model_coefficients);
+		double *model_coefficients = NULL;
 
 		model.n_features = feature_dim;
 		model.n_samples = n_samples;
 		model.intercept = h_beta[0];
 		model.lambda = lambda;
-		NDB_ALLOC(model_coefficients, double, feature_dim);
+		nalloc(model_coefficients, double, feature_dim);
 		model.coefficients = model_coefficients;
 		for (i = 0; i < feature_dim; i++)
 			model.coefficients[i] = h_beta[i + 1];
@@ -737,13 +737,13 @@ build_model:
 		rc = ndb_cuda_ridge_pack_model(
 									   &model, &payload, &metrics_json, errstr);
 
-		NDB_FREE(model.coefficients);
+		nfree(model.coefficients);
 	}
 
-	NDB_FREE(h_XtX);
-	NDB_FREE(h_Xty);
-	NDB_FREE(h_XtX_inv);
-	NDB_FREE(h_beta);
+	nfree(h_XtX);
+	nfree(h_Xty);
+	nfree(h_XtX_inv);
+	nfree(h_beta);
 	if (d_XtX)
 		cudaFree(d_XtX);
 	if (d_Xty)
@@ -762,9 +762,9 @@ build_model:
 	}
 
 	if (payload != NULL)
-		NDB_FREE(payload);
+		nfree(payload);
 	if (metrics_json != NULL)
-		NDB_FREE(metrics_json);
+		nfree(metrics_json);
 
 	return -1;
 }
@@ -1075,9 +1075,9 @@ ndb_cuda_ridge_evaluate(const bytea * model_data,
 
 	/* Convert coefficients from float to double and copy to GPU */
 	{
-		NDB_DECLARE(double *, h_coefficients_double);
+		double *h_coefficients_double = NULL;
 
-		NDB_ALLOC(h_coefficients_double, double, feature_dim);
+		nalloc(h_coefficients_double, double, feature_dim);
 
 		if (h_coefficients_double == NULL)
 		{
@@ -1096,7 +1096,7 @@ ndb_cuda_ridge_evaluate(const bytea * model_data,
 			h_coefficients_double[i] = (double) coefficients[i];
 
 		cuda_err = cudaMemcpy(d_coefficients, h_coefficients_double, coeff_bytes, cudaMemcpyHostToDevice);
-		NDB_FREE(h_coefficients_double);
+		nfree(h_coefficients_double);
 
 		if (cuda_err != cudaSuccess)
 		{

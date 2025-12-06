@@ -101,10 +101,10 @@ get_guc_bool(const char *name, bool default_val)
 static QuotaLimits *
 get_tenant_quota(const char *tenantId)
 {
-	NDB_DECLARE(QuotaLimits *, limits);
-	NDB_DECLARE(NdbSpiSession *, session);
+	QuotaLimits *limits = NULL;
+	NdbSpiSession *session = NULL;
 
-	NDB_ALLOC(limits, QuotaLimits, 1);
+	nalloc(limits, QuotaLimits, 1);
 
 	session = ndb_spi_session_begin(CurrentMemoryContext, false);
 	if (session == NULL)
@@ -190,7 +190,7 @@ get_tenant_quota(const char *tenantId)
 			limits->enforceHard = get_guc_bool("neurondb.enforce_quotas", true);
 		}
 
-		NDB_FREE(query.data);
+		nfree(query.data);
 	}
 
 	ndb_spi_session_end(&session);
@@ -208,10 +208,10 @@ get_tenant_usage(const char *tenantId, Oid indexOid)
 	int32		count_val;
 	int32		qps_val;
 
-	NDB_DECLARE(QuotaUsage *, usage);
-	NDB_DECLARE(NdbSpiSession *, session);
+	QuotaUsage *usage = NULL;
+	NdbSpiSession *session = NULL;
 
-	NDB_ALLOC(usage, QuotaUsage, 1);
+	nalloc(usage, QuotaUsage, 1);
 	usage->tenantId = pstrdup(tenantId);
 	usage->lastCheck = GetCurrentTimestamp();
 
@@ -294,7 +294,7 @@ get_tenant_usage(const char *tenantId, Oid indexOid)
 			usage->storageBytes = 0;
 		}
 
-		NDB_FREE(query.data);
+		nfree(query.data);
 	}
 
 	{
@@ -321,7 +321,7 @@ get_tenant_usage(const char *tenantId, Oid indexOid)
 			usage->currentQPS = 0;
 		}
 
-		NDB_FREE(query.data);
+		nfree(query.data);
 	}
 
 	ndb_spi_session_end(&session);
@@ -400,8 +400,8 @@ ndb_quota_check(const char *tenantId,
 		allowed = false;
 	}
 
-	NDB_FREE(limits);
-	NDB_FREE(usage);
+	nfree(limits);
+	nfree(usage);
 
 	return allowed;
 }
@@ -437,7 +437,7 @@ ndb_quota_update_usage(const char *tenantId,
 {
 	StringInfoData query;
 
-	NDB_DECLARE(NdbSpiSession *, session);
+	NdbSpiSession *session = NULL;
 
 	if (tenantId == NULL)
 		return;
@@ -464,13 +464,13 @@ ndb_quota_update_usage(const char *tenantId,
 	session = ndb_spi_session_begin(CurrentMemoryContext, false);
 	if (session == NULL)
 	{
-		NDB_FREE(query.data);
+		nfree(query.data);
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
 				 errmsg("neurondb: failed to begin SPI session in update_tenant_usage")));
 	}
 	ndb_spi_execute(session, query.data, false, 0);
-	NDB_FREE(query.data);
+	nfree(query.data);
 	ndb_spi_session_end(&session);
 
 }
@@ -505,8 +505,8 @@ neurondb_get_quota_usage(PG_FUNCTION_ARGS)
 	text	   *tenant_id_text = PG_GETARG_TEXT_PP(0);
 	Oid			index_oid = PG_GETARG_OID(1);
 	char	   *tenant_id = text_to_cstring(tenant_id_text);
-	QuotaUsage *usage;
-	QuotaLimits *limits;
+	QuotaUsage *usage = NULL;
+	QuotaLimits *limits = NULL;
 	TupleDesc	tupdesc;
 	Datum		values[6];
 	bool		nulls[6];
@@ -546,7 +546,7 @@ PG_FUNCTION_INFO_V1(neurondb_reset_quota);
 Datum
 neurondb_reset_quota(PG_FUNCTION_ARGS)
 {
-	NDB_DECLARE(NdbSpiSession *, session);
+	NdbSpiSession *session = NULL;
 	session = ndb_spi_session_begin(CurrentMemoryContext, false);
 	if (session == NULL)
 	{

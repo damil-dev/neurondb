@@ -26,14 +26,23 @@ PG_FUNCTION_INFO_V1(create_model);
 Datum
 create_model(PG_FUNCTION_ARGS)
 {
-	text	   *model_name = PG_GETARG_TEXT_PP(0);
-	text	   *model_type = PG_GETARG_TEXT_PP(1);
-	text	   *config_json = PG_GETARG_TEXT_PP(2);
-	char	   *name_str;
-	char	   *type_str;
-	char	   *config_str;
+	char	   *config_str = NULL;
+	char	   *name_str = NULL;
+	char	   *type_str = NULL;
+	NdbSpiSession *session = NULL;
+	text	   *config_json;
+	text	   *model_name;
+	text	   *model_type;
 
-	NDB_DECLARE(NdbSpiSession *, session);
+	/* Validate argument count */
+	if (PG_NARGS() != 3)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: create_model requires 3 arguments")));
+
+	model_name = PG_GETARG_TEXT_PP(0);
+	model_type = PG_GETARG_TEXT_PP(1);
+	config_json = PG_GETARG_TEXT_PP(2);
 
 	name_str = text_to_cstring(model_name);
 	type_str = text_to_cstring(model_type);
@@ -61,10 +70,17 @@ PG_FUNCTION_INFO_V1(drop_model);
 Datum
 drop_model(PG_FUNCTION_ARGS)
 {
-	text	   *model_name = PG_GETARG_TEXT_PP(0);
-	char	   *name_str;
+	char	   *name_str = NULL;
+	NdbSpiSession *session2 = NULL;
+	text	   *model_name;
 
-	NDB_DECLARE(NdbSpiSession *, session2);
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: drop_model requires 1 argument")));
+
+	model_name = PG_GETARG_TEXT_PP(0);
 
 	name_str = text_to_cstring(model_name);
 
@@ -85,15 +101,27 @@ PG_FUNCTION_INFO_V1(create_ann_index);
 Datum
 create_ann_index(PG_FUNCTION_ARGS)
 {
-	text	   *index_name = PG_GETARG_TEXT_PP(0);
-	text	   *table_name = PG_GETARG_TEXT_PP(1);
-	text	   *column_name = PG_GETARG_TEXT_PP(2);
-	text	   *index_type = PG_GETARG_TEXT_PP(3);
-	text	   *options = PG_GETARG_TEXT_PP(4);
-	char	   *idx_str;
-	char	   *tbl_str;
-	char	   *col_str;
-	char	   *type_str;
+	text	   *index_name;
+	text	   *table_name;
+	text	   *column_name;
+	text	   *index_type;
+	text	   *options;
+	char *idx_str = NULL;
+	char *tbl_str = NULL;
+	char *col_str = NULL;
+	char *type_str = NULL;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 5)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: create_ann_index requires 5 arguments")));
+
+	index_name = PG_GETARG_TEXT_PP(0);
+	table_name = PG_GETARG_TEXT_PP(1);
+	column_name = PG_GETARG_TEXT_PP(2);
+	index_type = PG_GETARG_TEXT_PP(3);
+	options = PG_GETARG_TEXT_PP(4);
 
 	(void) options;
 
@@ -116,8 +144,17 @@ PG_FUNCTION_INFO_V1(explain_vector_query);
 Datum
 explain_vector_query(PG_FUNCTION_ARGS)
 {
-	text	   *query = PG_GETARG_TEXT_PP(0);
-	char	   *query_str;
+	text	   *query;
+
+	char *query_str = NULL;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: explain_vector_query requires 1 argument")));
+
+	query = PG_GETARG_TEXT_PP(0);
 
 	query_str = text_to_cstring(query);
 	(void) query_str;
@@ -151,9 +188,18 @@ PG_FUNCTION_INFO_V1(neurondb_api_docs);
 Datum
 neurondb_api_docs(PG_FUNCTION_ARGS)
 {
-	text	   *function_name = PG_GETARG_TEXT_PP(0);
-	char	   *func_str;
+	text	   *function_name;
+
+	char *func_str = NULL;
 	StringInfoData docs;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: neurondb_api_docs requires 1 argument")));
+
+	function_name = PG_GETARG_TEXT_PP(0);
 
 	func_str = text_to_cstring(function_name);
 

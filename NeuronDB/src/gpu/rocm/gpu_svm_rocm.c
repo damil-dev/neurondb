@@ -104,11 +104,11 @@ ndb_rocm_svm_pack_model(const SVMModel * model,
 		return -1;
 	}
 
-	NDB_DECLARE(bytea *, blob);
-	NDB_DECLARE(char *, blob_raw);
+	bytea *blob = NULL;
+	char *blob_raw = NULL;
 
 	payload_bytes = total_payload;
-	NDB_ALLOC(blob_raw, char, VARHDRSZ + payload_bytes);
+	nalloc(blob_raw, char, VARHDRSZ + payload_bytes);
 	blob = (bytea *) blob_raw;
 	SET_VARSIZE(blob, VARHDRSZ + payload_bytes);
 	base = VARDATA(blob);
@@ -144,7 +144,7 @@ ndb_rocm_svm_pack_model(const SVMModel * model,
 	if (metrics != NULL)
 	{
 		StringInfoData buf;
-		Jsonb	   *metrics_json;
+		Jsonb *metrics_json = NULL;
 
 		initStringInfo(&buf);
 		appendStringInfo(&buf,
@@ -163,7 +163,7 @@ ndb_rocm_svm_pack_model(const SVMModel * model,
 
 		metrics_json = DatumGetJsonbP(DirectFunctionCall1(
 														  jsonb_in, CStringGetTextDatum(buf.data)));
-		NDB_FREE(buf.data);
+		nfree(buf.data);
 		*metrics = metrics_json;
 	}
 
@@ -183,10 +183,10 @@ ndb_rocm_svm_train(const float *features,
 {
 	double		C = 1.0;
 	int			max_iters = 1000;
-	NDB_DECLARE(float *, alphas);
-	NDB_DECLARE(float *, errors);
-	NDB_DECLARE(float *, kernel_matrix);
-	NDB_DECLARE(float *, kernel_row);
+	float *alphas = NULL;
+	float *errors = NULL;
+	float *kernel_matrix = NULL;
+	float *kernel_row = NULL;
 	float		bias = 0.0f;
 	int			actual_max_iters;
 	int			sample_limit;
@@ -335,23 +335,23 @@ ndb_rocm_svm_train(const float *features,
 		return -1;
 	}
 
-	NDB_ALLOC(alphas, float, sample_limit);
-	NDB_ALLOC(errors, float, sample_limit);
-	NDB_ALLOC(kernel_matrix, float, sample_limit * sample_limit);
-	NDB_ALLOC(kernel_row, float, sample_limit);
+	nalloc(alphas, float, sample_limit);
+	nalloc(errors, float, sample_limit);
+	nalloc(kernel_matrix, float, sample_limit * sample_limit);
+	nalloc(kernel_row, float, sample_limit);
 
 	if (alphas == NULL || errors == NULL || kernel_matrix == NULL || kernel_row == NULL)
 	{
 		if (errstr)
 			*errstr = pstrdup("HIP SVM train: failed to allocate memory");
 		if (alphas)
-			NDB_FREE(alphas);
+			nfree(alphas);
 		if (errors)
-			NDB_FREE(errors);
+			nfree(errors);
 		if (kernel_matrix)
-			NDB_FREE(kernel_matrix);
+			nfree(kernel_matrix);
 		if (kernel_row)
-			NDB_FREE(kernel_row);
+			nfree(kernel_row);
 		return -1;
 	}
 
@@ -362,10 +362,10 @@ ndb_rocm_svm_train(const float *features,
 		{
 			if (errstr)
 				*errstr = pstrdup("HIP SVM train: failed to compute kernel matrix");
-			NDB_FREE(alphas);
-			NDB_FREE(errors);
-			NDB_FREE(kernel_matrix);
-			NDB_FREE(kernel_row);
+			nfree(alphas);
+			nfree(errors);
+			nfree(kernel_matrix);
+			nfree(kernel_row);
 			return -1;
 		}
 		memcpy(kernel_matrix + i * sample_limit, kernel_row, sizeof(float) * (size_t) sample_limit);
@@ -519,12 +519,12 @@ ndb_rocm_svm_train(const float *features,
 	model.max_iters = actual_max_iters;
 
 	/* Allocate support vectors and alphas */
-	NDB_DECLARE(double *, model_alphas);
-	NDB_DECLARE(float *, model_support_vectors);
-	NDB_DECLARE(int *, model_support_vector_indices);
-	NDB_ALLOC(model_alphas, double, sv_count);
-	NDB_ALLOC(model_support_vectors, float, sv_count * feature_dim);
-	NDB_ALLOC(model_support_vector_indices, int, sv_count);
+	double *model_alphas = NULL;
+	float *model_support_vectors = NULL;
+	int *model_support_vector_indices = NULL;
+	nalloc(model_alphas, double, sv_count);
+	nalloc(model_support_vectors, float, sv_count * feature_dim);
+	nalloc(model_support_vector_indices, int, sv_count);
 	model.alphas = model_alphas;
 	model.support_vectors = model_support_vectors;
 	model.support_vector_indices = model_support_vector_indices;
@@ -534,15 +534,15 @@ ndb_rocm_svm_train(const float *features,
 		if (errstr)
 			*errstr = pstrdup("HIP SVM train: failed to allocate support vectors");
 		if (model.alphas)
-			NDB_FREE(model.alphas);
+			nfree(model.alphas);
 		if (model.support_vectors)
-			NDB_FREE(model.support_vectors);
+			nfree(model.support_vectors);
 		if (model.support_vector_indices)
-			NDB_FREE(model.support_vector_indices);
-		NDB_FREE(alphas);
-		NDB_FREE(errors);
-		NDB_FREE(kernel_matrix);
-		NDB_FREE(kernel_row);
+			nfree(model.support_vector_indices);
+		nfree(alphas);
+		nfree(errors);
+		nfree(kernel_matrix);
+		nfree(kernel_row);
 		return -1;
 	}
 
@@ -577,28 +577,28 @@ ndb_rocm_svm_train(const float *features,
 		if (errstr && *errstr == NULL)
 			*errstr = pstrdup("HIP SVM train: model packing failed");
 		if (model.alphas)
-			NDB_FREE(model.alphas);
+			nfree(model.alphas);
 		if (model.support_vectors)
-			NDB_FREE(model.support_vectors);
+			nfree(model.support_vectors);
 		if (model.support_vector_indices)
-			NDB_FREE(model.support_vector_indices);
-		NDB_FREE(alphas);
-		NDB_FREE(errors);
-		NDB_FREE(kernel_matrix);
-		NDB_FREE(kernel_row);
+			nfree(model.support_vector_indices);
+		nfree(alphas);
+		nfree(errors);
+		nfree(kernel_matrix);
+		nfree(kernel_row);
 		return -1;
 	}
 
 	if (model.alphas)
-		NDB_FREE(model.alphas);
+		nfree(model.alphas);
 	if (model.support_vectors)
-		NDB_FREE(model.support_vectors);
+		nfree(model.support_vectors);
 	if (model.support_vector_indices)
-		NDB_FREE(model.support_vector_indices);
-	NDB_FREE(alphas);
-	NDB_FREE(errors);
-	NDB_FREE(kernel_matrix);
-	NDB_FREE(kernel_row);
+		nfree(model.support_vector_indices);
+	nfree(alphas);
+	nfree(errors);
+	nfree(kernel_matrix);
+	nfree(kernel_row);
 
 	rc = 0;
 	return rc;
@@ -648,7 +648,7 @@ ndb_rocm_svm_predict(const bytea * model_data,
 	{
 		if (errstr)
 			*errstr = pstrdup("HIP SVM predict: model_data too small for expected layout");
-		NDB_FREE((void *) detoasted);
+		nfree((void *) detoasted);
 		return -1;
 	}
 
@@ -659,7 +659,7 @@ ndb_rocm_svm_predict(const bytea * model_data,
 							   "has %d, input has %d",
 							   hdr->feature_dim,
 							   feature_dim);
-		NDB_FREE((void *) detoasted);
+		nfree((void *) detoasted);
 		return -1;
 	}
 
@@ -689,7 +689,7 @@ ndb_rocm_svm_predict(const bytea * model_data,
 		*confidence_out = fabs(prediction);
 
 	/* Free detoasted copy */
-	NDB_FREE((void *) detoasted);
+	nfree((void *) detoasted);
 
 	return 0;
 }
@@ -732,7 +732,7 @@ ndb_rocm_svm_predict_batch(const bytea * model_data,
 	{
 		if (errstr)
 			*errstr = pstrdup("HIP SVM batch predict: model_data too small");
-		NDB_FREE((void *) detoasted);
+		nfree((void *) detoasted);
 		return -1;
 	}
 
@@ -749,7 +749,7 @@ ndb_rocm_svm_predict_batch(const bytea * model_data,
 	{
 		if (errstr)
 			*errstr = pstrdup("HIP SVM batch predict: model_data too small for expected layout");
-		NDB_FREE((void *) detoasted);
+		nfree((void *) detoasted);
 		return -1;
 	}
 
@@ -759,7 +759,7 @@ ndb_rocm_svm_predict_batch(const bytea * model_data,
 		if (errstr)
 			*errstr = psprintf("HIP SVM batch predict: feature dimension mismatch (expected %d, got %d)",
 							   hdr->feature_dim, feature_dim);
-		NDB_FREE((void *) detoasted);
+		nfree((void *) detoasted);
 		return -1;
 	}
 
@@ -788,7 +788,7 @@ ndb_rocm_svm_predict_batch(const bytea * model_data,
 	}
 
 	/* Free detoasted copy */
-	NDB_FREE((void *) detoasted);
+	nfree((void *) detoasted);
 
 	return 0;
 }
@@ -808,7 +808,7 @@ ndb_rocm_svm_evaluate_batch(const bytea * model_data,
 							double *f1_out,
 							char **errstr)
 {
-	NDB_DECLARE(int *, predictions);
+	int *predictions = NULL;
 	int			tp = 0;
 	int			tn = 0;
 	int			fp = 0;
@@ -837,7 +837,7 @@ ndb_rocm_svm_evaluate_batch(const bytea * model_data,
 	}
 
 	/* Allocate predictions array */
-	NDB_ALLOC(predictions, int, n_samples);
+	nalloc(predictions, int, n_samples);
 	if (predictions == NULL)
 	{
 		if (errstr)
@@ -855,7 +855,7 @@ ndb_rocm_svm_evaluate_batch(const bytea * model_data,
 
 	if (rc != 0)
 	{
-		NDB_FREE(predictions);
+		nfree(predictions);
 		return -1;
 	}
 
@@ -907,7 +907,7 @@ ndb_rocm_svm_evaluate_batch(const bytea * model_data,
 	else
 		*f1_out = 0.0;
 
-	NDB_FREE(predictions);
+	nfree(predictions);
 
 	return 0;
 }

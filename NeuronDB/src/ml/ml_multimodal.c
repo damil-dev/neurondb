@@ -88,8 +88,8 @@ clip_embed(PG_FUNCTION_ARGS)
 		NdbLLMConfig cfg;
 		NdbLLMCallOptions call_opts;
 
-		NDB_DECLARE(float *, vec_data);
-		NDB_DECLARE(Vector *, result_vec);
+		float *vec_data;
+		Vector *result_vec;
 		int			dim = 0;
 		int			i;
 
@@ -125,11 +125,11 @@ clip_embed(PG_FUNCTION_ARGS)
 		for (i = 0; i < dim; i++)
 			result_vec->data[i] = vec_data[i];
 
-		NDB_FREE(input_str);
+		nfree(input_str);
 		if (modality_str)
-			NDB_FREE(modality_str);
+			nfree(modality_str);
 		if (vec_data)
-			NDB_FREE(vec_data);
+			nfree(vec_data);
 
 		PG_RETURN_POINTER(result_vec);
 	}
@@ -184,8 +184,8 @@ imagebind_embed(PG_FUNCTION_ARGS)
 		NdbLLMConfig cfg;
 		NdbLLMCallOptions call_opts;
 
-		NDB_DECLARE(float *, vec_data);
-		NDB_DECLARE(Vector *, result_vec);
+		float *vec_data;
+		Vector *result_vec;
 		int			dim = 0;
 		int			i;
 
@@ -221,10 +221,10 @@ imagebind_embed(PG_FUNCTION_ARGS)
 		for (i = 0; i < dim; i++)
 			result_vec->data[i] = vec_data[i];
 
-		NDB_FREE(input_str);
-		NDB_FREE(modality_str);
+		nfree(input_str);
+		nfree(modality_str);
 		if (vec_data)
-			NDB_FREE(vec_data);
+			nfree(vec_data);
 
 		PG_RETURN_POINTER(result_vec);
 	}
@@ -242,16 +242,16 @@ cross_modal_search(PG_FUNCTION_ARGS)
 	text	   *query_modality = PG_GETARG_TEXT_PP(2);
 	text	   *query_input = PG_GETARG_TEXT_PP(3);
 	text	   *target_modality = PG_GETARG_TEXT_PP(4);
-	ReturnSetInfo *rsinfo;
+	ReturnSetInfo *rsinfo = NULL;
 	TupleDesc	tupdesc;
-	Tuplestorestate *tupstore;
+	Tuplestorestate *tupstore = NULL;
 	MemoryContext per_query_ctx;
 	MemoryContext oldcontext;
-	char	   *tbl_str;
-	char	   *col_str;
-	char	   *qmod_str;
-	char	   *qin_str;
-	char	   *tmod_str;
+	char *tbl_str = NULL;
+	char *col_str = NULL;
+	char *qmod_str = NULL;
+	char *qin_str = NULL;
+	char *tmod_str = NULL;
 
 	PG_GETARG_INT32(5);
 
@@ -301,11 +301,11 @@ cross_modal_search(PG_FUNCTION_ARGS)
 
 	/* Generate query embedding */
 	{
-		NDB_DECLARE(Vector *, query_vec);
+		Vector *query_vec = NULL;
 		Datum		query_datum;
 		FmgrInfo	flinfo;
 		Oid			func_oid;
-		List	   *funcname;
+		List *funcname = NULL;
 		Oid			argtypes[2];
 
 		/* Use clip_embed or imagebind_embed based on query_modality */
@@ -344,22 +344,22 @@ cross_modal_search(PG_FUNCTION_ARGS)
 		{
 			/* Return empty result set */
 			tuplestore_end(tupstore);
-			NDB_FREE(tbl_str);
-			NDB_FREE(col_str);
-			NDB_FREE(qmod_str);
-			NDB_FREE(qin_str);
-			NDB_FREE(tmod_str);
+			nfree(tbl_str);
+			nfree(col_str);
+			nfree(qmod_str);
+			nfree(qin_str);
+			nfree(tmod_str);
 			PG_RETURN_NULL();
 		}
 
 		/* In a full implementation, search table and compute similarity */
 		/* For now, return empty result set */
 		tuplestore_end(tupstore);
-		NDB_FREE(tbl_str);
-		NDB_FREE(col_str);
-		NDB_FREE(qmod_str);
-		NDB_FREE(qin_str);
-		NDB_FREE(tmod_str);
+		nfree(tbl_str);
+		nfree(col_str);
+		nfree(qmod_str);
+		nfree(qin_str);
+		nfree(tmod_str);
 	}
 
 	PG_RETURN_NULL();

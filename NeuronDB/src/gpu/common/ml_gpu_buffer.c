@@ -137,7 +137,7 @@ ml_gpu_buffer_ensure_device(MLGpuBuffer *buf, bool copy_from_host)
 {
 	const ndb_gpu_backend *backend;
 	Size		required;
-	void	   *dev_ptr;
+	void *dev_ptr = NULL;
 
 	if (buf == NULL || buf->context == NULL)
 		return false;
@@ -212,7 +212,7 @@ ml_gpu_buffer_release(MLGpuBuffer *buf)
 		return;
 
 	if (buf->host_owner && buf->host_ptr != NULL)
-		NDB_FREE(buf->host_ptr);
+		nfree(buf->host_ptr);
 
 	backend = ndb_gpu_get_active_backend();
 	if (buf->device_owner && buf->device_ptr != NULL && backend

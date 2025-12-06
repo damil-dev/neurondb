@@ -93,7 +93,13 @@ Datum
 vector_to_int8(PG_FUNCTION_ARGS)
 {
 	Vector	   *v;
-	VectorI8   *result;
+	VectorI8 *result = NULL;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_to_int8 requires 1 argument")));
 
 	v = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(v);
@@ -111,9 +117,15 @@ PG_FUNCTION_INFO_V1(int8_to_vector);
 Datum
 int8_to_vector(PG_FUNCTION_ARGS)
 {
-	VectorI8   *v8;
-	Vector	   *result;
+	VectorI8 *v8 = NULL;
+	Vector *result = NULL;
 	int			i;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: int8_to_vector requires 1 argument")));
 
 	v8 = (VectorI8 *) PG_GETARG_POINTER(0);
 	result = new_vector(v8->dim);
@@ -208,7 +220,7 @@ fp16_to_float(uint16 h)
 VectorF16 *
 quantize_vector_f16(Vector *v)
 {
-	VectorF16  *result;
+	VectorF16 *result = NULL;
 	int			size;
 	int			i;
 
@@ -228,7 +240,13 @@ Datum
 vector_to_float16(PG_FUNCTION_ARGS)
 {
 	Vector	   *v;
-	VectorF16  *result;
+	VectorF16 *result = NULL;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_to_float16 requires 1 argument")));
 
 	v = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(v);
@@ -241,9 +259,17 @@ PG_FUNCTION_INFO_V1(float16_to_vector);
 Datum
 float16_to_vector(PG_FUNCTION_ARGS)
 {
-	VectorF16  *vf16 = (VectorF16 *) PG_GETARG_POINTER(0);
-	Vector	   *result;
+	VectorF16  *vf16;
+	Vector *result = NULL;
 	int			i;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: float16_to_vector requires 1 argument")));
+
+	vf16 = (VectorF16 *) PG_GETARG_POINTER(0);
 
 	result = new_vector(vf16->dim);
 	for (i = 0; i < vf16->dim; i++)
@@ -258,7 +284,7 @@ float16_to_vector(PG_FUNCTION_ARGS)
 VectorBinary *
 quantize_vector_binary(Vector *v)
 {
-	VectorBinary *result;
+	VectorBinary *result = NULL;
 	int			nbytes;
 	int			size;
 	int			i;
@@ -293,7 +319,13 @@ Datum
 vector_to_binary(PG_FUNCTION_ARGS)
 {
 	Vector	   *v;
-	VectorBinary *result;
+	VectorBinary *result = NULL;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_to_binary requires 1 argument")));
 
 	v = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(v);
@@ -319,11 +351,19 @@ PG_FUNCTION_INFO_V1(binary_to_vector);
 Datum
 binary_to_vector(PG_FUNCTION_ARGS)
 {
-	VectorBinary *vb = (VectorBinary *) PG_GETARG_POINTER(0);
-	Vector	   *result;
+	VectorBinary *vb;
+	Vector *result = NULL;
 	int			i;
 	int			byte_idx;
 	int			bit_idx;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: binary_to_vector requires 1 argument")));
+
+	vb = (VectorBinary *) PG_GETARG_POINTER(0);
 
 	result = new_vector(vb->dim);
 
@@ -346,8 +386,17 @@ PG_FUNCTION_INFO_V1(binary_hamming_distance);
 Datum
 binary_hamming_distance(PG_FUNCTION_ARGS)
 {
-	VectorBinary *a = (VectorBinary *) PG_GETARG_POINTER(0);
-	VectorBinary *b = (VectorBinary *) PG_GETARG_POINTER(1);
+	VectorBinary *a;
+	VectorBinary *b;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: binary_hamming_distance requires 2 arguments")));
+
+	a = (VectorBinary *) PG_GETARG_POINTER(0);
+	b = (VectorBinary *) PG_GETARG_POINTER(1);
 	int			count = 0;
 	int			nbytes;
 	int			i;
@@ -388,6 +437,12 @@ dynamic_quantize_vector(PG_FUNCTION_ARGS)
 	float8		memory_pressure;
 	float8		recall_target;
 
+	/* Validate argument count */
+	if (PG_NARGS() != 3)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: dynamic_quantize_vector requires 3 arguments")));
+
 	v = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(v);
 	memory_pressure = PG_GETARG_FLOAT8(1);
@@ -409,9 +464,9 @@ PG_FUNCTION_INFO_V1(quantize_analyze_int8);
 Datum
 quantize_analyze_int8(PG_FUNCTION_ARGS)
 {
-	Vector	   *original;
-	VectorI8   *quantized;
-	Vector	   *dequantized;
+	Vector *original = NULL;
+	VectorI8 *quantized = NULL;
+	Vector *dequantized = NULL;
 	float4		max_abs;
 	float4		scale;
 	double		mse;
@@ -425,7 +480,13 @@ quantize_analyze_int8(PG_FUNCTION_ARGS)
 	int			quantized_bytes;
 	double		compression_ratio;
 	StringInfoData json_buf;
-	Jsonb	   *result_jsonb;
+	Jsonb *result_jsonb = NULL;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: quantize_analyze_int8 requires 1 argument")));
 
 	original = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(original);
@@ -459,8 +520,8 @@ quantize_analyze_int8(PG_FUNCTION_ARGS)
 						 8.0);
 		result_jsonb = DatumGetJsonbP(DirectFunctionCall1(
 														  jsonb_in, CStringGetTextDatum(json_buf.data)));
-		NDB_FREE(json_buf.data);
-		NDB_FREE(quantized);
+		nfree(json_buf.data);
+		nfree(quantized);
 		PG_RETURN_POINTER(result_jsonb);
 	}
 
@@ -512,9 +573,9 @@ quantize_analyze_int8(PG_FUNCTION_ARGS)
 	result_jsonb = DatumGetJsonbP(DirectFunctionCall1(
 													  jsonb_in, CStringGetTextDatum(json_buf.data)));
 
-	NDB_FREE(json_buf.data);
-	NDB_FREE(quantized);
-	NDB_FREE(dequantized);
+	nfree(json_buf.data);
+	nfree(quantized);
+	nfree(dequantized);
 
 	PG_RETURN_POINTER(result_jsonb);
 }
@@ -526,9 +587,9 @@ PG_FUNCTION_INFO_V1(quantize_analyze_fp16);
 Datum
 quantize_analyze_fp16(PG_FUNCTION_ARGS)
 {
-	Vector	   *original;
-	VectorF16  *quantized;
-	Vector	   *dequantized;
+	Vector *original = NULL;
+	VectorF16 *quantized = NULL;
+	Vector *dequantized = NULL;
 
 	double		mse;
 	double		mae;
@@ -541,7 +602,13 @@ quantize_analyze_fp16(PG_FUNCTION_ARGS)
 	int			quantized_bytes;
 	double		compression_ratio;
 	StringInfoData json_buf;
-	Jsonb	   *result_jsonb;
+	Jsonb *result_jsonb = NULL;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: quantize_analyze_fp16 requires 1 argument")));
 
 	original = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(original);
@@ -601,9 +668,9 @@ quantize_analyze_fp16(PG_FUNCTION_ARGS)
 	result_jsonb = DatumGetJsonbP(DirectFunctionCall1(
 													  jsonb_in, CStringGetTextDatum(json_buf.data)));
 
-	NDB_FREE(json_buf.data);
-	NDB_FREE(quantized);
-	NDB_FREE(dequantized);
+	nfree(json_buf.data);
+	nfree(quantized);
+	nfree(dequantized);
 
 	PG_RETURN_POINTER(result_jsonb);
 }
@@ -615,9 +682,9 @@ PG_FUNCTION_INFO_V1(quantize_analyze_binary);
 Datum
 quantize_analyze_binary(PG_FUNCTION_ARGS)
 {
-	Vector	   *original;
-	VectorBinary *quantized;
-	Vector	   *dequantized;
+	Vector *original = NULL;
+	VectorBinary *quantized = NULL;
+	Vector *dequantized = NULL;
 
 	double		mse;
 	double		mae;
@@ -630,10 +697,16 @@ quantize_analyze_binary(PG_FUNCTION_ARGS)
 	int			quantized_bytes;
 	double		compression_ratio;
 	StringInfoData json_buf;
-	Jsonb	   *result_jsonb;
+	Jsonb *result_jsonb = NULL;
 
 	int			byte_idx;
 	int			bit_idx;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: quantize_analyze_binary requires 1 argument")));
 
 	original = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(original);
@@ -698,9 +771,9 @@ quantize_analyze_binary(PG_FUNCTION_ARGS)
 	result_jsonb = DatumGetJsonbP(DirectFunctionCall1(
 													  jsonb_in, CStringGetTextDatum(json_buf.data)));
 
-	NDB_FREE(json_buf.data);
-	NDB_FREE(quantized);
-	NDB_FREE(dequantized);
+	nfree(json_buf.data);
+	nfree(quantized);
+	nfree(dequantized);
 
 	PG_RETURN_POINTER(result_jsonb);
 }
@@ -713,18 +786,26 @@ PG_FUNCTION_INFO_V1(quantize_compare_distances);
 Datum
 quantize_compare_distances(PG_FUNCTION_ARGS)
 {
-	Vector	   *a_original;
-	Vector	   *b_original;
-	text	   *quant_type;
-	char	   *qtype;
-	Vector	   *a_dequantized;
-	Vector	   *b_dequantized;
+	Vector *a_original = NULL;
+	Vector *b_original = NULL;
+	text *quant_type = NULL;
+	char *qtype = NULL;
+	Vector *a_dequantized = NULL;
+
+	Vector *b_dequantized = NULL;
+
 	float4		original_dist;
 	float4		quantized_dist;
 	double		distance_error;
 	double		distance_preservation;
 	StringInfoData json_buf;
-	Jsonb	   *result_jsonb;
+	Jsonb *result_jsonb = NULL;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 3)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: quantize_compare_distances requires 3 arguments")));
 
 	a_original = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(a_original);
@@ -773,8 +854,8 @@ quantize_compare_distances(PG_FUNCTION_ARGS)
 		for (i = 0; i < b_original->dim; i++)
 			b_dequantized->data[i] = ((float4) bq->data[i]) / scale_b;
 
-		NDB_FREE(aq);
-		NDB_FREE(bq);
+		nfree(aq);
+		nfree(bq);
 	}
 	else if (strcmp(qtype, "fp16") == 0)
 	{
@@ -793,8 +874,8 @@ quantize_compare_distances(PG_FUNCTION_ARGS)
 		for (i = 0; i < b_original->dim; i++)
 			b_dequantized->data[i] = fp16_to_float(bq->data[i]);
 
-		NDB_FREE(aq);
-		NDB_FREE(bq);
+		nfree(aq);
+		nfree(bq);
 	}
 	else if (strcmp(qtype, "binary") == 0)
 	{
@@ -825,12 +906,12 @@ quantize_compare_distances(PG_FUNCTION_ARGS)
 				(bq->data[byte_idx] & (1 << bit_idx)) ? 1.0f : -1.0f;
 		}
 
-		NDB_FREE(aq);
-		NDB_FREE(bq);
+		nfree(aq);
+		nfree(bq);
 	}
 	else
 	{
-		NDB_FREE(qtype);
+		nfree(qtype);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("quantization type must be 'int8', 'fp16', or 'binary'")));
@@ -864,10 +945,10 @@ quantize_compare_distances(PG_FUNCTION_ARGS)
 	result_jsonb = DatumGetJsonbP(DirectFunctionCall1(
 													  jsonb_in, CStringGetTextDatum(json_buf.data)));
 
-	NDB_FREE(json_buf.data);
-	NDB_FREE(qtype);
-	NDB_FREE(a_dequantized);
-	NDB_FREE(b_dequantized);
+	nfree(json_buf.data);
+	nfree(qtype);
+	nfree(a_dequantized);
+	nfree(b_dequantized);
 
 	PG_RETURN_POINTER(result_jsonb);
 }
@@ -879,9 +960,9 @@ PG_FUNCTION_INFO_V1(quantize_analyze_uint8);
 Datum
 quantize_analyze_uint8(PG_FUNCTION_ARGS)
 {
-	Vector	   *original;
-	VectorU8   *quantized;
-	Vector	   *dequantized;
+	Vector *original = NULL;
+	VectorU8 *quantized = NULL;
+	Vector *dequantized = NULL;
 
 	float4		min_val;
 	float4		max_val;
@@ -897,8 +978,14 @@ quantize_analyze_uint8(PG_FUNCTION_ARGS)
 	int			quantized_bytes;
 	double		compression_ratio;
 	StringInfoData json_buf;
-	Jsonb	   *result_jsonb;
+	Jsonb *result_jsonb = NULL;
 	bool		first;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: quantize_analyze_uint8 requires 1 argument")));
 
 	original = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(original);
@@ -942,8 +1029,8 @@ quantize_analyze_uint8(PG_FUNCTION_ARGS)
 						 4.0);
 		result_jsonb = DatumGetJsonbP(DirectFunctionCall1(
 														  jsonb_in, CStringGetTextDatum(json_buf.data)));
-		NDB_FREE(json_buf.data);
-		NDB_FREE(quantized);
+		nfree(json_buf.data);
+		nfree(quantized);
 		PG_RETURN_POINTER(result_jsonb);
 	}
 
@@ -995,9 +1082,9 @@ quantize_analyze_uint8(PG_FUNCTION_ARGS)
 	result_jsonb = DatumGetJsonbP(DirectFunctionCall1(
 													  jsonb_in, CStringGetTextDatum(json_buf.data)));
 
-	NDB_FREE(json_buf.data);
-	NDB_FREE(quantized);
-	NDB_FREE(dequantized);
+	nfree(json_buf.data);
+	nfree(quantized);
+	nfree(dequantized);
 
 	PG_RETURN_POINTER(result_jsonb);
 }
@@ -1009,9 +1096,9 @@ PG_FUNCTION_INFO_V1(quantize_analyze_ternary);
 Datum
 quantize_analyze_ternary(PG_FUNCTION_ARGS)
 {
-	Vector	   *original;
-	VectorTernary *quantized;
-	Vector	   *dequantized;
+	Vector *original = NULL;
+	VectorTernary *quantized = NULL;
+	Vector *dequantized = NULL;
 
 	double		mse;
 	double		mae;
@@ -1024,12 +1111,18 @@ quantize_analyze_ternary(PG_FUNCTION_ARGS)
 	int			quantized_bytes;
 	double		compression_ratio;
 	StringInfoData json_buf;
-	Jsonb	   *result_jsonb;
+	Jsonb *result_jsonb = NULL;
 
 	int			byte_idx;
 	int			bit_idx;
 	uint8		value;
 	float4		max_abs;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: quantize_analyze_ternary requires 1 argument")));
 
 	original = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(original);
@@ -1110,9 +1203,9 @@ quantize_analyze_ternary(PG_FUNCTION_ARGS)
 	result_jsonb = DatumGetJsonbP(DirectFunctionCall1(
 													  jsonb_in, CStringGetTextDatum(json_buf.data)));
 
-	NDB_FREE(json_buf.data);
-	NDB_FREE(quantized);
-	NDB_FREE(dequantized);
+	nfree(json_buf.data);
+	nfree(quantized);
+	nfree(dequantized);
 
 	PG_RETURN_POINTER(result_jsonb);
 }
@@ -1124,9 +1217,9 @@ PG_FUNCTION_INFO_V1(quantize_analyze_int4);
 Datum
 quantize_analyze_int4(PG_FUNCTION_ARGS)
 {
-	Vector	   *original;
-	VectorI4   *quantized;
-	Vector	   *dequantized;
+	Vector *original = NULL;
+	VectorI4 *quantized = NULL;
+	Vector *dequantized = NULL;
 
 	float4		max_abs;
 	float4		scale;
@@ -1142,11 +1235,18 @@ quantize_analyze_int4(PG_FUNCTION_ARGS)
 	int			quantized_bytes;
 	double		compression_ratio;
 	StringInfoData json_buf;
-	Jsonb	   *result_jsonb;
+	Jsonb *result_jsonb = NULL;
+
 	int			byte_idx;
 	int			bit_idx;
 	uint8		uvalue;
 	int8		value;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: quantize_analyze_int4 requires 1 argument")));
 
 	original = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(original);
@@ -1179,8 +1279,8 @@ quantize_analyze_int4(PG_FUNCTION_ARGS)
 						 8.0);
 		result_jsonb = DatumGetJsonbP(DirectFunctionCall1(
 														  jsonb_in, CStringGetTextDatum(json_buf.data)));
-		NDB_FREE(json_buf.data);
-		NDB_FREE(quantized);
+		nfree(json_buf.data);
+		nfree(quantized);
 		PG_RETURN_POINTER(result_jsonb);
 	}
 
@@ -1240,9 +1340,9 @@ quantize_analyze_int4(PG_FUNCTION_ARGS)
 	result_jsonb = DatumGetJsonbP(DirectFunctionCall1(
 													  jsonb_in, CStringGetTextDatum(json_buf.data)));
 
-	NDB_FREE(json_buf.data);
-	NDB_FREE(quantized);
-	NDB_FREE(dequantized);
+	nfree(json_buf.data);
+	nfree(quantized);
+	nfree(dequantized);
 
 	PG_RETURN_POINTER(result_jsonb);
 }
@@ -1254,7 +1354,7 @@ quantize_analyze_int4(PG_FUNCTION_ARGS)
 VectorU8 *
 quantize_vector_uint8(Vector *v)
 {
-	VectorU8   *result;
+	VectorU8 *result = NULL;
 	int			size;
 	float4		min_val = 0.0f;
 	float4		max_val = 0.0f;
@@ -1308,7 +1408,13 @@ Datum
 vector_to_uint8(PG_FUNCTION_ARGS)
 {
 	Vector	   *v;
-	VectorU8   *result;
+	VectorU8 *result = NULL;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_to_uint8 requires 1 argument")));
 
 	v = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(v);
@@ -1321,9 +1427,18 @@ PG_FUNCTION_INFO_V1(uint8_to_vector);
 Datum
 uint8_to_vector(PG_FUNCTION_ARGS)
 {
-	VectorU8   *vu8 = (VectorU8 *) PG_GETARG_POINTER(0);
-	Vector	   *result;
+	VectorU8   *vu8;
+
+	Vector *result = NULL;
 	int			i;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: uint8_to_vector requires 1 argument")));
+
+	vu8 = (VectorU8 *) PG_GETARG_POINTER(0);
 
 	/* Note: This is approximate - exact restoration requires min/max */
 	result = new_vector(vu8->dim);
@@ -1340,7 +1455,7 @@ uint8_to_vector(PG_FUNCTION_ARGS)
 VectorTernary *
 quantize_vector_ternary(Vector *v)
 {
-	VectorTernary *result;
+	VectorTernary *result = NULL;
 	int			nbytes;
 	int			size;
 	int			i;
@@ -1394,7 +1509,13 @@ Datum
 vector_to_ternary(PG_FUNCTION_ARGS)
 {
 	Vector	   *v;
-	VectorTernary *result;
+	VectorTernary *result = NULL;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_to_ternary requires 1 argument")));
 
 	v = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(v);
@@ -1408,7 +1529,7 @@ Datum
 ternary_to_vector(PG_FUNCTION_ARGS)
 {
 	VectorTernary *vt = (VectorTernary *) PG_GETARG_POINTER(0);
-	Vector	   *result;
+	Vector *result = NULL;
 	int			i;
 	int			byte_idx;
 	int			bit_idx;
@@ -1441,7 +1562,7 @@ ternary_to_vector(PG_FUNCTION_ARGS)
 VectorI4 *
 quantize_vector_int4(Vector *v)
 {
-	VectorI4   *result;
+	VectorI4 *result = NULL;
 	int			nbytes;
 	int			size;
 	int			i;
@@ -1525,7 +1646,13 @@ Datum
 vector_to_int4(PG_FUNCTION_ARGS)
 {
 	Vector	   *v;
-	VectorI4   *result;
+	VectorI4 *result = NULL;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_to_int4 requires 1 argument")));
 
 	v = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(v);
@@ -1539,7 +1666,7 @@ Datum
 int4_to_vector(PG_FUNCTION_ARGS)
 {
 	VectorI4   *vi4 = (VectorI4 *) PG_GETARG_POINTER(0);
-	Vector	   *result;
+	Vector *result = NULL;
 	int			i;
 	int			byte_idx;
 	int			bit_idx;
@@ -1571,13 +1698,21 @@ PG_FUNCTION_INFO_V1(halfvec_in);
 Datum
 halfvec_in(PG_FUNCTION_ARGS)
 {
-	char	   *str = PG_GETARG_CSTRING(0);
-	VectorF16  *result;
-	float4	   *temp_data;
+	char	   *str;
+
+	/* Validate minimum argument count */
+	if (PG_NARGS() < 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: halfvec_in requires at least 1 argument")));
+
+	str = PG_GETARG_CSTRING(0);
+	VectorF16 *result = NULL;
+	float4 *temp_data = NULL;
 	int			dim;
 	int			capacity;
-	char	   *ptr;
-	char	   *endptr;
+	char *ptr = NULL;
+	char *endptr = NULL;
 	int			size;
 	int			i;
 
@@ -1641,7 +1776,7 @@ halfvec_in(PG_FUNCTION_ARGS)
 	for (i = 0; i < dim; i++)
 		result->data[i] = float4_to_fp16(temp_data[i]);
 
-	NDB_FREE(temp_data);
+	nfree(temp_data);
 	PG_RETURN_POINTER(result);
 }
 
@@ -1652,7 +1787,15 @@ PG_FUNCTION_INFO_V1(halfvec_out);
 Datum
 halfvec_out(PG_FUNCTION_ARGS)
 {
-	VectorF16  *vf16 = (VectorF16 *) PG_GETARG_POINTER(0);
+	VectorF16  *vf16;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: halfvec_out requires 1 argument")));
+
+	vf16 = (VectorF16 *) PG_GETARG_POINTER(0);
 	StringInfoData buf;
 	int			i;
 
@@ -1681,7 +1824,7 @@ Datum
 halfvec_recv(PG_FUNCTION_ARGS)
 {
 	StringInfo	buf = (StringInfo) PG_GETARG_POINTER(0);
-	VectorF16  *result;
+	VectorF16 *result = NULL;
 	int16		dim;
 	int			size;
 	int			i;
@@ -1711,7 +1854,15 @@ PG_FUNCTION_INFO_V1(halfvec_send);
 Datum
 halfvec_send(PG_FUNCTION_ARGS)
 {
-	VectorF16  *vf16 = (VectorF16 *) PG_GETARG_POINTER(0);
+	VectorF16  *vf16;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: halfvec_send requires 1 argument")));
+
+	vf16 = (VectorF16 *) PG_GETARG_POINTER(0);
 	StringInfoData buf;
 	int			i;
 
@@ -1731,8 +1882,17 @@ PG_FUNCTION_INFO_V1(halfvec_eq);
 Datum
 halfvec_eq(PG_FUNCTION_ARGS)
 {
-	VectorF16  *a = (VectorF16 *) PG_GETARG_POINTER(0);
-	VectorF16  *b = (VectorF16 *) PG_GETARG_POINTER(1);
+	VectorF16  *a;
+	VectorF16  *b;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: halfvec_eq requires 2 arguments")));
+
+	a = (VectorF16 *) PG_GETARG_POINTER(0);
+	b = (VectorF16 *) PG_GETARG_POINTER(1);
 	int			i;
 
 	/* Handle NULL vectors */
@@ -1774,7 +1934,15 @@ PG_FUNCTION_INFO_V1(halfvec_hash);
 Datum
 halfvec_hash(PG_FUNCTION_ARGS)
 {
-	VectorF16  *v = (VectorF16 *) PG_GETARG_POINTER(0);
+	VectorF16  *v;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: halfvec_hash requires 1 argument")));
+
+	v = (VectorF16 *) PG_GETARG_POINTER(0);
 	uint32		hash = 5381;
 	int			i;
 
@@ -1812,8 +1980,17 @@ PG_FUNCTION_INFO_V1(halfvec_l2_distance);
 Datum
 halfvec_l2_distance(PG_FUNCTION_ARGS)
 {
-	VectorF16  *a = (VectorF16 *) PG_GETARG_POINTER(0);
-	VectorF16  *b = (VectorF16 *) PG_GETARG_POINTER(1);
+	VectorF16  *a;
+	VectorF16  *b;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: halfvec_l2_distance requires 2 arguments")));
+
+	a = (VectorF16 *) PG_GETARG_POINTER(0);
+	b = (VectorF16 *) PG_GETARG_POINTER(1);
 	double		sum = 0.0;
 	int			i;
 	float4		result;
@@ -1850,8 +2027,17 @@ PG_FUNCTION_INFO_V1(halfvec_cosine_distance);
 Datum
 halfvec_cosine_distance(PG_FUNCTION_ARGS)
 {
-	VectorF16  *a = (VectorF16 *) PG_GETARG_POINTER(0);
-	VectorF16  *b = (VectorF16 *) PG_GETARG_POINTER(1);
+	VectorF16  *a;
+	VectorF16  *b;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: halfvec_cosine_distance requires 2 arguments")));
+
+	a = (VectorF16 *) PG_GETARG_POINTER(0);
+	b = (VectorF16 *) PG_GETARG_POINTER(1);
 	double		dot = 0.0,
 				norm_a = 0.0,
 				norm_b = 0.0;
@@ -1892,30 +2078,41 @@ PG_FUNCTION_INFO_V1(halfvec_inner_product);
 Datum
 halfvec_inner_product(PG_FUNCTION_ARGS)
 {
-	VectorF16  *a = (VectorF16 *) PG_GETARG_POINTER(0);
-	VectorF16  *b = (VectorF16 *) PG_GETARG_POINTER(1);
-	double		sum = 0.0;
-	int			i;
+	VectorF16  *a;
+	VectorF16  *b;
 
-	if (a == NULL || b == NULL)
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
 		ereport(ERROR,
-				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
-				 errmsg("cannot compute distance with NULL halfvec")));
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: halfvec_inner_product requires 2 arguments")));
 
-	if (a->dim != b->dim)
-		ereport(ERROR,
-				(errcode(ERRCODE_DATA_EXCEPTION),
-				 errmsg("halfvec dimensions must match")));
-
-	for (i = 0; i < a->dim; i++)
+	a = (VectorF16 *) PG_GETARG_POINTER(0);
+	b = (VectorF16 *) PG_GETARG_POINTER(1);
 	{
-		float		va = fp16_to_float(a->data[i]);
-		float		vb = fp16_to_float(b->data[i]);
+		double		sum = 0.0;
+		int			i;
 
-		sum += (double) va * (double) vb;
+		if (a == NULL || b == NULL)
+			ereport(ERROR,
+					(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+					 errmsg("cannot compute distance with NULL halfvec")));
+
+		if (a->dim != b->dim)
+			ereport(ERROR,
+					(errcode(ERRCODE_DATA_EXCEPTION),
+					 errmsg("halfvec dimensions must match")));
+
+		for (i = 0; i < a->dim; i++)
+		{
+			float		va = fp16_to_float(a->data[i]);
+			float		vb = fp16_to_float(b->data[i]);
+
+			sum += (double) va * (double) vb;
+		}
+
+		PG_RETURN_FLOAT4((float4) (-sum));
 	}
-
-	PG_RETURN_FLOAT4((float4) (-sum));
 }
 
 /*
@@ -1926,15 +2123,21 @@ PG_FUNCTION_INFO_V1(vector_to_bit);
 Datum
 vector_to_bit(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
-	VectorBinary *vb;
-	VarBit	   *result;
+	Vector *v = NULL;
+	VectorBinary *vb = NULL;
+	VarBit *result = NULL;
 	int			nbits;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_to_bit requires 1 argument")));
 	int			nbytes;
 	int			i;
 	int			byte_idx;
 	int			bit_idx;
-	bits8	   *bit_data;
+	bits8 *bit_data = NULL;
 
 	v = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(v);
@@ -1967,7 +2170,7 @@ vector_to_bit(PG_FUNCTION_ARGS)
 		}
 	}
 
-	NDB_FREE(vb);
+	nfree(vb);
 	PG_RETURN_VARBIT_P(result);
 }
 
@@ -1978,11 +2181,19 @@ PG_FUNCTION_INFO_V1(bit_to_vector);
 Datum
 bit_to_vector(PG_FUNCTION_ARGS)
 {
-	VarBit	   *bit_vec = PG_GETARG_VARBIT_P(0);
-	Vector	   *result;
+	VarBit	   *bit_vec;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: bit_to_vector requires 1 argument")));
+
+	bit_vec = PG_GETARG_VARBIT_P(0);
+	Vector *result = NULL;
 	int			nbits;
 	int			i;
-	bits8	   *bit_data;
+	bits8 *bit_data = NULL;
 
 	if (bit_vec == NULL)
 		PG_RETURN_NULL();
@@ -2011,8 +2222,17 @@ PG_FUNCTION_INFO_V1(bit_hamming_distance);
 Datum
 bit_hamming_distance(PG_FUNCTION_ARGS)
 {
-	VarBit	   *a = PG_GETARG_VARBIT_P(0);
-	VarBit	   *b = PG_GETARG_VARBIT_P(1);
+	VarBit	   *a;
+	VarBit	   *b;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: bit_hamming_distance requires 2 arguments")));
+
+	a = PG_GETARG_VARBIT_P(0);
+	b = PG_GETARG_VARBIT_P(1);
 	int			nbits;
 	int			count = 0;
 	int			i;

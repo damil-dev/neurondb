@@ -99,7 +99,7 @@ typedef struct NeurandefragSharedState
 	bool		in_maintenance_window;
 }			NeurandefragSharedState;
 
-static NeurandefragSharedState * neurandefrag_state = NULL;
+static NeurandefragSharedState *neurandefrag_state = NULL;
 
 PGDLLEXPORT void neurandefrag_main(Datum main_arg);
 
@@ -119,7 +119,7 @@ neurandefrag_run(PG_FUNCTION_ARGS)
 	int			n_indexes = 0;
 	bool		success = false;
 
-	NDB_DECLARE(NdbSpiSession *, session);
+	NdbSpiSession *session = NULL;
 
 	elog(DEBUG1, "neurondb: neurandefrag_run invoked");
 
@@ -141,7 +141,7 @@ neurandefrag_run(PG_FUNCTION_ARGS)
 					 "AND n.nspname NOT IN ('pg_catalog', 'information_schema')");
 
 	ret = ndb_spi_execute(session, query.data, true, 0);
-	NDB_FREE(query.data);
+	nfree(query.data);
 
 	if (ret == SPI_OK_SELECT && SPI_processed > 0)
 	{
@@ -393,10 +393,10 @@ neurandefrag_main(Datum main_arg)
 			int64		rebalances_done = 0;
 			StringInfoData sql;
 			int			ret;
-			SPITupleTable *tuptable;
+			SPITupleTable *tuptable = NULL;
 			bool		isnull;
 
-			NDB_DECLARE(NdbSpiSession *, nested_session);
+			NdbSpiSession *nested_session = NULL;
 
 			StartTransactionCommand();
 			PushActiveSnapshot(GetTransactionSnapshot());
@@ -431,7 +431,7 @@ neurandefrag_main(Datum main_arg)
 							HeapTuple	tuple = tuptable->vals[i];
 							Datum		relname_datum;
 							Datum		oid_datum;
-							char	   *relname;
+							char *relname = NULL;
 							Oid			indexOid;
 							Relation	indexRel;
 							BlockNumber nblocks;
@@ -451,7 +451,7 @@ neurandefrag_main(Datum main_arg)
 													  &isnull);
 							if (isnull)
 							{
-								NDB_FREE(relname);
+								nfree(relname);
 								continue;
 							}
 							indexOid = DatumGetObjectId(oid_datum);
@@ -499,13 +499,13 @@ neurandefrag_main(Datum main_arg)
 							}
 
 							index_close(indexRel, AccessShareLock);
-							NDB_FREE(relname);
+							nfree(relname);
 						}
 
 						SPI_freetuptable(tuptable);
 					}
 
-					NDB_FREE(sql.data);
+					nfree(sql.data);
 				}
 				PG_CATCH();
 				{

@@ -84,8 +84,8 @@ build_isolation_tree(float **data, int *indices, int n_points, int dim,
 
 	if (n_points <= 1 || current_depth >= max_depth)
 	{
-		NDB_DECLARE(IsolationNode *, node);
-		NDB_ALLOC(node, IsolationNode, 1);
+		IsolationNode *node = NULL;
+		nalloc(node, IsolationNode, 1);
 		node->split_dim = -1;
 		node->split_value = 0.0;
 		node->left = NULL;
@@ -94,8 +94,8 @@ build_isolation_tree(float **data, int *indices, int n_points, int dim,
 		return node;
 	}
 
-	NDB_DECLARE(IsolationNode *, node);
-	NDB_ALLOC(node, IsolationNode, 1);
+	IsolationNode *node = NULL;
+	nalloc(node, IsolationNode, 1);
 	node->size = n_points;
 
 	/* Randomly select dimension */
@@ -123,10 +123,10 @@ build_isolation_tree(float **data, int *indices, int n_points, int dim,
 	node->split_value = split_value;
 
 	/* Partition indices */
-	NDB_DECLARE(int *, left_indices);
-	NDB_DECLARE(int *, right_indices);
-	NDB_ALLOC(left_indices, int, n_points);
-	NDB_ALLOC(right_indices, int, n_points);
+	int *left_indices = NULL;
+	int *right_indices = NULL;
+	nalloc(left_indices, int, n_points);
+	nalloc(right_indices, int, n_points);
 	left_count = right_count = 0;
 
 	for (i = 0; i < n_points; i++)
@@ -143,8 +143,8 @@ build_isolation_tree(float **data, int *indices, int n_points, int dim,
 	node->right = build_isolation_tree(data, right_indices, right_count, dim,
 									   current_depth + 1, max_depth);
 
-	NDB_FREE(left_indices);
-	NDB_FREE(right_indices);
+	nfree(left_indices);
+	nfree(right_indices);
 
 	return node;
 }
@@ -188,7 +188,7 @@ free_isolation_tree(IsolationNode * node)
 		return;
 	free_isolation_tree(node->left);
 	free_isolation_tree(node->right);
-	NDB_FREE(node);
+	nfree(node);
 }
 
 /*
@@ -210,24 +210,24 @@ PG_FUNCTION_INFO_V1(detect_anomalies_isolation_forest);
 Datum
 detect_anomalies_isolation_forest(PG_FUNCTION_ARGS)
 {
-	text	   *table_name;
-	text	   *vector_column;
+	text *table_name = NULL;
+	text *vector_column = NULL;
 	int			n_trees;
 	double		contamination;
-	char	   *tbl_str;
-	char	   *vec_col_str;
+	char *tbl_str = NULL;
+	char *vec_col_str = NULL;
 	float	  **vectors;
 	int			nvec,
 				dim;
-	IsolationForest *forest;
-	int		   *indices;
+	IsolationForest *forest = NULL;
+	int *indices = NULL;
 	int			i,
 				t;
-	double	   *anomaly_scores;
-	bool	   *anomalies;
+	double *anomaly_scores = NULL;
+	bool *anomalies = NULL;
 	double		threshold;
-	ArrayType  *result;
-	Datum	   *result_datums;
+	ArrayType *result = NULL;
+	Datum *result_datums = NULL;
 	int16		typlen;
 	bool		typbyval;
 	char		typalign;
@@ -253,8 +253,8 @@ detect_anomalies_isolation_forest(PG_FUNCTION_ARGS)
 												tbl_str, vec_col_str, &nvec, &dim);
 	if (vectors == NULL || nvec == 0)
 	{
-		NDB_FREE(tbl_str);
-		NDB_FREE(vec_col_str);
+		nfree(tbl_str);
+		nfree(vec_col_str);
 		ereport(ERROR,
 				(errcode(ERRCODE_DATA_EXCEPTION),
 				 errmsg("No vectors found")));
@@ -262,17 +262,17 @@ detect_anomalies_isolation_forest(PG_FUNCTION_ARGS)
 
 	if (dim <= 0)
 	{
-		NDB_FREE(tbl_str);
-		NDB_FREE(vec_col_str);
+		nfree(tbl_str);
+		nfree(vec_col_str);
 		/* Free vectors array and rows if vectors is not NULL */
 		if (vectors != NULL)
 		{
 			for (int i = 0; i < nvec; i++)
 			{
 				if (vectors[i] != NULL)
-					NDB_FREE(vectors[i]);
+					nfree(vectors[i]);
 			}
-			NDB_FREE(vectors);
+			nfree(vectors);
 		}
 		ereport(ERROR,
 				(errcode(ERRCODE_DATA_EXCEPTION),
@@ -285,19 +285,19 @@ detect_anomalies_isolation_forest(PG_FUNCTION_ARGS)
 				 errmsg("Need at least 2 vectors")));
 
 	/* Build isolation forest */
-	NDB_DECLARE(IsolationForest *, forest);
-	NDB_ALLOC(forest, IsolationForest, 1);
+	IsolationForest *forest = NULL;
+	nalloc(forest, IsolationForest, 1);
 	forest->n_trees = n_trees;
 	forest->max_depth = (int) ceil(log2((double) nvec));
 	forest->n_samples = nvec;
 	forest->dim = dim;
-	NDB_DECLARE(IsolationNode **, trees);
-	NDB_ALLOC(trees, IsolationNode *, n_trees);
+	IsolationNode **trees = NULL;
+	nalloc(trees, IsolationNode *, n_trees);
 	forest->trees = trees;
 											   n_trees);
 
-	NDB_DECLARE(int *, indices);
-	NDB_ALLOC(indices, int, nvec);
+	int *indices = NULL;
+	nalloc(indices, int, nvec);
 	for (i = 0; i < nvec; i++)
 		indices[i] = i;
 
@@ -317,8 +317,8 @@ detect_anomalies_isolation_forest(PG_FUNCTION_ARGS)
 	}
 
 	/* Calculate anomaly scores */
-	NDB_DECLARE(double *, anomaly_scores);
-	NDB_ALLOC(anomaly_scores, double, nvec);
+	double *anomaly_scores = NULL;
+	nalloc(anomaly_scores, double, nvec);
 	for (i = 0; i < nvec; i++)
 	{
 		double		avg_path = 0.0;
@@ -331,11 +331,10 @@ detect_anomalies_isolation_forest(PG_FUNCTION_ARGS)
 
 	/* Determine threshold based on contamination */
 	{
-		double	   *sorted_scores;
 		int			threshold_idx;
 
-		NDB_DECLARE(double *, sorted_scores);
-		NDB_ALLOC(sorted_scores, double, nvec);
+		double *sorted_scores = NULL;
+		nalloc(sorted_scores, double, nvec);
 		memcpy(sorted_scores, anomaly_scores, sizeof(double) * nvec);
 		qsort(sorted_scores, nvec, sizeof(double), double_compare);
 
@@ -344,7 +343,7 @@ detect_anomalies_isolation_forest(PG_FUNCTION_ARGS)
 			threshold_idx = nvec - 1;
 		threshold = sorted_scores[threshold_idx];
 
-		NDB_FREE(sorted_scores);
+		nfree(sorted_scores);
 	}
 
 	/* Mark anomalies */
@@ -353,8 +352,8 @@ detect_anomalies_isolation_forest(PG_FUNCTION_ARGS)
 		anomalies[i] = (anomaly_scores[i] > threshold);
 
 	/* Build result array */
-	NDB_DECLARE(Datum *, result_datums);
-	NDB_ALLOC(result_datums, Datum, nvec);
+	Datum *result_datums = NULL;
+	nalloc(result_datums, Datum, nvec);
 	for (i = 0; i < nvec; i++)
 		result_datums[i] = BoolGetDatum(anomalies[i]);
 
@@ -364,17 +363,17 @@ detect_anomalies_isolation_forest(PG_FUNCTION_ARGS)
 
 	for (t = 0; t < n_trees; t++)
 		free_isolation_tree(forest->trees[t]);
-	NDB_FREE(forest->trees);
-	NDB_FREE(forest);
+	nfree(forest->trees);
+	nfree(forest);
 	for (i = 0; i < nvec; i++)
-		NDB_FREE(vectors[i]);
-	NDB_FREE(vectors);
-	NDB_FREE(indices);
-	NDB_FREE(anomaly_scores);
-	NDB_FREE(anomalies);
-	NDB_FREE(result_datums);
-	NDB_FREE(tbl_str);
-	NDB_FREE(vec_col_str);
+		nfree(vectors[i]);
+	nfree(vectors);
+	nfree(indices);
+	nfree(anomaly_scores);
+	nfree(anomalies);
+	nfree(result_datums);
+	nfree(tbl_str);
+	nfree(vec_col_str);
 
 	PG_RETURN_ARRAYTYPE_P(result);
 }
@@ -401,13 +400,12 @@ double_compare(const void *a, const void *b)
 static double
 k_distance(const float *point, float **data, int nvec, int dim, int k)
 {
-	double	   *distances;
 	int			i,
 				d;
 	double		dist;
 
-	NDB_DECLARE(double *, distances);
-	NDB_ALLOC(distances, double, nvec);
+	double *distances = NULL;
+	nalloc(distances, double, nvec);
 
 	for (i = 0; i < nvec; i++)
 	{
@@ -424,7 +422,7 @@ k_distance(const float *point, float **data, int nvec, int dim, int k)
 
 	qsort(distances, nvec, sizeof(double), double_compare);
 	dist = distances[k];
-	NDB_FREE(distances);
+	nfree(distances);
 	return dist;
 }
 
@@ -457,18 +455,16 @@ static double
 local_reachability_density(const float *point, float **data, int nvec,
 						   int dim, int k)
 {
-	double	   *distances;
-	int		   *neighbors;
+	double *distances = NULL;
+	int *neighbors = NULL;
 	int			i,
 				j,
 				d;
 	double		sum_reach_dist = 0.0;
 	double		lrd;
 
-	NDB_DECLARE(double *, distances);
-	NDB_ALLOC(distances, double, nvec);
-	NDB_DECLARE(int *, neighbors);
-	NDB_ALLOC(neighbors, int, k);
+	nalloc(distances, double, nvec);
+	nalloc(neighbors, int, k);
 
 	/* Calculate distances to all points */
 	for (i = 0; i < nvec; i++)
@@ -520,8 +516,8 @@ local_reachability_density(const float *point, float **data, int nvec,
 
 	lrd = (sum_reach_dist > 0.0) ? (double) k / sum_reach_dist : 0.0;
 
-	NDB_FREE(distances);
-	NDB_FREE(neighbors);
+	nfree(distances);
+	nfree(neighbors);
 
 	return lrd;
 }
@@ -545,20 +541,20 @@ PG_FUNCTION_INFO_V1(detect_anomalies_lof);
 Datum
 detect_anomalies_lof(PG_FUNCTION_ARGS)
 {
-	text	   *table_name;
-	text	   *vector_column;
+	text *table_name = NULL;
+	text *vector_column = NULL;
 	int			k;
 	double		threshold;
-	char	   *tbl_str;
-	char	   *vec_col_str;
+	char *tbl_str = NULL;
+	char *vec_col_str = NULL;
 	float	  **vectors;
 	int			nvec,
 				dim;
-	double	   *lof_scores;
-	bool	   *anomalies;
+	double *lof_scores = NULL;
+	bool *anomalies = NULL;
 	int			i;
-	ArrayType  *result;
-	Datum	   *result_datums;
+	ArrayType *result = NULL;
+	Datum *result_datums = NULL;
 	int16		typlen;
 	bool		typbyval;
 	char		typalign;
@@ -584,8 +580,8 @@ detect_anomalies_lof(PG_FUNCTION_ARGS)
 												tbl_str, vec_col_str, &nvec, &dim);
 	if (vectors == NULL || nvec == 0)
 	{
-		NDB_FREE(tbl_str);
-		NDB_FREE(vec_col_str);
+		nfree(tbl_str);
+		nfree(vec_col_str);
 		ereport(ERROR,
 				(errcode(ERRCODE_DATA_EXCEPTION),
 				 errmsg("No vectors found")));
@@ -593,17 +589,17 @@ detect_anomalies_lof(PG_FUNCTION_ARGS)
 
 	if (dim <= 0)
 	{
-		NDB_FREE(tbl_str);
-		NDB_FREE(vec_col_str);
+		nfree(tbl_str);
+		nfree(vec_col_str);
 		/* Free vectors array and rows if vectors is not NULL */
 		if (vectors != NULL)
 		{
 			for (int i = 0; i < nvec; i++)
 			{
 				if (vectors[i] != NULL)
-					NDB_FREE(vectors[i]);
+					nfree(vectors[i]);
 			}
-			NDB_FREE(vectors);
+			nfree(vectors);
 		}
 		ereport(ERROR,
 				(errcode(ERRCODE_DATA_EXCEPTION),
@@ -620,8 +616,8 @@ detect_anomalies_lof(PG_FUNCTION_ARGS)
 				 errmsg("Need at least k+1 vectors for LOF")));
 
 	/* Calculate LOF scores */
-	NDB_DECLARE(double *, lof_scores);
-	NDB_ALLOC(lof_scores, double, nvec);
+	double *lof_scores = NULL;
+	nalloc(lof_scores, double, nvec);
 	for (i = 0; i < nvec; i++)
 	{
 		double		lrd_point = local_reachability_density(
@@ -631,14 +627,12 @@ detect_anomalies_lof(PG_FUNCTION_ARGS)
 
 		/* Find k nearest neighbors and sum their LRD ratios */
 		{
-			double	   *distances;
-			int		   *neighbors;
 			int			n;
 
-			NDB_DECLARE(double *, distances);
-	NDB_ALLOC(distances, double, nvec);
-			NDB_DECLARE(int *, neighbors);
-	NDB_ALLOC(neighbors, int, k);
+			double *distances = NULL;
+			nalloc(distances, double, nvec);
+			int *neighbors = NULL;
+			nalloc(neighbors, int, k);
 
 			/* Calculate distances */
 			for (j = 0; j < nvec; j++)
@@ -701,8 +695,8 @@ detect_anomalies_lof(PG_FUNCTION_ARGS)
 					sum_lrd_ratio += lrd_point / lrd_neighbor;
 			}
 
-			NDB_FREE(distances);
-			NDB_FREE(neighbors);
+			nfree(distances);
+			nfree(neighbors);
 		}
 
 		lof_scores[i] = sum_lrd_ratio / (double) k;
@@ -714,8 +708,8 @@ detect_anomalies_lof(PG_FUNCTION_ARGS)
 		anomalies[i] = (lof_scores[i] > threshold);
 
 	/* Build result array */
-	NDB_DECLARE(Datum *, result_datums);
-	NDB_ALLOC(result_datums, Datum, nvec);
+	Datum *result_datums = NULL;
+	nalloc(result_datums, Datum, nvec);
 	for (i = 0; i < nvec; i++)
 		result_datums[i] = BoolGetDatum(anomalies[i]);
 
@@ -724,13 +718,13 @@ detect_anomalies_lof(PG_FUNCTION_ARGS)
 							 result_datums, nvec, BOOLOID, typlen, typbyval, typalign);
 
 	for (i = 0; i < nvec; i++)
-		NDB_FREE(vectors[i]);
-	NDB_FREE(vectors);
-	NDB_FREE(lof_scores);
-	NDB_FREE(anomalies);
-	NDB_FREE(result_datums);
-	NDB_FREE(tbl_str);
-	NDB_FREE(vec_col_str);
+		nfree(vectors[i]);
+	nfree(vectors);
+	nfree(lof_scores);
+	nfree(anomalies);
+	nfree(result_datums);
+	nfree(tbl_str);
+	nfree(vec_col_str);
 
 	PG_RETURN_ARRAYTYPE_P(result);
 }
@@ -745,22 +739,22 @@ PG_FUNCTION_INFO_V1(detect_anomalies_ocsvm);
 Datum
 detect_anomalies_ocsvm(PG_FUNCTION_ARGS)
 {
-	text	   *table_name;
-	text	   *vector_column;
+	text *table_name = NULL;
+	text *vector_column = NULL;
 	double		nu;
 	double		gamma;
-	char	   *tbl_str;
-	char	   *vec_col_str;
+	char *tbl_str = NULL;
+	char *vec_col_str = NULL;
 	float	  **vectors;
 	int			nvec,
 				dim;
-	double	   *scores;
-	bool	   *anomalies;
+	double *scores = NULL;
+	bool *anomalies = NULL;
 	int			i,
 				j,
 				d;
-	ArrayType  *result;
-	Datum	   *result_datums;
+	ArrayType *result = NULL;
+	Datum *result_datums = NULL;
 	int16		typlen;
 	bool		typbyval;
 	char		typalign;
@@ -786,8 +780,8 @@ detect_anomalies_ocsvm(PG_FUNCTION_ARGS)
 												tbl_str, vec_col_str, &nvec, &dim);
 	if (vectors == NULL || nvec == 0)
 	{
-		NDB_FREE(tbl_str);
-		NDB_FREE(vec_col_str);
+		nfree(tbl_str);
+		nfree(vec_col_str);
 		ereport(ERROR,
 				(errcode(ERRCODE_DATA_EXCEPTION),
 				 errmsg("No vectors found")));
@@ -795,17 +789,17 @@ detect_anomalies_ocsvm(PG_FUNCTION_ARGS)
 
 	if (dim <= 0)
 	{
-		NDB_FREE(tbl_str);
-		NDB_FREE(vec_col_str);
+		nfree(tbl_str);
+		nfree(vec_col_str);
 		/* Free vectors array and rows if vectors is not NULL */
 		if (vectors != NULL)
 		{
 			for (int i = 0; i < nvec; i++)
 			{
 				if (vectors[i] != NULL)
-					NDB_FREE(vectors[i]);
+					nfree(vectors[i]);
 			}
-			NDB_FREE(vectors);
+			nfree(vectors);
 		}
 		ereport(ERROR,
 				(errcode(ERRCODE_DATA_EXCEPTION),
@@ -819,8 +813,8 @@ detect_anomalies_ocsvm(PG_FUNCTION_ARGS)
 
 	/* Simplified One-Class SVM using RBF kernel */
 	/* Calculate decision function for each point */
-	NDB_DECLARE(double *, scores);
-	NDB_ALLOC(scores, double, nvec);
+	double *scores = NULL;
+	nalloc(scores, double, nvec);
 
 	/* Use support vectors (subset of training data) */
 	int			n_sv = (int) (nu * nvec);
@@ -858,11 +852,10 @@ detect_anomalies_ocsvm(PG_FUNCTION_ARGS)
 
 	/* Determine threshold (use quantile based on nu) */
 	{
-		double	   *sorted_scores;
 		int			threshold_idx;
 
-		NDB_DECLARE(double *, sorted_scores);
-		NDB_ALLOC(sorted_scores, double, nvec);
+		double *sorted_scores = NULL;
+		nalloc(sorted_scores, double, nvec);
 		memcpy(sorted_scores, scores, sizeof(double) * nvec);
 		qsort(sorted_scores, nvec, sizeof(double), double_compare);
 
@@ -875,12 +868,12 @@ detect_anomalies_ocsvm(PG_FUNCTION_ARGS)
 		for (i = 0; i < nvec; i++)
 			anomalies[i] = (scores[i] < sorted_scores[threshold_idx]);
 
-		NDB_FREE(sorted_scores);
+		nfree(sorted_scores);
 	}
 
 	/* Build result array */
-	NDB_DECLARE(Datum *, result_datums);
-	NDB_ALLOC(result_datums, Datum, nvec);
+	Datum *result_datums = NULL;
+	nalloc(result_datums, Datum, nvec);
 	for (i = 0; i < nvec; i++)
 		result_datums[i] = BoolGetDatum(anomalies[i]);
 
@@ -889,13 +882,13 @@ detect_anomalies_ocsvm(PG_FUNCTION_ARGS)
 							 result_datums, nvec, BOOLOID, typlen, typbyval, typalign);
 
 	for (i = 0; i < nvec; i++)
-		NDB_FREE(vectors[i]);
-	NDB_FREE(vectors);
-	NDB_FREE(scores);
-	NDB_FREE(anomalies);
-	NDB_FREE(result_datums);
-	NDB_FREE(tbl_str);
-	NDB_FREE(vec_col_str);
+		nfree(vectors[i]);
+	nfree(vectors);
+	nfree(scores);
+	nfree(anomalies);
+	nfree(result_datums);
+	nfree(tbl_str);
+	nfree(vec_col_str);
 
 	PG_RETURN_ARRAYTYPE_P(result);
 }

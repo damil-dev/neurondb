@@ -144,7 +144,7 @@ ndb_spi_execute_safe(const char *query, bool read_only, long tcount)
 	}
 	PG_CATCH();
 	{
-		ErrorData  *edata;
+		ErrorData *edata = NULL;
 
 		/*
 		 * Select a safe memory context for error handling. ErrorContext
@@ -472,8 +472,8 @@ ndb_spi_get_jsonb_safe(int row_idx, int col_idx, MemoryContext dest_context)
 	MemoryContext oldcontext;
 	Datum		result_datum;
 	bool		result_isnull;
-	Jsonb	   *temp_jsonb;
-	Jsonb	   *result = NULL;
+	Jsonb *temp_jsonb = NULL;
+	Jsonb *result = NULL;
 	bool		success;
 
 	if (dest_context == NULL)
@@ -519,7 +519,7 @@ ndb_spi_get_jsonb_safe(int row_idx, int col_idx, MemoryContext dest_context)
 	if (result == NULL || VARSIZE(result) < sizeof(Jsonb))
 	{
 		if (result != NULL)
-			NDB_FREE(result);
+			nfree(result);
 		MemoryContextSwitchTo(oldcontext);
 		elog(ERROR,
 			 "neurondb: JSONB copy validation failed");
@@ -539,7 +539,7 @@ ndb_spi_get_text_safe(int row_idx, int col_idx, MemoryContext dest_context)
 	MemoryContext oldcontext;
 	Datum		result_datum;
 	bool		result_isnull;
-	text	   *temp_text;
+	text *temp_text = NULL;
 	text	   *result = NULL;
 	bool		success;
 

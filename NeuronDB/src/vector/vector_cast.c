@@ -56,9 +56,9 @@ PG_FUNCTION_INFO_V1(array_to_vector_float4);
 Datum
 array_to_vector_float4(PG_FUNCTION_ARGS)
 {
-	ArrayType  *arr;
-	Vector	   *result;
-	float4	   *data;
+	ArrayType *arr = NULL;
+	Vector *result = NULL;
+	float4 *data = NULL;
 	int			dim;
 	int			i;
 
@@ -114,9 +114,9 @@ PG_FUNCTION_INFO_V1(array_to_vector_float8);
 Datum
 array_to_vector_float8(PG_FUNCTION_ARGS)
 {
-	ArrayType  *arr;
-	Vector	   *result;
-	float8	   *data;
+	ArrayType *arr = NULL;
+	Vector *result = NULL;
+	float8 *data = NULL;
 	int			dim;
 	int			i;
 
@@ -172,9 +172,9 @@ PG_FUNCTION_INFO_V1(array_to_vector_integer);
 Datum
 array_to_vector_integer(PG_FUNCTION_ARGS)
 {
-	ArrayType  *arr;
-	Vector	   *result;
-	int32	   *data;
+	ArrayType *arr = NULL;
+	Vector *result = NULL;
+	int32 *data = NULL;
 	int			dim;
 	int			i;
 
@@ -235,10 +235,10 @@ PG_FUNCTION_INFO_V1(vector_to_array_float4);
 Datum
 vector_to_array_float4(PG_FUNCTION_ARGS)
 {
-	Vector	   *vec;
-	ArrayType  *result;
-	Datum	   *elems;
-	bool	   *nulls;
+	Vector *vec = NULL;
+	ArrayType *result = NULL;
+	Datum *elems = NULL;
+	bool *nulls = NULL;
 	int			i;
 
 	if (PG_NARGS() != 1)
@@ -263,8 +263,8 @@ vector_to_array_float4(PG_FUNCTION_ARGS)
 
 	elems = NULL;
 	nulls = NULL;
-	NDB_ALLOC(elems, Datum, vec->dim);
-	NDB_ALLOC(nulls, bool, vec->dim);
+	nalloc(elems, Datum, vec->dim);
+	nalloc(nulls, bool, vec->dim);
 	if (elems == NULL || nulls == NULL)
 		ereport(ERROR,
 				(errcode(ERRCODE_OUT_OF_MEMORY),
@@ -282,8 +282,8 @@ vector_to_array_float4(PG_FUNCTION_ARGS)
 							 sizeof(float4),
 							 true,
 							 'i');
-	NDB_FREE(elems);
-	NDB_FREE(nulls);
+	nfree(elems);
+	nfree(nulls);
 
 	PG_RETURN_ARRAYTYPE_P(result);
 }
@@ -292,10 +292,10 @@ PG_FUNCTION_INFO_V1(vector_to_array_float8);
 Datum
 vector_to_array_float8(PG_FUNCTION_ARGS)
 {
-	Vector	   *vec;
-	ArrayType  *result;
-	Datum	   *elems;
-	bool	   *nulls;
+	Vector *vec = NULL;
+	ArrayType *result = NULL;
+	Datum *elems = NULL;
+	bool *nulls = NULL;
 	int			i;
 
 	if (PG_NARGS() != 1)
@@ -320,8 +320,8 @@ vector_to_array_float8(PG_FUNCTION_ARGS)
 
 	elems = NULL;
 	nulls = NULL;
-	NDB_ALLOC(elems, Datum, vec->dim);
-	NDB_ALLOC(nulls, bool, vec->dim);
+	nalloc(elems, Datum, vec->dim);
+	nalloc(nulls, bool, vec->dim);
 	if (elems == NULL || nulls == NULL)
 		ereport(ERROR,
 				(errcode(ERRCODE_OUT_OF_MEMORY),
@@ -339,8 +339,8 @@ vector_to_array_float8(PG_FUNCTION_ARGS)
 							 sizeof(float8),
 							 true,
 							 'd');
-	NDB_FREE(elems);
-	NDB_FREE(nulls);
+	nfree(elems);
+	nfree(nulls);
 
 	PG_RETURN_ARRAYTYPE_P(result);
 }
@@ -349,9 +349,9 @@ PG_FUNCTION_INFO_V1(vector_cast_dimension);
 Datum
 vector_cast_dimension(PG_FUNCTION_ARGS)
 {
-	Vector	   *vec;
+	Vector *vec = NULL;
 	int32		new_dim;
-	Vector	   *result;
+	Vector *result = NULL;
 	int			i;
 
 	if (PG_NARGS() != 2)
@@ -409,7 +409,7 @@ Datum
 vector_to_halfvec(PG_FUNCTION_ARGS)
 {
 	Vector	   *v;
-	VectorF16  *result;
+	VectorF16 *result = NULL;
 	int			size;
 	int			i;
 
@@ -447,7 +447,7 @@ Datum
 halfvec_to_vector(PG_FUNCTION_ARGS)
 {
 	VectorF16  *vf16 = (VectorF16 *) PG_GETARG_POINTER(0);
-	Vector	   *result;
+	Vector *result = NULL;
 	int			i;
 
 	if (vf16 == NULL)
@@ -465,10 +465,10 @@ PG_FUNCTION_INFO_V1(vector_to_sparsevec);
 Datum
 vector_to_sparsevec(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
-	VectorMap  *result;
-	int32	   *indices;
-	float4	   *values;
+	Vector *v = NULL;
+	VectorMap *result = NULL;
+	int32 *indices = NULL;
+	float4 *values = NULL;
 	int32		nnz = 0;
 	int			capacity;
 	int			i;
@@ -483,8 +483,8 @@ vector_to_sparsevec(PG_FUNCTION_ARGS)
 	capacity = 16;
 	indices = NULL;
 	values = NULL;
-	NDB_ALLOC(indices, int32, capacity);
-	NDB_ALLOC(values, float4, capacity);
+	nalloc(indices, int32, capacity);
+	nalloc(values, float4, capacity);
 
 	for (i = 0; i < v->dim; i++)
 	{
@@ -516,8 +516,8 @@ vector_to_sparsevec(PG_FUNCTION_ARGS)
 	memcpy(VECMAP_INDICES(result), indices, sizeof(int32) * nnz);
 	memcpy(VECMAP_VALUES(result), values, sizeof(float4) * nnz);
 
-	NDB_FREE(indices);
-	NDB_FREE(values);
+	nfree(indices);
+	nfree(values);
 
 	PG_RETURN_POINTER(result);
 }
@@ -527,9 +527,9 @@ Datum
 sparsevec_to_vector(PG_FUNCTION_ARGS)
 {
 	VectorMap  *sv = (VectorMap *) PG_GETARG_POINTER(0);
-	Vector	   *result;
-	int32	   *indices;
-	float4	   *values;
+	Vector *result = NULL;
+	int32 *indices = NULL;
+	float4 *values = NULL;
 	int			i;
 
 	if (sv == NULL)

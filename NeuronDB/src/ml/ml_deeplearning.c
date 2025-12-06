@@ -71,9 +71,9 @@ import_pytorch_model(PG_FUNCTION_ARGS)
 	/* Defensive: validate model path */
 	if (path == NULL || strlen(path) == 0)
 	{
-		NDB_FREE(path);
-		NDB_FREE(name);
-		NDB_FREE(type);
+		nfree(path);
+		nfree(name);
+		nfree(type);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("import_pytorch_model: model_path cannot be empty")));
@@ -85,9 +85,9 @@ import_pytorch_model(PG_FUNCTION_ARGS)
 
 		if (stat(path, &st) != 0)
 		{
-			NDB_FREE(path);
-			NDB_FREE(name);
-			NDB_FREE(type);
+			nfree(path);
+			nfree(name);
+			nfree(type);
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("import_pytorch_model: model file not found: %s", path)));
@@ -95,9 +95,9 @@ import_pytorch_model(PG_FUNCTION_ARGS)
 
 		if (!S_ISREG(st.st_mode))
 		{
-			NDB_FREE(path);
-			NDB_FREE(name);
-			NDB_FREE(type);
+			nfree(path);
+			nfree(name);
+			nfree(type);
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("import_pytorch_model: path is not a regular file: %s", path)));
@@ -107,7 +107,7 @@ import_pytorch_model(PG_FUNCTION_ARGS)
 	/* Register model in catalog */
 	{
 		MLCatalogModelSpec spec;
-		Jsonb	   *params_jsonb;
+		Jsonb *params_jsonb = NULL;
 		StringInfoData params_json;
 
 		initStringInfo(&params_json);
@@ -119,7 +119,7 @@ import_pytorch_model(PG_FUNCTION_ARGS)
 			appendStringInfo(&params_json,
 							 "{\"model_type\":\"%s\",\"framework\":\"pytorch\",\"path\":%s}",
 							 type, quoted_path);
-			NDB_FREE(quoted_path);
+			nfree(quoted_path);
 		}
 		params_jsonb = DatumGetJsonbP(DirectFunctionCall1(jsonb_in,
 														  CStringGetDatum(params_json.data)));
@@ -139,7 +139,7 @@ import_pytorch_model(PG_FUNCTION_ARGS)
 		spec.num_features = 0;
 
 		model_id = ml_catalog_register_model(&spec);
-		NDB_FREE(params_json.data);
+		nfree(params_json.data);
 	}
 
 	initStringInfo(&result);
@@ -149,9 +149,9 @@ import_pytorch_model(PG_FUNCTION_ARGS)
 		 model_id,
 		 type);
 
-	NDB_FREE(path);
-	NDB_FREE(name);
-	NDB_FREE(type);
+	nfree(path);
+	nfree(name);
+	nfree(type);
 
 	PG_RETURN_TEXT_P(cstring_to_text(result.data));
 }
@@ -178,8 +178,8 @@ import_tensorflow_model(PG_FUNCTION_ARGS)
 	/* Defensive: validate model path */
 	if (path == NULL || strlen(path) == 0)
 	{
-		NDB_FREE(path);
-		NDB_FREE(name);
+		nfree(path);
+		nfree(name);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("import_tensorflow_model: model_path cannot be empty")));
@@ -194,8 +194,8 @@ import_tensorflow_model(PG_FUNCTION_ARGS)
 
 		if (stat(path, &st) != 0)
 		{
-			NDB_FREE(path);
-			NDB_FREE(name);
+			nfree(path);
+			nfree(name);
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("import_tensorflow_model: model directory not found: %s", path)));
@@ -203,8 +203,8 @@ import_tensorflow_model(PG_FUNCTION_ARGS)
 
 		if (!S_ISDIR(st.st_mode))
 		{
-			NDB_FREE(path);
-			NDB_FREE(name);
+			nfree(path);
+			nfree(name);
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("import_tensorflow_model: path is not a directory: %s", path)));
@@ -214,7 +214,7 @@ import_tensorflow_model(PG_FUNCTION_ARGS)
 	/* Register model in catalog */
 	{
 		MLCatalogModelSpec spec;
-		Jsonb	   *params_jsonb;
+		Jsonb *params_jsonb = NULL;
 		StringInfoData params_json;
 
 		initStringInfo(&params_json);
@@ -226,7 +226,7 @@ import_tensorflow_model(PG_FUNCTION_ARGS)
 			appendStringInfo(&params_json,
 							 "{\"framework\":\"tensorflow\",\"path\":%s}",
 							 quoted_path);
-			NDB_FREE(quoted_path);
+			nfree(quoted_path);
 		}
 		if (input_shapes != NULL)
 		{
@@ -250,7 +250,7 @@ import_tensorflow_model(PG_FUNCTION_ARGS)
 		spec.num_features = 0;
 
 		model_id = ml_catalog_register_model(&spec);
-		NDB_FREE(params_json.data);
+		nfree(params_json.data);
 	}
 
 	initStringInfo(&result);
@@ -259,8 +259,8 @@ import_tensorflow_model(PG_FUNCTION_ARGS)
 		 name,
 		 model_id);
 
-	NDB_FREE(path);
-	NDB_FREE(name);
+	nfree(path);
+	nfree(name);
 
 	PG_RETURN_TEXT_P(cstring_to_text(result.data));
 }
@@ -285,8 +285,8 @@ import_onnx_model(PG_FUNCTION_ARGS)
 	/* Defensive: validate model path */
 	if (path == NULL || strlen(path) == 0)
 	{
-		NDB_FREE(path);
-		NDB_FREE(name);
+		nfree(path);
+		nfree(name);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("import_onnx_model: model_path cannot be empty")));
@@ -298,8 +298,8 @@ import_onnx_model(PG_FUNCTION_ARGS)
 
 		if (stat(path, &st) != 0)
 		{
-			NDB_FREE(path);
-			NDB_FREE(name);
+			nfree(path);
+			nfree(name);
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("import_onnx_model: model file not found: %s", path)));
@@ -307,8 +307,8 @@ import_onnx_model(PG_FUNCTION_ARGS)
 
 		if (!S_ISREG(st.st_mode))
 		{
-			NDB_FREE(path);
-			NDB_FREE(name);
+			nfree(path);
+			nfree(name);
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("import_onnx_model: path is not a regular file: %s", path)));
@@ -318,7 +318,7 @@ import_onnx_model(PG_FUNCTION_ARGS)
 	/* Register model in catalog */
 	{
 		MLCatalogModelSpec spec;
-		Jsonb	   *params_jsonb;
+		Jsonb *params_jsonb = NULL;
 		StringInfoData params_json;
 
 		initStringInfo(&params_json);
@@ -331,7 +331,7 @@ import_onnx_model(PG_FUNCTION_ARGS)
 							 "{\"framework\":\"onnx\",\"path\":%s,\"optimized\":%s}",
 							 quoted_path,
 							 optimize ? "true" : "false");
-			NDB_FREE(quoted_path);
+			nfree(quoted_path);
 		}
 		params_jsonb = DatumGetJsonbP(DirectFunctionCall1(jsonb_in,
 														  CStringGetDatum(params_json.data)));
@@ -351,7 +351,7 @@ import_onnx_model(PG_FUNCTION_ARGS)
 		spec.num_features = 0;
 
 		model_id = ml_catalog_register_model(&spec);
-		NDB_FREE(params_json.data);
+		nfree(params_json.data);
 	}
 
 	initStringInfo(&result);
@@ -361,8 +361,8 @@ import_onnx_model(PG_FUNCTION_ARGS)
 		 model_id,
 		 optimize ? "yes" : "no");
 
-	NDB_FREE(path);
-	NDB_FREE(name);
+	nfree(path);
+	nfree(name);
 
 	PG_RETURN_TEXT_P(cstring_to_text(result.data));
 }
@@ -380,13 +380,13 @@ dl_predict(PG_FUNCTION_ARGS)
 	bool		return_probabilities = PG_ARGISNULL(2) ? false : PG_GETARG_BOOL(2);
 
 	int			n_inputs;
-	ArrayType  *result_array;
-	float	   *predictions;
-	Datum	   *elems;
+	ArrayType *result_array = NULL;
+	float *predictions = NULL;
+	Datum *elems = NULL;
 	int			i;
 	int			n_outputs = 10;
 #ifdef HAVE_ONNX_RUNTIME
-	NDB_DECLARE(ONNXTensor *, output_tensor);	/* ONNX output tensor */
+	ONNXTensor *output_tensor = NULL;	/* ONNX output tensor */
 #endif
 
 	/* Get input size */
@@ -405,9 +405,9 @@ dl_predict(PG_FUNCTION_ARGS)
 
 	/* Load model from catalog */
 	{
-		NDB_DECLARE(bytea *, model_data);
-		NDB_DECLARE(Jsonb *, parameters);
-		NDB_DECLARE(Jsonb *, metrics);
+		bytea *model_data = NULL;
+		Jsonb *parameters = NULL;
+		Jsonb *metrics = NULL;
 
 		if (!ml_catalog_fetch_model_payload(model_id, &model_data,
 											&parameters, &metrics))
@@ -420,11 +420,11 @@ dl_predict(PG_FUNCTION_ARGS)
 		/* Extract model framework from parameters */
 		if (parameters != NULL)
 		{
-			JsonbIterator *it;
+			JsonbIterator *it = NULL;
 			JsonbValue	v;
 			int			r;
 
-			NDB_DECLARE(char *, framework);
+			char *framework = NULL;
 
 			it = JsonbIteratorInit(&parameters->root);
 			while ((r = JsonbIteratorNext(&it, &v, false)) != WJB_DONE)
@@ -438,7 +438,7 @@ dl_predict(PG_FUNCTION_ARGS)
 					{
 						framework = pnstrdup(v.val.string.val, v.val.string.len);
 					}
-					NDB_FREE(key);
+					nfree(key);
 				}
 			}
 
@@ -449,8 +449,8 @@ dl_predict(PG_FUNCTION_ARGS)
 				{
 					/* Use ONNX runtime for inference */
 #ifdef HAVE_ONNX_RUNTIME
-					NDB_DECLARE(ONNXModelSession *, session);
-					NDB_DECLARE(ONNXTensor *, input_tensor);
+					ONNXModelSession *session = NULL;
+					ONNXTensor *input_tensor = NULL;
 					char		model_name_str[256];
 					int			d;
 
@@ -568,7 +568,7 @@ dl_predict(PG_FUNCTION_ARGS)
 					n_outputs = 10;
 				}
 
-				NDB_FREE(framework);
+				nfree(framework);
 			}
 			else
 			{
@@ -643,8 +643,8 @@ dl_predict(PG_FUNCTION_ARGS)
 	result_array = construct_array(
 								   elems, n_outputs, FLOAT4OID, sizeof(float4), true, 'i');
 
-	NDB_FREE(predictions);
-	NDB_FREE(elems);
+	nfree(predictions);
+	nfree(elems);
 
 	PG_RETURN_ARRAYTYPE_P(result_array);
 }
@@ -686,7 +686,7 @@ finetune_dl_model(PG_FUNCTION_ARGS)
 		 epochs,
 		 learning_rate);
 
-	NDB_FREE(table);
+	nfree(table);
 
 	PG_RETURN_TEXT_P(cstring_to_text(result.data));
 }
@@ -723,8 +723,8 @@ export_dl_model(PG_FUNCTION_ARGS)
 	appendStringInfo(
 					 &result, "Model exported to %s format at: %s", format, path);
 
-	NDB_FREE(format);
-	NDB_FREE(path);
+	nfree(format);
+	nfree(path);
 
 	PG_RETURN_TEXT_P(cstring_to_text(result.data));
 }
@@ -782,8 +782,8 @@ dl_predict_batch(PG_FUNCTION_ARGS)
 	/* Defensive: validate model_id */
 	if (model_id <= 0)
 	{
-		NDB_FREE(in_table);
-		NDB_FREE(out_table);
+		nfree(in_table);
+		nfree(out_table);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("dl_predict_batch: model_id must be positive")));
@@ -795,7 +795,7 @@ dl_predict_batch(PG_FUNCTION_ARGS)
 		StringInfoData sql;
 		int			total_rows = 0;
 
-		NDB_DECLARE(NdbSpiSession *, spi_session);
+		NdbSpiSession *spi_session = NULL;
 		MemoryContext oldcontext = CurrentMemoryContext;
 
 		NDB_SPI_SESSION_BEGIN(spi_session, oldcontext);
@@ -873,8 +873,8 @@ dl_predict_batch(PG_FUNCTION_ARGS)
 		NDB_SPI_SESSION_END(spi_session);
 	}
 
-	NDB_FREE(in_table);
-	NDB_FREE(out_table);
+	nfree(in_table);
+	nfree(out_table);
 
 	PG_RETURN_INT32(processed_rows);
 }
@@ -913,7 +913,7 @@ quantize_dl_model(PG_FUNCTION_ARGS)
 		 quant_type,
 		 quantized_model_id);
 
-	NDB_FREE(quant_type);
+	nfree(quant_type);
 
 	PG_RETURN_TEXT_P(cstring_to_text(result.data));
 }

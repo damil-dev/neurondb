@@ -92,7 +92,7 @@ Datum
 vector_l2_distance_gpu(PG_FUNCTION_ARGS)
 {
 	Vector	   *a;
-	Vector	   *b;
+	Vector *b = NULL;
 	float4		result = -1.0f;
 	extern float4 l2_distance(Vector *a, Vector *b);
 
@@ -116,7 +116,7 @@ Datum
 vector_cosine_distance_gpu(PG_FUNCTION_ARGS)
 {
 	Vector	   *a;
-	Vector	   *b;
+	Vector *b = NULL;
 	float4		result = -1.0f;
 	extern float4 cosine_distance(Vector *a, Vector *b);
 
@@ -140,7 +140,7 @@ Datum
 vector_inner_product_gpu(PG_FUNCTION_ARGS)
 {
 	Vector	   *a;
-	Vector	   *b;
+	Vector *b = NULL;
 	float4		result = -1.0f;
 	extern float4 inner_product_distance(Vector *a, Vector *b);
 
@@ -170,14 +170,14 @@ vector_to_int8_gpu(PG_FUNCTION_ARGS)
 {
 	Vector	   *v;
 	int			count;
-	bytea	   *out;
-	char	   *out_raw = NULL;
+	bytea *out = NULL;
+	char *out_raw = NULL;
 
 	v = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(v);
 	count = v->dim;
 
-	NDB_ALLOC(out_raw, char, VARHDRSZ + count);
+	nalloc(out_raw, char, VARHDRSZ + count);
 	out = (bytea *) out_raw;
 	SET_VARSIZE(out, VARHDRSZ + count);
 
@@ -228,18 +228,18 @@ PG_FUNCTION_INFO_V1(vector_to_fp16_gpu);
 Datum
 vector_to_fp16_gpu(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
+	Vector *v = NULL;
 	int			count;
 	int			out_bytes;
-	bytea	   *out;
-	char	   *out_raw = NULL;
+	bytea *out = NULL;
+	char *out_raw = NULL;
 
 	v = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(v);
 	count = v->dim;
 	out_bytes = count * 2;		/* 2 bytes per fp16 */
 
-	NDB_ALLOC(out_raw, char, VARHDRSZ + out_bytes);
+	nalloc(out_raw, char, VARHDRSZ + out_bytes);
 	out = (bytea *) out_raw;
 	SET_VARSIZE(out, VARHDRSZ + out_bytes);
 
@@ -361,18 +361,18 @@ PG_FUNCTION_INFO_V1(vector_to_binary_gpu);
 Datum
 vector_to_binary_gpu(PG_FUNCTION_ARGS)
 {
-	Vector	   *v;
+	Vector *v = NULL;
 	int			count;
 	int			out_bytes;
-	bytea	   *out;
-	char	   *out_raw = NULL;
+	bytea *out = NULL;
+	char *out_raw = NULL;
 
 	v = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(v);
 	count = v->dim;
 	out_bytes = (count + 7) / 8;
 
-	NDB_ALLOC(out_raw, char, VARHDRSZ + out_bytes);
+	nalloc(out_raw, char, VARHDRSZ + out_bytes);
 	out = (bytea *) out_raw;
 	SET_VARSIZE(out, VARHDRSZ + out_bytes);
 
@@ -410,8 +410,8 @@ Datum
 vector_to_uint8_gpu(PG_FUNCTION_ARGS)
 {
 	Vector	   *v;
-	VectorU8   *result;
-	bytea	   *out;
+	VectorU8 *result = NULL;
+	bytea *out = NULL;
 
 	v = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(v);
@@ -433,8 +433,8 @@ Datum
 vector_to_ternary_gpu(PG_FUNCTION_ARGS)
 {
 	Vector	   *v;
-	VectorTernary *result;
-	bytea	   *out;
+	VectorTernary *result = NULL;
+	bytea *out = NULL;
 
 	v = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(v);
@@ -456,8 +456,8 @@ Datum
 vector_to_int4_gpu(PG_FUNCTION_ARGS)
 {
 	Vector	   *v;
-	VectorI4   *result;
-	bytea	   *out;
+	VectorI4 *result = NULL;
+	bytea *out = NULL;
 
 	v = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(v);
@@ -499,12 +499,12 @@ PG_FUNCTION_INFO_V1(hnsw_knn_search_gpu);
 Datum
 hnsw_knn_search_gpu(PG_FUNCTION_ARGS)
 {
-	FuncCallContext *funcctx;
+	FuncCallContext *funcctx = NULL;
 	TupleDesc	tupdesc;
 	MemoryContext oldcontext;
-	text	   *index_name_text;
-	char	   *index_name;
-	Vector	   *query;
+	text *index_name_text = NULL;
+	char *index_name = NULL;
+	Vector *query = NULL;
 	int32		k;
 	int32		ef_search;
 	const ndb_gpu_backend *backend;
@@ -534,7 +534,7 @@ hnsw_knn_search_gpu(PG_FUNCTION_ARGS)
 		/* Followed by vector and neighbors, but we only need heapPtr */
 	}			HnswNodeData;
 	typedef HnswNodeData * HnswNode;
-	HnswMetaPageData *meta;
+	HnswMetaPageData *meta = NULL;
 	ItemPointerData *results = NULL;
 	float4	   *distances = NULL;
 	int			resultCount = 0;
@@ -648,17 +648,17 @@ hnsw_knn_search_gpu(PG_FUNCTION_ARGS)
 			 */
 			BlockNumber current = meta->entryPoint;
 			BlockNumber *candidates = NULL;
-			float4	   *candidateDists = NULL;
+			float4 *candidateDists = NULL;
 			int			candidateCount = 0;
 			int			maxCandidates = ef_search > k ? ef_search : k * 2;
-			bool	   *visited = NULL;
+			bool *visited = NULL;
 			int			visitedSize = RelationGetNumberOfBlocks(indexRel);
 			int			i,
 						j;
 			extern float4 l2_distance(Vector *a, Vector *b);
 
-			NDB_ALLOC(candidates, BlockNumber, maxCandidates);
-			NDB_ALLOC(candidateDists, float4, maxCandidates);
+			nalloc(candidates, BlockNumber, maxCandidates);
+			nalloc(candidateDists, float4, maxCandidates);
 			visited = (bool *) palloc0(sizeof(bool) * visitedSize);
 
 			/* Start from entry point */
@@ -666,10 +666,10 @@ hnsw_knn_search_gpu(PG_FUNCTION_ARGS)
 				Buffer		nodeBuf;
 				Page		nodePage;
 				HnswNode	node;
-				float4	   *nodeVector;
-				Vector	   *nodeVec;
+				float4 *nodeVector = NULL;
+				Vector *nodeVec = NULL;
 				float4		dist;
-				char	   *nodeVec_raw = NULL;
+				char *nodeVec_raw = NULL;
 
 				nodeBuf = ReadBuffer(indexRel, current);
 				LockBuffer(nodeBuf, BUFFER_LOCK_SHARE);
@@ -680,7 +680,7 @@ hnsw_knn_search_gpu(PG_FUNCTION_ARGS)
 												  PageGetItemId(nodePage, FirstOffsetNumber));
 					nodeVector = (float4 *) ((char *) (node) + MAXALIGN(sizeof(HnswNodeData)));
 
-					NDB_ALLOC(nodeVec_raw, char, VARHDRSZ + sizeof(int16) * 2 + sizeof(float4) * node->dim);
+					nalloc(nodeVec_raw, char, VARHDRSZ + sizeof(int16) * 2 + sizeof(float4) * node->dim);
 					nodeVec = (Vector *) nodeVec_raw;
 					SET_VARSIZE(nodeVec, VARHDRSZ + sizeof(int16) * 2 + sizeof(float4) * node->dim);
 					nodeVec->dim = node->dim;
@@ -693,7 +693,7 @@ hnsw_knn_search_gpu(PG_FUNCTION_ARGS)
 					candidateCount = 1;
 					visited[current] = true;
 
-					NDB_FREE(nodeVec);
+					nfree(nodeVec);
 				}
 				UnlockReleaseBuffer(nodeBuf);
 			}
@@ -707,7 +707,7 @@ hnsw_knn_search_gpu(PG_FUNCTION_ARGS)
 				Buffer		nodeBuf;
 				Page		nodePage;
 				HnswNode	node;
-				BlockNumber *neighbors;
+				BlockNumber *neighbors = NULL;
 				int16		neighborCount;
 
 				nodeBuf = ReadBuffer(indexRel, candidates[i]);
@@ -728,10 +728,10 @@ hnsw_knn_search_gpu(PG_FUNCTION_ARGS)
 							Buffer		neighborBuf;
 							Page		neighborPage;
 							HnswNode	neighbor;
-							float4	   *neighborVector;
-							Vector	   *neighborVec;
+							float4 *neighborVector = NULL;
+							Vector *neighborVec = NULL;
 							float4		dist;
-							char	   *neighborVec_raw = NULL;
+							char *neighborVec_raw = NULL;
 
 							neighborBuf = ReadBuffer(indexRel, neighbors[j]);
 							LockBuffer(neighborBuf, BUFFER_LOCK_SHARE);
@@ -742,7 +742,7 @@ hnsw_knn_search_gpu(PG_FUNCTION_ARGS)
 																  PageGetItemId(neighborPage, FirstOffsetNumber));
 								neighborVector = (float4 *) ((char *) (neighbor) + MAXALIGN(sizeof(HnswNodeData)));
 
-								NDB_ALLOC(neighborVec_raw, char, VARHDRSZ + sizeof(int16) * 2 + sizeof(float4) * neighbor->dim);
+								nalloc(neighborVec_raw, char, VARHDRSZ + sizeof(int16) * 2 + sizeof(float4) * neighbor->dim);
 								neighborVec = (Vector *) neighborVec_raw;
 								SET_VARSIZE(neighborVec, VARHDRSZ + sizeof(int16) * 2 + sizeof(float4) * neighbor->dim);
 								neighborVec->dim = neighbor->dim;
@@ -755,7 +755,7 @@ hnsw_knn_search_gpu(PG_FUNCTION_ARGS)
 								candidateCount++;
 								visited[neighbors[j]] = true;
 
-								NDB_FREE(neighborVec);
+								nfree(neighborVec);
 							}
 							UnlockReleaseBuffer(neighborBuf);
 						}
@@ -768,15 +768,15 @@ hnsw_knn_search_gpu(PG_FUNCTION_ARGS)
 			if (candidateCount > 0)
 			{
 				/* Simple selection sort for top-k */
-				int		   *topKIndices = NULL;
+				int *topKIndices = NULL;
 				int			topKCount = candidateCount < k ? candidateCount : k;
 				int			l,
 							m,
 							minIdx;
 				float4		minDist;
 				ItemPointerData *results_local = NULL;
-				float4	   *distances_local = NULL;
-				NDB_ALLOC(topKIndices, int, k);
+				float4 *distances_local = NULL;
+				nalloc(topKIndices, int, k);
 
 				for (l = 0; l < topKCount; l++)
 				{
@@ -805,8 +805,8 @@ hnsw_knn_search_gpu(PG_FUNCTION_ARGS)
 
 				/* Convert to results */
 				resultCount = topKCount;
-				NDB_ALLOC(results_local, ItemPointerData, resultCount);
-				NDB_ALLOC(distances_local, float4, resultCount);
+				nalloc(results_local, ItemPointerData, resultCount);
+				nalloc(distances_local, float4, resultCount);
 				results = results_local;
 				distances = distances_local;
 
@@ -829,12 +829,12 @@ hnsw_knn_search_gpu(PG_FUNCTION_ARGS)
 					UnlockReleaseBuffer(resultBuf);
 				}
 
-				NDB_FREE(topKIndices);
+				nfree(topKIndices);
 			}
 
-			NDB_FREE(candidates);
-			NDB_FREE(candidateDists);
-			NDB_FREE(visited);
+			nfree(candidates);
+			nfree(candidateDists);
+			nfree(visited);
 
 			elog(DEBUG1,
 				 "hnsw_knn_search_gpu: Completed graph traversal, returning %d result(s)",
@@ -857,7 +857,7 @@ hnsw_knn_search_gpu(PG_FUNCTION_ARGS)
 			typedef struct
 			{
 				ItemPointerData *results;
-				float4	   *distances;
+				float4 *distances;
 				int			count;
 			}			HnswSearchResults;
 			HnswSearchResults *searchResults = NULL;
@@ -865,7 +865,7 @@ hnsw_knn_search_gpu(PG_FUNCTION_ARGS)
 			funcctx->max_calls = resultCount;
 			if (resultCount > 0)
 			{
-				NDB_ALLOC(searchResults, HnswSearchResults, 1);
+				nalloc(searchResults, HnswSearchResults, 1);
 				searchResults->results = results;
 				searchResults->distances = distances;
 				searchResults->count = resultCount;
@@ -875,9 +875,9 @@ hnsw_knn_search_gpu(PG_FUNCTION_ARGS)
 			{
 				funcctx->user_fctx = NULL;
 				if (results)
-					NDB_FREE(results);
+					nfree(results);
 				if (distances)
-					NDB_FREE(distances);
+					nfree(distances);
 			}
 		}
 
@@ -890,7 +890,7 @@ hnsw_knn_search_gpu(PG_FUNCTION_ARGS)
 		typedef struct
 		{
 			ItemPointerData *results;
-			float4	   *distances;
+			float4 *distances;
 			int			count;
 		}			HnswSearchResults;
 		HnswSearchResults *searchResults = (HnswSearchResults *) funcctx->user_fctx;
@@ -930,7 +930,7 @@ PG_FUNCTION_INFO_V1(ivf_knn_search_gpu);
 Datum
 ivf_knn_search_gpu(PG_FUNCTION_ARGS)
 {
-	FuncCallContext *funcctx;
+	FuncCallContext *funcctx = NULL;
 	ItemPointerData *results = NULL;
 	float4	   *distances = NULL;
 	int			resultCount = 0;
@@ -939,9 +939,9 @@ ivf_knn_search_gpu(PG_FUNCTION_ARGS)
 	{
 		TupleDesc	tupdesc;
 		MemoryContext oldcontext;
-		text	   *index_name_text;
-		char	   *index_name;
-		Vector	   *query;
+		text *index_name_text = NULL;
+		char *index_name = NULL;
+		Vector *query = NULL;
 		int32		k;
 		int32		nprobe;
 		const ndb_gpu_backend *backend;
@@ -959,7 +959,7 @@ ivf_knn_search_gpu(PG_FUNCTION_ARGS)
 			BlockNumber centroidsBlock;
 			int64		insertedVectors;
 		}			IvfMetaPageData;
-		IvfMetaPageData *meta;
+		IvfMetaPageData *meta = NULL;
 
 		index_name_text = PG_GETARG_TEXT_P(0);
 		query = PG_GETARG_VECTOR_P(1);
@@ -1059,10 +1059,10 @@ ivf_knn_search_gpu(PG_FUNCTION_ARGS)
 			Buffer		centroidsBuf;
 			Page		centroidsPage;
 			OffsetNumber maxoff;
-			float4	   *centroids = NULL;
-			float4	   *centroid_distances = NULL;
-			int		   *selected_clusters = NULL;
-			float4	   *candidate_vectors = NULL;
+			float4 *centroids = NULL;
+			float4 *centroid_distances = NULL;
+			int *selected_clusters = NULL;
+			float4 *candidate_vectors = NULL;
 			ItemPointerData *candidate_tids = NULL;
 			int			candidate_count = 0;
 			int			i,
@@ -1086,16 +1086,16 @@ ivf_knn_search_gpu(PG_FUNCTION_ARGS)
 			maxoff = PageGetMaxOffsetNumber(centroidsPage);
 
 			/* Allocate centroids array */
-			NDB_ALLOC(centroids, float4, meta->nlists * query->dim);
-			NDB_ALLOC(centroid_distances, float4, meta->nlists);
-			NDB_ALLOC(selected_clusters, int, nprobe);
+			nalloc(centroids, float4, meta->nlists * query->dim);
+			nalloc(centroid_distances, float4, meta->nlists);
+			nalloc(selected_clusters, int, nprobe);
 
 			/* Extract centroids from page */
 			for (i = 0; i < meta->nlists && i < maxoff; i++)
 			{
 				OffsetNumber offnum = FirstOffsetNumber + i;
-				IvfCentroidData *centroid;
-				float4	   *centroid_vec;
+				IvfCentroidData *centroid = NULL;
+				float4 *centroid_vec = NULL;
 
 				if (offnum > maxoff)
 					break;
@@ -1185,15 +1185,15 @@ ivf_knn_search_gpu(PG_FUNCTION_ARGS)
 			centroidsPage = BufferGetPage(centroidsBuf);
 			maxoff = PageGetMaxOffsetNumber(centroidsPage);
 
-			NDB_ALLOC(candidate_vectors, float4, max_candidates * query->dim);
-			NDB_ALLOC(candidate_tids, ItemPointerData, max_candidates);
+			nalloc(candidate_vectors, float4, max_candidates * query->dim);
+			nalloc(candidate_tids, ItemPointerData, max_candidates);
 
 			/* Collect candidates from selected clusters */
 			for (i = 0; i < nprobe && candidate_count < max_candidates; i++)
 			{
 				int			cluster_id = selected_clusters[i];
 				OffsetNumber offnum;
-				IvfCentroidData *centroid;
+				IvfCentroidData *centroid = NULL;
 				BlockNumber list_block;
 
 				if (cluster_id < 0 || cluster_id >= maxoff)
@@ -1215,7 +1215,7 @@ ivf_knn_search_gpu(PG_FUNCTION_ARGS)
 				{
 					Buffer		list_buf;
 					Page		list_page;
-					IvfListPageHeader *list_header;
+					IvfListPageHeader *list_header = NULL;
 					OffsetNumber list_maxoff;
 					OffsetNumber list_offnum;
 
@@ -1263,14 +1263,14 @@ ivf_knn_search_gpu(PG_FUNCTION_ARGS)
 			/* Step 4: Compute distances on GPU for all candidates */
 			if (candidate_count > 0)
 			{
-				float4	   *candidate_distances = NULL;
-				int		   *indices = NULL;
+				float4 *candidate_distances = NULL;
+				int *indices = NULL;
 				int			j_local;
 				ItemPointerData *results_local = NULL;
-				float4	   *distances_local = NULL;
+				float4 *distances_local = NULL;
 
-				NDB_ALLOC(candidate_distances, float4, candidate_count);
-				NDB_ALLOC(indices, int, candidate_count);
+				nalloc(candidate_distances, float4, candidate_count);
+				nalloc(indices, int, candidate_count);
 
 				if (backend && backend->launch_l2_distance)
 				{
@@ -1341,8 +1341,8 @@ ivf_knn_search_gpu(PG_FUNCTION_ARGS)
 
 				/* Allocate result arrays */
 				resultCount = (k < candidate_count) ? k : candidate_count;
-				NDB_ALLOC(results_local, ItemPointerData, resultCount);
-				NDB_ALLOC(distances_local, float4, resultCount);
+				nalloc(results_local, ItemPointerData, resultCount);
+				nalloc(distances_local, float4, resultCount);
 				results = results_local;
 				distances = distances_local;
 
@@ -1352,8 +1352,8 @@ ivf_knn_search_gpu(PG_FUNCTION_ARGS)
 					distances[i] = candidate_distances[indices[i]];
 				}
 
-				NDB_FREE(candidate_distances);
-				NDB_FREE(indices);
+				nfree(candidate_distances);
+				nfree(indices);
 			}
 			else
 			{
@@ -1363,15 +1363,15 @@ ivf_knn_search_gpu(PG_FUNCTION_ARGS)
 			}
 
 			if (centroids)
-				NDB_FREE(centroids);
+				nfree(centroids);
 			if (centroid_distances)
-				NDB_FREE(centroid_distances);
+				nfree(centroid_distances);
 			if (selected_clusters)
-				NDB_FREE(selected_clusters);
+				nfree(selected_clusters);
 			if (candidate_vectors)
-				NDB_FREE(candidate_vectors);
+				nfree(candidate_vectors);
 			if (candidate_tids)
-				NDB_FREE(candidate_tids);
+				nfree(candidate_tids);
 		}
 		else
 		{
@@ -1392,7 +1392,7 @@ ivf_knn_search_gpu(PG_FUNCTION_ARGS)
 			typedef struct
 			{
 				ItemPointerData *results;
-				float4	   *distances;
+				float4 *distances;
 				int			count;
 			}			IvfSearchResults;
 			IvfSearchResults *searchResults = NULL;
@@ -1400,7 +1400,7 @@ ivf_knn_search_gpu(PG_FUNCTION_ARGS)
 			funcctx->max_calls = resultCount;
 			if (resultCount > 0)
 			{
-				NDB_ALLOC(searchResults, IvfSearchResults, 1);
+				nalloc(searchResults, IvfSearchResults, 1);
 				searchResults->results = results;
 				searchResults->distances = distances;
 				searchResults->count = resultCount;
@@ -1410,9 +1410,9 @@ ivf_knn_search_gpu(PG_FUNCTION_ARGS)
 			{
 				funcctx->user_fctx = NULL;
 				if (results)
-					NDB_FREE(results);
+					nfree(results);
 				if (distances)
-					NDB_FREE(distances);
+					nfree(distances);
 			}
 		}
 		MemoryContextSwitchTo(oldcontext);
@@ -1424,7 +1424,7 @@ ivf_knn_search_gpu(PG_FUNCTION_ARGS)
 		typedef struct
 		{
 			ItemPointerData *results;
-			float4	   *distances;
+			float4 *distances;
 			int			count;
 		}			IvfSearchResults;
 		IvfSearchResults *searchResults = (IvfSearchResults *) funcctx->user_fctx;

@@ -119,7 +119,7 @@ ndb_cuda_nb_pack_model(const GaussianNBModel * model,
 	}
 
 	/* Note: palloc never returns NULL in PostgreSQL - it errors on failure */
-	NDB_ALLOC(blob_raw, char, VARHDRSZ + payload_bytes);
+	nalloc(blob_raw, char, VARHDRSZ + payload_bytes);
 	blob = (bytea *) blob_raw;
 
 	SET_VARSIZE(blob, VARHDRSZ + payload_bytes);
@@ -145,7 +145,7 @@ ndb_cuda_nb_pack_model(const GaussianNBModel * model,
 			{
 				if (errstr)
 					*errstr = pstrdup("invalid NB model: class_priors contains invalid value (must be in [0, 1])");
-				NDB_FREE(blob);
+				nfree(blob);
 				return -1;
 			}
 			priors_dest[i] = prior;
@@ -173,7 +173,7 @@ ndb_cuda_nb_pack_model(const GaussianNBModel * model,
 					{
 						if (errstr)
 							*errstr = pstrdup("invalid NB model: means contains non-finite value");
-						NDB_FREE(blob);
+						nfree(blob);
 						return -1;
 					}
 					means_dest[i * model->n_features + j] = mean_val;
@@ -208,7 +208,7 @@ ndb_cuda_nb_pack_model(const GaussianNBModel * model,
 					{
 						if (errstr)
 							*errstr = pstrdup("invalid NB model: variances contains invalid value");
-						NDB_FREE(blob);
+						nfree(blob);
 						return -1;
 					}
 					/* Regularize to avoid division by zero */
@@ -259,7 +259,7 @@ ndb_cuda_nb_pack_model(const GaussianNBModel * model,
 		}
 		PG_END_TRY();
 
-		NDB_FREE(buf.data);
+		nfree(buf.data);
 		*metrics = metrics_json;
 	}
 
@@ -356,8 +356,8 @@ ndb_cuda_nb_train(const float *features,
 
 	/* Allocate host memory with overflow checks */
 	/* Note: palloc never returns NULL in PostgreSQL - it errors on failure */
-	NDB_ALLOC(class_counts, int, class_count);
-	NDB_ALLOC(class_priors, double, class_count);
+	nalloc(class_counts, int, class_count);
+	nalloc(class_priors, double, class_count);
 
 	if (feature_dim > 0 && (size_t) class_count > MaxAllocSize / sizeof(double) / (size_t) feature_dim)
 	{
@@ -365,8 +365,8 @@ ndb_cuda_nb_train(const float *features,
 			*errstr = pstrdup("CUDA NB train: means array size exceeds MaxAllocSize");
 		goto cleanup;
 	}
-	NDB_ALLOC(means, double, class_count * feature_dim);
-	NDB_ALLOC(variances, double, class_count * feature_dim);
+	nalloc(means, double, class_count * feature_dim);
+	nalloc(variances, double, class_count * feature_dim);
 
 	/* Validate input data for NaN/Inf before processing */
 	/* Use rint() to match CPU training behavior - labels must be integral */
@@ -477,8 +477,8 @@ ndb_cuda_nb_train(const float *features,
 	model.n_classes = class_count;
 	model.n_features = feature_dim;
 	model.class_priors = class_priors;
-	NDB_ALLOC(model_means, double *, class_count);
-	NDB_ALLOC(model_variances, double *, class_count);
+	nalloc(model_means, double *, class_count);
+	nalloc(model_variances, double *, class_count);
 	model.means = model_means;
 	model.variances = model_variances;
 
@@ -508,19 +508,19 @@ ndb_cuda_nb_train(const float *features,
 cleanup:
 	/* Free model structure arrays (not the data they point to) */
 	if (model.means != NULL)
-		NDB_FREE(model.means);
+		nfree(model.means);
 	if (model.variances != NULL)
-		NDB_FREE(model.variances);
+		nfree(model.variances);
 
 	/* Free host memory */
 	if (class_counts != NULL)
-		NDB_FREE(class_counts);
+		nfree(class_counts);
 	if (class_priors != NULL)
-		NDB_FREE(class_priors);
+		nfree(class_priors);
 	if (means != NULL)
-		NDB_FREE(means);
+		nfree(means);
 	if (variances != NULL)
-		NDB_FREE(variances);
+		nfree(variances);
 
 	return rc;
 }
@@ -538,7 +538,7 @@ ndb_cuda_nb_predict(const bytea * model_data,
 	const double *priors;
 	const double *means;
 	const double *variances;
-	NDB_DECLARE(double *, class_log_probs);
+	double *class_log_probs = NULL;
 	double		max_log_prob;
 	int			best_class;
 	int			i,
@@ -618,7 +618,7 @@ ndb_cuda_nb_predict(const bytea * model_data,
 	variances = (const double *) (base + sizeof(NdbCudaNbModelHeader) + sizeof(double) * (size_t) hdr->n_classes + sizeof(double) * (size_t) hdr->n_classes * (size_t) hdr->n_features);
 
 	/* Note: palloc never returns NULL in PostgreSQL - it errors on failure */
-	NDB_ALLOC(class_log_probs, double, hdr->n_classes);
+	nalloc(class_log_probs, double, hdr->n_classes);
 
 	/*
 	 * Note: priors, means, variances are computed from valid bytea offsets,
@@ -634,7 +634,7 @@ ndb_cuda_nb_predict(const bytea * model_data,
 		{
 			if (errstr)
 				*errstr = pstrdup("CUDA NB predict: invalid prior in model");
-			NDB_FREE(class_log_probs);
+			nfree(class_log_probs);
 			return -1;
 		}
 		log_prob = log(prior + 1e-10);	/* Add small epsilon to avoid log(0) */
@@ -649,7 +649,7 @@ ndb_cuda_nb_predict(const bytea * model_data,
 			{
 				if (errstr)
 					*errstr = pstrdup("CUDA NB predict: invalid mean or variance in model");
-				NDB_FREE(class_log_probs);
+				nfree(class_log_probs);
 				return -1;
 			}
 
@@ -661,7 +661,7 @@ ndb_cuda_nb_predict(const bytea * model_data,
 			{
 				if (errstr)
 					*errstr = pstrdup("CUDA NB predict: variance is zero or negative");
-				NDB_FREE(class_log_probs);
+				nfree(class_log_probs);
 				return -1;
 			}
 
@@ -672,7 +672,7 @@ ndb_cuda_nb_predict(const bytea * model_data,
 			{
 				if (errstr)
 					*errstr = pstrdup("CUDA NB predict: computed non-finite log_pdf");
-				NDB_FREE(class_log_probs);
+				nfree(class_log_probs);
 				return -1;
 			}
 
@@ -684,7 +684,7 @@ ndb_cuda_nb_predict(const bytea * model_data,
 		{
 			if (errstr)
 				*errstr = pstrdup("CUDA NB predict: computed non-finite log_prob");
-			NDB_FREE(class_log_probs);
+			nfree(class_log_probs);
 			return -1;
 		}
 
@@ -714,7 +714,7 @@ ndb_cuda_nb_predict(const bytea * model_data,
 		{
 			if (errstr)
 				*errstr = pstrdup("CUDA NB predict: max_log_prob is non-finite");
-			NDB_FREE(class_log_probs);
+			nfree(class_log_probs);
 			return -1;
 		}
 
@@ -726,7 +726,7 @@ ndb_cuda_nb_predict(const bytea * model_data,
 			{
 				if (errstr)
 					*errstr = pstrdup("CUDA NB predict: computed non-finite exp value");
-				NDB_FREE(class_log_probs);
+				nfree(class_log_probs);
 				return -1;
 			}
 			sum += exp_val;
@@ -737,7 +737,7 @@ ndb_cuda_nb_predict(const bytea * model_data,
 		{
 			if (errstr)
 				*errstr = pstrdup("CUDA NB predict: sum of probabilities is zero or non-finite");
-			NDB_FREE(class_log_probs);
+			nfree(class_log_probs);
 			return -1;
 		}
 
@@ -746,7 +746,7 @@ ndb_cuda_nb_predict(const bytea * model_data,
 		{
 			if (errstr)
 				*errstr = pstrdup("CUDA NB predict: computed invalid probability");
-			NDB_FREE(class_log_probs);
+			nfree(class_log_probs);
 			return -1;
 		}
 
@@ -754,7 +754,7 @@ ndb_cuda_nb_predict(const bytea * model_data,
 	}
 
 	*class_out = best_class;
-	NDB_FREE(class_log_probs);
+	nfree(class_log_probs);
 
 	return 0;
 }
@@ -848,7 +848,7 @@ ndb_cuda_nb_evaluate_batch(const bytea * model_data,
 						   double *f1_out,
 						   char **errstr)
 {
-	NDB_DECLARE(int *, predictions);
+	int *predictions = NULL;
 	int			tp = 0;
 	int			tn = 0;
 	int			fp = 0;
@@ -878,7 +878,7 @@ ndb_cuda_nb_evaluate_batch(const bytea * model_data,
 
 	/* Allocate predictions array */
 	/* Note: palloc never returns NULL in PostgreSQL - it errors on failure */
-	NDB_ALLOC(predictions, int, n_samples);
+	nalloc(predictions, int, n_samples);
 
 	/* Batch predict */
 	rc = ndb_cuda_nb_predict_batch(model_data,
@@ -890,7 +890,7 @@ ndb_cuda_nb_evaluate_batch(const bytea * model_data,
 
 	if (rc != 0)
 	{
-		NDB_FREE(predictions);
+		nfree(predictions);
 		return -1;
 	}
 
@@ -942,7 +942,7 @@ ndb_cuda_nb_evaluate_batch(const bytea * model_data,
 	else
 		*f1_out = 0.0;
 
-	NDB_FREE(predictions);
+	nfree(predictions);
 
 	return 0;
 }

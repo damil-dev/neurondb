@@ -93,26 +93,26 @@ PG_FUNCTION_INFO_V1(rerank_cross_encoder);
 Datum
 rerank_cross_encoder(PG_FUNCTION_ARGS)
 {
-	FuncCallContext *funcctx;
+	FuncCallContext *funcctx = NULL;
 	int			call_cntr;
 	int			max_calls;
-	RerankState *state;
+	RerankState *state = NULL;
 
 	if (SRF_IS_FIRSTCALL())
 	{
 		MemoryContext oldcontext;
 		TupleDesc	tupdesc;
-		text	   *query_text;
-		ArrayType  *candidates_array;
-		text	   *model_text;
+		text *query_text = NULL;
+		ArrayType *candidates_array = NULL;
+		text *model_text = NULL;
 		int			top_k;
 
-		NDB_DECLARE(char *, query_str);
-		Datum	   *candidate_datums;
-		bool	   *candidate_nulls;
+		char *query_str = NULL;
+		Datum *candidate_datums = NULL;
+		bool *candidate_nulls = NULL;
 		int			ncandidates;
 
-		NDB_DECLARE(float *, scores);
+		float *scores = NULL;
 
 		funcctx = SRF_FIRSTCALL_INIT();
 		oldcontext =
@@ -154,12 +154,12 @@ rerank_cross_encoder(PG_FUNCTION_ARGS)
 
 		if (model_text)
 		{
-			NDB_DECLARE(char *, model_str);
+			char *model_str = NULL;
 			NdbLLMConfig cfg;
 			NdbLLMCallOptions call_opts;
 			int			i;
 
-			NDB_DECLARE(const char **, docs);
+			const char **docs = NULL;
 			int			api_result;
 
 			model_str = text_to_cstring(model_text);
@@ -194,7 +194,7 @@ rerank_cross_encoder(PG_FUNCTION_ARGS)
 			call_opts.require_gpu = cfg.require_gpu;
 			call_opts.fail_open = neurondb_llm_fail_open;
 
-			NDB_ALLOC(docs, const char *, ncandidates);
+			nalloc(docs, const char *, ncandidates);
 			for (i = 0; i < ncandidates; i++)
 			{
 				if (!candidate_nulls[i]
@@ -232,8 +232,8 @@ rerank_cross_encoder(PG_FUNCTION_ARGS)
 					if (docs[i] && docs[i][0] != '\0')
 						pfree((char *) docs[i]);
 				}
-				NDB_FREE(docs);
-				NDB_FREE(query_str);
+				nfree(docs);
+				nfree(query_str);
 				ereport(ERROR,
 						(errcode(ERRCODE_EXTERNAL_ROUTINE_INVOCATION_EXCEPTION),
 						 errmsg("neurondb_rerank: reranking failed"),
@@ -247,10 +247,10 @@ rerank_cross_encoder(PG_FUNCTION_ARGS)
 					pfree((char *) docs[i]);
 				}
 			}
-			NDB_FREE(docs);
+			nfree(docs);
 			if (scores)
-				NDB_FREE(scores);
-			NDB_FREE(model_str);
+				nfree(scores);
+			nfree(model_str);
 		}
 		else
 		{
@@ -321,37 +321,37 @@ PG_FUNCTION_INFO_V1(rerank_llm);
 Datum
 rerank_llm(PG_FUNCTION_ARGS)
 {
-	FuncCallContext *funcctx;
+	FuncCallContext *funcctx = NULL;
 	int			call_cntr;
 	int			max_calls;
-	RerankState *state;
+	RerankState *state = NULL;
 
 	if (SRF_IS_FIRSTCALL())
 	{
 		MemoryContext oldcontext;
 		TupleDesc	tupdesc;
-		text	   *query_text;
-		ArrayType  *candidates_array;
-		text	   *model_text;
-		text	   *prompt_template_text;
+		text *query_text = NULL;
+		ArrayType *candidates_array = NULL;
+		text *model_text = NULL;
+		text *prompt_template_text = NULL;
 		int			top_k;
 		float4		temperature;
 
-		NDB_DECLARE(char *, query_str);
-		NDB_DECLARE(char *, model_str);
-		NDB_DECLARE(char *, prompt_template);
-		Datum	   *candidate_datums;
-		bool	   *candidate_nulls;
+		char *query_str = NULL;
+		char *model_str = NULL;
+		char *prompt_template = NULL;
+		Datum *candidate_datums = NULL;
+		bool *candidate_nulls = NULL;
 		int			ncandidates;
 		int			i;
 		StringInfoData prompt;
 		StringInfoData params_json;
-		char	   *params_json_str;
+		char *params_json_str = NULL;
 		NdbLLMConfig cfg;
 		NdbLLMCallOptions call_opts;
 		NdbLLMResp	resp;
 
-		NDB_DECLARE(char *, llm_response);
+		char *llm_response = NULL;
 		int			api_result;
 
 		/*-- Prepare multi-call context --*/
@@ -416,13 +416,13 @@ rerank_llm(PG_FUNCTION_ARGS)
 		appendStringInfo(&prompt, "Query: %s\n\nDocuments:\n", query_str);
 		for (i = 0; i < ncandidates; i++)
 		{
-			char	   *doc_str;
+			char *doc_str = NULL;
 
 			if (!candidate_nulls[i] && DatumGetPointer(candidate_datums[i]))
 			{
 				doc_str = text_to_cstring(DatumGetTextPP(candidate_datums[i]));
 				appendStringInfo(&prompt, "%d. %s\n", i + 1, doc_str);
-				NDB_FREE(doc_str);
+				nfree(doc_str);
 			}
 			else
 			{
@@ -490,7 +490,7 @@ rerank_llm(PG_FUNCTION_ARGS)
 				/* Parse scores */
 				while (*p && score_idx < ncandidates)
 				{
-					char	   *endptr;
+					char *endptr = NULL;
 
 					/* Skip whitespace and commas */
 					while (*p && (isspace((unsigned char) *p) || *p == ','))
@@ -546,19 +546,19 @@ rerank_llm(PG_FUNCTION_ARGS)
 		funcctx->user_fctx = state;
 
 		if (llm_response && llm_response != resp.text)
-			NDB_FREE(llm_response);
+			nfree(llm_response);
 		if (resp.text)
-			NDB_FREE(resp.text);
+			nfree(resp.text);
 		if (resp.json)
-			NDB_FREE(resp.json);
+			nfree(resp.json);
 		if (params_json_str)
-			NDB_FREE(params_json_str);
+			nfree(params_json_str);
 		if (prompt.data)
-			NDB_FREE(prompt.data);
+			nfree(prompt.data);
 		if (model_str)
-			NDB_FREE(model_str);
+			nfree(model_str);
 		if (prompt_template)
-			NDB_FREE(prompt_template);
+			nfree(prompt_template);
 
 		MemoryContextSwitchTo(oldcontext);
 	}
@@ -595,32 +595,32 @@ PG_FUNCTION_INFO_V1(rerank_cohere);
 Datum
 rerank_cohere(PG_FUNCTION_ARGS)
 {
-	FuncCallContext *funcctx;
+	FuncCallContext *funcctx = NULL;
 	int			call_cntr;
 	int			max_calls;
-	RerankState *state;
+	RerankState *state = NULL;
 
 	if (SRF_IS_FIRSTCALL())
 	{
 		MemoryContext oldcontext;
 		TupleDesc	tupdesc;
-		text	   *query_text;
-		ArrayType  *candidates_array;
-		text	   *model_text;
+		text *query_text = NULL;
+		ArrayType *candidates_array = NULL;
+		text *model_text = NULL;
 		int			top_k;
 
-		NDB_DECLARE(char *, query_str);
-		Datum	   *candidate_datums;
-		bool	   *candidate_nulls;
+		char *query_str = NULL;
+		Datum *candidate_datums = NULL;
+		bool *candidate_nulls = NULL;
 		int			ncandidates;
 
-		NDB_DECLARE(float *, scores);
+		float *scores = NULL;
 		int			i;
 
-		NDB_DECLARE(const char **, docs);
+		const char **docs = NULL;
 		int			api_result;
 
-		NDB_DECLARE(char *, model_str);
+		char *model_str = NULL;
 		NdbLLMConfig cfg;
 		NdbLLMCallOptions call_opts;
 
@@ -666,7 +666,7 @@ rerank_cohere(PG_FUNCTION_ARGS)
 		call_opts.require_gpu = false;
 		call_opts.fail_open = neurondb_llm_fail_open;
 
-		NDB_ALLOC(docs, const char *, ncandidates);
+		nalloc(docs, const char *, ncandidates);
 		for (i = 0; i < ncandidates; i++)
 		{
 			if (!candidate_nulls[i] && DatumGetPointer(candidate_datums[i]))
@@ -701,11 +701,11 @@ rerank_cohere(PG_FUNCTION_ARGS)
 				pfree((char *) docs[i]);
 			}
 		}
-		NDB_FREE(docs);
+		nfree(docs);
 		if (scores)
-			NDB_FREE(scores);
+			nfree(scores);
 		if (model_str)
-			NDB_FREE(model_str);
+			nfree(model_str);
 
 		tupdesc = CreateTemplateTupleDesc(2);
 		TupleDescInitEntry(tupdesc, (AttrNumber) 1, "idx", INT4OID, -1, 0);
@@ -752,34 +752,34 @@ PG_FUNCTION_INFO_V1(rerank_colbert);
 Datum
 rerank_colbert(PG_FUNCTION_ARGS)
 {
-	FuncCallContext *funcctx;
+	FuncCallContext *funcctx = NULL;
 	int			call_cntr;
 	int			max_calls;
-	RerankState *state;
+	RerankState *state = NULL;
 
 	if (SRF_IS_FIRSTCALL())
 	{
 		MemoryContext oldcontext;
 		TupleDesc	tupdesc;
-		text	   *query_text;
-		ArrayType  *candidates_array;
-		text	   *model_text;
+		text *query_text = NULL;
+		ArrayType *candidates_array = NULL;
+		text *model_text = NULL;
 		int			top_k;
 
-		NDB_DECLARE(char *, query_str);
-		Datum	   *candidate_datums;
-		bool	   *candidate_nulls;
+		char *query_str = NULL;
+		Datum *candidate_datums = NULL;
+		bool *candidate_nulls = NULL;
 		int			ncandidates;
 		int			i,
 					j;
 
-		NDB_DECLARE(char *, model_str);
+		char *model_str = NULL;
 		NdbLLMConfig cfg;
 
-		NDB_DECLARE(float *, query_embedding);
+		float *query_embedding = NULL;
 		int			query_dim = 0;
 
-		NDB_DECLARE(float *, doc_embeddings);
+		float *doc_embeddings = NULL;
 
 		funcctx = SRF_FIRSTCALL_INIT();
 		oldcontext = MemoryContextSwitchTo(funcctx->multi_call_memory_ctx);
@@ -826,7 +826,7 @@ rerank_colbert(PG_FUNCTION_ARGS)
 			/* Check for integer overflow in size calculation */
 			if (ncandidates > 0 && query_dim > 0 && (size_t) ncandidates > MaxAllocSize / sizeof(float) / (size_t) query_dim)
 			{
-				NDB_FREE(state);
+				nfree(state);
 				ereport(ERROR,
 						(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
 						 errmsg("neurondb: doc_embeddings allocation size exceeds MaxAllocSize")));
@@ -834,9 +834,9 @@ rerank_colbert(PG_FUNCTION_ARGS)
 			doc_embeddings = (float *) palloc0(ncandidates * query_dim * sizeof(float));
 			for (i = 0; i < ncandidates; i++)
 			{
-				char	   *doc_str;
+				char *doc_str = NULL;
 
-				NDB_DECLARE(float *, doc_emb);
+				float *doc_emb = NULL;
 				int			temp_dim = 0;
 
 				if (!candidate_nulls[i] && DatumGetPointer(candidate_datums[i]))
@@ -846,9 +846,9 @@ rerank_colbert(PG_FUNCTION_ARGS)
 						&& doc_emb != NULL && temp_dim == query_dim)
 					{
 						memcpy(doc_embeddings + i * query_dim, doc_emb, query_dim * sizeof(float));
-						NDB_FREE(doc_emb);
+						nfree(doc_emb);
 					}
-					NDB_FREE(doc_str);
+					nfree(doc_str);
 				}
 			}
 
@@ -882,9 +882,9 @@ rerank_colbert(PG_FUNCTION_ARGS)
 			}
 
 			if (query_embedding)
-				NDB_FREE(query_embedding);
+				nfree(query_embedding);
 			if (doc_embeddings)
-				NDB_FREE(doc_embeddings);
+				nfree(doc_embeddings);
 		}
 		else
 		{
@@ -899,7 +899,7 @@ rerank_colbert(PG_FUNCTION_ARGS)
 		sort_rerank_desc(state->scores, state->indices, ncandidates);
 
 		if (model_str)
-			NDB_FREE(model_str);
+			nfree(model_str);
 
 		tupdesc = CreateTemplateTupleDesc(2);
 		TupleDescInitEntry(tupdesc, (AttrNumber) 1, "idx", INT4OID, -1, 0);
@@ -946,30 +946,30 @@ PG_FUNCTION_INFO_V1(rerank_ltr);
 Datum
 rerank_ltr(PG_FUNCTION_ARGS)
 {
-	FuncCallContext *funcctx;
+	FuncCallContext *funcctx = NULL;
 	int			call_cntr;
 	int			max_calls;
-	RerankState *state;
+	RerankState *state = NULL;
 
 	if (SRF_IS_FIRSTCALL())
 	{
 		MemoryContext oldcontext;
 		TupleDesc	tupdesc;
-		text	   *query_text;
-		ArrayType  *candidates_array;
-		text	   *model_text;
+		text *query_text = NULL;
+		ArrayType *candidates_array = NULL;
+		text *model_text = NULL;
 		int			top_k;
 
-		NDB_DECLARE(char *, query_str);
-		Datum	   *candidate_datums;
-		bool	   *candidate_nulls;
+		char *query_str = NULL;
+		Datum *candidate_datums = NULL;
+		bool *candidate_nulls = NULL;
 		int			ncandidates;
 		int			i;
 
-		NDB_DECLARE(char *, model_str);
+		char *model_str = NULL;
 		NdbLLMConfig cfg;
 
-		NDB_DECLARE(float *, query_embedding);
+		float *query_embedding = NULL;
 		int			query_dim = 0;
 
 		funcctx = SRF_FIRSTCALL_INIT();
@@ -1019,9 +1019,9 @@ rerank_ltr(PG_FUNCTION_ARGS)
 			/* Compute LTR features and scores for each document */
 			for (i = 0; i < ncandidates; i++)
 			{
-				char	   *doc_str;
+				char *doc_str = NULL;
 
-				NDB_DECLARE(float *, doc_emb);
+				float *doc_emb = NULL;
 				int			doc_dim = 0;
 				float		cosine_sim = 0.0f;
 				float		doc_length = 0.0f;
@@ -1058,9 +1058,9 @@ rerank_ltr(PG_FUNCTION_ARGS)
 						 */
 						state->scores[i] = cosine_sim * 0.8f + (doc_length / (doc_length + 100.0f)) * 0.2f;
 
-						NDB_FREE(doc_emb);
+						nfree(doc_emb);
 					}
-					NDB_FREE(doc_str);
+					nfree(doc_str);
 				}
 				else
 				{
@@ -1070,7 +1070,7 @@ rerank_ltr(PG_FUNCTION_ARGS)
 			}
 
 			if (query_embedding)
-				NDB_FREE(query_embedding);
+				nfree(query_embedding);
 		}
 		else
 		{
@@ -1085,7 +1085,7 @@ rerank_ltr(PG_FUNCTION_ARGS)
 		sort_rerank_desc(state->scores, state->indices, ncandidates);
 
 		if (model_str)
-			NDB_FREE(model_str);
+			nfree(model_str);
 
 		tupdesc = CreateTemplateTupleDesc(2);
 		TupleDescInitEntry(tupdesc, (AttrNumber) 1, "idx", INT4OID, -1, 0);
@@ -1132,32 +1132,32 @@ PG_FUNCTION_INFO_V1(rerank_ensemble);
 Datum
 rerank_ensemble(PG_FUNCTION_ARGS)
 {
-	FuncCallContext *funcctx;
+	FuncCallContext *funcctx = NULL;
 	int			call_cntr;
 	int			max_calls;
-	RerankState *state;
+	RerankState *state = NULL;
 
 	if (SRF_IS_FIRSTCALL())
 	{
 		MemoryContext oldcontext;
 		TupleDesc	tupdesc;
-		text	   *query_text;
-		ArrayType  *candidates_array;
-		ArrayType  *methods_array;
+		text *query_text = NULL;
+		ArrayType *candidates_array = NULL;
+		ArrayType *methods_array = NULL;
 		int			top_k;
 
-		NDB_DECLARE(char *, query_str);
-		Datum	   *candidate_datums;
-		bool	   *candidate_nulls;
+		char *query_str = NULL;
+		Datum *candidate_datums = NULL;
+		bool *candidate_nulls = NULL;
 		int			ncandidates;
-		Datum	   *method_datums;
-		bool	   *method_nulls;
+		Datum *method_datums = NULL;
+		bool *method_nulls = NULL;
 		int			nmethods;
 		float	  **method_scores;
 		int			i,
 					j;
 
-		NDB_DECLARE(float *, weights);
+		float *weights = NULL;
 
 		funcctx = SRF_FIRSTCALL_INIT();
 		oldcontext = MemoryContextSwitchTo(funcctx->multi_call_memory_ctx);
@@ -1204,14 +1204,14 @@ rerank_ensemble(PG_FUNCTION_ARGS)
 		/* Get scores from each method */
 		for (i = 0; i < nmethods; i++)
 		{
-			char	   *method_str;
+			char *method_str = NULL;
 
-			NDB_DECLARE(float *, temp_scores);
+			float *temp_scores = NULL;
 			int			api_result;
 			NdbLLMConfig cfg;
 			NdbLLMCallOptions call_opts;
 
-			NDB_DECLARE(const char **, docs);
+			const char **docs = NULL;
 
 			if (method_nulls[i] || !DatumGetPointer(method_datums[i]))
 				continue;
@@ -1232,7 +1232,7 @@ rerank_ensemble(PG_FUNCTION_ARGS)
 			call_opts.require_gpu = cfg.require_gpu;
 			call_opts.fail_open = neurondb_llm_fail_open;
 
-			NDB_ALLOC(docs, const char *, ncandidates);
+			nalloc(docs, const char *, ncandidates);
 			for (j = 0; j < ncandidates; j++)
 			{
 				if (!candidate_nulls[j] && DatumGetPointer(candidate_datums[j]))
@@ -1246,7 +1246,7 @@ rerank_ensemble(PG_FUNCTION_ARGS)
 			if (api_result == 0 && temp_scores != NULL)
 			{
 				memcpy(method_scores[i], temp_scores, ncandidates * sizeof(float));
-				NDB_FREE(temp_scores);
+				nfree(temp_scores);
 			}
 			else
 			{
@@ -1262,8 +1262,8 @@ rerank_ensemble(PG_FUNCTION_ARGS)
 					pfree((char *) docs[j]);
 				}
 			}
-			NDB_FREE(docs);
-			NDB_FREE(method_str);
+			nfree(docs);
+			nfree(method_str);
 		}
 
 		/* Combine scores using weighted average */
@@ -1282,11 +1282,11 @@ rerank_ensemble(PG_FUNCTION_ARGS)
 		for (i = 0; i < nmethods; i++)
 		{
 			if (method_scores[i])
-				NDB_FREE(method_scores[i]);
+				nfree(method_scores[i]);
 		}
-		NDB_FREE(method_scores);
+		nfree(method_scores);
 		if (weights)
-			NDB_FREE(weights);
+			nfree(weights);
 
 		sort_rerank_desc(state->scores, state->indices, ncandidates);
 

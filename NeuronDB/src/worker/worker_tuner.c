@@ -87,7 +87,7 @@ typedef struct NeuranmonSharedState
 	pid_t		worker_pid;
 }			NeuranmonSharedState;
 
-static NeuranmonSharedState * neuranmon_state = NULL;
+static NeuranmonSharedState *neuranmon_state = NULL;
 
 PGDLLEXPORT void neuranmon_main(Datum main_arg);
 static void neuranmon_sigterm(SIGNAL_ARGS);
@@ -263,7 +263,7 @@ sample_and_tune(void)
 	double		new_hybrid_weight;
 	bool		needs_adjustment = false;
 
-	NDB_DECLARE(NdbSpiSession *, session);
+	NdbSpiSession *session = NULL;
 
 	session = ndb_spi_session_begin(CurrentMemoryContext, false);
 	if (session == NULL)
@@ -317,7 +317,7 @@ sample_and_tune(void)
 		elog(LOG,
 			 "neurondb: neuranmon_state invalid in sample_and_tune, "
 			 "skipping adjustment");
-		NDB_FREE(sql.data);
+		nfree(sql.data);
 		ndb_spi_session_end(&session);
 		return;
 	}
@@ -374,11 +374,11 @@ sample_and_tune(void)
 					 "neurondb: failed to set neurondb.hnsw_ef_search to %d",
 					 new_ef_search);
 			}
-			NDB_FREE(sql.data);
+			nfree(sql.data);
 		}
 		PG_CATCH();
 		{
-			NDB_FREE(sql.data);
+			nfree(sql.data);
 			EmitErrorReport();
 			FlushErrorState();
 			elog(WARNING,
@@ -393,7 +393,7 @@ sample_and_tune(void)
 		LWLockRelease(neuranmon_state->lock);
 	}
 
-	NDB_FREE(sql.data);
+	nfree(sql.data);
 	ndb_spi_session_end(&session);
 }
 
@@ -403,7 +403,7 @@ rotate_caches(void)
 	StringInfoData sql;
 	int			ret;
 
-	NDB_DECLARE(NdbSpiSession *, session);
+	NdbSpiSession *session = NULL;
 
 	session = ndb_spi_session_begin(CurrentMemoryContext, false);
 	if (session == NULL)
@@ -443,7 +443,7 @@ rotate_caches(void)
 				 NDB_UINT64_CAST(SPI_processed));
 		}
 
-		NDB_FREE(sql.data);
+		nfree(sql.data);
 	}
 	PG_CATCH();
 	{
@@ -463,7 +463,7 @@ record_metrics(void)
 	StringInfoData sql;
 	int			ret;
 
-	NDB_DECLARE(NdbSpiSession *, session);
+	NdbSpiSession *session = NULL;
 	session = ndb_spi_session_begin(CurrentMemoryContext, false);
 	if (session == NULL)
 		return;
@@ -500,7 +500,7 @@ record_metrics(void)
 				 "neurondb: histogram INSERT returned unexpected code %d",
 				 ret);
 		}
-		NDB_FREE(sql.data);
+		nfree(sql.data);
 	}
 	PG_CATCH();
 	{
@@ -521,7 +521,7 @@ export_prometheus_metrics(void)
 	StringInfoData metrics;
 	int			ret;
 
-	NDB_DECLARE(NdbSpiSession *, session);
+	NdbSpiSession *session = NULL;
 
 	session = ndb_spi_session_begin(CurrentMemoryContext, false);
 	if (session == NULL)
@@ -591,8 +591,8 @@ export_prometheus_metrics(void)
 				 "neurondb: Prometheus metrics INSERT returned unexpected code %d",
 				 ret);
 		}
-		NDB_FREE(sql.data);
-		NDB_FREE(metrics.data);
+		nfree(sql.data);
+		nfree(metrics.data);
 	}
 	PG_CATCH();
 	{

@@ -55,6 +55,13 @@
 static ImageFormat
 ndb_detect_image_format(const unsigned char *data, size_t size)
 {
+	/* Validate inputs */
+	if (data == NULL)
+	{
+		elog(WARNING, "neurondb: ndb_detect_image_format called with NULL data");
+		return IMAGE_FORMAT_UNKNOWN;
+	}
+
 	if (size < 8)
 		return IMAGE_FORMAT_UNKNOWN;
 
@@ -133,9 +140,27 @@ ndb_parse_png_dimensions(const unsigned char *data,
 						 int *width,
 						 int *height)
 {
+	/* Validate inputs */
+	if (data == NULL || width == NULL || height == NULL)
+	{
+		elog(WARNING, "neurondb: ndb_parse_png_dimensions called with NULL parameters");
+		return false;
+	}
+
 	/* PNG IHDR chunk starts at offset 16 */
 	if (size < 24)
+	{
+		elog(DEBUG1, "neurondb: ndb_parse_png_dimensions: insufficient data (size=%zu, need 24)", size);
 		return false;
+	}
+
+	/* Validate PNG signature before parsing */
+	if (data[0] != IMAGE_MAGIC_PNG_1 || data[1] != IMAGE_MAGIC_PNG_2 ||
+		data[2] != IMAGE_MAGIC_PNG_3 || data[3] != IMAGE_MAGIC_PNG_4)
+	{
+		elog(DEBUG1, "neurondb: ndb_parse_png_dimensions: invalid PNG signature");
+		return false;
+	}
 
 	*width = (data[16] << 24) | (data[17] << 16) | (data[18] << 8) | data[19];
 	*height = (data[20] << 24) | (data[21] << 16) | (data[22] << 8) | data[23];
@@ -159,12 +184,23 @@ ndb_parse_jpeg_dimensions(const unsigned char *data,
 	const unsigned char *p = data;
 	const unsigned char *end = data + size;
 
+	/* Validate inputs */
+	if (data == NULL || width == NULL || height == NULL)
+	{
+		elog(WARNING, "neurondb: ndb_parse_jpeg_dimensions called with NULL parameters");
+		return false;
+	}
+
 	/* Skip JPEG header (FF D8) */
 	if (size < 4 || p[0] != 0xFF || p[1] != 0xD8)
+	{
+		elog(DEBUG1, "neurondb: ndb_parse_jpeg_dimensions: invalid JPEG header or insufficient data");
 		return false;
+	}
 
 	p += 2;
 
+	/* Bounds checking: ensure we don't read past buffer end */
 	while (p < end - 8)
 	{
 		if (p[0] == 0xFF)
@@ -176,6 +212,7 @@ ndb_parse_jpeg_dimensions(const unsigned char *data,
 				(marker >= 0xC9 && marker <= 0xCB) ||
 				(marker >= 0xCD && marker <= 0xCF))
 			{
+				/* Validate we have enough bytes before accessing p[5] through p[8] */
 				if (p + 9 <= end)
 				{
 					*height = (p[5] << 8) | p[6];
@@ -185,11 +222,19 @@ ndb_parse_jpeg_dimensions(const unsigned char *data,
 						return true;
 				}
 			}
-			p++;
+			/* Move to next byte, but check bounds */
+			if (p + 1 < end)
+				p++;
+			else
+				break;
 		}
 		else
 		{
-			p++;
+			/* Move to next byte, but check bounds */
+			if (p + 1 < end)
+				p++;
+			else
+				break;
 		}
 	}
 
@@ -203,8 +248,23 @@ ndb_parse_jpeg_dimensions(const unsigned char *data,
 ImageMetadata *
 ndb_validate_image(const unsigned char *data, size_t size, MemoryContext mctx)
 {
-	ImageMetadata *meta;
+	ImageMetadata *meta = NULL;
 	MemoryContext oldctx;
+
+	/* Validate inputs */
+	if (data == NULL)
+	{
+		elog(WARNING, "neurondb: ndb_validate_image called with NULL data");
+		if (mctx == NULL)
+			mctx = CurrentMemoryContext;
+		oldctx = MemoryContextSwitchTo(mctx);
+		meta = (ImageMetadata *) palloc0(sizeof(ImageMetadata));
+		MemoryContextSwitchTo(oldctx);
+		meta->size = 0;
+		meta->is_valid = false;
+		meta->error_msg = pstrdup("NULL image data");
+		return meta;
+	}
 
 	if (mctx == NULL)
 		mctx = CurrentMemoryContext;
@@ -324,7 +384,7 @@ char *
 ndb_image_metadata_to_json(const ImageMetadata *meta)
 {
 	StringInfoData json;
-	char	   *format_name;
+	char *format_name = NULL;
 
 	if (meta == NULL)
 		return pstrdup("{}");
@@ -346,6 +406,6 @@ ndb_image_metadata_to_json(const ImageMetadata *meta)
 	}
 	appendStringInfo(&json, "}");
 
-	NDB_FREE(format_name);
+	nfree(format_name);
 	return json.data;
 }

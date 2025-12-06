@@ -144,12 +144,12 @@ write_csv_from_spi(char *csv_path,
 
 		for (i = 0; i < n_features; i++)
 		{
-			Datum		val;
 			bool		isnull;
-			Oid			typid;
-			Oid			typoutput;
 			bool		typisvarlena;
-			char	   *valstr;
+			char	   *valstr = NULL;
+			Datum		val;
+			Oid			typoutput;
+			Oid			typid;
 
 			val = heap_getattr(tuple, feature_idxs[i] + 1, tupdesc, &isnull);
 
@@ -180,12 +180,12 @@ write_csv_from_spi(char *csv_path,
 
 		/* Output label column */
 		{
-			Datum		label_val;
 			bool		label_isnull;
-			Oid			typid;
-			Oid			typoutput;
 			bool		typisvarlena;
-			char	   *labelstr;
+			char	   *labelstr = NULL;
+			Datum		label_val;
+			Oid			typoutput;
+			Oid			typid;
 
 			label_val = heap_getattr(tuple, label_idx + 1, tupdesc, &label_isnull);
 			if (label_isnull)
@@ -258,9 +258,9 @@ train_catboost_classifier(PG_FUNCTION_ARGS)
 	float8		learning_rate;
 	int32		depth;
 
-	char	   *table_name;
-	char	   *feature_col_list;
-	char	   *label_col;
+	char *table_name = NULL;
+	char *feature_col_list = NULL;
+	char *label_col = NULL;
 
 	StringInfoData sql;
 	int			ret;
@@ -268,8 +268,8 @@ train_catboost_classifier(PG_FUNCTION_ARGS)
 	int			i;
 	int			model_id;
 
-	char	  **features = NULL;
-	char	   *token;
+	char **features = NULL;
+	char *token = NULL;
 	MemoryContext oldctx;
 	MemoryContext per_query_ctx;
 
@@ -317,7 +317,7 @@ train_catboost_classifier(PG_FUNCTION_ARGS)
 										  ALLOCSET_DEFAULT_SIZES);
 	oldctx = MemoryContextSwitchTo(per_query_ctx);
 
-	NDB_DECLARE(NdbSpiSession *, spi_session);
+	NdbSpiSession *spi_session = NULL;
 	MemoryContext oldcontext = CurrentMemoryContext;
 
 	NDB_SPI_SESSION_BEGIN(spi_session, oldcontext);
@@ -337,8 +337,8 @@ train_catboost_classifier(PG_FUNCTION_ARGS)
 	{
 		TupleDesc	tupdesc = SPI_tuptable->tupdesc;
 
-		NDB_DECLARE(int *, feature_idxs);
-		NDB_ALLOC(feature_idxs, int, n_features);
+		int *feature_idxs = NULL;
+		nalloc(feature_idxs, int, n_features);
 		int			label_idx;
 
 		for (i = 0; i < n_features; i++)
@@ -364,8 +364,8 @@ train_catboost_classifier(PG_FUNCTION_ARGS)
 
 			/* Setup CatBoost C API options and train */
 			{
-				NDB_DECLARE(ModelCalcerHandle *, model_handle);
-				CatBoostModelTrainingOptions *opts;
+				ModelCalcerHandle *model_handle = NULL;
+				CatBoostModelTrainingOptions *opts = NULL;
 
 				opts = CatBoostCreateModelTrainingOptions();
 
@@ -425,9 +425,9 @@ train_catboost_regressor(PG_FUNCTION_ARGS)
 	text	   *feature_col_text = PG_GETARG_TEXT_PP(1);
 	text	   *target_col_text = PG_GETARG_TEXT_PP(2);
 	int32		iterations;
-	char	   *table_name;
-	char	   *feature_col_list;
-	char	   *target_col;
+	char *table_name = NULL;
+	char *feature_col_list = NULL;
+	char *target_col = NULL;
 
 	StringInfoData sql;
 	int			ret;
@@ -435,8 +435,8 @@ train_catboost_regressor(PG_FUNCTION_ARGS)
 	int			i;
 	int			model_id;
 
-	char	  **features = NULL;
-	char	   *token;
+	char **features = NULL;
+	char *token = NULL;
 	MemoryContext oldctx;
 	MemoryContext per_query_ctx;
 
@@ -480,7 +480,7 @@ train_catboost_regressor(PG_FUNCTION_ARGS)
 										  ALLOCSET_DEFAULT_SIZES);
 	oldctx = MemoryContextSwitchTo(per_query_ctx);
 
-	NDB_DECLARE(NdbSpiSession *, spi_session);
+	NdbSpiSession *spi_session = NULL;
 	MemoryContext oldcontext = CurrentMemoryContext;
 
 	NDB_SPI_SESSION_BEGIN(spi_session, oldcontext);
@@ -522,8 +522,8 @@ train_catboost_regressor(PG_FUNCTION_ARGS)
 							   target_idx);
 
 			{
-				NDB_DECLARE(ModelCalcerHandle *, model_handle);
-				CatBoostModelTrainingOptions *opts;
+				ModelCalcerHandle *model_handle = NULL;
+				CatBoostModelTrainingOptions *opts = NULL;
 
 				opts = CatBoostCreateModelTrainingOptions();
 				check_catboost_error(CatBoostSetTrainingOptionInt(opts, "iterations", iterations));
@@ -579,7 +579,7 @@ predict_catboost(PG_FUNCTION_ARGS)
 {
 #ifdef CATBOOST_AVAILABLE
 	int32		model_id;
-	ArrayType  *features_array;
+	ArrayType *features_array = NULL;
 	Oid			elmtype;
 	int16		typlen;
 	bool		typbyval;
@@ -587,11 +587,11 @@ predict_catboost(PG_FUNCTION_ARGS)
 	int			n_features;
 	int			i;
 	int			ndim;
-	Datum	   *elems;
-	bool	   *nulls;
+	Datum *elems = NULL;
+	bool *nulls = NULL;
 	float64		result = 0.0;
 
-	NDB_DECLARE(ModelCalcerHandle *, model_handle);
+	ModelCalcerHandle *model_handle = NULL;
 	char		model_path[MAXPGPATH];
 
 	model_id = PG_GETARG_INT32(0);
@@ -618,9 +618,9 @@ predict_catboost(PG_FUNCTION_ARGS)
 	if (elmtype == TEXTOID)
 	{
 		/* categorical/text features */
-		NDB_DECLARE(char **, input_features);
+		char **input_features = NULL;
 
-		NDB_ALLOC(input_features, char *, n_features);
+		nalloc(input_features, char *, n_features);
 
 		for (i = 0; i < n_features; i++)
 		{
@@ -637,14 +637,14 @@ predict_catboost(PG_FUNCTION_ARGS)
 															n_features,
 															&result,
 															1));
-		NDB_FREE(input_features);
+		nfree(input_features);
 	}
 	else
 	{
 		/* numeric features */
-		NDB_DECLARE(double *, features);
+		double *features = NULL;
 
-		NDB_ALLOC(features, double, n_features);
+		nalloc(features, double, n_features);
 		for (i = 0; i < n_features; i++)
 		{
 			if (nulls[i])
@@ -669,7 +669,7 @@ predict_catboost(PG_FUNCTION_ARGS)
 
 		check_catboost_error(CatBoostModelCalcerPredict(model_handle,
 														features, n_features, &result, 1));
-		NDB_FREE(features);
+		nfree(features);
 	}
 
 	CatBoostFreeModelCalcer(model_handle);
@@ -704,12 +704,12 @@ evaluate_catboost_by_model_id(PG_FUNCTION_ARGS)
 {
 #ifdef CATBOOST_AVAILABLE
 	int32		model_id;
-	text	   *table_name;
-	text	   *feature_col;
-	text	   *label_col;
-	char	   *tbl_str;
-	char	   *feat_str;
-	char	   *targ_str;
+	text *table_name = NULL;
+	text *feature_col = NULL;
+	text *label_col = NULL;
+	char *tbl_str = NULL;
+	char *feat_str = NULL;
+	char *targ_str = NULL;
 	StringInfoData query;
 	int			ret;
 	int			nvec = 0;
@@ -722,7 +722,7 @@ evaluate_catboost_by_model_id(PG_FUNCTION_ARGS)
 	double		rmse;
 	int			i;
 	StringInfoData jsonbuf;
-	Jsonb	   *result;
+	Jsonb *result = NULL;
 	MemoryContext oldcontext;
 
 	/* Validate arguments */
@@ -754,7 +754,7 @@ evaluate_catboost_by_model_id(PG_FUNCTION_ARGS)
 	oldcontext = CurrentMemoryContext;
 
 	/* Connect to SPI */
-	NDB_DECLARE(NdbSpiSession *, spi_session);
+	NdbSpiSession *spi_session = NULL;
 
 	NDB_SPI_SESSION_BEGIN(spi_session, oldcontext);
 
@@ -769,9 +769,9 @@ evaluate_catboost_by_model_id(PG_FUNCTION_ARGS)
 	{
 		ndb_spi_stringinfo_free(spi_session, &query);
 		NDB_SPI_SESSION_END(spi_session);
-		NDB_FREE(tbl_str);
-		NDB_FREE(feat_str);
-		NDB_FREE(targ_str);
+		nfree(tbl_str);
+		nfree(feat_str);
+		nfree(targ_str);
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
 				 errmsg("neurondb: evaluate_catboost_by_model_id: query failed")));
@@ -782,9 +782,9 @@ evaluate_catboost_by_model_id(PG_FUNCTION_ARGS)
 	{
 		ndb_spi_stringinfo_free(spi_session, &query);
 		NDB_SPI_SESSION_END(spi_session);
-		NDB_FREE(tbl_str);
-		NDB_FREE(feat_str);
-		NDB_FREE(targ_str);
+		nfree(tbl_str);
+		nfree(feat_str);
+		nfree(targ_str);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("neurondb: evaluate_catboost_by_model_id: need at least 2 samples, got %d",
@@ -841,8 +841,8 @@ evaluate_catboost_by_model_id(PG_FUNCTION_ARGS)
 		Datum		targ_datum;
 		bool		feat_null;
 		bool		targ_null;
-		ArrayType  *arr;
-		Vector	   *vec;
+		ArrayType *arr = NULL;
+		Vector *vec = NULL;
 		double		y_true;
 		double		y_pred;
 		double		error;
@@ -865,9 +865,9 @@ evaluate_catboost_by_model_id(PG_FUNCTION_ARGS)
 			{
 				ndb_spi_stringinfo_free(spi_session, &query);
 				NDB_SPI_SESSION_END(spi_session);
-				NDB_FREE(tbl_str);
-				NDB_FREE(feat_str);
-				NDB_FREE(targ_str);
+				nfree(tbl_str);
+				nfree(feat_str);
+				nfree(targ_str);
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 						 errmsg("catboost: features array must be 1-D")));
@@ -896,8 +896,8 @@ evaluate_catboost_by_model_id(PG_FUNCTION_ARGS)
 			int			ndims = 1;
 			int			dims[1] = {actual_dim};
 			int			lbs[1] = {1};
-			NDB_DECLARE(Datum *, elems);
-			NDB_ALLOC(elems, Datum, actual_dim);
+			Datum *elems = NULL;
+			nalloc(elems, Datum, actual_dim);
 
 			for (j = 0; j < actual_dim; j++)
 				elems[j] = Float8GetDatum(vec->data[j]);
@@ -910,8 +910,8 @@ evaluate_catboost_by_model_id(PG_FUNCTION_ARGS)
 														Int32GetDatum(model_id),
 														features_datum));
 
-			NDB_FREE(elems);
-			NDB_FREE(feature_array);
+			nfree(elems);
+			nfree(feature_array);
 		}
 
 		/* Compute errors */
@@ -947,11 +947,11 @@ evaluate_catboost_by_model_id(PG_FUNCTION_ARGS)
 					 mse, mae, rmse, r_squared, nvec);
 
 	result = DatumGetJsonbP(DirectFunctionCall1(jsonb_in, CStringGetTextDatum(jsonbuf.data)));
-	NDB_FREE(jsonbuf.data);
+	nfree(jsonbuf.data);
 
-	NDB_FREE(tbl_str);
-	NDB_FREE(feat_str);
-	NDB_FREE(targ_str);
+	nfree(tbl_str);
+	nfree(feat_str);
+	nfree(targ_str);
 
 	PG_RETURN_JSONB_P(result);
 #else
@@ -987,8 +987,8 @@ catboost_model_serialize_to_bytea(int iterations, int depth, float learning_rate
 {
 	StringInfoData buf;
 	int			total_size;
-	NDB_DECLARE(bytea *, result);
-	NDB_DECLARE(char *, result_raw);
+	bytea *result = NULL;
+	char *result_raw = NULL;
 	int			loss_len;
 
 	initStringInfo(&buf);
@@ -1001,11 +1001,11 @@ catboost_model_serialize_to_bytea(int iterations, int depth, float learning_rate
 	appendBinaryStringInfo(&buf, loss_function, loss_len);
 
 	total_size = VARHDRSZ + buf.len;
-	NDB_ALLOC(result_raw, char, total_size);
+	nalloc(result_raw, char, total_size);
 	result = (bytea *) result_raw;
 	SET_VARSIZE(result, total_size);
 	memcpy(VARDATA(result), buf.data, buf.len);
-	NDB_FREE(buf.data);
+	nfree(buf.data);
 
 	return result;
 }
@@ -1043,7 +1043,7 @@ catboost_model_deserialize_from_bytea(const bytea * data, int *iterations_out, i
 static bool
 catboost_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 {
-	CatBoostGpuModelState *state;
+	CatBoostGpuModelState *state = NULL;
 	int			iterations = 1000;
 	int			depth = 6;
 	float		learning_rate = 0.03f;
@@ -1051,10 +1051,10 @@ catboost_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 	int			nvec = 0;
 	int			dim = 0;
 
-	NDB_DECLARE(bytea *, model_data);
-	NDB_DECLARE(Jsonb *, metrics);
+	bytea *model_data = NULL;
+	Jsonb *metrics = NULL;
 	StringInfoData metrics_json;
-	JsonbIterator *it;
+	JsonbIterator *it = NULL;
 	JsonbValue	v;
 	int			r;
 
@@ -1089,7 +1089,7 @@ catboost_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 																			   NumericGetDatum(v.val.numeric)));
 				else if (strcmp(key, "loss_function") == 0 && v.type == jbvString)
 					strncpy(loss_function, v.val.string.val, sizeof(loss_function) - 1);
-				NDB_FREE(key);
+				nfree(key);
 			}
 		}
 	}
@@ -1123,7 +1123,7 @@ catboost_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 					 iterations, depth, learning_rate, dim, loss_function, nvec);
 	metrics = DatumGetJsonbP(DirectFunctionCall1(jsonb_in,
 												 CStringGetTextDatum(metrics_json.data)));
-	NDB_FREE(metrics_json.data);
+	nfree(metrics_json.data);
 
 	state = (CatBoostGpuModelState *) palloc0(sizeof(CatBoostGpuModelState));
 	state->model_blob = model_data;
@@ -1136,7 +1136,7 @@ catboost_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 	strncpy(state->loss_function, loss_function, sizeof(state->loss_function) - 1);
 
 	if (model->backend_state != NULL)
-		NDB_FREE(model->backend_state);
+		nfree(model->backend_state);
 
 	model->backend_state = state;
 	model->gpu_ready = true;
@@ -1228,7 +1228,7 @@ catboost_gpu_evaluate(const MLGpuModel *model, const MLGpuEvalSpec *spec,
 
 	metrics_json = DatumGetJsonbP(DirectFunctionCall1(jsonb_in,
 													  CStringGetTextDatum(buf.data)));
-	NDB_FREE(buf.data);
+	nfree(buf.data);
 
 	if (out != NULL)
 		out->payload = metrics_json;
@@ -1242,7 +1242,7 @@ catboost_gpu_serialize(const MLGpuModel *model, bytea * *payload_out,
 {
 	const		CatBoostGpuModelState *state;
 	bytea	   *payload_copy;
-	NDB_DECLARE(char *, payload_copy_raw);
+	char *payload_copy_raw = NULL;
 	int			payload_size;
 
 	if (errstr != NULL)
@@ -1267,14 +1267,14 @@ catboost_gpu_serialize(const MLGpuModel *model, bytea * *payload_out,
 	}
 
 	payload_size = VARSIZE(state->model_blob);
-	NDB_ALLOC(payload_copy_raw, char, payload_size);
+	nalloc(payload_copy_raw, char, payload_size);
 	payload_copy = (bytea *) payload_copy_raw;
 	memcpy(payload_copy, state->model_blob, payload_size);
 
 	if (payload_out != NULL)
 		*payload_out = payload_copy;
 	else
-		NDB_FREE(payload_copy);
+		nfree(payload_copy);
 
 	if (metadata_out != NULL && state->metrics != NULL)
 		*metadata_out = (Jsonb *) PG_DETOAST_DATUM_COPY(
@@ -1289,14 +1289,14 @@ catboost_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 {
 	CatBoostGpuModelState *state;
 	bytea	   *payload_copy;
-	NDB_DECLARE(char *, payload_copy_raw);
+	char *payload_copy_raw = NULL;
 	int			payload_size;
 	int			iterations = 0;
 	int			depth = 0;
 	float		learning_rate = 0.0f;
 	int			n_features = 0;
 	char		loss_function[32];
-	JsonbIterator *it;
+	JsonbIterator *it = NULL;
 	JsonbValue	v;
 	int			r;
 
@@ -1310,13 +1310,13 @@ catboost_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 	}
 
 	payload_size = VARSIZE(payload);
-	NDB_ALLOC(payload_copy_raw, char, payload_size);
+	nalloc(payload_copy_raw, char, payload_size);
 	payload_copy = (bytea *) payload_copy_raw;
 	memcpy(payload_copy, payload, payload_size);
 
 	if (catboost_model_deserialize_from_bytea(payload_copy, &iterations, &depth, &learning_rate, &n_features, loss_function, sizeof(loss_function)) != 0)
 	{
-		NDB_FREE(payload_copy);
+		nfree(payload_copy);
 		if (errstr != NULL)
 			*errstr = pstrdup("catboost_gpu_deserialize: failed to deserialize");
 		return false;
@@ -1334,9 +1334,9 @@ catboost_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 	if (metadata != NULL)
 	{
 		int			metadata_size = VARSIZE(metadata);
-		NDB_DECLARE(Jsonb *, metadata_copy);
-		NDB_DECLARE(char *, metadata_copy_raw);
-		NDB_ALLOC(metadata_copy_raw, char, metadata_size);
+		Jsonb *metadata_copy = NULL;
+		char *metadata_copy_raw = NULL;
+		nalloc(metadata_copy_raw, char, metadata_size);
 		metadata_copy = (Jsonb *) metadata_copy_raw;
 
 		memcpy(metadata_copy, metadata, metadata_size);
@@ -1353,7 +1353,7 @@ catboost_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 				if (strcmp(key, "n_samples") == 0 && v.type == jbvNumeric)
 					state->n_samples = DatumGetInt32(DirectFunctionCall1(numeric_int4,
 																		 NumericGetDatum(v.val.numeric)));
-				NDB_FREE(key);
+				nfree(key);
 			}
 		}
 	}
@@ -1363,7 +1363,7 @@ catboost_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 	}
 
 	if (model->backend_state != NULL)
-		NDB_FREE(model->backend_state);
+		nfree(model->backend_state);
 
 	model->backend_state = state;
 	model->gpu_ready = true;
@@ -1375,7 +1375,7 @@ catboost_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 static void
 catboost_gpu_destroy(MLGpuModel *model)
 {
-	CatBoostGpuModelState *state;
+	CatBoostGpuModelState *state = NULL;
 
 	if (model == NULL)
 		return;
@@ -1384,10 +1384,10 @@ catboost_gpu_destroy(MLGpuModel *model)
 	{
 		state = (CatBoostGpuModelState *) model->backend_state;
 		if (state->model_blob != NULL)
-			NDB_FREE(state->model_blob);
+			nfree(state->model_blob);
 		if (state->metrics != NULL)
-			NDB_FREE(state->metrics);
-		NDB_FREE(state);
+			nfree(state->metrics);
+		nfree(state);
 		model->backend_state = NULL;
 	}
 

@@ -89,7 +89,7 @@ static void ndb_rocm_hf_free_kv_cache(NdbRocmHfKVCache *kv_cache);
 static NdbRocmHfModelEntry *
 ndb_rocm_hf_find_model(const char *model_name)
 {
-	NdbRocmHfModelEntry *entry;
+	NdbRocmHfModelEntry *entry = NULL;
 	size_t model_name_len;
 
 	if (!model_name)
@@ -408,16 +408,16 @@ ndb_rocm_hf_embed(const char *model_name,
 	int *dim_out,
 	char **errstr)
 {
-	NDB_DECLARE(NdbRocmHfModelEntry *, entry);
+	NdbRocmHfModelEntry *entry = NULL;
 	NdbRocmHfModelConfig config;
 	NdbRocmHfModelWeights weights;
 	int32_t token_ids[NDB_HF_MAX_SEQ_LEN];
 	int32_t attention_mask[NDB_HF_MAX_SEQ_LEN];
 	int seq_len = 0;
-	NDB_DECLARE(float *, embedding);
+	float *embedding = NULL;
 	int embed_dim = 0;
 	hipError_t hip_status;
-	NDB_DECLARE(float *, d_embedding_table);
+	float *d_embedding_table = NULL;
 	size_t embed_table_bytes;
 	size_t embed_table_size;
 	int rc = -1;
@@ -546,8 +546,8 @@ ndb_rocm_hf_embed(const char *model_name,
 		oldcontext = MemoryContextSwitchTo(CacheMemoryContext);
 
 		/* Allocate new cache entry in CacheMemoryContext (persistent) */
-		NDB_DECLARE(NdbRocmHfModelEntry *, entry);
-		NDB_ALLOC(entry, NdbRocmHfModelEntry, 1);
+		NdbRocmHfModelEntry *entry = NULL;
+		nalloc(entry, NdbRocmHfModelEntry, 1);
 			sizeof(NdbRocmHfModelEntry));
 		if (entry == NULL)
 		{
@@ -574,7 +574,7 @@ ndb_rocm_hf_embed(const char *model_name,
 			lm_head_size =
 				config.vocab_size * config.embed_dim * sizeof(float);
 
-			NDB_DECLARE(float *, embed_table);
+			float *embed_table = NULL;
 
 			/* Check for overflow */
 			if (position_embed_size / sizeof(float)
@@ -588,7 +588,7 @@ ndb_rocm_hf_embed(const char *model_name,
 				return -1;
 			}
 
-			NDB_ALLOC(embed_table, char, embed_table_size);
+			nalloc(embed_table, char, embed_table_size);
 			entry->weights.embedding_table = (float *) embed_table;
 			entry->embed_table = (float *) embed_table;
 			if (entry->weights.embedding_table == NULL)
@@ -602,14 +602,14 @@ ndb_rocm_hf_embed(const char *model_name,
 				weights.embedding_table,
 				embed_table_size);
 
-			NDB_DECLARE(float *, position_embed);
+			float *position_embed = NULL;
 
-			NDB_ALLOC(position_embed, char, position_embed_size);
+			nalloc(position_embed, char, position_embed_size);
 			entry->weights.position_embeddings = (float *) position_embed;
 			entry->position_embed = (float *) position_embed;
 			if (entry->weights.position_embeddings == NULL)
 			{
-				NDB_FREE(entry->weights.embedding_table);
+				nfree(entry->weights.embedding_table);
 				MemoryContextDelete(embed_context);
 				if (errstr)
 					*errstr =
@@ -620,15 +620,15 @@ ndb_rocm_hf_embed(const char *model_name,
 				weights.position_embeddings,
 				position_embed_size);
 
-			NDB_DECLARE(float *, lm_head);
+			float *lm_head = NULL;
 
-			NDB_ALLOC(lm_head, char, lm_head_size);
+			nalloc(lm_head, char, lm_head_size);
 			entry->weights.lm_head_weights = (float *) lm_head;
 			entry->lm_head = (float *) lm_head;
 			if (entry->weights.lm_head_weights == NULL)
 			{
-				NDB_FREE(entry->weights.embedding_table);
-				NDB_FREE(entry->weights.position_embeddings);
+				nfree(entry->weights.embedding_table);
+				nfree(entry->weights.position_embeddings);
 				MemoryContextDelete(embed_context);
 				if (errstr)
 					*errstr = pstrdup("failed to allocate LM head weights");
@@ -809,10 +809,10 @@ ndb_rocm_hf_embed(const char *model_name,
 		d_embedding_table = (float *)entry->device_weights_ptr;
 	}
 
-	NDB_DECLARE(float *, embedding);
+	float *embedding = NULL;
 
 	/* Allocate output embedding in embed context */
-	NDB_ALLOC(embedding, float, embed_dim);
+	nalloc(embedding, float, embed_dim);
 	if (embedding == NULL)
 	{
 		MemoryContextSwitchTo(oldcontext);
@@ -851,8 +851,8 @@ ndb_rocm_hf_embed(const char *model_name,
 
 	/* Copy embedding to parent context */
 	MemoryContextSwitchTo(oldcontext);
-	NDB_DECLARE(float *, vec_out);
-	NDB_ALLOC(vec_out, float, embed_dim);
+	float *vec_out = NULL;
+	nalloc(vec_out, float, embed_dim);
 	*vec_out = vec_out;
 	if (*vec_out == NULL)
 	{
@@ -879,10 +879,10 @@ ndb_rocm_hf_parse_gen_params_OLD_REMOVED(const char *params_json,
 							 NdbRocmHfGenParams *gen_params,
 							 char **errstr)
 {
-	NDB_DECLARE(char *, json_copy);
+	char *json_copy = NULL;
 	char *p = NULL;
-	NDB_DECLARE(char *, key);
-	NDB_DECLARE(char *, value);
+	char *key = NULL;
+	char *value = NULL;
 	char *endptr = NULL;
 	float float_val;
 	int int_val;
@@ -937,7 +937,7 @@ ndb_rocm_hf_parse_gen_params_OLD_REMOVED(const char *params_json,
 		/* Find key */
 		if (*p != '"')
 		{
-			NDB_FREE(json_copy);
+			nfree(json_copy);
 			if (errstr)
 				*errstr = pstrdup(
 					"invalid JSON format: expected key");
@@ -949,7 +949,7 @@ ndb_rocm_hf_parse_gen_params_OLD_REMOVED(const char *params_json,
 			p++;
 		if (*p != '"')
 		{
-			NDB_FREE(json_copy);
+			nfree(json_copy);
 			if (errstr)
 				*errstr = pstrdup("invalid JSON format: "
 						  "unterminated key");
@@ -1218,7 +1218,7 @@ ndb_rocm_hf_parse_gen_params_OLD_REMOVED(const char *params_json,
 		{
 			/* Parse stop sequences - supports both string and array format */
 #ifdef HAVE_ONNX_RUNTIME
-			NDB_DECLARE(int32_t *, stop_token_ids);
+			int32_t *stop_token_ids = NULL;
 			int32_t stop_token_len = 0;
 #endif
 
@@ -1301,18 +1301,18 @@ ndb_rocm_hf_parse_gen_params_OLD_REMOVED(const char *params_json,
 									1;
 							}
 
-							NDB_FREE(stop_token_ids);
+							nfree(stop_token_ids);
 						} else
 						{
 							if (stop_token_ids)
-								NDB_FREE(stop_token_ids);
+								nfree(stop_token_ids);
 						}
 					}
 					PG_CATCH();
 					{
 						FlushErrorState();
 						if (stop_token_ids)
-							NDB_FREE(stop_token_ids);
+							nfree(stop_token_ids);
 					}
 					PG_END_TRY();
 #endif
@@ -1420,7 +1420,7 @@ ndb_rocm_hf_parse_gen_params_OLD_REMOVED(const char *params_json,
 										i++;
 									}
 
-									NDB_FREE(stop_token_ids);
+									nfree(stop_token_ids);
 								} else
 								{
 									const char *ptr;
@@ -1429,7 +1429,7 @@ ndb_rocm_hf_parse_gen_params_OLD_REMOVED(const char *params_json,
 
 									/* Fallback: use word count estimation */
 									if (stop_token_ids)
-										NDB_FREE(stop_token_ids);
+										nfree(stop_token_ids);
 
 									ptr = value;
 									word_count = 0;
@@ -1477,7 +1477,7 @@ ndb_rocm_hf_parse_gen_params_OLD_REMOVED(const char *params_json,
 								EmitErrorReport();
 								FlushErrorState();
 								if (stop_token_ids)
-									NDB_FREE(stop_token_ids);
+									nfree(stop_token_ids);
 								/* Continue with next stop sequence */
 							}
 							PG_END_TRY();
@@ -1604,7 +1604,7 @@ ndb_rocm_hf_parse_gen_params_OLD_REMOVED(const char *params_json,
 									1;
 							}
 
-					NDB_FREE(stop_token_ids);
+					nfree(stop_token_ids);
 				} else
 				{
 					/* Fallback: use word count estimation */
@@ -1613,7 +1613,7 @@ ndb_rocm_hf_parse_gen_params_OLD_REMOVED(const char *params_json,
 					int in_word = 0;
 
 					if (stop_token_ids)
-						NDB_FREE(stop_token_ids);
+						nfree(stop_token_ids);
 
 					while (*ptr)
 							{
@@ -1659,7 +1659,7 @@ ndb_rocm_hf_parse_gen_params_OLD_REMOVED(const char *params_json,
 					EmitErrorReport();
 					FlushErrorState();
 					if (stop_token_ids)
-						NDB_FREE(stop_token_ids);
+						nfree(stop_token_ids);
 					/* Use fallback word count */
 
 					while (*ptr)
@@ -1772,7 +1772,7 @@ ndb_rocm_hf_parse_gen_params_OLD_REMOVED(const char *params_json,
 		}
 	}
 
-	NDB_FREE(json_copy);
+	nfree(json_copy);
 	return 0;
 }
 /* OLD FUNCTION REMOVED - use ndb_json_parse_gen_params instead */
@@ -1790,7 +1790,7 @@ ndb_rocm_hf_decode_tokens(const int32_t *token_ids,
 	char **text_out,
 	char **errstr)
 {
-	NDB_DECLARE(char *, decoded_text);
+	char *decoded_text = NULL;
 
 	if (errstr)
 		*errstr = NULL;
@@ -1965,7 +1965,7 @@ ndb_rocm_hf_complete(const char *model_name,
 	char **text_out,
 	char **errstr)
 {
-	NDB_DECLARE(NdbRocmHfModelEntry *, entry);
+	NdbRocmHfModelEntry *entry = NULL;
 	NdbRocmHfModelConfig config;
 	NdbRocmHfModelWeights weights;
 	NdbRocmHfGenParams gen_params;
@@ -1975,14 +1975,14 @@ ndb_rocm_hf_complete(const char *model_name,
 	int32_t output_token_ids[NDB_HF_MAX_GEN_TOKENS];
 	int input_seq_len = 0;
 	int output_seq_len = 0;
-	NDB_DECLARE(char *, generated_text);
+	char *generated_text = NULL;
 	int rc = -1;
 	MemoryContext oldcontext;
 	MemoryContext complete_context;
 	hipError_t hip_status;
-	NDB_DECLARE(float *, d_embedding_table);
-	NDB_DECLARE(float *, d_position_embeddings);
-	NDB_DECLARE(float *, d_lm_head_weights);
+	float *d_embedding_table = NULL;
+	float *d_position_embeddings = NULL;
+	float *d_lm_head_weights = NULL;
 	size_t embed_table_bytes;
 	size_t position_embed_bytes;
 	size_t lm_head_bytes;
@@ -2006,7 +2006,7 @@ ndb_rocm_hf_complete(const char *model_name,
 	/* Parse generation parameters */
 	if (params_json && strlen(params_json) > 0)
 	{
-		NDB_DECLARE(char *, temp_errstr);
+		char *temp_errstr = NULL;
 
 		NdbGenParams ndb_params = {0};
 		rc = ndb_json_parse_gen_params(params_json, &ndb_params, &temp_errstr);
@@ -2063,7 +2063,7 @@ ndb_rocm_hf_complete(const char *model_name,
 	entry = ndb_rocm_hf_find_model(model_name);
 	if (entry == NULL || !entry->loaded)
 	{
-		NDB_DECLARE(char *, temp_errstr);
+		char *temp_errstr = NULL;
 
 		/* Load model weights - will error if weights cannot be loaded */
 		rc = ndb_rocm_hf_load_model_weights(
@@ -2086,8 +2086,8 @@ ndb_rocm_hf_complete(const char *model_name,
 		oldcontext = MemoryContextSwitchTo(CacheMemoryContext);
 
 		/* Allocate new cache entry in CacheMemoryContext (persistent) */
-		NDB_DECLARE(NdbRocmHfModelEntry *, entry);
-		NDB_ALLOC(entry, NdbRocmHfModelEntry, 1);
+		NdbRocmHfModelEntry *entry = NULL;
+		nalloc(entry, NdbRocmHfModelEntry, 1);
 			sizeof(NdbRocmHfModelEntry));
 		memset(entry, 0, sizeof(NdbRocmHfModelEntry));
 		strncpy(entry->model_name,
@@ -2105,24 +2105,24 @@ ndb_rocm_hf_complete(const char *model_name,
 				config.vocab_size * config.embed_dim * sizeof(float);
 
 			entry->weights.embedding_table =
-				NDB_DECLARE(float *, embed_table);
-				NDB_ALLOC(embed_table, char, embed_table_size);
+				float *embed_table = NULL;
+				nalloc(embed_table, char, embed_table_size);
 				entry->embed_table = (float *) embed_table;
 			memcpy(entry->weights.embedding_table,
 				weights.embedding_table,
 				embed_table_size);
 
 			entry->weights.position_embeddings =
-				NDB_DECLARE(float *, position_embed);
-				NDB_ALLOC(position_embed, char, position_embed_size);
+				float *position_embed = NULL;
+				nalloc(position_embed, char, position_embed_size);
 				entry->position_embed = (float *) position_embed;
 			memcpy(entry->weights.position_embeddings,
 				weights.position_embeddings,
 				position_embed_size);
 
 			entry->weights.lm_head_weights =
-				NDB_DECLARE(float *, lm_head);
-				NDB_ALLOC(lm_head, char, lm_head_size);
+				float *lm_head = NULL;
+				nalloc(lm_head, char, lm_head_size);
 				entry->lm_head = (float *) lm_head;
 			memcpy(entry->weights.lm_head_weights,
 				weights.lm_head_weights,
@@ -2171,7 +2171,7 @@ ndb_rocm_hf_complete(const char *model_name,
 
 	/* Tokenize prompt */
 	{
-		NDB_DECLARE(char *, temp_errstr);
+		char *temp_errstr = NULL;
 
 		rc = ndb_rocm_hf_tokenize_text(prompt,
 			model_name,
@@ -2193,7 +2193,7 @@ ndb_rocm_hf_complete(const char *model_name,
 	/* Initialize KV cache */
 	memset(&kv_cache, 0, sizeof(NdbRocmHfKVCache));
 	{
-		NDB_DECLARE(char *, temp_errstr);
+		char *temp_errstr = NULL;
 
 		rc = ndb_rocm_hf_init_kv_cache(&kv_cache, &config, &temp_errstr);
 		if (rc != 0)
@@ -2371,7 +2371,7 @@ ndb_rocm_hf_complete(const char *model_name,
 
 	/* Call ROCm generation kernel */
 	{
-		NDB_DECLARE(char *, temp_errstr);
+		char *temp_errstr = NULL;
 
 		rc = ndb_rocm_hf_generate_inference(model_name,
 			input_token_ids,
@@ -2400,7 +2400,7 @@ ndb_rocm_hf_complete(const char *model_name,
 
 	/* Decode generated tokens to text */
 	{
-		NDB_DECLARE(char *, temp_errstr);
+		char *temp_errstr = NULL;
 
 		rc = ndb_rocm_hf_decode_tokens(output_token_ids,
 			output_seq_len,
@@ -2453,7 +2453,7 @@ ndb_rocm_hf_generate_stream(const char *model_name,
 	char **errstr)
 {
 	NdbRocmHfGenParams gen_params;
-	NDB_DECLARE(NdbRocmHfModelEntry *, entry);
+	NdbRocmHfModelEntry *entry = NULL;
 	NdbRocmHfModelConfig config;
 	NdbRocmHfModelWeights weights;
 	NdbRocmHfKVCache kv_cache;
@@ -2560,8 +2560,8 @@ ndb_rocm_hf_generate_stream(const char *model_name,
 		oldcontext = MemoryContextSwitchTo(CacheMemoryContext);
 
 		/* Allocate new cache entry in CacheMemoryContext (persistent) */
-		NDB_DECLARE(NdbRocmHfModelEntry *, entry);
-		NDB_ALLOC(entry, NdbRocmHfModelEntry, 1);
+		NdbRocmHfModelEntry *entry = NULL;
+		nalloc(entry, NdbRocmHfModelEntry, 1);
 			sizeof(NdbRocmHfModelEntry));
 		memset(entry, 0, sizeof(NdbRocmHfModelEntry));
 		strncpy(entry->model_name,
@@ -2579,24 +2579,24 @@ ndb_rocm_hf_generate_stream(const char *model_name,
 				config.vocab_size * config.embed_dim * sizeof(float);
 
 			entry->weights.embedding_table =
-				NDB_DECLARE(float *, embed_table);
-				NDB_ALLOC(embed_table, char, embed_table_size);
+				float *embed_table = NULL;
+				nalloc(embed_table, char, embed_table_size);
 				entry->embed_table = (float *) embed_table;
 			memcpy(entry->weights.embedding_table,
 				weights.embedding_table,
 				embed_table_size);
 
 			entry->weights.position_embeddings =
-				NDB_DECLARE(float *, position_embed);
-				NDB_ALLOC(position_embed, char, position_embed_size);
+				float *position_embed = NULL;
+				nalloc(position_embed, char, position_embed_size);
 				entry->position_embed = (float *) position_embed;
 			memcpy(entry->weights.position_embeddings,
 				weights.position_embeddings,
 				position_embed_size);
 
 			entry->weights.lm_head_weights =
-				NDB_DECLARE(float *, lm_head);
-				NDB_ALLOC(lm_head, char, lm_head_size);
+				float *lm_head = NULL;
+				nalloc(lm_head, char, lm_head_size);
 				entry->lm_head = (float *) lm_head;
 			memcpy(entry->weights.lm_head_weights,
 				weights.lm_head_weights,
@@ -2697,7 +2697,7 @@ ndb_rocm_hf_generate_stream(const char *model_name,
 	for (i = 0; i < output_seq_len; i++)
 	{
 		int32_t token_id = output_token_ids[i];
-		NDB_DECLARE(char *, decoded_token);
+		char *decoded_token = NULL;
 
 		/* Decode single token */
 		rc = ndb_rocm_hf_decode_tokens(
@@ -2708,7 +2708,7 @@ ndb_rocm_hf_generate_stream(const char *model_name,
 				decoded_token,
 				sizeof(token_text) - 1);
 			token_text[sizeof(token_text) - 1] = '\0';
-			NDB_FREE(decoded_token);
+			nfree(decoded_token);
 		} else
 		{
 			snprintf(token_text,
@@ -2748,7 +2748,7 @@ ndb_rocm_hf_generate_batch(const char *model_name,
 {
 	int i;
 	int rc = 0;
-	NDB_DECLARE(hipStream_t *, streams);
+	hipStream_t *streams = NULL;
 	const int max_streams = 8; /* Maximum number of concurrent streams */
 	int num_streams;
 	MemoryContext oldctx;
@@ -2805,8 +2805,8 @@ ndb_rocm_hf_generate_batch(const char *model_name,
 		for (i = 0; i < num_prompts; i++)
 		{
 			int stream_idx = i % num_streams;
-			NDB_DECLARE(char *, text_out);
-			NDB_DECLARE(char *, prompt_err);
+			char *text_out = NULL;
+			char *prompt_err = NULL;
 
 			/* Set current stream with multi-GPU support */
 			{
@@ -2837,7 +2837,7 @@ ndb_rocm_hf_generate_batch(const char *model_name,
 			{
 #ifdef HAVE_ONNX_RUNTIME
 				int32 token_length;
-				NDB_DECLARE(int32 *, token_ids);
+				int32 *token_ids = NULL;
 
 				/* Count tokens from generated text */
 				PG_TRY();
@@ -2882,7 +2882,7 @@ ndb_rocm_hf_generate_batch(const char *model_name,
 							: 1;
 					}
 					if (token_ids)
-						NDB_FREE(token_ids);
+						nfree(token_ids);
 				}
 			PG_CATCH();
 			{
@@ -2894,7 +2894,7 @@ ndb_rocm_hf_generate_batch(const char *model_name,
 				EmitErrorReport();
 				FlushErrorState();
 				if (token_ids)
-					NDB_FREE(token_ids);
+					nfree(token_ids);
 
 				while (*ptr)
 					{
@@ -2951,9 +2951,9 @@ ndb_rocm_hf_generate_batch(const char *model_name,
 				}
 				MemoryContextSwitchTo(batchctx);
 				if (text_out)
-					NDB_FREE(text_out);
+					nfree(text_out);
 				if (prompt_err)
-					NDB_FREE(prompt_err);
+					nfree(prompt_err);
 			} else
 			{
 				MemoryContext oldctx_temp = MemoryContextSwitchTo(CurrentMemoryContext);
@@ -2964,9 +2964,9 @@ ndb_rocm_hf_generate_batch(const char *model_name,
 				MemoryContextSwitchTo(oldctx_temp);
 				MemoryContextSwitchTo(batchctx);
 				if (text_out)
-					NDB_FREE(text_out);
+					nfree(text_out);
 				if (prompt_err)
-					NDB_FREE(prompt_err);
+					nfree(prompt_err);
 			}
 		}
 
@@ -2977,7 +2977,7 @@ ndb_rocm_hf_generate_batch(const char *model_name,
 			hipStreamDestroy(streams[i]);
 		}
 		if (streams)
-			NDB_FREE(streams);
+			nfree(streams);
 
 		/* Check if at least one prompt succeeded */
 		rc = -1;
@@ -3002,8 +3002,8 @@ ndb_rocm_hf_generate_batch(const char *model_name,
 		/* Fall back to sequential processing */
 		for (i = 0; i < num_prompts; i++)
 		{
-			NDB_DECLARE(char *, text_out);
-			NDB_DECLARE(char *, prompt_err);
+			char *text_out = NULL;
+			char *prompt_err = NULL;
 
 			rc = ndb_rocm_hf_complete(model_name,
 				prompts[i],
@@ -3013,7 +3013,7 @@ ndb_rocm_hf_generate_batch(const char *model_name,
 			if (rc == 0)
 			{
 				int32 token_length;
-				NDB_DECLARE(int32 *, token_ids);
+				int32 *token_ids = NULL;
 
 				/* Count tokens from generated text */
 				PG_TRY();
@@ -3063,7 +3063,7 @@ ndb_rocm_hf_generate_batch(const char *model_name,
 							: 1;
 					}
 					if (token_ids)
-						NDB_FREE(token_ids);
+						nfree(token_ids);
 				}
 			PG_CATCH();
 			{
@@ -3075,7 +3075,7 @@ ndb_rocm_hf_generate_batch(const char *model_name,
 				EmitErrorReport();
 				FlushErrorState();
 				if (token_ids)
-					NDB_FREE(token_ids);
+					nfree(token_ids);
 
 				while (*ptr)
 					{
@@ -3108,9 +3108,9 @@ ndb_rocm_hf_generate_batch(const char *model_name,
 				}
 				MemoryContextSwitchTo(batchctx);
 				if (text_out)
-					NDB_FREE(text_out);
+					nfree(text_out);
 				if (prompt_err)
-					NDB_FREE(prompt_err);
+					nfree(prompt_err);
 			} else
 			{
 				MemoryContext oldctx_temp = MemoryContextSwitchTo(CurrentMemoryContext);
@@ -3121,9 +3121,9 @@ ndb_rocm_hf_generate_batch(const char *model_name,
 				MemoryContextSwitchTo(oldctx_temp);
 				MemoryContextSwitchTo(batchctx);
 				if (text_out)
-					NDB_FREE(text_out);
+					nfree(text_out);
 				if (prompt_err)
-					NDB_FREE(prompt_err);
+					nfree(prompt_err);
 			}
 		}
 
@@ -3213,8 +3213,8 @@ ndb_rocm_hf_rerank(const char *model_name,
 	scores = NULL;
 
 	/* Allocate scores array */
-	NDB_DECLARE(float *, scores);
-	NDB_ALLOC(scores, float, ndocs);
+	float *scores = NULL;
+	nalloc(scores, float, ndocs);
 	if (!scores)
 	{
 		if (errstr)
@@ -3231,7 +3231,7 @@ ndb_rocm_hf_rerank(const char *model_name,
 		if (errstr)
 			*errstr = pstrdup("ROCm HF reranking model not loaded - use "
 					  "HTTP or ONNX fallback");
-		NDB_FREE(scores);
+		nfree(scores);
 		return -1;
 	}
 
@@ -3245,7 +3245,7 @@ ndb_rocm_hf_rerank(const char *model_name,
 		{
 			if (errstr)
 				*errstr = pstrdup("failed to allocate GPU memory for model weights");
-			NDB_FREE(scores);
+			nfree(scores);
 			return -1;
 		}
 
@@ -3259,7 +3259,7 @@ ndb_rocm_hf_rerank(const char *model_name,
 			entry->device_weights_ptr = NULL;
 			if (errstr)
 				*errstr = pstrdup("failed to copy model weights to GPU");
-			NDB_FREE(scores);
+			nfree(scores);
 			return -1;
 		}
 
@@ -3269,88 +3269,88 @@ ndb_rocm_hf_rerank(const char *model_name,
 
 	/* Batch process all query-document pairs using cross-encoder kernel */
 	{
-		NDB_DECLARE(int32_t *, token_ids_batch);
-		NDB_DECLARE(int32_t *, attention_mask_batch);
+		int32_t *token_ids_batch = NULL;
+		int32_t *attention_mask_batch = NULL;
 		int max_seq_len = 0;
 		int seq_len = 0;
 		int embed_dim = entry->config.embed_dim;
-		NDB_DECLARE(float *, classification_weights);
+		float *classification_weights = NULL;
 		float classification_bias = 0.0f;
 		int j;
 
 		/* First pass: tokenize all pairs to determine max sequence length */
 		for (i = 0; i < ndocs; i++)
 		{
-			NDB_DECLARE(int32_t *, temp_token_ids);
-			NDB_DECLARE(int32_t *, temp_attention_mask);
+			int32_t *temp_token_ids = NULL;
+			int32_t *temp_attention_mask = NULL;
 			int temp_seq_len = 0;
-			NDB_DECLARE(char *, query_doc_text);
+			char *query_doc_text = NULL;
 			size_t query_len;
 			size_t doc_len;
 
 			query_len = strlen(query);
 			doc_len = strlen(docs[i]);
-			NDB_DECLARE(char *, query_doc_text);
-			NDB_ALLOC(query_doc_text, char, query_len + doc_len + 10);
+			char *query_doc_text = NULL;
+			nalloc(query_doc_text, char, query_len + doc_len + 10);
 			snprintf(query_doc_text, query_len + doc_len + 10, "%s [SEP] %s", query, docs[i]);
 
-			NDB_DECLARE(int32_t *, temp_token_ids);
-			NDB_ALLOC(temp_token_ids, int32_t, NDB_HF_MAX_SEQ_LEN);
-			NDB_DECLARE(int32_t *, temp_attention_mask);
-			NDB_ALLOC(temp_attention_mask, int32_t, NDB_HF_MAX_SEQ_LEN);
+			int32_t *temp_token_ids = NULL;
+			nalloc(temp_token_ids, int32_t, NDB_HF_MAX_SEQ_LEN);
+			int32_t *temp_attention_mask = NULL;
+			nalloc(temp_attention_mask, int32_t, NDB_HF_MAX_SEQ_LEN);
 
 			rc = ndb_rocm_hf_tokenize_text(query_doc_text, model_name,
 				temp_token_ids, temp_attention_mask, &temp_seq_len, errstr);
-			NDB_FREE(query_doc_text);
+			nfree(query_doc_text);
 
 			if (rc == 0 && temp_seq_len > max_seq_len)
 				max_seq_len = temp_seq_len;
 
-			NDB_FREE(temp_token_ids);
-			NDB_FREE(temp_attention_mask);
+			nfree(temp_token_ids);
+			nfree(temp_attention_mask);
 		}
 
 		if (max_seq_len == 0)
 			max_seq_len = NDB_HF_MAX_SEQ_LEN;
 
 		/* Allocate batch arrays */
-		NDB_DECLARE(int32_t *, token_ids_batch);
-		NDB_DECLARE(int32_t *, attention_mask_batch);
-		NDB_ALLOC(token_ids_batch, int32_t, ndocs * max_seq_len);
-		NDB_ALLOC(attention_mask_batch, int32_t, ndocs * max_seq_len);
+		int32_t *token_ids_batch = NULL;
+		int32_t *attention_mask_batch = NULL;
+		nalloc(token_ids_batch, int32_t, ndocs * max_seq_len);
+		nalloc(attention_mask_batch, int32_t, ndocs * max_seq_len);
 
 		/* Second pass: tokenize and collect all pairs */
 		for (i = 0; i < ndocs; i++)
 		{
-			NDB_DECLARE(int32_t *, temp_token_ids);
-			NDB_DECLARE(int32_t *, temp_attention_mask);
+			int32_t *temp_token_ids = NULL;
+			int32_t *temp_attention_mask = NULL;
 			int temp_seq_len = 0;
-			NDB_DECLARE(char *, query_doc_text);
+			char *query_doc_text = NULL;
 			size_t query_len;
 			size_t doc_len;
 
 			query_len = strlen(query);
 			doc_len = strlen(docs[i]);
-			NDB_DECLARE(char *, query_doc_text);
-			NDB_ALLOC(query_doc_text, char, query_len + doc_len + 10);
+			char *query_doc_text = NULL;
+			nalloc(query_doc_text, char, query_len + doc_len + 10);
 			snprintf(query_doc_text, query_len + doc_len + 10, "%s [SEP] %s", query, docs[i]);
 
-			NDB_DECLARE(int32_t *, temp_token_ids);
-			NDB_ALLOC(temp_token_ids, int32_t, NDB_HF_MAX_SEQ_LEN);
-			NDB_DECLARE(int32_t *, temp_attention_mask);
-			NDB_ALLOC(temp_attention_mask, int32_t, NDB_HF_MAX_SEQ_LEN);
+			int32_t *temp_token_ids = NULL;
+			nalloc(temp_token_ids, int32_t, NDB_HF_MAX_SEQ_LEN);
+			int32_t *temp_attention_mask = NULL;
+			nalloc(temp_attention_mask, int32_t, NDB_HF_MAX_SEQ_LEN);
 
 			rc = ndb_rocm_hf_tokenize_text(query_doc_text, model_name,
 				temp_token_ids, temp_attention_mask, &temp_seq_len, errstr);
-			NDB_FREE(query_doc_text);
+			nfree(query_doc_text);
 
 			if (rc != 0)
 			{
 				/* Fill with zeros on error */
 				memset(token_ids_batch + i * max_seq_len, 0, sizeof(int32_t) * max_seq_len);
 				memset(attention_mask_batch + i * max_seq_len, 0, sizeof(int32_t) * max_seq_len);
-				NDB_FREE(temp_token_ids);
-				NDB_FREE(temp_attention_mask);
+				nfree(temp_token_ids);
+				nfree(temp_attention_mask);
 				continue;
 			}
 
@@ -3367,8 +3367,8 @@ ndb_rocm_hf_rerank(const char *model_name,
 					sizeof(int32_t) * (max_seq_len - temp_seq_len));
 			}
 
-			NDB_FREE(temp_token_ids);
-			NDB_FREE(temp_attention_mask);
+			nfree(temp_token_ids);
+			nfree(temp_attention_mask);
 		}
 
 		/* Get or create classification weights */
@@ -3381,8 +3381,8 @@ ndb_rocm_hf_rerank(const char *model_name,
 		{
 			/* Use default classification weights (learned from model or default values) */
 			/* For now, use a simple learned-like weight vector */
-			NDB_DECLARE(float *, classification_weights);
-			NDB_ALLOC(classification_weights, float, embed_dim);
+			float *classification_weights = NULL;
+			nalloc(classification_weights, float, embed_dim);
 			for (j = 0; j < embed_dim; j++)
 			{
 				/* Initialize with small random-like values */
@@ -3406,10 +3406,10 @@ ndb_rocm_hf_rerank(const char *model_name,
 			scores,
 			errstr);
 
-		NDB_FREE(token_ids_batch);
-		NDB_FREE(attention_mask_batch);
+		nfree(token_ids_batch);
+		nfree(attention_mask_batch);
 		if (classification_weights != entry->weights.classification_weights)
-			NDB_FREE(classification_weights);
+			nfree(classification_weights);
 
 		if (rc != 0)
 		{
@@ -3444,7 +3444,7 @@ ndb_rocm_hf_load_model(const char *model_name,
 	NdbRocmHfModelConfig *config,
 	char **errstr)
 {
-	NDB_DECLARE(NdbRocmHfModelEntry *, entry);
+	NdbRocmHfModelEntry *entry = NULL;
 	NdbRocmHfModelWeights weights;
 	int rc;
 
@@ -3477,8 +3477,8 @@ ndb_rocm_hf_load_model(const char *model_name,
 		MemoryContext oldcontext = MemoryContextSwitchTo(CacheMemoryContext);
 
 		/* Create cache entry in CacheMemoryContext (persistent) */
-		NDB_DECLARE(NdbRocmHfModelEntry *, entry);
-		NDB_ALLOC(entry, NdbRocmHfModelEntry, 1);sizeof(NdbRocmHfModelEntry));
+		NdbRocmHfModelEntry *entry = NULL;
+		nalloc(entry, NdbRocmHfModelEntry, 1);sizeof(NdbRocmHfModelEntry));
 		memset(entry, 0, sizeof(NdbRocmHfModelEntry));
 		strncpy(entry->model_name, model_name, NDB_HF_MAX_MODEL_NAME - 1);
 		entry->config = *config;
@@ -3494,24 +3494,24 @@ ndb_rocm_hf_load_model(const char *model_name,
 				config->vocab_size * config->embed_dim * sizeof(float);
 
 			entry->weights.embedding_table =
-				NDB_DECLARE(float *, embed_table);
-				NDB_ALLOC(embed_table, char, embed_table_size);
+				float *embed_table = NULL;
+				nalloc(embed_table, char, embed_table_size);
 				entry->embed_table = (float *) embed_table;
 			memcpy(entry->weights.embedding_table,
 				weights.embedding_table,
 				embed_table_size);
 
 			entry->weights.position_embeddings =
-				NDB_DECLARE(float *, position_embed);
-				NDB_ALLOC(position_embed, char, position_embed_size);
+				float *position_embed = NULL;
+				nalloc(position_embed, char, position_embed_size);
 				entry->position_embed = (float *) position_embed;
 			memcpy(entry->weights.position_embeddings,
 				weights.position_embeddings,
 				position_embed_size);
 
 			entry->weights.lm_head_weights =
-				NDB_DECLARE(float *, lm_head);
-				NDB_ALLOC(lm_head, char, lm_head_size);
+				float *lm_head = NULL;
+				nalloc(lm_head, char, lm_head_size);
 				entry->lm_head = (float *) lm_head;
 			memcpy(entry->weights.lm_head_weights,
 				weights.lm_head_weights,
@@ -3541,8 +3541,8 @@ ndb_rocm_hf_load_model(const char *model_name,
 int
 ndb_rocm_hf_unload_model(const char *model_name, char **errstr)
 {
-	NDB_DECLARE(NdbRocmHfModelEntry *, entry);
-	NDB_DECLARE(NdbRocmHfModelEntry *, prev);
+	NdbRocmHfModelEntry *entry = NULL;
+	NdbRocmHfModelEntry *prev = NULL;
 	hipError_t hip_status;
 
 	if (errstr)
@@ -3607,11 +3607,11 @@ ndb_rocm_hf_unload_model(const char *model_name, char **errstr)
 
 	/* Free host memory */
 	if (entry->weights.embedding_table != NULL)
-		NDB_FREE(entry->weights.embedding_table);
+		nfree(entry->weights.embedding_table);
 	if (entry->weights.position_embeddings != NULL)
-		NDB_FREE(entry->weights.position_embeddings);
+		nfree(entry->weights.position_embeddings);
 	if (entry->weights.lm_head_weights != NULL)
-		NDB_FREE(entry->weights.lm_head_weights);
+		nfree(entry->weights.lm_head_weights);
 
 	/* Remove from cache */
 	if (prev == NULL)
@@ -3619,7 +3619,7 @@ ndb_rocm_hf_unload_model(const char *model_name, char **errstr)
 	else
 		prev->next = entry->next;
 
-	NDB_FREE(entry);
+	nfree(entry);
 	g_model_cache_count--;
 
 	return 0;
@@ -3632,7 +3632,7 @@ ndb_rocm_hf_unload_model(const char *model_name, char **errstr)
 bool
 ndb_rocm_hf_model_loaded(const char *model_name)
 {
-	NdbRocmHfModelEntry *entry;
+	NdbRocmHfModelEntry *entry = NULL;
 
 	if (!model_name)
 		return false;

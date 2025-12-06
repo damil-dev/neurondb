@@ -90,9 +90,9 @@ PG_FUNCTION_INFO_V1(vector_quantize_fp16);
 Datum
 vector_quantize_fp16(PG_FUNCTION_ARGS)
 {
-	Vector	   *vec;
-	bytea	   *result;
-	uint16_t   *fp16_data;
+	Vector *vec = NULL;
+	bytea *result = NULL;
+	uint16_t *fp16_data = NULL;
 	int			i;
 	size_t		size;
 
@@ -142,9 +142,9 @@ PG_FUNCTION_INFO_V1(vector_dequantize_fp16);
 Datum
 vector_dequantize_fp16(PG_FUNCTION_ARGS)
 {
-	bytea	   *fp16_vec;
-	Vector	   *result;
-	uint16_t   *fp16_data;
+	bytea *fp16_vec = NULL;
+	Vector *result = NULL;
+	uint16_t *fp16_data = NULL;
 	int			dim;
 	int			i;
 	size_t		expected_size;
@@ -204,11 +204,11 @@ PG_FUNCTION_INFO_V1(vector_quantize_int8);
 Datum
 vector_quantize_int8(PG_FUNCTION_ARGS)
 {
-	Vector	   *vec;
-	Vector	   *min_vec;
-	Vector	   *max_vec;
-	bytea	   *result;
-	int8	   *int8_data;
+	Vector *vec = NULL;
+	Vector *min_vec = NULL;
+	Vector *max_vec = NULL;
+	bytea *result = NULL;
+	int8 *int8_data = NULL;
 	int			i;
 	size_t		size;
 	float		scale;
@@ -287,11 +287,11 @@ PG_FUNCTION_INFO_V1(vector_dequantize_int8);
 Datum
 vector_dequantize_int8(PG_FUNCTION_ARGS)
 {
-	bytea	   *int8_vec;
-	Vector	   *min_vec;
-	Vector	   *max_vec;
-	Vector	   *result;
-	int8	   *int8_data;
+	bytea *int8_vec = NULL;
+	Vector *min_vec = NULL;
+	Vector *max_vec = NULL;
+	Vector *result = NULL;
+	int8 *int8_data = NULL;
 	int			dim;
 	int			i;
 	size_t		expected_size;
@@ -377,10 +377,10 @@ PG_FUNCTION_INFO_V1(vector_l2_distance_fp16);
 Datum
 vector_l2_distance_fp16(PG_FUNCTION_ARGS)
 {
-	bytea	   *fp16_a;
-	bytea	   *fp16_b;
-	Vector	   *a;
-	Vector	   *b;
+	bytea *fp16_a = NULL;
+	bytea *fp16_b = NULL;
+	Vector *a = NULL;
+	Vector *b = NULL;
 	float4		result;
 	extern float4 l2_distance(Vector *a, Vector *b);
 
@@ -407,9 +407,9 @@ vector_l2_distance_fp16(PG_FUNCTION_ARGS)
 	if (a == NULL || b == NULL)
 	{
 		if (a != NULL)
-			NDB_FREE(a);
+			nfree(a);
 		if (b != NULL)
-			NDB_FREE(b);
+			nfree(b);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_BINARY_REPRESENTATION),
 				 errmsg("failed to dequantize FP16 vectors")));
@@ -419,8 +419,8 @@ vector_l2_distance_fp16(PG_FUNCTION_ARGS)
 	result = l2_distance(a, b);
 
 	/* Free temporary vectors */
-	NDB_FREE(a);
-	NDB_FREE(b);
+	nfree(a);
+	nfree(b);
 
 	PG_RETURN_FLOAT4(result);
 }
@@ -429,10 +429,10 @@ PG_FUNCTION_INFO_V1(vector_cosine_distance_fp16);
 Datum
 vector_cosine_distance_fp16(PG_FUNCTION_ARGS)
 {
-	bytea	   *fp16_a;
-	bytea	   *fp16_b;
-	Vector	   *a;
-	Vector	   *b;
+	bytea *fp16_a = NULL;
+	bytea *fp16_b = NULL;
+	Vector *a = NULL;
+	Vector *b = NULL;
 	float4		result;
 	extern float4 cosine_distance(Vector *a, Vector *b);
 
@@ -457,8 +457,8 @@ vector_cosine_distance_fp16(PG_FUNCTION_ARGS)
 
 	result = cosine_distance(a, b);
 
-	NDB_FREE(a);
-	NDB_FREE(b);
+	nfree(a);
+	nfree(b);
 
 	PG_RETURN_FLOAT4(result);
 }
@@ -467,14 +467,14 @@ PG_FUNCTION_INFO_V1(vector_quantize_binary);
 Datum
 vector_quantize_binary(PG_FUNCTION_ARGS)
 {
-	Vector	   *vec;
+	Vector *vec = NULL;
 	typedef struct BinaryVec
 	{
 		int32		vl_len_;
 		int32		dim;
 		uint8		data[FLEXIBLE_ARRAY_MEMBER];
 	}			BinaryVec;
-	BinaryVec  *result;
+	BinaryVec *result = NULL;
 	int			i;
 	int			byte_index;
 	int			bit_index;

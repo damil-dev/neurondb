@@ -48,10 +48,10 @@ vecmap_l2_distance(PG_FUNCTION_ARGS)
 {
 	VectorMap  *a = (VectorMap *) PG_GETARG_POINTER(0);
 	VectorMap  *b = (VectorMap *) PG_GETARG_POINTER(1);
-	int32	   *a_indices;
-	float4	   *a_values;
-	int32	   *b_indices;
-	float4	   *b_values;
+	int32 *a_indices = NULL;
+	float4 *a_values = NULL;
+	int32 *b_indices = NULL;
+	float4 *b_values = NULL;
 	double		sum = 0.0;
 	double		c = 0.0;		/* Kahan summation correction */
 	int			i;
@@ -142,10 +142,10 @@ vecmap_inner_product(PG_FUNCTION_ARGS)
 {
 	VectorMap  *a = (VectorMap *) PG_GETARG_POINTER(0);
 	VectorMap  *b = (VectorMap *) PG_GETARG_POINTER(1);
-	int32	   *a_indices;
-	float4	   *a_values;
-	int32	   *b_indices;
-	float4	   *b_values;
+	int32 *a_indices = NULL;
+	float4 *a_values = NULL;
+	int32 *b_indices = NULL;
+	float4 *b_values = NULL;
 	double		sum = 0.0;
 	int			i;
 	int			j;
@@ -187,10 +187,10 @@ vecmap_cosine_distance(PG_FUNCTION_ARGS)
 {
 	VectorMap  *a = (VectorMap *) PG_GETARG_POINTER(0);
 	VectorMap  *b = (VectorMap *) PG_GETARG_POINTER(1);
-	int32	   *a_indices;
-	float4	   *a_values;
-	int32	   *b_indices;
-	float4	   *b_values;
+	int32 *a_indices = NULL;
+	float4 *a_values = NULL;
+	int32 *b_indices = NULL;
+	float4 *b_values = NULL;
 	double		dot = 0.0;
 	double		norm_a = 0.0;
 	double		norm_b = 0.0;
@@ -264,10 +264,10 @@ vecmap_l1_distance(PG_FUNCTION_ARGS)
 {
 	VectorMap  *a = (VectorMap *) PG_GETARG_POINTER(0);
 	VectorMap  *b = (VectorMap *) PG_GETARG_POINTER(1);
-	int32	   *a_indices;
-	float4	   *a_values;
-	int32	   *b_indices;
-	float4	   *b_values;
+	int32 *a_indices = NULL;
+	float4 *a_values = NULL;
+	int32 *b_indices = NULL;
+	float4 *b_values = NULL;
 	double		sum = 0.0;
 	int			i;
 	int			j;
@@ -324,13 +324,13 @@ vecmap_add(PG_FUNCTION_ARGS)
 {
 	VectorMap  *a = (VectorMap *) PG_GETARG_POINTER(0);
 	VectorMap  *b = (VectorMap *) PG_GETARG_POINTER(1);
-	int32	   *a_indices;
-	float4	   *a_values;
-	int32	   *b_indices;
-	float4	   *b_values;
-	VectorMap  *result;
-	int32	   *result_indices;
-	float4	   *result_values;
+	int32 *a_indices = NULL;
+	float4 *a_values = NULL;
+	int32 *b_indices = NULL;
+	float4 *b_values = NULL;
+	VectorMap *result = NULL;
+	int32 *result_indices = NULL;
+	float4 *result_values = NULL;
 	int32		max_nnz;
 	int32		result_nnz;
 	int			i;
@@ -349,8 +349,8 @@ vecmap_add(PG_FUNCTION_ARGS)
 	max_nnz = a->nnz + b->nnz;
 	result_indices = NULL;
 	result_values = NULL;
-	NDB_ALLOC(result_indices, int32, max_nnz);
-	NDB_ALLOC(result_values, float4, max_nnz);
+	nalloc(result_indices, int32, max_nnz);
+	nalloc(result_values, float4, max_nnz);
 
 	i = 0;
 	j = 0;
@@ -418,8 +418,8 @@ vecmap_add(PG_FUNCTION_ARGS)
 	memcpy(VECMAP_INDICES(result), result_indices, sizeof(int32) * result_nnz);
 	memcpy(VECMAP_VALUES(result), result_values, sizeof(float4) * result_nnz);
 
-	NDB_FREE(result_indices);
-	NDB_FREE(result_values);
+	nfree(result_indices);
+	nfree(result_values);
 
 	PG_RETURN_POINTER(result);
 }
@@ -430,13 +430,13 @@ vecmap_sub(PG_FUNCTION_ARGS)
 {
 	VectorMap  *a = (VectorMap *) PG_GETARG_POINTER(0);
 	VectorMap  *b = (VectorMap *) PG_GETARG_POINTER(1);
-	int32	   *a_indices;
-	float4	   *a_values;
-	int32	   *b_indices;
-	float4	   *b_values;
-	VectorMap  *result;
-	int32	   *result_indices;
-	float4	   *result_values;
+	int32 *a_indices = NULL;
+	float4 *a_values = NULL;
+	int32 *b_indices = NULL;
+	float4 *b_values = NULL;
+	VectorMap *result = NULL;
+	int32 *result_indices = NULL;
+	float4 *result_values = NULL;
 	int32		max_nnz;
 	int32		result_nnz;
 	int			i;
@@ -454,8 +454,8 @@ vecmap_sub(PG_FUNCTION_ARGS)
 	max_nnz = a->nnz + b->nnz;
 	result_indices = NULL;
 	result_values = NULL;
-	NDB_ALLOC(result_indices, int32, max_nnz);
-	NDB_ALLOC(result_values, float4, max_nnz);
+	nalloc(result_indices, int32, max_nnz);
+	nalloc(result_values, float4, max_nnz);
 
 	i = 0;
 	j = 0;
@@ -522,8 +522,8 @@ vecmap_sub(PG_FUNCTION_ARGS)
 	memcpy(VECMAP_INDICES(result), result_indices, sizeof(int32) * result_nnz);
 	memcpy(VECMAP_VALUES(result), result_values, sizeof(float4) * result_nnz);
 
-	NDB_FREE(result_indices);
-	NDB_FREE(result_values);
+	nfree(result_indices);
+	nfree(result_values);
 
 	PG_RETURN_POINTER(result);
 }
@@ -534,11 +534,11 @@ vecmap_mul_scalar(PG_FUNCTION_ARGS)
 {
 	VectorMap  *a = (VectorMap *) PG_GETARG_POINTER(0);
 	float4		scalar = PG_GETARG_FLOAT4(1);
-	VectorMap  *result;
-	int32	   *a_indices;
-	float4	   *a_values;
-	int32	   *result_indices;
-	float4	   *result_values;
+	VectorMap *result = NULL;
+	int32 *a_indices = NULL;
+	float4 *a_values = NULL;
+	int32 *result_indices = NULL;
+	float4 *result_values = NULL;
 	int32		result_nnz;
 	int			i;
 	int			size;

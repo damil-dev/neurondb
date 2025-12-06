@@ -33,7 +33,7 @@ ml_gpu_context_default_tag(void)
 MLGpuContext *
 ml_gpu_context_acquire(const char *tag)
 {
-	MLGpuContext *ctx;
+	MLGpuContext *ctx = NULL;
 	MemoryContext parent;
 	MemoryContext local;
 	const char *tagname;

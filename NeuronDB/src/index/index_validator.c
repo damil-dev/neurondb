@@ -164,11 +164,17 @@ neurondb_validate(PG_FUNCTION_ARGS)
 {
 	Oid			indexOid;
 	Relation	indexRel;
-	ValidateResult *result;
+	ValidateResult *result = NULL;
 	TupleDesc	tupdesc;
 	Datum		values[5];
 	bool		nulls[5];
 	HeapTuple	tuple;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: neurondb_validate requires 1 argument")));
 
 	/* Get index OID */
 	indexOid = PG_GETARG_OID(0);
@@ -223,11 +229,17 @@ neurondb_diag(PG_FUNCTION_ARGS)
 {
 	Oid			indexOid;
 	Relation	indexRel;
-	DiagResult *diag;
+	DiagResult *diag = NULL;
 	TupleDesc	tupdesc;
 	Datum		values[9];
 	bool		nulls[9];
 	HeapTuple	tuple;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: neurondb_diag requires 1 argument")));
 
 	indexOid = PG_GETARG_OID(0);
 	indexRel = index_open(indexOid, AccessShareLock);
@@ -273,7 +285,7 @@ neurondb_diag(PG_FUNCTION_ARGS)
 static ValidateResult *
 validate_hnsw_index(Relation index)
 {
-	ValidateResult *result;
+	ValidateResult *result = NULL;
 
 	result = (ValidateResult *) palloc0(sizeof(ValidateResult));
 	initStringInfo(&result->messages);
@@ -446,7 +458,7 @@ validate_hnsw_index(Relation index)
 __attribute__((unused)) static ValidateResult *
 validate_ivf_index(Relation index)
 {
-	ValidateResult *result;
+	ValidateResult *result = NULL;
 
 	result = (ValidateResult *) palloc0(sizeof(ValidateResult));
 	initStringInfo(&result->messages);
@@ -601,7 +613,7 @@ check_hnsw_connectivity(Relation index, ValidateResult * result)
 		Buffer		metaBuf;
 		Page		metaPage;
 		HnswMetaPage meta;
-		bool	   *visited;
+		bool *visited = NULL;
 		int			visitedSize;
 		BlockNumber entryPoint;
 		BlockNumber blkno;
@@ -627,7 +639,7 @@ check_hnsw_connectivity(Relation index, ValidateResult * result)
 		/* Traverse from entry point using BFS */
 		if (entryPoint != InvalidBlockNumber)
 		{
-			BlockNumber *queue;
+			BlockNumber *queue = NULL;
 			int			queueHead = 0;
 			int			queueTail = 0;
 			int			queueSize = totalNodes;
@@ -642,7 +654,7 @@ check_hnsw_connectivity(Relation index, ValidateResult * result)
 				Buffer		nodeBuf;
 				Page		nodePage;
 				HnswNode	node;
-				BlockNumber *neighbors;
+				BlockNumber *neighbors = NULL;
 				int			level;
 				int16		neighborCount;
 				int			j;
@@ -688,7 +700,7 @@ check_hnsw_connectivity(Relation index, ValidateResult * result)
 				UnlockReleaseBuffer(nodeBuf);
 			}
 
-			NDB_FREE(queue);
+			nfree(queue);
 		}
 
 		/* Count unreachable nodes */
@@ -733,7 +745,7 @@ check_hnsw_connectivity(Relation index, ValidateResult * result)
 			UnlockReleaseBuffer(nodeBuf);
 		}
 
-		NDB_FREE(visited);
+		nfree(visited);
 	}
 
 	if (orphanCount > 0)
@@ -857,7 +869,7 @@ check_dead_tuples(Relation index, ValidateResult * result)
 static DiagResult *
 diagnose_index(Relation index)
 {
-	DiagResult *diag;
+	DiagResult *diag = NULL;
 
 	diag = (DiagResult *) palloc0(sizeof(DiagResult));
 	initStringInfo(&diag->recommendations);
@@ -1061,6 +1073,12 @@ neurondb_rebuild_index(PG_FUNCTION_ARGS)
 	Oid			indexOid;
 	Relation	indexRel;
 
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: neurondb_rebuild_index requires 1 argument")));
+
 	indexOid = PG_GETARG_OID(0);
 	indexRel = index_open(indexOid, AccessExclusiveLock);
 
@@ -1071,13 +1089,13 @@ neurondb_rebuild_index(PG_FUNCTION_ARGS)
 	/* Get heap relation and index info for rebuild */
 	{
 		Relation	heapRel;
-		IndexInfo  *indexInfo;
+		IndexInfo *indexInfo = NULL;
 		Oid			heapOid;
-		char	   *indexName = NULL;
+		char *indexName = NULL;
 		StringInfoData sql;
 		TimestampTz rebuildTime;
 
-		NDB_DECLARE(NdbSpiSession *, session2);
+		NdbSpiSession *session2 = NULL;
 
 		/* Get heap relation OID from index */
 		heapOid = IndexGetRelation(indexOid, false);
@@ -1113,11 +1131,11 @@ neurondb_rebuild_index(PG_FUNCTION_ARGS)
 
 		/* Perform the actual rebuild using REINDEX via SPI */
 		{
-			char	   *inner_indexName;
-			char	   *rebuildCmd;
+			char *inner_indexName = NULL;
+			char *rebuildCmd = NULL;
 			StringInfoData cmd;
 
-			NDB_DECLARE(NdbSpiSession *, session);
+			NdbSpiSession *session = NULL;
 
 			inner_indexName = pstrdup(RelationGetRelationName(indexRel));
 			initStringInfo(&cmd);
@@ -1127,8 +1145,8 @@ neurondb_rebuild_index(PG_FUNCTION_ARGS)
 			if (session == NULL)
 			{
 				pfree(indexInfo);
-				NDB_FREE(inner_indexName);
-				NDB_FREE(rebuildCmd);
+				nfree(inner_indexName);
+				nfree(rebuildCmd);
 				ereport(ERROR,
 						(errcode(ERRCODE_INTERNAL_ERROR),
 						 errmsg("neurondb: failed to begin SPI session during index rebuild")));
@@ -1137,8 +1155,8 @@ neurondb_rebuild_index(PG_FUNCTION_ARGS)
 			ndb_spi_execute(session, rebuildCmd, false, 0);
 			ndb_spi_session_end(&session);
 
-			NDB_FREE(indexName);
-			NDB_FREE(rebuildCmd);
+			nfree(indexName);
+			nfree(rebuildCmd);
 
 			elog(INFO,
 				 "neurondb: Index %s rebuilt successfully",
@@ -1157,7 +1175,7 @@ neurondb_rebuild_index(PG_FUNCTION_ARGS)
 			pfree(indexInfo);
 			relation_close(heapRel, AccessShareLock);
 			index_close(indexRel, AccessExclusiveLock);
-			NDB_FREE(indexName);
+			nfree(indexName);
 			ereport(ERROR,
 					(errcode(ERRCODE_INTERNAL_ERROR),
 					 errmsg("neurondb: failed to begin SPI session during rebuild history tracking")));
@@ -1173,11 +1191,11 @@ neurondb_rebuild_index(PG_FUNCTION_ARGS)
 							 "last_rebuild_time TIMESTAMPTZ NOT NULL, "
 							 "rebuild_count BIGINT DEFAULT 1)");
 			(void) ndb_spi_execute(session2, sql.data, false, 0);
-			NDB_FREE(sql.data);
+			nfree(sql.data);
 		}
 		/* Upsert rebuild history */
 		{
-			char	   *rebuildTimeStr;
+			char *rebuildTimeStr = NULL;
 			Datum		rebuildTimeDatum = TimestampTzGetDatum(rebuildTime);
 
 			rebuildTimeStr = DatumGetCString(DirectFunctionCall1(timestamptz_out, rebuildTimeDatum));
@@ -1194,10 +1212,10 @@ neurondb_rebuild_index(PG_FUNCTION_ARGS)
 							 quote_literal_cstr(indexName),
 							 quote_literal_cstr(rebuildTimeStr));
 			(void) ndb_spi_execute(session2, sql.data, false, 0);
-			NDB_FREE(sql.data);
-			NDB_FREE(rebuildTimeStr);
+			nfree(sql.data);
+			nfree(rebuildTimeStr);
 		}
-		NDB_FREE(indexName);
+		nfree(indexName);
 		ndb_spi_session_end(&session2);
 
 		pfree(indexInfo);
@@ -1218,13 +1236,21 @@ PG_FUNCTION_INFO_V1(index_statistics);
 Datum
 index_statistics(PG_FUNCTION_ARGS)
 {
-	text	   *index_name = PG_GETARG_TEXT_P(0);
-	char	   *idx_name;
+	text	   *index_name;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: index_statistics requires 1 argument")));
+
+	index_name = PG_GETARG_TEXT_P(0);
+	char *idx_name = NULL;
 	Oid			indexOid;
 	Relation	indexRel;
-	DiagResult *diag;
+	DiagResult *diag = NULL;
 	StringInfoData json_buf;
-	Jsonb	   *result_jsonb;
+	Jsonb *result_jsonb = NULL;
 	int64		total_blocks;
 	int64		index_size_bytes;
 	int64		heap_size_bytes;
@@ -1264,7 +1290,7 @@ index_statistics(PG_FUNCTION_ARGS)
 	if (!RelationIsValid(indexRel))
 	{
 		index_close(indexRel, AccessShareLock);
-		NDB_FREE(idx_name);
+		nfree(idx_name);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("invalid index: %s", idx_name)));
@@ -1346,8 +1372,8 @@ index_statistics(PG_FUNCTION_ARGS)
 	result_jsonb = DatumGetJsonbP(DirectFunctionCall1(
 													  jsonb_in, CStringGetTextDatum(json_buf.data)));
 
-	NDB_FREE(json_buf.data);
-	NDB_FREE(idx_name);
+	nfree(json_buf.data);
+	nfree(idx_name);
 	index_close(indexRel, AccessShareLock);
 
 	PG_RETURN_POINTER(result_jsonb);
@@ -1362,15 +1388,23 @@ PG_FUNCTION_INFO_V1(index_health);
 Datum
 index_health(PG_FUNCTION_ARGS)
 {
-	text	   *index_name = PG_GETARG_TEXT_P(0);
-	char	   *idx_name;
+	text	   *index_name;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: index_health requires 1 argument")));
+
+	index_name = PG_GETARG_TEXT_P(0);
+	char *idx_name = NULL;
 	Oid			indexOid;
 	Relation	indexRel;
-	DiagResult *diag;
+	DiagResult *diag = NULL;
 	StringInfoData json_buf;
-	Jsonb	   *result_jsonb;
+	Jsonb *result_jsonb = NULL;
 	float4		health_score;
-	char	   *health_status;
+	char *health_status = NULL;
 	int64		total_tuples;
 	int64		dead_tuples;
 	float4		fragmentation;
@@ -1407,7 +1441,7 @@ index_health(PG_FUNCTION_ARGS)
 	if (!RelationIsValid(indexRel))
 	{
 		index_close(indexRel, AccessShareLock);
-		NDB_FREE(idx_name);
+		nfree(idx_name);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("invalid index: %s", idx_name)));
@@ -1455,8 +1489,8 @@ index_health(PG_FUNCTION_ARGS)
 	result_jsonb = DatumGetJsonbP(DirectFunctionCall1(
 													  jsonb_in, CStringGetTextDatum(json_buf.data)));
 
-	NDB_FREE(json_buf.data);
-	NDB_FREE(idx_name);
+	nfree(json_buf.data);
+	nfree(idx_name);
 	index_close(indexRel, AccessShareLock);
 
 	PG_RETURN_POINTER(result_jsonb);
@@ -1471,13 +1505,21 @@ PG_FUNCTION_INFO_V1(index_rebuild_recommendation);
 Datum
 index_rebuild_recommendation(PG_FUNCTION_ARGS)
 {
-	text	   *index_name = PG_GETARG_TEXT_P(0);
-	char	   *idx_name;
+	text	   *index_name;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: index_rebuild_recommendation requires 1 argument")));
+
+	index_name = PG_GETARG_TEXT_P(0);
+	char *idx_name = NULL;
 	Oid			indexOid;
 	Relation	indexRel;
-	DiagResult *diag;
+	DiagResult *diag = NULL;
 	StringInfoData json_buf;
-	Jsonb	   *result_jsonb;
+	Jsonb *result_jsonb = NULL;
 	bool		should_rebuild = false;
 	char	   *rebuild_reason = NULL;
 	float4		dead_ratio;
@@ -1517,7 +1559,7 @@ index_rebuild_recommendation(PG_FUNCTION_ARGS)
 	if (!RelationIsValid(indexRel))
 	{
 		index_close(indexRel, AccessShareLock);
-		NDB_FREE(idx_name);
+		nfree(idx_name);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("invalid index: %s", idx_name)));
@@ -1535,7 +1577,7 @@ index_rebuild_recommendation(PG_FUNCTION_ARGS)
 		int			ret;
 		StringInfoData sql;
 
-		NDB_DECLARE(NdbSpiSession *, session3);
+		NdbSpiSession *session3 = NULL;
 		session3 = ndb_spi_session_begin(CurrentMemoryContext, false);
 		if (session3 != NULL)
 		{
@@ -1559,7 +1601,7 @@ index_rebuild_recommendation(PG_FUNCTION_ARGS)
 					days_since_last_rebuild = (GetCurrentTimestamp() - last_rebuild_time) / (24 * 60 * 60 * 1000000.0);
 				}
 			}
-			NDB_FREE(sql.data);
+			nfree(sql.data);
 			ndb_spi_session_end(&session3);
 		}
 	}
@@ -1614,8 +1656,8 @@ index_rebuild_recommendation(PG_FUNCTION_ARGS)
 	result_jsonb = DatumGetJsonbP(DirectFunctionCall1(
 													  jsonb_in, CStringGetTextDatum(json_buf.data)));
 
-	NDB_FREE(json_buf.data);
-	NDB_FREE(idx_name);
+	nfree(json_buf.data);
+	nfree(idx_name);
 	index_close(indexRel, AccessShareLock);
 
 	PG_RETURN_POINTER(result_jsonb);

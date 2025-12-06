@@ -80,7 +80,7 @@ typedef struct TokenizerCacheEntry
 #define MAX_TOKENIZER_CACHE 10
 
 /* Global tokenizer cache */
-static TokenizerCacheEntry * g_tokenizer_cache_head = NULL;
+static TokenizerCacheEntry *g_tokenizer_cache_head = NULL;
 static int	g_tokenizer_cache_count = 0;
 
 /* Default vocabulary (used when no model-specific vocab is loaded) */
@@ -179,7 +179,7 @@ vocab_lookup_id(VocabEntry * *vocab_table, int32 token_id)
 static int32
 load_vocab_file(VocabEntry * *vocab_table, const char *vocab_path)
 {
-	FILE	   *fp;
+	FILE *fp = NULL;
 	char		line[512];
 	int32		token_id = 0;
 
@@ -237,7 +237,7 @@ load_vocab_file(VocabEntry * *vocab_table, const char *vocab_path)
 static TokenizerCacheEntry *
 find_tokenizer_cache_entry(const char *model_name)
 {
-	TokenizerCacheEntry *entry;
+	TokenizerCacheEntry *entry = NULL;
 
 	for (entry = g_tokenizer_cache_head; entry != NULL; entry = entry->next)
 	{
@@ -305,19 +305,19 @@ evict_lru_tokenizer(void)
 			{
 				next = vocab_entry->next;
 				if (vocab_entry->token)
-					NDB_FREE(vocab_entry->token);
-				NDB_FREE(vocab_entry);
+					nfree(vocab_entry->token);
+				nfree(vocab_entry);
 			}
 		}
-		NDB_FREE(lru_entry->vocab_table);
+		nfree(lru_entry->vocab_table);
 	}
 
 	/* Free cache entry */
 	if (lru_entry->model_name)
-		NDB_FREE(lru_entry->model_name);
+		nfree(lru_entry->model_name);
 	if (lru_entry->vocab_path)
-		NDB_FREE(lru_entry->vocab_path);
-	NDB_FREE(lru_entry);
+		nfree(lru_entry->vocab_path);
+	nfree(lru_entry);
 
 	g_tokenizer_cache_count--;
 }
@@ -329,7 +329,7 @@ evict_lru_tokenizer(void)
 static TokenizerCacheEntry *
 get_or_load_tokenizer(const char *model_name)
 {
-	TokenizerCacheEntry *entry;
+	TokenizerCacheEntry *entry = NULL;
 	char		vocab_path[MAXPGPATH];
 	int32		vocab_size;
 
@@ -421,8 +421,8 @@ _to_lower_case(char *src)
 static char **
 tokenize_text(const char *text, int *num_tokens)
 {
-	char	   *text_copy;
-	char	   *token;
+	char *text_copy = NULL;
+	char *token = NULL;
 	char	  **tokens;			/* Array of pointers to token strings */
 	int			count = 0;
 	int			capacity = 128;
@@ -457,7 +457,7 @@ tokenize_text(const char *text, int *num_tokens)
 	}
 
 	/* Free the temporary, mutable copy */
-	NDB_FREE(text_copy);
+	nfree(text_copy);
 
 	*num_tokens = count;
 	return tokens;
@@ -560,10 +560,10 @@ neurondb_tokenize_with_model(const char *text,
 			token_id = TOKEN_UNK_ID;
 		}
 		token_ids[output_idx++] = token_id;
-		NDB_FREE(tokens[i]);	/* Free each token string */
+		nfree(tokens[i]);	/* Free each token string */
 	}
 	/* Free the tokens array itself */
-	NDB_FREE(tokens);
+	nfree(tokens);
 
 	/* Always add [SEP] if there is room */
 	if (output_idx < max_length)
@@ -667,7 +667,7 @@ neurondb_detokenize(const int32 * token_ids,
 int32 *
 neurondb_create_attention_mask(int32 * token_ids, int32 length)
 {
-	int32	   *mask;
+	int32 *mask = NULL;
 	int			i;
 
 	Assert(token_ids != NULL);
@@ -703,13 +703,13 @@ neurondb_hf_tokenize(PG_FUNCTION_ARGS)
 	text	   *model_name_text = NULL;
 	text	   *input_text = NULL;
 	int32		max_length = 512;
-	char	   *model_name = NULL;
-	char	   *text_str = NULL;
-	int32	   *token_ids = NULL;
+	char *model_name = NULL;
+	char *text_str = NULL;
+	int32 *token_ids = NULL;
 	int32		output_length = 0;
-	Datum	   *dvalues = NULL;
-	bool	   *dnulls = NULL;
-	ArrayType  *result;
+	Datum *dvalues = NULL;
+	bool *dnulls = NULL;
+	ArrayType *result = NULL;
 	int			i;
 	Oid			arg1_type = InvalidOid;
 
@@ -812,12 +812,12 @@ neurondb_hf_tokenize(PG_FUNCTION_ARGS)
 	result = construct_array(
 							 dvalues, output_length, INT4OID, sizeof(int32), true, 'i');
 
-	NDB_FREE(token_ids);
-	NDB_FREE(dvalues);
-	NDB_FREE(dnulls);
-	NDB_FREE(text_str);
+	nfree(token_ids);
+	nfree(dvalues);
+	nfree(dnulls);
+	nfree(text_str);
 	if (model_name)
-		NDB_FREE(model_name);
+		nfree(model_name);
 
 	PG_RETURN_ARRAYTYPE_P(result);
 }
@@ -838,13 +838,13 @@ neurondb_hf_detokenize(PG_FUNCTION_ARGS)
 {
 	text	   *model_name_text = NULL;
 	ArrayType  *token_ids_array = NULL;
-	char	   *model_name = NULL;
-	int32	   *token_ids = NULL;
+	char *model_name = NULL;
+	int32 *token_ids = NULL;
 	int32		length = 0;
 	char	   *text_str = NULL;
 	int			i;
-	Datum	   *dvalues = NULL;
-	bool	   *dnulls = NULL;
+	Datum *dvalues = NULL;
+	bool *dnulls = NULL;
 	int			ndims;
 
 	/* Handle two overloaded versions */
@@ -922,11 +922,11 @@ neurondb_hf_detokenize(PG_FUNCTION_ARGS)
 	/* Detokenize */
 	text_str = neurondb_detokenize(token_ids, length, model_name);
 
-	NDB_FREE(token_ids);
-	NDB_FREE(dvalues);
-	NDB_FREE(dnulls);
+	nfree(token_ids);
+	nfree(dvalues);
+	nfree(dnulls);
 	if (model_name)
-		NDB_FREE(model_name);
+		nfree(model_name);
 
 	PG_RETURN_TEXT_P(cstring_to_text(text_str));
 }

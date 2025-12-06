@@ -40,8 +40,8 @@ typedef struct NdbLLMRateLimiter
 	int			capacity;		/* tokens per second */
 }			NdbLLMRateLimiter;
 
-static NdbLLMRateLimiter * llm_rl = NULL;
-static LWLock * llm_rl_lock = NULL;
+static NdbLLMRateLimiter *llm_rl = NULL;
+static LWLock *llm_rl_lock = NULL;
 
 Size
 neurondb_llm_shmem_size(void)
@@ -101,6 +101,8 @@ llm_acquire_token(void)
 		return true;
 	}
 	LWLockRelease(llm_rl_lock);
+	/* Rate limit exceeded - log reason */
+	elog(DEBUG1, "neurondb: llm_acquire_token: rate limit exceeded (tokens: %.2f, capacity: %d)", llm_rl->tokens, cap);
 	return false;
 }
 
@@ -145,7 +147,7 @@ cache_lookup_text(const char *key, char **text_out)
 {
 	bool		hit = false;
 
-	NDB_DECLARE(NdbSpiSession *, session);
+	NdbSpiSession *session = NULL;
 	Oid			argtypes[2] = {TEXTOID, INT4OID};
 	Datum		values[2];
 	const char	nulls[2] = {'i', 'i'};
@@ -203,7 +205,7 @@ cache_store_text(const char *key, const char *text)
 	Datum		values[2];
 	StringInfoData val;
 
-	NDB_DECLARE(NdbSpiSession *, session);
+	NdbSpiSession *session = NULL;
 	session = ndb_spi_session_begin(CurrentMemoryContext, false);
 	if (session == NULL)
 		return;
@@ -233,7 +235,7 @@ cache_store_text(const char *key, const char *text)
 				 ret);
 		}
 	}
-	NDB_FREE(val.data);
+	nfree(val.data);
 	ndb_spi_session_end(&session);
 }
 
@@ -252,7 +254,7 @@ record_llm_stats(const char *model_name,
 	Datum		values[8];
 	char		nulls[8];
 
-	NDB_DECLARE(NdbSpiSession *, session);
+	NdbSpiSession *session = NULL;
 	session = ndb_spi_session_begin(CurrentMemoryContext, false);
 	if (session == NULL)
 		return;
@@ -411,7 +413,7 @@ record_llm_stats(const char *model_name,
 		Datum		hist_values[4];
 		char		hist_nulls[4] = {' ', ' ', ' ', ' '};
 		StringInfoData metric_name;
-		char	   *metric_name_str;
+		char *metric_name_str = NULL;
 
 		initStringInfo(&metric_name);
 		appendStringInfo(&metric_name,
@@ -440,8 +442,8 @@ record_llm_stats(const char *model_name,
 								  false,
 								  0);
 
-		NDB_FREE(metric_name.data);
-		NDB_FREE(metric_name_str);
+		nfree(metric_name.data);
+		nfree(metric_name_str);
 	}
 
 	ndb_spi_session_end(&session);
@@ -450,8 +452,22 @@ record_llm_stats(const char *model_name,
 static void
 fill_cfg(NdbLLMConfig *cfg)
 {
+	if (cfg == NULL)
+	{
+		elog(ERROR, "neurondb: fill_cfg called with NULL cfg");
+		return;
+	}
+
 	cfg->provider =
 		neurondb_llm_provider ? neurondb_llm_provider : "huggingface";
+	
+	/* Validate provider name */
+	if (cfg->provider != NULL && strlen(cfg->provider) == 0)
+	{
+		elog(WARNING, "neurondb: fill_cfg: empty provider name, using default 'huggingface'");
+		cfg->provider = "huggingface";
+	}
+	
 	if (cfg->provider && (pg_strcasecmp(cfg->provider, "openai") == 0
 						  || pg_strcasecmp(cfg->provider, "chatgpt") == 0))
 	{
@@ -471,8 +487,40 @@ fill_cfg(NdbLLMConfig *cfg)
 			? neurondb_llm_model
 			: "sentence-transformers/all-MiniLM-L6-v2";
 	}
+	
+	/* Validate endpoint and model */
+	if (cfg->endpoint != NULL && strlen(cfg->endpoint) == 0)
+	{
+		elog(WARNING, "neurondb: fill_cfg: empty endpoint, using default");
+		if (cfg->provider && (pg_strcasecmp(cfg->provider, "openai") == 0
+							  || pg_strcasecmp(cfg->provider, "chatgpt") == 0))
+			cfg->endpoint = "https://api.openai.com";
+		else
+			cfg->endpoint = "https://router.huggingface.co/hf-inference";
+	}
+	
+	if (cfg->model != NULL && strlen(cfg->model) == 0)
+	{
+		elog(WARNING, "neurondb: fill_cfg: empty model, using default");
+		if (cfg->provider && (pg_strcasecmp(cfg->provider, "openai") == 0
+							  || pg_strcasecmp(cfg->provider, "chatgpt") == 0))
+			cfg->model = "gpt-3.5-turbo";
+		else
+			cfg->model = "sentence-transformers/all-MiniLM-L6-v2";
+	}
+	
+	/* Validate timeout */
+	if (neurondb_llm_timeout_ms <= 0)
+	{
+		elog(WARNING, "neurondb: fill_cfg: invalid timeout_ms %d, using default 30000", neurondb_llm_timeout_ms);
+		cfg->timeout_ms = 30000; /* Default 30 seconds */
+	}
+	else
+	{
+		cfg->timeout_ms = neurondb_llm_timeout_ms;
+	}
+	
 	cfg->api_key = neurondb_llm_api_key;
-	cfg->timeout_ms = neurondb_llm_timeout_ms;
 	cfg->prefer_gpu = NDB_SHOULD_TRY_GPU();
 	cfg->require_gpu = false;
 	if (cfg->provider != NULL
@@ -503,7 +551,7 @@ ndb_llm_complete(PG_FUNCTION_ARGS)
 	StringInfoData keysrc,
 				keyhex;
 	char	   *cached = NULL;
-	char	   *model_from_params = NULL;
+	char *model_from_params = NULL;
 	int			rc;
 	TimestampTz start_time;
 	TimestampTz end_time;
@@ -533,7 +581,7 @@ ndb_llm_complete(PG_FUNCTION_ARGS)
 				model_from_params = palloc(len - 1);
 				memcpy(model_from_params, raw_model + 1, len - 2);
 				model_from_params[len - 2] = '\0';
-				NDB_FREE(raw_model);
+				nfree(raw_model);
 			}
 			else
 			{
@@ -547,13 +595,13 @@ ndb_llm_complete(PG_FUNCTION_ARGS)
 			}
 			else
 			{
-				NDB_FREE(model_from_params);
+				nfree(model_from_params);
 				model_from_params = NULL;
 			}
 		}
 		else if (raw_model)
 		{
-			NDB_FREE(raw_model);
+			nfree(raw_model);
 		}
 	}
 	
@@ -584,7 +632,7 @@ ndb_llm_complete(PG_FUNCTION_ARGS)
 				tokens_in =
 					0;
 			if (token_ids)
-				NDB_FREE(token_ids);
+				nfree(token_ids);
 
 #ifdef HAVE_ONNX_RUNTIME
 			PG_TRY();
@@ -636,7 +684,7 @@ ndb_llm_complete(PG_FUNCTION_ARGS)
 					}
 				}
 				if (output_token_ids)
-					NDB_FREE(output_token_ids);
+					nfree(output_token_ids);
 			}
 			PG_CATCH();
 			{
@@ -777,7 +825,7 @@ ndb_llm_complete(PG_FUNCTION_ARGS)
 		if (resp.http_status >= NDB_HTTP_STATUS_ERROR_MIN && resp.json && strlen(resp.json) > 0)
 		{
 			StringInfoData err_msg;
-			char	   *error_text = NULL;
+			char *error_text = NULL;
 			
 			/* Try to extract error message from JSON if it's in {"error":"..."} format */
 			if (strncmp(resp.json, "{\"error\"", 8) == 0)
@@ -795,7 +843,7 @@ ndb_llm_complete(PG_FUNCTION_ARGS)
 						
 						memcpy(unquoted, error_text + 1, len - 2);
 						unquoted[len - 2] = '\0';
-						NDB_FREE(error_text);
+						nfree(error_text);
 						error_text = unquoted;
 					}
 				}
@@ -836,7 +884,7 @@ ndb_llm_complete(PG_FUNCTION_ARGS)
 								 cfg.model ? cfg.model : "unknown",
 								 url_str.data,
 								 error_text);
-				NDB_FREE(error_text);
+				nfree(error_text);
 			}
 			else if (resp.json)
 			{
@@ -854,7 +902,7 @@ ndb_llm_complete(PG_FUNCTION_ARGS)
 								 cfg.model ? cfg.model : "unknown",
 								 url_str.data);
 				}
-				NDB_FREE(url_str.data);
+				nfree(url_str.data);
 			}
 
 			record_llm_stats(cfg.model,
@@ -987,7 +1035,7 @@ ndb_llm_complete(PG_FUNCTION_ARGS)
 	
 	/* Clean up model_from_params if we allocated it */
 	if (model_from_params)
-		NDB_FREE(model_from_params);
+		nfree(model_from_params);
 	
 	PG_RETURN_TEXT_P(cstring_to_text(resp.text ? resp.text : ""));
 }
@@ -1030,7 +1078,7 @@ ndb_llm_image_analyze(PG_FUNCTION_ARGS)
 	const char *error_type = NULL;
 	int			tokens_in = 0;
 	int			tokens_out = 0;
-	bytea	   *detoasted_image = NULL;
+	bytea *detoasted_image = NULL;
 	size_t		image_size;
 	const unsigned char *image_bytes;
 	bool		need_free_detoasted = false;
@@ -1062,13 +1110,13 @@ ndb_llm_image_analyze(PG_FUNCTION_ARGS)
 			if (img_meta)
 			{
 				if (img_meta->mime_type)
-					NDB_FREE(img_meta->mime_type);
+					nfree(img_meta->mime_type);
 				if (img_meta->error_msg)
-					NDB_FREE(img_meta->error_msg);
-				NDB_FREE(img_meta);
+					nfree(img_meta->error_msg);
+				nfree(img_meta);
 			}
 			if (need_free_detoasted)
-				NDB_FREE(detoasted_image);
+				nfree(detoasted_image);
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("ndb_llm_image_analyze: %s", error_msg),
@@ -1079,10 +1127,10 @@ ndb_llm_image_analyze(PG_FUNCTION_ARGS)
 		if (img_meta)
 		{
 			if (img_meta->mime_type)
-				NDB_FREE(img_meta->mime_type);
+				nfree(img_meta->mime_type);
 			if (img_meta->error_msg)
-				NDB_FREE(img_meta->error_msg);
-			NDB_FREE(img_meta);
+				nfree(img_meta->error_msg);
+			nfree(img_meta);
 		}
 	}
 
@@ -1131,15 +1179,15 @@ ndb_llm_image_analyze(PG_FUNCTION_ARGS)
 		cache_hit = true;
 		success = true;
 		if (need_free_detoasted)
-			NDB_FREE(detoasted_image);
-		NDB_FREE(keysrc.data);
-		NDB_FREE(keyhex.data);
+			nfree(detoasted_image);
+		nfree(keysrc.data);
+		nfree(keyhex.data);
 		if (prompt)
-			NDB_FREE(prompt);
+			nfree(prompt);
 		if (params)
-			NDB_FREE(params);
+			nfree(params);
 		if (model_str)
-			NDB_FREE(model_str);
+			nfree(model_str);
 		PG_RETURN_TEXT_P(cstring_to_text(cached));
 	}
 
@@ -1162,15 +1210,15 @@ ndb_llm_image_analyze(PG_FUNCTION_ARGS)
 							 tokens_out,
 							 error_type);
 			if (need_free_detoasted)
-				NDB_FREE(detoasted_image);
-			NDB_FREE(keysrc.data);
-			NDB_FREE(keyhex.data);
+				nfree(detoasted_image);
+			nfree(keysrc.data);
+			nfree(keyhex.data);
 			if (prompt)
-				NDB_FREE(prompt);
+				nfree(prompt);
 			if (params)
-				NDB_FREE(params);
+				nfree(params);
 			if (model_str)
-				NDB_FREE(model_str);
+				nfree(model_str);
 			PG_RETURN_NULL();
 		}
 		record_llm_stats(cfg.model,
@@ -1182,15 +1230,15 @@ ndb_llm_image_analyze(PG_FUNCTION_ARGS)
 						 tokens_out,
 						 error_type);
 		if (need_free_detoasted)
-			NDB_FREE(detoasted_image);
-		NDB_FREE(keysrc.data);
-		NDB_FREE(keyhex.data);
+			nfree(detoasted_image);
+		nfree(keysrc.data);
+		nfree(keyhex.data);
 		if (prompt)
-			NDB_FREE(prompt);
+			nfree(prompt);
 		if (params)
-			NDB_FREE(params);
+			nfree(params);
 		if (model_str)
-			NDB_FREE(model_str);
+			nfree(model_str);
 		ereport(ERROR, (errmsg("neurondb: LLM rate limited")));
 	}
 
@@ -1219,19 +1267,19 @@ ndb_llm_image_analyze(PG_FUNCTION_ARGS)
 							 tokens_out,
 							 error_type);
 			if (need_free_detoasted)
-				NDB_FREE(detoasted_image);
+				nfree(detoasted_image);
 			if (resp.text)
-				NDB_FREE(resp.text);
+				nfree(resp.text);
 			if (resp.json)
-				NDB_FREE(resp.json);
-			NDB_FREE(keysrc.data);
-			NDB_FREE(keyhex.data);
+				nfree(resp.json);
+			nfree(keysrc.data);
+			nfree(keyhex.data);
 			if (prompt)
-				NDB_FREE(prompt);
+				nfree(prompt);
 			if (params)
-				NDB_FREE(params);
+				nfree(params);
 			if (model_str)
-				NDB_FREE(model_str);
+				nfree(model_str);
 			PG_RETURN_NULL();
 		}
 		record_llm_stats(cfg.model,
@@ -1243,19 +1291,19 @@ ndb_llm_image_analyze(PG_FUNCTION_ARGS)
 						 tokens_out,
 						 error_type);
 		if (need_free_detoasted)
-			NDB_FREE(detoasted_image);
+			nfree(detoasted_image);
 		if (resp.text)
-			NDB_FREE(resp.text);
+			nfree(resp.text);
 		if (resp.json)
-			NDB_FREE(resp.json);
-		NDB_FREE(keysrc.data);
-		NDB_FREE(keyhex.data);
+			nfree(resp.json);
+		nfree(keysrc.data);
+		nfree(keyhex.data);
 		if (prompt)
-			NDB_FREE(prompt);
+			nfree(prompt);
 		if (params)
-			NDB_FREE(params);
+			nfree(params);
 		if (model_str)
-			NDB_FREE(model_str);
+			nfree(model_str);
 		ereport(ERROR, (errmsg("neurondb: vision API failed")));
 	}
 
@@ -1277,17 +1325,17 @@ ndb_llm_image_analyze(PG_FUNCTION_ARGS)
 					 NULL);
 
 	if (need_free_detoasted)
-		NDB_FREE(detoasted_image);
+		nfree(detoasted_image);
 	if (resp.json)
-		NDB_FREE(resp.json);
-	NDB_FREE(keysrc.data);
-	NDB_FREE(keyhex.data);
+		nfree(resp.json);
+	nfree(keysrc.data);
+	nfree(keyhex.data);
 	if (prompt)
-		NDB_FREE(prompt);
+		nfree(prompt);
 	if (params)
-		NDB_FREE(params);
+		nfree(params);
 	if (model_str)
-		NDB_FREE(model_str);
+		nfree(model_str);
 
 	PG_RETURN_TEXT_P(cstring_to_text(resp.text));
 }
@@ -1305,7 +1353,7 @@ ndb_llm_embed(PG_FUNCTION_ARGS)
 	NdbLLMConfig cfg;
 	float	   *vec = NULL;
 	int			dim = 0;
-	Vector	   *v;
+	Vector *v = NULL;
 	NdbLLMCallOptions call_opts;
 	TimestampTz start_time;
 	TimestampTz end_time;
@@ -1418,7 +1466,7 @@ ndb_llm_embed(PG_FUNCTION_ARGS)
 		else
 			tokens_in = 0;		/* Fallback: estimate from word count */
 		if (token_ids)
-			NDB_FREE(token_ids);
+			nfree(token_ids);
 	}
 	tokens_out = dim;			/* Embedding dimension */
 	record_llm_stats(cfg.model,
@@ -1441,19 +1489,19 @@ PG_FUNCTION_INFO_V1(ndb_llm_rerank);
 Datum
 ndb_llm_rerank(PG_FUNCTION_ARGS)
 {
-	FuncCallContext *funcctx;
+	FuncCallContext *funcctx = NULL;
 	typedef struct
 	{
 		int			ndocs;
 		int			i;
 	}			Ctx;
-	Ctx		   *c;
+	Ctx *c = NULL;
 
 	if (SRF_IS_FIRSTCALL())
 	{
 		MemoryContext old;
-		Ctx		   *new_ctx;
-		ArrayType  *arr;
+		Ctx *new_ctx = NULL;
+		ArrayType *arr = NULL;
 		TupleDesc	tupdesc;
 
 		funcctx = SRF_FIRSTCALL_INIT();
@@ -1506,7 +1554,7 @@ ndb_llm_enqueue(PG_FUNCTION_ARGS)
 	text	   *action = PG_GETARG_TEXT_PP(0);
 	text	   *payload = PG_GETARG_TEXT_PP(1);
 
-	NDB_DECLARE(NdbSpiSession *, session);
+	NdbSpiSession *session = NULL;
 	session = ndb_spi_session_begin(CurrentMemoryContext, false);
 	if (session == NULL)
 		ereport(ERROR, (errmsg("failed to begin SPI session")));
@@ -1566,9 +1614,9 @@ PG_FUNCTION_INFO_V1(neurondb_llm_gpu_info);
 Datum
 neurondb_llm_gpu_info(PG_FUNCTION_ARGS)
 {
-	FuncCallContext *funcctx;
+	FuncCallContext *funcctx = NULL;
 	TupleDesc	tupdesc;
-	AttInMetadata *attinmeta;
+	AttInMetadata *attinmeta = NULL;
 	Datum		values[6];
 	bool		nulls[6];
 	HeapTuple	tuple;
@@ -1601,7 +1649,7 @@ neurondb_llm_gpu_info(PG_FUNCTION_ARGS)
 	if (funcctx->call_cntr < 1)
 	{
 		const ndb_gpu_backend *backend;
-		GPUDeviceInfo *device_info;
+		GPUDeviceInfo *device_info = NULL;
 		bool		gpu_available;
 		char	   *backend_name = NULL;
 		int			device_id = 0;
@@ -1671,9 +1719,9 @@ PG_FUNCTION_INFO_V1(neurondb_llm_gpu_utilization);
 Datum
 neurondb_llm_gpu_utilization(PG_FUNCTION_ARGS)
 {
-	FuncCallContext *funcctx;
+	FuncCallContext *funcctx = NULL;
 	TupleDesc	tupdesc;
-	AttInMetadata *attinmeta;
+	AttInMetadata *attinmeta = NULL;
 	Datum		values[8];
 	bool		nulls[8];
 	HeapTuple	tuple;
@@ -1706,7 +1754,7 @@ neurondb_llm_gpu_utilization(PG_FUNCTION_ARGS)
 	if (funcctx->call_cntr < 1)
 	{
 		const ndb_gpu_backend *backend;
-		GPUDeviceInfo *device_info;
+		GPUDeviceInfo *device_info = NULL;
 		bool		gpu_available;
 		int			device_id = 0;
 		float4		utilization_pct = 0.0;
@@ -1784,9 +1832,9 @@ PG_FUNCTION_INFO_V1(ndb_llm_complete_batch);
 Datum
 ndb_llm_complete_batch(PG_FUNCTION_ARGS)
 {
-	FuncCallContext *funcctx;
+	FuncCallContext *funcctx = NULL;
 	TupleDesc	tupdesc;
-	AttInMetadata *attinmeta;
+	AttInMetadata *attinmeta = NULL;
 	Datum		values[5];
 	bool		nulls[5];
 	HeapTuple	tuple;
@@ -1802,9 +1850,9 @@ ndb_llm_complete_batch(PG_FUNCTION_ARGS)
 
 	if (SRF_IS_FIRSTCALL())
 	{
-		ArrayType  *prompts_arr;
-		text	   *params_in;
-		char	   *params;
+		ArrayType *prompts_arr = NULL;
+		text *params_in = NULL;
+		char *params = NULL;
 		NdbLLMConfig cfg;
 		NdbLLMCallOptions call_opts;
 		NdbLLMBatchResp batch_resp;
@@ -1831,13 +1879,23 @@ ndb_llm_complete_batch(PG_FUNCTION_ARGS)
 
 		/* Get prompts array */
 		prompts_arr = PG_GETARG_ARRAYTYPE_P(0);
+		if (prompts_arr == NULL)
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					 errmsg("prompts array must not be NULL")));
+		
 		num_prompts = ArrayGetNItems(
 									 ARR_NDIM(prompts_arr), ARR_DIMS(prompts_arr));
 		if (num_prompts <= 0)
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-					 errmsg("prompts array must not be "
-							"empty")));
+					 errmsg("prompts array must not be empty")));
+		
+		/* Validate array dimensions */
+		if (ARR_NDIM(prompts_arr) != 1)
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					 errmsg("prompts array must be one-dimensional")));
 
 		/* Get params */
 		params_in = (PG_NARGS() > 1 && !PG_ARGISNULL(1))
@@ -1847,8 +1905,8 @@ ndb_llm_complete_batch(PG_FUNCTION_ARGS)
 
 		/* Extract prompts from array using deconstruct_array */
 		{
-			Datum	   *prompt_datums;
-			bool	   *prompt_nulls;
+			Datum *prompt_datums;
+			bool *prompt_nulls;
 			int			nprompt_elems;
 
 			deconstruct_array(prompts_arr,
@@ -1897,10 +1955,10 @@ ndb_llm_complete_batch(PG_FUNCTION_ARGS)
 			/* Free prompts */
 			for (i = 0; i < num_prompts; i++)
 				if (prompts[i])
-					NDB_FREE(prompts[i]);
-			NDB_FREE(prompts);
+					nfree(prompts[i]);
+			nfree(prompts);
 			if (params)
-				NDB_FREE(params);
+				nfree(params);
 			ereport(ERROR,
 					(errcode(ERRCODE_EXTERNAL_ROUTINE_INVOCATION_EXCEPTION),
 					 errmsg("neurondb: batch completion "
@@ -1935,8 +1993,8 @@ ndb_llm_complete_batch(PG_FUNCTION_ARGS)
 			}
 			if (batch_resp.tokens_in && batch_resp.num_items > 0)
 			{
-				NDB_DECLARE(int *, tokens_in);
-				NDB_ALLOC(tokens_in, int, batch_resp.num_items);
+				int *tokens_in = NULL;
+				nalloc(tokens_in, int, batch_resp.num_items);
 				state->batch_resp->tokens_in = tokens_in;
 				memcpy(state->batch_resp->tokens_in,
 					   batch_resp.tokens_in,
@@ -1944,8 +2002,8 @@ ndb_llm_complete_batch(PG_FUNCTION_ARGS)
 			}
 			if (batch_resp.tokens_out && batch_resp.num_items > 0)
 			{
-				NDB_DECLARE(int *, tokens_out);
-				NDB_ALLOC(tokens_out, int, batch_resp.num_items);
+				int *tokens_out = NULL;
+				nalloc(tokens_out, int, batch_resp.num_items);
 				state->batch_resp->tokens_out = tokens_out;
 				memcpy(state->batch_resp->tokens_out,
 					   batch_resp.tokens_out,
@@ -1953,8 +2011,8 @@ ndb_llm_complete_batch(PG_FUNCTION_ARGS)
 			}
 			if (batch_resp.http_status && batch_resp.num_items > 0)
 			{
-				NDB_DECLARE(int *, http_status);
-				NDB_ALLOC(http_status, int, batch_resp.num_items);
+				int *http_status = NULL;
+				nalloc(http_status, int, batch_resp.num_items);
 				state->batch_resp->http_status = http_status;
 				memcpy(state->batch_resp->http_status,
 					   batch_resp.http_status,
@@ -1966,7 +2024,7 @@ ndb_llm_complete_batch(PG_FUNCTION_ARGS)
 		}
 
 		if (params)
-			NDB_FREE(params);
+			nfree(params);
 		MemoryContextSwitchTo(oldcontext);
 	}
 
@@ -2050,26 +2108,26 @@ ndb_llm_complete_batch(PG_FUNCTION_ARGS)
 						 < cleanup_state->batch_resp->num_items;
 						 i++)
 						if (cleanup_state->batch_resp->texts[i])
-							NDB_FREE(cleanup_state->batch_resp->texts
+							nfree(cleanup_state->batch_resp->texts
 									 [i]);
-					NDB_FREE(cleanup_state->batch_resp->texts);
+					nfree(cleanup_state->batch_resp->texts);
 				}
 				if (cleanup_state->batch_resp->tokens_in)
-					NDB_FREE(cleanup_state->batch_resp->tokens_in);
+					nfree(cleanup_state->batch_resp->tokens_in);
 				if (cleanup_state->batch_resp->tokens_out)
-					NDB_FREE(cleanup_state->batch_resp->tokens_out);
+					nfree(cleanup_state->batch_resp->tokens_out);
 				if (cleanup_state->batch_resp->http_status)
-					NDB_FREE(cleanup_state->batch_resp->http_status);
-				NDB_FREE(cleanup_state->batch_resp);
+					nfree(cleanup_state->batch_resp->http_status);
+				nfree(cleanup_state->batch_resp);
 			}
 			if (cleanup_state->prompts)
 			{
 				for (i = 0; i < cleanup_state->num_prompts; i++)
 					if (cleanup_state->prompts[i])
-						NDB_FREE(cleanup_state->prompts[i]);
-				NDB_FREE(cleanup_state->prompts);
+						nfree(cleanup_state->prompts[i]);
+				nfree(cleanup_state->prompts);
 			}
-			NDB_FREE(cleanup_state);
+			nfree(cleanup_state);
 			SRF_RETURN_DONE(funcctx);
 		}
 	}
@@ -2084,9 +2142,9 @@ PG_FUNCTION_INFO_V1(ndb_llm_rerank_batch);
 Datum
 ndb_llm_rerank_batch(PG_FUNCTION_ARGS)
 {
-	FuncCallContext *funcctx;
+	FuncCallContext *funcctx = NULL;
 	TupleDesc	tupdesc;
-	AttInMetadata *attinmeta;
+	AttInMetadata *attinmeta = NULL;
 	Datum		values[3];
 	bool		nulls[3];
 	HeapTuple	tuple;
@@ -2103,18 +2161,18 @@ ndb_llm_rerank_batch(PG_FUNCTION_ARGS)
 
 	if (SRF_IS_FIRSTCALL())
 	{
-		ArrayType  *queries_arr;
-		ArrayType  *documents_arr;
-		text	   *model_in;
-		char	   *model;
+		ArrayType *queries_arr = NULL;
+		ArrayType *documents_arr = NULL;
+		text *model_in = NULL;
+		char *model = NULL;
 		NdbLLMConfig cfg;
 		NdbLLMCallOptions call_opts;
 		int			num_queries;
 		char	  **queries;
 		const char ***docs_array;
-		int		   *ndocs_array;
+		int *ndocs_array = NULL;
 		float	  **scores;
-		int		   *nscores;
+		int *nscores = NULL;
 		int			i;
 		int			j;
 		int			rc;
@@ -2165,8 +2223,8 @@ ndb_llm_rerank_batch(PG_FUNCTION_ARGS)
 
 		/* Extract queries from array using deconstruct_array */
 		{
-			Datum	   *query_datums;
-			bool	   *query_nulls;
+			Datum *query_datums;
+			bool *query_nulls;
 			int			nquery_elems;
 
 			deconstruct_array(queries_arr,
@@ -2241,9 +2299,9 @@ ndb_llm_rerank_batch(PG_FUNCTION_ARGS)
 				{
 					bool		isNull;
 					Datum		row_datum;
-					ArrayType  *doc_row;
-					Datum	   *doc_datums;
-					bool	   *doc_nulls;
+					ArrayType *doc_row = NULL;
+					Datum *doc_datums = NULL;
+					bool *doc_nulls = NULL;
 					int			ndoc_elems;
 
 					indices[0] = i;
@@ -2384,9 +2442,9 @@ ndb_llm_rerank_batch(PG_FUNCTION_ARGS)
 				{
 					bool		isNull;
 					Datum		row_datum;
-					ArrayType  *doc_row;
-					Datum	   *doc_datums;
-					bool	   *doc_nulls;
+					ArrayType *doc_row = NULL;
+					Datum *doc_datums = NULL;
+					bool *doc_nulls = NULL;
 					int			ndoc_elems;
 
 					indices[0] = i;
@@ -2458,8 +2516,8 @@ ndb_llm_rerank_batch(PG_FUNCTION_ARGS)
 			/* Free queries */
 			for (i = 0; i < num_queries; i++)
 				if (queries[i])
-					NDB_FREE(queries[i]);
-			NDB_FREE(queries);
+					nfree(queries[i]);
+			nfree(queries);
 			/* Free documents */
 			for (i = 0; i < num_queries; i++)
 			{
@@ -2469,15 +2527,15 @@ ndb_llm_rerank_batch(PG_FUNCTION_ARGS)
 
 					for (j = 0; j < ndocs_array[i]; j++)
 					{
-						NDB_FREE(docs_ptr[j]);
+						nfree(docs_ptr[j]);
 					}
-					NDB_FREE(docs_ptr);
+					nfree(docs_ptr);
 				}
 			}
-			NDB_FREE(docs_array);
-			NDB_FREE(ndocs_array);
+			nfree(docs_array);
+			nfree(ndocs_array);
 			if (model)
-				NDB_FREE(model);
+				nfree(model);
 			ereport(ERROR,
 					(errcode(ERRCODE_EXTERNAL_ROUTINE_INVOCATION_EXCEPTION),
 					 errmsg("neurondb: batch reranking "
@@ -2507,8 +2565,8 @@ ndb_llm_rerank_batch(PG_FUNCTION_ARGS)
 		/* Free queries and documents arrays (scores are stored in state) */
 		for (i = 0; i < num_queries; i++)
 			if (queries[i])
-				NDB_FREE(queries[i]);
-		NDB_FREE(queries);
+				nfree(queries[i]);
+		nfree(queries);
 		for (i = 0; i < num_queries; i++)
 		{
 			if (docs_array[i])
@@ -2517,14 +2575,14 @@ ndb_llm_rerank_batch(PG_FUNCTION_ARGS)
 
 				for (j = 0; j < ndocs_array[i]; j++)
 				{
-					NDB_FREE(docs_ptr[j]);
+					nfree(docs_ptr[j]);
 				}
-				NDB_FREE(docs_ptr);
+				nfree(docs_ptr);
 			}
 		}
-		NDB_FREE(docs_array);
+		nfree(docs_array);
 		if (model)
-			NDB_FREE(model);
+			nfree(model);
 		MemoryContextSwitchTo(oldcontext);
 	}
 
@@ -2618,14 +2676,14 @@ ndb_llm_rerank_batch(PG_FUNCTION_ARGS)
 			{
 				for (i = 0; i < state->num_queries; i++)
 					if (state->scores[i])
-						NDB_FREE(state->scores[i]);
-				NDB_FREE(state->scores);
+						nfree(state->scores[i]);
+				nfree(state->scores);
 			}
 			if (state->nscores)
-				NDB_FREE(state->nscores);
+				nfree(state->nscores);
 			if (state->ndocs_array)
-				NDB_FREE(state->ndocs_array);
-			NDB_FREE(state);
+				nfree(state->ndocs_array);
+			nfree(state);
 		}
 		SRF_RETURN_DONE(funcctx);
 	}

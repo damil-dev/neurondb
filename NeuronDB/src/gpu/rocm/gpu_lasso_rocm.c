@@ -89,9 +89,9 @@ ndb_rocm_lasso_pack_model(const LassoModel *model,
 	}
 	payload_bytes = sizeof(NdbCudaLassoModelHeader)
 		+ sizeof(float) * (size_t) model->n_features;
-	NDB_DECLARE(bytea *, blob);
-	NDB_DECLARE(char *, blob_raw);
-	NDB_ALLOC(blob_raw, char, VARHDRSZ + payload_bytes);
+	bytea *blob = NULL;
+	char *blob_raw = NULL;
+	nalloc(blob_raw, char, VARHDRSZ + payload_bytes);
 	blob = (bytea *) blob_raw;
 	SET_VARSIZE(blob, VARHDRSZ + payload_bytes);
 	base = VARDATA(blob);
@@ -118,7 +118,7 @@ ndb_rocm_lasso_pack_model(const LassoModel *model,
 	if (metrics)
 	{
 		StringInfoData buf;
-		Jsonb	   *metrics_json;
+		Jsonb *metrics_json = NULL;
 
 		initStringInfo(&buf);
 		appendStringInfo(&buf,
@@ -142,7 +142,7 @@ ndb_rocm_lasso_pack_model(const LassoModel *model,
 		metrics_json = DatumGetJsonbP(DirectFunctionCall1(
 														  jsonb_in,
 														  CStringGetDatum(buf.data)));
-		NDB_FREE(buf.data);
+		nfree(buf.data);
 		*metrics = metrics_json;
 	}
 
@@ -207,7 +207,7 @@ ndb_rocm_lasso_train(const float *features,
 	/* Extract hyperparameters from JSON */
 	if (hyperparams)
 	{
-		JsonbIterator *it;
+		JsonbIterator *it = NULL;
 		JsonbValue	v;
 		int			r;
 		bool		parsed_lambda = false;
@@ -263,7 +263,7 @@ ndb_rocm_lasso_train(const float *features,
 								parsed_max_iters = true;
 						}
 					}
-					NDB_FREE(key);
+					nfree(key);
 				}
 			}
 		}
@@ -293,11 +293,11 @@ ndb_rocm_lasso_train(const float *features,
 	}
 	y_mean /= (double) n_samples;
 
-	NDB_ALLOC(weights, double, feature_dim);
-	NDB_ALLOC(weights_old, double, feature_dim);
-	NDB_ALLOC(residuals, double, n_samples);
-	NDB_ALLOC(h_rho, double, 1);
-	NDB_ALLOC(h_z, double, 1);
+	nalloc(weights, double, feature_dim);
+	nalloc(weights_old, double, feature_dim);
+	nalloc(residuals, double, n_samples);
+	nalloc(h_rho, double, 1);
+	nalloc(h_z, double, 1);
 
 	for (i = 0; i < n_samples; i++)
 		residuals[i] = targets[i] - y_mean;
@@ -513,14 +513,14 @@ ndb_rocm_lasso_train(const float *features,
 		double		mse = 0.0;
 		double		mae = 0.0;
 
-		NDB_DECLARE(double *, model_coefficients);
+		double *model_coefficients = NULL;
 
 		model.n_features = feature_dim;
 		model.n_samples = n_samples;
 		model.intercept = y_mean;
 		model.lambda = lambda;
 		model.max_iters = max_iters;
-		NDB_ALLOC(model_coefficients, double, feature_dim);
+		nalloc(model_coefficients, double, feature_dim);
 		model.coefficients = model_coefficients;
 		for (i = 0; i < feature_dim; i++)
 		{
@@ -557,7 +557,7 @@ ndb_rocm_lasso_train(const float *features,
 		rc = ndb_rocm_lasso_pack_model(
 									   &model, &payload, &metrics_json, errstr);
 
-		NDB_FREE(model.coefficients);
+		nfree(model.coefficients);
 	}
 
 	rc = 0;
@@ -576,11 +576,11 @@ cleanup:
 	}
 
 cleanup_host:
-	NDB_FREE(weights);
-	NDB_FREE(weights_old);
-	NDB_FREE(residuals);
-	NDB_FREE(h_rho);
-	NDB_FREE(h_z);
+	nfree(weights);
+	nfree(weights_old);
+	nfree(residuals);
+	nfree(h_rho);
+	nfree(h_z);
 
 	if (rc == 0 && payload)
 	{
@@ -591,9 +591,9 @@ cleanup_host:
 	}
 
 	if (payload)
-		NDB_FREE(payload);
+		nfree(payload);
 	if (metrics_json)
-		NDB_FREE(metrics_json);
+		nfree(metrics_json);
 
 	return -1;
 }
@@ -905,9 +905,9 @@ ndb_rocm_lasso_evaluate(const bytea * model_data,
 
 	/* Convert coefficients from float to double and copy to GPU */
 	{
-		NDB_DECLARE(double *, h_coefficients_double);
+		double *h_coefficients_double = NULL;
 
-		NDB_ALLOC(h_coefficients_double, double, feature_dim);
+		nalloc(h_coefficients_double, double, feature_dim);
 
 		if (h_coefficients_double == NULL)
 		{
@@ -926,7 +926,7 @@ ndb_rocm_lasso_evaluate(const bytea * model_data,
 			h_coefficients_double[i] = (double) coefficients[i];
 
 		cuda_err = hipMemcpy(d_coefficients, h_coefficients_double, coeff_bytes, hipMemcpyHostToDevice);
-		NDB_FREE(h_coefficients_double);
+		nfree(h_coefficients_double);
 
 		if (cuda_err != hipSuccess)
 		{

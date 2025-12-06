@@ -70,20 +70,20 @@ PG_FUNCTION_INFO_V1(qlearning_train);
 Datum
 qlearning_train(PG_FUNCTION_ARGS)
 {
-	text	   *table_name;
+	text *table_name = NULL;
 	int			n_states;
 	int			n_actions;
 	double		learning_rate;
 	double		discount_factor;
 	double		epsilon;
 	int			iterations;
-	char	   *tbl_str;
-	QLearningAgent *agent;
+	char *tbl_str = NULL;
+	QLearningAgent *agent = NULL;
 	StringInfoData query;
 	int			ret;
 	int			i;
-	Jsonb	   *parameters;
-	Jsonb	   *metrics;
+	Jsonb *parameters = NULL;
+	Jsonb *metrics = NULL;
 	MLCatalogModelSpec spec;
 	int32		model_id;
 
@@ -110,24 +110,30 @@ qlearning_train(PG_FUNCTION_ARGS)
 
 	tbl_str = text_to_cstring(table_name);
 
-	NDB_DECLARE(NdbSpiSession *, spi_session);
+	NdbSpiSession *spi_session = NULL;
 	MemoryContext oldcontext = CurrentMemoryContext;
 
 	NDB_SPI_SESSION_BEGIN(spi_session, oldcontext);
 
 	/* Initialize Q-table */
-	NDB_DECLARE(QLearningAgent *, agent);
-	NDB_ALLOC(agent, QLearningAgent, 1);
+	QLearningAgent *agent = NULL;
+	nalloc(agent, QLearningAgent, 1);
 	agent->n_states = n_states;
 	agent->n_actions = n_actions;
 	agent->learning_rate = learning_rate;
 	agent->discount_factor = discount_factor;
 	agent->epsilon = epsilon;
 
-	NDB_ALLOC(agent->q_table, double *, n_states);
-	for (i = 0; i < n_states; i++)
 	{
-		NDB_ALLOC(agent->q_table[i], double, n_actions);
+		double **q_table_tmp = NULL;
+		nalloc(q_table_tmp, double *, n_states);
+		for (i = 0; i < n_states; i++)
+		{
+			double *q_table_row = NULL;
+			nalloc(q_table_row, double, n_actions);
+			q_table_tmp[i] = q_table_row;
+		}
+		agent->q_table = q_table_tmp;
 	}
 
 	/* Training loop */
@@ -237,7 +243,7 @@ qlearning_train(PG_FUNCTION_ARGS)
 		appendStringInfoString(&jsonbuf, "]}");
 		parameters = DatumGetJsonbP(
 									DirectFunctionCall1(jsonb_in, CStringGetTextDatum(jsonbuf.data)));
-		NDB_FREE(jsonbuf.data);
+		nfree(jsonbuf.data);
 	}
 
 	/* Create metrics */
@@ -250,7 +256,7 @@ qlearning_train(PG_FUNCTION_ARGS)
 						 iterations, n_states, n_actions);
 		metrics = DatumGetJsonbP(
 								 DirectFunctionCall1(jsonb_in, CStringGetTextDatum(metricsbuf.data)));
-		NDB_FREE(metricsbuf.data);
+		nfree(metricsbuf.data);
 	}
 
 	/* Register model */
@@ -266,12 +272,12 @@ qlearning_train(PG_FUNCTION_ARGS)
 	model_id = ml_catalog_register_model(&spec);
 
 	for (i = 0; i < n_states; i++)
-		NDB_FREE(agent->q_table[i]);
-	NDB_FREE(agent->q_table);
-	NDB_FREE(agent);
+		nfree(agent->q_table[i]);
+	nfree(agent->q_table);
+	nfree(agent);
 	ndb_spi_stringinfo_free(spi_session, &query);
 	NDB_SPI_SESSION_END(spi_session);
-	NDB_FREE(tbl_str);
+	nfree(tbl_str);
 
 	PG_RETURN_INT32(model_id);
 }
@@ -294,14 +300,14 @@ qlearning_predict(PG_FUNCTION_ARGS)
 	int			best_action = 0;
 	double		best_q = -DBL_MAX;
 	int			a;
-	Jsonb	   *parameters;
+	Jsonb *parameters = NULL;
 	StringInfoData query;
 	int			ret;
 
 	model_id = PG_GETARG_INT32(0);
 	state_id = PG_GETARG_INT32(1);
 
-	NDB_DECLARE(NdbSpiSession *, spi_session);
+	NdbSpiSession *spi_session = NULL;
 	MemoryContext oldcontext = CurrentMemoryContext;
 
 	NDB_SPI_SESSION_BEGIN(spi_session, oldcontext);
@@ -355,22 +361,22 @@ PG_FUNCTION_INFO_V1(multi_armed_bandit);
 Datum
 multi_armed_bandit(PG_FUNCTION_ARGS)
 {
-	text	   *table_name;
-	text	   *algorithm_text;
+	text *table_name = NULL;
+	text *algorithm_text = NULL;
 	int			n_arms;
 	double		epsilon;
 	double		alpha;
 	double		beta;
-	char	   *tbl_str;
-	char	   *algorithm;
+	char *tbl_str = NULL;
+	char *algorithm = NULL;
 
-	NDB_DECLARE(int *, arm_counts);
-	NDB_DECLARE(double *, arm_rewards);
-	NDB_DECLARE(double *, arm_probs);
+	int *arm_counts = NULL;
+	double *arm_rewards = NULL;
+	double *arm_probs = NULL;
 	int			i;
-	ArrayType  *result;
+	ArrayType *result = NULL;
 
-	NDB_DECLARE(Datum *, result_datums);
+	Datum *result_datums = NULL;
 	StringInfoData query;
 	int			ret;
 
@@ -389,14 +395,14 @@ multi_armed_bandit(PG_FUNCTION_ARGS)
 	tbl_str = text_to_cstring(table_name);
 	algorithm = text_to_cstring(algorithm_text);
 
-	NDB_DECLARE(NdbSpiSession *, spi_session);
+	NdbSpiSession *spi_session = NULL;
 	MemoryContext oldcontext = CurrentMemoryContext;
 
 	NDB_SPI_SESSION_BEGIN(spi_session, oldcontext);
 
 	/* Initialize arm statistics */
-	NDB_ALLOC(arm_counts, int, n_arms);
-	NDB_ALLOC(arm_rewards, double, n_arms);
+	nalloc(arm_counts, int, n_arms);
+	nalloc(arm_rewards, double, n_arms);
 
 	/* Collect statistics from table */
 	ndb_spi_stringinfo_init(spi_session, &query);
@@ -544,14 +550,14 @@ multi_armed_bandit(PG_FUNCTION_ARGS)
 							 FLOAT8PASSBYVAL,
 							 'd');
 
-	NDB_FREE(arm_counts);
-	NDB_FREE(arm_rewards);
-	NDB_FREE(arm_probs);
-	NDB_FREE(result_datums);
+	nfree(arm_counts);
+	nfree(arm_rewards);
+	nfree(arm_probs);
+	nfree(result_datums);
 	ndb_spi_stringinfo_free(spi_session, &query);
 	NDB_SPI_SESSION_END(spi_session);
-	NDB_FREE(tbl_str);
-	NDB_FREE(algorithm);
+	nfree(tbl_str);
+	nfree(algorithm);
 
 	PG_RETURN_ARRAYTYPE_P(result);
 }

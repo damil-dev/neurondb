@@ -44,13 +44,13 @@ hybrid_index_create(PG_FUNCTION_ARGS)
 	text	   *vector_col = PG_GETARG_TEXT_PP(1);
 	text	   *text_col = PG_GETARG_TEXT_PP(2);
 	float4		fusion_weight = PG_GETARG_FLOAT4(3);
-	char	   *tbl_str;
-	char	   *vec_str;
-	char	   *txt_str;
+	char *tbl_str = NULL;
+	char *vec_str = NULL;
+	char *txt_str = NULL;
 	StringInfoData sql;
 	int			ret;
 
-	NDB_DECLARE(NdbSpiSession *, session);
+	NdbSpiSession *session = NULL;
 
 	tbl_str = text_to_cstring(table_name);
 	vec_str = text_to_cstring(vector_col);
@@ -87,7 +87,7 @@ hybrid_index_create(PG_FUNCTION_ARGS)
 	ret = ndb_spi_execute(session, sql.data, false, 0);
 	if (ret != SPI_OK_UTILITY)
 	{
-		NDB_FREE(sql.data);
+		nfree(sql.data);
 		ndb_spi_session_end(&session);
 		elog(ERROR,
 			 "Failed to create vector ANN index on %s.%s: SPI error "
@@ -98,7 +98,7 @@ hybrid_index_create(PG_FUNCTION_ARGS)
 	}
 
 	/* Use safe free/reinit to handle potential memory context changes */
-	NDB_FREE(sql.data);
+	nfree(sql.data);
 	initStringInfo(&sql);
 
 	/*
@@ -116,7 +116,7 @@ hybrid_index_create(PG_FUNCTION_ARGS)
 	ret = ndb_spi_execute(session, sql.data, false, 0);
 	if (ret != SPI_OK_UTILITY)
 	{
-		NDB_FREE(sql.data);
+		nfree(sql.data);
 		ndb_spi_session_end(&session);
 		elog(ERROR,
 			 "Failed to create GIN index on %s.%s: SPI error %d",
@@ -125,7 +125,7 @@ hybrid_index_create(PG_FUNCTION_ARGS)
 			 ret);
 	}
 
-	NDB_FREE(sql.data);
+	nfree(sql.data);
 	ndb_spi_session_end(&session);
 
 	/* In production: store fusion config and columns in metadata */
@@ -154,22 +154,22 @@ PG_FUNCTION_INFO_V1(hybrid_index_search);
 Datum
 hybrid_index_search(PG_FUNCTION_ARGS)
 {
-	FuncCallContext *funcctx;
+	FuncCallContext *funcctx = NULL;
 	TupleDesc	tupdesc;
 	MemoryContext oldcontext;
-	text	   *index_name;
-	Vector	   *query_vec;
-	text	   *query_text;
+	text *index_name = NULL;
+	Vector *query_vec = NULL;
+	text *query_text = NULL;
 	int32		k;
-	char	   *idx_str;
-	char	   *txt_query;
+	char *idx_str = NULL;
+	char *txt_query = NULL;
 	StringInfoData sql;
 	int			ret;
-	char	   *origin_table;
-	char	   *vec_col;
-	char	   *txt_col;
+	char *origin_table = NULL;
+	char *vec_col = NULL;
+	char *txt_col = NULL;
 
-	NDB_DECLARE(NdbSpiSession *, session2);
+	NdbSpiSession *session2 = NULL;
 
 	if (SRF_IS_FIRSTCALL())
 	{
@@ -241,7 +241,7 @@ hybrid_index_search(PG_FUNCTION_ARGS)
 				 sql.data);
 		if (SPI_processed == 0)
 		{
-			NDB_FREE(sql.data);
+			nfree(sql.data);
 			ndb_spi_session_end(&session2);
 			funcctx->max_calls = 0;
 			SRF_RETURN_DONE(funcctx);
@@ -255,7 +255,7 @@ hybrid_index_search(PG_FUNCTION_ARGS)
 	{
 		uint64		call_cntr;
 		uint64		max_calls;
-		SPITupleTable *tuptable;
+		SPITupleTable *tuptable = NULL;
 		HeapTuple	spi_tuple;
 		Datum		values[4];
 		bool		nulls[4];

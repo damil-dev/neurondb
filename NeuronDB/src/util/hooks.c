@@ -33,8 +33,8 @@ register_custom_operator(PG_FUNCTION_ARGS)
 {
 	text	   *op_name = PG_GETARG_TEXT_PP(0);
 	text	   *op_function = PG_GETARG_TEXT_PP(1);
-	char	   *name_str;
-	char	   *func_str;
+	char *name_str = NULL;
+	char *func_str = NULL;
 
 	name_str = text_to_cstring(op_name);
 	func_str = text_to_cstring(op_function);
@@ -52,7 +52,7 @@ Datum
 enable_vector_replication(PG_FUNCTION_ARGS)
 {
 	text	   *publication_name = PG_GETARG_TEXT_PP(0);
-	char	   *pub_str;
+	char *pub_str = NULL;
 
 	pub_str = text_to_cstring(publication_name);
 
@@ -68,9 +68,9 @@ create_vector_fdw(PG_FUNCTION_ARGS)
 	text	   *fdw_name = PG_GETARG_TEXT_PP(0);
 	text	   *remote_type = PG_GETARG_TEXT_PP(1);
 	text	   *connection_string = PG_GETARG_TEXT_PP(2);
-	char	   *name_str;
-	char	   *type_str;
-	char	   *conn_str;
+	char *name_str = NULL;
+	char *type_str = NULL;
+	char *conn_str = NULL;
 
 	name_str = text_to_cstring(fdw_name);
 	type_str = text_to_cstring(remote_type);
@@ -82,9 +82,9 @@ create_vector_fdw(PG_FUNCTION_ARGS)
 		 name_str,
 		 conn_str);
 
-	NDB_FREE(name_str);
-	NDB_FREE(type_str);
-	NDB_FREE(conn_str);
+	nfree(name_str);
+	nfree(type_str);
+	nfree(conn_str);
 
 	PG_RETURN_BOOL(true);
 }

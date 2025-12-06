@@ -48,11 +48,11 @@ hybrid_dense_sparse_search(PG_FUNCTION_ARGS)
 	float4		sparse_weight = PG_ARGISNULL(7) ? 0.5f : PG_GETARG_FLOAT4(7);
 	ReturnSetInfo *rsinfo = (ReturnSetInfo *) fcinfo->resultinfo;
 	TupleDesc	tupdesc;
-	Tuplestorestate *tupstore;
+	Tuplestorestate *tupstore = NULL;
 	MemoryContext per_query_ctx;
 	MemoryContext oldcontext;
 
-	NDB_DECLARE(NdbSpiSession *, session);
+	NdbSpiSession *session = NULL;
 	StringInfoData sql;
 	int			ret;
 	Datum		values[2];
@@ -181,7 +181,7 @@ hybrid_dense_sparse_search(PG_FUNCTION_ARGS)
 		tuplestore_putvalues(tupstore, tupdesc, values, nulls);
 	}
 
-	NDB_FREE(sql.data);
+	nfree(sql.data);
 	ndb_spi_session_end(&session);
 
 	PG_RETURN_NULL();

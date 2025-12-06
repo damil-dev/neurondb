@@ -39,8 +39,11 @@ check_dimensions(const Vector *a, const Vector *b)
 float4
 l2_distance(Vector *a, Vector *b)
 {
-	double		sum = 0.0,
-				c = 0.0;
+	double		c = 0.0;
+	double		diff;
+	double		sum = 0.0;
+	double		t;
+	double		y;
 	int			i;
 
 	check_dimensions(a, b);
@@ -56,9 +59,9 @@ l2_distance(Vector *a, Vector *b)
 	 */
 	for (i = 0; i < a->dim; i++)
 	{
-		double		diff = (double) a->data[i] - (double) b->data[i];
-		double		y = (diff * diff) - c;
-		double		t = sum + y;
+		diff = (double) a->data[i] - (double) b->data[i];
+		y = (diff * diff) - c;
+		t = sum + y;
 
 		c = (t - sum) - y;
 		sum = t;
@@ -71,10 +74,18 @@ PG_FUNCTION_INFO_V1(vector_l2_distance);
 Datum
 vector_l2_distance(PG_FUNCTION_ARGS)
 {
-	Vector	   *a = PG_GETARG_VECTOR_P(0);
+	Vector	   *a;
+	Vector	   *b;
 
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_l2_distance requires 2 arguments")));
+
+	a = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(a);
-	Vector	   *b = PG_GETARG_VECTOR_P(1);
+	b = PG_GETARG_VECTOR_P(1);
 
 	NDB_CHECK_VECTOR_VALID(b);
 	PG_RETURN_FLOAT4(l2_distance(a, b));
@@ -98,10 +109,18 @@ PG_FUNCTION_INFO_V1(vector_inner_product);
 Datum
 vector_inner_product(PG_FUNCTION_ARGS)
 {
-	Vector	   *a = PG_GETARG_VECTOR_P(0);
+	Vector	   *a;
+	Vector	   *b;
 
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_inner_product requires 2 arguments")));
+
+	a = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(a);
-	Vector	   *b = PG_GETARG_VECTOR_P(1);
+	b = PG_GETARG_VECTOR_P(1);
 
 	NDB_CHECK_VECTOR_VALID(b);
 	PG_RETURN_FLOAT4(inner_product_distance(a, b));
@@ -111,9 +130,11 @@ vector_inner_product(PG_FUNCTION_ARGS)
 float4
 cosine_distance(Vector *a, Vector *b)
 {
-	double		dot = 0.0,
-				norm_a = 0.0,
-				norm_b = 0.0;
+	double		dot = 0.0;
+	double		norm_a = 0.0;
+	double		norm_b = 0.0;
+	double		va;
+	double		vb;
 	int			i;
 
 	check_dimensions(a, b);
@@ -121,8 +142,8 @@ cosine_distance(Vector *a, Vector *b)
 	/* Compute dot(a, b), ||a||^2, ||b||^2 */
 	for (i = 0; i < a->dim; i++)
 	{
-		double		va = (double) a->data[i];
-		double		vb = (double) b->data[i];
+		va = (double) a->data[i];
+		vb = (double) b->data[i];
 
 		dot += va * vb;
 		norm_a += va * va;
@@ -140,10 +161,18 @@ PG_FUNCTION_INFO_V1(vector_cosine_distance);
 Datum
 vector_cosine_distance(PG_FUNCTION_ARGS)
 {
-	Vector	   *a = PG_GETARG_VECTOR_P(0);
+	Vector	   *a;
+	Vector	   *b;
 
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_cosine_distance requires 2 arguments")));
+
+	a = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(a);
-	Vector	   *b = PG_GETARG_VECTOR_P(1);
+	b = PG_GETARG_VECTOR_P(1);
 
 	NDB_CHECK_VECTOR_VALID(b);
 	PG_RETURN_FLOAT4(cosine_distance(a, b));
@@ -168,10 +197,18 @@ PG_FUNCTION_INFO_V1(vector_l1_distance);
 Datum
 vector_l1_distance(PG_FUNCTION_ARGS)
 {
-	Vector	   *a = PG_GETARG_VECTOR_P(0);
+	Vector	   *a;
+	Vector	   *b;
 
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_l1_distance requires 2 arguments")));
+
+	a = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(a);
-	Vector	   *b = PG_GETARG_VECTOR_P(1);
+	b = PG_GETARG_VECTOR_P(1);
 
 	NDB_CHECK_VECTOR_VALID(b);
 	PG_RETURN_FLOAT4(l1_distance(a, b));
@@ -182,10 +219,18 @@ PG_FUNCTION_INFO_V1(vector_hamming_distance);
 Datum
 vector_hamming_distance(PG_FUNCTION_ARGS)
 {
-	Vector	   *a = PG_GETARG_VECTOR_P(0);
+	Vector	   *a;
+	Vector	   *b;
 
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_hamming_distance requires 2 arguments")));
+
+	a = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(a);
-	Vector	   *b = PG_GETARG_VECTOR_P(1);
+	b = PG_GETARG_VECTOR_P(1);
 
 	NDB_CHECK_VECTOR_VALID(b);
 	int			count = 0,
@@ -211,10 +256,18 @@ PG_FUNCTION_INFO_V1(vector_chebyshev_distance);
 Datum
 vector_chebyshev_distance(PG_FUNCTION_ARGS)
 {
-	Vector	   *a = PG_GETARG_VECTOR_P(0);
+	Vector	   *a;
+	Vector	   *b;
 
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_chebyshev_distance requires 2 arguments")));
+
+	a = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(a);
-	Vector	   *b = PG_GETARG_VECTOR_P(1);
+	b = PG_GETARG_VECTOR_P(1);
 
 	NDB_CHECK_VECTOR_VALID(b);
 	double		max_diff = 0.0;
@@ -238,13 +291,21 @@ PG_FUNCTION_INFO_V1(vector_minkowski_distance);
 Datum
 vector_minkowski_distance(PG_FUNCTION_ARGS)
 {
-	Vector	   *a = PG_GETARG_VECTOR_P(0);
+	Vector	   *a;
+	Vector	   *b;
+	float8		p;
 
+	/* Validate argument count */
+	if (PG_NARGS() != 3)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_minkowski_distance requires 3 arguments")));
+
+	a = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(a);
-	Vector	   *b = PG_GETARG_VECTOR_P(1);
-
+	b = PG_GETARG_VECTOR_P(1);
 	NDB_CHECK_VECTOR_VALID(b);
-	float8		p = PG_GETARG_FLOAT8(2);
+	p = PG_GETARG_FLOAT8(2);
 	double		sum = 0.0;
 	int			i;
 

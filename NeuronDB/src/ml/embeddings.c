@@ -59,19 +59,20 @@
 static Vector *
 parse_vector_from_text(const char *str)
 {
-	int			dim = 0;
-	int			i = 0;
-
-	NDB_DECLARE(char *, dup);
-	NDB_DECLARE(char *, token);
-	NDB_DECLARE(char *, saveptr);
-	NDB_DECLARE(char *, endptr);
-	NDB_DECLARE(Vector *, result);
-	NDB_DECLARE(float *, data);
 	bool		first = true;
-
-	NDB_DECLARE(char *, start);
-	NDB_DECLARE(char *, end);
+	char	   *c = NULL;
+	char	   *dup = NULL;
+	char	   *end = NULL;
+	char	   *endptr = NULL;
+	char	   *saveptr = NULL;
+	char	   *start = NULL;
+	char	   *token = NULL;
+	float	   *data = NULL;
+	int			commas;
+	int			dim = 0;
+	int			dval;
+	int			i = 0;
+	Vector	   *result = NULL;
 
 	/* Duplicate input string as strtok modifies it */
 	dup = pstrdup(str);
@@ -81,30 +82,26 @@ parse_vector_from_text(const char *str)
 	end = strrchr(dup, '}');
 	if (!start || !end || end <= start)
 	{
-		NDB_FREE(dup);
+		nfree(dup);
 		return NULL;
 	}
 	*end = '\0';
 	start++;
 
 	/* Count number of commas for dimension */
+	commas = 0;
+	for (c = start; *c; c++)
 	{
-		int			commas = 0;
-		char	   *c;
-
-		for (c = start; *c; c++)
-		{
-			if (*c == ',')
-				commas++;
-		}
-		dim = commas;			/* There should be dim+1 entries (first: dim) */
+		if (*c == ',')
+			commas++;
 	}
+	dim = commas;			/* There should be dim+1 entries (first: dim) */
 	if (dim < 1)
 	{
-		NDB_FREE(dup);
+		nfree(dup);
 		return NULL;
 	}
-	NDB_ALLOC(data, float, dim);
+	nalloc(data, float, dim);
 
 	/* Tokenize for dimension and entries */
 	i = 0;
@@ -118,14 +115,12 @@ parse_vector_from_text(const char *str)
 
 		if (first)
 		{
-			int			dval;
-
 			first = false;
 			dval = strtol(token, &endptr, 10);
 			if (*endptr != '\0' || dval <= 0)
 			{
-				NDB_FREE(data);
-				NDB_FREE(dup);
+				nfree(data);
+				nfree(dup);
 				return NULL;
 			}
 			if (dval != dim)
@@ -142,8 +137,8 @@ parse_vector_from_text(const char *str)
 				data[i++] = strtof(token, &endptr);
 				if (*endptr != '\0' && *endptr != '\n' && *endptr != '\r')
 				{
-					NDB_FREE(data);
-					NDB_FREE(dup);
+					nfree(data);
+					nfree(dup);
 					return NULL;
 				}
 			}
@@ -151,31 +146,31 @@ parse_vector_from_text(const char *str)
 	}
 	if (i != dim)
 	{
-		NDB_FREE(data);
-		NDB_FREE(dup);
+		nfree(data);
+		nfree(dup);
 		return NULL;
 	}
 
 	/* Allocate Vector with variable-length data array */
 	{
-		size_t		vec_size = VARHDRSZ + sizeof(int16) * 2 + dim * sizeof(float4);
+		size_t		vec_size_local = VARHDRSZ + sizeof(int16) * 2 + dim * sizeof(float4);
+		char *vec_bytes_local = NULL;
 
-		NDB_DECLARE(char *, vec_bytes);
-		NDB_ALLOC(vec_bytes, char, vec_size);
-		result = (Vector *) vec_bytes;
+		nalloc(vec_bytes_local, char, vec_size_local);
+		result = (Vector *) vec_bytes_local;
 	}
 	SET_VARSIZE(result, VARHDRSZ + sizeof(int16) * 2 + dim * sizeof(float4));
 	result->dim = dim;
 	for (i = 0; i < dim; i++)
 		result->data[i] = data[i];
 
-	NDB_FREE(dup);
-	NDB_FREE(data);
+	nfree(dup);
+	nfree(data);
 
 	return result;
 }
 
-/* SAFE_PFREE macro removed - use NDB_FREE instead */
+/* SAFE_PFREE macro removed - use nfree instead */
 
 /*
  * Helper: Build SQL safe literal for string input
@@ -214,10 +209,10 @@ to_sql_literal(const char *val)
 static Jsonb *
 get_embedding_model_config_internal(const char *model_name)
 {
-	NDB_DECLARE(Jsonb *, result);
-	NDB_DECLARE(NdbSpiSession *, spi_session);
-	NDB_DECLARE(char *, sql_str);
-	NDB_DECLARE(char *, quoted_model_name);
+	Jsonb *result = NULL;
+	NdbSpiSession *spi_session = NULL;
+	char *sql_str = NULL;
+	char *quoted_model_name = NULL;
 	StringInfoData sql;
 	int			spi_ret;
 	MemoryContext oldcontext;
@@ -243,7 +238,7 @@ get_embedding_model_config_internal(const char *model_name)
 	 * Free the quoted string after appending (appendStringInfo copies the
 	 * content)
 	 */
-	NDB_FREE(quoted_model_name);
+	nfree(quoted_model_name);
 
 	spi_ret = ndb_spi_execute(spi_session, sql_str, true, 1);
 
@@ -266,8 +261,8 @@ get_embedding_model_config_internal(const char *model_name)
 static void
 apply_embedding_model_config(NdbLLMConfig *cfg, const char *model_name)
 {
-	NDB_DECLARE(Jsonb *, config_jsonb);
-	NDB_DECLARE(JsonbIterator *, it);
+	Jsonb *config_jsonb = NULL;
+	JsonbIterator *it = NULL;
 	JsonbValue	v;
 	int			r;
 
@@ -283,7 +278,7 @@ apply_embedding_model_config(NdbLLMConfig *cfg, const char *model_name)
 	{
 		if (r == WJB_KEY)
 		{
-			NDB_DECLARE(char *, key);
+			char *key = NULL;
 			int			key_len = v.val.string.len;
 
 			key = pnstrdup(v.val.string.val, key_len);
@@ -303,7 +298,7 @@ apply_embedding_model_config(NdbLLMConfig *cfg, const char *model_name)
 					/* device is handled by prefer_gpu/require_gpu */
 					if (v.type == jbvString)
 					{
-						NDB_DECLARE(char *, device_str);
+						char *device_str = NULL;
 
 						device_str = pnstrdup(v.val.string.val, v.val.string.len);
 						if (pg_strcasecmp(device_str, "gpu") == 0 ||
@@ -311,7 +306,7 @@ apply_embedding_model_config(NdbLLMConfig *cfg, const char *model_name)
 						{
 							cfg->prefer_gpu = true;
 						}
-						NDB_FREE(device_str);
+						nfree(device_str);
 					}
 				}
 				else if (strcmp(key, "timeout_ms") == 0)
@@ -327,11 +322,11 @@ apply_embedding_model_config(NdbLLMConfig *cfg, const char *model_name)
 					}
 				}
 			}
-			NDB_FREE(key);
+			nfree(key);
 		}
 	}
 
-	NDB_FREE(config_jsonb);
+	nfree(config_jsonb);
 }
 
 PG_FUNCTION_INFO_V1(embed_text);
@@ -346,15 +341,15 @@ PG_FUNCTION_INFO_V1(embed_text);
 Datum
 embed_text(PG_FUNCTION_ARGS)
 {
-	NDB_DECLARE(text *, input_text);
-	NDB_DECLARE(text *, model_text);
-	NDB_DECLARE(char *, input_str);
-	NDB_DECLARE(char *, model_str);
+	text *input_text = NULL;
+	text *model_text = NULL;
+	char *input_str = NULL;
+	char *model_str = NULL;
 	NdbLLMConfig cfg;
 	NdbLLMCallOptions call_opts;
 
-	NDB_DECLARE(float *, vec_data);
-	NDB_DECLARE(Vector *, result);
+	float *vec_data = NULL;
+	Vector *result = NULL;
 	int			dim = 0;
 	int			i;
 
@@ -418,7 +413,7 @@ embed_text(PG_FUNCTION_ARGS)
 			int			j;
 
 			dim = 384;
-			NDB_ALLOC(vec_data, float, dim);
+			nalloc(vec_data, float, dim);
 
 			/*
 			 * Generate deterministic pseudo-random vector using djb2-like
@@ -447,11 +442,11 @@ embed_text(PG_FUNCTION_ARGS)
 
 	/* Allocate Vector with variable-length data array */
 	{
-		size_t		vec_size = VARHDRSZ + sizeof(int16) * 2 + dim * sizeof(float4);
+		size_t		vec_size_local = VARHDRSZ + sizeof(int16) * 2 + dim * sizeof(float4);
+		char *vec_bytes_local = NULL;
 
-		NDB_DECLARE(char *, vec_bytes);
-		NDB_ALLOC(vec_bytes, char, vec_size);
-		result = (Vector *) vec_bytes;
+		nalloc(vec_bytes_local, char, vec_size_local);
+		result = (Vector *) vec_bytes_local;
 	}
 	SET_VARSIZE(result, VARHDRSZ + sizeof(int16) * 2 + dim * sizeof(float4));
 	result->dim = dim;
@@ -459,9 +454,9 @@ embed_text(PG_FUNCTION_ARGS)
 	for (i = 0; i < dim; i++)
 		result->data[i] = vec_data[i];
 
-	NDB_FREE(input_str);
-	NDB_FREE(model_str);
-	NDB_FREE(vec_data);
+	nfree(input_str);
+	nfree(model_str);
+	nfree(vec_data);
 
 	PG_RETURN_POINTER(result);
 }
@@ -478,17 +473,17 @@ PG_FUNCTION_INFO_V1(embed_text_batch);
 Datum
 embed_text_batch(PG_FUNCTION_ARGS)
 {
-	ArrayType  *input_array;
+	ArrayType *input_array = NULL;
 
-	NDB_DECLARE(text *, model_text);
-	NDB_DECLARE(Datum *, text_datums);
-	NDB_DECLARE(bool *, text_nulls);
+	text *model_text = NULL;
+	Datum *text_datums = NULL;
+	bool *text_nulls = NULL;
 	int			nitems = 0;
 	int			i;
 
-	NDB_DECLARE(Datum *, result_datums);
-	NDB_DECLARE(bool *, result_nulls);
-	NDB_DECLARE(ArrayType *, result);
+	Datum *result_datums = NULL;
+	bool *result_nulls = NULL;
+	ArrayType *result = NULL;
 	Oid			array_oid;
 	Oid			vector_oid;
 	static Oid cached_vector_oid = InvalidOid;
@@ -508,24 +503,24 @@ embed_text_batch(PG_FUNCTION_ARGS)
 					  &text_nulls,
 					  &nitems);
 
-	NDB_ALLOC(result_datums, Datum, nitems);
-	NDB_ALLOC(result_nulls, bool, nitems);
+	nalloc(result_datums, Datum, nitems);
+	nalloc(result_nulls, bool, nitems);
 
 	/* Use batch API for better performance */
 	{
-		NDB_DECLARE(char **, text_cstrs);
-		NDB_DECLARE(char *, model_str);
+		char **text_cstrs = NULL;
+		char *model_str = NULL;
 		NdbLLMConfig cfg;
 		NdbLLMCallOptions call_opts;
-		float	  **vecs = NULL;
+		float **vecs = NULL;
 
-		NDB_DECLARE(int *, dims);
+		int *dims = NULL;
 		int			num_success = 0;
 		int			rc;
 		int			j;
 
 		/* Convert text datums to C strings */
-		NDB_ALLOC(text_cstrs, char *, nitems);
+		nalloc(text_cstrs, char *, nitems);
 		for (i = 0; i < nitems; i++)
 		{
 			if (text_nulls[i])
@@ -581,11 +576,11 @@ embed_text_batch(PG_FUNCTION_ARGS)
 				}
 				else
 				{
-					NDB_DECLARE(Vector *, result_vec);
+					Vector *result_vec = NULL;
 					size_t		vec_size = VARHDRSZ + sizeof(int16) * 2 + dims[i] * sizeof(float4);
 
-					NDB_DECLARE(char *, vec_bytes);
-					NDB_ALLOC(vec_bytes, char, vec_size);
+					char *vec_bytes = NULL;
+					nalloc(vec_bytes, char, vec_size);
 					result_vec = (Vector *) vec_bytes;
 					SET_VARSIZE(result_vec, VARHDRSZ + sizeof(int16) * 2 + dims[i] * sizeof(float4));
 					result_vec->dim = dims[i];
@@ -599,10 +594,10 @@ embed_text_batch(PG_FUNCTION_ARGS)
 			for (i = 0; i < nitems; i++)
 			{
 				if (vecs[i] != NULL)
-					NDB_FREE(vecs[i]);
+					nfree(vecs[i]);
 			}
-			NDB_FREE(vecs);
-			NDB_FREE(dims);
+			nfree(vecs);
+			nfree(dims);
 		}
 		else
 		{
@@ -612,18 +607,18 @@ embed_text_batch(PG_FUNCTION_ARGS)
 				for (i = 0; i < nitems; i++)
 				{
 					if (vecs[i] != NULL)
-						NDB_FREE(vecs[i]);
+						nfree(vecs[i]);
 				}
-				NDB_FREE(vecs);
+				nfree(vecs);
 			}
 			if (dims != NULL)
 			{
-				NDB_FREE(dims);
+				nfree(dims);
 			}
 
 			/* Look up embed_text function OID - always use 2-argument version */
 			{
-				List	   *funcname;
+				List *funcname = NULL;
 				Oid			argtypes[2];
 				Oid			embed_text_oid;
 				FmgrInfo	flinfo;
@@ -655,8 +650,8 @@ embed_text_batch(PG_FUNCTION_ARGS)
 					else
 					{
 						Datum		embed_result;
-						Vector	   *vec_copy;
-						text	   *text_copy;
+						Vector *vec_copy = NULL;
+						text *text_copy = NULL;
 
 						/*
 						 * Copy text to current memory context before calling
@@ -678,13 +673,13 @@ embed_text_batch(PG_FUNCTION_ARGS)
 							 * to avoid function lookup issues
 							 */
 							text	   *input_text_copy = (text *) text_copy;
-							char	   *input_str_copy;
+							char *input_str_copy = NULL;
 
-							NDB_DECLARE(char *, model_str_copy);
+							char *model_str_copy = NULL;
 							NdbLLMConfig cfg_copy;
 							NdbLLMCallOptions call_opts_copy;
 
-							NDB_DECLARE(float *, vec_data_copy);
+							float *vec_data_copy = NULL;
 							int			dim_copy = 0;
 							int			k;
 
@@ -726,16 +721,16 @@ embed_text_batch(PG_FUNCTION_ARGS)
 								vec_data_copy == NULL || dim_copy <= 0)
 							{
 								dim_copy = 384;
-								NDB_ALLOC(vec_data_copy, float, dim_copy);
+								nalloc(vec_data_copy, float, dim_copy);
 							}
 
 							/* Allocate Vector */
 							{
 								size_t		vec_size = VARHDRSZ + sizeof(int16) * 2 + dim_copy * sizeof(float4);
 
-								NDB_DECLARE(char *, vec_bytes);
-								NDB_DECLARE(Vector *, result_vec);
-								NDB_ALLOC(vec_bytes, char, vec_size);
+								char *vec_bytes = NULL;
+								Vector *result_vec = NULL;
+								nalloc(vec_bytes, char, vec_size);
 								result_vec = (Vector *) vec_bytes;
 								SET_VARSIZE(result_vec, VARHDRSZ + sizeof(int16) * 2 + dim_copy * sizeof(float4));
 								result_vec->dim = dim_copy;
@@ -744,9 +739,9 @@ embed_text_batch(PG_FUNCTION_ARGS)
 								embed_result = PointerGetDatum(result_vec);
 							}
 
-							NDB_FREE(input_str_copy);
-							NDB_FREE(model_str_copy);
-							NDB_FREE(vec_data_copy);
+							nfree(input_str_copy);
+							nfree(model_str_copy);
+							nfree(vec_data_copy);
 						}
 						else
 						{
@@ -766,14 +761,14 @@ embed_text_batch(PG_FUNCTION_ARGS)
 		/* Free C strings */
 		for (i = 0; i < nitems; i++)
 		{
-			NDB_FREE(text_cstrs[i]);
+			nfree(text_cstrs[i]);
 		}
-		NDB_FREE(text_cstrs);
+		nfree(text_cstrs);
 
 		/* Free model_str if allocated (only if model_text was provided) */
 		if (model_text != NULL)
 		{
-			NDB_FREE(model_str);
+			nfree(model_str);
 		}
 	}
 
@@ -808,9 +803,9 @@ embed_text_batch(PG_FUNCTION_ARGS)
 		result = construct_md_array(result_datums, result_nulls, 1, dims, lbs, vector_oid, typlen, typbyval, typalign);
 	}
 
-	NDB_FREE(result_datums);
-	NDB_FREE(result_nulls);
-	NDB_FREE(text_datums);
+	nfree(result_datums);
+	nfree(result_nulls);
+	nfree(text_datums);
 
 	PG_RETURN_POINTER(result);
 }
@@ -827,15 +822,15 @@ PG_FUNCTION_INFO_V1(embed_image);
 Datum
 embed_image(PG_FUNCTION_ARGS)
 {
-	bytea	   *image_data;
+	bytea *image_data = NULL;
 
-	NDB_DECLARE(text *, model_text);
-	NDB_DECLARE(Vector *, result);
-	NDB_DECLARE(float *, vec_data);
+	text *model_text = NULL;
+	Vector *result = NULL;
+	float *vec_data = NULL;
 	int			dim = 0;
 	int			i;
 
-	NDB_DECLARE(char *, model_str);
+	char *model_str = NULL;
 	NdbLLMConfig cfg;
 
 	image_data = PG_GETARG_BYTEA_PP(0);
@@ -878,7 +873,7 @@ embed_image(PG_FUNCTION_ARGS)
 	{
 		NdbLLMCallOptions call_opts;
 
-		NDB_DECLARE(bytea *, detoasted_image);
+		bytea *detoasted_image = NULL;
 		size_t		image_size;
 		const unsigned char *image_bytes;
 		bool		need_free_detoasted = false;
@@ -901,21 +896,21 @@ embed_image(PG_FUNCTION_ARGS)
 			vec_data == NULL || dim <= 0)
 		{
 			dim = 512;
-			NDB_ALLOC(vec_data, float, dim);
+			nalloc(vec_data, float, dim);
 		}
 
 		/* Free detoasted image if we created a copy */
 		if (need_free_detoasted)
-			NDB_FREE(detoasted_image);
+			nfree(detoasted_image);
 	}
 
 	/* Allocate Vector with variable-length data array */
 	{
-		size_t		vec_size = VARHDRSZ + sizeof(int16) * 2 + dim * sizeof(float4);
+		size_t		vec_size_local = VARHDRSZ + sizeof(int16) * 2 + dim * sizeof(float4);
+		char *vec_bytes_local = NULL;
 
-		NDB_DECLARE(char *, vec_bytes);
-		NDB_ALLOC(vec_bytes, char, vec_size);
-		result = (Vector *) vec_bytes;
+		nalloc(vec_bytes_local, char, vec_size_local);
+		result = (Vector *) vec_bytes_local;
 	}
 	SET_VARSIZE(result, VARHDRSZ + sizeof(int16) * 2 + dim * sizeof(float4));
 	result->dim = dim;
@@ -923,8 +918,8 @@ embed_image(PG_FUNCTION_ARGS)
 	for (i = 0; i < dim; i++)
 		result->data[i] = vec_data[i];
 
-	NDB_FREE(vec_data);
-	NDB_FREE(model_str);
+	nfree(vec_data);
+	nfree(model_str);
 
 	PG_RETURN_POINTER(result);
 }
@@ -942,17 +937,17 @@ PG_FUNCTION_INFO_V1(embed_multimodal);
 Datum
 embed_multimodal(PG_FUNCTION_ARGS)
 {
-	text	   *input_text;
-	bytea	   *image_data;
+	text *input_text = NULL;
+	bytea *image_data = NULL;
 
-	NDB_DECLARE(text *, model_text);
-	NDB_DECLARE(Vector *, result);
-	NDB_DECLARE(float *, vec_data);
+	text *model_text = NULL;
+	Vector *result = NULL;
+	float *vec_data = NULL;
 	int			dim = 0;
 	int			i;
 
-	NDB_DECLARE(char *, input_str);
-	NDB_DECLARE(char *, model_str);
+	char *input_str = NULL;
+	char *model_str = NULL;
 #ifdef NDB_HAVE_MULTIMODAL_EMBED
 	NdbLLMConfig cfg;
 #endif
@@ -982,7 +977,7 @@ embed_multimodal(PG_FUNCTION_ARGS)
 		NdbLLMConfig cfg;
 		NdbLLMCallOptions call_opts;
 
-		NDB_DECLARE(bytea *, detoasted_image);
+		bytea *detoasted_image = NULL;
 		size_t		image_size;
 		const unsigned char *image_bytes;
 		bool		need_free_detoasted = false;
@@ -1030,8 +1025,8 @@ embed_multimodal(PG_FUNCTION_ARGS)
 			vec_data == NULL || dim <= 0)
 		{
 			/* Fallback: concatenate text and image embeddings */
-			NDB_DECLARE(float *, text_vec);
-			NDB_DECLARE(float *, img_vec);
+			float *text_vec = NULL;
+			float *img_vec = NULL;
 			int			text_dim = 0;
 			int			img_dim = 0;
 
@@ -1040,33 +1035,33 @@ embed_multimodal(PG_FUNCTION_ARGS)
 				text_vec != NULL && img_vec != NULL && text_dim > 0 && img_dim > 0)
 			{
 				dim = text_dim + img_dim;
-				NDB_ALLOC(vec_data, float, dim);
+				nalloc(vec_data, float, dim);
 				memcpy(vec_data, text_vec, text_dim * sizeof(float));
 				memcpy(vec_data + text_dim, img_vec, img_dim * sizeof(float));
-				NDB_FREE(text_vec);
-				NDB_FREE(img_vec);
+				nfree(text_vec);
+				nfree(img_vec);
 			}
 			else
 			{
 				dim = 512;
-				NDB_ALLOC(vec_data, float, dim);
-				NDB_FREE(text_vec);
-				NDB_FREE(img_vec);
+				nalloc(vec_data, float, dim);
+				nfree(text_vec);
+				nfree(img_vec);
 			}
 		}
 
 		/* Free detoasted image if we created a copy */
 		if (need_free_detoasted && detoasted_image != NULL)
-			NDB_FREE(detoasted_image);
+			nfree(detoasted_image);
 	}
 
 	/* Allocate Vector with variable-length data array */
 	{
-		size_t		vec_size = VARHDRSZ + sizeof(int16) * 2 + dim * sizeof(float4);
+		size_t		vec_size_local = VARHDRSZ + sizeof(int16) * 2 + dim * sizeof(float4);
+		char *vec_bytes_local = NULL;
 
-		NDB_DECLARE(char *, vec_bytes);
-		NDB_ALLOC(vec_bytes, char, vec_size);
-		result = (Vector *) vec_bytes;
+		nalloc(vec_bytes_local, char, vec_size_local);
+		result = (Vector *) vec_bytes_local;
 	}
 	SET_VARSIZE(result, VARHDRSZ + sizeof(int16) * 2 + dim * sizeof(float4));
 	result->dim = dim;
@@ -1074,9 +1069,9 @@ embed_multimodal(PG_FUNCTION_ARGS)
 	for (i = 0; i < dim; i++)
 		result->data[i] = vec_data[i];
 
-	NDB_FREE(vec_data);
-	NDB_FREE(input_str);
-	NDB_FREE(model_str);
+	nfree(vec_data);
+	nfree(input_str);
+	nfree(model_str);
 
 	PG_RETURN_POINTER(result);
 }
@@ -1093,22 +1088,22 @@ PG_FUNCTION_INFO_V1(embed_cached);
 Datum
 embed_cached(PG_FUNCTION_ARGS)
 {
-	NDB_DECLARE(text *, input_text);
-	NDB_DECLARE(text *, model_text);
-	NDB_DECLARE(char *, input_str);
-	NDB_DECLARE(char *, model_str);
-	NDB_DECLARE(char *, cache_key);
-	NDB_DECLARE(char *, cached_text);
+	text *input_text = NULL;
+	text *model_text = NULL;
+	char *input_str = NULL;
+	char *model_str = NULL;
+	char *cache_key = NULL;
+	char *cached_text = NULL;
 	int			max_age;
 
-	NDB_DECLARE(Vector *, result);
+	Vector *result = NULL;
 	StringInfoData key_buf;
 
 	/* bool hit = false; */
 	const char *p;
 	uint32		hashval;
 
-	NDB_DECLARE(NdbSpiSession *, spi_session);
+	NdbSpiSession *spi_session = NULL;
 	MemoryContext oldcontext;
 
 	input_text = PG_GETARG_TEXT_PP(0);
@@ -1139,7 +1134,7 @@ embed_cached(PG_FUNCTION_ARGS)
 
 	/* Copy cache_key to current context */
 	cache_key = pstrdup(key_buf.data);
-	NDB_FREE(key_buf.data);
+	nfree(key_buf.data);
 	max_age = neurondb_llm_cache_ttl;
 
 	oldcontext = CurrentMemoryContext;
@@ -1150,7 +1145,7 @@ embed_cached(PG_FUNCTION_ARGS)
 	if (ndb_llm_cache_lookup(cache_key, max_age, &cached_text) && cached_text != NULL)
 	{
 		result = parse_vector_from_text(cached_text);
-		NDB_FREE(cached_text);
+		nfree(cached_text);
 	}
 
 	/* If cache miss or parse failed, generate embedding */
@@ -1205,8 +1200,8 @@ embed_cached(PG_FUNCTION_ARGS)
 		{
 			size_t		vec_size = VARHDRSZ + sizeof(int16) * 2 + dim * sizeof(float4);
 
-			NDB_DECLARE(char *, vec_bytes);
-			NDB_ALLOC(vec_bytes, char, vec_size);
+			char *vec_bytes = NULL;
+			nalloc(vec_bytes, char, vec_size);
 			result = (Vector *) vec_bytes;
 		}
 		SET_VARSIZE(result, VARHDRSZ + sizeof(int16) * 2 + dim * sizeof(float4));
@@ -1225,13 +1220,13 @@ embed_cached(PG_FUNCTION_ARGS)
 			appendStringInfo(&cache_val, ",%.7f", result->data[d]);
 		appendStringInfoChar(&cache_val, '}');
 		ndb_llm_cache_store(cache_key, cache_val.data);
-		NDB_FREE(cache_val.data);
+		nfree(cache_val.data);
 	}
 
 	NDB_SPI_SESSION_END(spi_session);
-	NDB_FREE(input_str);
-	NDB_FREE(model_str);
-	NDB_FREE(cache_key);
+	nfree(input_str);
+	nfree(model_str);
+	nfree(cache_key);
 	PG_RETURN_POINTER(result);
 }
 
@@ -1247,12 +1242,12 @@ PG_FUNCTION_INFO_V1(configure_embedding_model);
 Datum
 configure_embedding_model(PG_FUNCTION_ARGS)
 {
-	NDB_DECLARE(text *, model_name);
-	NDB_DECLARE(text *, config_json);
-	NDB_DECLARE(char *, model_str);
-	NDB_DECLARE(char *, cfg_str);
-	NDB_DECLARE(Jsonb *, config_jsonb);
-	NDB_DECLARE(JsonbIterator *, it);
+	text *model_name = NULL;
+	text *config_json = NULL;
+	char *model_str = NULL;
+	char *cfg_str = NULL;
+	Jsonb *config_jsonb = NULL;
+	JsonbIterator *it = NULL;
 	JsonbValue	v;
 	int			r;
 	bool		valid = true;
@@ -1261,7 +1256,7 @@ configure_embedding_model(PG_FUNCTION_ARGS)
 	Datum		values[2];
 	char		nulls[2];
 
-	NDB_DECLARE(NdbSpiSession *, spi_session);
+	NdbSpiSession *spi_session = NULL;
 	MemoryContext oldcontext;
 
 	model_name = PG_GETARG_TEXT_PP(0);
@@ -1290,8 +1285,8 @@ configure_embedding_model(PG_FUNCTION_ARGS)
 
 		if (config_jsonb == NULL)
 		{
-			NDB_FREE(model_str);
-			NDB_FREE(cfg_str);
+			nfree(model_str);
+			nfree(cfg_str);
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
 					 errmsg("configure_embedding_model: invalid JSON in config_json")));
@@ -1304,7 +1299,7 @@ configure_embedding_model(PG_FUNCTION_ARGS)
 	{
 		if (r == WJB_KEY)
 		{
-			NDB_DECLARE(char *, key);
+			char *key = NULL;
 			int			key_len = v.val.string.len;
 
 			key = pnstrdup(v.val.string.val, key_len);
@@ -1376,14 +1371,14 @@ configure_embedding_model(PG_FUNCTION_ARGS)
 					}
 				}
 			}
-			NDB_FREE(key);
+			nfree(key);
 		}
 	}
 
 	if (!valid)
 	{
-		NDB_FREE(model_str);
-		NDB_FREE(cfg_str);
+		nfree(model_str);
+		nfree(cfg_str);
 		PG_RETURN_BOOL(false);
 	}
 
@@ -1417,8 +1412,8 @@ configure_embedding_model(PG_FUNCTION_ARGS)
 
 	if (spi_ret != SPI_OK_INSERT && spi_ret != SPI_OK_UPDATE)
 	{
-		NDB_FREE(model_str);
-		NDB_FREE(cfg_str);
+		nfree(model_str);
+		nfree(cfg_str);
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
 				 errmsg("configure_embedding_model: failed to store configuration")));
@@ -1428,8 +1423,8 @@ configure_embedding_model(PG_FUNCTION_ARGS)
 		 "neurondb: configure_embedding_model: model='%s', config stored successfully",
 		 model_str);
 
-	NDB_FREE(model_str);
-	NDB_FREE(cfg_str);
+	nfree(model_str);
+	nfree(cfg_str);
 
 	PG_RETURN_BOOL(true);
 }
@@ -1445,9 +1440,9 @@ PG_FUNCTION_INFO_V1(get_embedding_model_config);
 Datum
 get_embedding_model_config(PG_FUNCTION_ARGS)
 {
-	NDB_DECLARE(text *, model_name);
-	NDB_DECLARE(char *, model_str);
-	NDB_DECLARE(Jsonb *, result);
+	text *model_name = NULL;
+	char *model_str = NULL;
+	Jsonb *result = NULL;
 
 	model_name = PG_GETARG_TEXT_PP(0);
 	if (model_name == NULL)
@@ -1455,7 +1450,7 @@ get_embedding_model_config(PG_FUNCTION_ARGS)
 
 	model_str = text_to_cstring(model_name);
 	result = get_embedding_model_config_internal(model_str);
-	NDB_FREE(model_str);
+	nfree(model_str);
 
 	if (result == NULL)
 		PG_RETURN_NULL();
@@ -1475,15 +1470,15 @@ list_embedding_model_configs(PG_FUNCTION_ARGS)
 {
 	ReturnSetInfo *rsinfo = (ReturnSetInfo *) fcinfo->resultinfo;
 	TupleDesc	tupdesc;
-	Tuplestorestate *tupstore;
+	Tuplestorestate *tupstore = NULL;
 	MemoryContext per_query_ctx;
 	MemoryContext oldcontext;
 	StringInfoData sql;
 	int			spi_ret;
 	int			i;
 
-	NDB_DECLARE(NdbSpiSession *, spi_session);
-	NDB_DECLARE(char *, sql_str);
+	NdbSpiSession *spi_session = NULL;
+	char *sql_str = NULL;
 
 	if (rsinfo == NULL || !IsA(rsinfo, ReturnSetInfo))
 		ereport(ERROR,
@@ -1547,8 +1542,8 @@ list_embedding_model_configs(PG_FUNCTION_ARGS)
 		{
 			Datum		values[4];
 			bool		nulls[4];
-			text	   *model_name_text;
-			Jsonb	   *config_jsonb;
+			text *model_name_text = NULL;
+			Jsonb *config_jsonb = NULL;
 			Datum		created_at_datum;
 			Datum		updated_at_datum;
 			bool		created_at_isnull;
@@ -1700,14 +1695,14 @@ PG_FUNCTION_INFO_V1(delete_embedding_model_config);
 Datum
 delete_embedding_model_config(PG_FUNCTION_ARGS)
 {
-	NDB_DECLARE(text *, model_name);
-	NDB_DECLARE(char *, model_str);
+	text *model_name = NULL;
+	char *model_str = NULL;
 	int			spi_ret;
 	Oid			argtypes[1];
 	Datum		values[1];
 	char		nulls[1];
 
-	NDB_DECLARE(NdbSpiSession *, spi_session);
+	NdbSpiSession *spi_session = NULL;
 	MemoryContext oldcontext;
 
 	model_name = PG_GETARG_TEXT_PP(0);
@@ -1736,7 +1731,7 @@ delete_embedding_model_config(PG_FUNCTION_ARGS)
 										0);
 
 	NDB_SPI_SESSION_END(spi_session);
-	NDB_FREE(model_str);
+	nfree(model_str);
 
 	if (spi_ret == SPI_OK_DELETE)
 		PG_RETURN_BOOL(true);

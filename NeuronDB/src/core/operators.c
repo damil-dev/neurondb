@@ -46,9 +46,15 @@ PG_FUNCTION_INFO_V1(vector_lt);
 Datum
 vector_lt(PG_FUNCTION_ARGS)
 {
-	Vector	   *a;
-	Vector	   *b;
 	int			i;
+	Vector	   *a = NULL;
+	Vector	   *b = NULL;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_lt requires 2 arguments")));
 
 	a = PG_GETARG_VECTOR_P(0);
 	b = PG_GETARG_VECTOR_P(1);
@@ -73,9 +79,15 @@ PG_FUNCTION_INFO_V1(vector_le);
 Datum
 vector_le(PG_FUNCTION_ARGS)
 {
-	Vector	   *a;
-	Vector	   *b;
 	int			i;
+	Vector	   *a = NULL;
+	Vector	   *b = NULL;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_le requires 2 arguments")));
 
 	a = PG_GETARG_VECTOR_P(0);
 	b = PG_GETARG_VECTOR_P(1);
@@ -100,9 +112,15 @@ PG_FUNCTION_INFO_V1(vector_gt);
 Datum
 vector_gt(PG_FUNCTION_ARGS)
 {
-	Vector	   *a;
-	Vector	   *b;
 	int			i;
+	Vector	   *a = NULL;
+	Vector	   *b = NULL;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_gt requires 2 arguments")));
 
 	a = PG_GETARG_VECTOR_P(0);
 	b = PG_GETARG_VECTOR_P(1);
@@ -127,9 +145,15 @@ PG_FUNCTION_INFO_V1(vector_ge);
 Datum
 vector_ge(PG_FUNCTION_ARGS)
 {
-	Vector	   *a;
-	Vector	   *b;
 	int			i;
+	Vector	   *a = NULL;
+	Vector	   *b = NULL;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_ge requires 2 arguments")));
 
 	a = PG_GETARG_VECTOR_P(0);
 	b = PG_GETARG_VECTOR_P(1);
@@ -154,12 +178,18 @@ PG_FUNCTION_INFO_V1(vector_cosine_similarity);
 Datum
 vector_cosine_similarity(PG_FUNCTION_ARGS)
 {
-	Vector	   *a;
-	Vector	   *b;
+	Vector *a = NULL;
+	Vector *b = NULL;
 	float4		dot = 0.0f;
 	float4		na = 0.0f;
 	float4		nb = 0.0f;
 	int			i;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_cosine_similarity requires 2 arguments")));
 
 	a = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(a);
@@ -211,10 +241,16 @@ PG_FUNCTION_INFO_V1(vector_dot_product);
 Datum
 vector_dot_product(PG_FUNCTION_ARGS)
 {
-	Vector	   *a;
-	Vector	   *b;
+	Vector *a = NULL;
+	Vector *b = NULL;
 	float4		result = 0.0f;
 	int			i;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_dot_product requires 2 arguments")));
 
 	a = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(a);
@@ -235,11 +271,17 @@ PG_FUNCTION_INFO_V1(vector_div);
 Datum
 vector_div(PG_FUNCTION_ARGS)
 {
-	Vector	   *a,
-			   *b,
-			   *res;
+	Vector *a = NULL;
+	Vector *b = NULL;
+	Vector *res = NULL;
 	int			i;
 	size_t		bytes;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_div requires 2 arguments")));
 
 	a = PG_GETARG_VECTOR_P(0);
 	b = PG_GETARG_VECTOR_P(1);
@@ -270,13 +312,19 @@ PG_FUNCTION_INFO_V1(vector_avg);
 Datum
 vector_avg(PG_FUNCTION_ARGS)
 {
-	ArrayType  *input;
+	ArrayType *input = NULL;
 	int			nvec,
 				i,
 				j,
 				count = 0;
-	Vector	   *sumvec = NULL;
+	Vector *sumvec = NULL;
 	bool		sum_allocated = false;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_avg requires 1 argument")));
 
 	input = PG_GETARG_ARRAYTYPE_P(0);
 	nvec = ArrayGetNItems(ARR_NDIM(input), ARR_DIMS(input));
@@ -294,7 +342,8 @@ vector_avg(PG_FUNCTION_ARGS)
 			continue;
 
 		{
-			Vector	   *vec = DatumGetVector(vectdat);
+			Vector *vec = NULL;
+			vec = DatumGetVector(vectdat);
 
 			if (vec == NULL)
 				continue;
@@ -336,13 +385,22 @@ PG_FUNCTION_INFO_V1(vector_contains);
 Datum
 vector_contains(PG_FUNCTION_ARGS)
 {
-	ArrayType  *set1 = PG_GETARG_ARRAYTYPE_P(0);
-	ArrayType  *set2 = PG_GETARG_ARRAYTYPE_P(1);
+	ArrayType  *set1;
+	ArrayType  *set2;
 	int			n1,
 				n2,
 				i2,
 				i1,
 				d;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_contains requires 2 arguments")));
+
+	set1 = PG_GETARG_ARRAYTYPE_P(0);
+	set2 = PG_GETARG_ARRAYTYPE_P(1);
 
 	if (set1 == NULL || set2 == NULL)
 		PG_RETURN_BOOL(false);
@@ -357,7 +415,7 @@ vector_contains(PG_FUNCTION_ARGS)
 	{
 		bool		isnull2 = false;
 		bool		found = false;
-		Vector	   *v2;
+		Vector *v2 = NULL;
 		Datum		d2 =
 			array_ref(set2, 1, &i2, -1, -1, false, 'd', &isnull2);
 
@@ -372,7 +430,7 @@ vector_contains(PG_FUNCTION_ARGS)
 		for (i1 = 1; i1 <= n1; i1++)
 		{
 			bool		isnull1 = false;
-			Vector	   *v1;
+			Vector *v1 = NULL;
 			Datum		d1 = array_ref(
 									   set1, 1, &i1, -1, -1, false, 'd', &isnull1);
 
@@ -404,13 +462,22 @@ PG_FUNCTION_INFO_V1(vector_overlap);
 Datum
 vector_overlap(PG_FUNCTION_ARGS)
 {
-	ArrayType  *set1 = PG_GETARG_ARRAYTYPE_P(0);
-	ArrayType  *set2 = PG_GETARG_ARRAYTYPE_P(1);
+	ArrayType  *set1;
+	ArrayType  *set2;
 	int			n1,
 				n2,
 				i1,
 				i2,
 				d;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_overlap requires 2 arguments")));
+
+	set1 = PG_GETARG_ARRAYTYPE_P(0);
+	set2 = PG_GETARG_ARRAYTYPE_P(1);
 
 	if (set1 == NULL || set2 == NULL)
 		PG_RETURN_BOOL(false);
@@ -424,7 +491,7 @@ vector_overlap(PG_FUNCTION_ARGS)
 	for (i1 = 1; i1 <= n1; i1++)
 	{
 		bool		isnull1 = false;
-		Vector	   *v1;
+		Vector *v1 = NULL;
 		Datum		d1 =
 			array_ref(set1, 1, &i1, -1, -1, false, 'd', &isnull1);
 
@@ -438,7 +505,7 @@ vector_overlap(PG_FUNCTION_ARGS)
 		{
 			bool		isnull2 = false;
 			bool		match = true;
-			Vector	   *v2;
+			Vector *v2 = NULL;
 			Datum		d2 = array_ref(
 									   set2, 1, &i2, -1, -1, false, 'd', &isnull2);
 
@@ -489,22 +556,28 @@ vec_join(PG_FUNCTION_ARGS)
 		NdbSpiSession *session;
 	}			vec_join_fctx;
 
-	FuncCallContext *funcctx;
-	vec_join_fctx *state;
+	FuncCallContext *funcctx = NULL;
+	vec_join_fctx *state = NULL;
 
 	if (SRF_IS_FIRSTCALL())
 	{
 		MemoryContext oldcontext;
-		text	   *left_table_text;
-		text	   *right_table_text;
-		text	   *join_pred_text;
-		char	   *left_table = NULL,
-				   *right_table = NULL,
-				   *join_pred = NULL;
+		text *left_table_text = NULL;
+		text *right_table_text = NULL;
+		text *join_pred_text = NULL;
+		char *left_table = NULL;
+		char *right_table = NULL;
+		char *join_pred = NULL;
 		char		querybuf[2048];
 		int			spi_ret;
 		TupleDesc	tupdesc;
-		vec_join_fctx *newstate;
+		vec_join_fctx *newstate = NULL;
+
+		/* Validate argument count */
+		if (PG_NARGS() != 4)
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					 errmsg("neurondb: vec_join requires 4 arguments")));
 
 		funcctx = SRF_FIRSTCALL_INIT();
 		oldcontext =
@@ -540,9 +613,9 @@ vec_join(PG_FUNCTION_ARGS)
 			if (newstate->session == NULL)
 			{
 				MemoryContextSwitchTo(oldcontext);
-				NDB_FREE(left_table);
-				NDB_FREE(right_table);
-				NDB_FREE(join_pred);
+				nfree(left_table);
+				nfree(right_table);
+				nfree(join_pred);
 				PG_RETURN_NULL();
 			}
 
@@ -551,9 +624,9 @@ vec_join(PG_FUNCTION_ARGS)
 			{
 				ndb_spi_session_end(&newstate->session);
 				MemoryContextSwitchTo(oldcontext);
-				NDB_FREE(left_table);
-				NDB_FREE(right_table);
-				NDB_FREE(join_pred);
+				nfree(left_table);
+				nfree(right_table);
+				nfree(join_pred);
 				PG_RETURN_NULL();
 			}
 		}
@@ -563,9 +636,9 @@ vec_join(PG_FUNCTION_ARGS)
 			EmitErrorReport();
 			FlushErrorState();
 			MemoryContextSwitchTo(oldcontext);
-			NDB_FREE(left_table);
-			NDB_FREE(right_table);
-			NDB_FREE(join_pred);
+			nfree(left_table);
+			nfree(right_table);
+			nfree(join_pred);
 			if (IsTransactionState())
 				AbortCurrentTransaction();
 			PG_RE_THROW();
@@ -587,9 +660,9 @@ vec_join(PG_FUNCTION_ARGS)
 		funcctx->user_fctx = newstate;
 		funcctx->tuple_desc = BlessTupleDesc(tupdesc);
 
-		NDB_FREE(left_table);
-		NDB_FREE(right_table);
-		NDB_FREE(join_pred);
+		nfree(left_table);
+		nfree(right_table);
+		nfree(join_pred);
 
 		MemoryContextSwitchTo(oldcontext);
 	}
@@ -605,8 +678,8 @@ vec_join(PG_FUNCTION_ARGS)
 					left_vec_d,
 					right_vec_d;
 		bool		isnull[4] = {false, false, false, false};
-		Vector	   *vec1 = NULL,
-				   *vec2 = NULL;
+		Vector *vec1 = NULL;
+		Vector *vec2 = NULL;
 		float4		dist = 0.0f;
 		int			j;
 
@@ -693,21 +766,27 @@ graph_knn(PG_FUNCTION_ARGS)
 		NdbSpiSession *session;
 	}			graph_knn_fctx;
 
-	FuncCallContext *funcctx;
-	graph_knn_fctx *state;
+	FuncCallContext *funcctx = NULL;
+	graph_knn_fctx *state = NULL;
 
 	if (SRF_IS_FIRSTCALL())
 	{
 		MemoryContext oldcontext;
-		Vector	   *query_vec;
-		text	   *graph_col_text;
-		char	   *graph_col_cstr = NULL;
-		ArrayType  *edge_labels;
+		Vector *query_vec = NULL;
+		text *graph_col_text = NULL;
+		char *graph_col_cstr = NULL;
+		ArrayType *edge_labels = NULL;
 		int32		max_hops;
 		int32		k;
 		char		querybuf[2048];
-		graph_knn_fctx *newstate;
+		graph_knn_fctx *newstate = NULL;
 		TupleDesc	tupdesc;
+
+		/* Validate argument count */
+		if (PG_NARGS() != 5)
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					 errmsg("neurondb: graph_knn requires 5 arguments")));
 
 		query_vec = PG_GETARG_VECTOR_P(0);
 		NDB_CHECK_VECTOR_VALID(query_vec);
@@ -752,7 +831,7 @@ graph_knn(PG_FUNCTION_ARGS)
 			newstate->session = ndb_spi_session_begin(funcctx->multi_call_memory_ctx, false);
 			if (newstate->session == NULL)
 			{
-				NDB_FREE(graph_col_cstr);
+				nfree(graph_col_cstr);
 				MemoryContextSwitchTo(oldcontext);
 				PG_RETURN_NULL();
 			}
@@ -760,7 +839,7 @@ graph_knn(PG_FUNCTION_ARGS)
 			if (ndb_spi_execute(newstate->session, querybuf, true, 0) != SPI_OK_SELECT)
 			{
 				ndb_spi_session_end(&newstate->session);
-				NDB_FREE(graph_col_cstr);
+				nfree(graph_col_cstr);
 				MemoryContextSwitchTo(oldcontext);
 				PG_RETURN_NULL();
 			}
@@ -770,7 +849,7 @@ graph_knn(PG_FUNCTION_ARGS)
 			ndb_spi_session_end(&newstate->session);
 			EmitErrorReport();
 			FlushErrorState();
-			NDB_FREE(graph_col_cstr);
+			nfree(graph_col_cstr);
 			MemoryContextSwitchTo(oldcontext);
 			if (IsTransactionState())
 				AbortCurrentTransaction();
@@ -793,7 +872,7 @@ graph_knn(PG_FUNCTION_ARGS)
 		funcctx->user_fctx = newstate;
 		funcctx->tuple_desc = BlessTupleDesc(tupdesc);
 
-		NDB_FREE(graph_col_cstr);
+		nfree(graph_col_cstr);
 
 		MemoryContextSwitchTo(oldcontext);
 	}
@@ -808,8 +887,8 @@ graph_knn(PG_FUNCTION_ARGS)
 					vector_d;
 		bool		isnull1 = false,
 					isnull2 = false;
-		Vector	   *item_vec = NULL;
-		Vector	   *query_vec;
+		Vector *item_vec = NULL;
+		Vector *query_vec = NULL;
 		float4		dist = 0.0f;
 		int			j;
 
@@ -872,17 +951,23 @@ PG_FUNCTION_INFO_V1(hybrid_rank);
 Datum
 hybrid_rank(PG_FUNCTION_ARGS)
 {
-	text	   *relation_name;
-	Vector	   *query_vec;
-	text	   *query_text;
+	text *relation_name = NULL;
+	Vector *query_vec = NULL;
+	text *query_text = NULL;
 
-	char	   *rel_str = NULL;
-	char	   *txt_str = NULL;
+	char *rel_str = NULL;
+	char *txt_str = NULL;
 	float4		vector_score = 0.0f;
 	float4		lexical_score = 0.0f;
 	float4		alpha = 0.5f;
 	float4		beta = 0.5f;
 	int			d;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 3)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: hybrid_rank requires 3 arguments")));
 
 	/* Get arguments */
 	relation_name = PG_GETARG_TEXT_PP(0);
@@ -909,7 +994,7 @@ hybrid_rank(PG_FUNCTION_ARGS)
 
 	/* Defensive: try to fetch weights from neurondb_hybrid_weights table */
 	{
-		NDB_DECLARE(NdbSpiSession *, session);
+		NdbSpiSession *session = NULL;
 		session = ndb_spi_session_begin(CurrentMemoryContext, false);
 		if (session != NULL)
 		{
@@ -945,7 +1030,7 @@ hybrid_rank(PG_FUNCTION_ARGS)
 					if (!isnull2)
 						beta = bval;
 				}
-				NDB_FREE(sql.data);
+				nfree(sql.data);
 				ndb_spi_session_end(&session);
 			}
 			PG_CATCH();
@@ -954,7 +1039,7 @@ hybrid_rank(PG_FUNCTION_ARGS)
 					ndb_spi_session_end(&session);
 				EmitErrorReport();
 				FlushErrorState();
-				NDB_FREE(sql.data);
+				nfree(sql.data);
 				if (IsTransactionState())
 					AbortCurrentTransaction();
 				PG_RE_THROW();
@@ -1015,8 +1100,8 @@ hybrid_rank(PG_FUNCTION_ARGS)
 		float4		final_score =
 			alpha * lexical_score + beta * vector_score;
 
-		NDB_FREE(rel_str);
-		NDB_FREE(txt_str);
+		nfree(rel_str);
+		nfree(txt_str);
 		PG_RETURN_FLOAT4(final_score);
 	}
 }
@@ -1028,11 +1113,17 @@ PG_FUNCTION_INFO_V1(vec_window_rank);
 Datum
 vec_window_rank(PG_FUNCTION_ARGS)
 {
-	Vector	   *ref_vector;
-	text	   *partition_col;
-	char	   *part_str;
+	Vector *ref_vector = NULL;
+	text *partition_col = NULL;
+	char *part_str = NULL;
 	const char *p;
 	uint64		hash = UINT64CONST(5381);
+
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vec_window_rank requires 2 arguments")));
 
 	ref_vector = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(ref_vector);
@@ -1053,7 +1144,7 @@ vec_window_rank(PG_FUNCTION_ARGS)
 
 	for (p = part_str; *p; ++p)
 		hash = ((hash << 5) + hash) + (unsigned char) *p;
-	NDB_FREE(part_str);
+	nfree(part_str);
 
 	PG_RETURN_INT64((int64) (hash % 10 + 1));
 }
@@ -1065,15 +1156,21 @@ PG_FUNCTION_INFO_V1(vec_route);
 Datum
 vec_route(PG_FUNCTION_ARGS)
 {
-	Vector	   *query;
-	ArrayType  *shard_centroids;
+	Vector *query = NULL;
+	ArrayType *shard_centroids = NULL;
 	bool		fallback_global;
 	int			nshards,
 				i,
 				j,
 				best_shard_id = -1;
-	Vector	   *centroid = NULL;
+	Vector *centroid = NULL;
 	double		min_dist = -1.0;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 3)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vec_route requires 3 arguments")));
 
 	query = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(query);
@@ -1120,7 +1217,7 @@ vec_route(PG_FUNCTION_ARGS)
 
 		if ((Pointer) centroid != DatumGetPointer(cent_dat))
 		{
-			NDB_FREE(centroid);
+			nfree(centroid);
 		}
 	}
 

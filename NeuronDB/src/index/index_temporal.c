@@ -45,7 +45,7 @@ static char *VectorToLiteral(Vector *v);
 static char *
 get_temporal_index_table(const char *table, const char *col)
 {
-	char	   *buf;
+	char *buf = NULL;
 
 	buf = palloc(strlen(table) + strlen(col) + 32);
 	snprintf(buf,
@@ -73,14 +73,14 @@ temporal_index_create(PG_FUNCTION_ARGS)
 	text	   *vector_col = PG_GETARG_TEXT_PP(1);
 	text	   *timestamp_col = PG_GETARG_TEXT_PP(2);
 	float8		decay_rate = PG_GETARG_FLOAT8(3);
-	char	   *tbl_str;
-	char	   *vec_str;
-	char	   *ts_str;
-	char	   *idx_tbl;
+	char *tbl_str = NULL;
+	char *vec_str = NULL;
+	char *ts_str = NULL;
+	char *idx_tbl = NULL;
 	StringInfoData sql;
 	int			ret;
 
-	NDB_DECLARE(NdbSpiSession *, session);
+	NdbSpiSession *session = NULL;
 
 	tbl_str = text_to_cstring(table_name);
 	vec_str = text_to_cstring(vector_col);
@@ -110,26 +110,26 @@ temporal_index_create(PG_FUNCTION_ARGS)
 	ret = ndb_spi_execute(session, sql.data, false, 0);
 	if (ret != SPI_OK_UTILITY)
 	{
-		NDB_FREE(sql.data);
+		nfree(sql.data);
 		ndb_spi_session_end(&session);
 		elog(ERROR, "Failed to create TVX index table: %s", sql.data);
 	}
 
 	/* Use safe free/reinit to handle potential memory context changes */
-	NDB_FREE(sql.data);
+	nfree(sql.data);
 	initStringInfo(&sql);
 
 	appendStringInfo(&sql, "TRUNCATE %s", idx_tbl);
 	ret = ndb_spi_execute(session, sql.data, false, 0);
 	if (ret != SPI_OK_UTILITY)
 	{
-		NDB_FREE(sql.data);
+		nfree(sql.data);
 		ndb_spi_session_end(&session);
 		elog(ERROR, "Failed to truncate TVX index table: %s", idx_tbl);
 	}
 
 	/* Use safe free/reinit to handle potential memory context changes */
-	NDB_FREE(sql.data);
+	nfree(sql.data);
 	initStringInfo(&sql);
 
 	appendStringInfo(&sql,
@@ -143,16 +143,16 @@ temporal_index_create(PG_FUNCTION_ARGS)
 	ret = ndb_spi_execute(session, sql.data, false, 0);
 	if (ret != SPI_OK_INSERT)
 	{
-		NDB_FREE(sql.data);
+		nfree(sql.data);
 		ndb_spi_session_end(&session);
 		elog(ERROR,
 			 "Failed to bulk insert vectors into TVX index: %s",
 			 sql.data);
 	}
 
-	NDB_FREE(sql.data);
+	nfree(sql.data);
 	ndb_spi_session_end(&session);
-	NDB_FREE(idx_tbl);
+	nfree(idx_tbl);
 
 	PG_RETURN_BOOL(true);
 }
@@ -175,24 +175,24 @@ PG_FUNCTION_INFO_V1(temporal_knn_search);
 Datum
 temporal_knn_search(PG_FUNCTION_ARGS)
 {
-	FuncCallContext *funcctx;
+	FuncCallContext *funcctx = NULL;
 	TupleDesc	tupdesc;
 	MemoryContext oldcontext;
 
-	NDB_DECLARE(NdbSpiSession *, session2);
+	NdbSpiSession *session2 = NULL;
 
 	if (SRF_IS_FIRSTCALL())
 	{
-		Vector	   *query;
+		Vector *query = NULL;
 		int32		k;
 		TimestampTz cutoff_time;
-		text	   *table_name;
-		text	   *vector_col;
-		text	   *ts_col;
+		text *table_name = NULL;
+		text *vector_col = NULL;
+		text *ts_col = NULL;
 		float8		decay_rate;
-		char	   *tbl_str;
-		char	   *vec_str;
-		char	   *idx_tbl;
+		char *tbl_str = NULL;
+		char *vec_str = NULL;
+		char *idx_tbl = NULL;
 		StringInfoData sql;
 		int			ret;
 
@@ -244,18 +244,18 @@ temporal_knn_search(PG_FUNCTION_ARGS)
 		ret = ndb_spi_execute(session2, sql.data, true, 0);
 		if (ret != SPI_OK_SELECT)
 		{
-			NDB_FREE(sql.data);
+			nfree(sql.data);
 			ndb_spi_session_end(&session2);
 			elog(ERROR, "Failed temporal index scan: %s", sql.data);
 		}
 
 		/* Store session to keep SPI connection alive for tuptable access */
 		funcctx->user_fctx = session2;
-		NDB_FREE(sql.data);
+		nfree(sql.data);
 
 		MemoryContextSwitchTo(oldcontext);
 
-		NDB_FREE(idx_tbl);
+		nfree(idx_tbl);
 	}
 
 	funcctx = SRF_PERCALL_SETUP();
@@ -263,8 +263,8 @@ temporal_knn_search(PG_FUNCTION_ARGS)
 	{
 		uint64		call_cntr;
 		uint64		max_calls;
-		NdbSpiSession *session2_local;
-		SPITupleTable *tuptable;
+		NdbSpiSession *session2_local = NULL;
+		SPITupleTable *tuptable = NULL;
 
 		call_cntr = funcctx->call_cntr;
 		max_calls = funcctx->max_calls;
@@ -337,8 +337,8 @@ temporal_score(PG_FUNCTION_ARGS)
 static char *
 VectorToLiteral(Vector *v)
 {
-	char	   *out;
-	char	   *buf;
+	char *out = NULL;
+	char *buf = NULL;
 
 	out = vector_out_internal(v);
 	buf = palloc(strlen(out) + 4);
@@ -357,7 +357,7 @@ Datum
 vector_l2(PG_FUNCTION_ARGS)
 {
 	Vector	   *a;
-	Vector	   *b;
+	Vector *b = NULL;
 	float4		sum = 0.0;
 	int			i;
 

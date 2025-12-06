@@ -45,9 +45,9 @@ typedef struct DistKNNResultCtx
 {
 	int			cur;
 	int			max;
-	Datum	   *ids;
-	Datum	   *dists;
-	bool	   *nulls;
+	Datum *ids;
+	Datum *dists;
+	bool *nulls;
 	}			DistKNNResultCtx;
 
 PG_FUNCTION_INFO_V1(distributed_knn_search);
@@ -55,7 +55,7 @@ PG_FUNCTION_INFO_V1(distributed_knn_search);
 Datum
 distributed_knn_search(PG_FUNCTION_ARGS)
 {
-	FuncCallContext *funcctx;
+	FuncCallContext *funcctx = NULL;
 	MemoryContext oldcontext;
 	TupleDesc	tupdesc;
 
@@ -68,12 +68,12 @@ distributed_knn_search(PG_FUNCTION_ARGS)
 		int			nshards = 0;
 		int			i;
 		int			total_candidates;
-		NDB_DECLARE(Datum *, candidate_ids);
-		NDB_DECLARE(Datum *, candidate_dists);
-		NDB_DECLARE(bool *, candidate_nulls);
+		Datum *candidate_ids = NULL;
+		Datum *candidate_dists = NULL;
+		bool *candidate_nulls = NULL;
 
 		{
-			char	   *token;
+			char *token = NULL;
 
 			token = strtok(shards_cstr, ",");
 			while (token != NULL)
@@ -127,9 +127,9 @@ distributed_knn_search(PG_FUNCTION_ARGS)
 			 k);
 
 		total_candidates = nshards * k;
-		NDB_ALLOC(candidate_ids, Datum, total_candidates);
-		NDB_ALLOC(candidate_dists, Datum, total_candidates);
-		NDB_ALLOC(candidate_nulls, bool, total_candidates);
+		nalloc(candidate_ids, Datum, total_candidates);
+		nalloc(candidate_dists, Datum, total_candidates);
+		nalloc(candidate_nulls, bool, total_candidates);
 
 		{
 			int			cidx = 0;
@@ -139,11 +139,11 @@ distributed_knn_search(PG_FUNCTION_ARGS)
 				StringInfoData sql;
 				int			ret;
 				TupleDesc	spi_tupdesc;
-				SPITupleTable *tuptable;
+				SPITupleTable *tuptable = NULL;
 				int			nrows;
 				int			row;
 
-				NDB_DECLARE(NdbSpiSession *, session);
+				NdbSpiSession *session = NULL;
 
 				initStringInfo(&sql);
 
@@ -162,7 +162,7 @@ distributed_knn_search(PG_FUNCTION_ARGS)
 				ret = ndb_spi_execute(session, sql.data, true, 0);
 				if (ret != SPI_OK_SELECT)
 				{
-					NDB_FREE(sql.data);
+					nfree(sql.data);
 					ndb_spi_session_end(&session);
 					elog(ERROR,
 						 "neurondb: SPI SELECT failed "
@@ -198,7 +198,7 @@ distributed_knn_search(PG_FUNCTION_ARGS)
 				}
 
 				ndb_spi_session_end(&session);
-				NDB_FREE(sql.data);
+				nfree(sql.data);
 			}
 
 			/* Global stable sort and SRF context build */
@@ -207,8 +207,8 @@ distributed_knn_search(PG_FUNCTION_ARGS)
 					? cidx
 					: total_candidates;
 
-				NDB_DECLARE(int *, sorted_idxs);
-				NDB_ALLOC(sorted_idxs, int, result_count);
+				int *sorted_idxs = NULL;
+				nalloc(sorted_idxs, int, result_count);
 
 				for (i = 0; i < result_count; i++)
 					sorted_idxs[i] = i;
@@ -244,16 +244,24 @@ distributed_knn_search(PG_FUNCTION_ARGS)
 				}
 
 				{
-					NDB_DECLARE(DistKNNResultCtx *, sctx);
+					DistKNNResultCtx *sctx = NULL;
 
-					NDB_ALLOC(sctx, DistKNNResultCtx, 1);
+					nalloc(sctx, DistKNNResultCtx, 1);
 					sctx->cur = 0;
 					sctx->max = (result_count < k)
 						? result_count
 						: k;
-					NDB_ALLOC(sctx->ids, Datum, sctx->max);
-					NDB_ALLOC(sctx->dists, Datum, sctx->max);
-					NDB_ALLOC(sctx->nulls, bool, sctx->max);
+					{
+						Datum *ids_tmp = NULL;
+						Datum *dists_tmp = NULL;
+						bool *nulls_tmp = NULL;
+						nalloc(ids_tmp, Datum, sctx->max);
+						nalloc(dists_tmp, Datum, sctx->max);
+						nalloc(nulls_tmp, bool, sctx->max);
+						sctx->ids = ids_tmp;
+						sctx->dists = dists_tmp;
+						sctx->nulls = nulls_tmp;
+					}
 
 					for (i = 0; i < sctx->max; i++)
 					{
@@ -268,7 +276,7 @@ distributed_knn_search(PG_FUNCTION_ARGS)
 					}
 
 					funcctx->user_fctx = sctx;
-					NDB_FREE(sorted_idxs);
+					nfree(sorted_idxs);
 					MemoryContextSwitchTo(oldcontext);
 				}
 			}
@@ -300,10 +308,10 @@ distributed_knn_search(PG_FUNCTION_ARGS)
 		}
 		else
 		{
-			NDB_FREE(sctx->ids);
-			NDB_FREE(sctx->dists);
-			NDB_FREE(sctx->nulls);
-			NDB_FREE(sctx);
+			nfree(sctx->ids);
+			nfree(sctx->dists);
+			nfree(sctx->nulls);
+			nfree(sctx);
 			SRF_RETURN_DONE(funcctx);
 		}
 	}
@@ -314,14 +322,14 @@ PG_FUNCTION_INFO_V1(merge_distributed_results);
 Datum
 merge_distributed_results(PG_FUNCTION_ARGS)
 {
-	ArrayType  *shard_results;
+	ArrayType *shard_results = NULL;
 	int32		k;
 	int			num_shards;
 	int			i,
 				j;
 	int			total_candidates = 0;
-	Datum	   *subarrays;
-	bool	   *nulls;
+	Datum *subarrays = NULL;
+	bool *nulls = NULL;
 	int			nelems;
 
 	typedef struct Candidate
@@ -345,7 +353,7 @@ merge_distributed_results(PG_FUNCTION_ARGS)
 
 	for (i = 0; i < num_shards; i++)
 	{
-		ArrayType  *subarr;
+		ArrayType *subarr = NULL;
 
 		if (nulls[i] || subarrays[i] == (Datum) 0)
 			continue;
@@ -362,9 +370,9 @@ merge_distributed_results(PG_FUNCTION_ARGS)
 
 		for (i = 0; i < num_shards; i++)
 		{
-			ArrayType  *subarr;
-			Datum	   *vals;
-			bool	   *nn;
+			ArrayType *subarr = NULL;
+			Datum *vals = NULL;
+			bool *nn = NULL;
 			int			nc;
 
 			if (nulls[i] || subarrays[i] == (Datum) 0)
@@ -436,8 +444,8 @@ merge_distributed_results(PG_FUNCTION_ARGS)
 
 		{
 			TupleDesc	res_tupdesc;
-			NDB_DECLARE(Datum *, recs);
-			ArrayType  *result;
+			Datum *recs = NULL;
+			ArrayType *result = NULL;
 
 			res_tupdesc = CreateTemplateTupleDesc(2);
 			TupleDescInitEntry(res_tupdesc,
@@ -454,7 +462,7 @@ merge_distributed_results(PG_FUNCTION_ARGS)
 							   0);
 			res_tupdesc = BlessTupleDesc(res_tupdesc);
 
-			NDB_ALLOC(recs, Datum, nres);
+			nalloc(recs, Datum, nres);
 
 			for (i = 0; i < nres; i++)
 			{
@@ -471,8 +479,8 @@ merge_distributed_results(PG_FUNCTION_ARGS)
 			result = construct_array(
 									 recs, nres, RECORDOID, -1, false, 'd');
 
-			NDB_FREE(cands);
-			NDB_FREE(recs);
+			nfree(cands);
+			nfree(recs);
 
 			PG_RETURN_ARRAYTYPE_P(result);
 		}
@@ -496,7 +504,7 @@ select_optimal_replica(PG_FUNCTION_ARGS)
 	float		scores[NREPLICAS];
 	int			i;
 	int			best = 0;
-	text	   *selected_replica;
+	text *selected_replica = NULL;
 	char	   *type_str = text_to_cstring(query_type);
 
 	elog(DEBUG1,
@@ -549,7 +557,7 @@ sync_index_async(PG_FUNCTION_ARGS)
 	char		nulls[3];
 	int			i;
 
-	NDB_DECLARE(NdbSpiSession *, session);
+	NdbSpiSession *session = NULL;
 
 	elog(DEBUG1,
 		 "neurondb: initiating async WAL streaming (index \"%s\" -> replica \"%s\")",
@@ -577,7 +585,7 @@ sync_index_async(PG_FUNCTION_ARGS)
 	ret = ndb_spi_execute(session, sql.data, false, 0);
 	if (ret != SPI_OK_UTILITY)
 	{
-		NDB_FREE(sql.data);
+		nfree(sql.data);
 		ndb_spi_session_end(&session);
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
@@ -624,9 +632,9 @@ sync_index_async(PG_FUNCTION_ARGS)
 		ret = ndb_spi_execute(session, sql.data, false, 0);
 		if (ret != SPI_OK_SELECT)
 		{
-			NDB_FREE(sql.data);
-			NDB_FREE(slot_name.data);
-			NDB_FREE(pub_name.data);
+			nfree(sql.data);
+			nfree(slot_name.data);
+			nfree(pub_name.data);
 			ndb_spi_session_end(&session);
 			ereport(ERROR,
 					(errcode(ERRCODE_INTERNAL_ERROR),
@@ -704,9 +712,9 @@ sync_index_async(PG_FUNCTION_ARGS)
 	ret = ndb_spi_execute_with_args(session, sql.data, 3, argtypes, values, nulls, false, 0);
 	if (ret != SPI_OK_INSERT && ret != SPI_OK_UPDATE)
 	{
-		NDB_FREE(sql.data);
-		NDB_FREE(slot_name.data);
-		NDB_FREE(pub_name.data);
+		nfree(sql.data);
+		nfree(slot_name.data);
+		nfree(pub_name.data);
 		ndb_spi_session_end(&session);
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
@@ -748,17 +756,17 @@ sync_index_async(PG_FUNCTION_ARGS)
 		{
 			char	   *lsn_str = TextDatumGetCString(lsn_datum);
 
-			NDB_FREE(lsn_str);
+			nfree(lsn_str);
 		}
 	}
 
 	ndb_spi_session_end(&session);
 
-	NDB_FREE(idx_str);
-	NDB_FREE(replica_str);
-	NDB_FREE(slot_name.data);
-	NDB_FREE(pub_name.data);
-	NDB_FREE(sql.data);
+	nfree(idx_str);
+	nfree(replica_str);
+	nfree(slot_name.data);
+	nfree(pub_name.data);
+	nfree(sql.data);
 
 	PG_RETURN_BOOL(true);
 }

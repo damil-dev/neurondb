@@ -120,9 +120,9 @@ ndb_rocm_gmm_pack_model(const struct GMMModel *model,
 		return -1;
 	}
 
-	NDB_DECLARE(bytea *, blob);
-	NDB_DECLARE(char *, blob_raw);
-	NDB_ALLOC(blob_raw, char, VARHDRSZ + payload_bytes);
+	bytea *blob = NULL;
+	char *blob_raw = NULL;
+	nalloc(blob_raw, char, VARHDRSZ + payload_bytes);
 	blob = (bytea *) blob_raw;
 
 	SET_VARSIZE(blob, VARHDRSZ + payload_bytes);
@@ -152,7 +152,7 @@ ndb_rocm_gmm_pack_model(const struct GMMModel *model,
 			{
 				if (errstr)
 					*errstr = pstrdup("invalid GMM model: mixing_coeffs contains invalid value");
-				NDB_FREE(blob);
+				nfree(blob);
 				return -1;
 			}
 			mixing_dest[i] = coeff;
@@ -163,7 +163,7 @@ ndb_rocm_gmm_pack_model(const struct GMMModel *model,
 		{
 			if (errstr)
 				*errstr = pstrdup("invalid GMM model: mixing_coeffs do not sum to 1.0");
-			NDB_FREE(blob);
+			nfree(blob);
 			return -1;
 		}
 	}
@@ -191,7 +191,7 @@ ndb_rocm_gmm_pack_model(const struct GMMModel *model,
 					{
 						if (errstr)
 							*errstr = pstrdup("invalid GMM model: means contains non-finite value");
-						NDB_FREE(blob);
+						nfree(blob);
 						return -1;
 					}
 					means_dest[i * model->dim + j] = mean_val;
@@ -226,7 +226,7 @@ ndb_rocm_gmm_pack_model(const struct GMMModel *model,
 					{
 						if (errstr)
 							*errstr = pstrdup("invalid GMM model: variances contains invalid value");
-						NDB_FREE(blob);
+						nfree(blob);
 						return -1;
 					}
 					/* Regularize to avoid division by zero */
@@ -277,7 +277,7 @@ ndb_rocm_gmm_pack_model(const struct GMMModel *model,
 		}
 		PG_END_TRY();
 
-		NDB_FREE(buf.data);
+		nfree(buf.data);
 		*metrics = metrics_json;
 	}
 
@@ -297,12 +297,12 @@ ndb_rocm_gmm_train(const float *features,
 {
 	int			max_iters = 100;
 	double		tolerance = 1e-6;
-	NDB_DECLARE(double *, mixing_coeffs);
-	NDB_DECLARE(double *, means);
-	NDB_DECLARE(double *, variances);
-	NDB_DECLARE(double **, means_2d);
-	NDB_DECLARE(double **, variances_2d);
-	NDB_DECLARE(double *, responsibilities);
+	double *mixing_coeffs = NULL;
+	double *means = NULL;
+	double *variances = NULL;
+	double **means_2d = NULL;
+	double **variances_2d = NULL;
+	double *responsibilities = NULL;
 	double		log_likelihood = 0.0;
 	double		prev_log_likelihood = -DBL_MAX;
 	struct GMMModel model;
@@ -440,7 +440,7 @@ ndb_rocm_gmm_train(const float *features,
 	}
 
 	/* Allocate host memory with overflow checks */
-	NDB_ALLOC(mixing_coeffs, double, n_components);
+	nalloc(mixing_coeffs, double, n_components);
 
 	if (feature_dim > 0 && (size_t) n_components > MaxAllocSize / sizeof(double) / (size_t) feature_dim)
 	{
@@ -448,10 +448,10 @@ ndb_rocm_gmm_train(const float *features,
 			*errstr = pstrdup("HIP GMM train: means array size exceeds MaxAllocSize");
 		goto cleanup;
 	}
-	NDB_ALLOC(means, double, n_components * feature_dim);
-	NDB_ALLOC(variances, double, n_components * feature_dim);
-	NDB_ALLOC(means_2d, double *, n_components);
-	NDB_ALLOC(variances_2d, double *, n_components);
+	nalloc(means, double, n_components * feature_dim);
+	nalloc(variances, double, n_components * feature_dim);
+	nalloc(means_2d, double *, n_components);
+	nalloc(variances_2d, double *, n_components);
 
 	if ((size_t) n_samples > MaxAllocSize / sizeof(double) / (size_t) n_components)
 	{
@@ -459,7 +459,7 @@ ndb_rocm_gmm_train(const float *features,
 			*errstr = pstrdup("HIP GMM train: responsibilities array size exceeds MaxAllocSize");
 		goto cleanup;
 	}
-	NDB_ALLOC(responsibilities, double, n_samples * n_components);
+	nalloc(responsibilities, double, n_samples * n_components);
 
 	/* Initialize means with random data points (K-means++ style) */
 	if (n_components <= 0)
@@ -617,19 +617,19 @@ ndb_rocm_gmm_train(const float *features,
 cleanup:
 	/* Free model structure arrays (not the data they point to) */
 	if (means_2d != NULL)
-		NDB_FREE(means_2d);
+		nfree(means_2d);
 	if (variances_2d != NULL)
-		NDB_FREE(variances_2d);
+		nfree(variances_2d);
 
 	/* Free host memory */
 	if (mixing_coeffs != NULL)
-		NDB_FREE(mixing_coeffs);
+		nfree(mixing_coeffs);
 	if (means != NULL)
-		NDB_FREE(means);
+		nfree(means);
 	if (variances != NULL)
-		NDB_FREE(variances);
+		nfree(variances);
 	if (responsibilities != NULL)
-		NDB_FREE(responsibilities);
+		nfree(responsibilities);
 
 	return rc;
 }
@@ -722,7 +722,7 @@ ndb_rocm_gmm_predict(const bytea * model_data,
 			char	   *msg = psprintf("HIP GMM predict: feature dimension mismatch (expected %d, got %d)", hdr->n_features, feature_dim);
 
 			*errstr = pstrdup(msg);
-			NDB_FREE(msg);
+			nfree(msg);
 		}
 		return -1;
 	}
@@ -754,7 +754,7 @@ ndb_rocm_gmm_predict(const bytea * model_data,
 	means = (const double *) (base + sizeof(NdbCudaGmmModelHeader) + sizeof(double) * (size_t) hdr->n_components);
 	variances = (const double *) (base + sizeof(NdbCudaGmmModelHeader) + sizeof(double) * (size_t) hdr->n_components + sizeof(double) * (size_t) hdr->n_components * (size_t) hdr->n_features);
 
-	NDB_DECLARE(double *, component_probs);
+	double *component_probs = NULL;
 
 	/* Validate model data pointers */
 	if (mixing == NULL || means == NULL || variances == NULL)
@@ -764,7 +764,7 @@ ndb_rocm_gmm_predict(const bytea * model_data,
 		return -1;
 	}
 
-	NDB_ALLOC(component_probs, double, hdr->n_components);
+	nalloc(component_probs, double, hdr->n_components);
 
 	/* Compute probability for each component */
 	for (i = 0; i < hdr->n_components; i++)
@@ -776,7 +776,7 @@ ndb_rocm_gmm_predict(const bytea * model_data,
 		{
 			if (errstr)
 				*errstr = pstrdup("HIP GMM predict: invalid mixing coefficient in model");
-			NDB_FREE(component_probs);
+			nfree(component_probs);
 			return -1;
 		}
 
@@ -793,7 +793,7 @@ ndb_rocm_gmm_predict(const bytea * model_data,
 			{
 				if (errstr)
 					*errstr = pstrdup("HIP GMM predict: invalid mean or variance in model");
-				NDB_FREE(component_probs);
+				nfree(component_probs);
 				return -1;
 			}
 
@@ -805,7 +805,7 @@ ndb_rocm_gmm_predict(const bytea * model_data,
 			{
 				if (errstr)
 					*errstr = pstrdup("HIP GMM predict: variance is zero or negative");
-				NDB_FREE(component_probs);
+				nfree(component_probs);
 				return -1;
 			}
 
@@ -814,7 +814,7 @@ ndb_rocm_gmm_predict(const bytea * model_data,
 			{
 				if (errstr)
 					*errstr = pstrdup("HIP GMM predict: computed non-finite log variance");
-				NDB_FREE(component_probs);
+				nfree(component_probs);
 				return -1;
 			}
 
@@ -823,7 +823,7 @@ ndb_rocm_gmm_predict(const bytea * model_data,
 			{
 				if (errstr)
 					*errstr = pstrdup("HIP GMM predict: computed non-finite log-likelihood contribution");
-				NDB_FREE(component_probs);
+				nfree(component_probs);
 				return -1;
 			}
 
@@ -836,7 +836,7 @@ ndb_rocm_gmm_predict(const bytea * model_data,
 		{
 			if (errstr)
 				*errstr = pstrdup("HIP GMM predict: computed non-finite log-likelihood");
-			NDB_FREE(component_probs);
+			nfree(component_probs);
 			return -1;
 		}
 
@@ -845,7 +845,7 @@ ndb_rocm_gmm_predict(const bytea * model_data,
 		{
 			if (errstr)
 				*errstr = pstrdup("HIP GMM predict: computed invalid exp value");
-			NDB_FREE(component_probs);
+			nfree(component_probs);
 			return -1;
 		}
 
@@ -854,7 +854,7 @@ ndb_rocm_gmm_predict(const bytea * model_data,
 		{
 			if (errstr)
 				*errstr = pstrdup("HIP GMM predict: computed invalid component probability");
-			NDB_FREE(component_probs);
+			nfree(component_probs);
 			return -1;
 		}
 	}
@@ -866,7 +866,7 @@ ndb_rocm_gmm_predict(const bytea * model_data,
 	{
 		if (errstr)
 			*errstr = pstrdup("HIP GMM predict: first component probability is non-finite");
-		NDB_FREE(component_probs);
+		nfree(component_probs);
 		return -1;
 	}
 
@@ -876,7 +876,7 @@ ndb_rocm_gmm_predict(const bytea * model_data,
 		{
 			if (errstr)
 				*errstr = pstrdup("HIP GMM predict: component probability is non-finite");
-			NDB_FREE(component_probs);
+			nfree(component_probs);
 			return -1;
 		}
 		if (component_probs[i] > max_prob)
@@ -897,7 +897,7 @@ ndb_rocm_gmm_predict(const bytea * model_data,
 			{
 				if (errstr)
 					*errstr = pstrdup("HIP GMM predict: component probability is non-finite during normalization");
-				NDB_FREE(component_probs);
+				nfree(component_probs);
 				return -1;
 			}
 			sum += component_probs[k];
@@ -907,7 +907,7 @@ ndb_rocm_gmm_predict(const bytea * model_data,
 		{
 			if (errstr)
 				*errstr = pstrdup("HIP GMM predict: sum of probabilities is non-finite");
-			NDB_FREE(component_probs);
+			nfree(component_probs);
 			return -1;
 		}
 
@@ -918,7 +918,7 @@ ndb_rocm_gmm_predict(const bytea * model_data,
 			{
 				if (errstr)
 					*errstr = pstrdup("HIP GMM predict: sum of probabilities is zero or non-finite");
-				NDB_FREE(component_probs);
+				nfree(component_probs);
 				return -1;
 			}
 
@@ -929,7 +929,7 @@ ndb_rocm_gmm_predict(const bytea * model_data,
 				{
 					if (errstr)
 						*errstr = pstrdup("HIP GMM predict: computed invalid normalized probability");
-					NDB_FREE(component_probs);
+					nfree(component_probs);
 					return -1;
 				}
 			}
@@ -950,7 +950,7 @@ ndb_rocm_gmm_predict(const bytea * model_data,
 	{
 		if (errstr)
 			*errstr = pstrdup("HIP GMM predict: invalid best_component index");
-		NDB_FREE(component_probs);
+		nfree(component_probs);
 		return -1;
 	}
 
@@ -959,13 +959,13 @@ ndb_rocm_gmm_predict(const bytea * model_data,
 	{
 		if (errstr)
 			*errstr = pstrdup("HIP GMM predict: computed invalid final probability");
-		NDB_FREE(component_probs);
+		nfree(component_probs);
 		return -1;
 	}
 
 	*cluster_out = best_component;
 	*probability_out = final_prob;
-	NDB_FREE(component_probs);
+	nfree(component_probs);
 
 	return 0;
 }

@@ -22,7 +22,7 @@ vector_wal_compress(PG_FUNCTION_ARGS)
 {
 	text	   *vector = PG_GETARG_TEXT_PP(0);
 	text	   *base_vector = PG_GETARG_TEXT_PP(1);
-	char	   *vec_str;
+	char *vec_str = NULL;
 	StringInfoData compressed;
 
 	(void) base_vector;
@@ -57,7 +57,7 @@ Datum
 vector_wal_estimate_size(PG_FUNCTION_ARGS)
 {
 	text	   *vector = PG_GETARG_TEXT_PP(0);
-	char	   *vec_str;
+	char *vec_str = NULL;
 	int32		original_size;
 	int32		estimated_compressed_size;
 	float4		compression_ratio;

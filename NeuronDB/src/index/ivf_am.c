@@ -117,7 +117,7 @@ typedef IvfCentroidData * IvfCentroid;
 static float4 *
 ivfExtractVectorData(Datum value, Oid typeOid, int *out_dim, MemoryContext ctx)
 {
-	float4	   *result = NULL;
+	float4 *result = NULL;
 	int			i;
 	MemoryContext oldctx;
 	Oid			vectorOid,
@@ -135,7 +135,7 @@ ivfExtractVectorData(Datum value, Oid typeOid, int *out_dim, MemoryContext ctx)
 
 	/* Get type OIDs - use LookupTypeNameOid for proper namespace lookup */
 	{
-		List	   *names;
+		List *names = NULL;
 
 		names = list_make2(makeString("public"), makeString("vector"));
 		vectorOid = LookupTypeNameOid(NULL, makeTypeNameFromNameList(names), false);
@@ -158,7 +158,7 @@ ivfExtractVectorData(Datum value, Oid typeOid, int *out_dim, MemoryContext ctx)
 		Vector	   *v = DatumGetVector(value);
 
 		*out_dim = v->dim;
-		NDB_ALLOC(result, float4, v->dim);
+		nalloc(result, float4, v->dim);
 		for (i = 0; i < v->dim; i++)
 			result[i] = v->data[i];
 	}
@@ -167,7 +167,7 @@ ivfExtractVectorData(Datum value, Oid typeOid, int *out_dim, MemoryContext ctx)
 		VectorF16  *hv = (VectorF16 *) PG_DETOAST_DATUM(value);
 
 		*out_dim = hv->dim;
-		NDB_ALLOC(result, float4, hv->dim);
+		nalloc(result, float4, hv->dim);
 		for (i = 0; i < hv->dim; i++)
 			result[i] = fp16_to_float(hv->data[i]);
 	}
@@ -178,7 +178,7 @@ ivfExtractVectorData(Datum value, Oid typeOid, int *out_dim, MemoryContext ctx)
 		float4	   *values = VECMAP_VALUES(sv);
 
 		*out_dim = sv->total_dim;
-		NDB_ALLOC(result, float4, sv->total_dim);
+		nalloc(result, float4, sv->total_dim);
 		/* Zero-initialize the result array */
 		memset(result, 0, sv->total_dim * sizeof(float4));
 		for (i = 0; i < sv->nnz; i++)
@@ -194,7 +194,7 @@ ivfExtractVectorData(Datum value, Oid typeOid, int *out_dim, MemoryContext ctx)
 		bits8	   *bit_data = VARBITS(bit_vec);
 
 		*out_dim = nbits;
-		NDB_ALLOC(result, float4, nbits);
+		nalloc(result, float4, nbits);
 		for (i = 0; i < nbits; i++)
 		{
 			int			byte_idx = i / BITS_PER_BYTE;
@@ -495,13 +495,13 @@ ivfBuildCallback(Relation index,
 	}
 
 	buildstate->indtuples++;
-	NDB_FREE(vectorData);
+	nfree(vectorData);
 }
 
 static IndexBuildResult *
 ivfbuild(Relation heap, Relation index, struct IndexInfo *indexInfo)
 {
-	IndexBuildResult *result;
+	IndexBuildResult *result = NULL;
 	IvfBuildState buildstate;
 	IvfOptions *options;
 	Buffer		metaBuffer;
@@ -532,15 +532,23 @@ ivfbuild(Relation heap, Relation index, struct IndexInfo *indexInfo)
 	options = (IvfOptions *) indexInfo->ii_AmCache;
 	if (options == NULL)
 	{
-		Datum		relopts = PointerGetDatum(index->rd_options);
+		/* Check if rd_options is valid before calling build_reloptions */
+		if (index->rd_options != NULL)
+		{
+			Datum		relopts = PointerGetDatum(index->rd_options);
 
-		options = (IvfOptions *) build_reloptions(relopts,
-												  true,
-												  relopt_kind_ivf,
-												  sizeof(IvfOptions),
-												  NULL,
-												  0);
-		indexInfo->ii_AmCache = (void *) options;
+			options = (IvfOptions *) build_reloptions(relopts,
+													  true,
+													  relopt_kind_ivf,
+													  sizeof(IvfOptions),
+													  NULL,
+													  0);
+			indexInfo->ii_AmCache = (void *) options;
+		}
+		else
+		{
+			/* Use default options if rd_options is NULL */
+		}
 	}
 	nlists = options ? options->nlists : IVF_DEFAULT_NLISTS;
 
@@ -651,7 +659,7 @@ ivfbuild(Relation heap, Relation index, struct IndexInfo *indexInfo)
 	{
 		IvfCentroidData *centroid;
 
-		NDB_DECLARE(char *, centroid_raw);
+		char *centroid_raw;
 
 		if (kmeans->centroids[i] == NULL)
 		{
@@ -662,7 +670,7 @@ ivfbuild(Relation heap, Relation index, struct IndexInfo *indexInfo)
 					 errmsg("ivf: centroid %d is NULL", i)));
 		}
 
-		NDB_ALLOC(centroid_raw, char, centroidSize);
+		nalloc(centroid_raw, char, centroidSize);
 		centroid = (IvfCentroidData *) centroid_raw;
 
 		centroid->listId = i;
@@ -684,7 +692,7 @@ ivfbuild(Relation heap, Relation index, struct IndexInfo *indexInfo)
 							 false);
 		if (offnum == InvalidOffsetNumber)
 		{
-			NDB_FREE(centroid);
+			nfree(centroid);
 			UnlockReleaseBuffer(centroidsBuf);
 			kmeans_free(kmeans);
 			ereport(ERROR,
@@ -696,7 +704,7 @@ ivfbuild(Relation heap, Relation index, struct IndexInfo *indexInfo)
 		 * PageAddItem copies the data, so we can free the temporary
 		 * allocation
 		 */
-		NDB_FREE(centroid);
+		nfree(centroid);
 	}
 
 	MarkBufferDirty(centroidsBuf);
@@ -724,13 +732,12 @@ ivfbuild(Relation heap, Relation index, struct IndexInfo *indexInfo)
 
 	/* Clean up kmeans (allocated in CurrentMemoryContext, not tmpCtx) */
 	kmeans_free(kmeans);
-	kmeans = NULL;
 
 	/* Clean up */
 	MemoryContextDelete(buildstate.tmpCtx);
 
 	/* Create result */
-	NDB_ALLOC(result, IndexBuildResult, 1);
+	nalloc(result, IndexBuildResult, 1);
 	result->heap_tuples = buildstate.indtuples;
 	result->index_tuples = buildstate.indtuples;	/* Simplified */
 
@@ -746,7 +753,7 @@ ivfbuildempty(Relation index)
 	Buffer		buf;
 	Page		page;
 	IvfMetaPage meta;
-	IvfOptions *options;
+	IvfOptions *options = NULL;
 	int			nlists;
 	int			nprobe;
 
@@ -812,11 +819,11 @@ ivfinsert(Relation index,
 
 	/* Extract vector data (handles vector, halfvec, sparsevec, bit) */
 	{
-		float4	   *vectorData;
+		float4 *vectorData;
 		int			dim;
 		Oid			keyType;
 		MemoryContext oldctx;
-		char	   *input_vec_raw = NULL;
+		char *input_vec_raw = NULL;
 
 		/* Get key type from index */
 		keyType = ivfGetKeyType(index, 1);
@@ -830,12 +837,12 @@ ivfinsert(Relation index,
 			return false;
 
 		/* Allocate Vector structure for compatibility */
-		NDB_ALLOC(input_vec_raw, char, VECTOR_SIZE(dim));
+		nalloc(input_vec_raw, char, VECTOR_SIZE(dim));
 		input_vec = (Vector *) input_vec_raw;
 		SET_VARSIZE(input_vec, VECTOR_SIZE(dim));
 		input_vec->dim = dim;
 		memcpy(input_vec->data, vectorData, dim * sizeof(float4));
-		NDB_FREE(vectorData);
+		nfree(vectorData);
 	}
 
 	/*
@@ -871,7 +878,7 @@ ivfinsert(Relation index,
 		OffsetNumber maxoff;
 		OffsetNumber offnum;
 		IvfCentroid centroid;
-		float4	   *centroidVector;
+		float4 *centroidVector;
 		float4		accum;
 		int			k;
 
@@ -1093,10 +1100,10 @@ ivfinsert(Relation index,
 
 		/* Construct entry in temporary buffer */
 		{
-			char	   *entryData = NULL;
+			char *entryData = NULL;
 			IvfListEntry tempEntry;
-			float4	   *entryVector;
-			NDB_ALLOC(entryData, char, entrySize);
+			float4 *entryVector;
+			nalloc(entryData, char, entrySize);
 			tempEntry = (IvfListEntry) entryData;
 
 			ItemPointerCopy(ht_ctid, &tempEntry->heapPtr);
@@ -1112,7 +1119,7 @@ ivfinsert(Relation index,
 									0,
 									false);
 
-			NDB_FREE(entryData);
+			nfree(entryData);
 		}
 
 		if (newOffnum == InvalidOffsetNumber)
@@ -1155,7 +1162,7 @@ ivfinsert(Relation index,
 		 min_idx,
 		 min_dist);
 
-	NDB_FREE(input_vec);
+	nfree(input_vec);
 	return true;
 }
 
@@ -1189,11 +1196,11 @@ ivfbulkdelete(IndexVacuumInfo * info,
 	int			tuplesRemoved = 0;
 	int			tuplesRemovedThisPage = 0;
 
-	NDB_DECLARE(IndexBulkDeleteResult *, new_stats);
+	IndexBulkDeleteResult *new_stats = NULL;
 
 	if (stats == NULL)
 	{
-		NDB_ALLOC(new_stats, IndexBulkDeleteResult, 1);
+		nalloc(new_stats, IndexBulkDeleteResult, 1);
 		stats = new_stats;
 	}
 
@@ -1352,11 +1359,11 @@ ivfbulkdelete(IndexVacuumInfo * info,
 static IndexBulkDeleteResult *
 ivfvacuumcleanup(IndexVacuumInfo * info, IndexBulkDeleteResult * stats)
 {
-	NDB_DECLARE(IndexBulkDeleteResult *, new_stats);
+	IndexBulkDeleteResult *new_stats = NULL;
 
 	if (stats == NULL)
 	{
-		NDB_ALLOC(new_stats, IndexBulkDeleteResult, 1);
+		nalloc(new_stats, IndexBulkDeleteResult, 1);
 		stats = new_stats;
 	}
 	return stats;
@@ -1409,7 +1416,7 @@ ivfbeginscan(Relation index, int nkeys, int norderbys)
 	IvfScanOpaque so = NULL;
 
 	scan = RelationGetIndexScan(index, nkeys, norderbys);
-	NDB_ALLOC(so, IvfScanOpaqueData, 1);
+	nalloc(so, IvfScanOpaqueData, 1);
 	so->strategy = 1;			/* Default to L2 */
 	so->nprobe = IVF_DEFAULT_NPROBE;
 	so->k = 10;					/* Default k */
@@ -1456,17 +1463,17 @@ ivfrescan(IndexScanDesc scan,
 	/* Free previous results */
 	if (so->results)
 	{
-		NDB_FREE(so->results);
+		nfree(so->results);
 		so->results = NULL;
 	}
 	if (so->distances)
 	{
-		NDB_FREE(so->distances);
+		nfree(so->distances);
 		so->distances = NULL;
 	}
 	if (so->selectedClusters)
 	{
-		NDB_FREE(so->selectedClusters);
+		nfree(so->selectedClusters);
 		so->selectedClusters = NULL;
 	}
 
@@ -1502,7 +1509,7 @@ ivfrescan(IndexScanDesc scan,
 	/* Extract query vector from orderbys */
 	if (norderbys > 0 && orderbys[0].sk_argument != 0)
 	{
-		float4	   *vectorData;
+		float4 *vectorData = NULL;
 		int			dim;
 		Oid			queryType;
 		MemoryContext oldctx;
@@ -1517,15 +1524,15 @@ ivfrescan(IndexScanDesc scan,
 
 		if (vectorData != NULL)
 		{
-			char	   *queryVector_raw = NULL;
+			char *queryVector_raw = NULL;
 			if (so->queryVector)
-				NDB_FREE(so->queryVector);
-			NDB_ALLOC(queryVector_raw, char, VECTOR_SIZE(dim));
+				nfree(so->queryVector);
+			nalloc(queryVector_raw, char, VECTOR_SIZE(dim));
 			so->queryVector = (Vector *) queryVector_raw;
 			SET_VARSIZE(so->queryVector, VECTOR_SIZE(dim));
 			so->queryVector->dim = dim;
 			memcpy(so->queryVector->data, vectorData, dim * sizeof(float4));
-			NDB_FREE(vectorData);
+			nfree(vectorData);
 		}
 
 		/*
@@ -1645,7 +1652,7 @@ ivfSelectClusters(Relation index,
 		nprobe = nlists;
 
 	/* Allocate distance array and initialize all entries to FLT_MAX */
-	NDB_ALLOC(clusterDistances, float4, nlists);
+	nalloc(clusterDistances, float4, nlists);
 	for (i = 0; i < nlists; i++)
 		clusterDistances[i] = FLT_MAX;
 
@@ -1706,7 +1713,7 @@ ivfSelectClusters(Relation index,
 		selectedClusters[i] = bestIdx;
 	}
 
-	NDB_FREE(clusterDistances);
+	nfree(clusterDistances);
 }
 
 /*
@@ -1739,8 +1746,8 @@ ivfCollectCandidates(Relation index,
 				j;
 
 	/* Allocate candidate arrays */
-	NDB_ALLOC(candidates, ItemPointerData, maxCandidates);
-	NDB_ALLOC(candidateDistances, float4, maxCandidates);
+	nalloc(candidates, ItemPointerData, maxCandidates);
+	nalloc(candidateDistances, float4, maxCandidates);
 
 	centroidsBuf = ReadBuffer(index, meta->centroidsBlock);
 	if (!BufferIsValid(centroidsBuf))
@@ -1776,11 +1783,11 @@ ivfCollectCandidates(Relation index,
 			BlockNumber listBlock = centroid->firstBlock;
 			Buffer		listBuf;
 			Page		listPage;
-			IvfListPageHeader *listHeader;
+			IvfListPageHeader *listHeader = NULL;
 			OffsetNumber listMaxoff;
 			OffsetNumber listOffnum;
 			IvfListEntry entry;
-			float4	   *entryVector;
+			float4 *entryVector = NULL;
 
 			/* Traverse all blocks in chain */
 			while (listBlock != InvalidBlockNumber && candidateCount < maxCandidates)
@@ -1839,14 +1846,14 @@ ivfCollectCandidates(Relation index,
 	/* Sort candidates by distance and keep top-k */
 	if (candidateCount > 0)
 	{
-		int		   *indices = NULL;
+		int *indices = NULL;
 		int			actualK = Min(k, candidateCount);
 		int			temp;
 		ItemPointerData *results_ptr = NULL;
-		float4	   *distances_ptr = NULL;
+		float4 *distances_ptr = NULL;
 
 		/* Create index array for sorting */
-		NDB_ALLOC(indices, int, candidateCount);
+		nalloc(indices, int, candidateCount);
 		for (i = 0; i < candidateCount; i++)
 			indices[i] = i;
 
@@ -1874,8 +1881,8 @@ ivfCollectCandidates(Relation index,
 		}
 
 		/* Allocate result arrays */
-		NDB_ALLOC(results_ptr, ItemPointerData, actualK);
-		NDB_ALLOC(distances_ptr, float4, actualK);
+		nalloc(results_ptr, ItemPointerData, actualK);
+		nalloc(distances_ptr, float4, actualK);
 		*results = results_ptr;
 		*distances = distances_ptr;
 
@@ -1888,7 +1895,7 @@ ivfCollectCandidates(Relation index,
 
 		*resultCount = actualK;
 
-		NDB_FREE(indices);
+		nfree(indices);
 	}
 	else
 	{
@@ -1897,8 +1904,8 @@ ivfCollectCandidates(Relation index,
 		*resultCount = 0;
 	}
 
-	NDB_FREE(candidates);
-	NDB_FREE(candidateDistances);
+	nfree(candidates);
+	nfree(candidateDistances);
 }
 
 static bool
@@ -1922,7 +1929,7 @@ ivfgettuple(IndexScanDesc scan, ScanDirection dir)
 	/* On first call, perform search */
 	if (so->firstCall)
 	{
-		int		   *selectedClusters = NULL;
+		int *selectedClusters = NULL;
 		metaBuffer = ReadBuffer(scan->indexRelation, 0);
 		if (!BufferIsValid(metaBuffer))
 		{
@@ -1965,7 +1972,7 @@ ivfgettuple(IndexScanDesc scan, ScanDirection dir)
 		}
 
 		/* Allocate selected clusters array */
-		NDB_ALLOC(selectedClusters, int, so->nprobe);
+		nalloc(selectedClusters, int, so->nprobe);
 		so->selectedClusters = selectedClusters;
 
 		/* Select nprobe closest clusters */
@@ -2028,15 +2035,15 @@ ivfendscan(IndexScanDesc scan)
 		return;
 
 	if (so->results)
-		NDB_FREE(so->results);
+		nfree(so->results);
 	if (so->distances)
-		NDB_FREE(so->distances);
+		nfree(so->distances);
 	if (so->selectedClusters)
-		NDB_FREE(so->selectedClusters);
+		nfree(so->selectedClusters);
 	if (so->queryVector)
-		NDB_FREE(so->queryVector);
+		nfree(so->queryVector);
 
-	NDB_FREE(so);
+	nfree(so);
 	scan->opaque = NULL;
 }
 
@@ -2063,12 +2070,12 @@ ivfendscan(IndexScanDesc scan)
 __attribute__((unused)) static KMeansState *
 kmeans_init(int k, int dim, float4 * *data, int n)
 {
-	KMeansState *state;
+	KMeansState *state = NULL;
 	int			i,
 				j;
 	float4	  **centroids = NULL;
-	int		   *assignments = NULL;
-	int		   *counts = NULL;
+	int *assignments = NULL;
+	int *counts = NULL;
 
 	state = (KMeansState *) palloc0(sizeof(KMeansState));
 	state->k = k;
@@ -2080,12 +2087,12 @@ kmeans_init(int k, int dim, float4 * *data, int n)
 	state->ctx = CurrentMemoryContext;
 
 	/* Allocate centroids */
-	NDB_ALLOC(centroids, float4 *, k);
+	nalloc(centroids, float4 *, k);
 	state->centroids = centroids;
 	for (i = 0; i < k; i++)
 	{
-		float4	   *centroid = NULL;
-		NDB_ALLOC(centroid, float4, dim);
+		float4 *centroid = NULL;
+		nalloc(centroid, float4, dim);
 		state->centroids[i] = centroid;
 
 		/* Initialize with random data points (KMeans++) */
@@ -2096,8 +2103,8 @@ kmeans_init(int k, int dim, float4 * *data, int n)
 		}
 	}
 
-	NDB_ALLOC(assignments, int, n);
-	NDB_ALLOC(counts, int, k);
+	nalloc(assignments, int, n);
+	nalloc(counts, int, k);
 	state->assignments = assignments;
 	state->counts = counts;
 
@@ -2234,12 +2241,12 @@ kmeans_free(KMeansState * state)
 	int			i;
 
 	for (i = 0; i < state->k; i++)
-		NDB_FREE(state->centroids[i]);
+		nfree(state->centroids[i]);
 
-	NDB_FREE(state->centroids);
-	NDB_FREE(state->assignments);
-	NDB_FREE(state->counts);
-	NDB_FREE(state);
+	nfree(state->centroids);
+	nfree(state->assignments);
+	nfree(state->counts);
+	nfree(state);
 }
 
 /*
@@ -2316,7 +2323,7 @@ ivfdelete(Relation index,
 	int			i;
 	int			minIdx = -1;
 	float4		minDist = FLT_MAX;
-	Vector	   *inputVec = NULL;
+	Vector	   *inputVec;
 	int			metaBlkno = 0;
 	BlockNumber centroidsBlock;
 	int			nlists;
@@ -2348,7 +2355,7 @@ ivfdelete(Relation index,
 	/* Step 2: Get vector from heap to find which centroid it belongs to */
 	if (values != NULL && !isnull[0])
 	{
-		float4	   *vectorData;
+		float4 *vectorData;
 		int			dim;
 		Oid			keyType;
 		MemoryContext oldctx;
@@ -2360,13 +2367,13 @@ ivfdelete(Relation index,
 
 		if (vectorData != NULL)
 		{
-			NDB_DECLARE(char *, inputVec_raw);
-			NDB_ALLOC(inputVec_raw, char, VECTOR_SIZE(dim));
+			char *inputVec_raw = NULL;
+			nalloc(inputVec_raw, char, VECTOR_SIZE(dim));
 			inputVec = (Vector *) inputVec_raw;
 			SET_VARSIZE(inputVec, VECTOR_SIZE(dim));
 			inputVec->dim = dim;
 			memcpy(inputVec->data, vectorData, dim * sizeof(float4));
-			NDB_FREE(vectorData);
+			nfree(vectorData);
 		}
 	}
 
@@ -2580,7 +2587,7 @@ ivfdelete(Relation index,
 			UnlockReleaseBuffer(centroidsBuf);
 		}
 
-		NDB_FREE(inputVec);
+		nfree(inputVec);
 	}
 
 	/* Step 5: Update metadata - reacquire EXCLUSIVE lock */

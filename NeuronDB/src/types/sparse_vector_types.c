@@ -41,7 +41,7 @@ Datum
 sparse_vector_in(PG_FUNCTION_ARGS)
 {
 	char	   *str = PG_GETARG_CSTRING(0);
-	SparseVector *result;
+	SparseVector *result = NULL;
 	NdbSparseVectorParse parsed = {0};
 	char	   *errstr = NULL;
 	int			parse_result;
@@ -76,6 +76,16 @@ sparse_vector_in(PG_FUNCTION_ARGS)
 		PG_RETURN_NULL();
 	}
 
+	/* Validate that token_ids and weights arrays are allocated */
+	if (parsed.token_ids == NULL || parsed.weights == NULL)
+	{
+		ndb_json_parse_sparse_vector_free(&parsed);
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
+				 errmsg("sparse_vector parsing failed: missing token_ids or weights arrays")));
+		PG_RETURN_NULL();
+	}
+
 	result = (SparseVector *) palloc0(SPARSE_VEC_SIZE(parsed.nnz));
 	SET_VARSIZE(result, SPARSE_VEC_SIZE(parsed.nnz));
 	result->vocab_size = parsed.vocab_size;
@@ -102,8 +112,8 @@ sparse_vector_out(PG_FUNCTION_ARGS)
 {
 	SparseVector *sv = (SparseVector *) PG_GETARG_POINTER(0);
 	StringInfoData buf;
-	int32	   *token_ids;
-	float4	   *weights;
+	int32 *token_ids = NULL;
+	float4 *weights = NULL;
 	int			i;
 	const char *model_name;
 
@@ -164,7 +174,7 @@ Datum
 sparse_vector_recv(PG_FUNCTION_ARGS)
 {
 	StringInfo	buf = (StringInfo) PG_GETARG_POINTER(0);
-	SparseVector *result;
+	SparseVector *result = NULL;
 	int32		vocab_size;
 	int32		nnz;
 	uint16		model_type;
@@ -237,12 +247,12 @@ PG_FUNCTION_INFO_V1(sparse_vector_dot_product);
 Datum
 sparse_vector_dot_product(PG_FUNCTION_ARGS)
 {
-	SparseVector *a;
-	SparseVector *b;
-	int32	   *a_tokens;
-	int32	   *b_tokens;
-	float4	   *a_weights;
-	float4	   *b_weights;
+	SparseVector *a = NULL;
+	SparseVector *b = NULL;
+	int32 *a_tokens = NULL;
+	int32 *b_tokens = NULL;
+	float4 *a_weights = NULL;
+	float4 *b_weights = NULL;
 	float4		result = 0.0;
 	int			i,
 				j;

@@ -735,8 +735,8 @@ rocm_backend_dbscan_impl(const float *vectors,
 		}
 	}
 
-	NDB_FREE(visited);
-	NDB_FREE(neighbors);
+	nfree(visited);
+	nfree(neighbors);
 
 	return true;
 }
@@ -937,7 +937,7 @@ ndb_rocm_launch_kmeans_assign(const float *vectors,
 			assignments[i] = (int)assign32[i];
 	}
 
-	NDB_FREE(assign32);
+	nfree(assign32);
 
 	return rc == 0 ? 0 : -1;
 }
@@ -976,8 +976,8 @@ ndb_rocm_launch_kmeans_update(const float *vectors,
 		k,
 		dim);
 
-	NDB_FREE(assign32);
-	NDB_FREE(counts);
+	nfree(assign32);
+	nfree(counts);
 
 	return rc == 0 ? 0 : -1;
 }
@@ -1276,7 +1276,7 @@ ndb_rocm_set_device(int device_id)
 static int
 ndb_rocm_mem_alloc(void **ptr, size_t bytes)
 {
-	void *tmp;
+	void *tmp = NULL;
 
 	if (ptr == NULL)
 		return -1;

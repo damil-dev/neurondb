@@ -74,23 +74,23 @@ PG_FUNCTION_INFO_V1(detect_centroid_drift);
 Datum
 detect_centroid_drift(PG_FUNCTION_ARGS)
 {
-	text	   *baseline_table;
-	text	   *baseline_column;
-	text	   *current_table;
-	text	   *current_column;
-	char	   *baseline_tbl;
-	char	   *baseline_col;
-	char	   *current_tbl;
-	char	   *current_col;
+	text *baseline_table = NULL;
+	text *baseline_column = NULL;
+	text *current_table = NULL;
+	text *current_column = NULL;
+	char *baseline_tbl = NULL;
+	char *baseline_col = NULL;
+	char *current_tbl = NULL;
+	char *current_col = NULL;
 	float	  **baseline_vecs;
 	float	  **current_vecs;
 	int			n_baseline,
 				n_current;
 	int			dim_baseline,
 				dim_current;
-	double	   *baseline_mean;
-	double	   *current_mean;
-	double	   *baseline_std;
+	double *baseline_mean = NULL;
+	double *current_mean = NULL;
+	double *baseline_std = NULL;
 	double		drift_distance;
 	double		normalized_drift;
 	double		avg_std;
@@ -124,10 +124,10 @@ detect_centroid_drift(PG_FUNCTION_ARGS)
 
 	if (baseline_vecs == NULL || n_baseline == 0 || current_vecs == NULL || n_current == 0)
 	{
-		NDB_FREE(baseline_tbl);
-		NDB_FREE(baseline_col);
-		NDB_FREE(current_tbl);
-		NDB_FREE(current_col);
+		nfree(baseline_tbl);
+		nfree(baseline_col);
+		nfree(current_tbl);
+		nfree(current_col);
 		ereport(ERROR,
 				(errcode(ERRCODE_DATA_EXCEPTION),
 				 errmsg("No vectors found in one or both datasets")));
@@ -135,28 +135,28 @@ detect_centroid_drift(PG_FUNCTION_ARGS)
 
 	if (dim_baseline <= 0 || dim_current <= 0)
 	{
-		NDB_FREE(baseline_tbl);
-		NDB_FREE(baseline_col);
-		NDB_FREE(current_tbl);
-		NDB_FREE(current_col);
+		nfree(baseline_tbl);
+		nfree(baseline_col);
+		nfree(current_tbl);
+		nfree(current_col);
 		/* Free vectors arrays if not NULL */
 		if (baseline_vecs != NULL)
 		{
 			for (int idx = 0; idx < n_baseline; idx++)
 			{
 				if (baseline_vecs[idx] != NULL)
-					NDB_FREE(baseline_vecs[idx]);
+					nfree(baseline_vecs[idx]);
 			}
-			NDB_FREE(baseline_vecs);
+			nfree(baseline_vecs);
 		}
 		if (current_vecs != NULL)
 		{
 			for (int idx = 0; idx < n_current; idx++)
 			{
 				if (current_vecs[idx] != NULL)
-					NDB_FREE(current_vecs[idx]);
+					nfree(current_vecs[idx]);
 			}
-			NDB_FREE(current_vecs);
+			nfree(current_vecs);
 		}
 		ereport(ERROR,
 				(errcode(ERRCODE_DATA_EXCEPTION),
@@ -253,18 +253,18 @@ detect_centroid_drift(PG_FUNCTION_ARGS)
 	tuple = heap_form_tuple(tupdesc, values, nulls);
 
 	for (i = 0; i < n_baseline; i++)
-		NDB_FREE(baseline_vecs[i]);
+		nfree(baseline_vecs[i]);
 	for (i = 0; i < n_current; i++)
-		NDB_FREE(current_vecs[i]);
-	NDB_FREE(baseline_vecs);
-	NDB_FREE(current_vecs);
-	NDB_FREE(baseline_mean);
-	NDB_FREE(current_mean);
-	NDB_FREE(baseline_std);
-	NDB_FREE(baseline_tbl);
-	NDB_FREE(baseline_col);
-	NDB_FREE(current_tbl);
-	NDB_FREE(current_col);
+		nfree(current_vecs[i]);
+	nfree(baseline_vecs);
+	nfree(current_vecs);
+	nfree(baseline_mean);
+	nfree(current_mean);
+	nfree(baseline_std);
+	nfree(baseline_tbl);
+	nfree(baseline_col);
+	nfree(current_tbl);
+	nfree(current_col);
 
 	PG_RETURN_DATUM(HeapTupleGetDatum(tuple));
 }
@@ -281,24 +281,24 @@ PG_FUNCTION_INFO_V1(compute_distribution_divergence);
 Datum
 compute_distribution_divergence(PG_FUNCTION_ARGS)
 {
-	text	   *baseline_table;
-	text	   *baseline_column;
-	text	   *current_table;
-	text	   *current_column;
-	char	   *baseline_tbl;
-	char	   *baseline_col;
-	char	   *current_tbl;
-	char	   *current_col;
+	text *baseline_table = NULL;
+	text *baseline_column = NULL;
+	text *current_table = NULL;
+	text *current_column = NULL;
+	char *baseline_tbl = NULL;
+	char *baseline_col = NULL;
+	char *current_tbl = NULL;
+	char *current_col = NULL;
 	float	  **baseline_vecs;
 	float	  **current_vecs;
 	int			n_baseline,
 				n_current;
 	int			dim_baseline,
 				dim_current;
-	double	   *baseline_mean;
-	double	   *current_mean;
-	double	   *baseline_var;
-	double	   *current_var;
+	double *baseline_mean = NULL;
+	double *current_mean = NULL;
+	double *baseline_var = NULL;
+	double *current_var = NULL;
 	double		divergence;
 	int			i,
 				d;
@@ -321,10 +321,10 @@ compute_distribution_divergence(PG_FUNCTION_ARGS)
 
 	if (baseline_vecs == NULL || n_baseline == 0 || current_vecs == NULL || n_current == 0)
 	{
-		NDB_FREE(baseline_tbl);
-		NDB_FREE(baseline_col);
-		NDB_FREE(current_tbl);
-		NDB_FREE(current_col);
+		nfree(baseline_tbl);
+		nfree(baseline_col);
+		nfree(current_tbl);
+		nfree(current_col);
 		ereport(ERROR,
 				(errcode(ERRCODE_DATA_EXCEPTION),
 				 errmsg("No vectors found in one or both datasets")));
@@ -332,28 +332,28 @@ compute_distribution_divergence(PG_FUNCTION_ARGS)
 
 	if (dim_baseline <= 0 || dim_current <= 0)
 	{
-		NDB_FREE(baseline_tbl);
-		NDB_FREE(baseline_col);
-		NDB_FREE(current_tbl);
-		NDB_FREE(current_col);
+		nfree(baseline_tbl);
+		nfree(baseline_col);
+		nfree(current_tbl);
+		nfree(current_col);
 		/* Free vectors arrays if not NULL */
 		if (baseline_vecs != NULL)
 		{
 			for (int idx = 0; idx < n_baseline; idx++)
 			{
 				if (baseline_vecs[idx] != NULL)
-					NDB_FREE(baseline_vecs[idx]);
+					nfree(baseline_vecs[idx]);
 			}
-			NDB_FREE(baseline_vecs);
+			nfree(baseline_vecs);
 		}
 		if (current_vecs != NULL)
 		{
 			for (int idx = 0; idx < n_current; idx++)
 			{
 				if (current_vecs[idx] != NULL)
-					NDB_FREE(current_vecs[idx]);
+					nfree(current_vecs[idx]);
 			}
-			NDB_FREE(current_vecs);
+			nfree(current_vecs);
 		}
 		ereport(ERROR,
 				(errcode(ERRCODE_DATA_EXCEPTION),
@@ -440,19 +440,19 @@ compute_distribution_divergence(PG_FUNCTION_ARGS)
 	}
 
 	for (i = 0; i < n_baseline; i++)
-		NDB_FREE(baseline_vecs[i]);
+		nfree(baseline_vecs[i]);
 	for (i = 0; i < n_current; i++)
-		NDB_FREE(current_vecs[i]);
-	NDB_FREE(baseline_vecs);
-	NDB_FREE(current_vecs);
-	NDB_FREE(baseline_mean);
-	NDB_FREE(current_mean);
-	NDB_FREE(baseline_var);
-	NDB_FREE(current_var);
-	NDB_FREE(baseline_tbl);
-	NDB_FREE(baseline_col);
-	NDB_FREE(current_tbl);
-	NDB_FREE(current_col);
+		nfree(current_vecs[i]);
+	nfree(baseline_vecs);
+	nfree(current_vecs);
+	nfree(baseline_mean);
+	nfree(current_mean);
+	nfree(baseline_var);
+	nfree(current_var);
+	nfree(baseline_tbl);
+	nfree(baseline_col);
+	nfree(current_tbl);
+	nfree(current_col);
 
 	PG_RETURN_FLOAT8(divergence);
 }

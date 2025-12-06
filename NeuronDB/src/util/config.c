@@ -266,13 +266,13 @@ PG_FUNCTION_INFO_V1(show_vector_config);
 Datum
 show_vector_config(PG_FUNCTION_ARGS)
 {
-	FuncCallContext *funcctx;
+	FuncCallContext *funcctx = NULL;
 	const		NeuronDBConfigOpt *catalog_row;
 	Datum		values[3];
 	bool		nulls[3];
 	HeapTuple	tuple;
 	StringInfoData valbuf;
-	char	   *curr_value;
+	char *curr_value = NULL;
 
 	if (SRF_IS_FIRSTCALL())
 	{
@@ -331,8 +331,8 @@ set_vector_config(PG_FUNCTION_ARGS)
 {
 	text	   *config_name = PG_GETARG_TEXT_PP(0);
 	text	   *config_value = PG_GETARG_TEXT_PP(1);
-	char	   *name_str;
-	char	   *value_str;
+	char *name_str = NULL;
+	char *value_str = NULL;
 	const		NeuronDBConfigOpt *opt;
 
 	name_str = text_to_cstring(config_name);
@@ -357,9 +357,9 @@ Datum
 get_vector_config(PG_FUNCTION_ARGS)
 {
 	text	   *config_name = PG_GETARG_TEXT_PP(0);
-	char	   *name_str;
+	char *name_str = NULL;
 	const		NeuronDBConfigOpt *opt;
-	char	   *curr_value;
+	char *curr_value = NULL;
 
 	name_str = text_to_cstring(config_name);
 	opt = get_config_opt(name_str);

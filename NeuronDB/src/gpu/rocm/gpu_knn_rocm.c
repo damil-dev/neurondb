@@ -38,8 +38,8 @@ typedef struct KNNModel
 	int			n_features;
 	int			k;
 	int			task_type;
-	float	   *features;
-	double	   *labels;
+	float *features;
+	double *labels;
 }			KNNModel;
 
 int
@@ -146,7 +146,7 @@ ndb_rocm_knn_pack(const struct KNNModel *model,
 			{
 				if (errstr)
 					*errstr = pstrdup("invalid KNN model: features array contains non-finite value");
-				NDB_FREE(blob);
+				nfree(blob);
 				return -1;
 			}
 		}
@@ -167,7 +167,7 @@ ndb_rocm_knn_pack(const struct KNNModel *model,
 			{
 				if (errstr)
 					*errstr = pstrdup("invalid KNN model: labels array contains non-finite value");
-				NDB_FREE(blob);
+				nfree(blob);
 				return -1;
 			}
 			/* For classification, labels should be integers */
@@ -179,7 +179,7 @@ ndb_rocm_knn_pack(const struct KNNModel *model,
 				{
 					if (errstr)
 						*errstr = pstrdup("invalid KNN model: classification labels must be non-negative integers");
-					NDB_FREE(blob);
+					nfree(blob);
 					return -1;
 				}
 			}
@@ -195,7 +195,7 @@ ndb_rocm_knn_pack(const struct KNNModel *model,
 	if (metrics != NULL)
 	{
 		StringInfoData buf;
-		Jsonb	   *metrics_json;
+		Jsonb *metrics_json = NULL;
 
 		initStringInfo(&buf);
 		appendStringInfo(&buf,
@@ -223,7 +223,7 @@ ndb_rocm_knn_pack(const struct KNNModel *model,
 		}
 		PG_END_TRY();
 
-		NDB_FREE(buf.data);
+		nfree(buf.data);
 		*metrics = metrics_json;
 	}
 
@@ -402,7 +402,7 @@ ndb_rocm_knn_train(const float *features,
 	{
 		if (errstr)
 			*errstr = pstrdup("HIP KNN train: failed to allocate labels_copy array");
-		NDB_FREE(features_copy);
+		nfree(features_copy);
 		return -1;
 	}
 
@@ -436,9 +436,9 @@ ndb_rocm_knn_train(const float *features,
 
 cleanup:
 	if (features_copy)
-		NDB_FREE(features_copy);
+		nfree(features_copy);
 	if (labels_copy)
-		NDB_FREE(labels_copy);
+		nfree(labels_copy);
 
 	return rc;
 }
@@ -577,7 +577,7 @@ ndb_rocm_knn_predict(const bytea * model_data,
 	{
 		if (errstr && *errstr == NULL)
 			*errstr = pstrdup("HIP distance computation failed");
-		NDB_FREE(distances);
+		nfree(distances);
 		return -1;
 	}
 
@@ -588,7 +588,7 @@ ndb_rocm_knn_predict(const bytea * model_data,
 		{
 			if (errstr)
 				*errstr = pstrdup("HIP KNN predict: computed invalid distance");
-			NDB_FREE(distances);
+			nfree(distances);
 			return -1;
 		}
 	}
@@ -598,7 +598,7 @@ ndb_rocm_knn_predict(const bytea * model_data,
 	{
 		if (errstr && *errstr == NULL)
 			*errstr = pstrdup("HIP top-k computation failed");
-		NDB_FREE(distances);
+		nfree(distances);
 		return -1;
 	}
 
@@ -607,7 +607,7 @@ ndb_rocm_knn_predict(const bytea * model_data,
 	{
 		if (errstr)
 			*errstr = pstrdup("HIP KNN predict: computed non-finite prediction");
-		NDB_FREE(distances);
+		nfree(distances);
 		return -1;
 	}
 	/* For classification, prediction should be an integer */
@@ -617,12 +617,12 @@ ndb_rocm_knn_predict(const bytea * model_data,
 		{
 			if (errstr)
 				*errstr = pstrdup("HIP KNN predict: classification prediction must be non-negative integer");
-			NDB_FREE(distances);
+			nfree(distances);
 			return -1;
 		}
 	}
 
-	NDB_FREE(distances);
+	nfree(distances);
 	return 0;
 }
 
@@ -823,7 +823,7 @@ ndb_rocm_knn_evaluate_batch(const bytea * model_data,
 
 	if (rc != 0)
 	{
-		NDB_FREE(predictions);
+		nfree(predictions);
 		return -1;
 	}
 
@@ -879,7 +879,7 @@ ndb_rocm_knn_evaluate_batch(const bytea * model_data,
 	else
 		*f1_out = 0.0;
 
-	NDB_FREE(predictions);
+	nfree(predictions);
 
 	return 0;
 }

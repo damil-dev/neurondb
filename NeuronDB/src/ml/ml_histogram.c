@@ -75,15 +75,15 @@ PG_FUNCTION_INFO_V1(similarity_histogram);
 Datum
 similarity_histogram(PG_FUNCTION_ARGS)
 {
-	text	   *table_name;
-	text	   *vector_column;
+	text *table_name = NULL;
+	text *vector_column = NULL;
 	int			num_samples;
-	char	   *tbl_str;
-	char	   *vec_col_str;
+	char *tbl_str = NULL;
+	char *vec_col_str = NULL;
 	float	  **vectors;
 	int			nvec;
 	int			dim;
-	double	   *distances;
+	double *distances = NULL;
 	double		min_dist;
 	double		max_dist;
 	double		mean_dist;
@@ -190,11 +190,11 @@ similarity_histogram(PG_FUNCTION_ARGS)
 	tuple = heap_form_tuple(tupdesc, values, nulls);
 
 	for (i = 0; i < nvec; i++)
-		NDB_FREE(vectors[i]);
-	NDB_FREE(vectors);
-	NDB_FREE(distances);
-	NDB_FREE(tbl_str);
-	NDB_FREE(vec_col_str);
+		nfree(vectors[i]);
+	nfree(vectors);
+	nfree(distances);
+	nfree(tbl_str);
+	nfree(vec_col_str);
 
 	PG_RETURN_DATUM(HeapTupleGetDatum(tuple));
 }

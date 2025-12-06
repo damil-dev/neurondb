@@ -48,7 +48,7 @@ ndb_json_quote_string_OLD_REMOVED(const char *str)
 {
 	StringInfoData buf;
 	const char *p;
-	char *result;
+	char *result = NULL;
 
 	if (str == NULL)
 		return pstrdup("null");
@@ -95,7 +95,7 @@ ndb_json_quote_string_OLD_REMOVED(const char *str)
 
 	appendStringInfoChar(&buf, '"');
 	result = pstrdup(buf.data);
-	NDB_FREE(buf.data);
+	nfree(buf.data);
 	return result;
 }
 #pragma GCC diagnostic pop
@@ -112,16 +112,33 @@ ndb_llm_cache_lookup(const char *key, int max_age_seconds, char **out_text)
 	bool hit = false;
 	int max_age = max_age_seconds > 0 ? max_age_seconds : 600;
 	int ret;
-	NDB_DECLARE(NdbSpiSession *, session);
+	NdbSpiSession *session = NULL;
 	MemoryContext oldcontext;
 
 	Assert(key != NULL);
 	Assert(max_age_seconds >= 0);
 
+	/* Validate output parameter */
+	if (out_text == NULL)
+	{
+		elog(WARNING, "neurondb: ndb_llm_cache_lookup called with NULL out_text");
+		return false;
+	}
+
+	/* Validate key is not empty */
+	if (strlen(key) == 0)
+	{
+		elog(WARNING, "neurondb: ndb_llm_cache_lookup called with empty key");
+		return false;
+	}
+
 	oldcontext = CurrentMemoryContext;
 	session = ndb_spi_session_begin(oldcontext, false);
 	if (session == NULL)
+	{
+		elog(DEBUG1, "neurondb: ndb_llm_cache_lookup: failed to begin SPI session");
 		return false;
+	}
 
 	/* Use parameterized query to avoid SQL injection and quoting issues */
 	/* Safely extract text field with validation to prevent crashes on corrupted JSONB */
@@ -154,14 +171,14 @@ ndb_llm_cache_lookup(const char *key, int max_age_seconds, char **out_text)
 			if (spi_text != NULL)
 			{
 				spi_text_cstr = text_to_cstring(spi_text);
-				NDB_FREE(spi_text);
+				nfree(spi_text);
 				if (out_text)
 				{
 					*out_text = spi_text_cstr;
 					hit = true;
 				} else
 				{
-					NDB_FREE(spi_text_cstr);
+					nfree(spi_text_cstr);
 				}
 			}
 		}
@@ -193,7 +210,7 @@ ndb_llm_cache_store(const char *key, const char *text)
 	Oid argtypes[2];
 	Datum values[2];
 	StringInfoData val;
-	NDB_DECLARE(NdbSpiSession *, session);
+	NdbSpiSession *session = NULL;
 	MemoryContext oldcontext;
 	int ret;
 
@@ -201,10 +218,27 @@ ndb_llm_cache_store(const char *key, const char *text)
 	argtypes[0] = TEXTOID;
 	argtypes[1] = JSONBOID;
 
+	/* Validate inputs */
+	if (key == NULL || text == NULL)
+	{
+		elog(WARNING, "neurondb: ndb_llm_cache_store called with NULL key or text");
+		return;
+	}
+
+	/* Validate key is not empty */
+	if (strlen(key) == 0)
+	{
+		elog(WARNING, "neurondb: ndb_llm_cache_store called with empty key");
+		return;
+	}
+
 	oldcontext = CurrentMemoryContext;
 	session = ndb_spi_session_begin(oldcontext, false);
 	if (session == NULL)
+	{
+		elog(DEBUG1, "neurondb: ndb_llm_cache_store: failed to begin SPI session");
 		return;
+	}
 
 	initStringInfo(&val);
 
@@ -233,7 +267,7 @@ ndb_llm_cache_store(const char *key, const char *text)
 			ret);
 	}
 
-	NDB_FREE(val.data);
+	nfree(val.data);
 	ndb_spi_session_end(&session);
 }
 
@@ -248,14 +282,14 @@ PG_FUNCTION_INFO_V1(ndb_llm_cache_test);
 Datum
 ndb_llm_cache_test(PG_FUNCTION_ARGS)
 {
-	text *key_in;
-	text *val_in;
+	text *key_in = NULL;
+	text *val_in = NULL;
 	int32 max_age;
-	char *key;
-	char *val;
-	char *result;
+	char *key = NULL;
+	char *val = NULL;
+	char *result = NULL;
 	bool hit;
-	text *out;
+	text *out = NULL;
 
 	/* All declarations above */
 	result = NULL;
@@ -274,7 +308,7 @@ ndb_llm_cache_test(PG_FUNCTION_ARGS)
 	if (hit && result)
 	{
 		out = cstring_to_text(result);
-		NDB_FREE(result);
+		nfree(result);
 		PG_RETURN_TEXT_P(out);
 	} else
 		PG_RETURN_NULL();
@@ -292,25 +326,42 @@ ndb_llm_cache_evict_lru(int max_size)
 	int			current_count = 0;
 	int			evicted = 0;
 	StringInfoData sql;
-	NDB_DECLARE(NdbSpiSession *, session);
+	NdbSpiSession *session = NULL;
 	MemoryContext oldcontext;
 	int32		count_val;
+
+	/* Validate max_size is positive */
+	if (max_size <= 0)
+	{
+		elog(WARNING, "neurondb: ndb_llm_cache_evict_lru called with invalid max_size: %d", max_size);
+		return 0;
+	}
 
 	oldcontext = CurrentMemoryContext;
 	session = ndb_spi_session_begin(oldcontext, false);
 	if (session == NULL)
+	{
+		elog(DEBUG1, "neurondb: ndb_llm_cache_evict_lru: failed to begin SPI session");
 		return 0;
+	}
 
 	/* Get current cache size */
 	initStringInfo(&sql);
 	appendStringInfo(&sql, "SELECT COUNT(*) FROM " NDB_FQ_LLM_CACHE);
 	spi_ret = ndb_spi_execute(session, sql.data, true, 1);
-	if (spi_ret == SPI_OK_SELECT && SPI_processed > 0)
+	if (spi_ret != SPI_OK_SELECT)
+	{
+		elog(WARNING, "neurondb: ndb_llm_cache_evict_lru: failed to get cache size: SPI return code %d", spi_ret);
+		nfree(sql.data);
+		ndb_spi_session_end(&session);
+		return 0;
+	}
+	if (SPI_processed > 0)
 	{
 		if (ndb_spi_get_int32(session, 0, 1, &count_val))
 			current_count = count_val;
 	}
-	NDB_FREE(sql.data);
+	nfree(sql.data);
 
 	if (current_count <= max_size)
 	{
@@ -331,7 +382,7 @@ ndb_llm_cache_evict_lru(int max_size)
 	spi_ret = ndb_spi_execute(session, sql.data, false, 0);
 	if (spi_ret == SPI_OK_DELETE)
 		evicted = current_count - max_size;
-	NDB_FREE(sql.data);
+	nfree(sql.data);
 
 	ndb_spi_session_end(&session);
 	return evicted;
@@ -365,7 +416,7 @@ ndb_llm_cache_stats(PG_FUNCTION_ARGS)
 	int			ttl_seconds = 0;
 	TimestampTz oldest_entry = 0;
 	TimestampTz newest_entry = 0;
-	NDB_DECLARE(NdbSpiSession *, session);
+	NdbSpiSession *session = NULL;
 	MemoryContext oldcontext;
 	int32		count_val;
 
@@ -387,7 +438,7 @@ ndb_llm_cache_stats(PG_FUNCTION_ARGS)
 		if (ndb_spi_get_int32(session, 0, 1, &count_val))
 			total_entries = count_val;
 	}
-	NDB_FREE(sql.data);
+	nfree(sql.data);
 
 	/* Get stale entries */
 	initStringInfo(&sql);
@@ -401,7 +452,7 @@ ndb_llm_cache_stats(PG_FUNCTION_ARGS)
 		if (ndb_spi_get_int32(session, 0, 1, &count_val))
 			stale_entries = count_val;
 	}
-	NDB_FREE(sql.data);
+	nfree(sql.data);
 
 	/* Get oldest and newest entry timestamps */
 	initStringInfo(&sql);
@@ -428,7 +479,7 @@ ndb_llm_cache_stats(PG_FUNCTION_ARGS)
 		if (!isnull2)
 			newest_entry = DatumGetTimestampTz(d2);
 	}
-	NDB_FREE(sql.data);
+	nfree(sql.data);
 
 	ndb_spi_session_end(&session);
 
@@ -445,27 +496,27 @@ ndb_llm_cache_stats(PG_FUNCTION_ARGS)
 		ttl_seconds);
 	if (oldest_entry != 0)
 	{
-		char	   *oldest_str = NULL;
+		char *oldest_str = NULL;
 
 		oldest_str = DatumGetCString(DirectFunctionCall1(timestamptz_out, TimestampTzGetDatum(oldest_entry)));
 		appendStringInfo(&jsonbuf, ",\"oldest_entry\":%s", ndb_json_quote_string(oldest_str));
-		NDB_FREE(oldest_str);
+		nfree(oldest_str);
 	}
 	if (newest_entry != 0)
 	{
-		char	   *newest_str = NULL;
+		char *newest_str = NULL;
 
 		newest_str = DatumGetCString(DirectFunctionCall1(timestamptz_out, TimestampTzGetDatum(newest_entry)));
 		appendStringInfo(&jsonbuf, ",\"newest_entry\":%s", ndb_json_quote_string(newest_str));
-		NDB_FREE(newest_str);
+		nfree(newest_str);
 	}
 	appendStringInfoChar(&jsonbuf, '}');
 
 	{
-		Jsonb	   *result;
+		Jsonb *result = NULL;
 		
 		result = ndb_jsonb_in_cstring(jsonbuf.data);
-		NDB_FREE(jsonbuf.data);
+		nfree(jsonbuf.data);
 		PG_RETURN_JSONB_P(result);
 	}
 }
@@ -478,11 +529,11 @@ Datum
 ndb_llm_cache_clear(PG_FUNCTION_ARGS)
 {
 	text	   *pattern = NULL;
-	char	   *pattern_str = NULL;
+	char *pattern_str = NULL;
 	StringInfoData sql;
 	int			spi_ret;
 	int			deleted = 0;
-	NDB_DECLARE(NdbSpiSession *, session);
+	NdbSpiSession *session = NULL;
 	MemoryContext oldcontext;
 
 	if (PG_ARGISNULL(0))
@@ -508,7 +559,7 @@ ndb_llm_cache_clear(PG_FUNCTION_ARGS)
 			"DELETE FROM " NDB_FQ_LLM_CACHE " "
 			"WHERE key LIKE %s",
 			ndb_json_quote_string(pattern_str));
-		NDB_FREE(pattern_str);
+		nfree(pattern_str);
 	}
 
 	spi_ret = ndb_spi_execute(session, sql.data, false, 0);
@@ -518,7 +569,7 @@ ndb_llm_cache_clear(PG_FUNCTION_ARGS)
 		deleted = SPI_processed;
 	}
 
-	NDB_FREE(sql.data);
+	nfree(sql.data);
 	ndb_spi_session_end(&session);
 
 	PG_RETURN_INT32(deleted);
@@ -535,7 +586,7 @@ ndb_llm_cache_evict_stale(PG_FUNCTION_ARGS)
 	int			spi_ret;
 	int			deleted = 0;
 	int			ttl_seconds = 0;
-	NDB_DECLARE(NdbSpiSession *, session);
+	NdbSpiSession *session = NULL;
 	MemoryContext oldcontext;
 
 	ttl_seconds = neurondb_llm_cache_ttl;
@@ -557,7 +608,7 @@ ndb_llm_cache_evict_stale(PG_FUNCTION_ARGS)
 	if (spi_ret == SPI_OK_DELETE)
 		deleted = SPI_processed;
 
-	NDB_FREE(sql.data);
+	nfree(sql.data);
 	ndb_spi_session_end(&session);
 
 	PG_RETURN_INT32(deleted);
@@ -591,14 +642,14 @@ PG_FUNCTION_INFO_V1(ndb_llm_cache_warm);
 Datum
 ndb_llm_cache_warm(PG_FUNCTION_ARGS)
 {
-	ArrayType  *texts_array;
-	Datum	   *text_datums = NULL;
-	bool	   *text_nulls = NULL;
+	ArrayType *texts_array = NULL;
+	Datum *text_datums = NULL;
+	bool *text_nulls = NULL;
 	int			nitems = 0;
 	int			i;
 	int			cached = 0;
 	text	   *model_text = NULL;
-	char	   *model_str = NULL;
+	char *model_str = NULL;
 
 	texts_array = PG_GETARG_ARRAYTYPE_P(0);
 	if (PG_ARGISNULL(1))
@@ -625,8 +676,8 @@ ndb_llm_cache_warm(PG_FUNCTION_ARGS)
 		if (!text_nulls[i])
 		{
 			text	   *input_text = (text *) DatumGetPointer(text_datums[i]);
-			char	   *input_str = NULL;
-			char	   *cache_key = NULL;
+			char *input_str = NULL;
+			char *cache_key = NULL;
 			StringInfoData key_buf;
 			Vector	   *embedding = NULL;
 			StringInfoData cache_val;
@@ -649,19 +700,19 @@ ndb_llm_cache_warm(PG_FUNCTION_ARGS)
 			/* BULLETPROOF: Copy cache_key to current context before SPI calls */
 			/* ndb_llm_cache_lookup/store use SPI which may change memory context */
 			cache_key = pstrdup(key_buf.data);
-			NDB_FREE(key_buf.data);  /* Free original StringInfo data */
+			nfree(key_buf.data);  /* Free original StringInfo data */
 
 			/* Check if already cached */
 			{
-				char	   *cached_text = NULL;
+				char *cached_text = NULL;
 				bool		hit = false;
 
 				hit = ndb_llm_cache_lookup(cache_key, neurondb_llm_cache_ttl, &cached_text);
 				if (hit && cached_text != NULL)
 				{
-					NDB_FREE(cached_text);
-					NDB_FREE(cache_key);
-					NDB_FREE(input_str);
+					nfree(cached_text);
+					nfree(cache_key);
+					nfree(input_str);
 					continue;
 				}
 			}
@@ -670,7 +721,7 @@ ndb_llm_cache_warm(PG_FUNCTION_ARGS)
 			{
 				Oid			embed_text_oid;
 				FmgrInfo	flinfo;
-				List	   *funcname;
+				List *funcname = NULL;
 				Oid			argtypes[2];
 
 				funcname = list_make1(makeString("embed_text"));
@@ -714,20 +765,20 @@ ndb_llm_cache_warm(PG_FUNCTION_ARGS)
 				ndb_llm_cache_store(cache_key, cache_val.data);
 				cached++;
 
-				NDB_FREE(cache_val.data);
+				nfree(cache_val.data);
 			}
 
-			NDB_FREE(cache_key);
-			NDB_FREE(input_str);
+			nfree(cache_key);
+			nfree(input_str);
 		}
 	}
 
 	if (text_datums)
-		NDB_FREE(text_datums);
+		nfree(text_datums);
 	if (text_nulls)
-		NDB_FREE(text_nulls);
+		nfree(text_nulls);
 	if (model_str)
-		NDB_FREE(model_str);
+		nfree(model_str);
 
 	PG_RETURN_INT32(cached);
 }
