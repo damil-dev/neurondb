@@ -532,23 +532,36 @@ ivfbuild(Relation heap, Relation index, struct IndexInfo *indexInfo)
 	options = (IvfOptions *) indexInfo->ii_AmCache;
 	if (options == NULL)
 	{
-		/* Check if rd_options is valid before calling build_reloptions */
+		IvfOptions opts;
+		IvfOptions *opts_ptr = NULL;
+
+		/* Use defaults if rd_options is not available during build */
 		if (index->rd_options != NULL)
 		{
-			Datum		relopts = PointerGetDatum(index->rd_options);
-
-			options = (IvfOptions *) build_reloptions(relopts,
-													  true,
-													  relopt_kind_ivf,
-													  sizeof(IvfOptions),
-													  NULL,
-													  0);
-			indexInfo->ii_AmCache = (void *) options;
+			/* index->rd_options is already a processed bytea from build_reloptions */
+			/* We can access it directly using VARDATA */
+			opts_ptr = (IvfOptions *) VARDATA(index->rd_options);
+			if (opts_ptr != NULL)
+			{
+				opts = *opts_ptr;
+			}
+			else
+			{
+				/* Use defaults if parsing failed */
+				opts.nlists = IVF_DEFAULT_NLISTS;
+				opts.nprobe = IVF_DEFAULT_NPROBE;
+			}
 		}
 		else
 		{
-			/* Use default options if rd_options is NULL */
+			/* Use defaults during index build */
+			opts.nlists = IVF_DEFAULT_NLISTS;
+			opts.nprobe = IVF_DEFAULT_NPROBE;
 		}
+
+		nalloc(options, IvfOptions, 1);
+		*options = opts;
+		indexInfo->ii_AmCache = (void *) options;
 	}
 	nlists = options ? options->nlists : IVF_DEFAULT_NLISTS;
 
@@ -754,13 +767,19 @@ ivfbuildempty(Relation index)
 	Page		page;
 	IvfMetaPage meta;
 	IvfOptions *options = NULL;
-	int			nlists;
-	int			nprobe;
+	int			nlists = IVF_DEFAULT_NLISTS;
+	int			nprobe = IVF_DEFAULT_NPROBE;
 
 	/* Get index options */
-	options = (IvfOptions *) index->rd_options;
-	nlists = options ? options->nlists : IVF_DEFAULT_NLISTS;
-	nprobe = options ? options->nprobe : IVF_DEFAULT_NPROBE;
+	if (index->rd_options != NULL)
+	{
+		options = (IvfOptions *) index->rd_options;
+		if (options != NULL)
+		{
+			nlists = (options->nlists > 0) ? options->nlists : IVF_DEFAULT_NLISTS;
+			nprobe = (options->nprobe > 0) ? options->nprobe : IVF_DEFAULT_NPROBE;
+		}
+	}
 
 	/* Initialize metadata page on block 0 */
 	buf = ReadBuffer(index, 0);
@@ -1394,6 +1413,10 @@ ivfoptions(Datum reloptions, bool validate)
 		{"probes", RELOPT_TYPE_INT, offsetof(IvfOptions, nprobe)}
 	};
 
+	/* Handle NULL reloptions safely */
+	if (reloptions == (Datum) 0 || reloptions == PointerGetDatum(NULL))
+		reloptions = (Datum) 0;
+
 	return (bytea *) build_reloptions(reloptions, validate, relopt_kind_ivf,
 									  sizeof(IvfOptions), tab, lengthof(tab));
 }
@@ -1484,9 +1507,14 @@ ivfrescan(IndexScanDesc scan,
 		so->strategy = 1;
 
 	/* Get nprobe from index options or metadata */
-	options = (IvfOptions *) scan->indexRelation->rd_options;
-	if (options)
-		so->nprobe = options->nprobe;
+	if (scan->indexRelation->rd_options != NULL)
+	{
+		options = (IvfOptions *) scan->indexRelation->rd_options;
+		if (options != NULL && options->nprobe > 0)
+			so->nprobe = options->nprobe;
+		else
+			so->nprobe = IVF_DEFAULT_NPROBE;
+	}
 	else
 	{
 		metaBuffer = ReadBuffer(scan->indexRelation, 0);
