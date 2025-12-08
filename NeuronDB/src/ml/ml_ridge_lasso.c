@@ -1248,6 +1248,10 @@ ridge_try_gpu_predict_catalog(int32 model_id,
 	double		prediction = 0.0;
 	bool		success = false;
 
+	/* Check compute mode - only try GPU if compute mode allows it */
+	if (!NDB_SHOULD_TRY_GPU())
+		return false;
+
 	if (!neurondb_gpu_is_available())
 		return false;
 	if (feature_vec == NULL)
@@ -1563,6 +1567,10 @@ lasso_try_gpu_predict_catalog(int32 model_id,
 	char *gpu_err = NULL;
 	double		prediction = 0.0;
 	bool		success = false;
+
+	/* Check compute mode - only try GPU if compute mode allows it */
+	if (!NDB_SHOULD_TRY_GPU())
+		return false;
 
 	if (!neurondb_gpu_is_available())
 		return false;
