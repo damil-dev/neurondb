@@ -7200,6 +7200,10 @@ rf_try_gpu_predict_catalog(int32 model_id,
 	int			class_out = -1;
 	bool		success = false;
 
+	/* Check compute mode - only try GPU if compute mode allows it */
+	if (!NDB_SHOULD_TRY_GPU())
+		return false;
+
 	if (!neurondb_gpu_is_available())
 		return false;
 	if (feature_vec == NULL)

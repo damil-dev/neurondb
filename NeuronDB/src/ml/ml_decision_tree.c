@@ -43,6 +43,7 @@
 #include "neurondb_safe_memory.h"
 #include "neurondb_macros.h"
 #include "neurondb_json.h"
+#include "neurondb_constants.h"
 
 #ifdef NDB_GPU_CUDA
 #include "neurondb_cuda_runtime.h"
@@ -989,6 +990,10 @@ dt_try_gpu_predict_catalog(int32 model_id, const Vector *feature_vec, double *re
 	char *gpu_err = NULL;
 	double		prediction = 0.0;
 	bool		success = false;
+
+	/* Check compute mode - only try GPU if compute mode allows it */
+	if (!NDB_SHOULD_TRY_GPU())
+		return false;
 
 	if (!neurondb_gpu_is_available())
 		return false;
