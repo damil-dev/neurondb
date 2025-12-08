@@ -7,6 +7,7 @@
 \pset tuples_only off
 
 \set ON_ERROR_STOP on
+SET client_min_messages TO WARNING;
 
 \echo '=========================================================================='
 \echo 'Index Module: Basic Functionality Tests'
@@ -43,17 +44,92 @@ CREATE INDEX idx_test_hnsw_custom ON index_test_table
 USING hnsw (embedding vector_l2_ops) 
 WITH (m = 16, ef_construction = 200);
 
+\echo 'Test 2a: Verify HNSW index parameters were set correctly'
+DO $$
+DECLARE
+	v_indexdef text;
+	v_m_found boolean := false;
+	v_ef_construction_found boolean := false;
+BEGIN
+	SELECT indexdef INTO v_indexdef
+	FROM pg_indexes
+	WHERE indexname = 'idx_test_hnsw_custom';
+	
+	IF v_indexdef IS NULL THEN
+		RAISE EXCEPTION 'Index idx_test_hnsw_custom not found';
+	END IF;
+	
+	v_m_found := v_indexdef LIKE '%m=''16''%';
+	v_ef_construction_found := v_indexdef LIKE '%ef_construction=''200''%';
+	
+	IF v_m_found AND v_ef_construction_found THEN
+		RAISE NOTICE 'PASS: Parameters correctly set (m=16, ef_construction=200)';
+	ELSE
+		RAISE EXCEPTION 'FAIL: Parameters not correctly set. Expected m=16, ef_construction=200. Got: %', v_indexdef;
+	END IF;
+END $$;
+
 \echo 'Test 3: Create HNSW index with cosine distance'
 DROP INDEX IF EXISTS idx_test_hnsw_cosine;
 CREATE INDEX idx_test_hnsw_cosine ON index_test_table 
 USING hnsw (embedding vector_cosine_ops) 
 WITH (m = 16, ef_construction = 200);
 
+\echo 'Test 3a: Verify HNSW cosine index parameters were set correctly'
+DO $$
+DECLARE
+	v_indexdef text;
+	v_m_found boolean := false;
+	v_ef_construction_found boolean := false;
+BEGIN
+	SELECT indexdef INTO v_indexdef
+	FROM pg_indexes
+	WHERE indexname = 'idx_test_hnsw_cosine';
+	
+	IF v_indexdef IS NULL THEN
+		RAISE EXCEPTION 'Index idx_test_hnsw_cosine not found';
+	END IF;
+	
+	v_m_found := v_indexdef LIKE '%m=''16''%';
+	v_ef_construction_found := v_indexdef LIKE '%ef_construction=''200''%';
+	
+	IF v_m_found AND v_ef_construction_found THEN
+		RAISE NOTICE 'PASS: Parameters correctly set (m=16, ef_construction=200)';
+	ELSE
+		RAISE EXCEPTION 'FAIL: Parameters not correctly set. Expected m=16, ef_construction=200. Got: %', v_indexdef;
+	END IF;
+END $$;
+
 \echo 'Test 4: Create HNSW index with inner product'
 DROP INDEX IF EXISTS idx_test_hnsw_ip;
 CREATE INDEX idx_test_hnsw_ip ON index_test_table 
 USING hnsw (embedding vector_ip_ops) 
 WITH (m = 16, ef_construction = 200);
+
+\echo 'Test 4a: Verify HNSW inner product index parameters were set correctly'
+DO $$
+DECLARE
+	v_indexdef text;
+	v_m_found boolean := false;
+	v_ef_construction_found boolean := false;
+BEGIN
+	SELECT indexdef INTO v_indexdef
+	FROM pg_indexes
+	WHERE indexname = 'idx_test_hnsw_ip';
+	
+	IF v_indexdef IS NULL THEN
+		RAISE EXCEPTION 'Index idx_test_hnsw_ip not found';
+	END IF;
+	
+	v_m_found := v_indexdef LIKE '%m=''16''%';
+	v_ef_construction_found := v_indexdef LIKE '%ef_construction=''200''%';
+	
+	IF v_m_found AND v_ef_construction_found THEN
+		RAISE NOTICE 'PASS: Parameters correctly set (m=16, ef_construction=200)';
+	ELSE
+		RAISE EXCEPTION 'FAIL: Parameters not correctly set. Expected m=16, ef_construction=200. Got: %', v_indexdef;
+	END IF;
+END $$;
 
 /*-------------------------------------------------------------------
  * ---- IVF INDEX CREATION ----
@@ -71,6 +147,29 @@ DROP INDEX IF EXISTS idx_test_ivf_custom;
 CREATE INDEX idx_test_ivf_custom ON index_test_table 
 USING ivf (embedding vector_l2_ops) 
 WITH (lists = 10);
+
+\echo 'Test 6a: Verify IVF index parameters were set correctly'
+DO $$
+DECLARE
+	v_indexdef text;
+	v_lists_found boolean := false;
+BEGIN
+	SELECT indexdef INTO v_indexdef
+	FROM pg_indexes
+	WHERE indexname = 'idx_test_ivf_custom';
+	
+	IF v_indexdef IS NULL THEN
+		RAISE EXCEPTION 'Index idx_test_ivf_custom not found';
+	END IF;
+	
+	v_lists_found := v_indexdef LIKE '%lists=''10''%';
+	
+	IF v_lists_found THEN
+		RAISE NOTICE 'PASS: Parameters correctly set (lists=10)';
+	ELSE
+		RAISE EXCEPTION 'FAIL: Parameters not correctly set. Expected lists=10. Got: %', v_indexdef;
+	END IF;
+END $$;
 
 /*-------------------------------------------------------------------
  * ---- INDEX QUERIES ----
