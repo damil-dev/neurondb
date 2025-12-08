@@ -24,14 +24,17 @@
 #include "access/htup_details.h"
 #include "executor/spi.h"
 #include "utils/memutils.h"
+#include "neurondb.h"
 #include "neurondb_pgcompat.h"
 #include "neurondb_validation.h"
 #include "neurondb_spi_safe.h"
-#include "neurondb_safe_memory.h"
+#include "neurondb_macros.h"
 #include "neurondb_macros.h"
 #include "neurondb_spi.h"
+#include "neurondb_json.h"
 #include "ml_catalog.h"
 #include "neurondb_constants.h"
+#include "neurondb_gpu.h"
 
 #include <math.h>
 #include <string.h>
@@ -210,7 +213,13 @@ fit_arima(const float *data, int n, int p, int d, int q)
 	if (q < 0 || q > MAX_ARIMA_ORDER_Q)
 		elog(ERROR, "arima q out of bounds");
 
-	model = (TimeSeriesModel *) palloc0(sizeof(TimeSeriesModel));
+	{
+		TimeSeriesModel *model_ptr = NULL;
+
+		nalloc(model_ptr, TimeSeriesModel, 1);
+		memset(model_ptr, 0, sizeof(TimeSeriesModel));
+		model = model_ptr;
+	}
 	model->p = p;
 	model->d = d;
 	model->q = q;
@@ -242,10 +251,39 @@ fit_arima(const float *data, int n, int p, int d, int q)
 		}
 		for (i = 0; i < p; i++)
 		{
-			R[i] = (float *) palloc0(sizeof(float) * p);
+			float	   *R_row = NULL;
+
+			nalloc(R_row, float, p);
+			memset(R_row, 0, sizeof(float) * p);
+			R[i] = R_row;
 			for (j = 0; j < p; j++)
 				R[i][j] = autocorr[abs(i - j)];
 			right[i] = autocorr[i + 1];
+		}
+
+		/* Add regularization to ensure positive definiteness */
+		/* This helps with numerical stability for small datasets or near-singular matrices */
+		{
+			float		lambda = 1e-4f;	/* Small regularization parameter */
+			float		max_diag = 0.0f;
+			int			k;
+
+			/* Find maximum diagonal element for adaptive regularization */
+			for (k = 0; k < p; k++)
+			{
+				if (R[k][k] > max_diag)
+					max_diag = R[k][k];
+			}
+
+			/* Adaptive regularization: scale lambda based on matrix size */
+			if (max_diag > 0.0f)
+				lambda = max_diag * 1e-4f;
+			else
+				lambda = 1e-4f;
+
+			/* Add regularization to diagonal (Tikhonov regularization) */
+			for (k = 0; k < p; k++)
+				R[k][k] += lambda;
 		}
 
 		nalloc(a, float, p);
@@ -270,14 +308,26 @@ fit_arima(const float *data, int n, int p, int d, int q)
 						sum -= L[i][k] * L[j][k];
 					if (i == j)
 					{
-						if (sum <= 0)
-							elog(ERROR,
-								 "Failed to "
-								 "decompose "
-								 "autocorrelatio"
-								 "n matrix: "
-								 "non-positive "
-								 "definite");
+						/* With regularization, sum should be positive, but add safety check */
+						if (sum <= 1e-8f)
+						{
+							/* Try adding more regularization dynamically */
+							float		extra_lambda = 1e-6f - sum;
+							if (extra_lambda > 0.0f)
+							{
+								R[i][i] += extra_lambda;
+								sum += extra_lambda;
+							}
+
+							/* Final check - if still too small, matrix is truly singular */
+							if (sum <= 1e-8f)
+								elog(ERROR,
+									 "Failed to decompose autocorrelation matrix: "
+									 "non-positive definite (diag_sum=%.6e). "
+									 "Try using simpler ARIMA parameters (e.g., lower p) "
+									 "or ensure sufficient data variation.",
+									 sum);
+						}
 						L[i][j] = sqrtf(sum);
 					}
 					else
@@ -285,8 +335,10 @@ fit_arima(const float *data, int n, int p, int d, int q)
 				}
 			}
 			{
-		float *y = NULL;
-				y = (float *) palloc0(sizeof(float) * p);
+				float	   *y = NULL;
+
+				nalloc(y, float, p);
+				memset(y, 0, sizeof(float) * p);
 				for (i = 0; i < p; i++)
 				{
 					float		sum = right[i];
@@ -331,7 +383,11 @@ fit_arima(const float *data, int n, int p, int d, int q)
 
 	if (q > 0)
 	{
-		model->ma_coeffs = (float *) palloc0(sizeof(float) * q);
+		float	   *ma_coeffs = NULL;
+
+		nalloc(ma_coeffs, float, q);
+		memset(ma_coeffs, 0, sizeof(float) * q);
+		model->ma_coeffs = ma_coeffs;
 	}
 	else
 	{
@@ -404,7 +460,13 @@ arima_forecast(const TimeSeriesModel * model,
 
 	p = model->p;
 	d = model->d;
-	history = (float *) palloc0(sizeof(float) * (n_last + n_ahead));
+	{
+		float	   *history_ptr = NULL;
+
+		nalloc(history_ptr, float, n_last + n_ahead);
+		memset(history_ptr, 0, sizeof(float) * (n_last + n_ahead));
+		history = history_ptr;
+	}
 
 	memcpy(history, last_values, sizeof(float) * n_last);
 
@@ -444,12 +506,25 @@ PG_FUNCTION_INFO_V1(train_arima);
 Datum
 train_arima(PG_FUNCTION_ARGS)
 {
-	text	   *table_name = PG_GETARG_TEXT_PP(0);
-	text	   *time_col = PG_GETARG_TEXT_PP(1);
-	text	   *value_col = PG_GETARG_TEXT_PP(2);
-	int32		p = PG_ARGISNULL(3) ? 1 : PG_GETARG_INT32(3);
-	int32		d = PG_ARGISNULL(4) ? 1 : PG_GETARG_INT32(4);
-	int32		q = PG_ARGISNULL(5) ? 1 : PG_GETARG_INT32(5);
+	text	   *table_name;
+	text	   *time_col;
+	text	   *value_col;
+	int32		p;
+	int32		d;
+	int32		q;
+
+	/* Validate argument count */
+	if (PG_NARGS() < 3 || PG_NARGS() > 6)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: train_arima requires 3 to 6 arguments")));
+
+	table_name = PG_GETARG_TEXT_PP(0);
+	time_col = PG_GETARG_TEXT_PP(1);
+	value_col = PG_GETARG_TEXT_PP(2);
+	p = PG_ARGISNULL(3) ? 1 : PG_GETARG_INT32(3);
+	d = PG_ARGISNULL(4) ? 1 : PG_GETARG_INT32(4);
+	q = PG_ARGISNULL(5) ? 1 : PG_GETARG_INT32(5);
 
 	char	   *table_name_str = text_to_cstring(table_name);
 	char	   *time_col_str = text_to_cstring(time_col);
@@ -613,12 +688,28 @@ train_arima(PG_FUNCTION_ARGS)
 		}
 
 		/* Insert model */
-		appendStringInfo(&insert_sql,
-						 "INSERT INTO neurondb.arima_models (p, d, q, intercept, ar_coeffs, ma_coeffs) "
-						 "VALUES (%d, %d, %d, %.10f, %s, %s) RETURNING model_id",
-						 p, d, q, (double) model->intercept,
-						 ar_array ? DatumGetCString(DirectFunctionCall1(array_out, PointerGetDatum(ar_array))) : "NULL",
-						 ma_array ? DatumGetCString(DirectFunctionCall1(array_out, PointerGetDatum(ma_array))) : "NULL");
+		{
+			char	   *ar_array_str = NULL;
+			char	   *ma_array_str = NULL;
+
+			if (ar_array != NULL)
+				ar_array_str = DatumGetCString(DirectFunctionCall1(array_out, PointerGetDatum(ar_array)));
+			if (ma_array != NULL)
+				ma_array_str = DatumGetCString(DirectFunctionCall1(array_out, PointerGetDatum(ma_array)));
+
+			appendStringInfo(&insert_sql,
+							 "INSERT INTO neurondb.arima_models (p, d, q, intercept, ar_coeffs, ma_coeffs) "
+							 "VALUES (%d, %d, %d, %.10f, %s, %s) RETURNING model_id",
+							 p, d, q, (double) model->intercept,
+							 ar_array_str ? ar_array_str : "NULL",
+							 ma_array_str ? ma_array_str : "NULL");
+
+			/* Free the array strings to prevent memory leaks */
+			if (ar_array_str)
+				nfree(ar_array_str);
+			if (ma_array_str)
+				nfree(ma_array_str);
+		}
 
 		ret2 = ndb_spi_execute(spi_session, insert_sql.data, true, 1);
 		if (ret2 != SPI_OK_INSERT || SPI_processed != 1)
@@ -644,7 +735,6 @@ train_arima(PG_FUNCTION_ARGS)
 				nfree(ar_datums);
 			if (ma_datums)
 				nfree(ma_datums);
-			nfree(insert_sql.data);
 			ereport(ERROR,
 					(errcode(ERRCODE_INTERNAL_ERROR),
 					 errmsg("failed to save ARIMA model")));
@@ -663,15 +753,12 @@ train_arima(PG_FUNCTION_ARGS)
 		/* Save history */
 		for (i = 0; i < n_samples; i++)
 		{
-			nfree(insert_sql.data);
-			initStringInfo(&insert_sql);
+			resetStringInfo(&insert_sql);
 			appendStringInfo(&insert_sql,
 							 "INSERT INTO neurondb.arima_history (model_id, observed) VALUES (%d, %.10f)",
 							 model_id, (double) values[i]);
 			ndb_spi_execute(spi_session, insert_sql.data, true, 0);
 		}
-
-		nfree(insert_sql.data);
 		if (ar_datums)
 			nfree(ar_datums);
 		if (ma_datums)
@@ -703,8 +790,17 @@ PG_FUNCTION_INFO_V1(forecast_arima);
 Datum
 forecast_arima(PG_FUNCTION_ARGS)
 {
-	int32		model_id = PG_GETARG_INT32(0);
-	int32		n_ahead = PG_GETARG_INT32(1);
+	int32		model_id;
+	int32		n_ahead;
+
+	/* Validate argument count */
+	if (PG_NARGS() < 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: forecast_arima requires at least 2 arguments")));
+
+	model_id = PG_GETARG_INT32(0);
+	n_ahead = PG_GETARG_INT32(1);
 
 	StringInfoData sql;
 	TimeSeriesModel model;
@@ -754,7 +850,7 @@ forecast_arima(PG_FUNCTION_ARGS)
 		NDB_SPI_SESSION_END(spi_session);
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_OBJECT),
-				 errmsg("model_id %d not found in neurondb_arima_models",
+				 errmsg("model_id %d not found in neurondb.arima_models",
 						model_id)));
 	}
 	{
@@ -815,52 +911,89 @@ forecast_arima(PG_FUNCTION_ARGS)
 				intercept = 0.0;
 			}
 		}
-		ar_coeffs_arr = DatumGetArrayTypeP(
-										   SPI_getbinval(modeltuple, modeldesc, 5, &isnull));
-		ma_coeffs_arr = DatumGetArrayTypeP(
-										   SPI_getbinval(modeltuple, modeldesc, 6, &isnull));
+	bool		ar_isnull = false;
+	bool		ma_isnull = false;
+
+	Datum		ar_datum = SPI_getbinval(modeltuple, modeldesc, 5, &ar_isnull);
+	Datum		ma_datum = SPI_getbinval(modeltuple, modeldesc, 6, &ma_isnull);
+
+	if (!ar_isnull)
+		ar_coeffs_arr = DatumGetArrayTypeP(ar_datum);
+	else
+		ar_coeffs_arr = NULL;
+
+	if (!ma_isnull)
+		ma_coeffs_arr = DatumGetArrayTypeP(ma_datum);
+	else
+		ma_coeffs_arr = NULL;
 	}
 
-	arr_elem_type = ARR_ELEMTYPE(ar_coeffs_arr);
-	(void) arr_elem_type;		/* Suppress unused variable warning */
-	ndims = ARR_NDIM(ar_coeffs_arr);
-	Assert(ndims == 1);
-	(void) ndims;				/* Used in Assert only */
-	dims = ARR_DIMS(ar_coeffs_arr);
-	Assert(dims[0] == p);
-	nalloc(ar_coeffs, float, p);
-	for (i = 0; i < p; i++)
+	if (ar_coeffs_arr != NULL && p > 0)
 	{
-		float8		val;
+		int			ndims = ARR_NDIM(ar_coeffs_arr);
 
-		memcpy(&val,
-			   (char *) ARR_DATA_PTR(ar_coeffs_arr)
-			   + i * sizeof(float8),
-			   sizeof(float8));
-		ar_coeffs[i] = (float) val;
+		if (ndims != 1)
+			ereport(ERROR,
+					(errcode(ERRCODE_DATA_EXCEPTION),
+					 errmsg("forecast_arima: AR coefficients array must be 1-dimensional, got %d dimensions", ndims)));
+
+		dims = ARR_DIMS(ar_coeffs_arr);
+		if (dims[0] != p)
+			ereport(ERROR,
+					(errcode(ERRCODE_DATA_EXCEPTION),
+					 errmsg("forecast_arima: AR coefficients array length %d does not match p=%d", dims[0], p)));
+
+		nalloc(ar_coeffs, float, p);
+		for (i = 0; i < p; i++)
+		{
+			float4		val;
+
+			memcpy(&val,
+				   (char *) ARR_DATA_PTR(ar_coeffs_arr)
+				   + i * sizeof(float4),	/* Use float4 size since we store as FLOAT4 */
+				   sizeof(float4));
+			ar_coeffs[i] = val;
+		}
+	}
+	else if (p > 0)
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_DATA_EXCEPTION),
+				 errmsg("forecast_arima: AR coefficients array is NULL but p=%d > 0", p)));
 	}
 
-	arr_elem_type = ARR_ELEMTYPE(ma_coeffs_arr);
-	ndims = ARR_NDIM(ma_coeffs_arr);
-	(void) ndims;				/* Used in Assert only */
-	dims = ARR_DIMS(ma_coeffs_arr);
-	if (q > 0 && dims[0] == q)
+	if (ma_coeffs_arr != NULL && q > 0)
 	{
+		int			ndims = ARR_NDIM(ma_coeffs_arr);
+
+		if (ndims != 1)
+			ereport(ERROR,
+					(errcode(ERRCODE_DATA_EXCEPTION),
+					 errmsg("forecast_arima: MA coefficients array must be 1-dimensional, got %d dimensions", ndims)));
+
+		dims = ARR_DIMS(ma_coeffs_arr);
+		if (dims[0] != q)
+			ereport(ERROR,
+					(errcode(ERRCODE_DATA_EXCEPTION),
+					 errmsg("forecast_arima: MA coefficients array length %d does not match q=%d", dims[0], q)));
+
 		nalloc(ma_coeffs, float, q);
 		for (i = 0; i < q; i++)
 		{
-			float8		val;
+			float4		val;
 
 			memcpy(&val,
 				   (char *) ARR_DATA_PTR(ma_coeffs_arr)
-				   + i * sizeof(float8),
-				   sizeof(float8));
-			ma_coeffs[i] = (float) val;
+				   + i * sizeof(float4),	/* Use float4 size since we store as FLOAT4 */
+				   sizeof(float4));
+			ma_coeffs[i] = val;
 		}
 	}
 	else if (q > 0)
 	{
-		ma_coeffs = (float *) palloc0(sizeof(float) * q);
+		ereport(ERROR,
+				(errcode(ERRCODE_DATA_EXCEPTION),
+				 errmsg("forecast_arima: MA coefficients array is NULL but q=%d > 0", q)));
 	}
 	else
 	{
@@ -869,7 +1002,9 @@ forecast_arima(PG_FUNCTION_ARGS)
 
 	resetStringInfo(&sql);
 	appendStringInfo(&sql,
-					 "SELECT observed FROM neurondb.arima_history WHERE model_id = %d ORDER BY observed_id DESC LIMIT 1",
+					 "SELECT array_agg(observed ORDER BY observed_id) "
+					 "FROM neurondb.arima_history "
+					 "WHERE model_id = %d",
 					 model_id);
 
 	ret = ndb_spi_execute(spi_session, sql.data, true, 1);
@@ -888,12 +1023,17 @@ forecast_arima(PG_FUNCTION_ARGS)
 	}
 
 	{
-		bool		isnull;
+		bool		isnull = false;
 		HeapTuple	observedtuple = SPI_tuptable->vals[0];
 		TupleDesc	observeddesc = SPI_tuptable->tupdesc;
 
 		last_values_arr = DatumGetArrayTypeP(
 											 SPI_getbinval(observedtuple, observeddesc, 1, &isnull));
+
+		if (isnull || last_values_arr == NULL)
+			ereport(ERROR,
+					(errcode(ERRCODE_DATA_EXCEPTION),
+					 errmsg("forecast_arima: no history found for model_id %d", model_id)));
 	}
 	ndims = ARR_NDIM(last_values_arr);
 	dims = ARR_DIMS(last_values_arr);
@@ -1085,7 +1225,7 @@ evaluate_arima_by_model_id(PG_FUNCTION_ARGS)
 		if (actual_null)
 			continue;
 
-		actual_value = DatumGetFloat4(actual_datum);
+		actual_value = DatumGetFloat8(actual_datum);	/* Use Float8 since column is float8 */
 
 		/*
 		 * Create temporary table with data up to current point for
@@ -1146,10 +1286,21 @@ PG_FUNCTION_INFO_V1(detect_anomalies);
 Datum
 detect_anomalies(PG_FUNCTION_ARGS)
 {
-	text	   *table_name = PG_GETARG_TEXT_PP(0);
-	text	   *time_col = PG_GETARG_TEXT_PP(1);
-	text	   *value_col = PG_GETARG_TEXT_PP(2);
-	float8		threshold = PG_ARGISNULL(3) ? 3.0 : PG_GETARG_FLOAT8(3);
+	text	   *table_name;
+	text	   *time_col;
+	text	   *value_col;
+	float8		threshold;
+
+	/* Validate argument count */
+	if (PG_NARGS() < 3 || PG_NARGS() > 4)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: detect_anomalies requires 3 to 4 arguments")));
+
+	table_name = PG_GETARG_TEXT_PP(0);
+	time_col = PG_GETARG_TEXT_PP(1);
+	value_col = PG_GETARG_TEXT_PP(2);
+	threshold = PG_ARGISNULL(3) ? 3.0 : PG_GETARG_FLOAT8(3);
 
 	char	   *table_name_str = text_to_cstring(table_name);
 	char	   *time_col_str = text_to_cstring(time_col);
@@ -1277,9 +1428,19 @@ PG_FUNCTION_INFO_V1(seasonal_decompose);
 Datum
 seasonal_decompose(PG_FUNCTION_ARGS)
 {
-	text	   *table_name = PG_GETARG_TEXT_PP(0);
-	text	   *value_col = PG_GETARG_TEXT_PP(1);
-	int32		period = PG_GETARG_INT32(2);
+	text	   *table_name;
+	text	   *value_col;
+	int32		period;
+
+	/* Validate argument count */
+	if (PG_NARGS() < 3)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: seasonal_decompose requires at least 3 arguments")));
+
+	table_name = PG_GETARG_TEXT_PP(0);
+	value_col = PG_GETARG_TEXT_PP(1);
+	period = PG_GETARG_INT32(2);
 
 	char	   *table_name_str = text_to_cstring(table_name);
 	char	   *value_col_str = text_to_cstring(value_col);
@@ -1405,8 +1566,17 @@ seasonal_decompose(PG_FUNCTION_ARGS)
 		}
 	}
 
-	seasonal_pattern = (float *) palloc0(sizeof(float) * period);
-	seasonal_counts = (int *) palloc0(sizeof(int) * period);
+	{
+		float	   *seasonal_pattern_ptr = NULL;
+		int		   *seasonal_counts_ptr = NULL;
+
+		nalloc(seasonal_pattern_ptr, float, period);
+		memset(seasonal_pattern_ptr, 0, sizeof(float) * period);
+		seasonal_pattern = seasonal_pattern_ptr;
+		nalloc(seasonal_counts_ptr, int, period);
+		memset(seasonal_counts_ptr, 0, sizeof(int) * period);
+		seasonal_counts = seasonal_counts_ptr;
+	}
 	for (i = 0; i < n; i++)
 	{
 		int			s = i % period;
@@ -1562,39 +1732,85 @@ timeseries_model_serialize_to_bytea(const float *ar_coeffs, int p, const float *
 				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
 				 errmsg("timeseries_model_serialize_to_bytea: model_type cannot be NULL")));
 
-	initStringInfo(&buf);
-	appendBinaryStringInfo(&buf, (char *) &p, sizeof(int));
-	appendBinaryStringInfo(&buf, (char *) &d, sizeof(int));
-	appendBinaryStringInfo(&buf, (char *) &q, sizeof(int));
-	appendBinaryStringInfo(&buf, (char *) &intercept, sizeof(float));
-	appendBinaryStringInfo(&buf, (char *) &n_obs, sizeof(int));
-	type_len = model_type != NULL ? strlen(model_type) : 0;
-	appendBinaryStringInfo(&buf, (char *) &type_len, sizeof(int));
-	appendBinaryStringInfo(&buf, model_type, type_len);
+	/* Use nalloc for StringInfo buffer */
+	{
+		int			initial_size = 256;
+		char	   *buf_data = NULL;
 
-	/* Only serialize ar_coeffs if p > 0 and ar_coeffs is not NULL */
-	if (p > 0 && ar_coeffs != NULL)
-	{
-		for (i = 0; i < p; i++)
-			appendBinaryStringInfo(&buf, (char *) &ar_coeffs[i], sizeof(float));
+		nalloc(buf_data, char, initial_size);
+		buf.data = buf_data;
+		buf.len = 0;
+		buf.maxlen = initial_size;
 	}
-	/* Only serialize ma_coeffs if q > 0 and ma_coeffs is not NULL */
-	if (q > 0 && ma_coeffs != NULL)
+
+	/* Append data to buffer, reallocating if needed */
 	{
-		for (i = 0; i < q; i++)
-			appendBinaryStringInfo(&buf, (char *) &ma_coeffs[i], sizeof(float));
+		int			needed = sizeof(int) * 4 + sizeof(float) + strlen(model_type) + (p > 0 ? p * sizeof(float) : 0) + (q > 0 ? q * sizeof(float) : 0);
+
+		if (buf.maxlen < needed)
+		{
+			char	   *new_data = NULL;
+
+			nalloc(new_data, char, needed);
+			if (buf.data != NULL)
+			{
+				memcpy(new_data, buf.data, buf.len);
+				nfree(buf.data);
+			}
+			buf.data = new_data;
+			buf.maxlen = needed;
+		}
+
+		memcpy(buf.data + buf.len, &p, sizeof(int));
+		buf.len += sizeof(int);
+		memcpy(buf.data + buf.len, &d, sizeof(int));
+		buf.len += sizeof(int);
+		memcpy(buf.data + buf.len, &q, sizeof(int));
+		buf.len += sizeof(int);
+		memcpy(buf.data + buf.len, &intercept, sizeof(float));
+		buf.len += sizeof(float);
+		memcpy(buf.data + buf.len, &n_obs, sizeof(int));
+		buf.len += sizeof(int);
+		type_len = model_type != NULL ? strlen(model_type) : 0;
+		memcpy(buf.data + buf.len, &type_len, sizeof(int));
+		buf.len += sizeof(int);
+		if (type_len > 0)
+		{
+			memcpy(buf.data + buf.len, model_type, type_len);
+			buf.len += type_len;
+		}
+
+		/* Only serialize ar_coeffs if p > 0 and ar_coeffs is not NULL */
+		if (p > 0 && ar_coeffs != NULL)
+		{
+			for (i = 0; i < p; i++)
+			{
+				memcpy(buf.data + buf.len, &ar_coeffs[i], sizeof(float));
+				buf.len += sizeof(float);
+			}
+		}
+		/* Only serialize ma_coeffs if q > 0 and ma_coeffs is not NULL */
+		if (q > 0 && ma_coeffs != NULL)
+		{
+			for (i = 0; i < q; i++)
+			{
+				memcpy(buf.data + buf.len, &ma_coeffs[i], sizeof(float));
+				buf.len += sizeof(float);
+			}
+		}
 	}
 
 	total_size = VARHDRSZ + buf.len;
 	{
-		char *result_raw = NULL;
+		char	   *result_raw = NULL;
 
 		nalloc(result_raw, char, total_size);
 		result = (bytea *) result_raw;
 		SET_VARSIZE(result, total_size);
 		memcpy(VARDATA(result), buf.data, buf.len);
 	}
-	nfree(buf.data);
+	if (buf.data != NULL)
+		nfree(buf.data);
 
 	return result;
 }
@@ -1736,8 +1952,17 @@ timeseries_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errst
 	dim = spec->feature_dim;
 
 	/* Initialize ARIMA coefficients */
-	ar_coeffs = (float *) palloc0(sizeof(float) * p);
-	ma_coeffs = (float *) palloc0(sizeof(float) * q);
+	{
+		float	   *ar_coeffs_ptr = NULL;
+		float	   *ma_coeffs_ptr = NULL;
+
+		nalloc(ar_coeffs_ptr, float, p);
+		memset(ar_coeffs_ptr, 0, sizeof(float) * p);
+		ar_coeffs = ar_coeffs_ptr;
+		nalloc(ma_coeffs_ptr, float, q);
+		memset(ma_coeffs_ptr, 0, sizeof(float) * q);
+		ma_coeffs = ma_coeffs_ptr;
+	}
 
 	/* Simple initialization */
 	for (i = 0; i < p; i++)
@@ -1759,15 +1984,30 @@ timeseries_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errst
 	model_data = timeseries_model_serialize_to_bytea(ar_coeffs, p, ma_coeffs, q, d, intercept, nvec, model_type);
 
 	/* Build metrics */
-	initStringInfo(&metrics_json);
-	appendStringInfo(&metrics_json,
-					 "{\"storage\":\"cpu\",\"p\":%d,\"d\":%d,\"q\":%d,\"intercept\":%.6f,\"model_type\":\"%s\",\"n_samples\":%d}",
-					 p, d, q, intercept, model_type, nvec);
-	metrics = DatumGetJsonbP(DirectFunctionCall1(jsonb_in,
-												 CStringGetTextDatum(metrics_json.data)));
-	nfree(metrics_json.data);
+	{
+		StringInfoData metrics_json;
+		char	   *metrics_json_str = NULL;
+		int			metrics_json_len = 0;
 
-	state = (TimeSeriesGpuModelState *) palloc0(sizeof(TimeSeriesGpuModelState));
+		metrics_json_len = snprintf(NULL, 0,
+									"{\"storage\":\"cpu\",\"p\":%d,\"d\":%d,\"q\":%d,\"intercept\":%.6f,\"model_type\":\"%s\",\"n_samples\":%d}",
+									p, d, q, intercept, model_type, nvec) + 1;
+		nalloc(metrics_json_str, char, metrics_json_len);
+		snprintf(metrics_json_str, metrics_json_len,
+				 "{\"storage\":\"cpu\",\"p\":%d,\"d\":%d,\"q\":%d,\"intercept\":%.6f,\"model_type\":\"%s\",\"n_samples\":%d}",
+				 p, d, q, intercept, model_type, nvec);
+		metrics = DatumGetJsonbP(DirectFunctionCall1(jsonb_in,
+													 CStringGetTextDatum(metrics_json_str)));
+		nfree(metrics_json_str);
+	}
+
+	{
+		TimeSeriesGpuModelState *state_ptr = NULL;
+
+		nalloc(state_ptr, TimeSeriesGpuModelState, 1);
+		memset(state_ptr, 0, sizeof(TimeSeriesGpuModelState));
+		state = state_ptr;
+	}
 	state->model_blob = model_data;
 	state->metrics = metrics;
 	state->ar_coeffs = ar_coeffs;
@@ -1884,7 +2124,6 @@ timeseries_gpu_evaluate(const MLGpuModel *model, const MLGpuEvalSpec *spec,
 {
 	const		TimeSeriesGpuModelState *state;
 	Jsonb	   *metrics_json = NULL;
-	StringInfoData buf;
 
 	if (errstr != NULL)
 		*errstr = NULL;
@@ -1899,20 +2138,34 @@ timeseries_gpu_evaluate(const MLGpuModel *model, const MLGpuEvalSpec *spec,
 
 	state = (const TimeSeriesGpuModelState *) model->backend_state;
 
-	initStringInfo(&buf);
-	appendStringInfo(&buf,
-					 "{\"algorithm\":\"timeseries\",\"storage\":\"cpu\","
-					 "\"p\":%d,\"d\":%d,\"q\":%d,\"intercept\":%.6f,\"model_type\":\"%s\",\"n_samples\":%d}",
-					 state->p > 0 ? state->p : 1,
-					 state->d > 0 ? state->d : 1,
-					 state->q > 0 ? state->q : 1,
-					 state->intercept,
-					 state->model_type[0] ? state->model_type : "arima",
-					 state->n_samples > 0 ? state->n_samples : 0);
+	{
+		char	   *buf_str = NULL;
+		int			buf_len = 0;
 
-	metrics_json = DatumGetJsonbP(DirectFunctionCall1(jsonb_in,
-													  CStringGetTextDatum(buf.data)));
-	nfree(buf.data);
+		buf_len = snprintf(NULL, 0,
+						   "{\"algorithm\":\"timeseries\",\"storage\":\"cpu\","
+						   "\"p\":%d,\"d\":%d,\"q\":%d,\"intercept\":%.6f,\"model_type\":\"%s\",\"n_samples\":%d}",
+						   state->p > 0 ? state->p : 1,
+						   state->d > 0 ? state->d : 1,
+						   state->q > 0 ? state->q : 1,
+						   state->intercept,
+						   state->model_type[0] ? state->model_type : "arima",
+						   state->n_samples > 0 ? state->n_samples : 0) + 1;
+		nalloc(buf_str, char, buf_len);
+		snprintf(buf_str, buf_len,
+				 "{\"algorithm\":\"timeseries\",\"storage\":\"cpu\","
+				 "\"p\":%d,\"d\":%d,\"q\":%d,\"intercept\":%.6f,\"model_type\":\"%s\",\"n_samples\":%d}",
+				 state->p > 0 ? state->p : 1,
+				 state->d > 0 ? state->d : 1,
+				 state->q > 0 ? state->q : 1,
+				 state->intercept,
+				 state->model_type[0] ? state->model_type : "arima",
+				 state->n_samples > 0 ? state->n_samples : 0);
+
+		metrics_json = DatumGetJsonbP(DirectFunctionCall1(jsonb_in,
+														  CStringGetTextDatum(buf_str)));
+		nfree(buf_str);
+	}
 
 	if (out != NULL)
 		out->payload = metrics_json;
@@ -2014,7 +2267,13 @@ timeseries_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 		return false;
 	}
 
-	state = (TimeSeriesGpuModelState *) palloc0(sizeof(TimeSeriesGpuModelState));
+	{
+		TimeSeriesGpuModelState *state_ptr = NULL;
+
+		nalloc(state_ptr, TimeSeriesGpuModelState, 1);
+		memset(state_ptr, 0, sizeof(TimeSeriesGpuModelState));
+		state = state_ptr;
+	}
 	state->model_blob = payload_copy;
 	state->ar_coeffs = ar_coeffs;
 	state->ma_coeffs = ma_coeffs;
@@ -2121,7 +2380,7 @@ neurondb_gpu_register_timeseries_model(void)
  *
  * This function trains a timeseries (ARIMA) model on CPU using the unified API format:
  * - table_name: table containing the data
- * - feature_column: column name containing feature vectors (we use first dimension)
+ * - feature_column: column name containing feature vectors (unused, kept for API compatibility)
  * - target_column: column name containing target values (time series values)
  * - p, d, q: ARIMA parameters
  */
@@ -2130,35 +2389,50 @@ PG_FUNCTION_INFO_V1(train_timeseries_cpu);
 Datum
 train_timeseries_cpu(PG_FUNCTION_ARGS)
 {
-	text	   *table_name = PG_GETARG_TEXT_PP(0);
-	text	   *feature_col = PG_GETARG_TEXT_PP(1);
-	text	   *target_col = PG_GETARG_TEXT_PP(2);
-	int32		p = PG_GETARG_INT32(3);
-	int32		d = PG_GETARG_INT32(4);
-	int32		q = PG_GETARG_INT32(5);
-	char *table_name_str = NULL;
-	char *feature_col_str = NULL;
-	char *target_col_str = NULL;
-	StringInfoData sql;
-	int			ret;
-	SPITupleTable *tuptable = NULL;
-	TupleDesc	tupdesc;
-
-	float *values = NULL;
-	TimeSeriesModel *model = NULL;
+	bytea	   *model_data = NULL;
+	bool		isnull = false;
+	char	   *feature_col_str = NULL;
+	char	   *table_name_str = NULL;
+	char	   *target_col_str = NULL;
+	Datum		value_datum;
+	float	   *values = NULL;
+	int			i = 0;
 	int			n_samples = 0;
-	int			i;
-
-	NdbSpiSession *spi_session = NULL;
-	MemoryContext oldcontext;
+	int			ret = 0;
+	int32		d;
 	int32		model_id = 0;
-	MLCatalogModelSpec spec;
-
-	bytea *model_data = NULL;
-	Jsonb *params_jsonb = NULL;
-	Jsonb *metrics_jsonb = NULL;
-	StringInfoData paramsbuf;
+	int32		p;
+	int32		q;
+	Jsonb	   *metrics_jsonb = NULL;
+	Jsonb	   *params_jsonb = NULL;
+	MLCatalogModelSpec spec = {0};
+	MemoryContext oldcontext = NULL;
+	NdbSpiSession *spi_session = NULL;
+	SPITupleTable *tuptable = NULL;
 	StringInfoData metricsbuf;
+	StringInfoData paramsbuf;
+	StringInfoData sql;
+	TimeSeriesModel *model = NULL;
+	TupleDesc	tupdesc = NULL;
+	HeapTuple	tuple = NULL;
+	text	   *feature_col;
+	text	   *table_name;
+	text	   *target_col;
+
+	/* Validate argument count */
+	if (PG_NARGS() < 3 || PG_NARGS() > 6)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: train_timeseries_cpu requires 3 to 6 arguments")));
+
+	table_name = PG_GETARG_TEXT_PP(0);
+	feature_col = PG_GETARG_TEXT_PP(1);
+	target_col = PG_GETARG_TEXT_PP(2);
+	p = PG_ARGISNULL(3) ? 1 : PG_GETARG_INT32(3);
+	d = PG_ARGISNULL(4) ? 1 : PG_GETARG_INT32(4);
+	q = PG_ARGISNULL(5) ? 1 : PG_GETARG_INT32(5);
+
+	memset(&spec, 0, sizeof(MLCatalogModelSpec));
 
 	/* Validate inputs */
 	if (table_name == NULL)
@@ -2191,13 +2465,16 @@ train_timeseries_cpu(PG_FUNCTION_ARGS)
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("q must be between 0 and %d", MAX_ARIMA_ORDER_Q)));
 
+	/*
+	 * SPI section: fetch time series values from target column in a
+	 * deterministic order.
+	 */
 	oldcontext = CurrentMemoryContext;
 	NDB_SPI_SESSION_BEGIN(spi_session, oldcontext);
 
-	/* Fetch time series data from target column */
 	ndb_spi_stringinfo_init(spi_session, &sql);
 	appendStringInfo(&sql,
-					 "SELECT %s FROM %s ORDER BY (SELECT 1)",
+					 "SELECT %s FROM %s ORDER BY 1",
 					 quote_identifier(target_col_str),
 					 quote_identifier(table_name_str));
 
@@ -2214,8 +2491,9 @@ train_timeseries_cpu(PG_FUNCTION_ARGS)
 				 errmsg("failed to execute time series query")));
 	}
 
-	/* Validate SPI result before accessing */
-	if (SPI_tuptable == NULL || SPI_tuptable->tupdesc == NULL || SPI_tuptable->vals == NULL)
+	if (SPI_tuptable == NULL ||
+		SPI_tuptable->tupdesc == NULL ||
+		SPI_tuptable->vals == NULL)
 	{
 		ndb_spi_stringinfo_free(spi_session, &sql);
 		NDB_SPI_SESSION_END(spi_session);
@@ -2244,21 +2522,21 @@ train_timeseries_cpu(PG_FUNCTION_ARGS)
 						MIN_ARIMA_OBSERVATIONS)));
 	}
 
-	nalloc(values, float, n_samples);
+	/* Allocate values in the outer (parent) context, not SPI context */
+	{
+		MemoryContext save_context = MemoryContextSwitchTo(oldcontext);
+		nalloc(values, float, n_samples);
+		MemoryContextSwitchTo(save_context);
+	}
 
 	for (i = 0; i < n_samples; i++)
 	{
-		HeapTuple	tuple;
-		bool		isnull = false;
-		Datum		value_datum;
-
-		/* Validate tuple exists before accessing */
 		if (i >= SPI_processed || tuptable->vals[i] == NULL)
 		{
-			if (values)
-				nfree(values);
 			ndb_spi_stringinfo_free(spi_session, &sql);
 			NDB_SPI_SESSION_END(spi_session);
+			if (values)
+				nfree(values);
 			nfree(table_name_str);
 			nfree(feature_col_str);
 			nfree(target_col_str);
@@ -2272,10 +2550,10 @@ train_timeseries_cpu(PG_FUNCTION_ARGS)
 
 		if (isnull)
 		{
-			if (values)
-				nfree(values);
 			ndb_spi_stringinfo_free(spi_session, &sql);
 			NDB_SPI_SESSION_END(spi_session);
+			if (values)
+				nfree(values);
 			nfree(table_name_str);
 			nfree(feature_col_str);
 			nfree(target_col_str);
@@ -2286,13 +2564,17 @@ train_timeseries_cpu(PG_FUNCTION_ARGS)
 		values[i] = (float) DatumGetFloat8(value_datum);
 	}
 
-	/* Fit ARIMA model */
-	model = fit_arima(values, n_samples, p, d, q);
+	/* Clean up SPI resources, leave values[] in outer context */
+	ndb_spi_stringinfo_free(spi_session, &sql);
+	NDB_SPI_SESSION_END(spi_session);
 
-	if (!model)
+	/* Ensure we're in the outer context for all subsequent operations */
+	MemoryContextSwitchTo(oldcontext);
+
+	/* Fit ARIMA model in outer context */
+	model = fit_arima(values, n_samples, p, d, q);
+	if (model == NULL)
 	{
-		ndb_spi_stringinfo_free(spi_session, &sql);
-		NDB_SPI_SESSION_END(spi_session);
 		if (values)
 			nfree(values);
 		nfree(table_name_str);
@@ -2303,33 +2585,38 @@ train_timeseries_cpu(PG_FUNCTION_ARGS)
 				 errmsg("ARIMA model fitting failed")));
 	}
 
-	/* Serialize model */
+	/* Serialize model in outer context */
 	model_data = timeseries_model_serialize_to_bytea(
-													 model->ar_coeffs, p,
-													 model->ma_coeffs, q,
-													 d, model->intercept,
-													 n_samples, "arima");
+													 model->ar_coeffs,
+													 p,
+													 model->ma_coeffs,
+													 q,
+													 d,
+													 model->intercept,
+													 n_samples,
+													 "arima");
 
-	/* Build parameters JSON */
+	/* Build parameters JSON in outer context */
 	initStringInfo(&paramsbuf);
 	appendStringInfo(&paramsbuf,
 					 "{\"p\":%d,\"d\":%d,\"q\":%d,\"model_type\":\"arima\"}",
 					 p, d, q);
-	params_jsonb = DatumGetJsonbP(DirectFunctionCall1(jsonb_in,
-													  CStringGetTextDatum(paramsbuf.data)));
-	nfree(paramsbuf.data);
+	params_jsonb = ndb_jsonb_in_cstring(paramsbuf.data);
+	/* Don't free - let memory context handle it */
 
-	/* Build metrics JSON */
+	/* Build metrics JSON in outer context */
 	initStringInfo(&metricsbuf);
 	appendStringInfo(&metricsbuf,
 					 "{\"storage\":\"cpu\",\"p\":%d,\"d\":%d,\"q\":%d,\"intercept\":%.6f,\"model_type\":\"arima\",\"n_samples\":%d,\"training_backend\":0}",
 					 p, d, q, model->intercept, n_samples);
-	metrics_jsonb = DatumGetJsonbP(DirectFunctionCall1(jsonb_in,
-													   CStringGetTextDatum(metricsbuf.data)));
-	nfree(metricsbuf.data);
+	metrics_jsonb = ndb_jsonb_in_cstring(metricsbuf.data);
+	/* Don't free - let memory context handle it */
 
-	/* Register model in catalog */
-	memset(&spec, 0, sizeof(MLCatalogModelSpec));
+	/*
+	 * Register model in catalog.
+	 * ml_catalog_register_model takes ownership of model_data, parameters,
+	 * and metrics. Do not free them here.
+	 */
 	spec.algorithm = NDB_ALGO_TIMESERIES;
 	spec.training_table = table_name_str;
 	spec.training_column = target_col_str;
@@ -2337,13 +2624,11 @@ train_timeseries_cpu(PG_FUNCTION_ARGS)
 	spec.parameters = params_jsonb;
 	spec.metrics = metrics_jsonb;
 	spec.num_samples = n_samples;
-	spec.num_features = 1;		/* Time series uses single feature dimension */
+	spec.num_features = 1;
 
-	MemoryContextSwitchTo(oldcontext);
 	model_id = ml_catalog_register_model(&spec);
 
-	ndb_spi_stringinfo_free(spi_session, &sql);
-	NDB_SPI_SESSION_END(spi_session);
+	/* Local clean-up: only free objects owned here */
 	if (values)
 		nfree(values);
 	if (model->ar_coeffs)
@@ -2353,9 +2638,246 @@ train_timeseries_cpu(PG_FUNCTION_ARGS)
 	if (model->residuals)
 		nfree(model->residuals);
 	nfree(model);
+
+	/* ml_catalog_register_model copies the strings, so we can free them */
 	nfree(table_name_str);
-	nfree(feature_col_str);
 	nfree(target_col_str);
+	nfree(feature_col_str);
 
 	PG_RETURN_INT32(model_id);
+}
+
+/*
+ * timeseries_try_gpu_predict_catalog
+ *
+ * Attempts GPU prediction for a timeseries model loaded from the catalog.
+ * Returns true if GPU prediction succeeded, false otherwise.
+ */
+static bool
+timeseries_try_gpu_predict_catalog(int32 model_id,
+								  const Vector *feature_vec,
+								  double *result_out)
+{
+	bytea	   *payload = NULL;
+	Jsonb	   *metrics = NULL;
+	char	   *gpu_err = NULL;
+	float		prediction = 0.0f;
+	bool		success = false;
+	MLGpuModel	gpu_model;
+	const MLGpuModelOps *ops = NULL;
+
+	/* Check compute mode - only try GPU if compute mode allows it */
+	if (!NDB_SHOULD_TRY_GPU())
+		return false;
+
+	if (!neurondb_gpu_is_available())
+		return false;
+	if (feature_vec == NULL)
+		return false;
+	if (feature_vec->dim <= 0)
+		return false;
+
+	if (!ml_catalog_fetch_model_payload(model_id, &payload, NULL, &metrics))
+		return false;
+
+	if (payload == NULL)
+		goto cleanup;
+
+	/* Ensure GPU models are registered */
+	neurondb_gpu_register_models();
+	
+	/* Try GPU prediction for all models if GPU is available */
+	/* This allows both CPU and GPU-trained models to use GPU acceleration */
+
+	/* Look up timeseries GPU model ops */
+	ops = ndb_gpu_lookup_model_ops("timeseries");
+	if (ops == NULL || ops->predict == NULL)
+	{
+		elog(DEBUG1, "timeseries_try_gpu_predict_catalog: GPU model ops not found for timeseries");
+		goto cleanup;
+	}
+
+	/* Initialize GPU model */
+	memset(&gpu_model, 0, sizeof(gpu_model));
+	gpu_model.ops = ops;
+	gpu_model.catalog_id = model_id;
+
+	/* Deserialize model */
+	if (!ops->deserialize(&gpu_model, payload, metrics, &gpu_err))
+	{
+		elog(DEBUG1, "timeseries_try_gpu_predict_catalog: deserialize failed: %s", gpu_err ? gpu_err : "unknown error");
+		goto cleanup;
+	}
+
+	/* Perform prediction */
+	if (ops->predict(&gpu_model, feature_vec->data, feature_vec->dim, &prediction, 1, &gpu_err))
+	{
+		if (result_out != NULL)
+			*result_out = (double) prediction;
+		success = true;
+	}
+	else
+	{
+		elog(DEBUG1, "timeseries_try_gpu_predict_catalog: predict failed: %s", gpu_err ? gpu_err : "unknown error");
+	}
+
+	/* Cleanup GPU model */
+	if (ops->destroy)
+		ops->destroy(&gpu_model);
+
+cleanup:
+	nfree(payload);
+	nfree(metrics);
+	nfree(gpu_err);
+
+	return success;
+}
+
+/*
+ * predict_timeseries_model_id
+ *
+ * Makes predictions using trained timeseries (ARIMA) model from catalog.
+ * Uses the input features as the last values in the series and predicts
+ * the next value using ARIMA forecasting.
+ */
+PG_FUNCTION_INFO_V1(predict_timeseries_model_id);
+
+Datum
+predict_timeseries_model_id(PG_FUNCTION_ARGS)
+{
+	int32		model_id;
+	Vector	   *features = NULL;
+	bytea	   *model_data = NULL;
+	Jsonb	   *metrics = NULL;
+	float	   *ar_coeffs = NULL;
+	float	   *ma_coeffs = NULL;
+	int			p = 0;
+	int			d = 0;
+	int			q = 0;
+	float		intercept = 0.0f;
+	int			n_obs = 0;
+	char		model_type[32] = {0};
+	float	   *last_values = NULL;
+	float	   *forecast = NULL;
+	double		prediction;
+	int			i;
+
+	/* Validate argument count */
+	if (PG_NARGS() < 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: predict_timeseries_model_id requires at least 2 arguments")));
+
+	if (PG_ARGISNULL(0))
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: timeseries: model_id is required"),
+				 errdetail("First argument (model_id) is NULL"),
+				 errhint("Provide a valid model_id from neurondb.ml_models table.")));
+
+	model_id = PG_GETARG_INT32(0);
+
+	if (PG_ARGISNULL(1))
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: timeseries: features vector is required"),
+				 errdetail("Second argument (features) is NULL"),
+				 errhint("Provide a valid vector of historical values for prediction.")));
+
+	features = PG_GETARG_VECTOR_P(1);
+	NDB_CHECK_VECTOR_VALID(features);
+
+	/* Try GPU prediction first */
+	if (timeseries_try_gpu_predict_catalog(model_id, features, &prediction))
+	{
+		PG_RETURN_FLOAT8(prediction);
+	}
+
+	/* Load model from catalog */
+	if (!ml_catalog_fetch_model_payload(model_id, &model_data, NULL, &metrics))
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: timeseries: model %d not found", model_id),
+				 errdetail("Model does not exist in neurondb.ml_models catalog"),
+				 errhint("Verify the model_id is correct and the model exists in the catalog.")));
+	}
+
+	if (model_data == NULL)
+	{
+		if (metrics)
+			nfree(metrics);
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: timeseries: model %d has no model data", model_id)));
+	}
+
+	/* Deserialize model */
+	if (timeseries_model_deserialize_from_bytea(model_data, &ar_coeffs, &p,
+												&ma_coeffs, &q, &d, &intercept,
+												&n_obs, model_type,
+												sizeof(model_type)) != 0)
+	{
+		if (metrics)
+			nfree(metrics);
+		nfree(model_data);
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: timeseries: failed to deserialize model %d", model_id)));
+	}
+
+	/* Use features as last values - need at least p values for AR prediction */
+	{
+		int			n_last = features->dim;
+
+		if (n_last < p && p > 0)
+		{
+			elog(WARNING,
+				 "neurondb: timeseries: input vector has %d values, but model requires at least %d for AR(%d) prediction. Using available values.",
+				 n_last, p, p);
+		}
+
+		/* Allocate arrays for last values and forecast */
+		nalloc(last_values, float, n_last);
+		nalloc(forecast, float, 1);
+
+		/* Copy features to last_values */
+		for (i = 0; i < n_last; i++)
+			last_values[i] = features->data[i];
+
+		/* Create a TimeSeriesModel structure for arima_forecast */
+		{
+			TimeSeriesModel model;
+
+			model.p = p;
+			model.d = d;
+			model.q = q;
+			model.ar_coeffs = ar_coeffs;
+			model.ma_coeffs = ma_coeffs;
+			model.intercept = intercept;
+			model.n_obs = n_obs;
+			model.residuals = NULL;	/* Not needed for prediction */
+
+			/* Forecast 1 step ahead */
+			arima_forecast(&model, last_values, n_last, 1, forecast);
+		}
+
+		prediction = (double) forecast[0];
+	}
+
+	/* Cleanup */
+	if (ar_coeffs)
+		nfree(ar_coeffs);
+	if (ma_coeffs)
+		nfree(ma_coeffs);
+	if (last_values)
+		nfree(last_values);
+	if (forecast)
+		nfree(forecast);
+	if (model_data)
+		nfree(model_data);
+	if (metrics)
+		nfree(metrics);
+
+	PG_RETURN_FLOAT8(prediction);
 }

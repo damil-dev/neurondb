@@ -1796,6 +1796,12 @@ CREATE FUNCTION forecast_arima(integer, integer)
     LANGUAGE C STABLE STRICT;
 COMMENT ON FUNCTION forecast_arima IS 'Forecast future values using trained ARIMA model. Returns predicted value.';
 
+CREATE FUNCTION predict_timeseries_model_id(integer, vector)
+    RETURNS float8
+    AS 'MODULE_PATHNAME', 'predict_timeseries_model_id'
+    LANGUAGE C STABLE STRICT;
+COMMENT ON FUNCTION predict_timeseries_model_id(integer, vector) IS 'Predict next value using trained timeseries (ARIMA) model from catalog. Uses input features as historical values.';
+
 CREATE FUNCTION evaluate_arima_by_model_id(integer, text, text, text, integer)
     RETURNS jsonb
     AS 'MODULE_PATHNAME', 'evaluate_arima_by_model_id'
@@ -1885,6 +1891,12 @@ CREATE FUNCTION apply_opq_rotation(float8[], float8[])
     AS 'MODULE_PATHNAME', 'apply_opq_rotation'
     LANGUAGE C IMMUTABLE STRICT;
 COMMENT ON FUNCTION apply_opq_rotation IS 'OPQ apply: (vector, rotation_matrix) rotates vector for quantization';
+
+CREATE FUNCTION train_pq_codebook(text, text, integer, integer)
+    RETURNS bytea
+    AS 'MODULE_PATHNAME', 'train_pq_codebook'
+    LANGUAGE C STABLE STRICT;
+COMMENT ON FUNCTION train_pq_codebook IS 'PQ codebook: (table, vector_col, num_subspaces, num_centroids) trains PQ codebook';
 
 -- ============================================================================
 -- Complex ML Algorithms (External Recommended)
@@ -3352,6 +3364,9 @@ BEGIN
         'gmm',
         'hierarchical',
         'pca',
+        'timeseries',
+        'catboost',
+        'lightgbm',
         'custom'
     ] LOOP
         BEGIN
@@ -4963,6 +4978,8 @@ BEGIN
 		WHEN 'gmm' THEN
 			-- Delegate to C function (convert vector to array)
 			RETURN neurondb_predict(model_id, vector_to_array(features));
+		WHEN 'timeseries' THEN
+			RETURN predict_timeseries_model_id(model_id, features);
 		ELSE
 			RAISE EXCEPTION 'Prediction not implemented for algorithm: %', algo;
 	END CASE;
@@ -6511,7 +6528,8 @@ GRANT EXECUTE ON FUNCTION neurondb.evaluate TO PUBLIC;
 GRANT EXECUTE ON FUNCTION neurondb.list_algorithms TO PUBLIC;
 GRANT EXECUTE ON FUNCTION neurondb.models TO PUBLIC;
 GRANT EXECUTE ON FUNCTION neurondb.model_info TO PUBLIC;
-GRANT EXECUTE ON FUNCTION neurondb.drop_model TO PUBLIC;
+GRANT EXECUTE ON FUNCTION neurondb.drop_model(integer) TO PUBLIC;
+GRANT EXECUTE ON FUNCTION neurondb.drop_model(text) TO PUBLIC;
 GRANT EXECUTE ON FUNCTION neurondb.embed TO PUBLIC;
 GRANT EXECUTE ON FUNCTION neurondb.classify TO PUBLIC;
 GRANT EXECUTE ON FUNCTION neurondb.llm TO PUBLIC;
