@@ -166,28 +166,28 @@ PGDLLEXPORT Datum whiten_embeddings(PG_FUNCTION_ARGS);
 Datum
 whiten_embeddings(PG_FUNCTION_ARGS)
 {
-	text *table_name = NULL;
-	text *vector_column = NULL;
-	double		epsilon;
-	char *tbl_str = NULL;
-	char *vec_col_str = NULL;
-	float	  **vectors;
-	int			nvec,
-				dim;
-	double *mean = NULL;
-	double **covariance = NULL;
-	double **eigenvectors = NULL;
-	double *eigenvalues = NULL;
-	double **whitening_matrix = NULL;
-	float **whitened_vectors = NULL;
-	int			i,
-				j,
-				k,
-				c;
-	ArrayType *result = NULL;
-	Datum *result_datums = NULL;
-	int			dims[2];
-	int			lbs[2];
+	ArrayType  *result = NULL;
+	char	   *tbl_str = NULL;
+	char	   *vec_col_str = NULL;
+	Datum	   *result_datums = NULL;
+	double		epsilon = WHITENING_EPSILON;
+	double	   *eigenvalues = NULL;
+	double	   *mean = NULL;
+	double	   **covariance = NULL;
+	double	   **eigenvectors = NULL;
+	double	   **whitening_matrix = NULL;
+	float	   **vectors = NULL;
+	float	   **whitened_vectors = NULL;
+	int			c = 0;
+	int			dim = 0;
+	int			dims[2] = {0, 0};
+	int			i = 0;
+	int			j = 0;
+	int			k = 0;
+	int			lbs[2] = {0, 0};
+	int			nvec = 0;
+	text	   *table_name = NULL;
+	text	   *vector_column = NULL;
 
 	table_name = PG_GETARG_TEXT_PP(0);
 	vector_column = PG_GETARG_TEXT_PP(1);

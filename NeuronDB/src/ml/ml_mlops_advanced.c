@@ -62,6 +62,8 @@ create_ab_test(PG_FUNCTION_ARGS)
 	int			n_splits;
 	StringInfoData result;
 	int			experiment_id = 0;
+	NdbSpiSession *spi_session = NULL;
+	MemoryContext oldcontext;
 
 	name = text_to_cstring(experiment_name);
 
@@ -309,7 +311,6 @@ log_prediction(PG_FUNCTION_ARGS)
 	StringInfoData sql;
 	Jsonb *input_jsonb = NULL;
 	StringInfoData input_json;
-
 	NdbSpiSession *spi_session = NULL;
 	MemoryContext oldcontext;
 
@@ -430,6 +431,9 @@ monitor_model_performance(PG_FUNCTION_ARGS)
 	float			avg_latency = 0.0f;
 	float			p95_latency = 0.0f;
 	float			error_rate = 0.0f;
+	NdbSpiSession *spi_session = NULL;
+	MemoryContext oldcontext;
+	int				ret;
 
 	window = time_window ? text_to_cstring(time_window) : pstrdup("1 hour");
 
@@ -607,6 +611,12 @@ detect_model_drift(PG_FUNCTION_ARGS)
 	float			drift_score;
 	bool			drift_detected;
 	StringInfoData result;
+	int				ret;
+	StringInfoData sql;
+	float			baseline_accuracy = 0.0f;
+	float			current_accuracy = 0.0f;
+	NdbSpiSession *spi_session = NULL;
+	MemoryContext oldcontext;
 
 	baseline = text_to_cstring(baseline_period);
 	current = text_to_cstring(current_period);
@@ -772,6 +782,9 @@ create_model_version(PG_FUNCTION_ARGS)
 	char		   *desc;
 	StringInfoData result;
 	int				version_id;
+	bytea *model_data = NULL;
+	Jsonb *parameters = NULL;
+	Jsonb *metrics = NULL;
 
 	tag = text_to_cstring(version_tag);
 	desc = description ? text_to_cstring(description) : pstrdup("");
@@ -1028,12 +1041,25 @@ PG_FUNCTION_INFO_V1(audit_model_access);
 Datum
 audit_model_access(PG_FUNCTION_ARGS)
 {
-	int32		model_id = PG_GETARG_INT32(0);
-	text	   *action = PG_GETARG_TEXT_PP(1);
-	text	   *user_id = PG_ARGISNULL(2) ? NULL : PG_GETARG_TEXT_PP(2);
+	int32		model_id;
+	text	   *action;
+	text	   *user_id;
 
-	char	   *action_str = text_to_cstring(action);
-	char	   *user = user_id ? text_to_cstring(user_id) : pstrdup("unknown");
+	/* Validate minimum argument count */
+	if (PG_NARGS() < 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: audit_model_access requires at least 2 arguments")));
+
+	model_id = PG_GETARG_INT32(0);
+	action = PG_GETARG_TEXT_PP(1);
+	user_id = PG_ARGISNULL(2) ? NULL : PG_GETARG_TEXT_PP(2);
+
+	char	   *action_str;
+	char	   *user;
+
+	action_str = text_to_cstring(action);
+	user = user_id ? text_to_cstring(user_id) : pstrdup("unknown");
 
 	/* Log audit event (production would insert into audit log) */
 	(void) model_id;

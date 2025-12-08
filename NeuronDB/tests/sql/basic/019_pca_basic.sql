@@ -104,13 +104,14 @@ BEGIN
 		RAISE EXCEPTION 'PCA result count (%) does not match input count (%)', result_count, original_count;
 	END IF;
 	
-	-- Convert real[] array elements to vector[]
-	-- Each element of pca_result is itself a real[] array
-	-- Use direct array subscripting - PostgreSQL handles nested arrays correctly
+	-- Convert 2D array rows to vector[]
+	-- pca_result is a 2D array real[][], so we need to extract rows as 1D arrays
+	-- Use unnest to flatten the 2D slice to 1D, then aggregate back to array
 	FOR i IN 1..result_count LOOP
-		-- Extract the i-th nested array element
-		-- pca_result[i] should give us the real[] array at position i
-		arr_elem := pca_result[i];
+		-- Extract the i-th row as a 1D array by unnesting the slice
+		-- pca_result[i:i][1:2] gives a 1x2 2D slice, unnest flattens it to 1D
+		SELECT array_agg(val ORDER BY ord) INTO arr_elem
+		FROM unnest(pca_result[i:i][1:2]) WITH ORDINALITY AS t(val, ord);
 		
 		IF arr_elem IS NULL OR array_length(arr_elem, 1) IS NULL THEN
 			RAISE EXCEPTION 'PCA result element % is NULL or invalid', i;

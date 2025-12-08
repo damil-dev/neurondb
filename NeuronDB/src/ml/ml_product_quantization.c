@@ -84,20 +84,20 @@ train_subspace_kmeans(float **subspace_data,
 					  float **centroids,
 					  int max_iters)
 {
-	int *assignments = NULL;
-
-	int *counts = NULL;
 	bool		changed = true;
-	int			iter,
-				i,
-				c,
-				d;
+	int			c = 0;
+	int			d = 0;
+	int			i = 0;
+	int			idx = 0;
+	int			iter = 0;
+	int		   *assignments = NULL;
+	int		   *counts = NULL;
 
 	assignments = (int *) palloc0(sizeof(int) * nvec);
 
 	for (c = 0; c < k; c++)
 	{
-		int			idx = rand() % nvec;
+		idx = rand() % nvec;
 
 		memcpy(centroids[c], subspace_data[idx], sizeof(float) * dsub);
 	}
@@ -139,7 +139,7 @@ train_subspace_kmeans(float **subspace_data,
 		if (!changed)
 			break;
 
-		counts = (int *) palloc0(sizeof(int) * k);
+		nalloc(counts, int, k);
 		for (c = 0; c < k; c++)
 			memset(centroids[c], 0, sizeof(float) * dsub);
 
@@ -194,23 +194,24 @@ PG_FUNCTION_INFO_V1(train_pq_codebook);
 Datum
 train_pq_codebook(PG_FUNCTION_ARGS)
 {
-	text *table_name = NULL;
-	text *column_name = NULL;
-	int			m,
-				ksub;
-	char	   *tbl_str,
-			   *col_str;
-	float **data = NULL;	/* Training data array [nvec][dim] */
-	int			nvec = 0,
-				dim = 0;
-	PQCodebook	codebook;
-	int			sub,
-				i;
-	bytea *result = NULL;
-	int			result_size;
-	char *result_ptr = NULL;
-	float ***centroids = NULL;
-	char *result_raw = NULL;
+	bytea	   *result = NULL;
+	char	   *col_str = NULL;
+	char	   *result_ptr = NULL;
+	char	   *result_raw = NULL;
+	char	   *tbl_str = NULL;
+	float	   **data = NULL;
+	float	   ***centroids = NULL;
+	int			dim = 0;
+	int			i = 0;
+	int			idx = 0;
+	int			ksub = 0;
+	int			m = 0;
+	int			nvec = 0;
+	int			result_size = 0;
+	int			sub = 0;
+	PQCodebook	codebook = {0};
+	text	   *column_name = NULL;
+	text	   *table_name = NULL;
 
 	/* Argument parsing and validation */
 	table_name = PG_GETARG_TEXT_PP(0);
@@ -263,7 +264,7 @@ train_pq_codebook(PG_FUNCTION_ARGS)
 		/* Free data array and rows if data is not NULL */
 		if (data != NULL)
 		{
-			for (int idx = 0; idx < nvec; idx++)
+			for (idx = 0; idx < nvec; idx++)
 			{
 				if (data[idx] != NULL)
 					nfree(data[idx]);

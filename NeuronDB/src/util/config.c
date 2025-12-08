@@ -278,6 +278,8 @@ show_vector_config(PG_FUNCTION_ARGS)
 	{
 		TupleDesc	tupdesc;
 		MemoryContext oldcontext;
+		const		NeuronDBConfigOpt *opt;
+		int			count = 0;
 
 		funcctx = SRF_FIRSTCALL_INIT();
 
@@ -290,7 +292,12 @@ show_vector_config(PG_FUNCTION_ARGS)
 						   tupdesc, (AttrNumber) 3, "description", TEXTOID, -1, 0);
 
 		funcctx->tuple_desc = BlessTupleDesc(tupdesc);
-		funcctx->max_calls = 0;
+
+		/* Count entries in catalog */
+		for (opt = neuron_config_catalog; opt && opt->name; opt++)
+			count++;
+
+		funcctx->max_calls = count;
 
 		oldcontext =
 			MemoryContextSwitchTo(funcctx->multi_call_memory_ctx);
@@ -329,8 +336,17 @@ PG_FUNCTION_INFO_V1(set_vector_config);
 Datum
 set_vector_config(PG_FUNCTION_ARGS)
 {
-	text	   *config_name = PG_GETARG_TEXT_PP(0);
-	text	   *config_value = PG_GETARG_TEXT_PP(1);
+	text	   *config_name;
+	text	   *config_value;
+
+	/* Validate argument count */
+	if (PG_NARGS() < 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: set_vector_config requires at least 2 arguments")));
+
+	config_name = PG_GETARG_TEXT_PP(0);
+	config_value = PG_GETARG_TEXT_PP(1);
 	char *name_str = NULL;
 	char *value_str = NULL;
 	const		NeuronDBConfigOpt *opt;
@@ -356,7 +372,15 @@ PG_FUNCTION_INFO_V1(get_vector_config);
 Datum
 get_vector_config(PG_FUNCTION_ARGS)
 {
-	text	   *config_name = PG_GETARG_TEXT_PP(0);
+	text	   *config_name;
+
+	/* Validate argument count */
+	if (PG_NARGS() < 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: get_vector_config requires at least 1 argument")));
+
+	config_name = PG_GETARG_TEXT_PP(0);
 	char *name_str = NULL;
 	const		NeuronDBConfigOpt *opt;
 	char *curr_value = NULL;

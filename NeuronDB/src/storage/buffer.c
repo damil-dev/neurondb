@@ -34,8 +34,17 @@ PG_FUNCTION_INFO_V1(rebuild_hnsw_safe);
 Datum
 rebuild_hnsw_safe(PG_FUNCTION_ARGS)
 {
-	text	   *index_name = PG_GETARG_TEXT_PP(0);
-	bool		resume = PG_GETARG_BOOL(1);
+	text	   *index_name;
+	bool		resume;
+
+	/* Validate argument count */
+	if (PG_NARGS() < 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: rebuild_hnsw_safe requires at least 2 arguments")));
+
+	index_name = PG_GETARG_TEXT_PP(0);
+	resume = PG_GETARG_BOOL(1);
 	char *idx_str = NULL;
 	int64		vectors_processed = 0;
 	int64		checkpoint_id = 0;
@@ -145,9 +154,19 @@ PG_FUNCTION_INFO_V1(parallel_knn_search);
 Datum
 parallel_knn_search(PG_FUNCTION_ARGS)
 {
-	Vector	   *query_vector = (Vector *) PG_GETARG_POINTER(0);
-	int32		k = PG_GETARG_INT32(1);
-	int32		num_workers = PG_GETARG_INT32(2);
+	Vector	   *query_vector;
+	int32		k;
+	int32		num_workers;
+
+	/* Validate argument count */
+	if (PG_NARGS() < 3)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: parallel_knn_search requires at least 3 arguments")));
+
+	query_vector = (Vector *) PG_GETARG_POINTER(0);
+	k = PG_GETARG_INT32(1);
+	num_workers = PG_GETARG_INT32(2);
 	int			i;
 
 	(void) query_vector;
@@ -177,9 +196,19 @@ PG_FUNCTION_INFO_V1(save_rebuild_checkpoint);
 Datum
 save_rebuild_checkpoint(PG_FUNCTION_ARGS)
 {
-	text	   *index_name = PG_GETARG_TEXT_PP(0);
-	int64		vector_offset = PG_GETARG_INT64(1);
-	text	   *state_json = PG_GETARG_TEXT_PP(2);
+	text	   *index_name;
+	int64		vector_offset;
+	text	   *state_json;
+
+	/* Validate argument count */
+	if (PG_NARGS() < 3)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: save_rebuild_checkpoint requires at least 3 arguments")));
+
+	index_name = PG_GETARG_TEXT_PP(0);
+	vector_offset = PG_GETARG_INT64(1);
+	state_json = PG_GETARG_TEXT_PP(2);
 	char *idx_str = NULL;
 	char *state_str = NULL;
 
@@ -212,8 +241,16 @@ PG_FUNCTION_INFO_V1(load_rebuild_checkpoint);
 Datum
 load_rebuild_checkpoint(PG_FUNCTION_ARGS)
 {
-	text	   *index_name = PG_GETARG_TEXT_PP(0);
+	text	   *index_name;
 	text *checkpoint_data = NULL;
+
+	/* Validate argument count */
+	if (PG_NARGS() < 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: load_rebuild_checkpoint requires at least 1 argument")));
+
+	index_name = PG_GETARG_TEXT_PP(0);
 	char *idx_str = NULL;
 
 	NdbSpiSession *session3 = NULL;
