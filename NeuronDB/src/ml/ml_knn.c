@@ -2985,8 +2985,8 @@ cpu_evaluation_path:
 /* GPU Model State */
 typedef struct KnnGpuModelState
 {
-	bytea	   *model_blob = NULL;
-	Jsonb	   *metrics = NULL;
+	bytea	   *model_blob;
+	Jsonb	   *metrics;
 	int			feature_dim;
 	int			n_samples;
 	int			k;

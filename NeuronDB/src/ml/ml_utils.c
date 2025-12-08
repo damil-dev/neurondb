@@ -75,6 +75,7 @@ neurondb_fetch_vectors_from_table(const char *table,
 
 	max_vectors_limit = 500000;
 	initStringInfo(&sql);
+	/* Note: No ORDER BY clause - views don't have ctid, and ordering isn't required for training */
 	appendStringInfo(&sql, "SELECT %s FROM %s LIMIT %d", col, table, max_vectors_limit);
 	oldcontext_spi = CurrentMemoryContext;
 
@@ -83,9 +84,7 @@ neurondb_fetch_vectors_from_table(const char *table,
 	ret = ndb_spi_execute(spi_session, sql.data, true, 0);
 	if (ret != SPI_OK_SELECT)
 	{
-		char	   *query_str = NULL;
-
-		query_str = sql.data;
+		char	   *query_str = sql.data;
 		nfree(sql.data);
 		NDB_SPI_SESSION_END(spi_session);
 		ereport(ERROR,
@@ -209,7 +208,8 @@ neurondb_fetch_vectors_from_table(const char *table,
 		/* Verify dimension consistency */
 		if (vec->dim != *out_dim)
 		{
-			int j_free;
+			int			j_free;
+
 			/* Free already allocated vectors */
 			for (j_free = 0; j_free < i; j_free++)
 				nfree(result[j_free]);
@@ -233,11 +233,11 @@ neurondb_fetch_vectors_from_table(const char *table,
 
 		/* Check individual vector allocation size */
 		{
+			int			j_free2;
 			size_t		vector_size = sizeof(float) * (size_t) (*out_dim);
 
 			if (vector_size > MaxAllocSize)
 			{
-				int j_free2;
 				/* Free already allocated vectors */
 				for (j_free2 = 0; j_free2 < i; j_free2++)
 					nfree(result[j_free2]);
@@ -261,7 +261,8 @@ neurondb_fetch_vectors_from_table(const char *table,
 
 		/* Copy vector data */
 		{
-			float *vec_data = NULL;
+			float	   *vec_data = NULL;
+
 			nalloc(vec_data, float, *out_dim);
 			result[i] = vec_data;
 			for (d = 0; d < *out_dim; d++)

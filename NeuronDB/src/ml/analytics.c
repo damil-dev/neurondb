@@ -21,6 +21,8 @@
 #include "executor/spi.h"
 #include "catalog/pg_type.h"
 #include "utils/lsyscache.h"
+#include "parser/parse_type.h"
+#include "nodes/makefuncs.h"
 
 #include "neurondb.h"
 #include "neurondb_ml.h"
@@ -29,6 +31,7 @@
 #include <float.h>
 #include <math.h>
 #include <stdlib.h>
+#include <time.h>
 #include "neurondb_validation.h"
 #include "neurondb_safe_memory.h"
 #include "neurondb_macros.h"
@@ -45,12 +48,21 @@ PG_FUNCTION_INFO_V1(feedback_loop_integrate);
 Datum
 feedback_loop_integrate(PG_FUNCTION_ARGS)
 {
-	text	   *query = PG_GETARG_TEXT_PP(0);
-	text	   *result = PG_GETARG_TEXT_PP(1);
-	float4		user_rating = PG_GETARG_FLOAT4(2);
+	text	   *query;
+	text	   *result;
+	float4		user_rating;
+
+	/* Validate argument count */
+	if (PG_NARGS() < 3)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: feedback_loop_integrate requires at least 3 arguments")));
+
+	query = PG_GETARG_TEXT_PP(0);
+	result = PG_GETARG_TEXT_PP(1);
+	user_rating = PG_GETARG_FLOAT4(2);
 	char *query_str = NULL;
 	char *result_str = NULL;
-	StringInfoData sql;
 	const char *tbl_def;
 	int			ret;
 
@@ -82,26 +94,40 @@ feedback_loop_integrate(PG_FUNCTION_ARGS)
 				 errmsg("neurondb: failed to create neurondb_feedback table")));
 	}
 
-	ndb_spi_stringinfo_init(spi_session, &sql);
-	appendStringInfo(&sql,
-					 "INSERT INTO neurondb_feedback (query, result, rating) VALUES "
-					 "($$%s$$, $$%s$$, %g)",
-					 query_str,
-					 result_str,
-					 user_rating);
-	ret = ndb_spi_execute(spi_session, sql.data, false, 0);
-	if (ret != SPI_OK_INSERT)
+	/* Use parameterized query to prevent SQL injection */
 	{
-		ndb_spi_stringinfo_free(spi_session, &sql);
-		NDB_SPI_SESSION_END(spi_session);
-		nfree(query_str);
-		nfree(result_str);
-		ereport(ERROR,
-				(errcode(ERRCODE_INTERNAL_ERROR),
-				 errmsg("neurondb: failed to insert feedback row")));
+		const char *insert_query = "INSERT INTO neurondb_feedback (query, result, rating) VALUES ($1, $2, $3)";
+		Oid			argtypes[3] = {TEXTOID, TEXTOID, FLOAT4OID};
+		Datum		values[3];
+		const char nulls[3] = {' ', ' ', ' '};
+
+		/* Validate rating is in reasonable range (0-5) */
+		if (user_rating < 0.0f || user_rating > 5.0f)
+		{
+			NDB_SPI_SESSION_END(spi_session);
+			nfree(query_str);
+			nfree(result_str);
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					 errmsg("neurondb: rating must be between 0 and 5, got %g", user_rating)));
+		}
+
+		values[0] = PointerGetDatum(query);
+		values[1] = PointerGetDatum(result);
+		values[2] = Float4GetDatum(user_rating);
+
+		ret = ndb_spi_execute_with_args(spi_session, insert_query, 3, argtypes, values, nulls, false, 0);
+		if (ret != SPI_OK_INSERT)
+		{
+			NDB_SPI_SESSION_END(spi_session);
+			nfree(query_str);
+			nfree(result_str);
+			ereport(ERROR,
+					(errcode(ERRCODE_INTERNAL_ERROR),
+					 errmsg("neurondb: failed to insert feedback row")));
+		}
 	}
 
-	ndb_spi_stringinfo_free(spi_session, &sql);
 	NDB_SPI_SESSION_END(spi_session);
 	nfree(query_str);
 	nfree(result_str);
@@ -200,23 +226,31 @@ PG_FUNCTION_INFO_V1(reduce_pca);
 Datum
 reduce_pca(PG_FUNCTION_ARGS)
 {
-	text *table_name = NULL;
-	text *column_name = NULL;
-	int			n_components;
-	char *tbl_str = NULL;
-	char *col_str = NULL;
-	float	  **data;
-	float **components = NULL;
-	float **projected = NULL;
-	int			nvec,
-				dim;
-	int			i,
-				j,
-				c;
-	ArrayType *result_array = NULL;
+	ArrayType  *result_array = NULL;
+	char	   *col_str = NULL;
+	char	   *tbl_str = NULL;
+	float	   *mean = NULL;
+	float	   **components = NULL;
+	float	   **data = NULL;
+	float	   **centered_data = NULL;	/* Copy of centered data for projection */
+	float	   **projected = NULL;
+	int			c = 0;
+	int			dim = 0;
+	int			i = 0;
+	int			j = 0;
+	int			n_components = 0;
+	int			nvec = 0;
+	text	   *column_name = NULL;
+	text	   *table_name = NULL;
+	char		typalign = 0;
+	bool		typbyval = false;
+	int16		typlen = 0;
 
-	Datum *result_datums = NULL;
-	float *mean = NULL;
+	/* Validate argument count */
+	if (PG_NARGS() < 3)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: reduce_pca requires at least 3 arguments")));
 
 	table_name = PG_GETARG_TEXT_PP(0);
 	column_name = PG_GETARG_TEXT_PP(1);
@@ -251,7 +285,6 @@ reduce_pca(PG_FUNCTION_ARGS)
 	{
 		nfree(tbl_str);
 		nfree(col_str);
-		/* Free data array and rows if data is not NULL */
 		if (data != NULL)
 		{
 			for (j = 0; j < nvec; j++)
@@ -267,40 +300,59 @@ reduce_pca(PG_FUNCTION_ARGS)
 	}
 
 	if (n_components > dim)
+	{
+		nfree(tbl_str);
+		nfree(col_str);
+		for (j = 0; j < nvec; j++)
+		{
+			if (data[j] != NULL)
+				nfree(data[j]);
+		}
+		nfree(data);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("n_components (%d) cannot exceed "
 						"dimension (%d)",
 						n_components,
 						dim)));
+	}
 
+	/* Compute mean */
 	nalloc(mean, float, dim);
+	memset(mean, 0, sizeof(float) * dim);
 	for (j = 0; j < nvec; j++)
 		for (i = 0; i < dim; i++)
 			mean[i] += data[j][i];
 	for (i = 0; i < dim; i++)
 		mean[i] /= nvec;
+
+	/* Center the data */
 	for (j = 0; j < nvec; j++)
 		for (i = 0; i < dim; i++)
 			data[j][i] -= mean[i];
 
+	/* Keep a copy of centered data for projection */
+	nalloc(centered_data, float *, nvec);
+	for (j = 0; j < nvec; j++)
+	{
+		nalloc(centered_data[j], float, dim);
+		for (i = 0; i < dim; i++)
+			centered_data[j][i] = data[j][i];
+	}
+
+	/* Compute principal components using power iteration and deflation */
 	nalloc(components, float *, n_components);
 	for (c = 0; c < n_components; c++)
 	{
-		float *component_row = NULL;
+		float	   *component_row = NULL;
+
 		nalloc(component_row, float, dim);
 		components[c] = component_row;
 		pca_power_iteration(data, nvec, dim, components[c], 100);
 		pca_deflate(data, nvec, dim, components[c]);
 	}
 
-	for (j = 0; j < nvec; j++)
-		for (i = 0; i < dim; i++)
-			data[j][i] += mean[i];
-	for (j = 0; j < nvec; j++)
-		for (i = 0; i < dim; i++)
-			data[j][i] -= mean[i];
-
+	/* Project centered data onto principal components */
 	nalloc(projected, float *, nvec);
 	for (j = 0; j < nvec; j++)
 	{
@@ -311,396 +363,88 @@ reduce_pca(PG_FUNCTION_ARGS)
 		{
 			double		dot = 0.0;
 
+			/* Use original centered data, not deflated residuals */
 			for (i = 0; i < dim; i++)
-				dot += data[j][i] * components[c][i];
+				dot += centered_data[j][i] * components[c][i];
 			projected[j][c] = dot;
 		}
 	}
 
-	/*
-	 * Validate inputs before array construction - nvec should already be
-	 * validated above
-	 */
-	/* n_components is validated at function entry, but double-check */
-	if (n_components <= 0)
+	/* Build 2D array real[][]: dims = [nvec][n_components] */
 	{
+		int			dims[2];
+		int			lbs[2];
+		Datum	   *flat_datums = NULL;
+		int			idx = 0;
+
+		dims[0] = nvec;
+		dims[1] = n_components;
+		lbs[0] = 1;
+		lbs[1] = 1;
+
+		nalloc(flat_datums, Datum, nvec * n_components);
+
+		idx = 0;
 		for (j = 0; j < nvec; j++)
 		{
-			if (data[j] != NULL)
-				nfree(data[j]);
-			if (projected[j] != NULL)
-				nfree(projected[j]);
-		}
-		for (c = 0; c < n_components; c++)
-		{
-			if (components[c] != NULL)
-				nfree(components[c]);
-		}
-		nfree(data);
-		nfree(projected);
-		nfree(components);
-		nfree(mean);
-		nfree(tbl_str);
-		nfree(col_str);
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				 errmsg("reduce_pca: invalid n_components: %d", n_components)));
-	}
-
-	nalloc(result_datums, Datum, nvec);
-	if (result_datums == NULL)
-	{
-		for (j = 0; j < nvec; j++)
-		{
-			if (data[j] != NULL)
-				nfree(data[j]);
-			if (projected[j] != NULL)
-				nfree(projected[j]);
-		}
-		for (c = 0; c < n_components; c++)
-		{
-			if (components[c] != NULL)
-				nfree(components[c]);
-		}
-		nfree(data);
-		nfree(projected);
-		nfree(components);
-		nfree(mean);
-		nfree(tbl_str);
-		nfree(col_str);
-		ereport(ERROR,
-				(errcode(ERRCODE_OUT_OF_MEMORY),
-				 errmsg("reduce_pca: failed to allocate result_datums")));
-	}
-
-	for (j = 0; j < nvec; j++)
-	{
-		ArrayType *vec_array = NULL;
-
-		Datum *vec_datums = NULL;
-		int16		typlen;
-		bool		typbyval;
-		char		typalign;
-
-		/* Validate projected data */
-		if (projected[j] == NULL)
-		{
-			/* Clean up and error */
-			for (i = 0; i < j; i++)
-			{
-				if (result_datums[i] != 0)
-				{
-					ArrayType  *arr = DatumGetArrayTypeP(result_datums[i]);
-
-					if (arr != NULL)
-						nfree(arr);
-				}
-			}
-			nfree(result_datums);
-			for (i = 0; i < nvec; i++)
-			{
-				if (data[i] != NULL)
-					nfree(data[i]);
-				if (projected[i] != NULL)
-					nfree(projected[i]);
-			}
 			for (c = 0; c < n_components; c++)
 			{
-				if (components[c] != NULL)
-					nfree(components[c]);
-			}
-			nfree(data);
-			nfree(projected);
-			nfree(components);
-			nfree(mean);
-			nfree(tbl_str);
-			nfree(col_str);
-			ereport(ERROR,
-					(errcode(ERRCODE_DATA_EXCEPTION),
-					 errmsg("reduce_pca: projected[%d] is NULL", j)));
-		}
-
-		nalloc(vec_datums, Datum, n_components);
-		if (vec_datums == NULL)
-		{
-			/* Clean up and error */
-			for (i = 0; i < j; i++)
-			{
-				if (result_datums[i] != 0)
+				/* Validate projected value is finite */
+				if (!isfinite(projected[j][c]))
 				{
-					ArrayType  *arr = DatumGetArrayTypeP(result_datums[i]);
-
-					if (arr != NULL)
-						nfree(arr);
-				}
-			}
-			nfree(result_datums);
-			for (i = 0; i < nvec; i++)
-			{
-				if (data[i] != NULL)
-					nfree(data[i]);
-				if (projected[i] != NULL)
-					nfree(projected[i]);
-			}
-			for (c = 0; c < n_components; c++)
-			{
-				if (components[c] != NULL)
-					nfree(components[c]);
-			}
-			nfree(data);
-			nfree(projected);
-			nfree(components);
-			nfree(mean);
-			nfree(tbl_str);
-			nfree(col_str);
-			ereport(ERROR,
-					(errcode(ERRCODE_OUT_OF_MEMORY),
-					 errmsg("reduce_pca: failed to allocate vec_datums for row %d", j)));
-		}
-
-		for (c = 0; c < n_components; c++)
-		{
-			/* Validate projected value is finite */
-			if (!isfinite(projected[j][c]))
-			{
-				nfree(vec_datums);
-				/* Clean up and error */
-				for (i = 0; i < j; i++)
-				{
-					if (result_datums[i] != 0)
+					nfree(flat_datums);
+					for (i = 0; i < nvec; i++)
 					{
-						ArrayType  *arr = DatumGetArrayTypeP(result_datums[i]);
-
-						nfree(arr);
+						if (data[i] != NULL)
+							nfree(data[i]);
+						if (centered_data[i] != NULL)
+							nfree(centered_data[i]);
+						if (projected[i] != NULL)
+							nfree(projected[i]);
 					}
+					for (c = 0; c < n_components; c++)
+					{
+						if (components[c] != NULL)
+							nfree(components[c]);
+					}
+					nfree(data);
+					nfree(centered_data);
+					nfree(projected);
+					nfree(components);
+					nfree(mean);
+					nfree(tbl_str);
+					nfree(col_str);
+					ereport(ERROR,
+							(errcode(ERRCODE_DATA_EXCEPTION),
+							 errmsg("reduce_pca: non-finite value in "
+									"projected[%d][%d]", j, c)));
 				}
-				nfree(result_datums);
-				for (i = 0; i < nvec; i++)
-				{
-					if (data[i] != NULL)
-						nfree(data[i]);
-					if (projected[i] != NULL)
-						nfree(projected[i]);
-				}
-				for (c = 0; c < n_components; c++)
-				{
-					if (components[c] != NULL)
-						nfree(components[c]);
-				}
-				nfree(data);
-				nfree(projected);
-				nfree(components);
-				nfree(mean);
-				nfree(tbl_str);
-				nfree(col_str);
-				ereport(ERROR,
-						(errcode(ERRCODE_DATA_EXCEPTION),
-						 errmsg("reduce_pca: non-finite value in projected[%d][%d]", j, c)));
+
+				flat_datums[idx++] = Float4GetDatum(projected[j][c]);
 			}
-			vec_datums[c] = Float4GetDatum(projected[j][c]);
 		}
 
 		get_typlenbyvalalign(FLOAT4OID, &typlen, &typbyval, &typalign);
 
-		/* Validate type information */
-		if (typlen <= 0)
-		{
-			nfree(vec_datums);
-			/* Clean up and error */
-			for (i = 0; i < j; i++)
-			{
-				if (result_datums[i] != 0)
-				{
-					ArrayType  *arr = DatumGetArrayTypeP(result_datums[i]);
+		result_array = construct_md_array(flat_datums,
+										  NULL,
+										  2,
+										  dims,
+										  lbs,
+										  FLOAT4OID,
+										  typlen,
+										  typbyval,
+										  typalign);
 
-					if (arr != NULL)
-						nfree(arr);
-				}
-			}
-			nfree(result_datums);
-			for (i = 0; i < nvec; i++)
-			{
-				if (data[i] != NULL)
-					nfree(data[i]);
-				if (projected[i] != NULL)
-					nfree(projected[i]);
-			}
-			for (c = 0; c < n_components; c++)
-			{
-				if (components[c] != NULL)
-					nfree(components[c]);
-			}
-			nfree(data);
-			nfree(projected);
-			nfree(components);
-			nfree(mean);
-			nfree(tbl_str);
-			nfree(col_str);
-			ereport(ERROR,
-					(errcode(ERRCODE_INTERNAL_ERROR),
-					 errmsg("reduce_pca: invalid type length for FLOAT4OID: %d", typlen)));
-		}
-
-		vec_array = construct_array(vec_datums,
-									n_components,
-									FLOAT4OID,
-									typlen,
-									typbyval,
-									typalign);
-
-		/* Validate constructed array */
-		if (vec_array == NULL)
-		{
-			nfree(vec_datums);
-			/* Clean up and error */
-			for (i = 0; i < j; i++)
-			{
-				if (result_datums[i] != 0)
-				{
-					ArrayType  *arr = DatumGetArrayTypeP(result_datums[i]);
-
-					if (arr != NULL)
-						nfree(arr);
-				}
-			}
-			nfree(result_datums);
-			for (i = 0; i < nvec; i++)
-			{
-				if (data[i] != NULL)
-					nfree(data[i]);
-				if (projected[i] != NULL)
-					nfree(projected[i]);
-			}
-			for (c = 0; c < n_components; c++)
-			{
-				if (components[c] != NULL)
-					nfree(components[c]);
-			}
-			nfree(data);
-			nfree(projected);
-			nfree(components);
-			nfree(mean);
-			nfree(tbl_str);
-			nfree(col_str);
-			ereport(ERROR,
-					(errcode(ERRCODE_OUT_OF_MEMORY),
-					 errmsg("reduce_pca: failed to construct array for row %d", j)));
-		}
-
-		/* Validate array structure */
-		if (ARR_NDIM(vec_array) != 1 || ARR_DIMS(vec_array)[0] != n_components)
-		{
-			nfree(vec_array);
-			nfree(vec_datums);
-			/* Clean up and error */
-			for (i = 0; i < j; i++)
-			{
-				if (result_datums[i] != 0)
-				{
-					ArrayType  *arr = DatumGetArrayTypeP(result_datums[i]);
-
-					if (arr != NULL)
-						nfree(arr);
-				}
-			}
-			nfree(result_datums);
-			for (i = 0; i < nvec; i++)
-			{
-				if (data[i] != NULL)
-					nfree(data[i]);
-				if (projected[i] != NULL)
-					nfree(projected[i]);
-			}
-			for (c = 0; c < n_components; c++)
-			{
-				if (components[c] != NULL)
-					nfree(components[c]);
-			}
-			nfree(data);
-			nfree(projected);
-			nfree(components);
-			nfree(mean);
-			nfree(tbl_str);
-			nfree(col_str);
-			ereport(ERROR,
-					(errcode(ERRCODE_INTERNAL_ERROR),
-					 errmsg("reduce_pca: constructed array has invalid dimensions for row %d", j)));
-		}
-
-		result_datums[j] = PointerGetDatum(vec_array);
-		nfree(vec_datums);
-	}
-
-	{
-		int16		typlen;
-		bool		typbyval;
-		char		typalign;
-
-		get_typlenbyvalalign(FLOAT4ARRAYOID, &typlen, &typbyval, &typalign);
-
-		/* Validate type information for array of arrays */
-		/* Note: typlen = -1 is valid for variable-length types (arrays) */
-		if (typlen < -1)
-		{
-			/* Clean up */
-			for (j = 0; j < nvec; j++)
-			{
-				if (result_datums[j] != 0)
-				{
-					ArrayType  *arr = DatumGetArrayTypeP(result_datums[j]);
-
-					nfree(arr);
-				}
-			}
-			nfree(result_datums);
-			for (j = 0; j < nvec; j++)
-			{
-				if (data[j] != NULL)
-					nfree(data[j]);
-				if (projected[j] != NULL)
-					nfree(projected[j]);
-			}
-			for (c = 0; c < n_components; c++)
-			{
-				if (components[c] != NULL)
-					nfree(components[c]);
-			}
-			nfree(data);
-			nfree(projected);
-			nfree(components);
-			nfree(mean);
-			nfree(tbl_str);
-			nfree(col_str);
-			ereport(ERROR,
-					(errcode(ERRCODE_INTERNAL_ERROR),
-					 errmsg("reduce_pca: invalid type length for FLOAT4ARRAYOID: %d", typlen)));
-		}
-
-		result_array = construct_array(result_datums,
-									   nvec,
-									   FLOAT4ARRAYOID,
-									   typlen,
-									   typbyval,
-									   typalign);
-
-		/* Validate final array */
 		if (result_array == NULL)
 		{
-			/* Clean up */
-			for (j = 0; j < nvec; j++)
-			{
-				if (result_datums[j] != 0)
-				{
-					ArrayType  *arr = DatumGetArrayTypeP(result_datums[j]);
-
-					nfree(arr);
-				}
-			}
-			nfree(result_datums);
+			nfree(flat_datums);
 			for (j = 0; j < nvec; j++)
 			{
 				if (data[j] != NULL)
 					nfree(data[j]);
+				if (centered_data[j] != NULL)
+					nfree(centered_data[j]);
 				if (projected[j] != NULL)
 					nfree(projected[j]);
 			}
@@ -710,6 +454,7 @@ reduce_pca(PG_FUNCTION_ARGS)
 					nfree(components[c]);
 			}
 			nfree(data);
+			nfree(centered_data);
 			nfree(projected);
 			nfree(components);
 			nfree(mean);
@@ -720,285 +465,29 @@ reduce_pca(PG_FUNCTION_ARGS)
 					 errmsg("reduce_pca: failed to construct result array")));
 		}
 
-		/* Validate final array structure */
-		if (ARR_NDIM(result_array) != 1 || ARR_DIMS(result_array)[0] != nvec)
-		{
-			nfree(result_array);
-			/* Clean up */
-			for (j = 0; j < nvec; j++)
-			{
-				if (result_datums[j] != 0)
-				{
-					ArrayType  *arr = DatumGetArrayTypeP(result_datums[j]);
-
-					nfree(arr);
-				}
-			}
-			nfree(result_datums);
-			for (j = 0; j < nvec; j++)
-			{
-				if (data[j] != NULL)
-					nfree(data[j]);
-				if (projected[j] != NULL)
-					nfree(projected[j]);
-			}
-			for (c = 0; c < n_components; c++)
-			{
-				if (components[c] != NULL)
-					nfree(components[c]);
-			}
-			nfree(data);
-			nfree(projected);
-			nfree(components);
-			nfree(mean);
-			nfree(tbl_str);
-			nfree(col_str);
-			ereport(ERROR,
-					(errcode(ERRCODE_INTERNAL_ERROR),
-					 errmsg("reduce_pca: result array has invalid dimensions")));
-		}
-
-		/* Validate element type matches expected FLOAT4ARRAYOID */
-		if (ARR_ELEMTYPE(result_array) != FLOAT4ARRAYOID)
-		{
-			nfree(result_array);
-			/* Clean up */
-			for (j = 0; j < nvec; j++)
-			{
-				if (result_datums[j] != 0)
-				{
-					ArrayType  *arr = DatumGetArrayTypeP(result_datums[j]);
-
-					nfree(arr);
-				}
-			}
-			nfree(result_datums);
-			for (j = 0; j < nvec; j++)
-			{
-				if (data[j] != NULL)
-					nfree(data[j]);
-				if (projected[j] != NULL)
-					nfree(projected[j]);
-			}
-			for (c = 0; c < n_components; c++)
-			{
-				if (components[c] != NULL)
-					nfree(components[c]);
-			}
-			nfree(data);
-			nfree(projected);
-			nfree(components);
-			nfree(mean);
-			nfree(tbl_str);
-			nfree(col_str);
-			ereport(ERROR,
-					(errcode(ERRCODE_INTERNAL_ERROR),
-					 errmsg("reduce_pca: result array has incorrect element type (expected %u, got %u)",
-							FLOAT4ARRAYOID, ARR_ELEMTYPE(result_array))));
-		}
-
-		/*
-		 * Validate nested array structure - check directly from result_datums
-		 * before construction
-		 */
-
-		/*
-		 * This validation happens after construction but validates the source
-		 * arrays
-		 */
-
-		/*
-		 * We validate a sample to ensure structure is correct without risking
-		 * crashes
-		 */
-		for (j = 0; j < nvec && j < 10; j++)
-		{
-			ArrayType *nested_array = NULL;
-
-			if (result_datums[j] == 0)
-			{
-				nfree(result_array);
-				/* Clean up */
-				for (i = 0; i < nvec; i++)
-				{
-					if (result_datums[i] != 0)
-					{
-						ArrayType  *arr = DatumGetArrayTypeP(result_datums[i]);
-
-						nfree(arr);
-					}
-				}
-				nfree(result_datums);
-				for (i = 0; i < nvec; i++)
-				{
-					if (data[i] != NULL)
-						nfree(data[i]);
-					if (projected[i] != NULL)
-						nfree(projected[i]);
-				}
-				for (c = 0; c < n_components; c++)
-				{
-					if (components[c] != NULL)
-						nfree(components[c]);
-				}
-				nfree(data);
-				nfree(projected);
-				nfree(components);
-				nfree(mean);
-				nfree(tbl_str);
-				nfree(col_str);
-				ereport(ERROR,
-						(errcode(ERRCODE_INTERNAL_ERROR),
-						 errmsg("reduce_pca: nested array element %d datum is NULL", j)));
-			}
-
-			nested_array = DatumGetArrayTypeP(result_datums[j]);
-			if (nested_array == NULL)
-			{
-				nfree(result_array);
-				/* Clean up */
-				for (i = 0; i < nvec; i++)
-				{
-					if (result_datums[i] != 0)
-					{
-						ArrayType  *arr = DatumGetArrayTypeP(result_datums[i]);
-
-						nfree(arr);
-					}
-				}
-				nfree(result_datums);
-				for (i = 0; i < nvec; i++)
-				{
-					if (data[i] != NULL)
-						nfree(data[i]);
-					if (projected[i] != NULL)
-						nfree(projected[i]);
-				}
-				for (c = 0; c < n_components; c++)
-				{
-					if (components[c] != NULL)
-						nfree(components[c]);
-				}
-				nfree(data);
-				nfree(projected);
-				nfree(components);
-				nfree(mean);
-				nfree(tbl_str);
-				nfree(col_str);
-				ereport(ERROR,
-						(errcode(ERRCODE_INTERNAL_ERROR),
-						 errmsg("reduce_pca: nested array element %d is invalid", j)));
-			}
-
-			/* Validate nested array is one-dimensional with correct size */
-			if (ARR_NDIM(nested_array) != 1 || ARR_DIMS(nested_array)[0] != n_components)
-			{
-				nfree(result_array);
-				/* Clean up */
-				for (i = 0; i < nvec; i++)
-				{
-					if (result_datums[i] != 0)
-					{
-						ArrayType  *arr = DatumGetArrayTypeP(result_datums[i]);
-
-						nfree(arr);
-					}
-				}
-				nfree(result_datums);
-				for (i = 0; i < nvec; i++)
-				{
-					if (data[i] != NULL)
-						nfree(data[i]);
-					if (projected[i] != NULL)
-						nfree(projected[i]);
-				}
-				for (c = 0; c < n_components; c++)
-				{
-					if (components[c] != NULL)
-						nfree(components[c]);
-				}
-				nfree(data);
-				nfree(projected);
-				nfree(components);
-				nfree(mean);
-				nfree(tbl_str);
-				nfree(col_str);
-				ereport(ERROR,
-						(errcode(ERRCODE_INTERNAL_ERROR),
-						 errmsg("reduce_pca: nested array element %d has invalid dimensions (expected 1 dim with %d elements, got %d dims)",
-								j, n_components, ARR_NDIM(nested_array))));
-			}
-
-			/* Validate nested array element type is FLOAT4OID */
-			if (ARR_ELEMTYPE(nested_array) != FLOAT4OID)
-			{
-				nfree(result_array);
-				/* Clean up */
-				for (i = 0; i < nvec; i++)
-				{
-					if (result_datums[i] != 0)
-					{
-						ArrayType  *arr = DatumGetArrayTypeP(result_datums[i]);
-
-						nfree(arr);
-					}
-				}
-				nfree(result_datums);
-				for (i = 0; i < nvec; i++)
-				{
-					if (data[i] != NULL)
-						nfree(data[i]);
-					if (projected[i] != NULL)
-						nfree(projected[i]);
-				}
-				for (c = 0; c < n_components; c++)
-				{
-					if (components[c] != NULL)
-						nfree(components[c]);
-				}
-				nfree(data);
-				nfree(projected);
-				nfree(components);
-				nfree(mean);
-				nfree(tbl_str);
-				nfree(col_str);
-				ereport(ERROR,
-						(errcode(ERRCODE_INTERNAL_ERROR),
-						 errmsg("reduce_pca: nested array element %d has incorrect element type (expected %u, got %u)",
-								j, FLOAT4OID, ARR_ELEMTYPE(nested_array))));
-			}
-		}
+		nfree(flat_datums);
 	}
-
 	for (j = 0; j < nvec; j++)
 	{
-		nfree(data[j]);
-		nfree(projected[j]);
+		if (data[j] != NULL)
+			nfree(data[j]);
+		if (centered_data[j] != NULL)
+			nfree(centered_data[j]);
+		if (projected[j] != NULL)
+			nfree(projected[j]);
 	}
 	for (c = 0; c < n_components; c++)
-		nfree(components[c]);
+	{
+		if (components[c] != NULL)
+			nfree(components[c]);
+	}
 	nfree(data);
+	nfree(centered_data);
 	nfree(projected);
 	nfree(components);
 	nfree(mean);
-	nfree(result_datums);
 	nfree(tbl_str);
 	nfree(col_str);
-
-	/* Final validation: ensure array is properly constructed and typed */
-	if (result_array == NULL)
-	{
-		ereport(ERROR,
-				(errcode(ERRCODE_INTERNAL_ERROR),
-				 errmsg("reduce_pca: result array is NULL")));
-	}
-
-	/* Ensure array is in current memory context for proper return */
-	if (GetMemoryChunkContext((void *) result_array) != CurrentMemoryContext)
-	{
-		/* This shouldn't happen with construct_array, but check anyway */
-		elog(WARNING, "reduce_pca: result array is not in current memory context");
-	}
 
 	PG_RETURN_ARRAYTYPE_P(result_array);
 }
@@ -1162,9 +651,15 @@ detect_outliers(PG_FUNCTION_ARGS)
 	ArrayType *result_array = NULL;
 
 	Datum *result_datums = NULL;
-	int16		typlen;
-	bool		typbyval;
-	char		typalign;
+	char		typalign = 0;
+	bool		typbyval = false;
+	int16		typlen = 0;
+
+	/* Validate argument count */
+	if (PG_NARGS() < 2 || PG_NARGS() > 4)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: detect_outliers requires 2 to 4 arguments")));
 
 	table_name = PG_GETARG_TEXT_PP(0);
 	column_name = PG_GETARG_TEXT_PP(1);
@@ -1201,6 +696,10 @@ detect_outliers(PG_FUNCTION_ARGS)
 	max_depth = (int) ceil(log2(nvec));
 	nalloc(forest, IsoTreeNode *, n_trees);
 	nalloc(indices, int, nvec);
+
+	/* Seed random number generator for reproducible results */
+	/* Note: In production, this should be seeded once in module init */
+	srand((unsigned int) time(NULL));
 
 	for (t = 0; t < n_trees; t++)
 	{
@@ -1304,10 +803,16 @@ build_knn_graph(PG_FUNCTION_ARGS)
 	ArrayType *result_array = NULL;
 
 	Datum *result_datums = NULL;
-	int			result_count;
-	int16		typlen;
-	bool		typbyval;
-	char		typalign;
+	int			result_count = 0;
+	char		typalign = 0;
+	bool		typbyval = false;
+	int16		typlen = 0;
+
+	/* Validate argument count */
+	if (PG_NARGS() < 3)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: build_knn_graph requires at least 3 arguments")));
 
 	table_name = PG_GETARG_TEXT_PP(0);
 	column_name = PG_GETARG_TEXT_PP(1);
@@ -1359,15 +864,19 @@ build_knn_graph(PG_FUNCTION_ARGS)
 	if (k >= nvec)
 		k = nvec - 1;
 
-	nalloc(edges, KNNEdge, nvec);
+	/* Allocate edges array - we need nvec-1 edges per node (excluding self) */
+	nalloc(edges, KNNEdge, nvec - 1);
 	result_count = 0;
-	nalloc(result_datums, Datum, nvec * k * 3);
+	/* Store as array of real[3] arrays: [src, dst, dist] */
+	nalloc(result_datums, Datum, nvec * k);
 
 	for (i = 0; i < nvec; i++)
 	{
+		int			edge_count = 0;
 		double		dist_sq;
 		double		diff;
 
+		/* Build edges list excluding self */
 		for (j = 0; j < nvec; j++)
 		{
 			if (i == j)
@@ -1379,29 +888,129 @@ build_knn_graph(PG_FUNCTION_ARGS)
 				diff = (double) data[i][n] - (double) data[j][n];
 				dist_sq += diff * diff;
 			}
-			edges[j].target = j;
-			edges[j].distance = sqrt(dist_sq);
+			edges[edge_count].target = j;
+			edges[edge_count].distance = sqrt(dist_sq);
+			edge_count++;
 		}
 
-		qsort(edges, nvec, sizeof(KNNEdge), knn_edge_compare);
+		/* Sort by distance */
+		qsort(edges, edge_count, sizeof(KNNEdge), knn_edge_compare);
 
-		for (j = 0; j < k && j < nvec - 1; j++)
+		/* Take top k neighbors */
+		for (j = 0; j < k && j < edge_count; j++)
 		{
-			result_datums[result_count++] = Int32GetDatum(i);
-			result_datums[result_count++] =
-				Int32GetDatum(edges[j].target);
-			result_datums[result_count++] =
-				Float4GetDatum(edges[j].distance);
+			/* Build array [src, dst, dist] for this edge */
+			Datum	   *edge_datums = NULL;
+			ArrayType  *edge_array = NULL;
+			int			edge_idx = result_count++;
+
+			nalloc(edge_datums, Datum, 3);
+			edge_datums[0] = Int32GetDatum(i);
+			edge_datums[1] = Int32GetDatum(edges[j].target);
+			edge_datums[2] = Float4GetDatum(edges[j].distance);
+
+			get_typlenbyvalalign(FLOAT4OID, &typlen, &typbyval, &typalign);
+			edge_array = construct_array(edge_datums, 3, FLOAT4OID, typlen, typbyval, typalign);
+			nfree(edge_datums);
+
+			if (edge_array == NULL)
+			{
+				/* Cleanup */
+				for (i = 0; i < nvec; i++)
+					nfree(data[i]);
+				nfree(data);
+				nfree(edges);
+				for (i = 0; i < edge_idx; i++)
+				{
+					if (result_datums[i] != 0)
+					{
+						ArrayType  *arr = DatumGetArrayTypeP(result_datums[i]);
+						nfree(arr);
+					}
+				}
+				nfree(result_datums);
+				nfree(tbl_str);
+				nfree(col_str);
+				ereport(ERROR,
+						(errcode(ERRCODE_OUT_OF_MEMORY),
+						 errmsg("build_knn_graph: failed to construct edge array")));
+			}
+
+			result_datums[edge_idx] = PointerGetDatum(edge_array);
 		}
 	}
 
-	get_typlenbyvalalign(FLOAT4OID, &typlen, &typbyval, &typalign);
-	result_array = construct_array(result_datums,
-								   result_count,
-								   FLOAT4OID,
-								   typlen,
-								   typbyval,
-								   typalign);
+	/* Build 2D array real[][3]: dims = [result_count][3] */
+	/* Convert array-of-arrays to true 2D array */
+	{
+		int			dims[2];
+		int			lbs[2];
+		Datum	   *flat_datums = NULL;
+		int			idx = 0;
+
+		dims[0] = result_count;
+		dims[1] = 3;
+		lbs[0] = 1;
+		lbs[1] = 1;
+
+		nalloc(flat_datums, Datum, result_count * 3);
+
+		idx = 0;
+		for (i = 0; i < result_count; i++)
+		{
+			ArrayType  *edge_array = NULL;
+			Datum	   *edge_elems = NULL;
+			bool	   *nulls = NULL;
+			int			nelems;
+			int			e;
+
+			if (result_datums[i] != 0)
+			{
+				edge_array = DatumGetArrayTypeP(result_datums[i]);
+				deconstruct_array(edge_array,
+								  FLOAT4OID,
+								  sizeof(float4),
+								  true,
+								  'i',
+								  &edge_elems,
+								  &nulls,
+								  &nelems);
+
+				for (e = 0; e < nelems && e < 3; e++)
+				{
+					if (!nulls[e])
+						flat_datums[idx++] = edge_elems[e];
+					else
+						flat_datums[idx++] = Float4GetDatum(0.0);
+				}
+				/* Free the inner array */
+				nfree(edge_array);
+			}
+			else
+			{
+				/* Fill with zeros if array is NULL */
+				flat_datums[idx++] = Float4GetDatum(0.0);
+				flat_datums[idx++] = Float4GetDatum(0.0);
+				flat_datums[idx++] = Float4GetDatum(0.0);
+			}
+		}
+
+		get_typlenbyvalalign(FLOAT4OID, &typlen, &typbyval, &typalign);
+
+		result_array = construct_md_array(flat_datums,
+										  NULL,
+										  2,
+										  dims,
+										  lbs,
+										  FLOAT4OID,
+										  typlen,
+										  typbyval,
+										  typalign);
+
+		nfree(flat_datums);
+	}
+
+	/* Free result_datums (inner arrays already freed above) */
 
 	for (i = 0; i < nvec; i++)
 		nfree(data[i]);
@@ -1450,6 +1059,12 @@ compute_embedding_quality(PG_FUNCTION_ARGS)
 
 	NdbSpiSession *spi_session = NULL;
 	MemoryContext oldcontext;
+
+	/* Validate argument count */
+	if (PG_NARGS() < 3)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: compute_embedding_quality requires at least 3 arguments")));
 
 	table_name = PG_GETARG_TEXT_PP(0);
 	column_name = PG_GETARG_TEXT_PP(1);
@@ -1502,6 +1117,7 @@ compute_embedding_quality(PG_FUNCTION_ARGS)
 	NDB_SPI_SESSION_BEGIN(spi_session, oldcontext);
 
 	ndb_spi_stringinfo_init(spi_session, &sql);
+	/* Note: No ORDER BY clause - views don't have ctid, and ordering isn't required */
 	appendStringInfo(&sql, "SELECT %s FROM %s", cluster_col_str, tbl_str);
 	ret = ndb_spi_execute(spi_session, sql.data, true, 0);
 
@@ -1511,7 +1127,15 @@ compute_embedding_quality(PG_FUNCTION_ARGS)
 		NDB_SPI_SESSION_END(spi_session);
 		nfree(clusters);
 		nfree(tbl_str);
+		nfree(col_str);
 		nfree(cluster_col_str);
+		/* Free data array and rows */
+		for (i = 0; i < nvec; i++)
+		{
+			if (data[i] != NULL)
+				nfree(data[i]);
+		}
+		nfree(data);
 		ereport(ERROR,
 				(errcode(ERRCODE_DATA_EXCEPTION),
 				 errmsg("Failed to fetch cluster assignments")));

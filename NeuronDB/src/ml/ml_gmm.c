@@ -133,23 +133,23 @@ cluster_gmm(PG_FUNCTION_ARGS)
 	char	   *col_str = NULL;
 	char	   *tbl_str = NULL;
 	Datum	   *result_datums = NULL;
+	double		log_likelihood = 0.0;
+	double		prev_log_likelihood = -DBL_MAX;
 	double	   **responsibilities = NULL;
-	double		log_likelihood;
-	double		prev_log_likelihood;
 	float	   **data = NULL;
 	GMMModel	model = {0};
-	int			d;
-	int			dim;
-	int			dims[2];
-	int			i;
-	int			iter;
-	int			k;
-	int			max_iters;
-	int			num_components;
-	int			nvec;
+	int			d = 0;
+	int			dim = 0;
+	int			dims[2] = {0, 0};
+	int			i = 0;
+	int			iter = 0;
+	int			k = 0;
+	int			lbs[2] = {0, 0};
+	int			max_iters = 100;
+	int			num_components = 0;
+	int			nvec = 0;
 	text	   *table_name = NULL;
 	text	   *vector_column = NULL;
-	int			lbs[2];
 
 	table_name = PG_GETARG_TEXT_PP(0);
 	vector_column = PG_GETARG_TEXT_PP(1);
@@ -205,18 +205,19 @@ cluster_gmm(PG_FUNCTION_ARGS)
 	model.k = num_components;
 	model.dim = dim;
 	{
-		double *mixing_coeffs_tmp = NULL;
-		double **means_tmp = NULL;
-		double **variances_tmp = NULL;
+		double	   *mixing_coeffs_tmp = NULL;
+		double	   **means_tmp = NULL;
+		double	   **variances_tmp = NULL;
+		double	   *means_row = NULL;
+		double	   *variances_row = NULL;
+		int			idx = 0;
+
 		nalloc(mixing_coeffs_tmp, double, num_components);
 		nalloc(means_tmp, double *, num_components);
 		nalloc(variances_tmp, double *, num_components);
 
 		for (k = 0; k < num_components; k++)
 		{
-			int			idx;
-			double *means_row = NULL;
-			double *variances_row = NULL;
 
 			nalloc(means_row, double, dim);
 			nalloc(variances_row, double, dim);
@@ -239,8 +240,12 @@ cluster_gmm(PG_FUNCTION_ARGS)
 	}
 
 	nalloc(responsibilities, double *, nvec);
+	/* Explicitly ensure all pointers are NULL before allocation (palloc0 should do this, but be defensive) */
 	for (i = 0; i < nvec; i++)
+	{
+		responsibilities[i] = NULL;
 		nalloc(responsibilities[i], double, num_components);
+	}
 
 	prev_log_likelihood = -DBL_MAX;
 
@@ -395,13 +400,12 @@ cluster_gmm(PG_FUNCTION_ARGS)
 static bytea *
 gmm_model_serialize_to_bytea(const GMMModel * model, uint8 training_backend)
 {
-	StringInfoData buf;
-	int			i,
-				j;
-	int			total_size;
-	bytea *result = NULL;
-
-	char *result_bytes = NULL;
+	bytea	   *result = NULL;
+	char	   *result_bytes = NULL;
+	int			i = 0;
+	int			j = 0;
+	int			total_size = 0;
+	StringInfoData buf = {0};
 
 	/* Validate training_backend */
 	if (training_backend > 1)
@@ -447,11 +451,11 @@ gmm_model_serialize_to_bytea(const GMMModel * model, uint8 training_backend)
 static GMMModel *
 gmm_model_deserialize_from_bytea(const bytea * data, uint8 * training_backend_out)
 {
-	GMMModel *model = NULL;
-	const char *buf;
+	const char *buf = NULL;
+	GMMModel   *model = NULL;
+	int			i = 0;
+	int			j = 0;
 	int			offset = 0;
-	int			i,
-				j;
 	uint8		training_backend = 0;
 
 	if (data == NULL || VARSIZE(data) < VARHDRSZ + sizeof(int) * 2)
@@ -500,7 +504,8 @@ gmm_model_deserialize_from_bytea(const bytea * data, uint8 * training_backend_ou
 
 		for (i = 0; i < model->k; i++)
 		{
-			double *means_row = NULL;
+			double	   *means_row = NULL;
+
 			nalloc(means_row, double, model->dim);
 			for (j = 0; j < model->dim; j++)
 			{
@@ -512,7 +517,8 @@ gmm_model_deserialize_from_bytea(const bytea * data, uint8 * training_backend_ou
 
 		for (i = 0; i < model->k; i++)
 		{
-			double *variances_row = NULL;
+			double	   *variances_row = NULL;
+
 			nalloc(variances_row, double, model->dim);
 			for (j = 0; j < model->dim; j++)
 			{
@@ -539,29 +545,28 @@ PG_FUNCTION_INFO_V1(train_gmm_model_id);
 Datum
 train_gmm_model_id(PG_FUNCTION_ARGS)
 {
-	text *table_name = NULL;
-	text *vector_column = NULL;
-	int			num_components;
-	int			max_iters;
-	char *tbl_str = NULL;
-	char *col_str = NULL;
-	float	  **data;
-	int			nvec,
-				dim;
-	GMMModel	model;
-
-	double **responsibilities = NULL;
-	double		log_likelihood,
-				prev_log_likelihood;
-	int			iter,
-				i,
-				k,
-				d;
-	bytea *model_data = NULL;
-	MLCatalogModelSpec spec;
-	Jsonb *metrics = NULL;
-	StringInfoData metrics_json;
-	int32		model_id;
+	bytea	   *model_data = NULL;
+	char	   *col_str = NULL;
+	char	   *tbl_str = NULL;
+	double		log_likelihood = 0.0;
+	double		prev_log_likelihood = -DBL_MAX;
+	double	   **responsibilities = NULL;
+	float	   **data = NULL;
+	GMMModel	model = {0};
+	int			d = 0;
+	int			dim = 0;
+	int			i = 0;
+	int			iter = 0;
+	int			k = 0;
+	int			max_iters = 100;
+	int			num_components = 0;
+	int			nvec = 0;
+	int32		model_id = 0;
+	Jsonb	   *metrics = NULL;
+	MLCatalogModelSpec spec = {0};
+	StringInfoData metrics_json = {0};
+	text	   *table_name = NULL;
+	text	   *vector_column = NULL;
 
 	table_name = PG_GETARG_TEXT_PP(0);
 	vector_column = PG_GETARG_TEXT_PP(1);
@@ -657,8 +662,12 @@ train_gmm_model_id(PG_FUNCTION_ARGS)
 	}
 
 	nalloc(responsibilities, double *, nvec);
+	/* Explicitly ensure all pointers are NULL before allocation (palloc0 should do this, but be defensive) */
 	for (i = 0; i < nvec; i++)
+	{
+		responsibilities[i] = NULL;
 		nalloc(responsibilities[i], double, num_components);
+	}
 
 	prev_log_likelihood = -DBL_MAX;
 

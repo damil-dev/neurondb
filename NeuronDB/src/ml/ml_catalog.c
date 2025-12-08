@@ -529,7 +529,7 @@ ml_catalog_register_model(const MLCatalogModelSpec *spec)
 						 NDB_COL_TRAINING_COLUMN ", parameters, model_data, " NDB_COL_METRICS ", "
 						 "training_time_ms, num_samples, num_features, "
 						 "completed_at) "
-						 "VALUES (%d, %d, %s::" NDB_FQ_TYPE_ML_ALGORITHM ", '" NDB_STATUS_COMPLETED "', "
+						 "VALUES (%d, %d, %s::text::" NDB_FQ_TYPE_ML_ALGORITHM ", '" NDB_STATUS_COMPLETED "', "
 						 "%s, %s, %s::jsonb, NULL, %s::jsonb, "
 						 "%s, %s, %s, NOW()) "
 						 "ON CONFLICT (" NDB_COL_PROJECT_ID ", " NDB_COL_VERSION ") DO UPDATE SET "
@@ -559,6 +559,11 @@ ml_catalog_register_model(const MLCatalogModelSpec *spec)
 		nfree(num_samples_str);
 		nfree(num_features_str);
 	}
+
+	/* Note: Enum values should be added during extension installation via neurondb--1.0.sql.
+	 * We use ::text::enum cast to allow using enum values that may have been added in the same
+	 * transaction (though PostgreSQL generally doesn't allow this, the cast is a workaround).
+	 * If the enum value doesn't exist, the INSERT will fail with a helpful error message. */
 
 	ret = ndb_spi_execute(spi_session, insert_sql.data, false, 1);
 
@@ -602,6 +607,7 @@ ml_catalog_register_model(const MLCatalogModelSpec *spec)
 
 		argtypes[0] = BYTEAOID;
 		argtypes[1] = INT4OID;
+		/* SPI_execute_with_args will copy the bytea Datum automatically */
 		values[0] = PointerGetDatum(spec->model_data);
 		values[1] = Int32GetDatum(model_id);
 		nulls[0] = ' ';

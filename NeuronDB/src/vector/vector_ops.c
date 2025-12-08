@@ -618,6 +618,12 @@ PG_FUNCTION_INFO_V1(vector_ne);
 Datum
 vector_ne(PG_FUNCTION_ARGS)
 {
+	/* Validate argument count */
+	if (PG_NARGS() < 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_ne requires at least 2 arguments")));
+
 	return DirectFunctionCall2(
 							   vector_eq, PG_GETARG_DATUM(0), PG_GETARG_DATUM(1))
 		? BoolGetDatum(false)

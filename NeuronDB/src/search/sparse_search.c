@@ -41,10 +41,21 @@ PG_FUNCTION_INFO_V1(sparse_search);
 Datum
 sparse_search(PG_FUNCTION_ARGS)
 {
-	text	   *table_name = PG_GETARG_TEXT_PP(0);
-	text	   *sparse_col = PG_GETARG_TEXT_PP(1);
-	Datum		query_vec = PG_GETARG_DATUM(2);
-	int32		k = PG_GETARG_INT32(3);
+	text	   *table_name;
+	text	   *sparse_col;
+	Datum		query_vec;
+	int32		k;
+
+	/* Validate argument count */
+	if (PG_NARGS() < 4)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: sparse_search requires at least 4 arguments")));
+
+	table_name = PG_GETARG_TEXT_PP(0);
+	sparse_col = PG_GETARG_TEXT_PP(1);
+	query_vec = PG_GETARG_DATUM(2);
+	k = PG_GETARG_INT32(3);
 	ReturnSetInfo *rsinfo = (ReturnSetInfo *) fcinfo->resultinfo;
 	TupleDesc	tupdesc;
 	Tuplestorestate *tupstore = NULL;
@@ -156,7 +167,15 @@ PG_FUNCTION_INFO_V1(splade_embed);
 Datum
 splade_embed(PG_FUNCTION_ARGS)
 {
-	text	   *input_text = PG_GETARG_TEXT_PP(0);
+	text	   *input_text;
+
+	/* Validate argument count */
+	if (PG_NARGS() < 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: splade_embed requires at least 1 argument")));
+
+	input_text = PG_GETARG_TEXT_PP(0);
 	char	   *input_str = text_to_cstring(input_text);
 #ifdef HAVE_ONNX_RUNTIME
 	ONNXModelSession *session = NULL;
@@ -274,7 +293,15 @@ PG_FUNCTION_INFO_V1(colbertv2_embed);
 Datum
 colbertv2_embed(PG_FUNCTION_ARGS)
 {
-	text	   *input_text = PG_GETARG_TEXT_PP(0);
+	text	   *input_text;
+
+	/* Validate argument count */
+	if (PG_NARGS() < 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: colbertv2_embed requires at least 1 argument")));
+
+	input_text = PG_GETARG_TEXT_PP(0);
 	char	   *input_str = text_to_cstring(input_text);
 #ifdef HAVE_ONNX_RUNTIME
 	ONNXModelSession *session = NULL;
@@ -509,10 +536,21 @@ PG_FUNCTION_INFO_V1(bm25_score);
 Datum
 bm25_score(PG_FUNCTION_ARGS)
 {
-	text	   *query_text = PG_GETARG_TEXT_PP(0);
-	text	   *doc_text = PG_GETARG_TEXT_PP(1);
-	float8		k1 = PG_ARGISNULL(2) ? 1.2 : PG_GETARG_FLOAT8(2);
-	float8		b = PG_ARGISNULL(3) ? 0.75 : PG_GETARG_FLOAT8(3);
+	text	   *query_text;
+	text	   *doc_text;
+	float8		k1;
+	float8		b;
+
+	/* Validate argument count */
+	if (PG_NARGS() < 2 || PG_NARGS() > 4)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: bm25_score requires 2 to 4 arguments")));
+
+	query_text = PG_GETARG_TEXT_PP(0);
+	doc_text = PG_GETARG_TEXT_PP(1);
+	k1 = PG_ARGISNULL(2) ? 1.2 : PG_GETARG_FLOAT8(2);
+	b = PG_ARGISNULL(3) ? 0.75 : PG_GETARG_FLOAT8(3);
 	char	   *query_str = text_to_cstring(query_text);
 	char	   *doc_str = text_to_cstring(doc_text);
 	char	  **query_tokens = NULL;

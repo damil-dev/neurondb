@@ -16,6 +16,7 @@
 
 #include "postgres.h"
 #include "fmgr.h"
+#include "funcapi.h"
 #include "neurondb.h"
 #include "utils/builtins.h"
 #include "miscadmin.h"
@@ -72,9 +73,19 @@ PG_FUNCTION_INFO_V1(create_tenant_worker);
 Datum
 create_tenant_worker(PG_FUNCTION_ARGS)
 {
-	text	   *tenant_id = PG_GETARG_TEXT_PP(0);
-	text	   *worker_type = PG_GETARG_TEXT_PP(1);
-	text	   *config = PG_GETARG_TEXT_PP(2);
+	text	   *tenant_id;
+	text	   *worker_type;
+	text	   *config;
+
+	/* Validate argument count */
+	if (PG_NARGS() < 3)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: create_tenant_worker requires at least 3 arguments")));
+
+	tenant_id = PG_GETARG_TEXT_PP(0);
+	worker_type = PG_GETARG_TEXT_PP(1);
+	config = PG_GETARG_TEXT_PP(2);
 	char	   *tid_str = NULL;
 	char	   *type_str = NULL;
 	int32		worker_id = 0;
@@ -131,29 +142,66 @@ PG_FUNCTION_INFO_V1(get_tenant_stats);
 Datum
 get_tenant_stats(PG_FUNCTION_ARGS)
 {
-	text	   *tenant_id = PG_GETARG_TEXT_PP(0);
-	StringInfoData stats;
+	FuncCallContext *funcctx;
+	TupleDesc	tupdesc;
+	Datum		values[4];
+	bool		nulls[4];
+	HeapTuple	tuple;
+	text	   *tenant_id = NULL;
 	char	   *tid_str = NULL;
 
-	if (tenant_id == NULL)
-		ereport(ERROR,
-				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
-				 errmsg("tenant_id must not be null")));
+	if (SRF_IS_FIRSTCALL())
+	{
+		MemoryContext oldcontext;
 
-	tid_str = ndb_text_to_cstring_safe(tenant_id);
+		/* Validate argument count */
+		if (PG_NARGS() < 1)
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					 errmsg("neurondb: get_tenant_stats requires at least 1 argument")));
 
-	/* Proper initialization */
-	initStringInfo(&stats);
+		funcctx = SRF_FIRSTCALL_INIT();
+
+		tenant_id = PG_GETARG_TEXT_PP(0);
+		if (tenant_id == NULL)
+			ereport(ERROR,
+					(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+					 errmsg("tenant_id must not be null")));
+
+		tid_str = ndb_text_to_cstring_safe(tenant_id);
+
+		oldcontext = MemoryContextSwitchTo(funcctx->multi_call_memory_ctx);
+
+		/* Build tuple descriptor */
+		if (get_call_result_type(fcinfo, NULL, &tupdesc) != TYPEFUNC_COMPOSITE)
+			ereport(ERROR,
+					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+					 errmsg("function returning record called in context "
+							"that cannot accept type record")));
+
+		funcctx->tuple_desc = BlessTupleDesc(tupdesc);
+		funcctx->max_calls = 1;
+		funcctx->user_fctx = (void *) tid_str;
+
+		MemoryContextSwitchTo(oldcontext);
+	}
+
+	funcctx = SRF_PERCALL_SETUP();
+	tupdesc = funcctx->tuple_desc;
+	tid_str = (char *) funcctx->user_fctx;
+
+	if (funcctx->call_cntr >= funcctx->max_calls)
+		SRF_RETURN_DONE(funcctx);
 
 	/* In production, this would be a query against tenant metric tables */
-	appendStringInfo(&stats, "tenant_id: %s\n", tid_str);
-	appendStringInfo(&stats, "queries: %lld\n", (long long) 1000);
-	appendStringInfo(&stats, "tokens: %lld\n", (long long) 50000);
-	appendStringInfo(&stats, "cost: %.2f\n", 25.50);
-	appendStringInfo(&stats, "avg_latency_ms: %d\n", 150);
+	memset(nulls, 0, sizeof(nulls));
+	values[0] = Int64GetDatum(1000);	/* vectors */
+	values[1] = Float4GetDatum(25.50);	/* storage_mb */
+	values[2] = Float4GetDatum(150.0);	/* qps */
+	values[3] = Int32GetDatum(5);		/* indexes */
 
-
-	PG_RETURN_TEXT_P(cstring_to_text(stats.data));
+	tuple = heap_form_tuple(tupdesc, values, nulls);
+	SRF_RETURN_NEXT(funcctx, HeapTupleGetDatum(tuple));
 }
 
 /*
@@ -164,8 +212,17 @@ PG_FUNCTION_INFO_V1(create_policy);
 Datum
 create_policy(PG_FUNCTION_ARGS)
 {
-	text	   *policy_name = PG_GETARG_TEXT_PP(0);
-	text	   *policy_rule = PG_GETARG_TEXT_PP(1);
+	text	   *policy_name;
+	text	   *policy_rule;
+
+	/* Validate argument count */
+	if (PG_NARGS() < 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: create_policy requires at least 2 arguments")));
+
+	policy_name = PG_GETARG_TEXT_PP(0);
+	policy_rule = PG_GETARG_TEXT_PP(1);
 	char	   *name_str = NULL;
 	char	   *rule_str = NULL;
 	volatile bool success = false;
@@ -297,9 +354,19 @@ PG_FUNCTION_INFO_V1(audit_log_query);
 Datum
 audit_log_query(PG_FUNCTION_ARGS)
 {
-	text	   *query_text = PG_GETARG_TEXT_PP(0);
-	text	   *user_id = PG_GETARG_TEXT_PP(1);
-	Vector	   *result_vectors = (Vector *) PG_GETARG_POINTER(2);
+	text	   *query_text;
+	text	   *user_id;
+	Vector	   *result_vectors;
+
+	/* Validate argument count */
+	if (PG_NARGS() < 3)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: audit_log_query requires at least 3 arguments")));
+
+	query_text = PG_GETARG_TEXT_PP(0);
+	user_id = PG_GETARG_TEXT_PP(1);
+	result_vectors = (Vector *) PG_GETARG_POINTER(2);
 	char	   *query_str = NULL;
 	char	   *user_str = NULL;
 	volatile	uint32 vector_hash = 0;
