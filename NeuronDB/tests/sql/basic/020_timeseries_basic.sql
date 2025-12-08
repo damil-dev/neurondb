@@ -17,12 +17,20 @@ CREATE TABLE ts_data (
 	label double precision
 );
 
--- Create sample time series data
+-- Create sample time series data with more variation suitable for ARIMA
+-- Use a combination of trend, seasonality, and noise for better ARIMA fitting
 INSERT INTO ts_data (features, label)
 SELECT 
 	array_to_vector_float8(ARRAY[x::double precision]) AS features,
-	(x::double precision + random()*0.1) AS label
-FROM generate_series(1, 30) AS x;
+	(
+		-- Trend component
+		x::double precision * 0.5
+		-- Seasonal component (period ~7)
+		+ 5.0 * sin(2.0 * pi() * x::double precision / 7.0)
+		-- Noise component
+		+ (random() - 0.5) * 2.0
+	) AS label
+FROM generate_series(1, 50) AS x;  -- Increased from 30 to 50 for better ARIMA fitting
 
 SELECT COUNT(*)::bigint AS data_rows FROM ts_data;
 
@@ -34,7 +42,7 @@ SELECT COUNT(*)::bigint AS data_rows FROM ts_data;
 -- Train time series model on CPU
 DO $$
 DECLARE
-	model_id int;
+	v_model_id int;
 	data_count int;
 BEGIN
 	-- Verify we have training data
@@ -44,16 +52,16 @@ BEGIN
 	END IF;
 	
 	-- Train the model
-	SELECT neurondb.train('default', 'timeseries', 'ts_data', 'label', ARRAY['features'], '{}'::jsonb) INTO model_id;
+	SELECT neurondb.train('default', 'timeseries', 'ts_data', 'label', ARRAY['features'], '{}'::jsonb) INTO v_model_id;
 	
 	-- Verify model was created
-	IF model_id IS NULL THEN
+	IF v_model_id IS NULL THEN
 		RAISE EXCEPTION 'Model training failed: model_id is NULL';
 	END IF;
 	
 	-- Verify model exists in ml_models table
-	IF NOT EXISTS (SELECT 1 FROM neurondb.ml_models m WHERE m.model_id = model_id) THEN
-		RAISE EXCEPTION 'Model % not found in ml_models table', model_id;
+	IF NOT EXISTS (SELECT 1 FROM neurondb.ml_models m WHERE m.model_id = v_model_id) THEN
+		RAISE EXCEPTION 'Model % not found in ml_models table', v_model_id;
 	END IF;
 END $$;
 
@@ -126,7 +134,7 @@ END $$;
 -- Train time series model on GPU
 DO $$
 DECLARE
-	model_id int;
+	v_model_id int;
 	data_count int;
 	gpu_model_id int;
 BEGIN
@@ -140,16 +148,16 @@ BEGIN
 	SELECT COUNT(*) INTO gpu_model_id FROM neurondb.ml_models WHERE algorithm::text = 'timeseries';
 	
 	-- Train the model
-	SELECT neurondb.train('default', 'timeseries', 'ts_data', 'label', ARRAY['features'], '{}'::jsonb) INTO model_id;
+	SELECT neurondb.train('default', 'timeseries', 'ts_data', 'label', ARRAY['features'], '{}'::jsonb) INTO v_model_id;
 	
 	-- Verify model was created
-	IF model_id IS NULL THEN
+	IF v_model_id IS NULL THEN
 		RAISE EXCEPTION 'GPU model training failed: model_id is NULL';
 	END IF;
 	
 	-- Verify model exists in ml_models table
-	IF NOT EXISTS (SELECT 1 FROM neurondb.ml_models m WHERE m.model_id = model_id) THEN
-		RAISE EXCEPTION 'GPU model % not found in ml_models table', model_id;
+	IF NOT EXISTS (SELECT 1 FROM neurondb.ml_models m WHERE m.model_id = v_model_id) THEN
+		RAISE EXCEPTION 'GPU model % not found in ml_models table', v_model_id;
 	END IF;
 	
 	-- Verify a new model was created (count should increase)
