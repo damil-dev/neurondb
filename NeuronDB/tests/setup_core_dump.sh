@@ -27,3 +27,4 @@ echo "To generate core dump, run the test command below."
 echo "After crash, core file will be saved as: core.postgres.<pid>.<timestamp>"
 echo ""
 
+

@@ -27,14 +27,32 @@
 #include "lib/stringinfo.h"
 #include "utils/builtins.h"
 #include "utils/jsonb.h"
+#include "utils/elog.h"
 
 #include "ml_linear_regression_internal.h"
 #include "neurondb_cuda_linreg.h"
 #include "neurondb_validation.h"
-#include "neurondb_safe_memory.h"
+/* Note: neurondb_safe_memory.h not needed - we override nalloc/nfree below */
 #include "neurondb_macros.h"
 #include "neurondb_guc.h"
 #include "neurondb_constants.h"
+#include "neurondb_json.h"
+
+/* TEMPORARY DEBUGGING: Replace nalloc/nfree with direct PostgreSQL allocators */
+/* This isolates whether the wrappers are causing memory corruption */
+#undef nalloc
+#undef nfree
+#define nalloc(var, type, count) \
+	do { \
+		(var) = (type *) MemoryContextAlloc(CurrentMemoryContext, sizeof(type) * (Size) (count)); \
+		memset((var), 0, sizeof(type) * (Size) (count)); \
+	} while (0)
+#define nfree(ptr) \
+	do { \
+		if ((ptr) != NULL) { \
+			pfree((ptr)); \
+		} \
+	} while (0)
 
 extern cudaError_t launch_build_X_matrix_kernel(const float *features,
 												float *X_with_intercept,
@@ -71,6 +89,29 @@ ndb_cuda_linreg_pack_model(const LinRegModel *model,
 	bytea *blob = NULL;
 	char *blob_raw = NULL;
 
+
+	/* GPU mode: ensure we're NOT in CPU mode */
+	if (NDB_COMPUTE_MODE_IS_CPU())
+	{
+		if (errstr)
+			*errstr = pstrdup("CUDA linreg_pack_model: CPU mode detected - should not be called");
+		ereport(ERROR,
+				(errcode(ERRCODE_INTERNAL_ERROR),
+				 errmsg("neurondb: CUDA pack_model called in CPU mode - this is a bug")));
+		return -1;
+	}
+
+	/* Ensure GPU mode is required */
+	if (!NDB_REQUIRE_GPU())
+	{
+		if (errstr)
+			*errstr = pstrdup("CUDA linreg_pack_model: not in GPU mode");
+		ereport(ERROR,
+				(errcode(ERRCODE_INTERNAL_ERROR),
+				 errmsg("neurondb: CUDA pack_model called but GPU mode not required - this is a bug")));
+		return -1;
+	}
+
 	if (errstr)
 		*errstr = NULL;
 	if (model == NULL || model_data == NULL)
@@ -82,12 +123,13 @@ ndb_cuda_linreg_pack_model(const LinRegModel *model,
 
 	payload_bytes = sizeof(NdbCudaLinRegModelHeader)
 		+ sizeof(float) * (size_t) model->n_features;
+
 	nalloc(blob_raw, char, VARHDRSZ + payload_bytes);
 	blob = (bytea *) blob_raw;
 	SET_VARSIZE(blob, VARHDRSZ + payload_bytes);
 	base = VARDATA(blob);
-
 	hdr = (NdbCudaLinRegModelHeader *) base;
+	
 	hdr->feature_dim = model->n_features;
 	hdr->n_samples = model->n_samples;
 	hdr->intercept = (float) model->intercept;
@@ -96,23 +138,36 @@ ndb_cuda_linreg_pack_model(const LinRegModel *model,
 	hdr->mae = model->mae;
 
 	coef_dest = (float *) (base + sizeof(NdbCudaLinRegModelHeader));
+	
 	if (model->coefficients != NULL)
 	{
 		int			i;
 
 		for (i = 0; i < model->n_features; i++)
+		{
 			coef_dest[i] = (float) model->coefficients[i];
+		}
 	}
 
 	if (metrics != NULL)
 	{
 		StringInfoData buf;
-		Jsonb *metrics_json = NULL;
+		Jsonb	   *metrics_json = NULL;
+		double		r_squared;
+		double		mse;
+		double		mae;
 
+		/* Compute safe metric values */
+		r_squared = isfinite(model->r_squared) ? model->r_squared : 0.0;
+		mse = isfinite(model->mse) ? model->mse : 0.0;
+		mae = isfinite(model->mae) ? model->mae : 0.0;
+
+		/* Create metrics JSON string - MUST include training_backend=1 and storage=gpu */
 		initStringInfo(&buf);
 		appendStringInfo(&buf,
 						 "{\"algorithm\":\"linear_regression\","
 						 "\"training_backend\":1,"
+						 "\"storage\":\"gpu\","
 						 "\"n_features\":%d,"
 						 "\"n_samples\":%d,"
 						 "\"r_squared\":%.6f,"
@@ -120,13 +175,82 @@ ndb_cuda_linreg_pack_model(const LinRegModel *model,
 						 "\"mae\":%.6f}",
 						 model->n_features,
 						 model->n_samples,
-						 model->r_squared,
-						 model->mse,
-						 model->mae);
+						 r_squared,
+						 mse,
+						 mae);
 
-		metrics_json = DatumGetJsonbP(DirectFunctionCall1(
-														  jsonb_in, CStringGetTextDatum(buf.data)));
-		nfree(buf.data);
+		/* Create JSON in TopMemoryContext to isolate from potentially corrupted context */
+		/* This prevents the corrupted freelist from affecting JSON creation */
+		{
+			MemoryContext oldcontext;
+			Jsonb	   *temp_json = NULL;
+
+			oldcontext = MemoryContextSwitchTo(TopMemoryContext);
+
+			PG_TRY();
+			{
+				temp_json = ndb_jsonb_in_cstring(buf.data);
+			}
+			PG_CATCH();
+			{
+				MemoryContextSwitchTo(oldcontext);
+				FlushErrorState();
+				ereport(ERROR,
+						(errcode(ERRCODE_INTERNAL_ERROR),
+						 errmsg("neurondb: CUDA linreg_pack_model: Failed to create metrics JSONB in TopMemoryContext"),
+						 errdetail("Even TopMemoryContext failed - this indicates a more serious issue"),
+						 errhint("Check PostgreSQL server logs for additional errors")));
+			}
+			PG_END_TRY();
+
+			if (temp_json == NULL)
+			{
+				MemoryContextSwitchTo(oldcontext);
+				ereport(ERROR,
+						(errcode(ERRCODE_INTERNAL_ERROR),
+						 errmsg("neurondb: CUDA linreg_pack_model: Failed to create metrics JSONB - ndb_jsonb_in_cstring returned NULL")));
+			}
+
+			/* Switch back to original context and copy JSON to it */
+			MemoryContextSwitchTo(oldcontext);
+
+			/* Copy JSONB to current context using palloc and memcpy */
+			/* JSONB is a varlena type, so we need to copy the entire structure */
+			{
+				size_t		jsonb_size = VARSIZE(temp_json);
+
+				metrics_json = (Jsonb *) MemoryContextAlloc(CurrentMemoryContext, jsonb_size);
+				memcpy(metrics_json, temp_json, jsonb_size);
+
+				/* Free the temporary JSON from TopMemoryContext */
+				pfree(temp_json);
+			}
+		}
+		
+		if (metrics_json == NULL)
+		{
+			ereport(ERROR,
+					(errcode(ERRCODE_INTERNAL_ERROR),
+					 errmsg("neurondb: CUDA linreg_pack_model: Failed to create metrics JSONB - ndb_jsonb_in_cstring returned NULL"),
+					 errdetail("Memory context %p may be corrupted. JSON string length=%d",
+							   (void *) CurrentMemoryContext, buf.len),
+					 errhint("This indicates memory corruption occurred earlier in the training process, likely during matrix operations or memory allocation.")));
+		}
+
+		/* Free StringInfo data - use pfree directly to avoid nfree wrapper issues */
+		if (buf.data != NULL)
+		{
+			pfree(buf.data);
+			buf.data = NULL;
+		}
+
+		if (metrics_json == NULL)
+		{
+			ereport(ERROR,
+					(errcode(ERRCODE_INTERNAL_ERROR),
+					 errmsg("neurondb: CUDA linreg_pack_model: metrics JSONB is NULL after creation - GPU mode requires valid metrics")));
+		}
+
 		*metrics = metrics_json;
 	}
 
@@ -167,13 +291,33 @@ ndb_cuda_linreg_train(const float *features,
 				k;
 	int			rc = -1;
 
-	/* CPU mode: never execute GPU code */
+	/* Memory context check at start to catch early corruption */
+#ifdef MEMORY_CONTEXT_CHECKING
+	MemoryContextCheck(CurrentMemoryContext);
+#endif
+
+	/* GPU mode: ensure we're NOT in CPU mode - strict check */
 	if (NDB_COMPUTE_MODE_IS_CPU())
 	{
 		if (errstr)
-			*errstr = pstrdup("CUDA linreg_train: CPU mode - GPU code should not be called");
+			*errstr = pstrdup("CUDA linreg_train: CPU mode detected - should not be called");
+		ereport(ERROR,
+				(errcode(ERRCODE_INTERNAL_ERROR),
+				 errmsg("neurondb: CUDA linreg_train called in CPU mode - this is a bug")));
 		return -1;
 	}
+
+	/* Ensure GPU mode is required - no fallback allowed */
+	if (!NDB_REQUIRE_GPU())
+	{
+		if (errstr)
+			*errstr = pstrdup("CUDA linreg_train: not in GPU mode");
+		ereport(ERROR,
+				(errcode(ERRCODE_INTERNAL_ERROR),
+				 errmsg("neurondb: CUDA linreg_train called but GPU mode not required - this is a bug")));
+		return -1;
+	}
+
 
 	if (errstr)
 		*errstr = NULL;
@@ -361,10 +505,27 @@ ndb_cuda_linreg_train(const float *features,
 				goto gpu_cleanup;
 		}
 
-		cudaFree(d_features);
-		cudaFree(d_targets);
-		cudaFree(d_XtX);
-		cudaFree(d_Xty);
+		/* Free CUDA memory - set pointers to NULL to prevent double-free in gpu_cleanup */
+		if (d_features)
+		{
+			cudaFree(d_features);
+			d_features = NULL;
+		}
+		if (d_targets)
+		{
+			cudaFree(d_targets);
+			d_targets = NULL;
+		}
+		if (d_XtX)
+		{
+			cudaFree(d_XtX);
+			d_XtX = NULL;
+		}
+		if (d_Xty)
+		{
+			cudaFree(d_Xty);
+			d_Xty = NULL;
+		}
 #endif
 
 gpu_cleanup:
@@ -521,7 +682,7 @@ cpu_fallback:
 		}
 
 		/* Allocate Cholesky factor L (lower triangular, stored row-major) */
-		L = (double *) palloc0(sizeof(double) * dim_with_intercept * dim_with_intercept);
+		nalloc(L, double, dim_with_intercept * dim_with_intercept);
 
 		/* Cholesky decomposition: X'X_work = L * L^T */
 		/* Use working copy (XtX_work) so we don't modify original matrix */
@@ -625,38 +786,68 @@ cpu_fallback:
 
 		/* Compute (X'X)^(-1) for metrics calculation using Cholesky */
 		/* Solve L * L^T * X = I column by column */
+		/* Initialize h_XtX_inv to zero before use */
+		memset(h_XtX_inv, 0, sizeof(double) * dim_with_intercept * dim_with_intercept);
+		
 		for (col = 0; col < dim_with_intercept; col++)
 		{
-			double	   *col_vec = (double *) palloc0(sizeof(double) * dim_with_intercept);
+			double *col_vec = NULL;
+			double *inv_work = NULL;
 
+			nalloc(col_vec, double, dim_with_intercept);
+
+			/* Initialize all entries to zero, then set unit vector */
+			memset(col_vec, 0, sizeof(double) * dim_with_intercept);
 			col_vec[col] = 1.0;
 
 			/* Forward substitution: L * y = e_col */
+			/* Use a separate work array for inverse computation to avoid reusing y_work */
+			nalloc(inv_work, double, dim_with_intercept);
+			
 			for (row = 0; row < dim_with_intercept; row++)
 			{
 				double		sum = col_vec[row];
 
 				for (k_local = 0; k_local < row; k_local++)
 				{
-					sum -= L[row * dim_with_intercept + k_local] * y_work[k_local];
+					sum -= L[row * dim_with_intercept + k_local] * inv_work[k_local];
 				}
-				y_work[row] = sum / L[row * dim_with_intercept + row];
+				inv_work[row] = sum / L[row * dim_with_intercept + row];
 			}
 
 			/* Backward substitution: L^T * x = y */
 			for (row = dim_with_intercept - 1; row >= 0; row--)
 			{
-				double		sum = y_work[row];
+				double		sum = inv_work[row];
+				int			idx;
 
 				for (k_local = row + 1; k_local < dim_with_intercept; k_local++)
 				{
+					/* Bounds check to prevent buffer overrun */
+					idx = k_local * dim_with_intercept + col;
+					if (idx < 0 || idx >= dim_with_intercept * dim_with_intercept)
+					{
+						nfree(inv_work);
+						nfree(col_vec);
+						elog(ERROR, "neurondb: CUDA linreg_train: buffer overrun detected: idx=%d, max=%d", 
+							 idx, dim_with_intercept * dim_with_intercept);
+					}
 					sum -= L[k_local * dim_with_intercept + row]
-						* h_XtX_inv[k_local * dim_with_intercept + col];
+						* h_XtX_inv[idx];
 				}
-				h_XtX_inv[row * dim_with_intercept + col] =
-					sum / L[row * dim_with_intercept + row];
+				/* Bounds check before write */
+				idx = row * dim_with_intercept + col;
+				if (idx < 0 || idx >= dim_with_intercept * dim_with_intercept)
+				{
+					nfree(inv_work);
+					nfree(col_vec);
+					elog(ERROR, "neurondb: CUDA linreg_train: buffer overrun detected on write: idx=%d, max=%d", 
+						 idx, dim_with_intercept * dim_with_intercept);
+				}
+				h_XtX_inv[idx] = sum / L[row * dim_with_intercept + row];
 			}
-
+			
+			nfree(inv_work);
 			nfree(col_vec);
 		}
 
@@ -683,7 +874,9 @@ cpu_fallback:
 		nalloc(model_coefficients, double, feature_dim);
 		model.coefficients = model_coefficients;
 		for (i = 0; i < feature_dim; i++)
+		{
 			model.coefficients[i] = h_beta[i + 1];
+		}
 
 		/* Compute metrics */
 		for (i = 0; i < n_samples; i++)
@@ -692,10 +885,13 @@ cpu_fallback:
 
 		for (i = 0; i < n_samples; i++)
 		{
-			const float *row = features + (i * feature_dim);
-			double		y_pred = model.intercept;
+			const float *row;
+			double		y_pred;
 			double		error;
 			int			j_local;
+
+			row = features + (i * feature_dim);
+			y_pred = model.intercept;
 
 			for (j_local = 0; j_local < feature_dim; j_local++)
 				y_pred += model.coefficients[j_local] * row[j_local];
@@ -1120,6 +1316,7 @@ ndb_cuda_linreg_evaluate(const bytea * model_data,
 
 	if (cuda_err != cudaSuccess)
 	{
+		const char *cuda_err_str = cudaGetErrorString(cuda_err);
 		cudaFree(d_features);
 		cudaFree(d_targets);
 		cudaFree(d_coefficients);
@@ -1127,8 +1324,15 @@ ndb_cuda_linreg_evaluate(const bytea * model_data,
 		cudaFree(d_sae);
 		cudaFree(d_count);
 		if (errstr)
-			*errstr = psprintf("neurondb: ndb_cuda_linreg_evaluate: evaluation kernel failed: %s",
-							   cudaGetErrorString(cuda_err));
+		{
+			*errstr = psprintf("neurondb: ndb_cuda_linreg_evaluate: evaluation kernel launch failed: CUDA error %d (%s). "
+							   "Parameters: n_samples=%d, feature_dim=%d, model_feature_dim=%d",
+							   (int) cuda_err,
+							   cuda_err_str ? cuda_err_str : "unknown",
+							   n_samples,
+							   feature_dim,
+							   hdr->feature_dim);
+		}
 		return -1;
 	}
 

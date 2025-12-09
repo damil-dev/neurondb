@@ -27,6 +27,9 @@
 #include "neurondb_safe_memory.h"
 #include "neurondb_macros.h"
 #include "neurondb_constants.h"
+#ifdef NDB_GPU_CUDA
+#include "neurondb_cuda_linreg.h"
+#endif
 
 extern int	ndb_gpu_dt_train(const float *features,
 							 const double *labels,
@@ -56,7 +59,10 @@ extern int	ndb_gpu_lasso_train(const float *features,
 #include "miscadmin.h"
 #include "utils/builtins.h"
 #include "utils/memutils.h"
+#include "utils/jsonb.h"
+#include "lib/stringinfo.h"
 #include <string.h>
+#include <math.h>
 
 static void
 ndb_gpu_init_train_result(MLGpuTrainResult *result)
@@ -112,29 +118,45 @@ ndb_gpu_try_train_model(const char *algorithm,
 
 	if (NDB_COMPUTE_MODE_IS_CPU())
 	{
+		if (errstr)
+			*errstr = pstrdup("ndb_gpu_try_train_model: CPU mode - GPU code should not be called");
 		return false;
 	}
 
 	if (feature_matrix == NULL || label_vector == NULL || sample_count <= 0 || feature_dim <= 0)
 	{
+		if (errstr)
+			*errstr = psprintf("ndb_gpu_try_train_model: invalid parameters (feature_matrix=%p, label_vector=%p, sample_count=%d, feature_dim=%d)",
+							   (void *) feature_matrix, (void *) label_vector, sample_count, feature_dim);
 		return false;
 	}
 
 	if (!neurondb_gpu_is_available())
 	{
+		if (errstr)
+			*errstr = pstrdup("ndb_gpu_try_train_model: GPU is not available");
 		return false;
 	}
 
 	ops = ndb_gpu_lookup_model_ops(algorithm);
 	if (ops == NULL || ops->train == NULL || ops->serialize == NULL)
 	{
-		return false;
+		/* For algorithms with direct paths (linear_regression, logistic_regression), ops might be NULL */
+		/* This is OK - we'll use the direct path instead */
+		if (algorithm != NULL && strcmp(algorithm, "linear_regression") != 0 && strcmp(algorithm, "logistic_regression") != 0)
+		{
+			if (errstr)
+				*errstr = psprintf("ndb_gpu_try_train_model: no GPU ops for algorithm '%s'", algorithm);
+			return false;
+		}
 	}
 
 	memset(&ctx, 0, sizeof(MLGpuContext));
 	ctx.backend = ndb_gpu_get_active_backend();
 	if (ctx.backend == NULL)
 	{
+		if (errstr)
+			*errstr = pstrdup("ndb_gpu_try_train_model: active_backend is NULL");
 		return false;
 	}
 
@@ -213,7 +235,7 @@ ndb_gpu_try_train_model(const char *algorithm,
 	if (ops != NULL && ops->train != NULL && ops->serialize != NULL
 		&& feature_matrix != NULL && label_vector != NULL
 		&& sample_count > 0 && feature_dim > 0
-		&& (algorithm == NULL || strcmp(algorithm, "linear_regression") != 0))
+		&& (algorithm == NULL || (strcmp(algorithm, "linear_regression") != 0 && strcmp(algorithm, "logistic_regression") != 0)))
 	{
 		TimestampTz train_start;
 		TimestampTz train_end;
@@ -421,18 +443,56 @@ ndb_gpu_try_train_model(const char *algorithm,
 			 backend ? (void *) backend->lr_train : NULL,
 			 sample_count,
 			 feature_dim);
+		
+		/* Set errstr if backend is NULL so we have a specific error message */
+		if (backend == NULL)
+		{
+			if (errstr && *errstr == NULL)
+				*errstr = pstrdup("logistic_regression: ndb_gpu_get_active_backend() returned NULL in direct path");
+		}
+		else if (backend->lr_train == NULL)
+		{
+			if (errstr && *errstr == NULL)
+				*errstr = psprintf("logistic_regression: backend->lr_train is NULL (backend=%s)", backend->name ? backend->name : "unknown");
+		}
+
+		/* GPU mode: ensure we're in GPU mode - no fallback allowed */
+		if (NDB_REQUIRE_GPU() && (backend == NULL || backend->lr_train == NULL))
+		{
+			ereport(ERROR,
+					(errcode(ERRCODE_INTERNAL_ERROR),
+					 errmsg("logistic_regression: GPU mode requires GPU backend but backend or lr_train is NULL"),
+					 errdetail("backend=%p, lr_train=%p",
+							   (void *) backend,
+							   backend ? (void *) backend->lr_train : NULL),
+					 errhint("GPU mode requires GPU to be available - cannot fall back to CPU")));
+		}
 
 		if (backend == NULL || backend->lr_train == NULL)
 		{
 			elog(DEBUG1,
 				 "logistic_regression: backend or lr_train is "
 				 "NULL, skipping GPU");
+			/* Ensure errstr is set before returning */
+			if (errstr && *errstr == NULL)
+			{
+				if (backend == NULL)
+					*errstr = pstrdup("logistic_regression: ndb_gpu_get_active_backend() returned NULL");
+				else
+					*errstr = psprintf("logistic_regression: backend->lr_train is NULL (backend=%s)", backend->name ? backend->name : "unknown");
+			}
 			goto lr_fallback;
 		}
 
 		/* Defensive: Validate all parameters before calling CUDA function */
 		if (feature_matrix == NULL)
 		{
+			if (NDB_REQUIRE_GPU())
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+						 errmsg("logistic_regression: feature_matrix is NULL - GPU mode requires valid input")));
+			}
 			if (errstr)
 				*errstr = pstrdup("logistic_regression: feature_matrix is NULL");
 			elog(WARNING,
@@ -442,6 +502,12 @@ ndb_gpu_try_train_model(const char *algorithm,
 
 		if (label_vector == NULL)
 		{
+			if (NDB_REQUIRE_GPU())
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+						 errmsg("logistic_regression: label_vector is NULL - GPU mode requires valid input")));
+			}
 			if (errstr)
 				*errstr = pstrdup("logistic_regression: label_vector is NULL");
 			elog(WARNING,
@@ -451,6 +517,13 @@ ndb_gpu_try_train_model(const char *algorithm,
 
 		if (sample_count <= 0 || sample_count > 10000000)
 		{
+			if (NDB_REQUIRE_GPU())
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+						 errmsg("logistic_regression: invalid sample_count %d - GPU mode requires valid input",
+								sample_count)));
+			}
 			if (errstr)
 				*errstr = psprintf("logistic_regression: invalid sample_count %d",
 								   sample_count);
@@ -462,6 +535,13 @@ ndb_gpu_try_train_model(const char *algorithm,
 
 		if (feature_dim <= 0 || feature_dim > 10000)
 		{
+			if (NDB_REQUIRE_GPU())
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+						 errmsg("logistic_regression: invalid feature_dim %d - GPU mode requires valid input",
+								feature_dim)));
+			}
 			if (errstr)
 				*errstr = psprintf("logistic_regression: invalid feature_dim %d",
 								   feature_dim);
@@ -474,6 +554,9 @@ ndb_gpu_try_train_model(const char *algorithm,
 		/* Defensive: Wrap CUDA call in error handling */
 		PG_TRY();
 		{
+			elog(DEBUG1,
+				 "logistic_regression: calling ndb_gpu_lr_train: samples=%d, dim=%d, errstr=%p",
+				 sample_count, feature_dim, (void *) errstr);
 			gpu_rc = ndb_gpu_lr_train(feature_matrix,
 									  label_vector,
 									  sample_count,
@@ -482,10 +565,38 @@ ndb_gpu_try_train_model(const char *algorithm,
 									  &payload,
 									  &metadata,
 									  errstr);
+			elog(DEBUG1,
+				 "logistic_regression: ndb_gpu_lr_train returned %d, errstr=%s",
+				 gpu_rc,
+				 (errstr && *errstr) ? *errstr : "NULL");
 		}
 		PG_CATCH();
 		{
 			/* Catch any PostgreSQL-level errors from CUDA code */
+			/* Capture error message from error state before re-throwing */
+			ErrorData *edata = NULL;
+			char *error_msg = NULL;
+			
+			if (CurrentMemoryContext != ErrorContext)
+			{
+				edata = CopyErrorData();
+				if (edata)
+				{
+					/* Prefer detail message over main message for more specific errors */
+					if (edata->detail && strlen(edata->detail) > 0)
+					{
+						error_msg = pstrdup(edata->detail);
+					}
+					else if (edata->message && strlen(edata->message) > 0)
+					{
+						error_msg = pstrdup(edata->message);
+					}
+					/* Set errstr so it's available after re-throw */
+					if (errstr && *errstr == NULL && error_msg != NULL)
+						*errstr = pstrdup(error_msg);
+				}
+			}
+			
 			/* GPU mode: re-raise error, no fallback */
 			if (NDB_REQUIRE_GPU())
 			{
@@ -499,6 +610,10 @@ ndb_gpu_try_train_model(const char *algorithm,
 					nfree(metadata);
 					metadata = NULL;
 				}
+				if (edata)
+					FreeErrorData(edata);
+				if (error_msg)
+					pfree(error_msg);
 				PG_RE_THROW();
 			}
 			/* AUTO mode: fall back to CPU */
@@ -506,7 +621,12 @@ ndb_gpu_try_train_model(const char *algorithm,
 				 "logistic_regression: exception caught during GPU training, falling back to CPU");
 			gpu_rc = -1;
 			if (errstr && *errstr == NULL)
-				*errstr = pstrdup("Exception during GPU training");
+			{
+				if (error_msg)
+					*errstr = pstrdup(error_msg);
+				else
+					*errstr = pstrdup("Exception during GPU training");
+			}
 			if (payload != NULL)
 			{
 				nfree(payload);
@@ -517,6 +637,10 @@ ndb_gpu_try_train_model(const char *algorithm,
 				nfree(metadata);
 				metadata = NULL;
 			}
+			if (edata)
+				FreeErrorData(edata);
+			if (error_msg)
+				pfree(error_msg);
 			FlushErrorState();
 		}
 		PG_END_TRY();
@@ -546,16 +670,7 @@ ndb_gpu_try_train_model(const char *algorithm,
 					 "gpu_model_bridge: LR direct path "
 					 "metadata is NULL!");
 			}
-			ereport(INFO,
-					(errmsg("logistic_regression: GPU training "
-							"succeeded (direct)"),
-					 errdetail(
-							   "Elapsed %.3f ms on backend %s",
-							   elapsed_ms,
-							   ctx.backend_name
-							   ? ctx.backend_name
-							   : "unknown"),
-					 errhidestmt(true)));
+			/* GPU training succeeded */
 		}
 		else
 		{
@@ -563,13 +678,31 @@ ndb_gpu_try_train_model(const char *algorithm,
 			/* CPU mode: never error, just return false for fallback */
 			if (!NDB_COMPUTE_MODE_IS_CPU() && NDB_REQUIRE_GPU())
 			{
+				/* Capture error message before raising ERROR */
+				/* Also ensure errstr is set so it's available to the caller */
+				char *error_detail = NULL;
+				if (errstr && *errstr)
+				{
+					error_detail = pstrdup(*errstr);
+				}
+				else
+				{
+					/* If errstr is not set, try to get a meaningful error message */
+					error_detail = psprintf("ndb_gpu_lr_train returned %d (gpu_rc=%d) - no error details available", gpu_rc, gpu_rc);
+					/* Set errstr so it's available to the caller */
+					if (errstr && *errstr == NULL)
+						*errstr = pstrdup(error_detail);
+				}
 				ereport(ERROR,
 						(errcode(ERRCODE_INTERNAL_ERROR),
 						 errmsg("logistic_regression: GPU training failed - GPU mode requires GPU to be available"),
-						 errdetail("GPU attempt elapsed %.3f ms (%s)",
+						 errdetail("GPU attempt elapsed %.3f ms. Error: %s",
 								   elapsed_ms,
-								   (errstr && *errstr) ? *errstr : "no error"),
+								   error_detail),
 						 errhint("Set compute_mode='auto' for automatic CPU fallback.")));
+				/* Should not reach here, but included for safety */
+				if (error_detail)
+					pfree(error_detail);
 			}
 			/* AUTO mode: fall back to CPU */
 			ndb_gpu_stats_record(false, 0.0, elapsed_ms, true);
@@ -611,6 +744,18 @@ lr_fallback:;
 						   (void *) feature_matrix,
 						   (void *) label_vector)));
 
+		/* GPU mode: ensure we're in GPU mode - no fallback allowed */
+		if (NDB_REQUIRE_GPU() && (backend == NULL || backend->linreg_train == NULL))
+		{
+			ereport(ERROR,
+					(errcode(ERRCODE_INTERNAL_ERROR),
+					 errmsg("linear_regression: GPU mode requires GPU backend but backend or linreg_train is NULL"),
+					 errdetail("backend=%p, linreg_train=%p",
+							   (void *) backend,
+							   backend ? (void *) backend->linreg_train : NULL),
+					 errhint("GPU mode requires GPU to be available - cannot fall back to CPU")));
+		}
+
 		if (backend == NULL || backend->linreg_train == NULL)
 		{
 			elog(DEBUG1,
@@ -622,6 +767,12 @@ lr_fallback:;
 		/* Defensive: Validate all parameters before calling GPU function */
 		if (feature_matrix == NULL)
 		{
+			if (NDB_REQUIRE_GPU())
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+						 errmsg("linear_regression: feature_matrix is NULL - GPU mode requires valid input")));
+			}
 			if (errstr)
 				*errstr = pstrdup("linear_regression: feature_matrix is NULL");
 			elog(WARNING,
@@ -631,6 +782,12 @@ lr_fallback:;
 
 		if (label_vector == NULL)
 		{
+			if (NDB_REQUIRE_GPU())
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+						 errmsg("linear_regression: label_vector is NULL - GPU mode requires valid input")));
+			}
 			if (errstr)
 				*errstr = pstrdup("linear_regression: label_vector is NULL");
 			elog(WARNING,
@@ -640,6 +797,13 @@ lr_fallback:;
 
 		if (sample_count <= 0 || sample_count > 10000000)
 		{
+			if (NDB_REQUIRE_GPU())
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+						 errmsg("linear_regression: invalid sample_count %d - GPU mode requires valid input",
+								sample_count)));
+			}
 			if (errstr)
 				*errstr = psprintf("linear_regression: invalid sample_count %d",
 								   sample_count);
@@ -651,6 +815,13 @@ lr_fallback:;
 
 		if (feature_dim <= 0 || feature_dim > 10000)
 		{
+			if (NDB_REQUIRE_GPU())
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+						 errmsg("linear_regression: invalid feature_dim %d - GPU mode requires valid input",
+								feature_dim)));
+			}
 			if (errstr)
 				*errstr = psprintf("linear_regression: invalid feature_dim %d",
 								   feature_dim);
@@ -766,12 +937,10 @@ lr_fallback:;
 
 				if (metadata != NULL)
 				{
-					/*
-					 * Skip metrics copying to avoid DirectFunctionCall1
-					 * issues
-					 */
-					result->spec.metrics = NULL;
-					result->metadata = NULL;
+					/* Set metrics for model registration */
+					result->spec.metrics = metadata;
+					result->metadata = metadata;
+					/* Don't transfer ownership - metadata will be copied during registration */
 
 					meta_txt = DatumGetCString(
 											   DirectFunctionCall1(jsonb_out,
@@ -785,10 +954,13 @@ lr_fallback:;
 				}
 				else
 				{
-					elog(WARNING,
-						 "gpu_model_bridge: linear_regression direct path "
-						 "metadata is NULL!");
-					result->spec.metrics = NULL;
+					/* metadata is NULL - pack_model should have created it */
+					/* This is a critical error in GPU mode - model cannot be registered without metrics */
+					ereport(ERROR,
+							(errcode(ERRCODE_INTERNAL_ERROR),
+							 errmsg("neurondb: GPU training succeeded but metrics JSON is NULL"),
+							 errdetail("pack_model should have created metrics JSON with training_backend=1 and storage=gpu"),
+							 errhint("This indicates a bug in ndb_cuda_linreg_pack_model - metrics JSON creation failed or was skipped")));
 				}
 			}
 			else
@@ -823,13 +995,26 @@ lr_fallback:;
 			/* CPU mode: never error, just return false for fallback */
 			if (!NDB_COMPUTE_MODE_IS_CPU() && NDB_REQUIRE_GPU())
 			{
+				/* Capture error message before raising ERROR */
+				char *error_detail = NULL;
+				if (errstr && *errstr)
+				{
+					error_detail = pstrdup(*errstr);
+				}
+				else
+				{
+					error_detail = pstrdup("GPU training failed - no error details available");
+				}
 				ereport(ERROR,
 						(errcode(ERRCODE_INTERNAL_ERROR),
 						 errmsg("linear_regression: GPU training failed - GPU mode requires GPU to be available"),
-						 errdetail("GPU attempt elapsed %.3f ms (%s)",
+						 errdetail("GPU attempt elapsed %.3f ms. Error: %s",
 								   elapsed_ms,
-								   (errstr && *errstr) ? *errstr : "no error"),
+								   error_detail),
 						 errhint("Set compute_mode='auto' for automatic CPU fallback.")));
+				/* Should not reach here, but included for safety */
+				if (error_detail)
+					pfree(error_detail);
 			}
 			/* AUTO mode: fall back to CPU */
 			ndb_gpu_stats_record(false, 0.0, elapsed_ms, true);
@@ -1128,7 +1313,22 @@ linreg_fallback:;
 	ereport(DEBUG2, (errmsg("gpu_model_bridge: about to check if (!trained), trained=%d", trained)));
 	if (!trained)
 	{
-		ereport(DEBUG1, (errmsg("gpu_model_bridge: trained is false, cleaning up")));
+		ereport(DEBUG1, (errmsg("gpu_model_bridge: trained is false, cleaning up. algorithm=%s, errstr=%s",
+								algorithm ? algorithm : "NULL",
+								(errstr && *errstr) ? *errstr : "NULL")));
+		/* If errstr is not set and we have an algorithm, set a default error message */
+		/* This ensures the caller always gets a meaningful error message */
+		if (errstr && *errstr == NULL)
+		{
+			if (algorithm != NULL)
+			{
+				*errstr = psprintf("ndb_gpu_try_train_model: GPU training failed for algorithm '%s' - no specific error available. Check GPU availability, backend registration, and that the algorithm is supported.", algorithm);
+			}
+			else
+			{
+				*errstr = pstrdup("ndb_gpu_try_train_model: GPU training failed - no specific error available. Check GPU availability and backend registration.");
+			}
+		}
 		nfree(payload);
 		nfree(metadata);
 		if (result != NULL)

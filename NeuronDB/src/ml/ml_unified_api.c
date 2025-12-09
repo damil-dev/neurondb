@@ -48,6 +48,11 @@
 #include "neurondb_constants.h"
 #include "neurondb_json.h"
 #include "ml_decision_tree_internal.h"
+#ifdef NDB_GPU_CUDA
+#include "neurondb_cuda_lr.h"
+#include "ml_logistic_regression_internal.h"
+#include "libpq/pqformat.h"
+#endif
 
 PG_FUNCTION_INFO_V1(neurondb_train);
 PG_FUNCTION_INFO_V1(neurondb_predict);
@@ -1560,6 +1565,8 @@ neurondb_train(PG_FUNCTION_ARGS)
 				MemoryContext old_spi_context;
 
 				nalloc(feature_names, const char *, nelems);
+				/* Zero-initialize to avoid accessing uninitialized pointers */
+				MemSet(feature_names, 0, nelems * sizeof(const char *));
 
 				/* Switch to SPI context before appending to feature_list */
 				old_spi_context = MemoryContextSwitchTo(ndb_spi_session_get_context(spi_session));
@@ -1604,6 +1611,8 @@ neurondb_train(PG_FUNCTION_ARGS)
 		MemoryContextSwitchTo(old_spi_context);
 
 		nalloc(feature_names, const char *, 1);
+		/* Zero-initialize to avoid accessing uninitialized pointers */
+		MemSet(feature_names, 0, sizeof(const char *));
 		feature_names[0] = pstrdup("*");
 		feature_name_count = 1;
 	}
@@ -1688,6 +1697,26 @@ neurondb_train(PG_FUNCTION_ARGS)
 	/* GPU mode requires GPU to be available */
 	if (NDB_REQUIRE_GPU() && !gpu_available)
 	{
+		/* Free feature_names BEFORE cleaning up callcontext */
+		if (feature_names)
+		{
+			int			i;
+
+			/* Switch to callcontext before freeing, as strings were allocated there */
+			MemoryContextSwitchTo(callcontext);
+			for (i = 0; i < feature_name_count; i++)
+			{
+				if (feature_names[i] != NULL)
+				{
+					char	   *ptr = (char *) feature_names[i];
+
+					nfree(ptr);
+				}
+			}
+			nfree(feature_names);
+			feature_names = NULL;
+		}
+		
 		nfree(feature_list_str);
 		ndb_spi_session_end(&spi_session);
 		MemoryContextSwitchTo(oldcontext);
@@ -1697,21 +1726,6 @@ neurondb_train(PG_FUNCTION_ARGS)
 		nfree(table_name);
 		if (target_column)
 			nfree(target_column);
-		if (feature_names)
-		{
-			int			i;
-
-			for (i = 0; i < feature_name_count; i++)
-			{
-				if (feature_names[i])
-				{
-					char	   *ptr = (char *) feature_names[i];
-
-					nfree(ptr);
-				}
-			}
-			nfree(feature_names);
-		}
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
 				 errmsg(NDB_ERR_PREFIX_TRAIN " GPU is required but not available"),
@@ -1721,9 +1735,9 @@ neurondb_train(PG_FUNCTION_ARGS)
 	}
 
 	/* Try to load training data for GPU training */
-	/* Only attempt GPU if compute_mode allows it (GPU or AUTO mode) */
-	/* CPU mode: never load data for GPU training */
-	if (!NDB_COMPUTE_MODE_IS_CPU() && gpu_available && NDB_SHOULD_TRY_GPU())
+	/* GPU mode: require GPU, no fallback. AUTO mode: try GPU with fallback. CPU mode: never load GPU data */
+	if (!NDB_COMPUTE_MODE_IS_CPU() && gpu_available && 
+		(NDB_REQUIRE_GPU() || NDB_COMPUTE_MODE_IS_AUTO()))
 	{
 		load_success = neurondb_load_training_data(spi_session, table_name, feature_list_str, target_column,
 												   &feature_matrix, &label_vector,
@@ -1741,8 +1755,10 @@ neurondb_train(PG_FUNCTION_ARGS)
 	/*
 	 * Double-check CPU mode to be absolutely safe - NEVER attempt GPU in CPU
 	 * mode
+	 * GPU mode: require GPU, no fallback. AUTO mode: try GPU with fallback.
 	 */
-	if (data_loaded && !NDB_COMPUTE_MODE_IS_CPU() && NDB_SHOULD_TRY_GPU() && strcmp(algorithm, NDB_ALGO_LOGISTIC_REGRESSION) != 0)
+	if (data_loaded && !NDB_COMPUTE_MODE_IS_CPU() && 
+		(NDB_REQUIRE_GPU() || NDB_COMPUTE_MODE_IS_AUTO()))
 	{
 		/* Additional safety check: never attempt GPU in CPU mode */
 		if (NDB_COMPUTE_MODE_IS_CPU())
@@ -1754,13 +1770,42 @@ neurondb_train(PG_FUNCTION_ARGS)
 		else
 		{
 			/*
+			 * Ensure hyperparams is always a valid Jsonb (even if empty) to
+			 * prevent JSON parsing errors in GPU code. This matches the
+			 * behavior in CPU training code (ml_linear_regression.c).
+			 */
+			Jsonb *gpu_hyperparams = hyperparams;
+			if (gpu_hyperparams == NULL)
+			{
+				/* Create empty JSONB object like CPU training does */
+				PG_TRY();
+				{
+					gpu_hyperparams = ndb_jsonb_in_cstring("{}");
+					if (gpu_hyperparams == NULL)
+					{
+						ereport(ERROR,
+								(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
+								 errmsg(NDB_ERR_PREFIX_TRAIN " failed to create empty hyperparams JSONB")));
+					}
+				}
+				PG_CATCH();
+				{
+					FlushErrorState();
+					ereport(ERROR,
+							(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
+							 errmsg(NDB_ERR_PREFIX_TRAIN " failed to parse empty hyperparams JSON: %m")));
+				}
+				PG_END_TRY();
+			}
+
+			/*
 			 * Wrap GPU training call in PG_TRY to catch exceptions and
 			 * prevent JSON parsing errors
 			 */
 			PG_TRY();
 			{
 				gpu_train_result = ndb_gpu_try_train_model(algorithm, project_name, model_name, table_name, target_column,
-														   feature_names, feature_name_count, hyperparams,
+														   feature_names, feature_name_count, gpu_hyperparams,
 														   feature_matrix, label_vector, n_samples, feature_dim, class_count,
 														   &gpu_result, gpu_errmsg);
 			}
@@ -1845,37 +1890,52 @@ neurondb_train(PG_FUNCTION_ARGS)
 						elog(ERROR, "BUG: GPU error path reached in CPU mode! compute_mode=%d", neurondb_compute_mode);
 					}
 
-					/* GPU mode: re-raise error, no fallback */
-					/* Switch out of ErrorContext before CopyErrorData() */
-					safe_context = oldcontext;
+				/* GPU mode: re-raise error, no fallback */
+				/* Switch out of ErrorContext before CopyErrorData() */
+				safe_context = oldcontext;
 
-					/* Ensure we're not switching to ErrorContext */
-					if (safe_context == ErrorContext || safe_context == NULL)
+				/* Ensure we're not switching to ErrorContext */
+				if (safe_context == ErrorContext || safe_context == NULL)
+				{
+					safe_context = TopMemoryContext;
+				}
+
+				MemoryContextSwitchTo(safe_context);
+
+				edata = NULL;
+				error_msg = NULL;
+
+				/* Save algorithm before freeing (it might be NULL) */
+				algorithm_safe = algorithm ? pstrdup(algorithm) : NULL;
+
+				if (CurrentMemoryContext != ErrorContext)
+				{
+					edata = CopyErrorData();
+					if (edata)
 					{
-						safe_context = TopMemoryContext;
-					}
-
-					MemoryContextSwitchTo(safe_context);
-
-					edata = NULL;
-					error_msg = NULL;
-
-					/* Save algorithm before freeing (it might be NULL) */
-					algorithm_safe = algorithm ? pstrdup(algorithm) : NULL;
-
-					if (CurrentMemoryContext != ErrorContext)
-					{
-						edata = CopyErrorData();
-						if (edata && edata->message)
+						/* Prefer detail message over main message for more specific errors */
+						if (edata->detail && strlen(edata->detail) > 0)
+						{
+							error_msg = pstrdup(edata->detail);
+						}
+						else if (edata->message && strlen(edata->message) > 0)
+						{
 							error_msg = pstrdup(edata->message);
-						FlushErrorState();
+						}
+						/* Also set gpu_errmsg_ptr so it's included in the final error */
+						if (gpu_errmsg_ptr == NULL && error_msg != NULL)
+						{
+							gpu_errmsg_ptr = pstrdup(error_msg);
+						}
 					}
-					else
-					{
-						/* Fallback if we can't switch contexts */
-						FlushErrorState();
-						error_msg = NULL;
-					}
+					FlushErrorState();
+				}
+				else
+				{
+					/* Fallback if we can't switch contexts */
+					FlushErrorState();
+					error_msg = NULL;
+				}
 
 					nfree(feature_list_str);
 					if (feature_names)
@@ -1884,7 +1944,7 @@ neurondb_train(PG_FUNCTION_ARGS)
 
 						for (i = 0; i < feature_name_count; i++)
 						{
-							if (feature_names[i])
+							if (feature_names[i] != NULL)
 							{
 								char	   *ptr = (char *) feature_names[i];
 
@@ -1999,6 +2059,216 @@ neurondb_train(PG_FUNCTION_ARGS)
 			{
 				/* GPU created model but didn't set model_id - register it */
 				spec = gpu_result.spec;
+				
+				/* Convert GPU format to unified format for logistic_regression */
+				if (algorithm != NULL && strcmp(algorithm, "logistic_regression") == 0)
+				{
+#ifdef NDB_GPU_CUDA
+					bytea *unified_model_data = NULL;
+					bytea *gpu_model_data = spec.model_data;
+					
+					/* Check if model_data is in GPU format (starts with NdbCudaLrModelHeader) */
+					if (gpu_model_data != NULL && VARSIZE(gpu_model_data) - VARHDRSZ >= sizeof(int32))
+					{
+						const int32 *first_int = (const int32 *) VARDATA(gpu_model_data);
+						int32		first_value = *first_int;
+						
+						/* GPU format: first field is feature_dim (int32), typically 1-10000 */
+						/* Unified format: first byte is training_backend (uint8), typically 0 or 1 */
+						if (first_value > 0 && first_value <= 10000)
+						{
+							size_t		gpu_header_size = sizeof(NdbCudaLrModelHeader);
+							size_t		expected_gpu_size = gpu_header_size + sizeof(float) * (size_t) first_value;
+							size_t		actual_size = VARSIZE(gpu_model_data) - VARHDRSZ;
+							
+							/* Check if size matches GPU format */
+							if (actual_size >= gpu_header_size && 
+								actual_size >= expected_gpu_size - 10 && 
+								actual_size <= expected_gpu_size + 10)
+							{
+								/* This is GPU format - convert to unified format */
+								LRModel		lr_model;
+								char	   *base = NULL;
+								NdbCudaLrModelHeader *hdr = NULL;
+								float	   *weights_src = NULL;
+								int			i;
+								double		accuracy = 0.0;
+								double		final_loss = 0.0;
+								
+								
+								/* Convert GPU format to unified format */
+								base = VARDATA(gpu_model_data);
+								hdr = (NdbCudaLrModelHeader *) base;
+								weights_src = (float *) (base + sizeof(NdbCudaLrModelHeader));
+								
+								/* Extract final_loss and accuracy from metrics if available */
+								if (spec.metrics != NULL)
+								{
+									text	   *metrics_text = DatumGetTextP(DirectFunctionCall1(jsonb_out, PointerGetDatum(spec.metrics)));
+									char	   *metrics_str = text_to_cstring(metrics_text);
+									char	   *loss_ptr = strstr(metrics_str, "\"final_loss\":");
+									char	   *acc_ptr = strstr(metrics_str, "\"accuracy\":");
+									
+									if (loss_ptr != NULL)
+										final_loss = strtod(loss_ptr + 13, NULL);
+									if (acc_ptr != NULL)
+										accuracy = strtod(acc_ptr + 12, NULL);
+									
+									nfree(metrics_str);
+								}
+								
+								/* Build LRModel structure */
+								memset(&lr_model, 0, sizeof(LRModel));
+								lr_model.n_features = hdr->feature_dim;
+								lr_model.n_samples = hdr->n_samples;
+								lr_model.bias = hdr->bias;
+								lr_model.learning_rate = hdr->learning_rate;
+								lr_model.lambda = hdr->lambda;
+								lr_model.max_iters = hdr->max_iters;
+								lr_model.final_loss = final_loss;
+								lr_model.accuracy = accuracy;
+								
+								/* Convert float weights to double */
+								if (lr_model.n_features > 0)
+								{
+									double *weights_tmp = NULL;
+									nalloc(weights_tmp, double, lr_model.n_features);
+									for (i = 0; i < lr_model.n_features; i++)
+										weights_tmp[i] = (double) weights_src[i];
+									lr_model.weights = weights_tmp;
+								}
+								
+								/* Serialize using unified format with training_backend=1 (GPU) */
+								/* Declare the function - it's static in ml_logistic_regression.c */
+								/* We need to call it through a helper or make it non-static */
+								/* For now, we'll need to include the header or make the function public */
+								/* Actually, we can't call lr_model_serialize from here as it's static */
+								/* We need to either make it public or duplicate the conversion logic */
+								/* Let's check if there's a public API for this */
+								
+								/* Since lr_model_serialize is static, we need to duplicate the logic here */
+								/* or make it public. For now, let's add a public wrapper function. */
+								/* Actually, let me check if we can just call the training function's conversion */
+								
+								/* For now, let's add the conversion inline */
+								{
+									StringInfoData buf;
+									int			j;
+									
+									pq_begintypsend(&buf);
+									
+									/* Write training_backend first (0=CPU, 1=GPU) */
+									pq_sendbyte(&buf, 1);  /* GPU */
+									
+									pq_sendint32(&buf, lr_model.n_features);
+									pq_sendint32(&buf, lr_model.n_samples);
+									pq_sendfloat8(&buf, lr_model.bias);
+									pq_sendfloat8(&buf, lr_model.learning_rate);
+									pq_sendfloat8(&buf, lr_model.lambda);
+									pq_sendint32(&buf, lr_model.max_iters);
+									pq_sendfloat8(&buf, lr_model.final_loss);
+									pq_sendfloat8(&buf, lr_model.accuracy);
+									
+									if (lr_model.weights != NULL && lr_model.n_features > 0)
+									{
+										for (j = 0; j < lr_model.n_features; j++)
+											pq_sendfloat8(&buf, lr_model.weights[j]);
+									}
+									
+									unified_model_data = pq_endtypsend(&buf);
+									
+									/* Cleanup LRModel weights */
+									if (lr_model.weights != NULL)
+									{
+										nfree(lr_model.weights);
+										lr_model.weights = NULL;
+									}
+								}
+								
+								if (unified_model_data != NULL)
+								{
+									spec.model_data = unified_model_data;
+									
+									/* Update metrics to ensure storage="gpu" and training_backend=1 are set */
+									{
+										Jsonb	   *gpu_metrics_update = NULL;
+										Jsonb	   *updated_metrics = NULL;
+										
+										PG_TRY();
+										{
+											/* Create JSONB with storage="gpu" and training_backend=1 */
+											JsonbParseState *state = NULL;
+											JsonbValue	jkey;
+											JsonbValue	jval;
+											JsonbValue *final_value = NULL;
+											
+											(void) pushJsonbValue(&state, WJB_BEGIN_OBJECT, NULL);
+											
+											/* Add storage="gpu" */
+											jkey.type = jbvString;
+											jkey.val.string.val = "storage";
+											jkey.val.string.len = strlen("storage");
+											(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+											jval.type = jbvString;
+											jval.val.string.val = "gpu";
+											jval.val.string.len = strlen("gpu");
+											(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+											
+											/* Add training_backend=1 */
+											jkey.val.string.val = "training_backend";
+											jkey.val.string.len = strlen("training_backend");
+											(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+											jval.type = jbvNumeric;
+											jval.val.numeric = DatumGetNumeric(DirectFunctionCall1(int4_numeric, Int32GetDatum(1)));
+											(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+											
+											final_value = pushJsonbValue(&state, WJB_END_OBJECT, NULL);
+											
+											if (final_value != NULL)
+											{
+												gpu_metrics_update = JsonbValueToJsonb(final_value);
+												
+												/* Merge with existing metrics if any */
+												if (spec.metrics != NULL && gpu_metrics_update != NULL)
+												{
+													/* Use JSONB merge: existing || update (update overwrites) */
+													updated_metrics = DatumGetJsonbP(DirectFunctionCall2(jsonb_concat,
+																										  PointerGetDatum(spec.metrics),
+																										  PointerGetDatum(gpu_metrics_update)));
+												}
+												else if (gpu_metrics_update != NULL)
+												{
+													updated_metrics = gpu_metrics_update;
+												}
+												else if (spec.metrics != NULL)
+												{
+													updated_metrics = spec.metrics;
+												}
+												
+												if (updated_metrics != NULL)
+												{
+													spec.metrics = updated_metrics;
+												}
+											}
+										}
+										PG_CATCH();
+										{
+											elog(WARNING, "neurondb_train: failed to update metrics JSONB, using original metrics");
+											FlushErrorState();
+										}
+										PG_END_TRY();
+									}
+								}
+								else
+								{
+									elog(WARNING,
+										 "neurondb_train: failed to convert logistic_regression model to unified format, using GPU format");
+								}
+							}
+						}
+					}
+#endif
+				}
 
 				/*
 				 * ALWAYS copy all string pointers to current memory context
@@ -2114,6 +2384,12 @@ neurondb_train(PG_FUNCTION_ARGS)
 				MemoryContextSwitchTo(oldcontext);
 				model_id = ml_catalog_register_model(&spec);
 				MemoryContextSwitchTo(callcontext);
+				
+				/* Verify model was registered and is visible */
+				if (model_id > 0)
+				{
+					elog(DEBUG1, "neurondb_train: registered model_id=%d, verifying it exists in catalog", model_id);
+				}
 			}
 			else
 			{
@@ -2227,30 +2503,53 @@ neurondb_train(PG_FUNCTION_ARGS)
 			}
 			if (model_name)
 				nfree(model_name);
+			ndb_spi_session_end(&spi_session);
+		/* Report error BEFORE freeing strings - they're needed in errdetail */
+		/* Save gpu_errmsg_ptr before freeing - it contains the actual error */
+		{
+			char *gpu_error_msg = NULL;
+			/* Try to get error message from gpu_errmsg_ptr first */
+			if (gpu_errmsg_ptr && strlen(gpu_errmsg_ptr) > 0)
+			{
+				gpu_error_msg = pstrdup(gpu_errmsg_ptr);
+			}
+			else
+			{
+				/* If no error message, provide a more specific fallback */
+				gpu_error_msg = psprintf("ndb_gpu_try_train_model returned false for algorithm '%s' - check GPU availability and backend registration",
+										 algorithm ? algorithm : "unknown");
+			}
 			if (gpu_errmsg_ptr)
 				nfree(gpu_errmsg_ptr);
-			ndb_spi_session_end(&spi_session);
-			MemoryContextSwitchTo(oldcontext);
-			neurondb_cleanup(oldcontext, callcontext);
-			nfree(project_name);
-			nfree(algorithm);
-			nfree(table_name);
-			if (target_column)
-				nfree(target_column);
-			if (data_loaded)
-			{
-				if (feature_matrix)
-					nfree(feature_matrix);
-				if (label_vector)
-					nfree(label_vector);
-			}
 			ereport(ERROR,
 					(errcode(ERRCODE_INTERNAL_ERROR),
 					 errmsg(NDB_ERR_PREFIX_TRAIN " GPU training failed - GPU mode requires GPU to be available"),
-					 errdetail("Algorithm: %s, Project: %s, Table: %s. GPU was not available or training failed.",
-							   algorithm, project_name, table_name),
+					 errdetail("Algorithm: %s, Project: %s, Table: %s. Error: %s",
+							   algorithm ? algorithm : "unknown",
+							   project_name ? project_name : "unknown",
+							   table_name ? table_name : "unknown",
+							   gpu_error_msg),
 					 errhint("Check GPU hardware, drivers, and configuration. "
 							 "Set compute_mode='auto' for automatic CPU fallback.")));
+			if (gpu_error_msg)
+				pfree(gpu_error_msg);
+		}
+
+		/* Cleanup after error (should not reach here, but included for safety) */
+		MemoryContextSwitchTo(oldcontext);
+		neurondb_cleanup(oldcontext, callcontext);
+		nfree(project_name);
+		nfree(algorithm);
+		nfree(table_name);
+		if (target_column)
+			nfree(target_column);
+		if (data_loaded)
+		{
+			if (feature_matrix)
+				nfree(feature_matrix);
+			if (label_vector)
+				nfree(label_vector);
+		}
 		}
 
 		/* AUTO mode or CPU mode: fall back to CPU training */
@@ -3777,20 +4076,12 @@ neurondb_evaluate(PG_FUNCTION_ARGS)
 			if (result_isnull)
 			{
 				/*
-				 * Evaluation returned NULL - return empty JSONB instead
+				 * Evaluation returned NULL - return NULL instead of empty JSONB
 				 */
-				char *result_buf = NULL;
-
 				MemoryContextSwitchTo(oldcontext);
-				/* Create minimal valid JSONB for empty object */
-				result_buf = NULL;
-				NBP_ALLOC(result_buf, char, VARHDRSZ + sizeof(uint32));
-				result = (Jsonb *) result_buf;
-				SET_VARSIZE(result, VARHDRSZ + sizeof(uint32));
-				*((uint32 *) VARDATA(result)) = JB_CMASK;	/* Empty object header */
 				ndb_spi_session_end(&spi_session);
 				MemoryContextDelete(callcontext);
-				PG_RETURN_JSONB_P(result);
+				PG_RETURN_NULL();
 			}
 
 			/* temp_jsonb is already obtained from ndb_spi_get_jsonb above */
@@ -3898,30 +4189,23 @@ neurondb_evaluate(PG_FUNCTION_ARGS)
 			error_msg = escaped;
 		}
 
-		/* Return error JSONB */
+		/* Return error JSONB using proper PostgreSQL API */
 		{
 			StringInfoData error_json;
+			text *json_text = NULL;
 
 			ndb_spi_stringinfo_init(spi_session, &error_json);
 			appendStringInfo(&error_json, "{\"error\": \"%s\"}", error_msg);
-			/* Skip JSONB creation to avoid DirectFunctionCall1 issues */
-			result = NULL;
+			
+			/* Use PostgreSQL's jsonb_in function to create proper JSONB */
+			json_text = cstring_to_text(error_json.data);
+			result = DatumGetJsonbP(DirectFunctionCall1(jsonb_in, 
+				PointerGetDatum(error_json.data)));
+			
 			ndb_spi_stringinfo_free(spi_session, &error_json);
 			error_json.data = NULL;
 			nfree(error_msg);
-
 			error_msg = NULL;
-
-			/* Defensive check: ensure result is valid */
-			if (result == NULL || VARSIZE(result) < sizeof(Jsonb))
-			{
-				/* Create minimal valid JSONB for empty object */
-				char *result_buf = NULL;
-				NBP_ALLOC(result_buf, char, VARHDRSZ + sizeof(uint32));
-				result = (Jsonb *) result_buf;
-				SET_VARSIZE(result, VARHDRSZ + sizeof(uint32));
-				*((uint32 *) VARDATA(result)) = JB_CMASK;	/* Empty object header */
-			}
 		}
 
 		/* Free error data if we copied it */
@@ -3976,15 +4260,8 @@ neurondb_evaluate(PG_FUNCTION_ARGS)
 	/* Additional validation - check if result is valid */
 	if (result == NULL)
 	{
-		char *result_buf = NULL;
-
-		elog(WARNING, "neurondb_evaluate: result is NULL, returning empty JSONB");
-		/* Create minimal valid JSONB for empty object */
-		result_buf = NULL;
-		NBP_ALLOC(result_buf, char, VARHDRSZ + sizeof(JsonbContainer));
-		result = (Jsonb *) result_buf;
-		SET_VARSIZE(result, VARHDRSZ + sizeof(JsonbContainer));
-		result->root.header = JB_CMASK; /* Empty object */
+		elog(WARNING, "neurondb_evaluate: result is NULL, returning NULL");
+		PG_RETURN_NULL();
 	}
 
 	elog(DEBUG2, "neurondb_evaluate: about to return JSONB result, size=%d", VARSIZE(result));
@@ -3992,15 +4269,9 @@ neurondb_evaluate(PG_FUNCTION_ARGS)
 	/* EMERGENCY SAFETY: Ensure result is ALWAYS valid before returning */
 	if (result == NULL || VARSIZE(result) < sizeof(Jsonb))
 	{
-		char *result_buf = NULL;
-
-		/* Create minimal valid JSONB for empty object */
-		elog(WARNING, "neurondb_evaluate: EMERGENCY - result invalid, creating empty JSONB");
-		result_buf = NULL;
-		NBP_ALLOC(result_buf, char, VARHDRSZ + sizeof(JsonbContainer));
-		result = (Jsonb *) result_buf;
-		SET_VARSIZE(result, VARHDRSZ + sizeof(JsonbContainer));
-		result->root.header = JB_CMASK; /* Empty object */
+		/* Return NULL instead of invalid JSONB */
+		elog(WARNING, "neurondb_evaluate: EMERGENCY - result invalid, returning NULL");
+		PG_RETURN_NULL();
 	}
 
 	PG_RETURN_JSONB_P(result);

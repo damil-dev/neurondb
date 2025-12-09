@@ -150,7 +150,7 @@ temporal_rerank_results(ItemPointer * items,
 	if (!config->enabled || count == 0)
 		return;
 
-	scores = (float4 *) palloc(count * sizeof(float4));
+	nalloc(scores, float4, count);
 	NDB_CHECK_ALLOC(scores, "scores");
 
 	for (i = 0; i < count; i++)
@@ -188,16 +188,10 @@ temporal_rerank_results(ItemPointer * items,
 	}
 	else
 	{
-		struct
-		{
-			ItemPointer item;
-			float4		distance;
-			TimestampTz timestamp;
-			float4		score;
-		}		   *sort_items;
+		TemporalItem *sort_items;
 		int			idx;
 
-		sort_items = palloc(sizeof(*sort_items) * count);
+		nalloc(sort_items, TemporalItem, count);
 		NDB_CHECK_ALLOC(sort_items, "allocation");
 		for (idx = 0; idx < count; idx++)
 		{
@@ -273,7 +267,8 @@ temporal_create_config(float4 decayRate, float4 recencyWeight)
 {
 	TemporalConfig *config = NULL;
 
-	config = (TemporalConfig *) palloc0(sizeof(TemporalConfig));
+	nalloc(config, TemporalConfig, 1);
+	MemSet(config, 0, sizeof(TemporalConfig));
 	NDB_CHECK_ALLOC(config, "config");
 	config->decayRate = decayRate;
 	config->recencyWeight = recencyWeight;
@@ -303,7 +298,7 @@ temporal_integrate_hnsw_search(Relation heapRel,
 	if (resultCount == 0 || items == NULL)
 		return;
 
-	timestamps = (TimestampTz *) palloc(resultCount * sizeof(TimestampTz));
+	nalloc(timestamps, TimestampTz, resultCount);
 	NDB_CHECK_ALLOC(timestamps, "timestamps");
 
 	snapshot = GetActiveSnapshot();

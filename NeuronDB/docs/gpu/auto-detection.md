@@ -13,7 +13,7 @@ NeuronDB automatically detects available GPUs and falls back to CPU if GPU is un
 SELECT neurondb_gpu_info();
 
 -- Enable auto-detection (default)
-SET neurondb.gpu_enabled = true;
+SET neurondb.compute_mode = true;
 SET neurondb.gpu_auto_detect = true;
 ```
 

@@ -40,7 +40,7 @@ GROUP BY i;
 \echo '══════════════════════════════════════════════════════════════════'
 \echo ''
 
-SET neurondb.gpu_enabled = false;
+SET neurondb.compute_mode = false;
 
 \echo 'CPU: Finding top-10 nearest neighbors for 100 queries'
 \echo '  (100 queries × 50,000 vectors × 2048 dims = 5M distances)'
@@ -77,7 +77,7 @@ WHERE rank <= 10;
 \echo '══════════════════════════════════════════════════════════════════'
 \echo ''
 
-SET neurondb.gpu_enabled = true;
+SET neurondb.compute_mode = true;
 SET neurondb.gpu_backend = 'metal';
 
 \echo 'GPU: Finding top-10 nearest neighbors for 100 queries'
@@ -115,7 +115,7 @@ WHERE rank <= 10;
 \echo '══════════════════════════════════════════════════════════════════'
 \echo ''
 
-SET neurondb.gpu_enabled = false;
+SET neurondb.compute_mode = false;
 
 \echo 'CPU: Computing 500,000 distance calculations'
 \echo '  (500 queries × 1,000 targets × 2048 dimensions)'
@@ -149,7 +149,7 @@ FROM (
 \echo '══════════════════════════════════════════════════════════════════'
 \echo ''
 
-SET neurondb.gpu_enabled = true;
+SET neurondb.compute_mode = true;
 SET neurondb.gpu_backend = 'metal';
 
 \echo 'GPU: Computing 500,000 distance calculations'
@@ -184,7 +184,7 @@ FROM (
 \echo '══════════════════════════════════════════════════════════════════'
 \echo ''
 
-SET neurondb.gpu_enabled = false;
+SET neurondb.compute_mode = false;
 
 \echo 'CPU: Computing 1 MILLION distances for clustering'
 \echo '  (1,000 × 1,000 vectors × 2048 dimensions)'
@@ -215,7 +215,7 @@ FROM (
 \echo '══════════════════════════════════════════════════════════════════'
 \echo ''
 
-SET neurondb.gpu_enabled = true;
+SET neurondb.compute_mode = true;
 SET neurondb.gpu_backend = 'metal';
 
 \echo 'GPU: Computing 1 MILLION distances for clustering'
@@ -255,7 +255,7 @@ FROM (
 \echo ''
 \echo 'GPU Configuration:'
 SELECT name, setting FROM pg_settings 
-WHERE name LIKE 'neurondb.gpu%' AND name IN ('neurondb.gpu_enabled', 'neurondb.gpu_backend');
+WHERE name LIKE 'neurondb.gpu%' AND name IN ('neurondb.compute_mode', 'neurondb.gpu_backend');
 \echo ''
 \echo '══════════════════════════════════════════════════════════════════'
 

@@ -39,7 +39,7 @@ FROM dequantized, original;
 
 SELECT
 	'GPU support check' AS test_name,
-	current_setting('neurondb.gpu_enabled', true) AS gpu_enabled;
+	current_setting('neurondb.compute_mode', true) AS gpu_enabled;
 
 \echo ''
 \echo '✅ Advance FP8 quantization tests completed'

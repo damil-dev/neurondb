@@ -23,18 +23,18 @@ BEGIN
 	SELECT setting_value INTO gpu_kernels_val FROM test_settings WHERE setting_key = 'gpu_kernels';
 	
 	-- Verify GPU configuration matches test_settings (set by test runner)
-	SELECT current_setting('neurondb.gpu_enabled', true) INTO current_gpu_enabled;
+	SELECT current_setting('neurondb.compute_mode', true) INTO current_gpu_enabled;
 	SELECT current_setting('neurondb.gpu_kernels', true) INTO current_gpu_kernels;
 	
 	IF gpu_mode = 'gpu' THEN
 		-- Verify GPU is enabled (should be set by test runner)
 		IF current_gpu_enabled != 'on' THEN
-			RAISE WARNING 'GPU mode expected but neurondb.gpu_enabled = % (expected: on)', current_gpu_enabled;
+			RAISE WARNING 'GPU mode expected but neurondb.compute_mode = % (expected: on)', current_gpu_enabled;
 		END IF;
 	ELSE
 		-- Verify GPU is disabled (should be set by test runner)
 		IF current_gpu_enabled != 'off' THEN
-			RAISE WARNING 'CPU mode expected but neurondb.gpu_enabled = % (expected: off)', current_gpu_enabled;
+			RAISE WARNING 'CPU mode expected but neurondb.compute_mode = % (expected: off)', current_gpu_enabled;
 		END IF;
 	END IF;
 END $$;
@@ -142,7 +142,7 @@ SELECT neurondb_gpu_info() AS gpu_info;
 \echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
 
 \echo 'Test 1: GPU training with default parameters'
-SET neurondb.gpu_enabled = on;
+SET neurondb.compute_mode = on;
 DROP TABLE IF EXISTS gpu_model_temp_001;
 CREATE TEMP TABLE gpu_model_temp_001 AS
 SELECT neurondb.train('linear_regression', 
@@ -156,7 +156,7 @@ SELECT
 FROM gpu_model_temp_001;
 
 \echo 'Test 2: CPU training with default parameters'
-SET neurondb.gpu_enabled = off;
+SET neurondb.compute_mode = off;
 DROP TABLE IF EXISTS cpu_model_temp_001;
 CREATE TEMP TABLE cpu_model_temp_001 AS
 SELECT neurondb.train('linear_regression', 
@@ -284,7 +284,7 @@ END$$;
 \echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
 
 \echo 'Predict Test 1: GPU batch prediction (1000 rows)'
-SET neurondb.gpu_enabled = on;
+SET neurondb.compute_mode = on;
 SELECT 
 	'GPU Batch' AS test_type,
 	COUNT(*) AS n_predictions,
@@ -299,7 +299,7 @@ FROM (
 ) sub;
 
 \echo 'Predict Test 2: CPU batch prediction (1000 rows)'
-SET neurondb.gpu_enabled = off;
+SET neurondb.compute_mode = off;
 SELECT 
 	'CPU Batch' AS test_type,
 	COUNT(*) AS n_predictions,
@@ -321,7 +321,7 @@ FROM test_test_view
 LIMIT 1;
 
 \echo 'Predict Test 4: Custom model batch (100 rows)'
-SET neurondb.gpu_enabled = off;
+SET neurondb.compute_mode = off;
 SELECT 
 	'Custom Batch' AS test_type,
 	COUNT(*) AS n_predictions,

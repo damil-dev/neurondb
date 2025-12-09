@@ -71,7 +71,7 @@ SELECT neurondb_embed_batch(
 
 ## GPU Distance Functions
 
-GPU-accelerated distance computation functions. Require `neurondb.gpu_enabled = true`.
+GPU-accelerated distance computation functions. Require `neurondb.compute_mode = true`.
 
 ### `vector_l2_distance_gpu(a, b)`
 Compute L2 distance on GPU.
@@ -80,7 +80,7 @@ Compute L2 distance on GPU.
 **Returns:** float8
 
 ```sql
-SET neurondb.gpu_enabled = true;
+SET neurondb.compute_mode = true;
 SELECT vector_l2_distance_gpu(embedding, '[1,2,3]'::vector) FROM documents;
 ```
 
@@ -194,7 +194,7 @@ Get project information and statistics.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `neurondb.gpu_enabled` | bool | false | Enable GPU acceleration |
+| `neurondb.compute_mode` | bool | false | Enable GPU acceleration |
 | `neurondb.gpu_device` | int | 0 | GPU device ID to use |
 | `neurondb.gpu_batch_size` | int | 1000 | Batch size for GPU operations |
 | `neurondb.gpu_streams` | int | 4 | Number of CUDA streams |

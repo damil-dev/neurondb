@@ -381,7 +381,8 @@ neurondb_gpu_get_device_info(int device_id)
 	GPUDeviceInfo *info = NULL;
 	NDBGpuDeviceInfo native;
 
-	info = (GPUDeviceInfo *) palloc0(sizeof(GPUDeviceInfo));
+		nalloc(info, GPUDeviceInfo, 1);
+		MemSet(info, 0, sizeof(GPUDeviceInfo));
 	info->device_id = device_id;
 	info->is_available = false;
 
@@ -440,7 +441,8 @@ neurondb_gpu_set_device(int device_id)
 GPUStats *
 neurondb_gpu_get_stats(void)
 {
-	GPUStats   *stats = (GPUStats *) palloc(sizeof(GPUStats));
+	GPUStats *stats = NULL;
+	nalloc(stats, GPUStats, 1);
 
 	memcpy(stats, &gpu_stats, sizeof(GPUStats));
 	if (stats->queries_executed > 0)
@@ -704,8 +706,9 @@ neurondb_gpu_rf_best_split_binary(const float *feature_values,
 	best_lc = 0;
 	best_rc = 0;
 
-	i_idx = (int *) palloc(sizeof(int) * n);
-	prefix_pos = (int *) palloc0(sizeof(int) * n);
+	nalloc(i_idx, int, n);
+	nalloc(prefix_pos, int, n);
+	MemSet(prefix_pos, 0, sizeof(int) * n);
 	total_pos = 0;
 	for (i = 0; i < n; i++)
 	{
@@ -990,8 +993,10 @@ neurondb_gpu_hf_rerank_batch(const char *model_name,
 		|| !scores_out || !nscores_out || num_queries <= 0)
 		goto out;
 
-	*scores_out = (float **) palloc0(num_queries * sizeof(float *));
-	*nscores_out = (int *) palloc0(num_queries * sizeof(int));
+	nalloc(*scores_out, float *, num_queries);
+	MemSet(*scores_out, 0, sizeof(float *) * num_queries);
+	nalloc(*nscores_out, int, num_queries);
+	MemSet(*nscores_out, 0, sizeof(int) * num_queries);
 
 	for (i = 0; i < num_queries; i++)
 	{

@@ -350,7 +350,6 @@ hnswbuild(Relation heap, Relation index, IndexInfo * indexInfo)
 {
 	HnswBuildState buildstate = {0};
 	Buffer		metaBuffer;
-	Page		metaPage = NULL;  /* Suppress unused variable warning */
 	HnswOptions *options = NULL;
 	IndexBuildResult *result = NULL;
 	int			m,
@@ -370,7 +369,6 @@ hnswbuild(Relation heap, Relation index, IndexInfo * indexInfo)
 	/* Initialize metadata page on block 0 */
 	metaBuffer = ReadBuffer(index, P_NEW);
 	LockBuffer(metaBuffer, BUFFER_LOCK_EXCLUSIVE);
-	metaPage = BufferGetPage(metaBuffer);
 
 	options = (HnswOptions *) indexInfo->ii_AmCache;
 	if (options == NULL)
@@ -446,7 +444,6 @@ static void
 hnswbuildempty(Relation index)
 {
 	Buffer		metaBuffer;
-	Page		metaPage;
 	HnswOptions opts;
 
 	/* Load options from relation to match CREATE INDEX reloptions */
@@ -455,7 +452,7 @@ hnswbuildempty(Relation index)
 	/* Initialize metadata page on block 0 */
 	metaBuffer = ReadBuffer(index, P_NEW);
 	LockBuffer(metaBuffer, BUFFER_LOCK_EXCLUSIVE);
-	metaPage = BufferGetPage(metaBuffer);
+	(void) BufferGetPage(metaBuffer);  /* Ensure page is valid */
 
 	hnswInitMetaPage(metaBuffer,
 					 opts.m,
@@ -544,7 +541,6 @@ hnswbulkdelete(IndexVacuumInfo * info,
 	if (stats == NULL)
 	{
 		nalloc(new_stats, IndexBulkDeleteResult, 1);
-		memset(new_stats, 0, sizeof(IndexBulkDeleteResult));
 		stats = new_stats;
 	}
 
@@ -685,9 +681,9 @@ hnswbulkdelete(IndexVacuumInfo * info,
 				}
 
 				{
-					ItemId		itemId = PageGetItemId(nodePage, FirstOffsetNumber);
+					ItemId		itemId2 = PageGetItemId(nodePage, FirstOffsetNumber);
 
-					if (!ItemIdIsValid(itemId))
+					if (!ItemIdIsValid(itemId2))
 					{
 						UnlockReleaseBuffer(nodeBuf);
 						nodeBuf = InvalidBuffer;
@@ -700,7 +696,7 @@ hnswbulkdelete(IndexVacuumInfo * info,
 						continue;
 					}
 
-					node = (HnswNode) PageGetItem(nodePage, itemId);
+					node = (HnswNode) PageGetItem(nodePage, itemId2);
 					if (node == NULL)
 					{
 						UnlockReleaseBuffer(nodeBuf);
@@ -815,7 +811,6 @@ hnswvacuumcleanup(IndexVacuumInfo * info, IndexBulkDeleteResult * stats)
 	if (stats == NULL)
 	{
 		nalloc(new_stats, IndexBulkDeleteResult, 1);
-		memset(new_stats, 0, sizeof(IndexBulkDeleteResult));
 		stats = new_stats;
 	}
 	return stats;
@@ -922,10 +917,14 @@ hnswoptions(Datum reloptions, bool validate)
 					
 					if (eq_pos != NULL)
 					{
+						char *param_name;
+						char *param_value_str;
+						int param_value;
+						
 						*eq_pos = '\0';
-						char *param_name = elem_str;
-						char *param_value_str = eq_pos + 1;
-						int param_value = atoi(param_value_str);
+						param_name = elem_str;
+						param_value_str = eq_pos + 1;
+						param_value = atoi(param_value_str);
 						
 						if (strcmp(param_name, "m") == 0)
 						{
@@ -943,7 +942,7 @@ hnswoptions(Datum reloptions, bool validate)
 							found_ef_search = true;
 						}
 					}
-					pfree(elem_str);
+					nfree(elem_str);
 				}
 			}
 			
@@ -1624,14 +1623,14 @@ hnswExtractVectorData(Datum value, Oid typeOid, int *out_dim, MemoryContext ctx)
 		VectorF16  *hv = (VectorF16 *) PG_DETOAST_DATUM(value);
 		bool		needsFree = false;
 
-		if (hv != DatumGetPointer(value))
+		if (hv != (VectorF16 *) DatumGetPointer(value))
 			needsFree = true;
 
 		NDB_CHECK_NULL(hv, "halfvec");
 		if (hv->dim <= 0 || hv->dim > 32767)
 		{
 			if (needsFree)
-				pfree(hv);
+				nfree(hv);
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("hnsw: invalid halfvec dimension %d", hv->dim)));
@@ -1651,14 +1650,14 @@ hnswExtractVectorData(Datum value, Oid typeOid, int *out_dim, MemoryContext ctx)
 		VectorMap  *sv = (VectorMap *) PG_DETOAST_DATUM(value);
 		bool		needsFree = false;
 
-		if (sv != DatumGetPointer(value))
+		if (sv != (VectorMap *) DatumGetPointer(value))
 			needsFree = true;
 
 		NDB_CHECK_NULL(sv, "sparsevec");
 		if (sv->total_dim <= 0 || sv->total_dim > 32767)
 		{
 			if (needsFree)
-				pfree(sv);
+				nfree(sv);
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("hnsw: invalid sparsevec total_dim %d", sv->total_dim)));
@@ -1691,7 +1690,7 @@ hnswExtractVectorData(Datum value, Oid typeOid, int *out_dim, MemoryContext ctx)
 		VarBit	   *bit_vec = (VarBit *) PG_DETOAST_DATUM(value);
 		bool		needsFree = false;
 
-		if (bit_vec != DatumGetPointer(value))
+		if (bit_vec != (VarBit *) DatumGetPointer(value))
 			needsFree = true;
 
 		NDB_CHECK_NULL(bit_vec, "bit vector");
@@ -1703,7 +1702,7 @@ hnswExtractVectorData(Datum value, Oid typeOid, int *out_dim, MemoryContext ctx)
 			if (nbits <= 0 || nbits > 32767)
 			{
 				if (needsFree)
-					pfree(bit_vec);
+					nfree(bit_vec);
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 						 errmsg("hnsw: invalid bit vector length %d", nbits)));
@@ -1807,6 +1806,7 @@ hnswSearch(Relation index,
 				worstIdx;
 	float4		worstDist,
 				minDist;
+	BlockNumber numBlocks;	/* Computed once and reused throughout function */
 
 	/* Defensive: no vectors yet */
 	if (metaPage->entryPoint == InvalidBlockNumber)
@@ -1816,8 +1816,6 @@ hnswSearch(Relation index,
 		*resultCount = 0;
 		return;
 	}
-
-	BlockNumber numBlocks;	/* Computed once and reused throughout function */
 
 	/* Enforce k <= efSearch: effective k is min(k, efSearch) */
 	if (k > efSearch)
@@ -1848,7 +1846,6 @@ hnswSearch(Relation index,
 								numBlocks)));
 			}
 			nalloc(visitedSet, bool, numBlocks);
-			memset(visitedSet, 0, visitedSetSize);
 		}
 		visitedCount = 0;
 
@@ -1905,6 +1902,9 @@ hnswSearch(Relation index,
 
 				if (node->level >= level)
 				{
+					BlockNumber *neighborBlocks = NULL;
+					int			validNeighborCount = 0;
+					
 					neighbors = HnswGetNeighborsSafe(node, level, metaPage->m);
 					neighborCount = node->neighborCount[level];
 
@@ -1912,8 +1912,6 @@ hnswSearch(Relation index,
 					neighborCount = hnswValidateNeighborCount(neighborCount, metaPage->m, level);
 
 					/* Copy neighbor block numbers to avoid deadlock - unlock nodeBuf first */
-					BlockNumber *neighborBlocks = NULL;
-					int			validNeighborCount = 0;
 
 					if (neighborCount > 0)
 					{
@@ -2073,6 +2071,8 @@ hnswSearch(Relation index,
 		for (i = 0; i < candidateCount && candidateCount < efSearch; i++)
 		{
 			BlockNumber candidate = candidates[i];
+			BlockNumber *neighborBlocks = NULL;
+			int			validNeighborCount = 0;
 
 			if (!hnswValidateBlockNumber(candidate, index))
 			{
@@ -2111,9 +2111,6 @@ hnswSearch(Relation index,
 			neighborCount = hnswValidateNeighborCount(neighborCount, metaPage->m, 0);
 
 			/* Copy neighbor block numbers to avoid deadlock - unlock nodeBuf first */
-			BlockNumber *neighborBlocks = NULL;
-			int			validNeighborCount = 0;
-
 			if (neighborCount > 0)
 			{
 				nalloc(neighborBlocks, BlockNumber, neighborCount);

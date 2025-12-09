@@ -46,17 +46,21 @@ COMMENT ON FUNCTION ivf_knn_search_gpu(text, vector, int) IS
 -- Extension assumed to be created in 01_types_basic
 
 -- ==== ENVIRONMENT PREP: Ensure deterministic fallback ====
-SET neurondb.gpu_enabled = off;  -- Guarantee CPU for baseline/consistency
+SET neurondb.compute_mode = off;  -- Guarantee CPU for baseline/consistency
 
 -- ==== 1. GPU Info and Status Functions: all call scenarios ====
 -- Actual info/stats output is environment-dependent, so always run, don't just skip
 -- Info before anything
 SELECT neurondb_gpu_info() AS initial_gpu_info;
 
--- Try both enabling (true) and disabling (false), and toggle back and forth
-SELECT neurondb_gpu_enable(true)  AS gpu_enabled_set_true;
-SELECT neurondb_gpu_enable(false) AS gpu_enabled_set_false;
-SELECT neurondb_gpu_enable(NULL)  AS gpu_enabled_set_null;
+-- Try enabling GPU and toggling compute_mode
+SELECT neurondb_gpu_enable() AS gpu_enabled;
+-- Set to GPU mode
+SET neurondb.compute_mode = 1;
+SELECT neurondb_gpu_enable() AS gpu_enabled_after_set_gpu;
+-- Set to CPU mode
+SET neurondb.compute_mode = 0;
+SELECT neurondb_gpu_enable() AS gpu_enabled_after_set_cpu;
 
 -- Again check info after toggling
 SELECT neurondb_gpu_info() AS post_toggle_gpu_info;

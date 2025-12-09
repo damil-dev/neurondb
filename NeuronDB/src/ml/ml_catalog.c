@@ -67,7 +67,7 @@ ml_catalog_default_project(const char *algorithm, const char *training_table)
 	 * Sanitize table name: replace spaces and other problematic chars with
 	 * underscores
 	 */
-	sanitized_table = palloc(strlen(training_table) + 1);
+	nalloc(sanitized_table, char, strlen(training_table) + 1);
 	j = 0;
 	for (i = 0; training_table[i] != '\0'; i++)
 	{
@@ -286,8 +286,6 @@ ml_catalog_register_model(const MLCatalogModelSpec *spec)
 				 errdetail("project_name is NULL or empty: '%s'", project_name ? project_name : "(NULL)"),
 				 errhint("This should not happen - project_name should have been validated earlier.")));
 	}
-	elog(INFO, "neurondb: ml_catalog_register_model: registering model for project '%s', algorithm '%s', type '%s'",
-		 project_name, algorithm, model_type);
 
 	/* Create or update project entry and retrieve project_id */
 	ndb_spi_stringinfo_init(spi_session, &insert_query);
@@ -590,9 +588,6 @@ ml_catalog_register_model(const MLCatalogModelSpec *spec)
 		error_code = 8;
 		goto error;
 	}
-
-	elog(INFO, "neurondb: ml_catalog_register_model: successfully registered model_id %d for project_id %d, version %d",
-		 model_id, project_id, version);
 
 	/* Optionally update model_data using parameterized query */
 	if (spec->model_data != NULL && model_id > 0)

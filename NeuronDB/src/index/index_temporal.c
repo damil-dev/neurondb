@@ -47,7 +47,7 @@ get_temporal_index_table(const char *table, const char *col)
 {
 	char *buf = NULL;
 
-	buf = palloc(strlen(table) + strlen(col) + 32);
+	nalloc(buf, char, strlen(table) + strlen(col) + 32);
 	snprintf(buf,
 			 strlen(table) + strlen(col) + 32,
 			 "__tvx_index_%s_%s",
@@ -341,7 +341,7 @@ VectorToLiteral(Vector *v)
 	char *buf = NULL;
 
 	out = vector_out_internal(v);
-	buf = palloc(strlen(out) + 4);
+	nalloc(buf, char, strlen(out) + 4);
 	snprintf(buf, strlen(out) + 4, "'%s'", out);
 
 	return buf;

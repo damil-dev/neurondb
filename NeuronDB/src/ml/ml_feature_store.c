@@ -340,7 +340,7 @@ neurondb_get_features(PG_FUNCTION_ARGS)
 						  &feat_nulls,
 						  &num_features);
 
-		feature_names = (char **) palloc(sizeof(char *) * num_features);
+		nalloc(feature_names, char *, num_features);
 		for (i = 0; i < num_features; ++i)
 			feature_names[i] = TextDatumGetCString(feat_datums[i]);
 	}
@@ -406,7 +406,7 @@ neurondb_get_features(PG_FUNCTION_ARGS)
 			tuple = SPI_tuptable->vals[0];
 			tupdesc = SPI_tuptable->tupdesc;
 			nf = ndefs;
-			obj_pairs = (JsonbPair *) palloc(sizeof(JsonbPair) * nf);
+			nalloc(obj_pairs, JsonbPair, nf);
 
 			for (j = 0; j < ndefs; ++j)
 			{
@@ -492,8 +492,8 @@ neurondb_get_features(PG_FUNCTION_ARGS)
 		{
 			/* entity row not found: return nulls for all features */
 			int			nf = ndefs;
-			JsonbPair  *obj_pairs =
-				(JsonbPair *) palloc(sizeof(JsonbPair) * nf);
+			JsonbPair *obj_pairs = NULL;
+			nalloc(obj_pairs, JsonbPair, nf);
 
 			for (j = 0; j < ndefs; ++j)
 			{

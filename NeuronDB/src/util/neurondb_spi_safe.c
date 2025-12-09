@@ -357,9 +357,9 @@ ndb_spi_exec_select_one_row_safe(const char *query,
 	if (out_datum != NULL || out_isnull != NULL)
 	{
 		if (out_datum != NULL)
-			*out_datum = (Datum *) palloc(sizeof(Datum) * natts);
+			nalloc(*out_datum, Datum, natts);
 		if (out_isnull != NULL)
-			*out_isnull = (bool *) palloc(sizeof(bool) * natts);
+			nalloc(*out_isnull, bool, natts);
 
 		for (i = 0; i < natts; i++)
 		{

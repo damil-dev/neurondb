@@ -93,17 +93,15 @@ _PG_init(void)
 		 relopt_kind_hnsw, relopt_kind_ivf);
 
 	/* Register all HNSW options - PostgreSQL requires registration for recognition */
-	/* CRITICAL: Registration order MUST match struct field order in HnswOptions! */
-	/* PostgreSQL assigns defaults by registration order, not by name matching */
 	add_int_reloption(relopt_kind_hnsw, "m",
 					  "Maximum number of connections per node",
-					  16, 2, 128, AccessExclusiveLock);
+					  16, 4, 200, AccessExclusiveLock);
 	add_int_reloption(relopt_kind_hnsw, "ef_construction",
 					  "Size of dynamic candidate list during construction",
-					  200, 10, 10000, AccessExclusiveLock);
+					  200, 10, 1000, AccessExclusiveLock);
 	add_int_reloption(relopt_kind_hnsw, "ef_search",
 					  "Size of dynamic candidate list during search",
-					  64, 10, 10000, AccessExclusiveLock);
+					  64, 10, 1000, AccessExclusiveLock);
 
 	add_int_reloption(relopt_kind_ivf, "lists",
 					  "Number of inverted lists",

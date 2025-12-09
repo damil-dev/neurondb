@@ -123,49 +123,32 @@ ndb_jsonb_init_oids(void)
 Jsonb *
 ndb_jsonb_in(text * json_text)
 {
-	char *cstr = NULL;
-	Datum		result_datum;
-
-	Jsonb *result = NULL;
+	char	   *cstr;
+	Datum		d;
+	Jsonb	   *result;
 
 	if (json_text == NULL)
 		return NULL;
 
-	if (!jsonb_oids_initialized)
-		ndb_jsonb_init_oids();
-
 	cstr = text_to_cstring(json_text);
+	d = DirectFunctionCall1(jsonb_in, CStringGetDatum(cstr));
+	pfree(cstr);
+	result = DatumGetJsonbP(d);
 
-	PG_TRY();
-	{
-		result_datum = DirectFunctionCall1(jsonb_in, CStringGetDatum(cstr));
-		result = DatumGetJsonbP(result_datum);
-	}
-	PG_CATCH();
-	{
-		FlushErrorState();
-		nfree(cstr);
-		return NULL;
-	}
-	PG_END_TRY();
-
-	nfree(cstr);
 	return result;
 }
 
 Jsonb *
 ndb_jsonb_in_cstring(const char *json_str)
 {
-	text *json_text = NULL;
-
-	Jsonb *result = NULL;
+	Datum		d;
+	Jsonb	   *result;
 
 	if (json_str == NULL)
 		return NULL;
 
-	json_text = cstring_to_text(json_str);
-	result = ndb_jsonb_in(json_text);
-	nfree(json_text);
+	d = DirectFunctionCall1(jsonb_in, CStringGetDatum((char *) json_str));
+	result = DatumGetJsonbP(d);
 
 	return result;
 }
@@ -2507,8 +2490,7 @@ ndb_json_parse_openai_embedding(const char *json_str,
 				{
 					if (vec != NULL)
 					{
-						pfree((void *) vec);
-						vec = NULL;
+						nfree(vec);
 					}
 				}
 			}

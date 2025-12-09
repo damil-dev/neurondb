@@ -21,12 +21,16 @@ SET client_min_messages TO WARNING;
 
 DO $$
 DECLARE
-	gpu_mode TEXT;
-	current_gpu_enabled TEXT;
+	compute_mode TEXT;
 BEGIN
-	SELECT setting_value INTO gpu_mode FROM test_settings WHERE setting_key = 'gpu_mode';
-	SELECT current_setting('neurondb.gpu_enabled', true) INTO current_gpu_enabled;
-	IF gpu_mode = 'gpu' THEN
+	-- Get compute_mode from test_settings (set by run_test.py)
+	SELECT setting_value INTO compute_mode FROM test_settings WHERE setting_key = 'compute_mode';
+	-- Note: compute_mode is set by run_test.py via switch_gpu_mode()
+	-- This block is kept for backward compatibility but compute_mode
+	-- should be set before running tests via run_test.py
+	IF compute_mode = 'gpu' THEN
+		PERFORM neurondb_gpu_enable();
+	ELSIF compute_mode = 'auto' THEN
 		PERFORM neurondb_gpu_enable();
 	END IF;
 END $$;
@@ -221,17 +225,17 @@ WHERE m.model_id = t.model_id;
 /* Verify GPU was used for training when GPU mode is enabled */
 DO $$
 DECLARE
-	gpu_mode TEXT;
+	compute_mode TEXT;
 	storage_val TEXT;
 	gpu_available BOOLEAN;
 BEGIN
-	SELECT setting_value INTO gpu_mode FROM test_settings WHERE setting_key = 'gpu_mode';
+	SELECT setting_value INTO compute_mode FROM test_settings WHERE setting_key = 'compute_mode';
 	SELECT COALESCE(m.metrics::jsonb->>'storage', 'cpu') INTO storage_val
 	FROM neurondb.ml_models m, gpu_model_temp t
 	WHERE m.model_id = t.model_id;
 	
 	-- Only check GPU info if GPU mode is enabled - never call GPU functions in CPU mode
-	IF gpu_mode = 'gpu' THEN
+	IF compute_mode = 'gpu' THEN
 		BEGIN
 			-- Check if GPU is actually available (use is_available column which matches C code check)
 			SELECT COALESCE(BOOL_OR(is_available), false) INTO gpu_available
@@ -254,7 +258,7 @@ BEGIN
 	END IF;
 	
 	-- If CPU mode is enabled, verify model was trained on CPU
-	IF gpu_mode = 'cpu' AND storage_val = 'gpu' THEN
+	IF compute_mode = 'cpu' AND storage_val = 'gpu' THEN
 		RAISE WARNING 'CPU mode enabled but model was trained on GPU (storage=gpu)';
 	END IF;
 END $$;
@@ -433,11 +437,11 @@ WHERE tm.test_name = '001_linreg_basic';
 -- Only show GPU info if GPU mode is enabled - never call GPU functions in CPU mode
 DO $$
 DECLARE
-	gpu_mode TEXT;
+	compute_mode TEXT;
 BEGIN
-	SELECT setting_value INTO gpu_mode FROM test_settings WHERE setting_key = 'gpu_mode';
+	SELECT setting_value INTO compute_mode FROM test_settings WHERE setting_key = 'compute_mode';
 	
-	IF gpu_mode = 'gpu' THEN
+	IF compute_mode = 'gpu' THEN
 		-- Display GPU information only when GPU mode is enabled
 		PERFORM NULL; -- Placeholder for GPU info display
 	END IF;
@@ -446,12 +450,12 @@ END $$;
 -- Conditionally display GPU info only in GPU mode
 DO $$
 DECLARE
-	gpu_mode TEXT;
+	compute_mode TEXT;
 	rec RECORD;
 BEGIN
-	SELECT setting_value INTO gpu_mode FROM test_settings WHERE setting_key = 'gpu_mode';
+	SELECT setting_value INTO compute_mode FROM test_settings WHERE setting_key = 'compute_mode';
 	
-	IF gpu_mode = 'gpu' THEN
+	IF compute_mode = 'gpu' THEN
 		BEGIN
 			RAISE NOTICE 'GPU Information:';
 			-- Display GPU info by looping through results

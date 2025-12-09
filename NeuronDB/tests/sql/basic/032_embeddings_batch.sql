@@ -10,7 +10,7 @@
 \echo 'NOTE: embed_text_batch() warnings are expected if LLM is not configured.'
 \echo '      To generate real embeddings, configure:'
 \echo '      - neurondb.llm_api_key (Hugging Face API key)'
-\echo '      - Or enable GPU embedding via GUC (ALTER SYSTEM SET neurondb.gpu_enabled = on)'
+\echo '      - Or enable GPU embedding via GUC (ALTER SYSTEM SET neurondb.compute_mode = on)'
 \echo '      Without configuration, embed_text_batch() returns zero vectors (graceful fallback).'
 \echo ''
 

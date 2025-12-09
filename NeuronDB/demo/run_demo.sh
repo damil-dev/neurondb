@@ -76,13 +76,13 @@ mkdir -p "$OUT_DIR"
 echo "Step 2: Configuring $GPU_MODE mode..."
 if [ "$GPU_MODE" = "gpu" ]; then
     $PSQL -p $DB_PORT -U $DB_USER -d $DB_NAME -q <<EOF
-SET neurondb.gpu_enabled = true;
+SET neurondb.compute_mode = true;
 SET neurondb.gpu_backend = 'metal';
 EOF
     echo "✓ GPU mode enabled (Metal backend)"
 else
     $PSQL -p $DB_PORT -U $DB_USER -d $DB_NAME -q <<EOF
-SET neurondb.gpu_enabled = false;
+SET neurondb.compute_mode = false;
 EOF
     echo "✓ CPU-only mode enabled"
 fi
@@ -171,7 +171,7 @@ if [ "$GPU_MODE" = "gpu" ]; then
     echo "GPU Configuration:"
     $PSQL -p $DB_PORT -U $DB_USER -d $DB_NAME -t -q <<EOF
 SELECT '  ' || name || ': ' || setting FROM pg_settings 
-WHERE name LIKE 'neurondb.gpu%' AND name IN ('neurondb.gpu_enabled', 'neurondb.gpu_backend');
+WHERE name LIKE 'neurondb.gpu%' AND name IN ('neurondb.compute_mode', 'neurondb.gpu_backend');
 EOF
     echo ""
 fi

@@ -453,7 +453,7 @@ multi_armed_bandit(PG_FUNCTION_ARGS)
 	}
 
 	/* Calculate selection probabilities */
-	arm_probs = (double *) palloc(sizeof(double) * n_arms);
+	nalloc(arm_probs, double, n_arms);
 
 	if (strcmp(algorithm, "thompson") == 0)
 	{
@@ -539,7 +539,7 @@ multi_armed_bandit(PG_FUNCTION_ARGS)
 	}
 
 	/* Build result array */
-	result_datums = (Datum *) palloc(sizeof(Datum) * n_arms);
+	nalloc(result_datums, Datum, n_arms);
 	for (i = 0; i < n_arms; i++)
 		result_datums[i] = Float8GetDatum(arm_probs[i]);
 

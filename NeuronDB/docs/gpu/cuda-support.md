@@ -12,7 +12,7 @@ Enable CUDA in `postgresql.conf`:
 
 ```conf
 shared_preload_libraries = 'neurondb'
-neurondb.gpu_enabled = true
+neurondb.compute_mode = true
 neurondb.gpu_backend = 'cuda'
 neurondb.gpu_device = 0
 ```

@@ -95,8 +95,13 @@ ml_gpu_buffer_init_owner(MLGpuBuffer *buf,
 
 	if (total_bytes > 0)
 	{
-		buf->host_ptr =
-			zero ? palloc0(total_bytes) : palloc(total_bytes);
+		{
+			char *tmp = NULL;
+			nalloc(tmp, char, total_bytes);
+			buf->host_ptr = tmp;
+			if (zero)
+				MemSet(buf->host_ptr, 0, total_bytes);
+		}
 	}
 
 	MemoryContextSwitchTo(oldcx);

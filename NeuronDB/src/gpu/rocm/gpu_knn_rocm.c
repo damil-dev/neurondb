@@ -117,7 +117,9 @@ ndb_rocm_knn_pack(const struct KNNModel *model,
 		return -1;
 	}
 
-	blob = (bytea *) palloc(VARHDRSZ + payload_bytes);
+	char *tmp = NULL;
+	nalloc(tmp, char, VARHDRSZ + payload_bytes);
+	blob = (bytea *) tmp;
 	if (blob == NULL)
 	{
 		if (errstr)
@@ -389,7 +391,7 @@ ndb_rocm_knn_train(const float *features,
 			*errstr = pstrdup("HIP KNN train: feature array size exceeds MaxAllocSize");
 		return -1;
 	}
-	features_copy = (float *) palloc(sizeof(float) * (size_t) n_samples * (size_t) feature_dim);
+	nalloc(features_copy, float, (size_t) n_samples * (size_t) feature_dim);
 	if (features_copy == NULL)
 	{
 		if (errstr)
@@ -397,7 +399,7 @@ ndb_rocm_knn_train(const float *features,
 		return -1;
 	}
 
-	labels_copy = (double *) palloc(sizeof(double) * (size_t) n_samples);
+	nalloc(labels_copy, double, (size_t) n_samples);
 	if (labels_copy == NULL)
 	{
 		if (errstr)
@@ -564,7 +566,7 @@ ndb_rocm_knn_predict(const bytea * model_data,
 			*errstr = pstrdup("HIP KNN predict: distances array size exceeds MaxAllocSize");
 		return -1;
 	}
-	distances = (float *) palloc(sizeof(float) * hdr->n_samples);
+	nalloc(distances, float, hdr->n_samples);
 	if (distances == NULL)
 	{
 		if (errstr)
@@ -805,7 +807,7 @@ ndb_rocm_knn_evaluate_batch(const bytea * model_data,
 	}
 
 	/* Allocate predictions array */
-	predictions = (int *) palloc(sizeof(int) * (size_t) n_samples);
+	nalloc(predictions, int, (size_t) n_samples);
 	if (predictions == NULL)
 	{
 		if (errstr)

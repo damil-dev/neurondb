@@ -578,7 +578,7 @@ ndb_llm_complete(PG_FUNCTION_ARGS)
 			if (len >= 2 && raw_model[0] == '"' && raw_model[len - 1] == '"')
 			{
 				/* Allocate new string without quotes */
-				model_from_params = palloc(len - 1);
+				nalloc(model_from_params, char, len - 1);
 				memcpy(model_from_params, raw_model + 1, len - 2);
 				model_from_params[len - 2] = '\0';
 				nfree(raw_model);
@@ -839,7 +839,8 @@ ndb_llm_complete(PG_FUNCTION_ARGS)
 					if (len >= 2 && error_text[0] == '"' && error_text[len - 1] == '"')
 					{
 						/* Remove quotes */
-						char	   *unquoted = palloc(len - 1);
+						char *unquoted = NULL;
+						nalloc(unquoted, char, len - 1);
 						
 						memcpy(unquoted, error_text + 1, len - 2);
 						unquoted[len - 2] = '\0';
@@ -1506,7 +1507,7 @@ ndb_llm_rerank(PG_FUNCTION_ARGS)
 
 		funcctx = SRF_FIRSTCALL_INIT();
 		old = MemoryContextSwitchTo(funcctx->multi_call_memory_ctx);
-		new_ctx = palloc0(sizeof(Ctx));
+		nalloc(new_ctx, Ctx, 1);
 		arr = PG_GETARG_ARRAYTYPE_P(1);
 		new_ctx->ndocs = ArrayGetNItems(ARR_NDIM(arr), ARR_DIMS(arr));
 		new_ctx->i = 0;
@@ -1925,7 +1926,7 @@ ndb_llm_complete_batch(PG_FUNCTION_ARGS)
 								num_prompts,
 								nprompt_elems)));
 
-			prompts = (char **) palloc0(num_prompts * sizeof(char *));
+			nalloc(prompts, char *, num_prompts);
 			for (i = 0; i < num_prompts; i++)
 			{
 				if (prompt_nulls[i])
@@ -1967,14 +1968,12 @@ ndb_llm_complete_batch(PG_FUNCTION_ARGS)
 
 		/* Store state */
 		{
-			BatchCompleteState *state =
-				(BatchCompleteState *) palloc0(
-											   sizeof(BatchCompleteState));
+			BatchCompleteState *state = NULL;
+			nalloc(state, BatchCompleteState, 1);
 
 			state->num_prompts = num_prompts;
 			state->current_idx = 0;
-			state->batch_resp = (NdbLLMBatchResp *) palloc0(
-															sizeof(NdbLLMBatchResp));
+			nalloc(state->batch_resp, NdbLLMBatchResp, 1);
 			/* Deep copy batch_resp structure */
 			state->batch_resp->num_items = batch_resp.num_items;
 			state->batch_resp->num_success = batch_resp.num_success;
@@ -1982,8 +1981,7 @@ ndb_llm_complete_batch(PG_FUNCTION_ARGS)
 			{
 				int			j;
 
-				state->batch_resp->texts = (char **) palloc0(
-															 batch_resp.num_items * sizeof(char *));
+				nalloc(state->batch_resp->texts, char *, batch_resp.num_items);
 				for (j = 0; j < batch_resp.num_items; j++)
 				{
 					if (batch_resp.texts[j])
@@ -2243,7 +2241,7 @@ ndb_llm_rerank_batch(PG_FUNCTION_ARGS)
 								num_queries,
 								nquery_elems)));
 
-			queries = (char **) palloc0(num_queries * sizeof(char *));
+			nalloc(queries, char *, num_queries);
 			for (i = 0; i < num_queries; i++)
 			{
 				if (query_nulls[i])
@@ -2254,9 +2252,8 @@ ndb_llm_rerank_batch(PG_FUNCTION_ARGS)
 		}
 
 		/* Extract documents from 2D array */
-		ndocs_array = (int *) palloc0(num_queries * sizeof(int));
-		docs_array =
-			(const char ***) palloc0(num_queries * sizeof(char **));
+		nalloc(ndocs_array, int, num_queries);
+		nalloc(docs_array, const char **, num_queries);
 
 		/*
 		 * Extract documents from array (handles both 1D array of arrays and
@@ -2335,7 +2332,8 @@ ndb_llm_rerank_batch(PG_FUNCTION_ARGS)
 									  &ndoc_elems);
 
 					ndocs_array[i] = ndoc_elems;
-					docs = (char **) palloc0(ndoc_elems * sizeof(char *));
+					nalloc(docs, char *, ndoc_elems);
+					MemSet(docs, 0, sizeof(char *) * ndoc_elems);
 					for (j = 0; j < ndoc_elems; j++)
 					{
 						if (doc_nulls[j])
@@ -2478,7 +2476,8 @@ ndb_llm_rerank_batch(PG_FUNCTION_ARGS)
 									  &ndoc_elems);
 
 					ndocs_array[i] = ndoc_elems;
-					docs = (char **) palloc0(ndoc_elems * sizeof(char *));
+					nalloc(docs, char *, ndoc_elems);
+					MemSet(docs, 0, sizeof(char *) * ndoc_elems);
 					for (j = 0; j < ndoc_elems; j++)
 					{
 						if (doc_nulls[j])
@@ -2544,8 +2543,9 @@ ndb_llm_rerank_batch(PG_FUNCTION_ARGS)
 
 		/* Store state */
 		{
-			BatchRerankState *state = (BatchRerankState *) palloc0(
-																   sizeof(BatchRerankState));
+			BatchRerankState *state = NULL;
+			nalloc(state, BatchRerankState, 1);
+			MemSet(state, 0, sizeof(BatchRerankState));
 
 			if (!state)
 			{

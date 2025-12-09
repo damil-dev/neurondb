@@ -69,7 +69,7 @@ FROM test_train_view;
 \echo ''
 \echo 'GPU Configuration'
 \echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
-SET neurondb.gpu_enabled = on;
+SET neurondb.compute_mode = on;
 SET neurondb.gpu_kernels = 'l2,cosine,ip,nb_train,nb_predict';
 SELECT neurondb_gpu_enable() AS gpu_available;
 SELECT neurondb_gpu_info() AS gpu_info;
@@ -83,7 +83,7 @@ SELECT neurondb_gpu_info() AS gpu_info;
 \echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
 
 \echo 'Test 1: GPU training with default parameters'
-SET neurondb.gpu_enabled = on;
+SET neurondb.compute_mode = on;
 DROP TABLE IF EXISTS gpu_model_temp_012;
 CREATE TEMP TABLE gpu_model_temp_012 AS
 SELECT neurondb.train('naive_bayes', 
@@ -97,7 +97,7 @@ SELECT
 FROM gpu_model_temp_012;
 
 \echo 'Test 2: CPU training with default parameters'
-SET neurondb.gpu_enabled = off;
+SET neurondb.compute_mode = off;
 DROP TABLE IF EXISTS cpu_model_temp_012;
 CREATE TEMP TABLE cpu_model_temp_012 AS
 SELECT neurondb.train('naive_bayes', 
@@ -211,7 +211,7 @@ END$$;
 \echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
 
 \echo 'Predict Test 1: GPU batch prediction (1000 rows)'
-SET neurondb.gpu_enabled = on;
+SET neurondb.compute_mode = on;
 SELECT 
 	'GPU Batch' AS test_type,
 	COUNT(*) AS n_predictions,
@@ -225,7 +225,7 @@ FROM (
 ) sub;
 
 \echo 'Predict Test 2: CPU batch prediction (1000 rows)'
-SET neurondb.gpu_enabled = off;
+SET neurondb.compute_mode = off;
 SELECT 
 	'CPU Batch' AS test_type,
 	COUNT(*) AS n_predictions,
@@ -246,7 +246,7 @@ FROM test_test_view
 LIMIT 1;
 
 \echo 'Predict Test 4: Custom model batch (100 rows)'
-SET neurondb.gpu_enabled = off;
+SET neurondb.compute_mode = off;
 SELECT 
 	'Custom Batch' AS test_type,
 	COUNT(*) AS n_predictions,

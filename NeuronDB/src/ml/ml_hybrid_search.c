@@ -163,7 +163,7 @@ hybrid_search_fusion(PG_FUNCTION_ARGS)
 		 num_docs,
 		 semantic_weight);
 
-	scores = (HybridScore *) palloc(sizeof(HybridScore) * num_docs);
+	nalloc(scores, HybridScore, num_docs);
 
 	/* Initialize scores */
 	for (i = 0; i < num_docs; i++)
@@ -234,7 +234,7 @@ hybrid_search_fusion(PG_FUNCTION_ARGS)
 	/* Sort by hybrid score */
 	qsort(scores, num_docs, sizeof(HybridScore), hybrid_score_cmp);
 
-	result_datums = (Datum *) palloc(sizeof(Datum) * num_docs);
+	nalloc(result_datums, Datum, num_docs);
 	for (i = 0; i < num_docs; i++)
 		result_datums[i] = Int32GetDatum(scores[i].doc_id);
 

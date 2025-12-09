@@ -37,7 +37,7 @@ LATERAL rerank_flash(
 
 SELECT
 	'GPU support' AS test_name,
-	current_setting('neurondb.gpu_enabled', true) AS gpu_enabled,
+	current_setting('neurondb.compute_mode', true) AS gpu_enabled,
 	current_setting('neurondb.gpu_backend', true) AS gpu_backend;
 
 \echo ''

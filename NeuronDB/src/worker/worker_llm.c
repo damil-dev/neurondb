@@ -175,13 +175,11 @@ neuranllm_main(Datum main_arg)
 
 				if (job_type != NULL)
 				{
-					pfree((void *) job_type);
-					job_type = NULL;
+					nfree(job_type);
 				}
 				if (payload != NULL)
 				{
-					pfree((void *) payload);
-					payload = NULL;
+					nfree(payload);
 				}
 			}
 

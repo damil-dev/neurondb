@@ -648,7 +648,7 @@ ndb_rocm_svm_predict(const bytea * model_data,
 	{
 		if (errstr)
 			*errstr = pstrdup("HIP SVM predict: model_data too small for expected layout");
-		nfree((void *) detoasted);
+		pfree((void *) detoasted);
 		return -1;
 	}
 
@@ -659,7 +659,7 @@ ndb_rocm_svm_predict(const bytea * model_data,
 							   "has %d, input has %d",
 							   hdr->feature_dim,
 							   feature_dim);
-		nfree((void *) detoasted);
+		pfree((void *) detoasted);
 		return -1;
 	}
 
@@ -689,7 +689,7 @@ ndb_rocm_svm_predict(const bytea * model_data,
 		*confidence_out = fabs(prediction);
 
 	/* Free detoasted copy */
-	nfree((void *) detoasted);
+	pfree((void *) detoasted);
 
 	return 0;
 }
@@ -732,7 +732,7 @@ ndb_rocm_svm_predict_batch(const bytea * model_data,
 	{
 		if (errstr)
 			*errstr = pstrdup("HIP SVM batch predict: model_data too small");
-		nfree((void *) detoasted);
+		pfree((void *) detoasted);
 		return -1;
 	}
 
@@ -749,7 +749,7 @@ ndb_rocm_svm_predict_batch(const bytea * model_data,
 	{
 		if (errstr)
 			*errstr = pstrdup("HIP SVM batch predict: model_data too small for expected layout");
-		nfree((void *) detoasted);
+		pfree((void *) detoasted);
 		return -1;
 	}
 
@@ -759,7 +759,7 @@ ndb_rocm_svm_predict_batch(const bytea * model_data,
 		if (errstr)
 			*errstr = psprintf("HIP SVM batch predict: feature dimension mismatch (expected %d, got %d)",
 							   hdr->feature_dim, feature_dim);
-		nfree((void *) detoasted);
+		pfree((void *) detoasted);
 		return -1;
 	}
 
@@ -788,7 +788,7 @@ ndb_rocm_svm_predict_batch(const bytea * model_data,
 	}
 
 	/* Free detoasted copy */
-	nfree((void *) detoasted);
+	pfree((void *) detoasted);
 
 	return 0;
 }

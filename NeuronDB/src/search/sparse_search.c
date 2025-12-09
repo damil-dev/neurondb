@@ -45,6 +45,11 @@ sparse_search(PG_FUNCTION_ARGS)
 	text	   *sparse_col;
 	Datum		query_vec;
 	int32		k;
+	ReturnSetInfo *rsinfo;
+	TupleDesc	tupdesc;
+	Tuplestorestate *tupstore = NULL;
+	MemoryContext per_query_ctx;
+	MemoryContext oldcontext;
 
 	/* Validate argument count */
 	if (PG_NARGS() < 4)
@@ -56,11 +61,7 @@ sparse_search(PG_FUNCTION_ARGS)
 	sparse_col = PG_GETARG_TEXT_PP(1);
 	query_vec = PG_GETARG_DATUM(2);
 	k = PG_GETARG_INT32(3);
-	ReturnSetInfo *rsinfo = (ReturnSetInfo *) fcinfo->resultinfo;
-	TupleDesc	tupdesc;
-	Tuplestorestate *tupstore = NULL;
-	MemoryContext per_query_ctx;
-	MemoryContext oldcontext;
+	rsinfo = (ReturnSetInfo *) fcinfo->resultinfo;
 
 	NdbSpiSession *session = NULL;
 	StringInfoData sql;
@@ -168,6 +169,7 @@ Datum
 splade_embed(PG_FUNCTION_ARGS)
 {
 	text	   *input_text;
+	char	   *input_str;
 
 	/* Validate argument count */
 	if (PG_NARGS() < 1)
@@ -176,7 +178,7 @@ splade_embed(PG_FUNCTION_ARGS)
 				 errmsg("neurondb: splade_embed requires at least 1 argument")));
 
 	input_text = PG_GETARG_TEXT_PP(0);
-	char	   *input_str = text_to_cstring(input_text);
+	input_str = text_to_cstring(input_text);
 #ifdef HAVE_ONNX_RUNTIME
 	ONNXModelSession *session = NULL;
 	ONNXTensor *input_tensor = NULL;
@@ -214,7 +216,8 @@ splade_embed(PG_FUNCTION_ARGS)
 				 errmsg("splade_embed: tokenization failed")));
 	}
 
-	input_tensor = (ONNXTensor *) palloc0(sizeof(ONNXTensor));
+		nalloc(input_tensor, ONNXTensor, 1);
+		MemSet(input_tensor, 0, sizeof(ONNXTensor));
 	input_tensor->ndim = 2;
 	nalloc(shape, int64, 2);
 	input_tensor->shape = shape;
@@ -294,6 +297,7 @@ Datum
 colbertv2_embed(PG_FUNCTION_ARGS)
 {
 	text	   *input_text;
+	char	   *input_str;
 
 	/* Validate argument count */
 	if (PG_NARGS() < 1)
@@ -302,7 +306,7 @@ colbertv2_embed(PG_FUNCTION_ARGS)
 				 errmsg("neurondb: colbertv2_embed requires at least 1 argument")));
 
 	input_text = PG_GETARG_TEXT_PP(0);
-	char	   *input_str = text_to_cstring(input_text);
+	input_str = text_to_cstring(input_text);
 #ifdef HAVE_ONNX_RUNTIME
 	ONNXModelSession *session = NULL;
 	ONNXTensor *input_tensor = NULL;
@@ -340,7 +344,8 @@ colbertv2_embed(PG_FUNCTION_ARGS)
 				 errmsg("colbertv2_embed: tokenization failed")));
 	}
 
-	input_tensor = (ONNXTensor *) palloc0(sizeof(ONNXTensor));
+		nalloc(input_tensor, ONNXTensor, 1);
+		MemSet(input_tensor, 0, sizeof(ONNXTensor));
 	input_tensor->ndim = 2;
 	nalloc(shape, int64, 2);
 	input_tensor->shape = shape;
@@ -380,7 +385,8 @@ colbertv2_embed(PG_FUNCTION_ARGS)
 
 		tokens = (int) output_tensor->shape[1];
 		output_dim = (int) output_tensor->shape[2];
-		max_pooled = (float *) palloc0(sizeof(float) * output_dim);
+		nalloc(max_pooled, float, output_dim);
+		MemSet(max_pooled, 0, sizeof(float) * output_dim);
 
 		for (i = 0; i < tokens; i++)
 		{
@@ -540,19 +546,8 @@ bm25_score(PG_FUNCTION_ARGS)
 	text	   *doc_text;
 	float8		k1;
 	float8		b;
-
-	/* Validate argument count */
-	if (PG_NARGS() < 2 || PG_NARGS() > 4)
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				 errmsg("neurondb: bm25_score requires 2 to 4 arguments")));
-
-	query_text = PG_GETARG_TEXT_PP(0);
-	doc_text = PG_GETARG_TEXT_PP(1);
-	k1 = PG_ARGISNULL(2) ? 1.2 : PG_GETARG_FLOAT8(2);
-	b = PG_ARGISNULL(3) ? 0.75 : PG_GETARG_FLOAT8(3);
-	char	   *query_str = text_to_cstring(query_text);
-	char	   *doc_str = text_to_cstring(doc_text);
+	char	   *query_str;
+	char	   *doc_str;
 	char	  **query_tokens = NULL;
 	char	  **doc_tokens = NULL;
 	char	  **query_unique = NULL;
@@ -566,6 +561,19 @@ bm25_score(PG_FUNCTION_ARGS)
 	int			i,
 				j;
 	double		doc_length;
+
+	/* Validate argument count */
+	if (PG_NARGS() < 2 || PG_NARGS() > 4)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: bm25_score requires 2 to 4 arguments")));
+
+	query_text = PG_GETARG_TEXT_PP(0);
+	doc_text = PG_GETARG_TEXT_PP(1);
+	k1 = PG_ARGISNULL(2) ? 1.2 : PG_GETARG_FLOAT8(2);
+	b = PG_ARGISNULL(3) ? 0.75 : PG_GETARG_FLOAT8(3);
+	query_str = text_to_cstring(query_text);
+	doc_str = text_to_cstring(doc_text);
 	double		avg_doc_length = 100.0;
 	double		N = 1000.0;
 	int			n_qi;
@@ -595,8 +603,10 @@ bm25_score(PG_FUNCTION_ARGS)
 	doc_length = (double) num_doc_tokens;
 
 	nalloc(query_unique, char *, num_query_tokens);
-	query_counts = (int *) palloc0(sizeof(int) * num_query_tokens);
-	doc_counts = (int *) palloc0(sizeof(int) * num_doc_tokens);
+	nalloc(query_counts, int, num_query_tokens);
+	MemSet(query_counts, 0, sizeof(int) * num_query_tokens);
+	nalloc(doc_counts, int, num_doc_tokens);
+	MemSet(doc_counts, 0, sizeof(int) * num_doc_tokens);
 	bm25_count_tf(query_tokens, num_query_tokens, query_counts, query_unique, &num_query_unique);
 
 	for (i = 0; i < num_query_unique; i++)

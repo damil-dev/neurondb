@@ -135,7 +135,7 @@ hnsw_tenant_search(PG_FUNCTION_ARGS)
 			tenant_id_long = strtol(tenant_id_str, &endptr, 10);
 			if (errno != 0 || *endptr != '\0' || tenant_id_long < 0 || tenant_id_long > INT_MAX)
 			{
-				pfree(tenant_id_str);
+				nfree(tenant_id_str);
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
 						 errmsg("tenant_id must be a non-negative integer, got: %s", tenant_id_str)));
@@ -410,7 +410,7 @@ get_hnsw_tenant_table(const char *table, const char *col, int32 tenant_id)
 	char *buf = NULL;
 
 	n = strlen(table) + strlen(col) + 48;
-	buf = (char *) palloc(n);
+	nalloc(buf, char, n);
 	snprintf(buf, n, "%s%s_%s_%d", HNSW_INDEX_PREFIX, table, col, tenant_id);
 
 	return buf;

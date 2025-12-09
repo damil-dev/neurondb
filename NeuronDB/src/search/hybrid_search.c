@@ -362,16 +362,6 @@ reciprocal_rank_fusion(PG_FUNCTION_ARGS)
 {
 	ArrayType  *rankings = NULL;
 	float8		k;
-
-	/* Validate argument count */
-	if (PG_NARGS() != 2)
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				 errmsg("neurondb: reciprocal_rank_fusion requires 2 arguments")));
-
-	rankings = PG_GETARG_ARRAYTYPE_P(0);
-	k = PG_GETARG_FLOAT8(1);
-
 	int			n_rankers;
 	int			i;
 	int			j;
@@ -385,6 +375,15 @@ reciprocal_rank_fusion(PG_FUNCTION_ARGS)
 	Datum		   *result_datums = NULL;
 	bool		   *result_nulls = NULL;
 	ArrayType  *ret_array = NULL;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: reciprocal_rank_fusion requires 2 arguments")));
+
+	rankings = PG_GETARG_ARRAYTYPE_P(0);
+	k = PG_GETARG_FLOAT8(1);
 
 	elog(DEBUG1,
 		 "neurondb: Computing Reciprocal Rank Fusion with k=%.2f",
@@ -464,9 +463,12 @@ reciprocal_rank_fusion(PG_FUNCTION_ARGS)
 
 	/* Output: sort the ids by score descending, return as text[] */
 	item_count = hash_get_num_entries(item_hash);
-	result_datums = palloc0(sizeof(Datum) * item_count);
+	nalloc(result_datums, Datum, item_count);
 	NDB_CHECK_ALLOC(result_datums, "allocation");
-	result_nulls = palloc0(sizeof(bool) * item_count);
+	MemSet(result_datums, 0, sizeof(Datum) * item_count);
+	nalloc(result_nulls, bool, item_count);
+	NDB_CHECK_ALLOC(result_nulls, "allocation");
+	MemSet(result_nulls, 0, sizeof(bool) * item_count);
 	NDB_CHECK_ALLOC(result_nulls, "allocation");
 
 	{
@@ -474,18 +476,18 @@ reciprocal_rank_fusion(PG_FUNCTION_ARGS)
 		{
 			char		key[512];
 			float8		score;
-		}		   *cur;
-		struct
+		}		   *cur = NULL;
+		struct HybridSearchItem
 		{
 			char *key;
 			float8		score;
-		}		   *items;
+		}		   *items = NULL;
 		HASH_SEQ_STATUS stat;
 		int			idx = 0;
 		int			idx_i,
 					idx_j;
 
-		items = palloc(sizeof(*items) * item_count);
+		nalloc(items, struct HybridSearchItem, item_count);
 		NDB_CHECK_ALLOC(items, "allocation");
 		hash_seq_init(&stat, item_hash);
 		while ((cur = hash_seq_search(&stat)) != NULL)
@@ -701,178 +703,180 @@ multi_vector_search(PG_FUNCTION_ARGS)
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("neurondb: multi_vector_search requires 4 arguments")));
 
-	table_name = PG_GETARG_TEXT_PP(0);
-	query_vectors = PG_GETARG_ARRAYTYPE_P(1);
-	agg_method = PG_GETARG_TEXT_PP(2);
-	top_k = PG_GETARG_INT32(3);
-
-	char		   *tbl_str;
-	char		   *agg_str;
-	int				nvecs;
-	StringInfoData sql;
-	StringInfoData subquery;
-	Datum		   *vec_datums = NULL;
-	bool		   *vec_nulls = NULL;
-	Oid				vec_elemtype;
-	int				i;
-	int				spi_ret;
-	int				proc;
-	ArrayType	   *ret_array = NULL;
-	Datum		   *datums = NULL;
-	bool		   *nulls = NULL;
-	NdbSpiSession  *session = NULL;
-
-	tbl_str = text_to_cstring(table_name);
-	agg_str = text_to_cstring(agg_method);
-	vec_elemtype = ARR_ELEMTYPE(query_vectors);
-
-	nvecs = ArrayGetNItems(
-						   ARR_NDIM(query_vectors), ARR_DIMS(query_vectors));
-	elog(DEBUG1,
-		 "neurondb: Multi-vector search on '%s' with %d queries, "
-		 "agg=%s, top_k=%d",
-		 tbl_str,
-		 nvecs,
-		 agg_str,
-		 top_k);
-	session = ndb_spi_session_begin(CurrentMemoryContext, false);
-	if (session == NULL)
-		ereport(ERROR, (errmsg("multi_vector_search: failed to begin SPI session")));
-
-	get_typlenbyvalalign(vec_elemtype, NULL, NULL, NULL);
-	deconstruct_array(query_vectors,
-					  vec_elemtype,
-					  -1,
-					  false,
-					  'i',
-					  &vec_datums,
-					  &vec_nulls,
-					  &nvecs);
-
-	if (nvecs < 1)
 	{
-		nfree(tbl_str);
-		nfree(agg_str);
-		ndb_spi_session_end(&session);
-		ereport(ERROR,
-				(errmsg("multi_vector_search: at least one query "
-						"vector required")));
-	}
+		char		   *tbl_str = NULL;
+		char		   *agg_str = NULL;
+		int				nvecs;
+		StringInfoData sql;
+		StringInfoData subquery;
+		Datum		   *vec_datums = NULL;
+		bool		   *vec_nulls = NULL;
+		Oid				vec_elemtype;
+		int				i;
+		int				spi_ret;
+		int				proc;
+		ArrayType	   *ret_array = NULL;
+		Datum		   *datums = NULL;
+		bool		   *nulls = NULL;
+		NdbSpiSession  *session = NULL;
+
+		table_name = PG_GETARG_TEXT_PP(0);
+		query_vectors = PG_GETARG_ARRAYTYPE_P(1);
+		agg_method = PG_GETARG_TEXT_PP(2);
+		top_k = PG_GETARG_INT32(3);
+
+		tbl_str = text_to_cstring(table_name);
+		agg_str = text_to_cstring(agg_method);
+		vec_elemtype = ARR_ELEMTYPE(query_vectors);
+
+		nvecs = ArrayGetNItems(
+							   ARR_NDIM(query_vectors), ARR_DIMS(query_vectors));
+		elog(DEBUG1,
+			 "neurondb: Multi-vector search on '%s' with %d queries, "
+			 "agg=%s, top_k=%d",
+			 tbl_str,
+			 nvecs,
+			 agg_str,
+			 top_k);
+		session = ndb_spi_session_begin(CurrentMemoryContext, false);
+		if (session == NULL)
+			ereport(ERROR, (errmsg("multi_vector_search: failed to begin SPI session")));
+
+		get_typlenbyvalalign(vec_elemtype, NULL, NULL, NULL);
+		deconstruct_array(query_vectors,
+						  vec_elemtype,
+						  -1,
+						  false,
+						  'i',
+						  &vec_datums,
+						  &vec_nulls,
+						  &nvecs);
+
+		if (nvecs < 1)
+		{
+			nfree(tbl_str);
+			nfree(agg_str);
+			ndb_spi_session_end(&session);
+			ereport(ERROR,
+					(errmsg("multi_vector_search: at least one query "
+							"vector required")));
+		}
 
 		{
 			Vector	   *first_vec = (Vector *) DatumGetPointer(vec_datums[0]);
 
-		if (first_vec->dim <= 0)
+			if (first_vec->dim <= 0)
+			{
+				nfree(tbl_str);
+				nfree(agg_str);
+				nfree(vec_datums);
+				nfree(vec_nulls);
+				ndb_spi_session_end(&session);
+				ereport(ERROR,
+						(errmsg("query vectors must have positive "
+								"dimension")));
+			}
+		}
+
+		initStringInfo(&subquery);
+		for (i = 0; i < nvecs; i++)
 		{
+			if (vec_nulls[i])
+				continue;
+			{
+				Vector	   *qv = (Vector *) DatumGetPointer(vec_datums[i]);
+				StringInfoData lit;
+				int			j;
+
+				initStringInfo(&lit);
+				appendStringInfoChar(&lit, '{');
+				for (j = 0; j < qv->dim; j++)
+				{
+					if (j)
+						appendStringInfoChar(&lit, ',');
+					appendStringInfo(
+									 &lit, "%g", ((float *) &qv[1])[j]);
+				}
+				appendStringInfoChar(&lit, '}');
+				if (i)
+					appendStringInfoString(&subquery, ", ");
+				appendStringInfo(&subquery, "'%s'::vector", lit.data);
+				nfree(lit.data);
+			}
+		}
+		nfree(vec_datums);
+		nfree(vec_nulls);
+
+		initStringInfo(&sql);
+		appendStringInfo(&sql,
+						 "SELECT id FROM ("
+						 "  SELECT id, "
+						 "         GREATEST(%s) as max_score "
+						 "    FROM ("
+						 "      SELECT id, "
+						 "             (1 - (embedding <-> ANY(ARRAY[%s]))) as "
+						 "agg_score "
+						 "        FROM %s"
+						 "    ) _agg "
+						 " ) z "
+						 "ORDER BY max_score DESC LIMIT %d;",
+						 strcmp(agg_str, "max") == 0 ? "agg_score" : "avg(agg_score)",
+						 subquery.data,
+						 tbl_str,
+						 top_k);
+
+		spi_ret = ndb_spi_execute(session, sql.data, true, top_k);
+		if (spi_ret != SPI_OK_SELECT)
+		{
+			nfree(sql.data);
+			nfree(subquery.data);
 			nfree(tbl_str);
 			nfree(agg_str);
-			nfree(vec_datums);
-			nfree(vec_nulls);
 			ndb_spi_session_end(&session);
 			ereport(ERROR,
-					(errmsg("query vectors must have positive "
-							"dimension")));
+					(errmsg("Failed to execute multi_vector_search SQL")));
 		}
-	}
-
-	initStringInfo(&subquery);
-	for (i = 0; i < nvecs; i++)
-	{
-		if (vec_nulls[i])
-			continue;
+		proc = SPI_processed;
+		if (proc == 0)
 		{
-			Vector	   *qv = (Vector *) DatumGetPointer(vec_datums[i]);
-			StringInfoData lit;
-			int			j;
-
-			initStringInfo(&lit);
-			appendStringInfoChar(&lit, '{');
-			for (j = 0; j < qv->dim; j++)
-			{
-				if (j)
-					appendStringInfoChar(&lit, ',');
-				appendStringInfo(
-								 &lit, "%g", ((float *) &qv[1])[j]);
-			}
-			appendStringInfoChar(&lit, '}');
-			if (i)
-				appendStringInfoString(&subquery, ", ");
-			appendStringInfo(&subquery, "'%s'::vector", lit.data);
-			nfree(lit.data);
+			nfree(sql.data);
+			nfree(subquery.data);
+			nfree(tbl_str);
+			nfree(agg_str);
+			ndb_spi_session_end(&session);
+			ret_array = construct_empty_array(TEXTOID);
+			PG_RETURN_ARRAYTYPE_P(ret_array);
 		}
-	}
-	nfree(vec_datums);
-	nfree(vec_nulls);
+		datums = NULL;
+		nulls = NULL;
+		nalloc(datums, Datum, proc);
+		NDB_CHECK_ALLOC(datums, "allocation");
+		nalloc(nulls, bool, proc);
+		NDB_CHECK_ALLOC(nulls, "allocation");
+		for (i = 0; i < proc; i++)
+		{
+			bool		isnull;
+			Datum		val = SPI_getbinval(SPI_tuptable->vals[i],
+											SPI_tuptable->tupdesc,
+											1,
+											&isnull);
 
-	initStringInfo(&sql);
-	appendStringInfo(&sql,
-					 "SELECT id FROM ("
-					 "  SELECT id, "
-					 "         GREATEST(%s) as max_score "
-					 "    FROM ("
-					 "      SELECT id, "
-					 "             (1 - (embedding <-> ANY(ARRAY[%s]))) as "
-					 "agg_score "
-					 "        FROM %s"
-					 "    ) _agg "
-					 " ) z "
-					 "ORDER BY max_score DESC LIMIT %d;",
-					 strcmp(agg_str, "max") == 0 ? "agg_score" : "avg(agg_score)",
-					 subquery.data,
-					 tbl_str,
-					 top_k);
-
-	spi_ret = ndb_spi_execute(session, sql.data, true, top_k);
-	if (spi_ret != SPI_OK_SELECT)
-	{
+			if (!isnull)
+				datums[i] = PointerGetDatum(
+											cstring_to_text(DatumGetCString(val)));
+			nulls[i] = isnull;
+		}
+		ret_array = construct_array(datums, proc, TEXTOID, -1, false, 'i');
+		nfree(datums);
+		nfree(nulls);
 		nfree(sql.data);
 		nfree(subquery.data);
 		nfree(tbl_str);
 		nfree(agg_str);
 		ndb_spi_session_end(&session);
-		ereport(ERROR,
-				(errmsg("Failed to execute multi_vector_search SQL")));
-	}
-	proc = SPI_processed;
-	if (proc == 0)
-	{
-		nfree(sql.data);
-		nfree(subquery.data);
-		nfree(tbl_str);
-		nfree(agg_str);
-		ndb_spi_session_end(&session);
-		ret_array = construct_empty_array(TEXTOID);
+
 		PG_RETURN_ARRAYTYPE_P(ret_array);
 	}
-	datums = NULL;
-	nulls = NULL;
-	nalloc(datums, Datum, proc);
-	NDB_CHECK_ALLOC(datums, "allocation");
-	nalloc(nulls, bool, proc);
-	NDB_CHECK_ALLOC(nulls, "allocation");
-	for (i = 0; i < proc; i++)
-	{
-		bool		isnull;
-		Datum		val = SPI_getbinval(SPI_tuptable->vals[i],
-										SPI_tuptable->tupdesc,
-										1,
-										&isnull);
-
-		if (!isnull)
-			datums[i] = PointerGetDatum(
-										cstring_to_text(DatumGetCString(val)));
-		nulls[i] = isnull;
-	}
-	ret_array = construct_array(datums, proc, TEXTOID, -1, false, 'i');
-	nfree(datums);
-	nfree(nulls);
-	nfree(sql.data);
-	nfree(subquery.data);
-	nfree(tbl_str);
-	nfree(agg_str);
-	ndb_spi_session_end(&session);
-
-	PG_RETURN_ARRAYTYPE_P(ret_array);
 }
 
 PG_FUNCTION_INFO_V1(faceted_vector_search);
