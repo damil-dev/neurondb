@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * client.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/client/client.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package client
 
 import (
@@ -9,19 +22,19 @@ import (
 	"github.com/neurondb/NeuronMCP/pkg/mcp"
 )
 
-// MCPConfig represents the configuration for an MCP server
+/* MCPConfig represents the configuration for an MCP server */
 type MCPConfig struct {
 	Command string
 	Env     map[string]string
 	Args    []string
 }
 
-// GetEnv returns environment variables, merging with current environment
+/* GetEnv returns environment variables, merging with current environment */
 func (c *MCPConfig) GetEnv() map[string]string {
 	env := make(map[string]string)
-	// Copy current environment
+  /* Copy current environment */
 	for _, e := range os.Environ() {
-		// Split on first '='
+   /* Split on first '=' */
 		for i := 0; i < len(e); i++ {
 			if e[i] == '=' {
 				env[e[:i]] = e[i+1:]
@@ -29,14 +42,14 @@ func (c *MCPConfig) GetEnv() map[string]string {
 			}
 		}
 	}
-	// Override with config env
+  /* Override with config env */
 	for k, v := range c.Env {
 		env[k] = v
 	}
 	return env
 }
 
-// MCPClient is a client for communicating with MCP servers
+/* MCPClient is a client for communicating with MCP servers */
 type MCPClient struct {
 	config      *MCPConfig
 	verbose     bool
@@ -44,7 +57,7 @@ type MCPClient struct {
 	initialized bool
 }
 
-// NewMCPClient creates a new MCP client
+/* NewMCPClient creates a new MCP client */
 func NewMCPClient(config *MCPConfig, verbose bool) (*MCPClient, error) {
 	return &MCPClient{
 		config:  config,
@@ -52,13 +65,13 @@ func NewMCPClient(config *MCPConfig, verbose bool) (*MCPClient, error) {
 	}, nil
 }
 
-// Connect connects to the MCP server
+/* Connect connects to the MCP server */
 func (c *MCPClient) Connect() error {
 	if c.transport != nil {
 		return fmt.Errorf("already connected")
 	}
 
-	// Create transport
+  /* Create transport */
 	transport, err := NewClientTransport(c.config.Command, c.config.GetEnv(), c.config.Args)
 	if err != nil {
 		return fmt.Errorf("failed to create transport: %w", err)
@@ -66,7 +79,7 @@ func (c *MCPClient) Connect() error {
 
 	c.transport = transport
 
-	// Start server process
+  /* Start server process */
 	if c.verbose {
 		fmt.Printf("Starting MCP server: %s\n", c.config.Command)
 	}
@@ -75,17 +88,17 @@ func (c *MCPClient) Connect() error {
 		return fmt.Errorf("failed to start transport: %w", err)
 	}
 
-	// Initialize connection
+  /* Initialize connection */
 	return c.initialize()
 }
 
-// initialize initializes the MCP connection
+/* initialize initializes the MCP connection */
 func (c *MCPClient) initialize() error {
 	if c.initialized {
 		return nil
 	}
 
-	// Send initialize request
+  /* Send initialize request */
 	initRequest := &mcp.JSONRPCRequest{
 		JSONRPC: "2.0",
 		ID:      json.RawMessage(`"` + generateID() + `"`),
@@ -113,7 +126,7 @@ func (c *MCPClient) initialize() error {
 		fmt.Println("MCP connection initialized")
 	}
 
-	// Send initialized notification
+  /* Send initialized notification */
 	notification := map[string]interface{}{
 		"jsonrpc": "2.0",
 		"method":  "notifications/initialized",
@@ -121,7 +134,7 @@ func (c *MCPClient) initialize() error {
 	}
 
 	if err := c.transport.SendNotification(notification); err != nil {
-		// Notification errors are not fatal
+   /* Notification errors are not fatal */
 		if c.verbose {
 			fmt.Printf("Warning: failed to send initialized notification: %v\n", err)
 		}
@@ -131,7 +144,7 @@ func (c *MCPClient) initialize() error {
 	return nil
 }
 
-// Disconnect disconnects from the MCP server
+/* Disconnect disconnects from the MCP server */
 func (c *MCPClient) Disconnect() {
 	if c.transport != nil {
 		if c.verbose {
@@ -143,7 +156,7 @@ func (c *MCPClient) Disconnect() {
 	}
 }
 
-// ListTools lists available tools
+/* ListTools lists available tools */
 func (c *MCPClient) ListTools() (map[string]interface{}, error) {
 	request := &mcp.JSONRPCRequest{
 		JSONRPC: "2.0",
@@ -167,7 +180,7 @@ func (c *MCPClient) ListTools() (map[string]interface{}, error) {
 		if resultMap, ok := response.Result.(map[string]interface{}); ok {
 			return resultMap, nil
 		}
-		// If result is not a map, wrap it
+   /* If result is not a map, wrap it */
 		return map[string]interface{}{
 			"result": response.Result,
 		}, nil
@@ -176,7 +189,7 @@ func (c *MCPClient) ListTools() (map[string]interface{}, error) {
 	return map[string]interface{}{}, nil
 }
 
-// CallTool calls a tool with the given name and arguments
+/* CallTool calls a tool with the given name and arguments */
 func (c *MCPClient) CallTool(toolName string, arguments map[string]interface{}) (map[string]interface{}, error) {
 	params := map[string]interface{}{
 		"name":      toolName,
@@ -210,7 +223,7 @@ func (c *MCPClient) CallTool(toolName string, arguments map[string]interface{}) 
 		if resultMap, ok := response.Result.(map[string]interface{}); ok {
 			return resultMap, nil
 		}
-		// If result is not a map, wrap it
+   /* If result is not a map, wrap it */
 		return map[string]interface{}{
 			"result": response.Result,
 		}, nil
@@ -219,9 +232,9 @@ func (c *MCPClient) CallTool(toolName string, arguments map[string]interface{}) 
 	return map[string]interface{}{}, nil
 }
 
-// ExecuteCommand executes a command string
+/* ExecuteCommand executes a command string */
 func (c *MCPClient) ExecuteCommand(commandStr string) (map[string]interface{}, error) {
-	// Parse command
+  /* Parse command */
 	toolName, arguments, err := ParseCommand(commandStr)
 	if err != nil {
 		return map[string]interface{}{
@@ -229,7 +242,7 @@ func (c *MCPClient) ExecuteCommand(commandStr string) (map[string]interface{}, e
 		}, nil
 	}
 
-	// Handle special commands
+  /* Handle special commands */
 	if toolName == "list_tools" {
 		return c.ListTools()
 	}
@@ -248,11 +261,11 @@ func (c *MCPClient) ExecuteCommand(commandStr string) (map[string]interface{}, e
 		return c.ReadResource(uri)
 	}
 
-	// Call tool
+  /* Call tool */
 	return c.CallTool(toolName, arguments)
 }
 
-// ListResources lists available resources
+/* ListResources lists available resources */
 func (c *MCPClient) ListResources() (map[string]interface{}, error) {
 	request := &mcp.JSONRPCRequest{
 		JSONRPC: "2.0",
@@ -284,7 +297,7 @@ func (c *MCPClient) ListResources() (map[string]interface{}, error) {
 	return map[string]interface{}{}, nil
 }
 
-// ReadResource reads a resource by URI
+/* ReadResource reads a resource by URI */
 func (c *MCPClient) ReadResource(uri string) (map[string]interface{}, error) {
 	params := map[string]interface{}{
 		"uri": uri,

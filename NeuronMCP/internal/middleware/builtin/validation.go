@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * validation.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/middleware/builtin/validation.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package builtin
 
 import (
@@ -6,30 +19,30 @@ import (
 	"github.com/neurondb/NeuronMCP/internal/middleware"
 )
 
-// ValidationMiddleware validates requests
+/* ValidationMiddleware validates requests */
 type ValidationMiddleware struct{}
 
-// NewValidationMiddleware creates a new validation middleware
+/* NewValidationMiddleware creates a new validation middleware */
 func NewValidationMiddleware() *ValidationMiddleware {
 	return &ValidationMiddleware{}
 }
 
-// Name returns the middleware name
+/* Name returns the middleware name */
 func (m *ValidationMiddleware) Name() string {
 	return "validation"
 }
 
-// Order returns the execution order
+/* Order returns the execution order */
 func (m *ValidationMiddleware) Order() int {
 	return 1
 }
 
-// Enabled returns whether the middleware is enabled
+/* Enabled returns whether the middleware is enabled */
 func (m *ValidationMiddleware) Enabled() bool {
 	return true
 }
 
-// Execute executes the middleware
+/* Execute executes the middleware */
 func (m *ValidationMiddleware) Execute(ctx context.Context, req *middleware.MCPRequest, next middleware.Handler) (*middleware.MCPResponse, error) {
 	if req.Method == "" {
 		return &middleware.MCPResponse{
@@ -41,7 +54,7 @@ func (m *ValidationMiddleware) Execute(ctx context.Context, req *middleware.MCPR
 	}
 
 	if req.Params != nil {
-		// Params should be a map, which is already validated by type
+   /* Params should be a map, which is already validated by type */
 	}
 
 	return next(ctx)

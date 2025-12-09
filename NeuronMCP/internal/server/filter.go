@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * filter.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/server/filter.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package server
 
 import (
@@ -5,7 +18,7 @@ import (
 	"github.com/neurondb/NeuronMCP/internal/tools"
 )
 
-// filterToolsByFeatures filters tools based on feature flags
+/* filterToolsByFeatures filters tools based on feature flags */
 func (s *Server) filterToolsByFeatures(definitions []tools.ToolDefinition) []tools.ToolDefinition {
 	features := s.config.GetFeaturesConfig()
 	filtered := make([]tools.ToolDefinition, 0, len(definitions))
@@ -19,43 +32,43 @@ func (s *Server) filterToolsByFeatures(definitions []tools.ToolDefinition) []too
 	return filtered
 }
 
-// shouldIncludeTool determines if a tool should be included based on feature flags
+/* shouldIncludeTool determines if a tool should be included based on feature flags */
 func shouldIncludeTool(toolName string, features *config.FeaturesConfig) bool {
-	// Vector tools
+  /* Vector tools */
 	if isVectorTool(toolName) {
 		return features.Vector != nil && features.Vector.Enabled
 	}
 	
-	// ML tools
+  /* ML tools */
 	if isMLTool(toolName) {
 		return features.ML != nil && features.ML.Enabled
 	}
 	
-	// Analytics tools
+  /* Analytics tools */
 	if isAnalyticsTool(toolName) {
 		return features.Analytics != nil && features.Analytics.Enabled
 	}
 	
-	// RAG tools
+  /* RAG tools */
 	if isRAGTool(toolName) {
 		return features.RAG != nil && features.RAG.Enabled
 	}
 	
-	// Project tools
+  /* Project tools */
 	if isProjectTool(toolName) {
 		return features.Projects != nil && features.Projects.Enabled
 	}
 	
-	// GPU tools
+  /* GPU tools */
 	if isGPUTool(toolName) {
 		return features.GPU != nil && features.GPU.Enabled
 	}
 	
-	// Default: include if no specific feature flag
+  /* Default: include if no specific feature flag */
 	return true
 }
 
-// Tool category checkers
+/* Tool category checkers */
 func isVectorTool(name string) bool {
 	vectorPrefixes := []string{"vector_", "embed_", "generate_embedding", "batch_embedding", "create_hnsw_index", "drop_index"}
 	for _, prefix := range vectorPrefixes {

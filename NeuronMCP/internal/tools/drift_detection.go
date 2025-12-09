@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * drift_detection.go
+ *    Tool implementation for NeuronMCP
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/tools/drift_detection.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package tools
 
 import (
@@ -8,14 +21,14 @@ import (
 	"github.com/neurondb/NeuronMCP/internal/logging"
 )
 
-// DriftDetectionTool detects data drift
+/* DriftDetectionTool detects data drift */
 type DriftDetectionTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewDriftDetectionTool creates a new drift detection tool
+/* NewDriftDetectionTool creates a new drift detection tool */
 func NewDriftDetectionTool(db *database.Database, logger *logging.Logger) *DriftDetectionTool {
 	return &DriftDetectionTool{
 		BaseTool: NewBaseTool(
@@ -54,7 +67,7 @@ func NewDriftDetectionTool(db *database.Database, logger *logging.Logger) *Drift
 	}
 }
 
-// Execute executes drift detection
+/* Execute executes drift detection */
 func (t *DriftDetectionTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -72,7 +85,7 @@ func (t *DriftDetectionTool) Execute(ctx context.Context, params map[string]inte
 		return Error("table and vector_column are required", "VALIDATION_ERROR", nil), nil
 	}
 
-	// Build query based on method
+  /* Build query based on method */
 	var query string
 	var queryParams []interface{}
 
@@ -115,6 +128,7 @@ func (t *DriftDetectionTool) Execute(ctx context.Context, params map[string]inte
 		"method": method,
 	}), nil
 }
+
 
 
 

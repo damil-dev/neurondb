@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * test_all_tools.go
+ *    Tool implementation for NeuronMCP
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/test/test_all_tools.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package test
 
 import (
@@ -10,7 +23,7 @@ import (
 	"github.com/neurondb/NeuronMCP/internal/tools"
 )
 
-// TestAllToolsRegistered tests that all tools are properly registered
+/* TestAllToolsRegistered tests that all tools are properly registered */
 func TestAllToolsRegistered(t *testing.T) {
 	db := database.NewDatabase()
 	output := "stderr"
@@ -23,38 +36,38 @@ func TestAllToolsRegistered(t *testing.T) {
 	registry := tools.NewToolRegistry(db, logger)
 	tools.RegisterAllTools(registry, db, logger)
 
-	// Expected tool categories and counts
+  /* Expected tool categories and counts */
 	expectedTools := []string{
-		// Vector operations
+   /* Vector operations */
 		"vector_search", "vector_search_l2", "vector_search_cosine", "vector_search_inner_product",
 		"vector_similarity", "vector_arithmetic", "vector_distance", "vector_similarity_unified",
-		// Quantization
+   /* Quantization */
 		"vector_quantize", "quantization_analyze",
-		// Embeddings
+   /* Embeddings */
 		"generate_embedding", "batch_embedding", "embed_image", "embed_multimodal", "embed_cached",
 		"configure_embedding_model", "get_embedding_model_config", "list_embedding_model_configs", "delete_embedding_model_config",
-		// Hybrid search
+   /* Hybrid search */
 		"hybrid_search", "reciprocal_rank_fusion", "semantic_keyword_search", "multi_vector_search",
 		"faceted_vector_search", "temporal_vector_search", "diverse_vector_search",
-		// Reranking
+   /* Reranking */
 		"rerank_cross_encoder", "rerank_llm", "rerank_cohere", "rerank_colbert", "rerank_ltr", "rerank_ensemble",
-		// ML
+   /* ML */
 		"train_model", "predict", "predict_batch", "evaluate_model", "list_models", "get_model_info", "delete_model", "export_model",
-		// Analytics
+   /* Analytics */
 		"analyze_data", "cluster_data", "reduce_dimensionality", "detect_outliers", "quality_metrics", "detect_drift", "topic_discovery",
-		// Time series
+   /* Time series */
 		"timeseries_analysis",
-		// AutoML
+   /* AutoML */
 		"automl",
-		// ONNX
+   /* ONNX */
 		"onnx_model",
-		// Indexing
+   /* Indexing */
 		"create_hnsw_index", "create_ivf_index", "index_status", "drop_index", "tune_hnsw_index", "tune_ivf_index",
-		// RAG
+   /* RAG */
 		"process_document", "retrieve_context", "generate_response", "chunk_document",
-		// Workers & GPU
+   /* Workers & GPU */
 		"worker_management", "gpu_info",
-		// PostgreSQL
+   /* PostgreSQL */
 		"postgresql_version", "postgresql_stats", "postgresql_databases", "postgresql_connections",
 		"postgresql_locks", "postgresql_replication", "postgresql_settings", "postgresql_extensions",
 	}
@@ -71,7 +84,7 @@ func TestAllToolsRegistered(t *testing.T) {
 	}
 }
 
-// TestToolValidation tests parameter validation
+/* TestToolValidation tests parameter validation */
 func TestToolValidation(t *testing.T) {
 	db := database.NewDatabase()
 	output := "stderr"
@@ -84,13 +97,13 @@ func TestToolValidation(t *testing.T) {
 	registry := tools.NewToolRegistry(db, logger)
 	tools.RegisterAllTools(registry, db, logger)
 
-	// Test vector_search validation
+  /* Test vector_search validation */
 	tool := registry.GetTool("vector_search")
 	if tool == nil {
 		t.Fatal("vector_search tool not found")
 	}
 
-	// Test with missing required parameter
+  /* Test with missing required parameter */
 	ctx := context.Background()
 	result, err := tool.Execute(ctx, map[string]interface{}{})
 	if err != nil {
@@ -104,12 +117,13 @@ func TestToolValidation(t *testing.T) {
 	}
 }
 
-// TestPostgreSQLTools tests PostgreSQL tools (no DB connection required for version)
+/* TestPostgreSQLTools tests PostgreSQL tools (no DB connection required for version) */
 func TestPostgreSQLTools(t *testing.T) {
-	// Note: These tests require a database connection
-	// They are integration tests and should be run with a test database
+  /* Note: These tests require a database connection */
+  /* They are integration tests and should be run with a test database */
 	t.Skip("Skipping integration tests - requires database connection")
 }
+
 
 
 

@@ -1,8 +1,21 @@
+/*-------------------------------------------------------------------------
+ *
+ * types.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/pkg/mcp/types.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package mcp
 
 import "encoding/json"
 
-// JSON-RPC 2.0 message types
+/* JSON-RPC 2.0 message types */
 type JSONRPCRequest struct {
 	JSONRPC string          `json:"jsonrpc"`
 	ID      json.RawMessage `json:"id,omitempty"`
@@ -23,7 +36,7 @@ type JSONRPCError struct {
 	Data    interface{} `json:"data,omitempty"`
 }
 
-// MCP Request types
+/* MCP Request types */
 type ListToolsRequest struct {
 	Method string `json:"method"`
 }
@@ -41,7 +54,7 @@ type ReadResourceRequest struct {
 	URI string `json:"uri"`
 }
 
-// MCP Response types
+/* MCP Response types */
 type ToolDefinition struct {
 	Name        string                 `json:"name"`
 	Description string                 `json:"description"`
@@ -84,7 +97,7 @@ type ResourceContent struct {
 	Text     string `json:"text"`
 }
 
-// Server info
+/* Server info */
 type ServerInfo struct {
 	Name    string `json:"name"`
 	Version string `json:"version"`

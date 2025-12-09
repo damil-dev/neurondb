@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * transport_test.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/pkg/mcp/transport_test.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package mcp
 
 import (
@@ -11,7 +24,7 @@ import (
 )
 
 func TestStdioTransport_ReadMessage(t *testing.T) {
-	// Create a test message
+  /* Create a test message */
 	message := map[string]interface{}{
 		"jsonrpc": "2.0",
 		"id":      1,
@@ -24,7 +37,7 @@ func TestStdioTransport_ReadMessage(t *testing.T) {
 	}
 	messageStr := string(messageJSON)
 
-	// Create input with Content-Length header
+  /* Create input with Content-Length header */
 	input := fmt.Sprintf("Content-Length: %d\r\nContent-Type: application/json\r\n\r\n%s", len(messageJSON), messageStr)
 
 	transport := &StdioTransport{
@@ -48,7 +61,7 @@ func TestStdioTransport_ReadMessage(t *testing.T) {
 }
 
 func TestStdioTransport_ReadMessage_InvalidContentLength(t *testing.T) {
-	// Test with invalid Content-Length header
+  /* Test with invalid Content-Length header */
 	input := "Content-Length: invalid\r\n\r\n{}"
 
 	transport := &StdioTransport{
@@ -64,7 +77,7 @@ func TestStdioTransport_ReadMessage_InvalidContentLength(t *testing.T) {
 }
 
 func TestStdioTransport_ReadMessage_MissingContentLength(t *testing.T) {
-	// Test with missing Content-Length header
+  /* Test with missing Content-Length header */
 	input := "Content-Type: application/json\r\n\r\n{}"
 
 	transport := &StdioTransport{
@@ -80,7 +93,7 @@ func TestStdioTransport_ReadMessage_MissingContentLength(t *testing.T) {
 }
 
 func TestStdioTransport_ReadMessage_InvalidJSON(t *testing.T) {
-	// Test with invalid JSON body
+  /* Test with invalid JSON body */
 	input := "Content-Length: 10\r\n\r\n{invalid}"
 
 	transport := &StdioTransport{
@@ -96,7 +109,7 @@ func TestStdioTransport_ReadMessage_InvalidJSON(t *testing.T) {
 }
 
 func TestStdioTransport_ReadMessage_ShortBody(t *testing.T) {
-	// Test with Content-Length larger than actual body
+  /* Test with Content-Length larger than actual body */
 	input := "Content-Length: 100\r\n\r\n{}"
 
 	transport := &StdioTransport{
@@ -125,7 +138,7 @@ func TestStdioTransport_ReadMessage_EOF(t *testing.T) {
 }
 
 func TestStdioTransport_ReadMessage_JSONDirect(t *testing.T) {
-	// Test reading JSON directly (without Content-Length headers)
+  /* Test reading JSON directly (without Content-Length headers) */
 	message := map[string]interface{}{
 		"jsonrpc": "2.0",
 		"id":      1,
@@ -174,7 +187,7 @@ func TestStdioTransport_WriteMessage(t *testing.T) {
 		t.Fatalf("WriteMessage() error = %v", err)
 	}
 
-	// Flush the buffer to get the output
+  /* Flush the buffer to get the output */
 	if err := transport.stdout.Flush(); err != nil {
 		t.Fatalf("Failed to flush stdout: %v", err)
 	}
@@ -184,7 +197,7 @@ func TestStdioTransport_WriteMessage(t *testing.T) {
 		t.Fatal("WriteMessage() produced no output")
 	}
 
-	// Should contain JSON
+  /* Should contain JSON */
 	if !strings.Contains(output, "jsonrpc") {
 		t.Error("WriteMessage() should include jsonrpc in output")
 	}
@@ -198,7 +211,7 @@ func TestStdioTransport_WriteMessage_NilResponse(t *testing.T) {
 		stderr: &bytes.Buffer{},
 	}
 
-	// Should not crash with nil response
+  /* Should not crash with nil response */
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -225,7 +238,7 @@ func TestStdioTransport_WriteNotification(t *testing.T) {
 		t.Fatalf("WriteNotification() error = %v", err)
 	}
 
-	// Flush the buffer to get the output
+  /* Flush the buffer to get the output */
 	if err := transport.stdout.Flush(); err != nil {
 		t.Fatalf("Failed to flush stdout: %v", err)
 	}
@@ -235,7 +248,7 @@ func TestStdioTransport_WriteNotification(t *testing.T) {
 		t.Fatal("WriteNotification() produced no output")
 	}
 
-	// Should contain method
+  /* Should contain method */
 	if !strings.Contains(output, "method") {
 		t.Error("WriteNotification() should include method in JSON")
 	}
@@ -249,12 +262,12 @@ func TestStdioTransport_WriteNotification_EmptyMethod(t *testing.T) {
 		stderr: &bytes.Buffer{},
 	}
 
-	// Should not crash with empty method
+  /* Should not crash with empty method */
 	err := transport.WriteNotification("", nil)
 	if err != nil {
 		t.Logf("WriteNotification() with empty method returned error: %v", err)
 	} else {
-		// Flush if no error
+   /* Flush if no error */
 		_ = transport.stdout.Flush()
 	}
 }
@@ -267,13 +280,13 @@ func TestStdioTransport_WriteNotification_NilParams(t *testing.T) {
 		stderr: &bytes.Buffer{},
 	}
 
-	// Should not crash with nil params
+  /* Should not crash with nil params */
 	err := transport.WriteNotification("test/notification", nil)
 	if err != nil {
 		t.Fatalf("WriteNotification() error with nil params = %v", err)
 	}
 
-	// Flush the buffer to get the output
+  /* Flush the buffer to get the output */
 	if err := transport.stdout.Flush(); err != nil {
 		t.Fatalf("Failed to flush stdout: %v", err)
 	}

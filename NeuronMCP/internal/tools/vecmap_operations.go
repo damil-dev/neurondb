@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * vecmap_operations.go
+ *    Tool implementation for NeuronMCP
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/tools/vecmap_operations.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package tools
 
 import (
@@ -9,14 +22,14 @@ import (
 	"github.com/neurondb/NeuronMCP/internal/logging"
 )
 
-// VecmapOperationsTool performs operations on vecmap (sparse vector) type
+/* VecmapOperationsTool performs operations on vecmap (sparse vector) type */
 type VecmapOperationsTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewVecmapOperationsTool creates a new vecmap operations tool
+/* NewVecmapOperationsTool creates a new vecmap operations tool */
 func NewVecmapOperationsTool(db *database.Database, logger *logging.Logger) *VecmapOperationsTool {
 	return &VecmapOperationsTool{
 		BaseTool: NewBaseTool(
@@ -51,7 +64,7 @@ func NewVecmapOperationsTool(db *database.Database, logger *logging.Logger) *Vec
 	}
 }
 
-// Execute executes the vecmap operation
+/* Execute executes the vecmap operation */
 func (t *VecmapOperationsTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -68,7 +81,7 @@ func (t *VecmapOperationsTool) Execute(ctx context.Context, params map[string]in
 		return Error("vecmap1 is required and cannot be empty", "VALIDATION_ERROR", nil), nil
 	}
 
-	// Decode base64 vecmap data
+  /* Decode base64 vecmap data */
 	vecmap1Bytes, err := base64.StdEncoding.DecodeString(vecmap1)
 	if err != nil {
 		return Error(fmt.Sprintf("Invalid base64 vecmap1 data: %v", err), "VALIDATION_ERROR", nil), nil
@@ -130,6 +143,7 @@ func (t *VecmapOperationsTool) Execute(ctx context.Context, params map[string]in
 		"operation": operation,
 	}), nil
 }
+
 
 
 

@@ -1,3 +1,19 @@
+/*-------------------------------------------------------------------------
+ *
+ * ml.go
+ *    Machine learning tools for NeuronMCP
+ *
+ * Provides tools for training, predicting, evaluating, and managing ML models
+ * using the NeuronDB unified train function.
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/tools/ml.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package tools
 
 import (
@@ -10,14 +26,14 @@ import (
 	"github.com/neurondb/NeuronMCP/internal/logging"
 )
 
-// TrainModelTool trains an ML model using the unified neurondb.train function
+/* TrainModelTool trains an ML model using the unified neurondb.train function */
 type TrainModelTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewTrainModelTool creates a new train model tool
+/* NewTrainModelTool creates a new train model tool */
 func NewTrainModelTool(db *database.Database, logger *logging.Logger) *TrainModelTool {
 	return &TrainModelTool{
 		BaseTool: NewBaseTool(
@@ -60,7 +76,7 @@ func NewTrainModelTool(db *database.Database, logger *logging.Logger) *TrainMode
 	}
 }
 
-// Execute executes the model training
+/* Execute executes the model training */
 func (t *TrainModelTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -109,7 +125,6 @@ func (t *TrainModelTool) Execute(ctx context.Context, params map[string]interfac
 		}), nil
 	}
 
-	// Build params JSON
 	paramsJSON := "{}"
 	if p, ok := params["params"].(map[string]interface{}); ok && len(p) > 0 {
 		paramsBytes, err := json.Marshal(p)
@@ -118,14 +133,12 @@ func (t *TrainModelTool) Execute(ctx context.Context, params map[string]interfac
 		}
 	}
 
-	// Use unified train function
 	project := "default"
 	if p, ok := params["project"].(string); ok && p != "" {
 		project = p
 	}
 
-	// NeuronDB train function signature: neurondb.train(project_name, algorithm, table_name, label_col, feature_columns[], params)
-	// Convert featureCol to array format
+	/* NeuronDB train function signature: neurondb.train(project_name, algorithm, table_name, label_col, feature_columns[], params) */
 	query := `SELECT neurondb.train($1, $2, $3, $4, $5::text[], $6::jsonb) AS model_id`
 	result, err := t.executor.ExecuteQueryOne(ctx, query, []interface{}{
 		project, algorithm, table, labelCol, []string{featureCol}, paramsJSON,
@@ -149,14 +162,14 @@ func (t *TrainModelTool) Execute(ctx context.Context, params map[string]interfac
 	}), nil
 }
 
-// PredictTool predicts using a trained ML model
+/* PredictTool predicts using a trained ML model */
 type PredictTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewPredictTool creates a new predict tool
+/* NewPredictTool creates a new predict tool */
 func NewPredictTool(db *database.Database, logger *logging.Logger) *PredictTool {
 	return &PredictTool{
 		BaseTool: NewBaseTool(
@@ -183,7 +196,7 @@ func NewPredictTool(db *database.Database, logger *logging.Logger) *PredictTool 
 	}
 }
 
-// Execute executes the prediction
+/* Execute executes the prediction */
 func (t *PredictTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -231,7 +244,6 @@ func (t *PredictTool) Execute(ctx context.Context, params map[string]interface{}
 		}), nil
 	}
 
-	// Convert features to vector format
 	vectorStr := formatVectorFromInterface(features)
 
 	query := `SELECT neurondb.predict($1::integer, $2::vector) AS prediction`
@@ -250,14 +262,14 @@ func (t *PredictTool) Execute(ctx context.Context, params map[string]interface{}
 	}), nil
 }
 
-// EvaluateModelTool evaluates a trained ML model
+/* EvaluateModelTool evaluates a trained ML model */
 type EvaluateModelTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewEvaluateModelTool creates a new evaluate model tool
+/* NewEvaluateModelTool creates a new evaluate model tool */
 func NewEvaluateModelTool(db *database.Database, logger *logging.Logger) *EvaluateModelTool {
 	return &EvaluateModelTool{
 		BaseTool: NewBaseTool(
@@ -291,7 +303,7 @@ func NewEvaluateModelTool(db *database.Database, logger *logging.Logger) *Evalua
 	}
 }
 
-// Execute executes the model evaluation
+/* Execute executes the model evaluation */
 func (t *EvaluateModelTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -365,14 +377,14 @@ func (t *EvaluateModelTool) Execute(ctx context.Context, params map[string]inter
 	}), nil
 }
 
-// ListModelsTool lists all trained models
+/* ListModelsTool lists all trained models */
 type ListModelsTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewListModelsTool creates a new list models tool
+/* NewListModelsTool creates a new list models tool */
 func NewListModelsTool(db *database.Database, logger *logging.Logger) *ListModelsTool {
 	return &ListModelsTool{
 		BaseTool: NewBaseTool(
@@ -397,7 +409,7 @@ func NewListModelsTool(db *database.Database, logger *logging.Logger) *ListModel
 	}
 }
 
-// Execute executes the list models query
+/* Execute executes the list models query */
 func (t *ListModelsTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	query := `SELECT model_id, algorithm, training_table, created_at, updated_at FROM neurondb.ml_models WHERE 1=1`
 	queryParams := []interface{}{}
@@ -444,14 +456,14 @@ func (t *ListModelsTool) Execute(ctx context.Context, params map[string]interfac
 	}), nil
 }
 
-// GetModelInfoTool gets detailed information about a model
+/* GetModelInfoTool gets detailed information about a model */
 type GetModelInfoTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewGetModelInfoTool creates a new get model info tool
+/* NewGetModelInfoTool creates a new get model info tool */
 func NewGetModelInfoTool(db *database.Database, logger *logging.Logger) *GetModelInfoTool {
 	return &GetModelInfoTool{
 		BaseTool: NewBaseTool(
@@ -473,7 +485,7 @@ func NewGetModelInfoTool(db *database.Database, logger *logging.Logger) *GetMode
 	}
 }
 
-// Execute executes the get model info query
+/* Execute executes the get model info query */
 func (t *GetModelInfoTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -514,14 +526,14 @@ func (t *GetModelInfoTool) Execute(ctx context.Context, params map[string]interf
 	return Success(result, nil), nil
 }
 
-// DeleteModelTool deletes a trained model
+/* DeleteModelTool deletes a trained model */
 type DeleteModelTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewDeleteModelTool creates a new delete model tool
+/* NewDeleteModelTool creates a new delete model tool */
 func NewDeleteModelTool(db *database.Database, logger *logging.Logger) *DeleteModelTool {
 	return &DeleteModelTool{
 		BaseTool: NewBaseTool(
@@ -543,7 +555,7 @@ func NewDeleteModelTool(db *database.Database, logger *logging.Logger) *DeleteMo
 	}
 }
 
-// Execute executes the model deletion
+/* Execute executes the model deletion */
 func (t *DeleteModelTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -588,7 +600,7 @@ func (t *DeleteModelTool) Execute(ctx context.Context, params map[string]interfa
 	}), nil
 }
 
-// Helper function to format vector from interface slice
+/* formatVectorFromInterface formats vector from interface slice */
 func formatVectorFromInterface(vec []interface{}) string {
 	var parts []string
 	for _, v := range vec {

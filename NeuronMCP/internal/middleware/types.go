@@ -1,31 +1,44 @@
+/*-------------------------------------------------------------------------
+ *
+ * types.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/middleware/types.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package middleware
 
 import "context"
 
-// MCPRequest represents an MCP request
+/* MCPRequest represents an MCP request */
 type MCPRequest struct {
 	Method   string                 `json:"method"`
 	Params   map[string]interface{} `json:"params,omitempty"`
 	Metadata map[string]interface{} `json:"metadata,omitempty"`
 }
 
-// MCPResponse represents an MCP response
+/* MCPResponse represents an MCP response */
 type MCPResponse struct {
 	Content  []ContentBlock         `json:"content,omitempty"`
 	IsError  bool                   `json:"isError,omitempty"`
 	Metadata map[string]interface{} `json:"metadata,omitempty"`
 }
 
-// ContentBlock represents a content block in a response
+/* ContentBlock represents a content block in a response */
 type ContentBlock struct {
 	Type string `json:"type"`
 	Text string `json:"text"`
 }
 
-// Handler is a function that handles a request
+/* Handler is a function that handles a request */
 type Handler func(ctx context.Context) (*MCPResponse, error)
 
-// Middleware is the interface that all middleware must implement
+/* Middleware is the interface that all middleware must implement */
 type Middleware interface {
 	Name() string
 	Order() int

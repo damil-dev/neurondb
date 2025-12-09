@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * ml_additional.go
+ *    Tool implementation for NeuronMCP
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/tools/ml_additional.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package tools
 
 import (
@@ -8,14 +21,14 @@ import (
 	"github.com/neurondb/NeuronMCP/internal/logging"
 )
 
-// PredictBatchTool performs batch prediction using a trained ML model
+/* PredictBatchTool performs batch prediction using a trained ML model */
 type PredictBatchTool struct {
 	*BaseTool
 	db     *database.Database
 	logger *logging.Logger
 }
 
-// NewPredictBatchTool creates a new PredictBatchTool
+/* NewPredictBatchTool creates a new PredictBatchTool */
 func NewPredictBatchTool(db *database.Database, logger *logging.Logger) *PredictBatchTool {
 	return &PredictBatchTool{
 		BaseTool: NewBaseTool(
@@ -47,7 +60,7 @@ func NewPredictBatchTool(db *database.Database, logger *logging.Logger) *Predict
 	}
 }
 
-// Execute performs batch prediction
+/* Execute performs batch prediction */
 func (t *PredictBatchTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -105,8 +118,8 @@ func (t *PredictBatchTool) Execute(ctx context.Context, params map[string]interf
 		}), nil
 	}
 
-	// Convert features_array to vector array format for PostgreSQL
-	// Format: ARRAY['[1,2,3]'::vector, '[4,5,6]'::vector]
+  /* Convert features_array to vector array format for PostgreSQL */
+  /* Format: ARRAY['[1,2,3]'::vector, '[4,5,6]'::vector] */
 	var vectorStrings []string
 	for i, features := range featuresArray {
 		featureVec, ok := features.([]interface{})
@@ -135,8 +148,8 @@ func (t *PredictBatchTool) Execute(ctx context.Context, params map[string]interf
 		vectorStrings = append(vectorStrings, vectorStr)
 	}
 
-	// Build query: SELECT neurondb.predict_batch(model_id, ARRAY[vector1, vector2, ...]::vector[])
-	// Need to build array of vectors properly
+  /* Build query: SELECT neurondb.predict_batch(model_id, ARRAY[vector1, vector2, ...]::vector[]) */
+  /* Need to build array of vectors properly */
 	if len(vectorStrings) == 0 {
 		return Error(fmt.Sprintf("No valid vectors in features_array for predict_batch tool: model_id=%d", modelIDInt), "VALIDATION_ERROR", map[string]interface{}{
 			"model_id": modelIDInt,
@@ -144,7 +157,7 @@ func (t *PredictBatchTool) Execute(ctx context.Context, params map[string]interf
 		}), nil
 	}
 
-	// Build array literal: ARRAY['[1,2,3]'::vector, '[4,5,6]'::vector]::vector[]
+  /* Build array literal: ARRAY['[1,2,3]'::vector, '[4,5,6]'::vector]::vector[] */
 	var arrayParts []string
 	for _, vecStr := range vectorStrings {
 		arrayParts = append(arrayParts, fmt.Sprintf("'%s'::vector", vecStr))
@@ -176,14 +189,14 @@ func (t *PredictBatchTool) Execute(ctx context.Context, params map[string]interf
 	}), nil
 }
 
-// ExportModelTool exports a trained ML model
+/* ExportModelTool exports a trained ML model */
 type ExportModelTool struct {
 	*BaseTool
 	db     *database.Database
 	logger *logging.Logger
 }
 
-// NewExportModelTool creates a new ExportModelTool
+/* NewExportModelTool creates a new ExportModelTool */
 func NewExportModelTool(db *database.Database, logger *logging.Logger) *ExportModelTool {
 	return &ExportModelTool{
 		BaseTool: NewBaseTool(
@@ -215,7 +228,7 @@ func NewExportModelTool(db *database.Database, logger *logging.Logger) *ExportMo
 	}
 }
 
-// Execute exports the model
+/* Execute exports the model */
 func (t *ExportModelTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -302,7 +315,7 @@ func (t *ExportModelTool) Execute(ctx context.Context, params map[string]interfa
 	}), nil
 }
 
-// Helper function to format vector array for PostgreSQL
+/* Helper function to format vector array for PostgreSQL */
 func formatVectorArray(vectorStrings []string) string {
 	if len(vectorStrings) == 0 {
 		return ""

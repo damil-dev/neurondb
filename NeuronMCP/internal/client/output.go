@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * output.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/client/output.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package client
 
 import (
@@ -8,21 +21,21 @@ import (
 	"time"
 )
 
-// OutputManager manages output file generation for command results
+/* OutputManager manages output file generation for command results */
 type OutputManager struct {
 	outputPath string
 	results    []ResultEntry
 	startTime  time.Time
 }
 
-// ResultEntry represents a single command result
+/* ResultEntry represents a single command result */
 type ResultEntry struct {
 	Timestamp string                 `json:"timestamp"`
 	Command   string                 `json:"command"`
 	Result    map[string]interface{} `json:"result"`
 }
 
-// NewOutputManager creates a new output manager
+/* NewOutputManager creates a new output manager */
 func NewOutputManager(outputPath string) *OutputManager {
 	return &OutputManager{
 		outputPath: outputPath,
@@ -31,7 +44,7 @@ func NewOutputManager(outputPath string) *OutputManager {
 	}
 }
 
-// AddResult adds a command result
+/* AddResult adds a command result */
 func (om *OutputManager) AddResult(command string, result map[string]interface{}) {
 	entry := ResultEntry{
 		Timestamp: time.Now().Format(time.RFC3339),
@@ -41,7 +54,7 @@ func (om *OutputManager) AddResult(command string, result map[string]interface{}
 	om.results = append(om.results, entry)
 }
 
-// Save saves results to file
+/* Save saves results to file */
 func (om *OutputManager) Save() (string, error) {
 	var outputFile string
 	if om.outputPath != "" {
@@ -51,7 +64,7 @@ func (om *OutputManager) Save() (string, error) {
 		outputFile = fmt.Sprintf("results_%s.json", timestamp)
 	}
 
-	// Ensure directory exists
+  /* Ensure directory exists */
 	dir := filepath.Dir(outputFile)
 	if dir != "" && dir != "." {
 		if err := os.MkdirAll(dir, 0755); err != nil {
@@ -59,7 +72,7 @@ func (om *OutputManager) Save() (string, error) {
 		}
 	}
 
-	// Count successful and failed commands
+  /* Count successful and failed commands */
 	successful := 0
 	failed := 0
 	for _, r := range om.results {
@@ -70,7 +83,7 @@ func (om *OutputManager) Save() (string, error) {
 		}
 	}
 
-	// Prepare output data
+  /* Prepare output data */
 	outputData := map[string]interface{}{
 		"metadata": map[string]interface{}{
 			"start_time":        om.startTime.Format(time.RFC3339),
@@ -82,7 +95,7 @@ func (om *OutputManager) Save() (string, error) {
 		"results": om.results,
 	}
 
-	// Write to file
+  /* Write to file */
 	data, err := json.MarshalIndent(outputData, "", "  ")
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal output: %w", err)
@@ -94,6 +107,7 @@ func (om *OutputManager) Save() (string, error) {
 
 	return outputFile, nil
 }
+
 
 
 

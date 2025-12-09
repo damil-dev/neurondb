@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * loader.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/config/loader.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package config
 
 import (
@@ -8,15 +21,15 @@ import (
 	"strconv"
 )
 
-// ConfigLoader handles loading configuration from multiple sources
+/* ConfigLoader handles loading configuration from multiple sources */
 type ConfigLoader struct{}
 
-// NewConfigLoader creates a new config loader
+/* NewConfigLoader creates a new config loader */
 func NewConfigLoader() *ConfigLoader {
 	return &ConfigLoader{}
 }
 
-// GetDefaultConfig returns a default configuration
+/* GetDefaultConfig returns a default configuration */
 func GetDefaultConfig() *ServerConfig {
 	defaultLimit := 10
 	defaultChunkSize := 500
@@ -111,7 +124,7 @@ func GetDefaultConfig() *ServerConfig {
 	}
 }
 
-// LoadFromFile loads configuration from a JSON file
+/* LoadFromFile loads configuration from a JSON file */
 func (l *ConfigLoader) LoadFromFile(configPath string) (*ServerConfig, error) {
 	possiblePaths := []string{}
 
@@ -145,14 +158,14 @@ func (l *ConfigLoader) LoadFromFile(configPath string) (*ServerConfig, error) {
 		}
 	}
 
-	return nil, nil // No config file found
+ 	return nil, nil /* No config file found */
 }
 
-// MergeWithEnv merges configuration with environment variables
+/* MergeWithEnv merges configuration with environment variables */
 func (l *ConfigLoader) MergeWithEnv(config *ServerConfig) *ServerConfig {
 	merged := *config
 
-	// Database config from env
+  /* Database config from env */
 	if connStr := os.Getenv("NEURONDB_CONNECTION_STRING"); connStr != "" {
 		merged.Database.ConnectionString = &connStr
 	}
@@ -174,7 +187,7 @@ func (l *ConfigLoader) MergeWithEnv(config *ServerConfig) *ServerConfig {
 		merged.Database.Password = &pass
 	}
 
-	// Logging config from env
+  /* Logging config from env */
 	if level := os.Getenv("NEURONDB_LOG_LEVEL"); level != "" {
 		merged.Logging.Level = level
 	}
@@ -185,7 +198,7 @@ func (l *ConfigLoader) MergeWithEnv(config *ServerConfig) *ServerConfig {
 		merged.Logging.Output = &output
 	}
 
-	// Feature flags from env
+  /* Feature flags from env */
 	if gpu := os.Getenv("NEURONDB_ENABLE_GPU"); gpu != "" {
 		gpuEnabled := gpu == "true"
 		if merged.Features.ML != nil {
@@ -196,7 +209,7 @@ func (l *ConfigLoader) MergeWithEnv(config *ServerConfig) *ServerConfig {
 	return &merged
 }
 
-// Helper functions
+/* Helper functions */
 func stringPtr(s string) *string {
 	return &s
 }

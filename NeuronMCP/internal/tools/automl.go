@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * automl.go
+ *    Tool implementation for NeuronMCP
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/tools/automl.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package tools
 
 import (
@@ -8,14 +21,14 @@ import (
 	"github.com/neurondb/NeuronMCP/internal/logging"
 )
 
-// AutoMLTool performs automated machine learning
+/* AutoMLTool performs automated machine learning */
 type AutoMLTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewAutoMLTool creates a new AutoML tool
+/* NewAutoMLTool creates a new AutoML tool */
 func NewAutoMLTool(db *database.Database, logger *logging.Logger) *AutoMLTool {
 	return &AutoMLTool{
 		BaseTool: NewBaseTool(
@@ -60,7 +73,7 @@ func NewAutoMLTool(db *database.Database, logger *logging.Logger) *AutoMLTool {
 	}
 }
 
-// Execute executes AutoML operation
+/* Execute executes AutoML operation */
 func (t *AutoMLTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -119,6 +132,7 @@ func (t *AutoMLTool) Execute(ctx context.Context, params map[string]interface{})
 		"count":     len(results),
 	}), nil
 }
+
 
 
 

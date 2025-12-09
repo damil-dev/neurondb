@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * manager.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/middleware/manager.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package middleware
 
 import (
@@ -7,14 +20,14 @@ import (
 	"github.com/neurondb/NeuronMCP/internal/logging"
 )
 
-// Manager manages middleware registration and execution
+/* Manager manages middleware registration and execution */
 type Manager struct {
 	middlewares []Middleware
 	mu          sync.RWMutex
 	logger      *logging.Logger
 }
 
-// NewManager creates a new middleware manager
+/* NewManager creates a new middleware manager */
 func NewManager(logger *logging.Logger) *Manager {
 	return &Manager{
 		middlewares: make([]Middleware, 0),
@@ -22,7 +35,7 @@ func NewManager(logger *logging.Logger) *Manager {
 	}
 }
 
-// Register registers a middleware
+/* Register registers a middleware */
 func (m *Manager) Register(middleware Middleware) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -33,7 +46,7 @@ func (m *Manager) Register(middleware Middleware) {
 	})
 }
 
-// Execute executes the middleware chain
+/* Execute executes the middleware chain */
 func (m *Manager) Execute(ctx context.Context, req *MCPRequest, handler Handler) (*MCPResponse, error) {
 	m.mu.RLock()
 	chain := NewChain(m.middlewares)
@@ -41,7 +54,7 @@ func (m *Manager) Execute(ctx context.Context, req *MCPRequest, handler Handler)
 	return chain.Execute(ctx, req, handler)
 }
 
-// GetAll returns all registered middlewares
+/* GetAll returns all registered middlewares */
 func (m *Manager) GetAll() []Middleware {
 	m.mu.RLock()
 	defer m.mu.RUnlock()

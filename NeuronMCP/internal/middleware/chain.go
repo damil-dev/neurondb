@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * chain.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/middleware/chain.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package middleware
 
 import (
@@ -5,14 +18,14 @@ import (
 	"sort"
 )
 
-// Chain executes middleware in order
+/* Chain executes middleware in order */
 type Chain struct {
 	middlewares []Middleware
 }
 
-// NewChain creates a new middleware chain
+/* NewChain creates a new middleware chain */
 func NewChain(middlewares []Middleware) *Chain {
-	// Sort by order
+  /* Sort by order */
 	sorted := make([]Middleware, len(middlewares))
 	copy(sorted, middlewares)
 	sort.Slice(sorted, func(i, j int) bool {
@@ -22,9 +35,9 @@ func NewChain(middlewares []Middleware) *Chain {
 	return &Chain{middlewares: sorted}
 }
 
-// Execute executes the middleware chain
+/* Execute executes the middleware chain */
 func (c *Chain) Execute(ctx context.Context, req *MCPRequest, finalHandler Handler) (*MCPResponse, error) {
-	// Filter enabled middlewares
+  /* Filter enabled middlewares */
 	enabled := make([]Middleware, 0)
 	for _, mw := range c.middlewares {
 		if mw.Enabled() {
@@ -32,7 +45,7 @@ func (c *Chain) Execute(ctx context.Context, req *MCPRequest, finalHandler Handl
 		}
 	}
 
-	// Build chain
+  /* Build chain */
 	index := 0
 	var next Handler
 	next = func(ctx context.Context) (*MCPResponse, error) {

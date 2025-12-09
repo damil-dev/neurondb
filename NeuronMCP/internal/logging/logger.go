@@ -1,3 +1,19 @@
+/*-------------------------------------------------------------------------
+ *
+ * logger.go
+ *    Structured logging for NeuronMCP
+ *
+ * Provides structured logging functionality using zerolog with configurable
+ * levels, formats, and outputs.
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/logging/logger.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package logging
 
 import (
@@ -9,15 +25,14 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// Logger provides structured logging
+/* Logger provides structured logging */
 type Logger struct {
 	logger zerolog.Logger
 	level  zerolog.Level
 }
 
-// NewLogger creates a new logger
+/* NewLogger creates a new logger */
 func NewLogger(cfg *config.LoggingConfig) *Logger {
-	// Parse level
 	var level zerolog.Level
 	switch cfg.Level {
 	case "debug":
@@ -32,7 +47,6 @@ func NewLogger(cfg *config.LoggingConfig) *Logger {
 		level = zerolog.InfoLevel
 	}
 
-	// Determine output
 	var output io.Writer
 	if cfg.Output != nil {
 		switch *cfg.Output {
@@ -41,7 +55,6 @@ func NewLogger(cfg *config.LoggingConfig) *Logger {
 		case "stderr":
 			output = os.Stderr
 		default:
-			// Try to open as file
 			if file, err := os.OpenFile(*cfg.Output, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644); err == nil {
 				output = file
 			} else {
@@ -52,7 +65,6 @@ func NewLogger(cfg *config.LoggingConfig) *Logger {
 		output = os.Stderr
 	}
 
-	// Configure format
 	if cfg.Format == "json" {
 		zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 	} else {
@@ -67,22 +79,22 @@ func NewLogger(cfg *config.LoggingConfig) *Logger {
 	}
 }
 
-// Debug logs a debug message
+/* Debug logs a debug message */
 func (l *Logger) Debug(message string, metadata map[string]interface{}) {
 	l.log(zerolog.DebugLevel, message, metadata)
 }
 
-// Info logs an info message
+/* Info logs an info message */
 func (l *Logger) Info(message string, metadata map[string]interface{}) {
 	l.log(zerolog.InfoLevel, message, metadata)
 }
 
-// Warn logs a warning message
+/* Warn logs a warning message */
 func (l *Logger) Warn(message string, metadata map[string]interface{}) {
 	l.log(zerolog.WarnLevel, message, metadata)
 }
 
-// Error logs an error message
+/* Error logs an error message */
 func (l *Logger) Error(message string, err error, metadata map[string]interface{}) {
 	event := l.logger.Error()
 	if err != nil {
@@ -106,7 +118,7 @@ func (l *Logger) log(level zerolog.Level, message string, metadata map[string]in
 	event.Msg(message)
 }
 
-// Child creates a child logger with additional metadata
+/* Child creates a child logger with additional metadata */
 func (l *Logger) Child(metadata map[string]interface{}) *Logger {
 	childLogger := l.logger.With().Fields(metadata).Logger()
 	return &Logger{

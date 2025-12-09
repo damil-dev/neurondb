@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * handlers_test.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/server/handlers_test.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package server
 
 import (
@@ -34,7 +47,7 @@ func TestServerSetup(t *testing.T) {
 		t.Fatal("Failed to create tool registry")
 	}
 
-	// This should not panic or crash
+  /* This should not panic or crash */
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -44,13 +57,13 @@ func TestServerSetup(t *testing.T) {
 		tools.RegisterAllTools(toolRegistry, db, logger)
 	}()
 
-	// Verify tools are registered
+  /* Verify tools are registered */
 	definitions := toolRegistry.GetAllDefinitions()
 	if len(definitions) == 0 {
 		t.Fatal("No tools registered - this indicates a real problem")
 	}
 
-	// Check that we have expected tools
+  /* Check that we have expected tools */
 	toolNames := make(map[string]bool)
 	for _, def := range definitions {
 		if def.Name == "" {
@@ -89,7 +102,7 @@ func TestToolRegistry(t *testing.T) {
 		t.Fatal("Failed to create tool registry")
 	}
 
-	// This should not panic
+  /* This should not panic */
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -99,25 +112,25 @@ func TestToolRegistry(t *testing.T) {
 		tools.RegisterAllTools(toolRegistry, db, logger)
 	}()
 
-	// Test that nonexistent tool returns nil
+  /* Test that nonexistent tool returns nil */
 	tool := toolRegistry.GetTool("nonexistent_tool")
 	if tool != nil {
 		t.Error("GetTool() should return nil for nonexistent tool")
 	}
 
-	// Test that existing tool is found
+  /* Test that existing tool is found */
 	tool = toolRegistry.GetTool("vector_search")
 	if tool == nil {
 		t.Fatal("GetTool() should return tool for 'vector_search'")
 	}
 
-	// Test with empty string - should not crash
+  /* Test with empty string - should not crash */
 	tool = toolRegistry.GetTool("")
 	if tool != nil {
 		t.Error("GetTool() should return nil for empty string")
 	}
 
-	// Test with nil-like behavior - should not crash
+  /* Test with nil-like behavior - should not crash */
 	tool = toolRegistry.GetTool("\x00")
 	if tool != nil {
 		t.Error("GetTool() should return nil for invalid tool name")
@@ -144,7 +157,7 @@ func TestHandleListTools(t *testing.T) {
 
 	ctx := context.Background()
 
-	// Test with valid empty params
+  /* Test with valid empty params */
 	params := json.RawMessage("{}")
 	result, err := srv.handleListTools(ctx, params)
 	if err != nil {
@@ -160,16 +173,16 @@ func TestHandleListTools(t *testing.T) {
 		t.Error("handleListTools() returned no tools")
 	}
 
-	// Test with invalid JSON - should return error, not crash
+  /* Test with invalid JSON - should return error, not crash */
 	invalidParams := json.RawMessage("{invalid json}")
 	result, err = srv.handleListTools(ctx, invalidParams)
-	// Note: handleListTools doesn't parse params, so it might not error
-	// But it should not crash
+  /* Note: handleListTools doesn't parse params, so it might not error */
+  /* But it should not crash */
 	if err != nil {
 		t.Logf("handleListTools() with invalid JSON returned error (expected): %v", err)
 	}
 
-	// Test with nil params - should not crash
+  /* Test with nil params - should not crash */
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -195,39 +208,39 @@ func TestHandleCallTool_ErrorConditions(t *testing.T) {
 
 	ctx := context.Background()
 
-	// Test with invalid JSON - should return error
+  /* Test with invalid JSON - should return error */
 	invalidParams := json.RawMessage("{invalid json}")
 	_, err = srv.handleCallTool(ctx, invalidParams)
 	if err == nil {
 		t.Error("handleCallTool() should return error for invalid JSON")
 	}
 
-	// Test with missing tool name - should return error
+  /* Test with missing tool name - should return error */
 	missingNameParams := json.RawMessage(`{"arguments": {}}`)
 	_, err = srv.handleCallTool(ctx, missingNameParams)
 	if err == nil {
 		t.Error("handleCallTool() should return error for missing tool name")
 	}
 
-	// Test with empty tool name - should return error
+  /* Test with empty tool name - should return error */
 	emptyNameParams := json.RawMessage(`{"name": "", "arguments": {}}`)
 	_, err = srv.handleCallTool(ctx, emptyNameParams)
 	if err == nil {
 		t.Error("handleCallTool() should return error for empty tool name")
 	}
 
-	// Test with nonexistent tool - should return error response, not crash
+  /* Test with nonexistent tool - should return error response, not crash */
 	nonexistentParams := json.RawMessage(`{"name": "nonexistent_tool_xyz", "arguments": {}}`)
 	result, err := srv.handleCallTool(ctx, nonexistentParams)
 	if err != nil {
 		t.Fatalf("handleCallTool() should not return error for nonexistent tool, but return error response: %v", err)
 	}
-	// Should return an error response, not nil
+  /* Should return an error response, not nil */
 	if result == nil {
 		t.Error("handleCallTool() should return error response for nonexistent tool, not nil")
 	}
 
-	// Test with nil params - should not crash
+  /* Test with nil params - should not crash */
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -237,10 +250,10 @@ func TestHandleCallTool_ErrorConditions(t *testing.T) {
 		_, _ = srv.handleCallTool(ctx, nil)
 	}()
 
-	// Test with malformed arguments - should handle gracefully
+  /* Test with malformed arguments - should handle gracefully */
 	malformedParams := json.RawMessage(`{"name": "vector_search", "arguments": "not an object"}`)
 	_, err = srv.handleCallTool(ctx, malformedParams)
-	// May or may not error depending on JSON parsing, but should not crash
+  /* May or may not error depending on JSON parsing, but should not crash */
 	if err != nil {
 		t.Logf("handleCallTool() with malformed arguments returned error: %v", err)
 	}
@@ -261,7 +274,7 @@ func TestExecuteTool_ErrorConditions(t *testing.T) {
 
 	ctx := context.Background()
 
-	// Test with empty tool name - should return error response
+  /* Test with empty tool name - should return error response */
 	resp, err := srv.executeTool(ctx, "", map[string]interface{}{})
 	if err != nil {
 		t.Fatalf("executeTool() should not return error for empty name, but error response: %v", err)
@@ -273,7 +286,7 @@ func TestExecuteTool_ErrorConditions(t *testing.T) {
 		t.Error("executeTool() should return error response for empty name")
 	}
 
-	// Test with nonexistent tool - should return error response
+  /* Test with nonexistent tool - should return error response */
 	resp, err = srv.executeTool(ctx, "nonexistent_tool_abc", map[string]interface{}{})
 	if err != nil {
 		t.Fatalf("executeTool() should not return error for nonexistent tool: %v", err)
@@ -285,7 +298,7 @@ func TestExecuteTool_ErrorConditions(t *testing.T) {
 		t.Error("executeTool() should return error response for nonexistent tool")
 	}
 
-	// Test with nil arguments - should not crash
+  /* Test with nil arguments - should not crash */
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -295,7 +308,7 @@ func TestExecuteTool_ErrorConditions(t *testing.T) {
 		_, _ = srv.executeTool(ctx, "vector_search", nil)
 	}()
 
-	// Test with invalid tool name containing null bytes - should not crash
+  /* Test with invalid tool name containing null bytes - should not crash */
 	func() {
 		defer func() {
 			if r := recover(); r != nil {

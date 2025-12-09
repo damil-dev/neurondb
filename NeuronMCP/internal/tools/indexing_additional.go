@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * indexing_additional.go
+ *    Tool implementation for NeuronMCP
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/tools/indexing_additional.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package tools
 
 import (
@@ -8,14 +21,14 @@ import (
 	"github.com/neurondb/NeuronMCP/internal/logging"
 )
 
-// TuneHNSWIndexTool automatically tunes HNSW index parameters
+/* TuneHNSWIndexTool automatically tunes HNSW index parameters */
 type TuneHNSWIndexTool struct {
 	*BaseTool
 	db     *database.Database
 	logger *logging.Logger
 }
 
-// NewTuneHNSWIndexTool creates a new TuneHNSWIndexTool
+/* NewTuneHNSWIndexTool creates a new TuneHNSWIndexTool */
 func NewTuneHNSWIndexTool(db *database.Database, logger *logging.Logger) *TuneHNSWIndexTool {
 	return &TuneHNSWIndexTool{
 		BaseTool: NewBaseTool(
@@ -41,7 +54,7 @@ func NewTuneHNSWIndexTool(db *database.Database, logger *logging.Logger) *TuneHN
 	}
 }
 
-// Execute tunes the HNSW index
+/* Execute tunes the HNSW index */
 func (t *TuneHNSWIndexTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -69,7 +82,7 @@ func (t *TuneHNSWIndexTool) Execute(ctx context.Context, params map[string]inter
 		}), nil
 	}
 
-	// Use NeuronDB's index_tune_hnsw function: index_tune_hnsw(table, vector_col)
+  /* Use NeuronDB's index_tune_hnsw function: index_tune_hnsw(table, vector_col) */
 	query := `SELECT index_tune_hnsw($1, $2) AS tuning_result`
 	executor := NewQueryExecutor(t.db)
 	result, err := executor.ExecuteQueryOne(ctx, query, []interface{}{table, vectorColumn})
@@ -89,14 +102,14 @@ func (t *TuneHNSWIndexTool) Execute(ctx context.Context, params map[string]inter
 	}), nil
 }
 
-// TuneIVFIndexTool automatically tunes IVF index parameters
+/* TuneIVFIndexTool automatically tunes IVF index parameters */
 type TuneIVFIndexTool struct {
 	*BaseTool
 	db     *database.Database
 	logger *logging.Logger
 }
 
-// NewTuneIVFIndexTool creates a new TuneIVFIndexTool
+/* NewTuneIVFIndexTool creates a new TuneIVFIndexTool */
 func NewTuneIVFIndexTool(db *database.Database, logger *logging.Logger) *TuneIVFIndexTool {
 	return &TuneIVFIndexTool{
 		BaseTool: NewBaseTool(
@@ -122,7 +135,7 @@ func NewTuneIVFIndexTool(db *database.Database, logger *logging.Logger) *TuneIVF
 	}
 }
 
-// Execute tunes the IVF index
+/* Execute tunes the IVF index */
 func (t *TuneIVFIndexTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -150,7 +163,7 @@ func (t *TuneIVFIndexTool) Execute(ctx context.Context, params map[string]interf
 		}), nil
 	}
 
-	// Use NeuronDB's index_tune_ivf function: index_tune_ivf(table, vector_col)
+  /* Use NeuronDB's index_tune_ivf function: index_tune_ivf(table, vector_col) */
 	query := `SELECT index_tune_ivf($1, $2) AS tuning_result`
 	executor := NewQueryExecutor(t.db)
 	result, err := executor.ExecuteQueryOne(ctx, query, []interface{}{table, vectorColumn})
@@ -169,6 +182,7 @@ func (t *TuneIVFIndexTool) Execute(ctx context.Context, params map[string]interf
 		"index_type":    "ivf",
 	}), nil
 }
+
 
 
 

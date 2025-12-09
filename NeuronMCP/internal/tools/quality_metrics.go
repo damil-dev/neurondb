@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * quality_metrics.go
+ *    Tool implementation for NeuronMCP
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/tools/quality_metrics.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package tools
 
 import (
@@ -8,14 +21,14 @@ import (
 	"github.com/neurondb/NeuronMCP/internal/logging"
 )
 
-// QualityMetricsTool computes quality metrics for search results
+/* QualityMetricsTool computes quality metrics for search results */
 type QualityMetricsTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewQualityMetricsTool creates a new quality metrics tool
+/* NewQualityMetricsTool creates a new quality metrics tool */
 func NewQualityMetricsTool(db *database.Database, logger *logging.Logger) *QualityMetricsTool {
 	return &QualityMetricsTool{
 		BaseTool: NewBaseTool(
@@ -54,7 +67,7 @@ func NewQualityMetricsTool(db *database.Database, logger *logging.Logger) *Quali
 	}
 }
 
-// Execute executes quality metrics computation
+/* Execute executes quality metrics computation */
 func (t *QualityMetricsTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -71,7 +84,7 @@ func (t *QualityMetricsTool) Execute(ctx context.Context, params map[string]inte
 		return Error("table is required", "VALIDATION_ERROR", nil), nil
 	}
 
-	// Build query based on metric type
+  /* Build query based on metric type */
 	var query string
 	var queryParams []interface{}
 
@@ -86,7 +99,7 @@ func (t *QualityMetricsTool) Execute(ctx context.Context, params map[string]inte
 		if groundTruthCol == "" || predictedCol == "" {
 			return Error("ground_truth_col and predicted_col are required for @K metrics", "VALIDATION_ERROR", nil), nil
 		}
-		// Use appropriate NeuronDB function
+   /* Use appropriate NeuronDB function */
 		funcName := "recall_at_k"
 		if metric == "precision_at_k" {
 			funcName = "precision_at_k"
@@ -128,6 +141,7 @@ func (t *QualityMetricsTool) Execute(ctx context.Context, params map[string]inte
 		"metric": metric,
 	}), nil
 }
+
 
 
 

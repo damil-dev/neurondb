@@ -1,3 +1,19 @@
+/*-------------------------------------------------------------------------
+ *
+ * query.go
+ *    SQL query builder for NeuronMCP
+ *
+ * Provides utilities for building SQL queries including SELECT statements
+ * and vector search queries.
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/database/query.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package database
 
 import (
@@ -5,10 +21,10 @@ import (
 	"strings"
 )
 
-// QueryBuilder provides utilities for building SQL queries
+/* QueryBuilder provides utilities for building SQL queries */
 type QueryBuilder struct{}
 
-// Select builds a SELECT query
+/* Select builds a SELECT query */
 func (qb *QueryBuilder) Select(table string, columns []string, where map[string]interface{}, orderBy *OrderBy, limit, offset *int) (string, []interface{}) {
 	if len(columns) == 0 {
 		columns = []string{"*"}
@@ -17,13 +33,9 @@ func (qb *QueryBuilder) Select(table string, columns []string, where map[string]
 	var params []interface{}
 	paramIndex := 1
 
-	// SELECT clause
 	selectClause := strings.Join(columns, ", ")
-
-	// FROM clause
 	fromClause := EscapeIdentifier(table)
 
-	// WHERE clause
 	var whereClause string
 	if len(where) > 0 {
 		var conditions []string
@@ -36,13 +48,11 @@ func (qb *QueryBuilder) Select(table string, columns []string, where map[string]
 		whereClause = "WHERE " + strings.Join(conditions, " AND ")
 	}
 
-	// ORDER BY clause
 	var orderByClause string
 	if orderBy != nil {
 		orderByClause = fmt.Sprintf("ORDER BY %s %s", EscapeIdentifier(orderBy.Column), orderBy.Direction)
 	}
 
-	// LIMIT clause
 	var limitClause string
 	if limit != nil {
 		limitClause = fmt.Sprintf("LIMIT $%d", paramIndex)
@@ -50,7 +60,6 @@ func (qb *QueryBuilder) Select(table string, columns []string, where map[string]
 		paramIndex++
 	}
 
-	// OFFSET clause
 	var offsetClause string
 	if offset != nil {
 		offsetClause = fmt.Sprintf("OFFSET $%d", paramIndex)
@@ -77,23 +86,21 @@ func (qb *QueryBuilder) Select(table string, columns []string, where map[string]
 	return query, params
 }
 
-// OrderBy represents an ORDER BY clause
+/* OrderBy represents an ORDER BY clause */
 type OrderBy struct {
 	Column    string
-	Direction string // ASC or DESC
+	Direction string
 }
 
-// VectorSearch builds a vector search query
+/* VectorSearch builds a vector search query */
 func (qb *QueryBuilder) VectorSearch(table, vectorColumn string, queryVector []float32, distanceMetric string, limit int, additionalColumns []string, minkowskiP *float64) (string, []interface{}) {
 	if len(queryVector) == 0 {
-		// Return error query - caller should handle this
 		return "", nil
 	}
 
 	var params []interface{}
 	paramIndex := 1
 
-	// Convert vector to string format for PostgreSQL
 	vectorStr := formatVector(queryVector)
 	params = append(params, vectorStr)
 	vectorParamIndex := paramIndex
@@ -121,29 +128,24 @@ func (qb *QueryBuilder) VectorSearch(table, vectorColumn string, queryVector []f
 		pParamIndex := paramIndex
 		paramIndex++
 		distanceExpr = fmt.Sprintf("vector_minkowski_distance(%s, $%d::vector, $%d::double precision) AS distance", EscapeIdentifier(vectorColumn), vectorParamIndex, pParamIndex)
-	default: // l2
+	default:
 		distanceExpr = fmt.Sprintf("%s <-> $%d::vector AS distance", EscapeIdentifier(vectorColumn), vectorParamIndex)
 	}
 
-	// Build SELECT columns
 	selectColumns := []string{}
 	if len(additionalColumns) > 0 {
 		for _, col := range additionalColumns {
 			selectColumns = append(selectColumns, EscapeIdentifier(col))
 		}
-		// Always include the vector column and distance
 		selectColumns = append(selectColumns, EscapeIdentifier(vectorColumn))
 	} else {
-		// If no additional columns, select all
 		selectColumns = append(selectColumns, "*")
 	}
 	selectColumns = append(selectColumns, distanceExpr)
 
-	// Add limit parameter
 	params = append(params, limit)
 	limitParamIndex := paramIndex
 
-	// Build the query
 	selectClause := strings.Join(selectColumns, ", ")
 	query := fmt.Sprintf(
 		"SELECT %s FROM %s ORDER BY distance ASC LIMIT $%d",
@@ -155,7 +157,7 @@ func (qb *QueryBuilder) VectorSearch(table, vectorColumn string, queryVector []f
 	return query, params
 }
 
-// formatVector formats a float32 slice as a PostgreSQL vector string
+/* formatVector formats a float32 slice as a PostgreSQL vector string */
 func formatVector(vec []float32) string {
 	var parts []string
 	for _, v := range vec {

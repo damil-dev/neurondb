@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * vector_graph.go
+ *    Tool implementation for NeuronMCP
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/tools/vector_graph.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package tools
 
 import (
@@ -8,14 +21,14 @@ import (
 	"github.com/neurondb/NeuronMCP/internal/logging"
 )
 
-// VectorGraphTool performs graph operations on vgraph type
+/* VectorGraphTool performs graph operations on vgraph type */
 type VectorGraphTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewVectorGraphTool creates a new vector graph tool
+/* NewVectorGraphTool creates a new vector graph tool */
 func NewVectorGraphTool(db *database.Database, logger *logging.Logger) *VectorGraphTool {
 	return &VectorGraphTool{
 		BaseTool: NewBaseTool(
@@ -65,7 +78,7 @@ func NewVectorGraphTool(db *database.Database, logger *logging.Logger) *VectorGr
 	}
 }
 
-// Execute executes the graph operation
+/* Execute executes the graph operation */
 func (t *VectorGraphTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -150,6 +163,7 @@ func (t *VectorGraphTool) Execute(ctx context.Context, params map[string]interfa
 		"count":     len(results),
 	}), nil
 }
+
 
 
 

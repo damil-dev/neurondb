@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * vector_additional.go
+ *    Tool implementation for NeuronMCP
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/tools/vector_additional.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package tools
 
 import (
@@ -8,14 +21,14 @@ import (
 	"github.com/neurondb/NeuronMCP/internal/logging"
 )
 
-// VectorSimilarityTool computes similarity between two vectors
+/* VectorSimilarityTool computes similarity between two vectors */
 type VectorSimilarityTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewVectorSimilarityTool creates a new vector similarity tool
+/* NewVectorSimilarityTool creates a new vector similarity tool */
 func NewVectorSimilarityTool(db *database.Database, logger *logging.Logger) *VectorSimilarityTool {
 	return &VectorSimilarityTool{
 		BaseTool: NewBaseTool(
@@ -49,7 +62,7 @@ func NewVectorSimilarityTool(db *database.Database, logger *logging.Logger) *Vec
 	}
 }
 
-// Execute executes the vector similarity computation
+/* Execute executes the vector similarity computation */
 func (t *VectorSimilarityTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -115,7 +128,7 @@ func (t *VectorSimilarityTool) Execute(ctx context.Context, params map[string]in
 		query = `SELECT $1::vector <#> $2::vector AS similarity`
 	case "l1":
 		query = `SELECT vector_l1_distance($1::vector, $2::vector) AS similarity`
-	default: // l2
+ 	default: /* l2 */
 		query = `SELECT $1::vector <-> $2::vector AS similarity`
 	}
 
@@ -136,14 +149,14 @@ func (t *VectorSimilarityTool) Execute(ctx context.Context, params map[string]in
 	}), nil
 }
 
-// CreateVectorIndexTool creates a vector index (generic, uses HNSW by default)
+/* CreateVectorIndexTool creates a vector index (generic, uses HNSW by default) */
 type CreateVectorIndexTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewCreateVectorIndexTool creates a new create vector index tool
+/* NewCreateVectorIndexTool creates a new create vector index tool */
 func NewCreateVectorIndexTool(db *database.Database, logger *logging.Logger) *CreateVectorIndexTool {
 	return &CreateVectorIndexTool{
 		BaseTool: NewBaseTool(
@@ -194,7 +207,7 @@ func NewCreateVectorIndexTool(db *database.Database, logger *logging.Logger) *Cr
 	}
 }
 
-// Execute executes the vector index creation
+/* Execute executes the vector index creation */
 func (t *CreateVectorIndexTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -265,7 +278,7 @@ func (t *CreateVectorIndexTool) Execute(ctx context.Context, params map[string]i
 			table, vectorColumn, indexName, numLists,
 		})
 	} else {
-		// Default to HNSW
+   /* Default to HNSW */
 		m := 16
 		if mVal, ok := params["m"].(float64); ok {
 			m = int(mVal)

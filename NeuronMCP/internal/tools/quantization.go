@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * quantization.go
+ *    Tool implementation for NeuronMCP
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/tools/quantization.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package tools
 
 import (
@@ -9,14 +22,14 @@ import (
 	"github.com/neurondb/NeuronMCP/internal/logging"
 )
 
-// VectorQuantizationTool performs vector quantization operations
+/* VectorQuantizationTool performs vector quantization operations */
 type VectorQuantizationTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewVectorQuantizationTool creates a new vector quantization tool
+/* NewVectorQuantizationTool creates a new vector quantization tool */
 func NewVectorQuantizationTool(db *database.Database, logger *logging.Logger) *VectorQuantizationTool {
 	return &VectorQuantizationTool{
 		BaseTool: NewBaseTool(
@@ -48,7 +61,7 @@ func NewVectorQuantizationTool(db *database.Database, logger *logging.Logger) *V
 	}
 }
 
-// Execute executes the quantization operation
+/* Execute executes the quantization operation */
 func (t *VectorQuantizationTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -281,14 +294,14 @@ func (t *VectorQuantizationTool) Execute(ctx context.Context, params map[string]
 	}), nil
 }
 
-// QuantizationAnalysisTool analyzes quantization options
+/* QuantizationAnalysisTool analyzes quantization options */
 type QuantizationAnalysisTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewQuantizationAnalysisTool creates a new quantization analysis tool
+/* NewQuantizationAnalysisTool creates a new quantization analysis tool */
 func NewQuantizationAnalysisTool(db *database.Database, logger *logging.Logger) *QuantizationAnalysisTool {
 	return &QuantizationAnalysisTool{
 		BaseTool: NewBaseTool(
@@ -330,7 +343,7 @@ func NewQuantizationAnalysisTool(db *database.Database, logger *logging.Logger) 
 	}
 }
 
-// Execute executes the quantization analysis
+/* Execute executes the quantization analysis */
 func (t *QuantizationAnalysisTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -424,6 +437,7 @@ func (t *QuantizationAnalysisTool) Execute(ctx context.Context, params map[strin
 		"operation": operation,
 	}), nil
 }
+
 
 
 

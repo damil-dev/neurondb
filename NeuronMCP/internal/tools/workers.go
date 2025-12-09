@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * workers.go
+ *    Tool implementation for NeuronMCP
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/tools/workers.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package tools
 
 import (
@@ -9,14 +22,14 @@ import (
 	"github.com/neurondb/NeuronMCP/internal/logging"
 )
 
-// WorkerManagementTool manages background workers
+/* WorkerManagementTool manages background workers */
 type WorkerManagementTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewWorkerManagementTool creates a new worker management tool
+/* NewWorkerManagementTool creates a new worker management tool */
 func NewWorkerManagementTool(db *database.Database, logger *logging.Logger) *WorkerManagementTool {
 	return &WorkerManagementTool{
 		BaseTool: NewBaseTool(
@@ -51,7 +64,7 @@ func NewWorkerManagementTool(db *database.Database, logger *logging.Logger) *Wor
 	}
 }
 
-// Execute executes worker management operation
+/* Execute executes worker management operation */
 func (t *WorkerManagementTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -79,7 +92,7 @@ func (t *WorkerManagementTool) Execute(ctx context.Context, params map[string]in
 		if jobType == "" {
 			return Error("job_type is required for queue_job", "VALIDATION_ERROR", nil), nil
 		}
-		// Format job params as JSON
+   /* Format job params as JSON */
 		paramsJSON := "{}"
 		if len(jobParams) > 0 {
 			paramsBytes, err := json.Marshal(jobParams)

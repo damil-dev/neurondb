@@ -1,3 +1,18 @@
+/*-------------------------------------------------------------------------
+ *
+ * registry.go
+ *    Tool registry for NeuronMCP
+ *
+ * Manages tool registration, definitions, and execution for the MCP server.
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/tools/registry.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package tools
 
 import (
@@ -8,14 +23,14 @@ import (
 	"github.com/neurondb/NeuronMCP/internal/logging"
 )
 
-// ToolDefinition represents a tool's definition for MCP
+/* ToolDefinition represents a tool's definition for MCP */
 type ToolDefinition struct {
 	Name        string                 `json:"name"`
 	Description string                 `json:"description"`
 	InputSchema map[string]interface{} `json:"inputSchema"`
 }
 
-// ToolRegistry manages tool registration and execution
+/* ToolRegistry manages tool registration and execution */
 type ToolRegistry struct {
 	tools      map[string]Tool
 	definitions map[string]ToolDefinition
@@ -24,7 +39,7 @@ type ToolRegistry struct {
 	logger     *logging.Logger
 }
 
-// NewToolRegistry creates a new tool registry
+/* NewToolRegistry creates a new tool registry */
 func NewToolRegistry(db *database.Database, logger *logging.Logger) *ToolRegistry {
 	return &ToolRegistry{
 		tools:       make(map[string]Tool),
@@ -34,7 +49,7 @@ func NewToolRegistry(db *database.Database, logger *logging.Logger) *ToolRegistr
 	}
 }
 
-// Register registers a tool
+/* Register registers a tool */
 func (r *ToolRegistry) Register(tool Tool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -50,21 +65,21 @@ func (r *ToolRegistry) Register(tool Tool) {
 	r.logger.Debug(fmt.Sprintf("Registered tool: %s", tool.Name()), nil)
 }
 
-// RegisterAll registers multiple tools
+/* RegisterAll registers multiple tools */
 func (r *ToolRegistry) RegisterAll(tools []Tool) {
 	for _, tool := range tools {
 		r.Register(tool)
 	}
 }
 
-// GetTool retrieves a tool by name
+/* GetTool retrieves a tool by name */
 func (r *ToolRegistry) GetTool(name string) Tool {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return r.tools[name]
 }
 
-// GetDefinition retrieves a tool definition by name
+/* GetDefinition retrieves a tool definition by name */
 func (r *ToolRegistry) GetDefinition(name string) (ToolDefinition, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -72,7 +87,7 @@ func (r *ToolRegistry) GetDefinition(name string) (ToolDefinition, bool) {
 	return def, exists
 }
 
-// GetAllDefinitions returns all tool definitions
+/* GetAllDefinitions returns all tool definitions */
 func (r *ToolRegistry) GetAllDefinitions() []ToolDefinition {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -84,7 +99,7 @@ func (r *ToolRegistry) GetAllDefinitions() []ToolDefinition {
 	return definitions
 }
 
-// GetAllToolNames returns all registered tool names
+/* GetAllToolNames returns all registered tool names */
 func (r *ToolRegistry) GetAllToolNames() []string {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -96,7 +111,7 @@ func (r *ToolRegistry) GetAllToolNames() []string {
 	return names
 }
 
-// HasTool checks if a tool exists
+/* HasTool checks if a tool exists */
 func (r *ToolRegistry) HasTool(name string) bool {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -104,7 +119,7 @@ func (r *ToolRegistry) HasTool(name string) bool {
 	return exists
 }
 
-// Unregister removes a tool
+/* Unregister removes a tool */
 func (r *ToolRegistry) Unregister(name string) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -119,7 +134,7 @@ func (r *ToolRegistry) Unregister(name string) bool {
 	return removed
 }
 
-// Clear removes all tools
+/* Clear removes all tools */
 func (r *ToolRegistry) Clear() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -127,7 +142,7 @@ func (r *ToolRegistry) Clear() {
 	r.definitions = make(map[string]ToolDefinition)
 }
 
-// GetCount returns the number of registered tools
+/* GetCount returns the number of registered tools */
 func (r *ToolRegistry) GetCount() int {
 	r.mu.RLock()
 	defer r.mu.RUnlock()

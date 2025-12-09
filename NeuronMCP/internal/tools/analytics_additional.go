@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * analytics_additional.go
+ *    Tool implementation for NeuronMCP
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/tools/analytics_additional.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package tools
 
 import (
@@ -8,14 +21,14 @@ import (
 	"github.com/neurondb/NeuronMCP/internal/logging"
 )
 
-// AnalyzeDataTool performs comprehensive data analysis
+/* AnalyzeDataTool performs comprehensive data analysis */
 type AnalyzeDataTool struct {
 	*BaseTool
 	db     *database.Database
 	logger *logging.Logger
 }
 
-// NewAnalyzeDataTool creates a new AnalyzeDataTool
+/* NewAnalyzeDataTool creates a new AnalyzeDataTool */
 func NewAnalyzeDataTool(db *database.Database, logger *logging.Logger) *AnalyzeDataTool {
 	return &AnalyzeDataTool{
 		BaseTool: NewBaseTool(
@@ -52,7 +65,7 @@ func NewAnalyzeDataTool(db *database.Database, logger *logging.Logger) *AnalyzeD
 	}
 }
 
-// Execute performs data analysis
+/* Execute performs data analysis */
 func (t *AnalyzeDataTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -74,18 +87,18 @@ func (t *AnalyzeDataTool) Execute(ctx context.Context, params map[string]interfa
 		}), nil
 	}
 
-	// Build comprehensive analysis query
+  /* Build comprehensive analysis query */
 	var query string
 	var queryParams []interface{}
 
 	if len(columns) > 0 {
-		// Analyze specific columns
+   /* Analyze specific columns */
 		colNames := make([]string, len(columns))
 		for i, col := range columns {
 			colNames[i] = col.(string)
 		}
 
-		// Build statistics query for each column
+   /* Build statistics query for each column */
 		statsQueries := []string{}
 		for _, col := range colNames {
 			statsQueries = append(statsQueries, fmt.Sprintf(`
@@ -118,7 +131,7 @@ func (t *AnalyzeDataTool) Execute(ctx context.Context, params map[string]interfa
 		query = "SELECT json_agg(row_to_json(t)) AS analysis FROM (" + unionQuery + ") t"
 		queryParams = []interface{}{}
 	} else {
-		// Analyze all columns - get column list first
+   /* Analyze all columns - get column list first */
 		colQuery := `
 			SELECT column_name, data_type 
 			FROM information_schema.columns 
@@ -140,13 +153,13 @@ func (t *AnalyzeDataTool) Execute(ctx context.Context, params map[string]interfa
 			}), nil
 		}
 
-		// Build analysis for all numeric columns
+   /* Build analysis for all numeric columns */
 		statsParts := []string{}
 		for _, colRow := range colResults {
 			colName, _ := colRow["column_name"].(string)
 			dataType, _ := colRow["data_type"].(string)
 			
-			// Only analyze numeric types
+    /* Only analyze numeric types */
 			if dataType == "real" || dataType == "double precision" || dataType == "integer" || 
 			   dataType == "bigint" || dataType == "numeric" || dataType == "smallint" {
 				statsParts = append(statsParts, fmt.Sprintf(`

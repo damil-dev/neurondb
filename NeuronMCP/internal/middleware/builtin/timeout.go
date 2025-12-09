@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * timeout.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/middleware/builtin/timeout.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package builtin
 
 import (
@@ -9,13 +22,13 @@ import (
 	"github.com/neurondb/NeuronMCP/internal/middleware"
 )
 
-// TimeoutMiddleware adds timeout to requests
+/* TimeoutMiddleware adds timeout to requests */
 type TimeoutMiddleware struct {
 	timeout time.Duration
 	logger  *logging.Logger
 }
 
-// NewTimeoutMiddleware creates a new timeout middleware
+/* NewTimeoutMiddleware creates a new timeout middleware */
 func NewTimeoutMiddleware(timeout time.Duration, logger *logging.Logger) *TimeoutMiddleware {
 	return &TimeoutMiddleware{
 		timeout: timeout,
@@ -23,22 +36,22 @@ func NewTimeoutMiddleware(timeout time.Duration, logger *logging.Logger) *Timeou
 	}
 }
 
-// Name returns the middleware name
+/* Name returns the middleware name */
 func (m *TimeoutMiddleware) Name() string {
 	return "timeout"
 }
 
-// Order returns the execution order
+/* Order returns the execution order */
 func (m *TimeoutMiddleware) Order() int {
 	return 3
 }
 
-// Enabled returns whether the middleware is enabled
+/* Enabled returns whether the middleware is enabled */
 func (m *TimeoutMiddleware) Enabled() bool {
 	return true
 }
 
-// Execute executes the middleware
+/* Execute executes the middleware */
 func (m *TimeoutMiddleware) Execute(ctx context.Context, req *middleware.MCPRequest, next middleware.Handler) (*middleware.MCPResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, m.timeout)
 	defer cancel()

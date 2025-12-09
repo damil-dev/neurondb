@@ -1,3 +1,19 @@
+/*-------------------------------------------------------------------------
+ *
+ * executor.go
+ *    Query executor for NeuronMCP tools
+ *
+ * Provides database query execution functionality with timeouts and
+ * error handling for all tool operations.
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/tools/executor.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package tools
 
 import (
@@ -11,25 +27,22 @@ import (
 )
 
 const (
-	// Default query timeout for all database operations
-	DefaultQueryTimeout = 60 * time.Second
-	// Embedding query timeout (embeddings can take longer)
-	EmbeddingQueryTimeout = 120 * time.Second
-	// Vector search timeout
-	VectorSearchTimeout = 30 * time.Second
+	DefaultQueryTimeout    = 60 * time.Second
+	EmbeddingQueryTimeout  = 120 * time.Second
+	VectorSearchTimeout    = 30 * time.Second
 )
 
-// QueryExecutor executes database queries for tools
+/* QueryExecutor executes database queries for tools */
 type QueryExecutor struct {
 	db *database.Database
 }
 
-// NewQueryExecutor creates a new query executor
+/* NewQueryExecutor creates a new query executor */
 func NewQueryExecutor(db *database.Database) *QueryExecutor {
 	return &QueryExecutor{db: db}
 }
 
-// ExecuteVectorSearch executes a vector search query
+/* ExecuteVectorSearch executes a vector search query */
 func (e *QueryExecutor) ExecuteVectorSearch(ctx context.Context, table, vectorColumn string, queryVector []interface{}, distanceMetric string, limit int, additionalColumns []interface{}) ([]map[string]interface{}, error) {
 	if e.db == nil {
 		return nil, fmt.Errorf("query executor database instance is nil: cannot execute vector search on table '%s', column '%s'", table, vectorColumn)
@@ -51,7 +64,6 @@ func (e *QueryExecutor) ExecuteVectorSearch(ctx context.Context, table, vectorCo
 		return nil, fmt.Errorf("query vector cannot be empty: vector search on table '%s', column '%s' requires a non-empty query vector", table, vectorColumn)
 	}
 	
-	// Convert queryVector to []float32
 	vec := make([]float32, 0, len(queryVector))
 	for i, v := range queryVector {
 		if f, ok := v.(float64); ok {
@@ -63,7 +75,6 @@ func (e *QueryExecutor) ExecuteVectorSearch(ctx context.Context, table, vectorCo
 		}
 	}
 
-	// Convert additional columns to []string
 	cols := make([]string, 0, len(additionalColumns))
 	for i, col := range additionalColumns {
 		if str, ok := col.(string); ok {
@@ -76,13 +87,11 @@ func (e *QueryExecutor) ExecuteVectorSearch(ctx context.Context, table, vectorCo
 		}
 	}
 
-	// Validate distance metric
 	validMetrics := map[string]bool{"l2": true, "cosine": true, "inner_product": true, "l1": true, "hamming": true, "chebyshev": true, "minkowski": true}
 	if !validMetrics[distanceMetric] {
 		return nil, fmt.Errorf("invalid distance metric '%s' for vector search on table '%s', column '%s': valid metrics are l2, cosine, inner_product, l1, hamming, chebyshev, minkowski", distanceMetric, table, vectorColumn)
 	}
 
-	// Validate limit
 	if limit <= 0 {
 		return nil, fmt.Errorf("invalid limit %d for vector search on table '%s', column '%s': limit must be greater than 0", limit, table, vectorColumn)
 	}
@@ -93,7 +102,6 @@ func (e *QueryExecutor) ExecuteVectorSearch(ctx context.Context, table, vectorCo
 	qb := &database.QueryBuilder{}
 	query, params := qb.VectorSearch(table, vectorColumn, vec, distanceMetric, limit, cols, nil)
 
-	// Create timeout context for vector search
 	queryCtx, cancel := context.WithTimeout(ctx, VectorSearchTimeout)
 	defer cancel()
 
@@ -114,7 +122,7 @@ func (e *QueryExecutor) ExecuteVectorSearch(ctx context.Context, table, vectorCo
 	return results, nil
 }
 
-// ExecuteQuery executes a query and returns all rows
+/* ExecuteQuery executes a query and returns all rows */
 func (e *QueryExecutor) ExecuteQuery(ctx context.Context, query string, params []interface{}) ([]map[string]interface{}, error) {
 	if e.db == nil {
 		return nil, fmt.Errorf("query executor database instance is nil: cannot execute query '%s' with %d parameters", query, len(params))
@@ -128,7 +136,6 @@ func (e *QueryExecutor) ExecuteQuery(ctx context.Context, query string, params [
 		return nil, fmt.Errorf("query string is empty: cannot execute empty query")
 	}
 	
-	// Create timeout context
 	queryCtx, cancel := context.WithTimeout(ctx, DefaultQueryTimeout)
 	defer cancel()
 	
@@ -149,12 +156,12 @@ func (e *QueryExecutor) ExecuteQuery(ctx context.Context, query string, params [
 	return results, nil
 }
 
-// ExecuteQueryOne executes a query and returns a single row
+/* ExecuteQueryOne executes a query and returns a single row */
 func (e *QueryExecutor) ExecuteQueryOne(ctx context.Context, query string, params []interface{}) (map[string]interface{}, error) {
 	return e.ExecuteQueryOneWithTimeout(ctx, query, params, DefaultQueryTimeout)
 }
 
-// ExecuteQueryOneWithTimeout executes a query with a specific timeout
+/* ExecuteQueryOneWithTimeout executes a query with a specific timeout */
 func (e *QueryExecutor) ExecuteQueryOneWithTimeout(ctx context.Context, query string, params []interface{}, timeout time.Duration) (map[string]interface{}, error) {
 	if e.db == nil {
 		return nil, fmt.Errorf("query executor database instance is nil: cannot execute single-row query '%s' with %d parameters", query, len(params))
@@ -168,7 +175,6 @@ func (e *QueryExecutor) ExecuteQueryOneWithTimeout(ctx context.Context, query st
 		return nil, fmt.Errorf("query string is empty: cannot execute empty query for single row result")
 	}
 	
-	// Create timeout context
 	queryCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	
@@ -191,7 +197,6 @@ func (e *QueryExecutor) ExecuteQueryOneWithTimeout(ctx context.Context, query st
 		return nil, fmt.Errorf("multiple rows returned from single-row query: query='%s', parameter_count=%d, parameters=%v (expected exactly one row, got at least two)", query, len(params), params)
 	}
 
-	// Check if context was cancelled (timeout)
 	if queryCtx.Err() != nil {
 		return nil, fmt.Errorf("query timeout after %v: query='%s', parameter_count=%d, error=%w", timeout, query, len(params), queryCtx.Err())
 	}
@@ -199,7 +204,7 @@ func (e *QueryExecutor) ExecuteQueryOneWithTimeout(ctx context.Context, query st
 	return result, nil
 }
 
-// Exec executes a query without returning rows (for DDL statements)
+/* Exec executes a query without returning rows (for DDL statements) */
 func (e *QueryExecutor) Exec(ctx context.Context, query string, params []interface{}) error {
 	if e.db == nil {
 		return fmt.Errorf("query executor database instance is nil: cannot execute DDL query '%s' with %d parameters", query, len(params))
@@ -220,7 +225,7 @@ func (e *QueryExecutor) Exec(ctx context.Context, query string, params []interfa
 	return nil
 }
 
-// scanRowsToMaps scans all rows into maps
+/* scanRowsToMaps scans all rows into maps */
 func scanRowsToMaps(rows pgx.Rows) ([]map[string]interface{}, error) {
 	var results []map[string]interface{}
 	rowNum := 0
@@ -246,7 +251,7 @@ func scanRowsToMaps(rows pgx.Rows) ([]map[string]interface{}, error) {
 	return results, nil
 }
 
-// scanRowToMap scans a single row into a map
+/* scanRowToMap scans a single row into a map */
 func scanRowToMap(rows pgx.Rows) (map[string]interface{}, error) {
 	fieldDescriptions := rows.FieldDescriptions()
 	if len(fieldDescriptions) == 0 {
@@ -269,9 +274,7 @@ func scanRowToMap(rows pgx.Rows) (map[string]interface{}, error) {
 	result := make(map[string]interface{})
 	for i, desc := range fieldDescriptions {
 		val := values[i]
-		// Handle byte arrays (JSON, text, etc.)
 		if bytes, ok := val.([]byte); ok {
-			// Try to parse as JSON
 			var jsonVal interface{}
 			if err := json.Unmarshal(bytes, &jsonVal); err == nil {
 				val = jsonVal

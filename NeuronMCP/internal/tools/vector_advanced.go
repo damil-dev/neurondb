@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * vector_advanced.go
+ *    Tool implementation for NeuronMCP
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/tools/vector_advanced.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package tools
 
 import (
@@ -8,14 +21,14 @@ import (
 	"github.com/neurondb/NeuronMCP/internal/logging"
 )
 
-// VectorArithmeticTool performs vector arithmetic operations
+/* VectorArithmeticTool performs vector arithmetic operations */
 type VectorArithmeticTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewVectorArithmeticTool creates a new vector arithmetic tool
+/* NewVectorArithmeticTool creates a new vector arithmetic tool */
 func NewVectorArithmeticTool(db *database.Database, logger *logging.Logger) *VectorArithmeticTool {
 	return &VectorArithmeticTool{
 		BaseTool: NewBaseTool(
@@ -52,7 +65,7 @@ func NewVectorArithmeticTool(db *database.Database, logger *logging.Logger) *Vec
 	}
 }
 
-// Execute executes the vector arithmetic operation
+/* Execute executes the vector arithmetic operation */
 func (t *VectorArithmeticTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -140,14 +153,14 @@ func (t *VectorArithmeticTool) Execute(ctx context.Context, params map[string]in
 	}), nil
 }
 
-// VectorDistanceTool computes distance between two vectors using various metrics
+/* VectorDistanceTool computes distance between two vectors using various metrics */
 type VectorDistanceTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewVectorDistanceTool creates a new vector distance tool
+/* NewVectorDistanceTool creates a new vector distance tool */
 func NewVectorDistanceTool(db *database.Database, logger *logging.Logger) *VectorDistanceTool {
 	return &VectorDistanceTool{
 		BaseTool: NewBaseTool(
@@ -191,7 +204,7 @@ func NewVectorDistanceTool(db *database.Database, logger *logging.Logger) *Vecto
 	}
 }
 
-// Execute executes the vector distance computation
+/* Execute executes the vector distance computation */
 func (t *VectorDistanceTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -261,7 +274,7 @@ func (t *VectorDistanceTool) Execute(ctx context.Context, params map[string]inte
 		query = "SELECT vector_mahalanobis_distance($1::vector, $2::vector, $3::vector) AS distance"
 		queryParams = []interface{}{vec1Str, vec2Str, covStr}
 	default:
-		// Use unified distance function
+   /* Use unified distance function */
 		pValue := 3.0
 		if p, ok := params["p_value"].(float64); ok {
 			pValue = p
@@ -287,14 +300,14 @@ func (t *VectorDistanceTool) Execute(ctx context.Context, params map[string]inte
 	}), nil
 }
 
-// VectorSimilarityUnifiedTool computes similarity using unified function
+/* VectorSimilarityUnifiedTool computes similarity using unified function */
 type VectorSimilarityUnifiedTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewVectorSimilarityUnifiedTool creates a new unified similarity tool
+/* NewVectorSimilarityUnifiedTool creates a new unified similarity tool */
 func NewVectorSimilarityUnifiedTool(db *database.Database, logger *logging.Logger) *VectorSimilarityUnifiedTool {
 	return &VectorSimilarityUnifiedTool{
 		BaseTool: NewBaseTool(
@@ -328,7 +341,7 @@ func NewVectorSimilarityUnifiedTool(db *database.Database, logger *logging.Logge
 	}
 }
 
-// Execute executes the similarity computation
+/* Execute executes the similarity computation */
 func (t *VectorSimilarityUnifiedTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {

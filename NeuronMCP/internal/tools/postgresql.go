@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * postgresql.go
+ *    Tool implementation for NeuronMCP
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/tools/postgresql.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package tools
 
 import (
@@ -8,14 +21,14 @@ import (
 	"github.com/neurondb/NeuronMCP/internal/logging"
 )
 
-// PostgreSQLVersionTool retrieves PostgreSQL version information
+/* PostgreSQLVersionTool retrieves PostgreSQL version information */
 type PostgreSQLVersionTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewPostgreSQLVersionTool creates a new PostgreSQL version tool
+/* NewPostgreSQLVersionTool creates a new PostgreSQL version tool */
 func NewPostgreSQLVersionTool(db *database.Database, logger *logging.Logger) *PostgreSQLVersionTool {
 	return &PostgreSQLVersionTool{
 		BaseTool: NewBaseTool(
@@ -32,9 +45,9 @@ func NewPostgreSQLVersionTool(db *database.Database, logger *logging.Logger) *Po
 	}
 }
 
-// Execute executes the PostgreSQL version query
+/* Execute executes the PostgreSQL version query */
 func (t *PostgreSQLVersionTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
-	// Query PostgreSQL version information
+  /* Query PostgreSQL version information */
 	versionQuery := `
 		SELECT 
 			version() AS version,
@@ -68,14 +81,14 @@ func (t *PostgreSQLVersionTool) Execute(ctx context.Context, params map[string]i
 	}), nil
 }
 
-// PostgreSQLStatsTool retrieves PostgreSQL statistics
+/* PostgreSQLStatsTool retrieves PostgreSQL statistics */
 type PostgreSQLStatsTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewPostgreSQLStatsTool creates a new PostgreSQL statistics tool
+/* NewPostgreSQLStatsTool creates a new PostgreSQL statistics tool */
 func NewPostgreSQLStatsTool(db *database.Database, logger *logging.Logger) *PostgreSQLStatsTool {
 	return &PostgreSQLStatsTool{
 		BaseTool: NewBaseTool(
@@ -113,7 +126,7 @@ func NewPostgreSQLStatsTool(db *database.Database, logger *logging.Logger) *Post
 	}
 }
 
-// Execute executes the PostgreSQL statistics query
+/* Execute executes the PostgreSQL statistics query */
 func (t *PostgreSQLStatsTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	includeDBStats := true
 	includeTableStats := true
@@ -135,7 +148,7 @@ func (t *PostgreSQLStatsTool) Execute(ctx context.Context, params map[string]int
 
 	stats := make(map[string]interface{})
 
-	// Database statistics
+  /* Database statistics */
 	if includeDBStats {
 		dbStatsQuery := `
 			SELECT 
@@ -155,7 +168,7 @@ func (t *PostgreSQLStatsTool) Execute(ctx context.Context, params map[string]int
 		}
 	}
 
-	// Connection statistics
+  /* Connection statistics */
 	if includeConnStats {
 		connStatsQuery := `
 			SELECT 
@@ -176,7 +189,7 @@ func (t *PostgreSQLStatsTool) Execute(ctx context.Context, params map[string]int
 		}
 	}
 
-	// Table statistics
+  /* Table statistics */
 	if includeTableStats {
 		tableStatsQuery := `
 			SELECT 
@@ -197,7 +210,7 @@ func (t *PostgreSQLStatsTool) Execute(ctx context.Context, params map[string]int
 		}
 	}
 
-	// Performance statistics
+  /* Performance statistics */
 	if includePerfStats {
 		perfStatsQuery := `
 			SELECT 
@@ -221,7 +234,7 @@ func (t *PostgreSQLStatsTool) Execute(ctx context.Context, params map[string]int
 			stats["performance"] = perfStats
 		}
 
-		// Cache hit ratio
+   /* Cache hit ratio */
 		cacheQuery := `
 			SELECT 
 				sum(heap_blks_hit)::float / NULLIF(sum(heap_blks_hit) + sum(heap_blks_read), 0) * 100 AS heap_cache_hit_ratio,
@@ -241,7 +254,7 @@ func (t *PostgreSQLStatsTool) Execute(ctx context.Context, params map[string]int
 		}
 	}
 
-	// Server information
+  /* Server information */
 	serverInfoQuery := `
 		SELECT 
 			current_setting('server_version') AS server_version,
@@ -275,14 +288,14 @@ func (t *PostgreSQLStatsTool) Execute(ctx context.Context, params map[string]int
 	}), nil
 }
 
-// PostgreSQLDatabaseListTool lists all databases
+/* PostgreSQLDatabaseListTool lists all databases */
 type PostgreSQLDatabaseListTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewPostgreSQLDatabaseListTool creates a new PostgreSQL database list tool
+/* NewPostgreSQLDatabaseListTool creates a new PostgreSQL database list tool */
 func NewPostgreSQLDatabaseListTool(db *database.Database, logger *logging.Logger) *PostgreSQLDatabaseListTool {
 	return &PostgreSQLDatabaseListTool{
 		BaseTool: NewBaseTool(
@@ -305,7 +318,7 @@ func NewPostgreSQLDatabaseListTool(db *database.Database, logger *logging.Logger
 	}
 }
 
-// Execute executes the database list query
+/* Execute executes the database list query */
 func (t *PostgreSQLDatabaseListTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	includeSystem := false
 	if val, ok := params["include_system"].(bool); ok {

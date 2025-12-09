@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * rag.go
+ *    Tool implementation for NeuronMCP
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/tools/rag.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package tools
 
 import (
@@ -8,14 +21,14 @@ import (
 	"github.com/neurondb/NeuronMCP/internal/logging"
 )
 
-// ProcessDocumentTool processes a document for RAG
+/* ProcessDocumentTool processes a document for RAG */
 type ProcessDocumentTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewProcessDocumentTool creates a new process document tool
+/* NewProcessDocumentTool creates a new process document tool */
 func NewProcessDocumentTool(db *database.Database, logger *logging.Logger) *ProcessDocumentTool {
 	return &ProcessDocumentTool{
 		BaseTool: NewBaseTool(
@@ -54,7 +67,7 @@ func NewProcessDocumentTool(db *database.Database, logger *logging.Logger) *Proc
 	}
 }
 
-// Execute executes the document processing
+/* Execute executes the document processing */
 func (t *ProcessDocumentTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -116,7 +129,7 @@ func (t *ProcessDocumentTool) Execute(ctx context.Context, params map[string]int
 		}), nil
 	}
 
-	// Use NeuronDB's unified chunking function: neurondb.chunk(document_text, chunk_size, chunk_overlap, method)
+  /* Use NeuronDB's unified chunking function: neurondb.chunk(document_text, chunk_size, chunk_overlap, method) */
 	query := `SELECT json_agg(json_build_object('chunk_id', chunk_id, 'chunk_text', chunk_text, 'start_pos', start_pos, 'end_pos', end_pos)) AS chunks FROM neurondb.chunk($1, $2, $3, 'fixed')`
 	result, err := t.executor.ExecuteQueryOne(ctx, query, []interface{}{text, chunkSize, overlap})
 	if err != nil {
@@ -130,10 +143,10 @@ func (t *ProcessDocumentTool) Execute(ctx context.Context, params map[string]int
 		}), nil
 	}
 
-	// If embeddings requested, generate them
+  /* If embeddings requested, generate them */
 	if generateEmbeddings {
-		// This would typically be done in a separate step or within the chunking function
-		// For now, return the chunks
+   /* This would typically be done in a separate step or within the chunking function */
+   /* For now, return the chunks */
 	}
 
 	return Success(result, map[string]interface{}{
@@ -142,14 +155,14 @@ func (t *ProcessDocumentTool) Execute(ctx context.Context, params map[string]int
 	}), nil
 }
 
-// RetrieveContextTool retrieves context for RAG
+/* RetrieveContextTool retrieves context for RAG */
 type RetrieveContextTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewRetrieveContextTool creates a new retrieve context tool
+/* NewRetrieveContextTool creates a new retrieve context tool */
 func NewRetrieveContextTool(db *database.Database, logger *logging.Logger) *RetrieveContextTool {
 	return &RetrieveContextTool{
 		BaseTool: NewBaseTool(
@@ -186,7 +199,7 @@ func NewRetrieveContextTool(db *database.Database, logger *logging.Logger) *Retr
 	}
 }
 
-// Execute executes the context retrieval
+/* Execute executes the context retrieval */
 func (t *RetrieveContextTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -251,7 +264,7 @@ func (t *RetrieveContextTool) Execute(ctx context.Context, params map[string]int
 		}), nil
 	}
 
-	// Generate embedding for query
+  /* Generate embedding for query */
 	embedQuery := `SELECT embed_text($1) AS embedding`
 	embedResult, err := t.executor.ExecuteQueryOne(ctx, embedQuery, []interface{}{queryText})
 	if err != nil {
@@ -265,14 +278,14 @@ func (t *RetrieveContextTool) Execute(ctx context.Context, params map[string]int
 		}), nil
 	}
 
-	// Extract embedding vector (assuming it's in the result)
-	// Then perform vector search
-	// For now, use the retrieve_context function if available
+  /* Extract embedding vector (assuming it's in the result) */
+  /* Then perform vector search */
+  /* For now, use the retrieve_context function if available */
 	retrieveQuery := `SELECT neurondb_retrieve_context_c($1, $2, $3, $4) AS context`
 	result, err := t.executor.ExecuteQueryOne(ctx, retrieveQuery, []interface{}{queryText, table, vectorColumn, limit})
 	if err != nil {
-		// Fallback to manual vector search
-		// This is a simplified version - actual implementation would use the embedding
+   /* Fallback to manual vector search */
+   /* This is a simplified version - actual implementation would use the embedding */
 		t.logger.Error("Context retrieval failed", err, params)
 		return Error(fmt.Sprintf("Context retrieval execution failed: query_length=%d, table='%s', vector_column='%s', limit=%d, embedding_generated=%v, error=%v", len(queryText), table, vectorColumn, limit, embedResult != nil, err), "RAG_ERROR", map[string]interface{}{
 			"query_length":      len(queryText),
@@ -289,14 +302,14 @@ func (t *RetrieveContextTool) Execute(ctx context.Context, params map[string]int
 	}), nil
 }
 
-// GenerateResponseTool generates a response using RAG
+/* GenerateResponseTool generates a response using RAG */
 type GenerateResponseTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewGenerateResponseTool creates a new generate response tool
+/* NewGenerateResponseTool creates a new generate response tool */
 func NewGenerateResponseTool(db *database.Database, logger *logging.Logger) *GenerateResponseTool {
 	return &GenerateResponseTool{
 		BaseTool: NewBaseTool(
@@ -323,7 +336,7 @@ func NewGenerateResponseTool(db *database.Database, logger *logging.Logger) *Gen
 	}
 }
 
-// Execute executes the response generation
+/* Execute executes the response generation */
 func (t *GenerateResponseTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -381,14 +394,14 @@ func (t *GenerateResponseTool) Execute(ctx context.Context, params map[string]in
 		}
 	}
 
-	// Use NeuronDB's LLM function for response generation
-	// neurondb.llm(task, model, input_text, input_array, params, max_length)
+  /* Use NeuronDB's LLM function for response generation */
+  /* neurondb.llm(task, model, input_text, input_array, params, max_length) */
 	modelName := "default"
 	if m, ok := params["model"].(string); ok && m != "" {
 		modelName = m
 	}
 
-	// Build prompt with context
+  /* Build prompt with context */
 	prompt := fmt.Sprintf("Context:\n%s\n\nQuestion: %s\n\nAnswer:", contextStr, query)
 	
 	llmParams := fmt.Sprintf(`{"temperature": 0.7, "max_tokens": 500}`)
@@ -407,14 +420,14 @@ func (t *GenerateResponseTool) Execute(ctx context.Context, params map[string]in
 	return Success(result, nil), nil
 }
 
-// ChunkDocumentTool chunks a document into smaller pieces
+/* ChunkDocumentTool chunks a document into smaller pieces */
 type ChunkDocumentTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewChunkDocumentTool creates a new chunk document tool
+/* NewChunkDocumentTool creates a new chunk document tool */
 func NewChunkDocumentTool(db *database.Database, logger *logging.Logger) *ChunkDocumentTool {
 	return &ChunkDocumentTool{
 		BaseTool: NewBaseTool(
@@ -448,7 +461,7 @@ func NewChunkDocumentTool(db *database.Database, logger *logging.Logger) *ChunkD
 	}
 }
 
-// Execute executes the document chunking
+/* Execute executes the document chunking */
 func (t *ChunkDocumentTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -506,7 +519,7 @@ func (t *ChunkDocumentTool) Execute(ctx context.Context, params map[string]inter
 		}), nil
 	}
 
-	// Use NeuronDB's unified chunking function: neurondb.chunk(document_text, chunk_size, chunk_overlap, method)
+  /* Use NeuronDB's unified chunking function: neurondb.chunk(document_text, chunk_size, chunk_overlap, method) */
 	query := `SELECT json_agg(json_build_object('chunk_id', chunk_id, 'chunk_text', chunk_text, 'start_pos', start_pos, 'end_pos', end_pos)) AS chunks FROM neurondb.chunk($1, $2, $3, 'fixed')`
 	result, err := t.executor.ExecuteQueryOne(ctx, query, []interface{}{text, chunkSize, overlap})
 	if err != nil {

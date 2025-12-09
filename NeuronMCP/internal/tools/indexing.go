@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * indexing.go
+ *    Tool implementation for NeuronMCP
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/tools/indexing.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package tools
 
 import (
@@ -8,14 +21,14 @@ import (
 	"github.com/neurondb/NeuronMCP/internal/logging"
 )
 
-// CreateHNSWIndexTool creates an HNSW index
+/* CreateHNSWIndexTool creates an HNSW index */
 type CreateHNSWIndexTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewCreateHNSWIndexTool creates a new create HNSW index tool
+/* NewCreateHNSWIndexTool creates a new create HNSW index tool */
 func NewCreateHNSWIndexTool(db *database.Database, logger *logging.Logger) *CreateHNSWIndexTool {
 	return &CreateHNSWIndexTool{
 		BaseTool: NewBaseTool(
@@ -59,7 +72,7 @@ func NewCreateHNSWIndexTool(db *database.Database, logger *logging.Logger) *Crea
 	}
 }
 
-// Execute executes the HNSW index creation
+/* Execute executes the HNSW index creation */
 func (t *CreateHNSWIndexTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -132,8 +145,8 @@ func (t *CreateHNSWIndexTool) Execute(ctx context.Context, params map[string]int
 		}), nil
 	}
 
-	// Use NeuronDB's unified index creation function
-	// neurondb.create_index(table_name, vector_col, index_type, params)
+  /* Use NeuronDB's unified index creation function */
+  /* neurondb.create_index(table_name, vector_col, index_type, params) */
 	paramsJSON := fmt.Sprintf(`{"m": %d, "ef_construction": %d}`, m, efConstruction)
 	query := `SELECT neurondb.create_index($1, $2, $3, $4::jsonb) AS result`
 	result, err := t.executor.ExecuteQueryOne(ctx, query, []interface{}{
@@ -158,14 +171,14 @@ func (t *CreateHNSWIndexTool) Execute(ctx context.Context, params map[string]int
 	}), nil
 }
 
-// CreateIVFIndexTool creates an IVF index
+/* CreateIVFIndexTool creates an IVF index */
 type CreateIVFIndexTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewCreateIVFIndexTool creates a new create IVF index tool
+/* NewCreateIVFIndexTool creates a new create IVF index tool */
 func NewCreateIVFIndexTool(db *database.Database, logger *logging.Logger) *CreateIVFIndexTool {
 	return &CreateIVFIndexTool{
 		BaseTool: NewBaseTool(
@@ -201,7 +214,7 @@ func NewCreateIVFIndexTool(db *database.Database, logger *logging.Logger) *Creat
 	}
 }
 
-// Execute executes the IVF index creation
+/* Execute executes the IVF index creation */
 func (t *CreateIVFIndexTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -255,8 +268,8 @@ func (t *CreateIVFIndexTool) Execute(ctx context.Context, params map[string]inte
 		}), nil
 	}
 
-	// Use NeuronDB's unified index creation function
-	// neurondb.create_index(table_name, vector_col, index_type, params)
+  /* Use NeuronDB's unified index creation function */
+  /* neurondb.create_index(table_name, vector_col, index_type, params) */
 	paramsJSON := fmt.Sprintf(`{"num_lists": %d}`, numLists)
 	query := `SELECT neurondb.create_index($1, $2, $3, $4::jsonb) AS result`
 	result, err := t.executor.ExecuteQueryOne(ctx, query, []interface{}{
@@ -279,14 +292,14 @@ func (t *CreateIVFIndexTool) Execute(ctx context.Context, params map[string]inte
 	}), nil
 }
 
-// IndexStatusTool gets index status and statistics
+/* IndexStatusTool gets index status and statistics */
 type IndexStatusTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewIndexStatusTool creates a new index status tool
+/* NewIndexStatusTool creates a new index status tool */
 func NewIndexStatusTool(db *database.Database, logger *logging.Logger) *IndexStatusTool {
 	return &IndexStatusTool{
 		BaseTool: NewBaseTool(
@@ -308,7 +321,7 @@ func NewIndexStatusTool(db *database.Database, logger *logging.Logger) *IndexSta
 	}
 }
 
-// Execute executes the index status query
+/* Execute executes the index status query */
 func (t *IndexStatusTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -359,14 +372,14 @@ func (t *IndexStatusTool) Execute(ctx context.Context, params map[string]interfa
 	}), nil
 }
 
-// DropIndexTool drops a vector index
+/* DropIndexTool drops a vector index */
 type DropIndexTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewDropIndexTool creates a new drop index tool
+/* NewDropIndexTool creates a new drop index tool */
 func NewDropIndexTool(db *database.Database, logger *logging.Logger) *DropIndexTool {
 	return &DropIndexTool{
 		BaseTool: NewBaseTool(
@@ -388,7 +401,7 @@ func NewDropIndexTool(db *database.Database, logger *logging.Logger) *DropIndexT
 	}
 }
 
-// Execute executes the index drop
+/* Execute executes the index drop */
 func (t *DropIndexTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -407,7 +420,7 @@ func (t *DropIndexTool) Execute(ctx context.Context, params map[string]interface
 		}), nil
 	}
 
-	// Escape identifier for safety
+  /* Escape identifier for safety */
 	escapedName := database.EscapeIdentifier(indexName)
 	query := fmt.Sprintf("DROP INDEX IF EXISTS %s", escapedName)
 

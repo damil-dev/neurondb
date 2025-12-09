@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * hybrid_search.go
+ *    Tool implementation for NeuronMCP
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/tools/hybrid_search.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package tools
 
 import (
@@ -9,14 +22,14 @@ import (
 	"github.com/neurondb/NeuronMCP/internal/logging"
 )
 
-// HybridSearchTool performs hybrid semantic + lexical search
+/* HybridSearchTool performs hybrid semantic + lexical search */
 type HybridSearchTool struct {
 	*BaseTool
 	db     *database.Database
 	logger *logging.Logger
 }
 
-// NewHybridSearchTool creates a new HybridSearchTool
+/* NewHybridSearchTool creates a new HybridSearchTool */
 func NewHybridSearchTool(db *database.Database, logger *logging.Logger) *HybridSearchTool {
 	return &HybridSearchTool{
 		BaseTool: NewBaseTool(
@@ -73,7 +86,7 @@ func NewHybridSearchTool(db *database.Database, logger *logging.Logger) *HybridS
 	}
 }
 
-// Execute performs hybrid search
+/* Execute performs hybrid search */
 func (t *HybridSearchTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -152,10 +165,10 @@ func (t *HybridSearchTool) Execute(ctx context.Context, params map[string]interf
 		}), nil
 	}
 
-	// Format query vector
+  /* Format query vector */
 	vectorStr := formatVectorFromInterface(queryVector)
 
-	// Format filters as JSON string
+  /* Format filters as JSON string */
 	filtersJSON := "{}"
 	if len(filters) > 0 {
 		filtersBytes, err := json.Marshal(filters)
@@ -164,7 +177,7 @@ func (t *HybridSearchTool) Execute(ctx context.Context, params map[string]interf
 		}
 	}
 
-	// Use NeuronDB's hybrid_search function: hybrid_search(table, query_vec, query_text, filters, vector_weight, limit)
+  /* Use NeuronDB's hybrid_search function: hybrid_search(table, query_vec, query_text, filters, vector_weight, limit) */
 	query := `SELECT hybrid_search($1, $2::vector, $3, $4::text, $5, $6) AS results`
 	executor := NewQueryExecutor(t.db)
 	result, err := executor.ExecuteQueryOne(ctx, query, []interface{}{
