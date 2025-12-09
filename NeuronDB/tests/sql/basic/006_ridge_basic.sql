@@ -7,6 +7,7 @@
  *
  *-------------------------------------------------------------------------*/
 
+SET client_min_messages TO WARNING;
 \set ON_ERROR_STOP on
 \timing on
 \pset footer off
@@ -20,13 +21,17 @@
 
 DO $$
 DECLARE
-	gpu_mode TEXT;
-	current_gpu_enabled TEXT;
+	compute_mode TEXT;
 BEGIN
-	SELECT setting_value INTO gpu_mode FROM test_settings WHERE setting_key = 'gpu_mode';
-	SELECT current_setting('neurondb.gpu_enabled', true) INTO current_gpu_enabled;
-	IF gpu_mode = 'gpu' THEN
-		SELECT neurondb_gpu_enable();
+	-- Get compute_mode from test_settings (set by run_test.py)
+	SELECT setting_value INTO compute_mode FROM test_settings WHERE setting_key = 'compute_mode';
+	-- Note: compute_mode is set by run_test.py via switch_gpu_mode()
+	-- This block is kept for backward compatibility but compute_mode
+	-- should be set before running tests via run_test.py
+	IF compute_mode = 'gpu' THEN
+		PERFORM neurondb_gpu_enable();
+	ELSIF compute_mode = 'auto' THEN
+		PERFORM neurondb_gpu_enable();
 	END IF;
 END $$;
 
@@ -155,7 +160,9 @@ DECLARE
 	mid integer;
 	metrics_result jsonb;
 	eval_error text;
+	test_count bigint;
 BEGIN
+	-- Get model_id
 	SELECT model_id INTO mid FROM gpu_model_temp LIMIT 1;
 	IF mid IS NULL THEN
 		RAISE WARNING 'No model_id found in gpu_model_temp';
@@ -163,27 +170,34 @@ BEGIN
 		RETURN;
 	END IF;
 	
+	-- Verify test data is available
+	SELECT COUNT(*) INTO test_count 
+	FROM test_test_view 
+	WHERE features IS NOT NULL AND label IS NOT NULL;
+	
+	IF test_count < 1 THEN
+		RAISE WARNING 'No valid test samples available (count: %)', test_count;
+		INSERT INTO gpu_metrics_temp VALUES (jsonb_build_object('error', 'No valid test samples available'));
+		RETURN;
+	END IF;
+	
+	RAISE NOTICE 'Evaluating model_id: % on test_test_view with % valid samples', mid, test_count;
+	
 	BEGIN
-		BEGIN
-			metrics_result := neurondb.evaluate(mid, 'test_test_view', 'features', 'label');
-			
-			IF metrics_result IS NULL THEN
-				RAISE WARNING 'Evaluation returned NULL';
-				INSERT INTO gpu_metrics_temp VALUES ('{"error": "Evaluation returned NULL"}'::jsonb);
-			ELSE
-				INSERT INTO gpu_metrics_temp VALUES (metrics_result);
-			END IF;
-		EXCEPTION WHEN OTHERS THEN
-			eval_error := SQLERRM;
-			RAISE WARNING 'Evaluation exception: %', eval_error;
-			eval_error := REPLACE(REPLACE(REPLACE(eval_error, '"', '\"'), E'\n', ' '), E'\r', ' ');
-			INSERT INTO gpu_metrics_temp VALUES (jsonb_build_object('error', eval_error));
-		END;
+		metrics_result := neurondb.evaluate(mid, 'test_test_view', 'features', 'label');
+		
+		IF metrics_result IS NULL THEN
+			RAISE WARNING 'Evaluation returned NULL for model_id: %', mid;
+			INSERT INTO gpu_metrics_temp VALUES ('{"error": "Evaluation returned NULL"}'::jsonb);
+		ELSE
+			RAISE NOTICE 'Evaluation successful for model_id: %', mid;
+			INSERT INTO gpu_metrics_temp VALUES (metrics_result);
+		END IF;
 	EXCEPTION WHEN OTHERS THEN
 		eval_error := SQLERRM;
-		RAISE WARNING 'Outer evaluation exception: %', eval_error;
+		RAISE WARNING 'Evaluation exception for model_id %: %', mid, eval_error;
 		eval_error := REPLACE(REPLACE(REPLACE(eval_error, '"', '\"'), E'\n', ' '), E'\r', ' ');
-		INSERT INTO gpu_metrics_temp VALUES (jsonb_build_object('error', eval_error));
+		INSERT INTO gpu_metrics_temp VALUES (jsonb_build_object('error', eval_error, 'model_id', mid));
 	END;
 END $$;
 
@@ -204,17 +218,17 @@ WHERE m.model_id = t.model_id;
 /* Verify GPU was used for training when GPU mode is enabled */
 DO $$
 DECLARE
-	gpu_mode TEXT;
+	compute_mode TEXT;
 	storage_val TEXT;
 	gpu_available BOOLEAN;
 BEGIN
-	SELECT setting_value INTO gpu_mode FROM test_settings WHERE setting_key = 'gpu_mode';
+	SELECT setting_value INTO compute_mode FROM test_settings WHERE setting_key = 'compute_mode';
 	SELECT COALESCE(m.metrics::jsonb->>'storage', 'cpu') INTO storage_val
 	FROM neurondb.ml_models m, gpu_model_temp t
 	WHERE m.model_id = t.model_id;
 	
 	-- Only check GPU info if GPU mode is enabled - never call GPU functions in CPU mode
-	IF gpu_mode = 'gpu' THEN
+	IF compute_mode = 'gpu' THEN
 		BEGIN
 			-- Check if GPU is actually available (use is_available column which matches C code check)
 			SELECT COALESCE(BOOL_OR(is_available), false) INTO gpu_available
@@ -237,7 +251,7 @@ BEGIN
 	END IF;
 	
 	-- If CPU mode is enabled, verify model was trained on CPU
-	IF gpu_mode = 'cpu' AND storage_val = 'gpu' THEN
+	IF compute_mode = 'cpu' AND storage_val = 'gpu' THEN
 		RAISE WARNING 'CPU mode enabled but model was trained on GPU (storage=gpu)';
 	END IF;
 END $$;
@@ -403,11 +417,11 @@ WHERE tm.test_name = '006_ridge_basic';
 -- Only show GPU info if GPU mode is enabled - never call GPU functions in CPU mode
 DO $$
 DECLARE
-	gpu_mode TEXT;
+	compute_mode TEXT;
 BEGIN
-	SELECT setting_value INTO gpu_mode FROM test_settings WHERE setting_key = 'gpu_mode';
+	SELECT setting_value INTO compute_mode FROM test_settings WHERE setting_key = 'compute_mode';
 	
-	IF gpu_mode = 'gpu' THEN
+	IF compute_mode = 'gpu' THEN
 		-- Display GPU information only when GPU mode is enabled
 		PERFORM NULL; -- Placeholder for GPU info display
 	END IF;
@@ -416,16 +430,23 @@ END $$;
 -- Conditionally display GPU info only in GPU mode
 DO $$
 DECLARE
-	gpu_mode TEXT;
+	compute_mode TEXT;
+	rec RECORD;
 BEGIN
-	SELECT setting_value INTO gpu_mode FROM test_settings WHERE setting_key = 'gpu_mode';
+	SELECT setting_value INTO compute_mode FROM test_settings WHERE setting_key = 'compute_mode';
 	
-	IF gpu_mode = 'gpu' THEN
+	IF compute_mode = 'gpu' THEN
 		BEGIN
 			RAISE NOTICE 'GPU Information:';
-			PERFORM device_id, device_name, total_memory_mb, free_memory_mb, 
+			-- Display GPU info by looping through results
+			FOR rec IN SELECT device_id, device_name, total_memory_mb, free_memory_mb, 
 					compute_capability_major, compute_capability_minor, is_available
-			FROM neurondb_gpu_info();
+			FROM neurondb_gpu_info()
+			LOOP
+				RAISE NOTICE '  Device %: % (Memory: %/% MB, Compute: %.%, Available: %)',
+					rec.device_id, rec.device_name, rec.free_memory_mb, rec.total_memory_mb,
+					rec.compute_capability_major, rec.compute_capability_minor, rec.is_available;
+			END LOOP;
 		EXCEPTION WHEN OTHERS THEN
 			RAISE NOTICE 'GPU information not available';
 		END;

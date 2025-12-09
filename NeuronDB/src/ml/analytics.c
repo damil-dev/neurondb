@@ -51,6 +51,12 @@ feedback_loop_integrate(PG_FUNCTION_ARGS)
 	text	   *query;
 	text	   *result;
 	float4		user_rating;
+	char *query_str = NULL;
+	char *result_str = NULL;
+	const char *tbl_def;
+	int			ret;
+	NdbSpiSession *spi_session = NULL;
+	MemoryContext oldcontext;
 
 	/* Validate argument count */
 	if (PG_NARGS() < 3)
@@ -61,13 +67,6 @@ feedback_loop_integrate(PG_FUNCTION_ARGS)
 	query = PG_GETARG_TEXT_PP(0);
 	result = PG_GETARG_TEXT_PP(1);
 	user_rating = PG_GETARG_FLOAT4(2);
-	char *query_str = NULL;
-	char *result_str = NULL;
-	const char *tbl_def;
-	int			ret;
-
-	NdbSpiSession *spi_session = NULL;
-	MemoryContext oldcontext;
 
 	query_str = text_to_cstring(query);
 	result_str = text_to_cstring(result);

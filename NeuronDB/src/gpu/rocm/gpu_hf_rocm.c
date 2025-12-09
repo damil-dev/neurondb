@@ -199,7 +199,7 @@ ndb_rocm_hf_load_model_weights(const char *model_name,
 								(size_t)config->embed_dim * config->hidden_dim * 2 * sizeof(float) +
 								(size_t)config->vocab_size * config->embed_dim * sizeof(float);
 
-			host_weights_buffer = palloc(total_weights_size);
+			nalloc(host_weights_buffer, char, total_weights_size);
 			if (!host_weights_buffer)
 			{
 				neurondb_onnx_unload_model(onnx_session);
@@ -216,7 +216,7 @@ ndb_rocm_hf_load_model_weights(const char *model_name,
 			hip_err = hipMalloc(&device_weights_buffer, total_weights_size);
 			if (hip_err != hipSuccess)
 			{
-				pfree(host_weights_buffer);
+				nfree(host_weights_buffer);
 				neurondb_onnx_unload_model(onnx_session);
 				if (errstr)
 					*errstr = psprintf("failed to allocate GPU memory for model weights: %s",
@@ -230,7 +230,7 @@ ndb_rocm_hf_load_model_weights(const char *model_name,
 			if (hip_err != hipSuccess)
 			{
 				hipFree(device_weights_buffer);
-				pfree(host_weights_buffer);
+				nfree(host_weights_buffer);
 				neurondb_onnx_unload_model(onnx_session);
 				if (errstr)
 					*errstr = psprintf("failed to copy model weights to GPU: %s",
@@ -322,11 +322,11 @@ ndb_rocm_hf_tokenize_text(const char *text,
 			}
 
 			*seq_len = onnx_seq_len;
-			pfree(onnx_token_ids);
+			nfree(onnx_token_ids);
 			return 0;
 		}
 		if (onnx_token_ids)
-			pfree(onnx_token_ids);
+			nfree(onnx_token_ids);
 	}
 	PG_CATCH();
 	{
@@ -2782,7 +2782,8 @@ ndb_rocm_hf_generate_batch(const char *model_name,
 	num_streams = (num_prompts < max_streams) ? num_prompts : max_streams;
 
 	/* Create ROCm streams for parallel processing */
-	streams = (hipStream_t *)palloc0(num_streams * sizeof(hipStream_t));
+		nalloc(streams, hipStream_t, num_streams);
+		MemSet(streams, 0, sizeof(hipStream_t) * num_streams);
 	for (i = 0; i < num_streams; i++)
 	{
 		hipError_t cuda_err = hipStreamCreate(&streams[i]);

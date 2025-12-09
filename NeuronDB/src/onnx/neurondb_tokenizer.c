@@ -438,7 +438,7 @@ tokenize_text(const char *text, int *num_tokens)
 	_to_lower_case(text_copy);
 
 	/* Preallocate token pointer array */
-	tokens = (char **) palloc(capacity * sizeof(char *));
+	nalloc(tokens, char *, capacity);
 	count = 0;
 
 	/* Tokenize by whitespace: space, tab, newline, and carriage return */
@@ -537,7 +537,8 @@ neurondb_tokenize_with_model(const char *text,
 	 * Allocate output array, zeroed (so all trailing positions are [PAD]). We
 	 * always write max_length elements, zero-initialized.
 	 */
-	token_ids = (int32 *) palloc0(max_length * sizeof(int32));
+		nalloc(token_ids, int32, max_length);
+		MemSet(token_ids, 0, sizeof(int32) * max_length);
 
 	/* Add [CLS] at beginning */
 	output_idx = 0;
@@ -673,7 +674,7 @@ neurondb_create_attention_mask(int32 * token_ids, int32 length)
 	Assert(token_ids != NULL);
 	Assert(length > 0);
 
-	mask = (int32 *) palloc(length * sizeof(int32));
+	nalloc(mask, int32, length);
 	for (i = 0; i < length; ++i)
 	{
 		/* If not a [PAD] ID, mask value = 1, else 0. */
@@ -798,8 +799,8 @@ neurondb_hf_tokenize(PG_FUNCTION_ARGS)
 											 text_str, max_length, &output_length, model_name);
 
 	/* Allocate arrays for result */
-	dvalues = (Datum *) palloc(output_length * sizeof(Datum));
-	dnulls = (bool *) palloc(output_length * sizeof(bool));
+	nalloc(dvalues, Datum, output_length);
+	nalloc(dnulls, bool, output_length);
 
 	/* Fill arrays */
 	for (i = 0; i < output_length; i++)
@@ -908,7 +909,7 @@ neurondb_hf_detokenize(PG_FUNCTION_ARGS)
 					  &length);
 
 	/* Allocate token IDs array */
-	token_ids = (int32 *) palloc(length * sizeof(int32));
+	nalloc(token_ids, int32, length);
 
 	/* Copy token IDs */
 	for (i = 0; i < length; i++)

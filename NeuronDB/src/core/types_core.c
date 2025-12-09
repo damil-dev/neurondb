@@ -66,7 +66,7 @@ vectorp_in(PG_FUNCTION_ARGS)
 	if (*ptr == '[')
 		ptr++;
 
-	temp_data = (float4 *) palloc(sizeof(float4) * capacity);
+	nalloc(temp_data, float4, capacity);
 
 	while (*ptr && *ptr != ']')
 	{
@@ -100,7 +100,12 @@ vectorp_in(PG_FUNCTION_ARGS)
 						"dimension")));
 
 	size = VECTORP_SIZE(dim);
-	result = (VectorPacked *) palloc0(size);
+		{
+			char *tmp = NULL;
+			nalloc(tmp, char, size);
+			result = (VectorPacked *) tmp;
+			MemSet(result, 0, size);
+		}
 	SET_VARSIZE(result, size);
 
 	/* Compute fingerprint (CRC32 of dimension count) */
@@ -325,7 +330,12 @@ vecmap_in(PG_FUNCTION_ARGS)
 	}
 
 	size = sizeof(VectorMap) + sizeof(int32) * nnz + sizeof(float4) * nnz;
-	result = (VectorMap *) palloc0(size);
+		{
+			char *tmp = NULL;
+			nalloc(tmp, char, size);
+			result = (VectorMap *) tmp;
+			MemSet(result, 0, size);
+		}
 	SET_VARSIZE(result, size);
 
 	result->total_dim = dim;
@@ -414,7 +424,12 @@ rtext_in(PG_FUNCTION_ARGS)
 
 	/* Basic implementation: store text, tokenize later */
 	size = sizeof(RetrievableText) + text_len + 1;
-	result = (RetrievableText *) palloc0(size);
+		{
+			char *tmp = NULL;
+			nalloc(tmp, char, size);
+			result = (RetrievableText *) tmp;
+			MemSet(result, 0, size);
+		}
 	SET_VARSIZE(result, size);
 
 	result->text_len = text_len;
@@ -445,7 +460,7 @@ rtext_out(PG_FUNCTION_ARGS)
 
 	rt = (RetrievableText *) PG_GETARG_POINTER(0);
 
-	result = (char *) palloc(rt->text_len + 1);
+	nalloc(result, char, rt->text_len + 1);
 	memcpy(result, RTEXT_DATA(rt), rt->text_len);
 	result[rt->text_len] = '\0';
 
@@ -632,7 +647,12 @@ vgraph_in(PG_FUNCTION_ARGS)
 
 	/* Build result - simplified: no node IDs, just edges */
 	size = sizeof(VectorGraph) + sizeof(GraphEdge) * num_edges;
-	result = (VectorGraph *) palloc0(size);
+		{
+			char *tmp = NULL;
+			nalloc(tmp, char, size);
+			result = (VectorGraph *) tmp;
+			MemSet(result, 0, size);
+		}
 	SET_VARSIZE(result, size);
 
 	result->num_nodes = num_nodes;

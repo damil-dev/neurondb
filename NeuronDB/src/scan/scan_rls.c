@@ -80,7 +80,8 @@ ndb_rls_init(Relation rel, EState * estate)
 {
 	RLSFilterState *state = NULL;
 
-	state = (RLSFilterState *) palloc0(sizeof(RLSFilterState));
+	nalloc(state, RLSFilterState, 1);
+	MemSet(state, 0, sizeof(RLSFilterState));
 	state->rel = rel;
 	state->userId = GetUserId();
 
@@ -441,7 +442,7 @@ ndb_rls_filter_results(Relation rel,
 	}
 
 	/* Allocate result array */
-	result = (ItemPointer *) palloc(count * sizeof(ItemPointer));
+	nalloc(result, ItemPointer, count);
 
 	/* Filter each item */
 	for (i = 0; i < count; i++)

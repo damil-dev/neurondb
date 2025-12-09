@@ -57,7 +57,7 @@ ndb_text_to_cstring_safe(text * t)
 				 errmsg("empty text argument")));
 
 	/* Allocate a string with NUL terminator */
-	result = (char *) palloc(len + 1);
+	nalloc(result, char, len + 1);
 	memcpy(result, VARDATA_ANY(t), len);
 	result[len] = '\0';
 
@@ -76,6 +76,9 @@ create_tenant_worker(PG_FUNCTION_ARGS)
 	text	   *tenant_id;
 	text	   *worker_type;
 	text	   *config;
+	char	   *tid_str = NULL;
+	char	   *type_str = NULL;
+	int32		worker_id = 0;
 
 	/* Validate argument count */
 	if (PG_NARGS() < 3)
@@ -86,9 +89,6 @@ create_tenant_worker(PG_FUNCTION_ARGS)
 	tenant_id = PG_GETARG_TEXT_PP(0);
 	worker_type = PG_GETARG_TEXT_PP(1);
 	config = PG_GETARG_TEXT_PP(2);
-	char	   *tid_str = NULL;
-	char	   *type_str = NULL;
-	int32		worker_id = 0;
 
 	/* Defensive argument checks */
 	if (tenant_id == NULL || worker_type == NULL || config == NULL)
@@ -214,6 +214,10 @@ create_policy(PG_FUNCTION_ARGS)
 {
 	text	   *policy_name;
 	text	   *policy_rule;
+	char	   *name_str = NULL;
+	char	   *rule_str = NULL;
+	volatile bool success = false;
+	NdbSpiSession *session = NULL;
 
 	/* Validate argument count */
 	if (PG_NARGS() < 2)
@@ -223,11 +227,6 @@ create_policy(PG_FUNCTION_ARGS)
 
 	policy_name = PG_GETARG_TEXT_PP(0);
 	policy_rule = PG_GETARG_TEXT_PP(1);
-	char	   *name_str = NULL;
-	char	   *rule_str = NULL;
-	volatile bool success = false;
-
-	NdbSpiSession *session = NULL;
 
 	if (policy_name == NULL || policy_rule == NULL)
 		ereport(ERROR,
@@ -340,7 +339,7 @@ compute_hmac_sha256(const char *key, const char *data)
 	}
 
 	/* Convert to hex string */
-	hex_hmac = (char *) palloc(SHA256_DIGEST_LENGTH * 2 + 1);
+	nalloc(hex_hmac, char, SHA256_DIGEST_LENGTH * 2 + 1);
 	for (i = 0; i < SHA256_DIGEST_LENGTH; i++)
 	{
 		sprintf(hex_hmac + (i * 2), "%02x", hmac[i]);
@@ -357,6 +356,14 @@ audit_log_query(PG_FUNCTION_ARGS)
 	text	   *query_text;
 	text	   *user_id;
 	Vector	   *result_vectors;
+	char	   *query_str = NULL;
+	char	   *user_str = NULL;
+	volatile	uint32 vector_hash = 0;
+	volatile bool success = false;
+	char *hmac_hex = NULL;
+	char *hmac_key = NULL;
+	StringInfoData hmac_data;
+	NdbSpiSession *session = NULL;
 
 	/* Validate argument count */
 	if (PG_NARGS() < 3)
@@ -367,15 +374,6 @@ audit_log_query(PG_FUNCTION_ARGS)
 	query_text = PG_GETARG_TEXT_PP(0);
 	user_id = PG_GETARG_TEXT_PP(1);
 	result_vectors = (Vector *) PG_GETARG_POINTER(2);
-	char	   *query_str = NULL;
-	char	   *user_str = NULL;
-	volatile	uint32 vector_hash = 0;
-	volatile bool success = false;
-	char *hmac_hex = NULL;
-	char *hmac_key = NULL;
-	StringInfoData hmac_data;
-
-	NdbSpiSession *session = NULL;
 
 	if (query_text == NULL || user_id == NULL || result_vectors == NULL)
 		ereport(ERROR,

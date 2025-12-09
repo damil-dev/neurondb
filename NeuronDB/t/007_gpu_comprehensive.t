@@ -54,14 +54,14 @@ subtest 'GPU Info - Positive' => sub {
 	
 	# Check GPU enabled setting
 	$result = $node->psql('postgres', q{
-		SELECT current_setting('neurondb.gpu_enabled', true);
+		SELECT current_setting('neurondb.compute_mode', true);
 	}, tuples_only => 1);
 	ok($result->{success}, 'gpu_enabled setting accessible');
 	
 	# Try to enable GPU
 	$result = $node->psql('postgres', q{
-		SET neurondb.gpu_enabled = 'on';
-		SELECT current_setting('neurondb.gpu_enabled', true);
+		SET neurondb.compute_mode = 'on';
+		SELECT current_setting('neurondb.compute_mode', true);
 	}, tuples_only => 1);
 	ok($result->{success}, 'gpu_enabled can be set');
 };
@@ -74,7 +74,7 @@ subtest 'GPU Distance Functions - Positive' => sub {
 	plan tests => 15;
 	
 	# Enable GPU if possible
-	$node->psql('postgres', q{SET neurondb.gpu_enabled = 'on';});
+	$node->psql('postgres', q{SET neurondb.compute_mode = 'on';});
 	
 	# GPU L2 distance
 	my $result = $node->psql('postgres', q{
@@ -145,7 +145,7 @@ subtest 'GPU Distance Functions - Negative' => sub {
 	plan tests => 10;
 	
 	# Disable GPU
-	$node->psql('postgres', q{SET neurondb.gpu_enabled = 'off';});
+	$node->psql('postgres', q{SET neurondb.compute_mode = 'off';});
 	
 	# GPU functions should fail or return error when GPU disabled
 	my $result = $node->psql('postgres', q{
@@ -183,7 +183,7 @@ subtest 'GPU Settings - Positive' => sub {
 	
 	# Test all GPU-related settings
 	my @gpu_settings = qw(
-		neurondb.gpu_enabled
+		neurondb.compute_mode
 		neurondb.gpu_kernels
 		neurondb.gpu_memory_limit
 		neurondb.gpu_device_id
@@ -199,15 +199,15 @@ subtest 'GPU Settings - Positive' => sub {
 	
 	# Try to set GPU enabled
 	my $result = $node->psql('postgres', q{
-		SET neurondb.gpu_enabled = 'on';
-		SELECT current_setting('neurondb.gpu_enabled', true);
+		SET neurondb.compute_mode = 'on';
+		SELECT current_setting('neurondb.compute_mode', true);
 	}, tuples_only => 1);
 	ok($result->{success}, 'gpu_enabled can be set to on');
 	
 	# Try to set GPU disabled
 	$result = $node->psql('postgres', q{
-		SET neurondb.gpu_enabled = 'off';
-		SELECT current_setting('neurondb.gpu_enabled', true);
+		SET neurondb.compute_mode = 'off';
+		SELECT current_setting('neurondb.compute_mode', true);
 	}, tuples_only => 1);
 	ok($result->{success}, 'gpu_enabled can be set to off');
 };
@@ -221,7 +221,7 @@ subtest 'GPU Settings - Negative' => sub {
 	
 	# Invalid GPU enabled value
 	my $result = $node->psql('postgres', q{
-		SET neurondb.gpu_enabled = 'invalid';
+		SET neurondb.compute_mode = 'invalid';
 	});
 	ok(!$result->{success}, 'invalid gpu_enabled value rejected');
 	

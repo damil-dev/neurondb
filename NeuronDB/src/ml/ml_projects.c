@@ -67,6 +67,15 @@ neurondb_create_ml_project(PG_FUNCTION_ARGS)
 	text	   *project_name_text;
 	text	   *model_type_text;
 	text	   *description_text;
+	char *project_name = NULL;
+	char *model_type = NULL;
+	char *description = NULL;
+	StringInfoData sql;
+	int			ret;
+	int32		project_id_val;
+	int			project_id;
+	NdbSpiSession *spi_session = NULL;
+	MemoryContext oldcontext;
 
 	/* Validate minimum argument count */
 	if (PG_NARGS() < 2)
@@ -77,16 +86,6 @@ neurondb_create_ml_project(PG_FUNCTION_ARGS)
 	project_name_text = PG_GETARG_TEXT_PP(0);
 	model_type_text = PG_GETARG_TEXT_PP(1);
 	description_text = PG_ARGISNULL(2) ? NULL : PG_GETARG_TEXT_PP(2);
-
-	char *project_name = NULL;
-	char *model_type = NULL;
-	char *description = NULL;
-	StringInfoData sql;
-	int			ret;
-	int32		project_id_val;
-	int			project_id;
-	NdbSpiSession *spi_session = NULL;
-	MemoryContext oldcontext;
 
 	project_name = text_to_cstring(project_name_text);
 	model_type = text_to_cstring(model_type_text);
@@ -188,22 +187,20 @@ Datum
 neurondb_list_ml_projects(PG_FUNCTION_ARGS)
 {
 	ReturnSetInfo *rsinfo = (ReturnSetInfo *) fcinfo->resultinfo;
-
-	/* Validate argument count */
-	if (PG_NARGS() != 0)
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				 errmsg("neurondb: neurondb_list_ml_projects requires 0 arguments")));
-
 	TupleDesc	tupdesc;
 	Tuplestorestate *tupstore = NULL;
 	MemoryContext per_query_ctx;
 	MemoryContext oldcontext;
 	int			ret;
 	int			i;
-
 	NdbSpiSession *spi_session = NULL;
 	MemoryContext oldcontext_spi;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 0)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: neurondb_list_ml_projects requires 0 arguments")));
 
 	/* Check result context */
 	if (rsinfo == NULL || !IsA(rsinfo, ReturnSetInfo))
@@ -306,6 +303,11 @@ Datum
 neurondb_delete_ml_project(PG_FUNCTION_ARGS)
 {
 	text	   *project_name_text;
+	char	   *project_name;
+	StringInfoData sql;
+	int			ret;
+	NdbSpiSession *spi_session = NULL;
+	MemoryContext oldcontext = CurrentMemoryContext;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 1)
@@ -314,15 +316,7 @@ neurondb_delete_ml_project(PG_FUNCTION_ARGS)
 				 errmsg("neurondb: neurondb_delete_ml_project requires 1 argument")));
 
 	project_name_text = PG_GETARG_TEXT_PP(0);
-
-	char	   *project_name;
-	StringInfoData sql;
-	int			ret;
-
 	project_name = text_to_cstring(project_name_text);
-
-	NdbSpiSession *spi_session = NULL;
-	MemoryContext oldcontext = CurrentMemoryContext;
 
 	NDB_SPI_SESSION_BEGIN(spi_session, oldcontext);
 
@@ -360,6 +354,13 @@ Datum
 neurondb_get_project_info(PG_FUNCTION_ARGS)
 {
 	text	   *project_name_text;
+	char	   *project_name;
+	StringInfoData sql;
+	int			ret;
+	Datum		result;
+	Jsonb *jsonb_result = NULL;
+	NdbSpiSession *spi_session = NULL;
+	MemoryContext oldcontext = CurrentMemoryContext;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 1)
@@ -368,17 +369,7 @@ neurondb_get_project_info(PG_FUNCTION_ARGS)
 				 errmsg("neurondb: neurondb_get_project_info requires 1 argument")));
 
 	project_name_text = PG_GETARG_TEXT_PP(0);
-
-	char	   *project_name;
-	StringInfoData sql;
-	int			ret;
-	Datum		result;
-	Jsonb *jsonb_result = NULL;
-
 	project_name = text_to_cstring(project_name_text);
-
-	NdbSpiSession *spi_session = NULL;
-	MemoryContext oldcontext = CurrentMemoryContext;
 
 	NDB_SPI_SESSION_BEGIN(spi_session, oldcontext);
 
@@ -464,27 +455,9 @@ neurondb_train_kmeans_project(PG_FUNCTION_ARGS)
 	text	   *vector_col_text;
 	int32		num_clusters;
 	int32		max_iters;
-
-	/* Validate minimum argument count */
-	if (PG_NARGS() < 4)
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				 errmsg("neurondb: neurondb_train_kmeans_project requires at least 4 arguments")));
-
-	project_name_text = PG_GETARG_TEXT_PP(0);
-	table_name_text = PG_GETARG_TEXT_PP(1);
-	vector_col_text = PG_GETARG_TEXT_PP(2);
-	num_clusters = PG_GETARG_INT32(3);
-	max_iters = PG_ARGISNULL(4) ? 100 : PG_GETARG_INT32(4);
-
 	char	   *project_name;
 	char	   *table_name;
 	char	   *vector_col;
-
-	project_name = text_to_cstring(project_name_text);
-	table_name = text_to_cstring(table_name_text);
-	vector_col = text_to_cstring(vector_col_text);
-
 	StringInfoData sql;
 	int			ret;
 	int32		project_id_val;
@@ -501,6 +474,22 @@ neurondb_train_kmeans_project(PG_FUNCTION_ARGS)
 	NdbSpiSession *spi_session2 = NULL;
 	MemoryContext oldcontext;
 	MemoryContext oldcontext2;
+
+	/* Validate minimum argument count */
+	if (PG_NARGS() < 4)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: neurondb_train_kmeans_project requires at least 4 arguments")));
+
+	project_name_text = PG_GETARG_TEXT_PP(0);
+	table_name_text = PG_GETARG_TEXT_PP(1);
+	vector_col_text = PG_GETARG_TEXT_PP(2);
+	num_clusters = PG_GETARG_INT32(3);
+	max_iters = PG_ARGISNULL(4) ? 100 : PG_GETARG_INT32(4);
+
+	project_name = text_to_cstring(project_name_text);
+	table_name = text_to_cstring(table_name_text);
+	vector_col = text_to_cstring(vector_col_text);
 
 	oldcontext = CurrentMemoryContext;
 	start_time = GetCurrentTimestamp();
@@ -732,6 +721,18 @@ predict_kmeans_project(PG_FUNCTION_ARGS)
 {
 	int32		model_id;
 	ArrayType  *features_array;
+	bytea *model_data = NULL;
+	Jsonb *parameters = NULL;
+	Jsonb *metrics = NULL;
+	float **centers = NULL;
+	int			n_clusters = 0;
+	int			dim = 0;
+	float *features = NULL;
+	int			n_features = 0;
+	int			cluster_id = 0;
+	int			i;
+	double		min_dist = DBL_MAX;
+	double		dist;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 2)
@@ -741,20 +742,6 @@ predict_kmeans_project(PG_FUNCTION_ARGS)
 
 	model_id = PG_GETARG_INT32(0);
 	features_array = PG_GETARG_ARRAYTYPE_P(1);
-
-	bytea *model_data = NULL;
-	Jsonb *parameters = NULL;
-	Jsonb *metrics = NULL;
-	float **centers = NULL;
-	int			n_clusters = 0;
-	int			dim = 0;
-
-	float *features = NULL;
-	int			n_features = 0;
-	int			cluster_id = 0;
-	int			i;
-	double		min_dist = DBL_MAX;
-	double		dist;
 
 	/* Validate inputs */
 	if (PG_ARGISNULL(0) || PG_ARGISNULL(1))
@@ -851,6 +838,17 @@ evaluate_kmeans_project_by_model_id(PG_FUNCTION_ARGS)
 	text *table_name = NULL;
 	text *feature_col = NULL;
 	char *tbl_str = NULL;
+	char *feat_str = NULL;
+	StringInfoData query;
+	int			ret;
+	int			n_points = 0;
+	StringInfoData jsonbuf;
+	Jsonb *result = NULL;
+	MemoryContext oldcontext;
+	double		inertia;
+	int			n_clusters;
+	NdbSpiSession *spi_session = NULL;
+	MemoryContext oldcontext_spi;
 
 	/* Validate minimum argument count */
 	if (PG_NARGS() < 3)
@@ -861,19 +859,6 @@ evaluate_kmeans_project_by_model_id(PG_FUNCTION_ARGS)
 	model_id = PG_GETARG_INT32(0);
 	table_name = PG_GETARG_TEXT_PP(1);
 	feature_col = PG_GETARG_TEXT_PP(2);
-
-	char *feat_str = NULL;
-	StringInfoData query;
-	int			ret;
-	int			n_points = 0;
-	StringInfoData jsonbuf;
-	Jsonb *result = NULL;
-	MemoryContext oldcontext;
-	double		inertia;
-	int			n_clusters;
-
-	NdbSpiSession *spi_session = NULL;
-	MemoryContext oldcontext_spi;
 
 	/* Validate arguments */
 	if (PG_NARGS() != 3)
@@ -1106,6 +1091,11 @@ neurondb_deploy_model(PG_FUNCTION_ARGS)
 {
 	text	   *project_name_text;
 	int32		version;
+	char	   *project_name;
+	StringInfoData sql;
+	int			ret;
+	NdbSpiSession *spi_session = NULL;
+	MemoryContext oldcontext = CurrentMemoryContext;
 
 	/* Validate minimum argument count */
 	if (PG_NARGS() < 1)
@@ -1116,15 +1106,7 @@ neurondb_deploy_model(PG_FUNCTION_ARGS)
 	project_name_text = PG_GETARG_TEXT_PP(0);
 	version = PG_ARGISNULL(1) ? -1 : PG_GETARG_INT32(1);
 
-	char	   *project_name;
-	StringInfoData sql;
-
 	project_name = text_to_cstring(project_name_text);
-
-	int			ret;
-
-	NdbSpiSession *spi_session = NULL;
-	MemoryContext oldcontext = CurrentMemoryContext;
 
 	NDB_SPI_SESSION_BEGIN(spi_session, oldcontext);
 
@@ -1199,6 +1181,13 @@ Datum
 neurondb_get_deployed_model(PG_FUNCTION_ARGS)
 {
 	text	   *project_name_text;
+	char	   *project_name;
+	StringInfoData sql;
+	int			ret;
+	int32		model_id_val;
+	int			model_id;
+	NdbSpiSession *spi_session = NULL;
+	MemoryContext oldcontext = CurrentMemoryContext;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 1)
@@ -1208,16 +1197,7 @@ neurondb_get_deployed_model(PG_FUNCTION_ARGS)
 
 	project_name_text = PG_GETARG_TEXT_PP(0);
 
-	char	   *project_name;
-	StringInfoData sql;
-	int			ret;
-	int32		model_id_val;
-	int			model_id;
-
 	project_name = text_to_cstring(project_name_text);
-
-	NdbSpiSession *spi_session = NULL;
-	MemoryContext oldcontext = CurrentMemoryContext;
 
 	NDB_SPI_SESSION_BEGIN(spi_session, oldcontext);
 
@@ -1268,6 +1248,17 @@ Datum
 neurondb_list_project_models(PG_FUNCTION_ARGS)
 {
 	text	   *project_name_text;
+	char	   *project_name;
+	ReturnSetInfo *rsinfo = (ReturnSetInfo *) fcinfo->resultinfo;
+	TupleDesc	tupdesc;
+	Tuplestorestate *tupstore = NULL;
+	MemoryContext per_query_ctx;
+	MemoryContext oldcontext;
+	StringInfoData sql;
+	int			ret;
+	int			i;
+	NdbSpiSession *spi_session = NULL;
+	MemoryContext oldcontext_spi;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 1)
@@ -1277,21 +1268,7 @@ neurondb_list_project_models(PG_FUNCTION_ARGS)
 
 	project_name_text = PG_GETARG_TEXT_PP(0);
 
-	char	   *project_name;
-	ReturnSetInfo *rsinfo = (ReturnSetInfo *) fcinfo->resultinfo;
-
 	project_name = text_to_cstring(project_name_text);
-
-	TupleDesc	tupdesc;
-	Tuplestorestate *tupstore = NULL;
-	MemoryContext per_query_ctx;
-	MemoryContext oldcontext;
-	StringInfoData sql;
-	int			ret;
-	int			i;
-
-	NdbSpiSession *spi_session = NULL;
-	MemoryContext oldcontext_spi;
 
 	/* Check result context */
 	if (rsinfo == NULL || !IsA(rsinfo, ReturnSetInfo))

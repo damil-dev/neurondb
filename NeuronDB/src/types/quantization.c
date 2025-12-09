@@ -1727,7 +1727,7 @@ halfvec_in(PG_FUNCTION_ARGS)
 	if (*ptr == '[')
 		ptr++;
 
-	temp_data = (float4 *) palloc(sizeof(float4) * capacity);
+	nalloc(temp_data, float4, capacity);
 
 	/* Parse comma-separated floats */
 	while (*ptr && *ptr != ']')

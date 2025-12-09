@@ -220,6 +220,8 @@ def run_psql_file(dbname: str, sql_file: str, psql_path: str, verbose: bool = Fa
 		stdout=subprocess.PIPE,
 		stderr=subprocess.PIPE,
 		text=True,
+		encoding='utf-8',
+		errors='replace',  # Replace invalid UTF-8 bytes with replacement character
 		env=os.environ.copy(),
 	)
 	out, err = proc.communicate()
@@ -702,7 +704,7 @@ def get_gpu_info(dbname: str, psql_path: str, host: Optional[str] = None, port: 
 	
 	try:
 		cmd = [psql_path, "-d", dbname, "-t", "-A", "-w", "-c", 
-		       "SELECT current_setting('neurondb.gpu_enabled', true), current_setting('neurondb.gpu_device', true), current_setting('neurondb.gpu_kernels', true);"]
+		       "SELECT current_setting('neurondb.compute_mode', true), current_setting('neurondb.gpu_device', true), current_setting('neurondb.gpu_kernels', true);"]
 		proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env, timeout=5)
 		out, err = proc.communicate()
 		if proc.returncode == 0 and out.strip():
@@ -908,6 +910,31 @@ def create_test_views(dbname: str, psql_path: str, num_rows: int, host: Optional
 			test_out, test_err = test_proc.communicate()
 			
 			if test_proc.returncode == 0 and test_out.strip() and int(test_out.strip()) > 0:
+				# Check class distribution in test table - if imbalanced, regenerate
+				check_class_dist_cmd = [
+					psql_path, "-d", dbname, "-t", "-A", "-w",
+					"-c", f"SELECT COUNT(*) FROM {test_table_full} WHERE label = 1;"
+				]
+				class_check = subprocess.Popen(check_class_dist_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
+				class_out, class_err = class_check.communicate()
+				class_1_count = int(class_out.strip()) if class_check.returncode == 0 and class_out.strip() else 0
+				
+				# If test set has no class 1 labels, regenerate with stratified split
+				if class_1_count == 0:
+					print(f"WARNING: Test set has no class 1 labels. Regenerating dataset with stratified split...", file=sys.stderr)
+					# Generate synthetic data with stratified split
+					# Use num_rows as total, which will be split 80/20
+					total_rows = int(num_rows / 0.8)  # num_rows is train_rows, so calculate total
+					regenerate_ok = load_synthetic_dataset(
+						dbname,
+						num_rows=total_rows,
+						seed=None,  # Use different seed each time
+						host=host,
+						port=port
+					)
+					if not regenerate_ok:
+						print(f"ERROR: Failed to regenerate dataset. Using existing imbalanced data.", file=sys.stderr)
+				
 				# Check if vector extension is available
 				check_vector_cmd = [
 					psql_path, "-d", dbname, "-t", "-A", "-w",
@@ -917,7 +944,19 @@ def create_test_views(dbname: str, psql_path: str, num_rows: int, host: Optional
 				vector_out, vector_err = vector_check.communicate()
 				has_vector = vector_check.returncode == 0 and vector_out.strip() == "t"
 				
-				# Create views with LIMIT num_rows
+				# Create views with 80/20 split (80% training, 20% test)
+				# Calculate train_rows (80%) and test_rows (20%) based on num_rows
+				train_rows = int(num_rows * 0.8)
+				test_rows = int(num_rows * 0.2)
+				
+				# Use stratified sampling to ensure both classes are represented
+				# For train: take 80% of class 0 and 80% of class 1, then shuffle
+				# For test: take 20% of class 0 and 20% of class 1, then shuffle
+				train_rows_class_0 = int(train_rows * 0.5)  # Approx 50% of train should be class 0
+				train_rows_class_1 = train_rows - train_rows_class_0  # Rest is class 1
+				test_rows_class_0 = int(test_rows * 0.5)  # Approx 50% of test should be class 0
+				test_rows_class_1 = test_rows - test_rows_class_0  # Rest is class 1
+				
 				# Try to convert REAL[] to vector if vector extension is available, otherwise use REAL[]
 				# Use DO block to handle potential cast failures gracefully
 				if has_vector:
@@ -928,14 +967,46 @@ DROP VIEW IF EXISTS test_test_view CASCADE;
 
 DO $$
 BEGIN
-	-- Try to create views with vector cast
+	-- Try to create views with vector cast and stratified sampling
 	BEGIN
-		EXECUTE format('CREATE VIEW test_train_view AS SELECT features::vector(28) as features, label FROM %s LIMIT %s', '{train_table_full}', {num_rows});
-		EXECUTE format('CREATE VIEW test_test_view AS SELECT features::vector(28) as features, label FROM %s LIMIT %s', '{test_table_full}', {num_rows});
+		-- Stratified train view: union of class 0 and class 1 samples, shuffled
+		EXECUTE format('CREATE VIEW test_train_view AS 
+			SELECT features::vector(28) as features, label 
+			FROM (
+				(SELECT features, label FROM %s WHERE label = 0 ORDER BY random() LIMIT %s)
+				UNION ALL
+				(SELECT features, label FROM %s WHERE label = 1 ORDER BY random() LIMIT %s)
+			) t ORDER BY random()', 
+			'{train_table_full}', {train_rows_class_0}, '{train_table_full}', {train_rows_class_1});
+		
+		-- Stratified test view: union of class 0 and class 1 samples, shuffled
+		EXECUTE format('CREATE VIEW test_test_view AS 
+			SELECT features::vector(28) as features, label 
+			FROM (
+				(SELECT features, label FROM %s WHERE label = 0 ORDER BY random() LIMIT %s)
+				UNION ALL
+				(SELECT features, label FROM %s WHERE label = 1 ORDER BY random() LIMIT %s)
+			) t ORDER BY random()', 
+			'{test_table_full}', {test_rows_class_0}, '{test_table_full}', {test_rows_class_1});
 	EXCEPTION WHEN OTHERS THEN
 		-- Fallback to REAL[] if vector cast fails
-		EXECUTE format('CREATE VIEW test_train_view AS SELECT features as features, label FROM %s LIMIT %s', '{train_table_full}', {num_rows});
-		EXECUTE format('CREATE VIEW test_test_view AS SELECT features as features, label FROM %s LIMIT %s', '{test_table_full}', {num_rows});
+		EXECUTE format('CREATE VIEW test_train_view AS 
+			SELECT features as features, label 
+			FROM (
+				(SELECT features, label FROM %s WHERE label = 0 ORDER BY random() LIMIT %s)
+				UNION ALL
+				(SELECT features, label FROM %s WHERE label = 1 ORDER BY random() LIMIT %s)
+			) t ORDER BY random()', 
+			'{train_table_full}', {train_rows_class_0}, '{train_table_full}', {train_rows_class_1});
+		
+		EXECUTE format('CREATE VIEW test_test_view AS 
+			SELECT features as features, label 
+			FROM (
+				(SELECT features, label FROM %s WHERE label = 0 ORDER BY random() LIMIT %s)
+				UNION ALL
+				(SELECT features, label FROM %s WHERE label = 1 ORDER BY random() LIMIT %s)
+			) t ORDER BY random()', 
+			'{test_table_full}', {test_rows_class_0}, '{test_table_full}', {test_rows_class_1});
 	END;
 END $$;
 
@@ -980,20 +1051,27 @@ CREATE TABLE IF NOT EXISTS test_metrics (
 TRUNCATE TABLE test_metrics;
 """
 				else:
-					# No vector extension, use REAL[] directly
+					# No vector extension, use REAL[] directly with stratified sampling
+					# train_rows_class_0, train_rows_class_1, test_rows_class_0, test_rows_class_1 already calculated above
 					create_sql = f"""
 DROP VIEW IF EXISTS test_train_view CASCADE;
 DROP VIEW IF EXISTS test_test_view CASCADE;
 
 CREATE VIEW test_train_view AS
 SELECT features as features, label 
-FROM {train_table_full} 
-LIMIT {num_rows};
+FROM (
+	(SELECT features, label FROM {train_table_full} WHERE label = 0 ORDER BY random() LIMIT {train_rows_class_0})
+	UNION ALL
+	(SELECT features, label FROM {train_table_full} WHERE label = 1 ORDER BY random() LIMIT {train_rows_class_1})
+) t ORDER BY random();
 
 CREATE VIEW test_test_view AS
 SELECT features as features, label 
-FROM {test_table_full} 
-LIMIT {num_rows};
+FROM (
+	(SELECT features, label FROM {test_table_full} WHERE label = 0 ORDER BY random() LIMIT {test_rows_class_0})
+	UNION ALL
+	(SELECT features, label FROM {test_table_full} WHERE label = 1 ORDER BY random() LIMIT {test_rows_class_1})
+) t ORDER BY random();
 
 -- Create or truncate test settings table for test runner configuration
 CREATE TABLE IF NOT EXISTS test_settings (
@@ -1141,33 +1219,8 @@ def switch_gpu_mode(dbname: str, compute_mode: str, psql_path: str, gpu_kernels:
 		if not success_k:
 			print(f"Warning: Failed to set GPU kernels: {err_k}", file=sys.stderr)
 
-	# Reload configuration
-	cmd2 = "SELECT pg_reload_conf();"
-	success2, out2, err2 = run_psql_command(dbname, cmd2, psql_path, verbose)
-	if not success2:
-		print(f"Failed to reload configuration: {err2}", file=sys.stderr)
-		return False
-
-	# Initialize GPU if GPU or auto mode is enabled
-	if compute_mode in ("gpu", "auto"):
-		cmd3 = "SELECT neurondb_gpu_enable();"
-		success3, out3, err3 = run_psql_command(dbname, cmd3, psql_path, verbose)
-		if not success3:
-			if compute_mode == "gpu":
-				print(f"Warning: Failed to enable GPU: {err3}", file=sys.stderr)
-				# In GPU mode, this is a warning but we continue (let the mode handle errors)
-			else:
-				print(f"Warning: Failed to enable GPU (auto mode will fallback to CPU): {err3}", file=sys.stderr)
-		
-		# Force GPU initialization by querying GPU info
-		cmd4 = "SELECT * FROM neurondb_gpu_info() LIMIT 1;"
-		success4, out4, err4 = run_psql_command(dbname, cmd4, psql_path, verbose)
-		if not success4:
-			if verbose:
-				if compute_mode == "gpu":
-					print(f"Warning: GPU info query failed (GPU may not be available): {err4}", file=sys.stderr)
-				else:
-					print(f"Info: GPU info query failed (auto mode will fallback to CPU): {err4}", file=sys.stderr)
+	# Note: We don't reload config or initialize GPU here - PostgreSQL will be restarted
+	# to apply ALTER SYSTEM changes, and GPU will be initialized after restart in the main flow
 
 	if verbose:
 		print(f"Switched to {compute_mode.upper()} mode successfully.")
@@ -1390,8 +1443,7 @@ def generate_synthetic_higgs_data(
 		if HAS_NUMPY:
 			np.random.seed(seed)
 	
-	train_data = []
-	test_data = []
+	all_data = []
 	
 	# Generate data with some correlation between features and labels
 	# to make it somewhat realistic for ML testing
@@ -1430,11 +1482,43 @@ def generate_synthetic_higgs_data(
 			# Clamp to reasonable range
 			features.append(max(-10.0, min(10.0, derived)))
 		
-		# Split 80/20 train/test (consistent with HIGGS loading)
-		if i % 10 < 8:
-			train_data.append((features, label))
-		else:
-			test_data.append((features, label))
+		# Collect all data first
+		all_data.append((features, label))
+	
+	# Shuffle data before splitting to ensure balanced class distribution in train/test
+	random.shuffle(all_data)
+	
+	# Stratified split: ensure both classes are present in train and test
+	# Separate by class first
+	class_0_data = [(f, l) for f, l in all_data if l == 0]
+	class_1_data = [(f, l) for f, l in all_data if l == 1]
+	
+	# Shuffle each class separately
+	random.shuffle(class_0_data)
+	random.shuffle(class_1_data)
+	
+	# Split each class 80/20
+	split_0 = int(len(class_0_data) * 0.8)
+	split_1 = int(len(class_1_data) * 0.8)
+	
+	train_data = class_0_data[:split_0] + class_1_data[:split_1]
+	test_data = class_0_data[split_0:] + class_1_data[split_1:]
+	
+	# Shuffle train and test sets to mix classes
+	random.shuffle(train_data)
+	random.shuffle(test_data)
+	
+	# Validate that both classes are present in train and test sets
+	train_class_0 = sum(1 for _, l in train_data if l == 0)
+	train_class_1 = sum(1 for _, l in train_data if l == 1)
+	test_class_0 = sum(1 for _, l in test_data if l == 0)
+	test_class_1 = sum(1 for _, l in test_data if l == 1)
+	
+	if train_class_1 == 0 or test_class_1 == 0:
+		raise ValueError(
+			f"Stratified split failed: train has {train_class_0} class 0, {train_class_1} class 1; "
+			f"test has {test_class_0} class 0, {test_class_1} class 1"
+		)
 	
 	return train_data, test_data
 
@@ -1560,9 +1644,21 @@ def load_synthetic_dataset(
 		cur.execute("SELECT COUNT(*) FROM dataset.test_test")
 		test_count = cur.fetchone()[0]
 		
+		# Verify class distribution
+		cur.execute("SELECT label, COUNT(*) FROM dataset.test_train GROUP BY label ORDER BY label")
+		train_dist = dict(cur.fetchall())
+		cur.execute("SELECT label, COUNT(*) FROM dataset.test_test GROUP BY label ORDER BY label")
+		test_dist = dict(cur.fetchall())
+		
 		print(f"\nFinal counts:")
-		print(f"  dataset.test_train: {train_count:,} rows")
-		print(f"  dataset.test_test: {test_count:,} rows")
+		print(f"  dataset.test_train: {train_count:,} rows (class 0: {train_dist.get(0, 0)}, class 1: {train_dist.get(1, 0)})")
+		print(f"  dataset.test_test: {test_count:,} rows (class 0: {test_dist.get(0, 0)}, class 1: {test_dist.get(1, 0)})")
+		
+		# Validate both classes are present
+		if test_dist.get(1, 0) == 0:
+			print(f"WARNING: Test set has no class 1 labels! This will cause precision/recall/F1 to be 0.", file=sys.stderr)
+		if train_dist.get(1, 0) == 0:
+			print(f"WARNING: Train set has no class 1 labels!", file=sys.stderr)
 		
 		cur.close()
 		conn.close()
@@ -1860,671 +1956,9 @@ def parse_args() -> argparse.Namespace:
 		default="all",
 		help="Test name to run (default: all). If specified, only runs tests matching this name. Use 'all' to run all tests in the category.",
 	)
-	parser.add_argument(
-		"--no-gcov",
-		"--no-coverage",
-		dest="no_coverage",
-		action="store_true",
-		help="Disable code coverage analysis using gcov (coverage is enabled by default).",
-	)
-	parser.add_argument(
-		"--coverage",
-		action="store_true",
-		help="[DEPRECATED] Coverage is now enabled by default. Use --no-gcov to disable.",
-	)
-	parser.add_argument(
-		"--coverage-dir",
-		default=None,
-		help="Directory to store coverage reports (default: tests/coverage).",
-	)
-	parser.add_argument(
-		"--coverage-html",
-		action="store_true",
-		help="Generate HTML coverage report (requires gcovr or lcov). Enabled by default if gcovr is available.",
-	)
-	parser.add_argument(
-		"--coverage-xml",
-		action="store_true",
-		help="Generate XML coverage report (requires gcovr).",
-	)
 	return parser.parse_args()
 
 
-def find_gcov() -> Optional[str]:
-	"""Find gcov executable in PATH."""
-	for gcov_name in ["gcov", "gcov-12", "gcov-11", "gcov-10", "gcov-9"]:
-		try:
-			result = subprocess.run(
-				["which", gcov_name],
-				stdout=subprocess.PIPE,
-				stderr=subprocess.PIPE,
-				text=True
-			)
-			if result.returncode == 0:
-				return result.stdout.strip()
-		except Exception:
-			continue
-	return None
-
-
-def find_gcovr() -> Optional[str]:
-	"""Find gcovr executable in PATH."""
-	try:
-		result = subprocess.run(
-			["which", "gcovr"],
-			stdout=subprocess.PIPE,
-			stderr=subprocess.PIPE,
-			text=True
-		)
-		if result.returncode == 0:
-			return result.stdout.strip()
-	except Exception:
-		pass
-	return None
-
-
-def find_lcov() -> Optional[str]:
-	"""Find lcov executable in PATH."""
-	try:
-		result = subprocess.run(
-			["which", "lcov"],
-			stdout=subprocess.PIPE,
-			stderr=subprocess.PIPE,
-			text=True
-		)
-		if result.returncode == 0:
-			return result.stdout.strip()
-	except Exception:
-		pass
-	return None
-
-
-def check_coverage_enabled(project_root: str) -> Tuple[bool, str]:
-	"""
-	Check if code was compiled with coverage flags.
-	Returns (enabled, message).
-	"""
-	# Check for .gcda files (coverage data files)
-	gcda_files = []
-	for root, dirs, files in os.walk(project_root):
-		# Skip hidden directories and build artifacts
-		dirs[:] = [d for d in dirs if not d.startswith('.') and d not in ['node_modules', 'venv']]
-		for f in files:
-			if f.endswith('.gcda'):
-				gcda_files.append(os.path.join(root, f))
-	
-	if gcda_files:
-		return True, f"Found {len(gcda_files)} coverage data files"
-	
-	# Check if .o files have coverage info by looking for .gcno files
-	gcno_files = []
-	for root, dirs, files in os.walk(project_root):
-		dirs[:] = [d for d in dirs if not d.startswith('.') and d not in ['node_modules', 'venv']]
-		for f in files:
-			if f.endswith('.gcno'):
-				gcno_files.append(os.path.join(root, f))
-	
-	if gcno_files:
-		return True, f"Found {len(gcno_files)} coverage note files (code compiled with coverage)"
-	
-	return False, "No coverage data found. Code must be compiled with --coverage or -fprofile-arcs -ftest-coverage flags."
-
-
-def collect_gcov_data(project_root: str, coverage_dir: str, gcov_path: Optional[str], verbose: bool = False) -> Tuple[bool, List[str]]:
-	"""
-	Run gcov on all source files and collect coverage data.
-	Returns (success, list of .gcov files generated).
-	"""
-	if not gcov_path:
-		return False, []
-	
-	gcov_files = []
-	
-	# Find all .gcda files (coverage data files)
-	gcda_files = []
-	for root, dirs, files in os.walk(project_root):
-		dirs[:] = [d for d in dirs if not d.startswith('.') and d not in ['node_modules', 'venv', 'coverage']]
-		for f in files:
-			if f.endswith('.gcda'):
-				gcda_path = os.path.join(root, f)
-				gcda_files.append((gcda_path, root))
-	
-	if not gcda_files:
-		return False, []
-	
-	# Run gcov on each .gcda file
-	os.makedirs(coverage_dir, exist_ok=True)
-	
-	for gcda_path, gcda_dir in gcda_files:
-		try:
-			# Run gcov in the directory where .gcda file is located
-			# -b: branch probabilities
-			# -c: branch counts
-			# -o: object directory
-			gcda_basename = os.path.basename(gcda_path)
-			cmd = [gcov_path, "-b", "-c", "-o", gcda_dir, gcda_basename]
-			result = subprocess.run(
-				cmd,
-				cwd=gcda_dir,
-				stdout=subprocess.PIPE,
-				stderr=subprocess.PIPE,
-				text=True,
-				timeout=30
-			)
-			
-			if result.returncode != 0 and verbose:
-				print(f"Warning: gcov returned {result.returncode} for {gcda_path}", file=sys.stderr)
-				if result.stderr:
-					print(f"  stderr: {result.stderr[:200]}", file=sys.stderr)
-			
-			# Find generated .gcov files in the gcda directory
-			if os.path.isdir(gcda_dir):
-				for f in os.listdir(gcda_dir):
-					if f.endswith('.gcov'):
-						gcov_file = os.path.join(gcda_dir, f)
-						# Move to coverage directory, handling name conflicts
-						dest = os.path.join(coverage_dir, f)
-						if os.path.exists(dest):
-							# Add prefix to avoid conflicts
-							base, ext = os.path.splitext(f)
-							dest = os.path.join(coverage_dir, f"{os.path.basename(gcda_dir)}_{base}{ext}")
-						try:
-							shutil.move(gcov_file, dest)
-							if dest not in gcov_files:
-								gcov_files.append(dest)
-						except Exception as e:
-							if verbose:
-								print(f"Warning: Failed to move {gcov_file} to {dest}: {e}", file=sys.stderr)
-		except subprocess.TimeoutExpired:
-			if verbose:
-				print(f"Warning: gcov timed out for {gcda_path}", file=sys.stderr)
-			continue
-		except Exception as e:
-			if verbose:
-				print(f"Warning: Failed to run gcov on {gcda_path}: {e}", file=sys.stderr)
-			continue
-	
-	return len(gcov_files) > 0, gcov_files
-
-
-def generate_gcovr_report(
-	project_root: str,
-	coverage_dir: str,
-	output_file: str,
-	format: str = "txt",
-	gcovr_path: Optional[str] = None
-) -> Tuple[bool, str]:
-	"""
-	Generate coverage report using gcovr.
-	format: 'txt', 'html', 'xml'
-	Returns (success, message).
-	"""
-	if not gcovr_path:
-		return False, "gcovr not found. Install with: pip install gcovr"
-	
-	os.makedirs(coverage_dir, exist_ok=True)
-	
-	# Build gcovr command - focus on NeuronDB source code only
-	cmd = [gcovr_path, "-r", project_root]
-	
-	# Include only NeuronDB source files
-	cmd.extend([
-		"--filter", "src/",
-		"--exclude", ".*/tests/.*",
-		"--exclude", ".*/test/.*",
-		"--exclude", ".*/tools/.*",
-		"--exclude", ".*/dataset/.*",
-		"--exclude", ".*/demo/.*",
-		"--exclude", ".*/build/.*",
-		"--exclude", ".*/node_modules/.*",
-		"--exclude", ".*/venv/.*",
-		"--exclude", r".*\/\.git\/.*",
-	])
-	
-	if format == "html":
-		cmd.extend(["--html", "--html-details", "-o", output_file])
-	elif format == "xml":
-		cmd.extend(["--xml", "-o", output_file])
-	else:  # txt
-		cmd.extend(["-o", output_file])
-	
-	# Add options for better reports
-	cmd.extend([
-		"--exclude-unreachable-branches",
-		"--exclude-throw-branches",
-		"--print-summary",
-		"--sort-percentage",
-		"--sort-uncovered",  # Show uncovered files first
-		"--sort-reverse",   # Sort by coverage (lowest first)
-	])
-	
-	try:
-		result = subprocess.run(
-			cmd,
-			cwd=project_root,
-			stdout=subprocess.PIPE,
-			stderr=subprocess.PIPE,
-			text=True,
-			timeout=300
-		)
-		
-		if result.returncode == 0:
-			return True, result.stdout
-		else:
-			return False, f"gcovr failed: {result.stderr}"
-	except subprocess.TimeoutExpired:
-		return False, "gcovr timed out"
-	except Exception as e:
-		return False, f"gcovr error: {str(e)}"
-
-
-def generate_lcov_report(
-	project_root: str,
-	coverage_dir: str,
-	output_file: str,
-	lcov_path: Optional[str] = None
-) -> Tuple[bool, str]:
-	"""
-	Generate coverage report using lcov.
-	Returns (success, message).
-	"""
-	if not lcov_path:
-		return False, "lcov not found. Install with: apt-get install lcov or brew install lcov"
-	
-	os.makedirs(coverage_dir, exist_ok=True)
-	
-	# Capture coverage data
-	capture_cmd = [lcov_path, "--capture", "--directory", project_root, "--output-file", output_file]
-	
-	try:
-		result = subprocess.run(
-			capture_cmd,
-			cwd=project_root,
-			stdout=subprocess.PIPE,
-			stderr=subprocess.PIPE,
-			text=True,
-			timeout=300
-		)
-		
-		if result.returncode == 0:
-			# Generate HTML report
-			html_dir = os.path.join(coverage_dir, "html")
-			genhtml_cmd = ["genhtml", output_file, "-o", html_dir]
-			genhtml_result = subprocess.run(
-				genhtml_cmd,
-				stdout=subprocess.PIPE,
-				stderr=subprocess.PIPE,
-				text=True,
-				timeout=300
-			)
-			
-			if genhtml_result.returncode == 0:
-				return True, f"HTML report generated in {html_dir}"
-			else:
-				return True, f"Coverage data captured, but HTML generation failed: {genhtml_result.stderr}"
-		else:
-			return False, f"lcov capture failed: {result.stderr}"
-	except subprocess.TimeoutExpired:
-		return False, "lcov timed out"
-	except Exception as e:
-		return False, f"lcov error: {str(e)}"
-
-
-def parse_gcov_summary(gcov_output: str) -> Tuple[Dict[str, float], List[Dict[str, Any]]]:
-	"""
-	Parse gcovr summary output to extract coverage percentages and file details.
-	Returns (summary_dict, file_list) where:
-	- summary_dict: {'lines': float, 'branches': float, 'functions': float}
-	- file_list: [{'file': str, 'lines_pct': float, 'branches_pct': float, 'functions_pct': float}, ...]
-	"""
-	summary = {"lines": 0.0, "branches": 0.0, "functions": 0.0}
-	files = []
-	
-	# Parse gcovr output - look for summary lines
-	for line in gcov_output.split('\n'):
-		line_lower = line.lower()
-		if 'lines:' in line_lower or 'line coverage:' in line_lower:
-			# Extract percentage
-			match = re.search(r'(\d+\.\d+)%', line)
-			if match:
-				summary["lines"] = float(match.group(1))
-		elif 'branches:' in line_lower or 'branch coverage:' in line_lower:
-			match = re.search(r'(\d+\.\d+)%', line)
-			if match:
-				summary["branches"] = float(match.group(1))
-		elif 'functions:' in line_lower or 'function coverage:' in line_lower:
-			match = re.search(r'(\d+\.\d+)%', line)
-			if match:
-				summary["functions"] = float(match.group(1))
-	
-	# If no percentages found, try to parse from summary table
-	if summary["lines"] == 0.0 and summary["branches"] == 0.0 and summary["functions"] == 0.0:
-		# Look for lines like: "TOTAL    1234    567    89.12%    234    123    52.56%    345    234    67.89%"
-		for line in gcov_output.split('\n'):
-			if 'TOTAL' in line.upper() and '%' in line:
-				# Extract all percentages
-				matches = re.findall(r'(\d+\.\d+)%', line)
-				if len(matches) >= 3:
-					summary["lines"] = float(matches[0])
-					summary["branches"] = float(matches[1])
-					summary["functions"] = float(matches[2])
-					break
-	
-	# Parse file-by-file coverage
-	for line in gcov_output.split('\n'):
-		line = line.strip()
-		if not line or line.startswith('-') or 'TOTAL' in line.upper() or 'lines:' in line.lower():
-			continue
-		
-		# Look for file coverage lines (format: "src/path/file.c    1234    567    89.12%    234    123    52.56%    345    234    67.89%")
-		# Match lines that have a file path and percentages
-		if '/' in line and '%' in line and ('src/' in line or line.startswith('src/')):
-			parts = line.split()
-			if len(parts) >= 4:
-				# Try to find file path (first part that contains '/')
-				file_path = None
-				percentages = []
-				
-				for i, part in enumerate(parts):
-					if '/' in part and not part.endswith('%'):
-						file_path = part
-						# Look for percentages after the file path
-						for j in range(i + 1, min(i + 10, len(parts))):
-							if '%' in parts[j]:
-								match = re.search(r'(\d+\.\d+)%', parts[j])
-								if match:
-									percentages.append(float(match.group(1)))
-				
-				if file_path and len(percentages) >= 3:
-					files.append({
-						'file': file_path,
-						'lines_pct': percentages[0] if len(percentages) > 0 else 0.0,
-						'branches_pct': percentages[1] if len(percentages) > 1 else 0.0,
-						'functions_pct': percentages[2] if len(percentages) > 2 else 0.0,
-					})
-	
-	return summary, files
-
-
-def parse_gcov_file(gcov_file: str) -> Dict[str, Any]:
-	"""
-	Parse a .gcov file to extract coverage details.
-	Returns dict with file info and uncovered lines.
-	"""
-	result = {
-		'file': '',
-		'total_lines': 0,
-		'executed_lines': 0,
-		'uncovered_lines': [],
-		'functions': {},
-	}
-	
-	try:
-		with open(gcov_file, 'r') as f:
-			current_function = None
-			line_num = 0
-			
-			for line in f:
-				line = line.rstrip()
-				# GCOV format: "        -:   45:void function_name()"
-				#              "    12345:   46:  code here"
-				#              "    #####:   47:  uncovered code"
-				
-				if line.startswith('function ') or ':' in line:
-					parts = line.split(':', 2)
-					if len(parts) >= 2:
-						count_str = parts[0].strip()
-						line_info = parts[1].strip() if len(parts) > 1 else ''
-						
-						# Extract line number
-						if line_info.isdigit():
-							line_num = int(line_info)
-							
-							# Check if line is uncovered
-							if count_str == '#####' or count_str == '-':
-								result['uncovered_lines'].append(line_num)
-							elif count_str.isdigit() or (count_str.startswith('-') and count_str[1:].isdigit()):
-								if count_str != '0' and count_str != '-':
-									result['executed_lines'] += 1
-							
-							result['total_lines'] += 1
-						
-						# Check for function definitions
-						if len(parts) >= 3 and 'function' in parts[2].lower():
-							func_name = parts[2].strip()
-							if func_name.startswith('function '):
-								func_name = func_name[9:].strip()
-							current_function = func_name
-							if current_function not in result['functions']:
-								result['functions'][current_function] = {'covered': False, 'line': line_num}
-		
-		# Extract source file name from gcov filename
-		base_name = os.path.basename(gcov_file)
-		if base_name.endswith('.gcov'):
-			result['file'] = base_name[:-5]  # Remove .gcov extension
-		
-	except Exception as e:
-		pass
-	
-	return result
-
-
-def generate_uncovered_details_report(coverage_dir: str, project_root: Optional[str] = None) -> Optional[str]:
-	"""
-	Generate a detailed report showing uncovered lines and functions.
-	Returns path to report file if successful.
-	"""
-	gcov_files = [f for f in os.listdir(coverage_dir) if f.endswith('.gcov')]
-	if not gcov_files:
-		return None
-	
-	report_file = os.path.join(coverage_dir, "uncovered_details.txt")
-	
-	try:
-		with open(report_file, 'w') as f:
-			f.write("NeuronDB Detailed Coverage Report - Uncovered Areas\n")
-			f.write("=" * 80 + "\n\n")
-			f.write("This report shows specific lines and functions that are NOT covered by tests.\n")
-			f.write("Each .gcov file contains detailed line-by-line execution information.\n\n")
-			f.write("=" * 80 + "\n\n")
-			
-			# Process each .gcov file
-			neurondb_files = []
-			for gcov_file in sorted(gcov_files):
-				gcov_path = os.path.join(coverage_dir, gcov_file)
-				details = parse_gcov_file(gcov_path)
-				
-				# Only include NeuronDB source files
-				if details['file'] and ('src/' in details['file'] or details['file'].startswith('src/')):
-					neurondb_files.append((gcov_file, details))
-			
-			# Sort by number of uncovered lines (most uncovered first)
-			neurondb_files.sort(key=lambda x: len(x[1]['uncovered_lines']), reverse=True)
-			
-			for gcov_file, details in neurondb_files:
-				if details['uncovered_lines'] or details['total_lines'] == 0:
-					f.write(f"\nFile: {details['file']}\n")
-					f.write("-" * 80 + "\n")
-					
-					coverage_pct = 0.0
-					if details['total_lines'] > 0:
-						coverage_pct = (details['executed_lines'] / details['total_lines']) * 100.0
-					
-					f.write(f"Coverage: {coverage_pct:.2f}% ({details['executed_lines']}/{details['total_lines']} lines)\n")
-					f.write(f"Uncovered lines: {len(details['uncovered_lines'])}\n\n")
-					
-					if details['uncovered_lines']:
-						f.write("Uncovered line numbers:\n")
-						# Show in ranges for compactness
-						uncovered = sorted(details['uncovered_lines'])
-						ranges = []
-						start = uncovered[0]
-						end = uncovered[0]
-						
-						for line in uncovered[1:]:
-							if line == end + 1:
-								end = line
-							else:
-								if start == end:
-									ranges.append(str(start))
-								else:
-									ranges.append(f"{start}-{end}")
-								start = line
-								end = line
-						
-						if start == end:
-							ranges.append(str(start))
-						else:
-							ranges.append(f"{start}-{end}")
-						
-						# Write ranges, 10 per line
-						for i in range(0, len(ranges), 10):
-							f.write("  " + ", ".join(ranges[i:i+10]) + "\n")
-					
-					f.write("\n")
-			
-			f.write("\n" + "=" * 80 + "\n")
-			f.write("Note: Open individual .gcov files for line-by-line execution counts.\n")
-			f.write("      Lines marked with '#####' were never executed.\n")
-			f.write("      Lines with numbers show execution count.\n")
-		
-		return report_file
-	except Exception as e:
-		return None
-
-
-def print_coverage_report(
-	coverage_dir: str,
-	summary: Dict[str, float],
-	html_report: Optional[str] = None,
-	xml_report: Optional[str] = None,
-	files: Optional[List[Dict[str, Any]]] = None,
-	project_root: Optional[str] = None
-) -> None:
-	"""Print a beautifully formatted coverage report with detailed breakdown."""
-	print()
-	print("=" * LINE_WIDTH)
-	print(f"{BOLD}NeuronDB Code Coverage Report{RESET}")
-	print("=" * LINE_WIDTH)
-	print()
-	
-	# Coverage summary
-	print(f"{BOLD}NeuronDB Coverage Summary:{RESET}")
-	print()
-	
-	lines_pct = summary.get("lines", 0.0)
-	branches_pct = summary.get("branches", 0.0)
-	functions_pct = summary.get("functions", 0.0)
-	
-	# Color code based on coverage percentage
-	def coverage_color(pct: float) -> str:
-		if pct >= 80:
-			return GREEN_BOLD
-		elif pct >= 60:
-			return GREEN
-		elif pct >= 40:
-			return ""
-		else:
-			return RED_BOLD
-	
-	lines_color = coverage_color(lines_pct)
-	branches_color = coverage_color(branches_pct)
-	functions_color = coverage_color(functions_pct)
-	
-	print(f"  {BOLD}Lines:{RESET}       {lines_color}{lines_pct:>6.2f}%{RESET}")
-	print(f"  {BOLD}Branches:{RESET}    {branches_color}{branches_pct:>6.2f}%{RESET}")
-	print(f"  {BOLD}Functions:{RESET}   {functions_color}{functions_pct:>6.2f}%{RESET}")
-	print()
-	
-	# Overall coverage
-	overall = (lines_pct + branches_pct + functions_pct) / 3.0
-	overall_color = coverage_color(overall)
-	print(f"  {BOLD}Overall:{RESET}     {overall_color}{overall:>6.2f}%{RESET}")
-	print()
-	
-	# File-by-file breakdown (show uncovered/low coverage files)
-	if files:
-		# Sort by coverage (lowest first)
-		files_sorted = sorted(files, key=lambda x: x.get('lines_pct', 0.0))
-		
-		# Show files with low coverage (< 80%)
-		low_coverage = [f for f in files_sorted if f.get('lines_pct', 0.0) < 80.0]
-		
-		if low_coverage:
-			print(f"{BOLD}Files Needing More Coverage (< 80%):{RESET}")
-			print()
-			print(f"  {'File':<50} {'Lines':<10} {'Branches':<10} {'Functions':<10}")
-			print(f"  {'-' * 50} {'-' * 10} {'-' * 10} {'-' * 10}")
-			
-			for f in low_coverage[:20]:  # Show top 20
-				file_name = f['file']
-				if len(file_name) > 47:
-					file_name = "..." + file_name[-44:]
-				
-				lines_p = f['lines_pct']
-				branches_p = f['branches_pct']
-				functions_p = f['functions_pct']
-				
-				lines_c = coverage_color(lines_p)
-				branches_c = coverage_color(branches_p)
-				functions_c = coverage_color(functions_p)
-				
-				print(f"  {file_name:<50} {lines_c}{lines_p:>6.2f}%{RESET}  {branches_c}{branches_p:>6.2f}%{RESET}  {functions_c}{functions_p:>6.2f}%{RESET}")
-			
-			if len(low_coverage) > 20:
-				print(f"  ... and {len(low_coverage) - 20} more files with low coverage")
-			print()
-		
-		# Show completely uncovered files (0% coverage)
-		uncovered = [f for f in files_sorted if f.get('lines_pct', 0.0) == 0.0]
-		if uncovered:
-			print(f"{BOLD}Completely Uncovered Files (0%):{RESET}")
-			print()
-			for f in uncovered[:15]:  # Show top 15
-				file_name = f['file']
-				if len(file_name) > 70:
-					file_name = "..." + file_name[-67:]
-				print(f"  {RED_BOLD}✗{RESET} {file_name}")
-			if len(uncovered) > 15:
-				print(f"  ... and {len(uncovered) - 15} more uncovered files")
-			print()
-	
-	# Report locations
-	print(f"{BOLD}Detailed Coverage Reports:{RESET}")
-	print()
-	print(f"  Coverage Directory: {coverage_dir}")
-	if html_report and os.path.exists(html_report):
-		print(f"  {GREEN_BOLD}✓{RESET} HTML Report:     {html_report}")
-		print(f"     Open in browser for line-by-line coverage details")
-	if xml_report and os.path.exists(xml_report):
-		print(f"  {GREEN_BOLD}✓{RESET} XML Report:      {xml_report}")
-	
-	# Find text report
-	txt_report = os.path.join(coverage_dir, "coverage.txt")
-	if os.path.exists(txt_report):
-		print(f"  {GREEN_BOLD}✓{RESET} Text Report:      {txt_report}")
-		print(f"     Contains detailed file-by-file coverage breakdown")
-	
-	# Find .gcov files for detailed analysis
-	gcov_files = [f for f in os.listdir(coverage_dir) if f.endswith('.gcov')]
-	if gcov_files:
-		print(f"  {GREEN_BOLD}✓{RESET} GCOV Files:      {len(gcov_files)} detailed .gcov files")
-		print(f"     Each .gcov file shows line-by-line execution counts")
-		
-		# Generate detailed uncovered report
-		if project_root:
-			uncovered_report = generate_uncovered_details_report(coverage_dir, project_root)
-			if uncovered_report:
-				print(f"  {GREEN_BOLD}✓{RESET} Uncovered Report: {uncovered_report}")
-				print(f"     Lists all uncovered lines and functions in detail")
-	
-	print()
-	print("=" * LINE_WIDTH)
-	print()
-	print(f"{BOLD}Note:{RESET} Coverage is calculated only for NeuronDB source code (src/ directory).")
-	print(f"      System libraries and external dependencies are excluded.")
-	print(f"      Check .gcov files for detailed line-by-line execution information.")
-	print()
 
 
 def ensure_dir(path: str) -> None:
@@ -2658,7 +2092,7 @@ def main() -> int:
 		print(f"Failed to connect to PostgreSQL at {conn_info}. Aborting.", file=sys.stderr)
 		return 1
 	
-	# 2. Switch compute mode (using ALTER SYSTEM)
+	# 2. Switch compute mode (using ALTER SYSTEM) - sets all GUCs
 	when = datetime.now()
 	mode_start = time.perf_counter()
 	mode_ok = switch_gpu_mode(args.db, args.compute, args.psql, args.gpu_kernels, args.verbose)
@@ -2666,6 +2100,123 @@ def main() -> int:
 	print(format_status_line(mode_ok, when, f"Configuring postgresql for {args.compute.upper()} compute mode...", mode_elapsed))
 	if not mode_ok:
 		print(f"Failed to switch to {args.compute.upper()} compute mode. Aborting.", file=sys.stderr)
+		return 1
+	
+	# 2.5. Restart PostgreSQL to apply ALTER SYSTEM changes
+	when = datetime.now()
+	restart_start = time.perf_counter()
+	restart_ok, restart_msg = restart_postgresql(args.db, args.psql, args.host, args.port, args.verbose)
+	restart_elapsed = time.perf_counter() - restart_start
+	if restart_ok:
+		print(format_status_line(True, when, f"Restarting PostgreSQL to apply GUC changes...", restart_elapsed))
+		# Wait a bit for PostgreSQL to be fully ready
+		time.sleep(2)
+		# Verify connection after restart
+		conn_ok, _, _ = check_postgresql_connection(args.db, args.psql, args.host, args.port)
+		if not conn_ok:
+			print(f"Warning: PostgreSQL restarted but connection verification failed. Waiting 5 more seconds...", file=sys.stderr)
+			time.sleep(5)
+			conn_ok, _, _ = check_postgresql_connection(args.db, args.psql, args.host, args.port)
+			if not conn_ok:
+				print(f"Failed to connect to PostgreSQL after restart. Aborting.", file=sys.stderr)
+				return 1
+		
+		# After restart, initialize GPU in the session (for GPU mode)
+		if args.compute in ("gpu", "auto"):
+			when = datetime.now()
+			gpu_init_start = time.perf_counter()
+			mode_enum = {"cpu": 0, "gpu": 1, "auto": 2}.get(args.compute, 2)
+			
+			# Set compute_mode in current session
+			cmd_set_mode = f"SET neurondb.compute_mode = {mode_enum};"
+			success_set, out_set, err_set = run_psql_command(args.db, cmd_set_mode, args.psql, args.verbose)
+			if not success_set:
+				print(f"ERROR: Failed to set compute_mode in session after restart: {err_set}", file=sys.stderr)
+				if args.compute == "gpu":
+					return 1
+			
+			# Set GPU kernels in session
+			if args.compute in ("gpu", "auto"):
+				default_kernels = "l2,cosine,ip,rf_split,rf_predict"
+				ml_kernels = "linreg_train,linreg_predict,lr_train,lr_predict,rf_train,svm_train,svm_predict,ridge_train,ridge_predict,lasso_train,lasso_predict,dt_train,dt_predict,nb_train,nb_predict"
+				full_kernels = f"{default_kernels},{ml_kernels}"
+				cmd_set_kernels = f"SET neurondb.gpu_kernels = '{full_kernels}';"
+				success_kernels, out_kernels, err_kernels = run_psql_command(args.db, cmd_set_kernels, args.psql, args.verbose)
+				if not success_kernels:
+					print(f"Warning: Failed to set GPU kernels in session: {err_kernels}", file=sys.stderr)
+			
+			# Set up environment for psql commands
+			env = os.environ.copy()
+			if args.host:
+				env["PGHOST"] = args.host
+			if args.port:
+				env["PGPORT"] = str(args.port)
+			
+			# Verify compute_mode is set correctly before enabling GPU (use -t flag for clean output)
+			cmd_check_mode = [args.psql, "-d", args.db, "-t", "-A", "-c", "SELECT current_setting('neurondb.compute_mode');"]
+			try:
+				proc = subprocess.Popen(cmd_check_mode, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
+				out_check, err_check = proc.communicate()
+				success_check = (proc.returncode == 0)
+				if success_check:
+					computed_mode_val = out_check.strip()
+					if computed_mode_val != str(mode_enum):
+						print(f"WARNING: neurondb.compute_mode = {computed_mode_val}, expected {mode_enum}", file=sys.stderr)
+			except Exception:
+				pass
+			
+			# Wait a bit more after restart to ensure PostgreSQL is fully ready
+			time.sleep(1)
+			
+			# Enable GPU - this should initialize GPU and return true if successful
+			# Use -t flag to get just the value without headers
+			cmd_enable = [args.psql, "-d", args.db, "-t", "-A", "-c", "SELECT neurondb_gpu_enable();"]
+			try:
+				proc = subprocess.Popen(cmd_enable, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
+				out_enable, err_enable = proc.communicate()
+				success_enable = (proc.returncode == 0)
+			except Exception as e:
+				success_enable = False
+				out_enable = ""
+				err_enable = str(e)
+			
+			if not success_enable:
+				if args.compute == "gpu":
+					print(f"ERROR: Failed to enable GPU after restart: {err_enable}", file=sys.stderr)
+					print(f"GPU mode requires GPU to be available. Aborting.", file=sys.stderr)
+					return 1
+				else:
+					print(f"Warning: Failed to enable GPU (auto mode will fallback to CPU): {err_enable}", file=sys.stderr)
+			else:
+				# Extract just the value (remove whitespace, newlines, etc.)
+				enable_result = out_enable.strip().lower()
+				# Verify GPU is actually available if GPU mode is required
+				if args.compute == "gpu":
+					if enable_result != "t":
+						print(f"ERROR: GPU mode enabled but neurondb_gpu_enable() returned '{enable_result}' (expected 't').", file=sys.stderr)
+						print(f"GPU mode requires GPU to be available. Aborting.", file=sys.stderr)
+						return 1
+					# Verify GPU info is accessible (use -t flag for clean output)
+					cmd_info = [args.psql, "-d", args.db, "-t", "-A", "-c", "SELECT COUNT(*) FROM neurondb_gpu_info() WHERE is_available = true;"]
+					try:
+						proc = subprocess.Popen(cmd_info, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
+						out_info, err_info = proc.communicate()
+						success_info = (proc.returncode == 0)
+						if not success_info or out_info.strip() == "0":
+							print(f"ERROR: GPU mode enabled but GPU info query failed or no GPU available: {err_info}", file=sys.stderr)
+							print(f"GPU mode requires GPU to be available. Aborting.", file=sys.stderr)
+							return 1
+					except Exception as e:
+						print(f"ERROR: GPU mode enabled but GPU info query exception: {e}", file=sys.stderr)
+						print(f"GPU mode requires GPU to be available. Aborting.", file=sys.stderr)
+						return 1
+			
+			gpu_init_elapsed = time.perf_counter() - gpu_init_start
+			print(format_status_line(True, when, f"Initializing GPU after restart...", gpu_init_elapsed))
+	else:
+		print(format_status_line(False, when, f"Restarting PostgreSQL to apply GUC changes...", restart_elapsed))
+		print(f"ERROR: Failed to restart PostgreSQL automatically: {restart_msg}", file=sys.stderr)
+		print(f"ALTER SYSTEM changes require a restart. Please restart PostgreSQL manually and re-run tests.", file=sys.stderr)
 		return 1
 	
 	# 3. Create test views (this also creates test_settings table)
@@ -2682,9 +2233,16 @@ def main() -> int:
 	when = datetime.now()
 	settings_start = time.perf_counter()
 	settings_sql = f"""
-	-- Store compute mode setting
+	-- Store compute mode setting (also store as gpu_mode for backward compatibility)
 	INSERT INTO test_settings (setting_key, setting_value, updated_at)
 	VALUES ('compute_mode', '{args.compute}', CURRENT_TIMESTAMP)
+	ON CONFLICT (setting_key) DO UPDATE SET
+		setting_value = EXCLUDED.setting_value,
+		updated_at = CURRENT_TIMESTAMP;
+	
+	-- Also store as gpu_mode for backward compatibility with older test files
+	INSERT INTO test_settings (setting_key, setting_value, updated_at)
+	VALUES ('gpu_mode', '{args.compute}', CURRENT_TIMESTAMP)
 	ON CONFLICT (setting_key) DO UPDATE SET
 		setting_value = EXCLUDED.setting_value,
 		updated_at = CURRENT_TIMESTAMP;
@@ -2861,147 +2419,6 @@ def main() -> int:
 	print(f"   Total Elapsed:      {total_elapsed:.2f}s")
 	print()
 	
-	# Generate coverage report (enabled by default, unless --no-gcov is specified)
-	# Default: enabled, --no-gcov: disabled, --coverage: enabled (for backward compatibility)
-	enable_coverage = not getattr(args, 'no_coverage', False)
-	if enable_coverage:
-		print()
-		print(HEADER_SEPARATOR)
-		print()
-		print(f"{BOLD}Generating Code Coverage Report...{RESET}")
-		print()
-		
-		# Determine project root (parent of tests directory)
-		project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-		
-		# Determine coverage directory
-		if args.coverage_dir:
-			coverage_dir = os.path.abspath(args.coverage_dir)
-		else:
-			coverage_dir = os.path.join(os.path.dirname(__file__), "coverage")
-		
-		# Check if code was compiled with coverage flags
-		coverage_compiled, coverage_msg = check_coverage_enabled(project_root)
-		if not coverage_compiled:
-			print(f"{RED_BOLD}⚠ Coverage Warning:{RESET} {coverage_msg}")
-			print()
-			print("To enable coverage:")
-			print("  1. Compile code with coverage flags:")
-			print("     make clean")
-			print("     make CFLAGS='-fprofile-arcs -ftest-coverage' LDFLAGS='-lgcov'")
-			print("  2. Or use: make COVERAGE=1")
-			print()
-		else:
-			print(f"{GREEN_BOLD}✓{RESET} {coverage_msg}")
-			print()
-			
-			# Find gcov
-			gcov_path = find_gcov()
-			if not gcov_path:
-				print(f"{RED_BOLD}✗{RESET} gcov not found. Install gcc or build-essential package.")
-			else:
-				print(f"{GREEN_BOLD}✓{RESET} Found gcov: {gcov_path}")
-				
-				# Collect coverage data
-				print("Collecting coverage data...")
-				gcov_success, gcov_files = collect_gcov_data(project_root, coverage_dir, gcov_path, args.verbose)
-				
-				if gcov_success:
-					print(f"{GREEN_BOLD}✓{RESET} Collected coverage data from {len(gcov_files)} files")
-					
-					# Generate reports
-					summary = {"lines": 0.0, "branches": 0.0, "functions": 0.0}
-					files = []
-					html_report = None
-					xml_report = None
-					
-					# Try gcovr first (preferred)
-					gcovr_path = find_gcovr()
-					if gcovr_path:
-						print(f"{GREEN_BOLD}✓{RESET} Found gcovr: {gcovr_path}")
-						
-						# Generate text report
-						txt_report = os.path.join(coverage_dir, "coverage.txt")
-						success, output = generate_gcovr_report(project_root, coverage_dir, txt_report, "txt", gcovr_path)
-						if success:
-							print(f"{GREEN_BOLD}✓{RESET} Generated text report: {txt_report}")
-							summary, files = parse_gcov_summary(output)
-							# Also print summary to console if verbose
-							if args.verbose and output:
-								print()
-								for line in output.split('\n')[:30]:  # First 30 lines
-									if line.strip():
-										print(f"  {line}")
-								print()
-						else:
-							print(f"{RED_BOLD}✗{RESET} Failed to generate text report: {output}")
-						
-						# Generate HTML report (enabled by default, or if explicitly requested)
-						generate_html = args.coverage_html or True  # Default to True for detailed view
-						if generate_html:
-							html_report = os.path.join(coverage_dir, "coverage.html")
-							success, output = generate_gcovr_report(project_root, coverage_dir, html_report, "html", gcovr_path)
-							if success:
-								print(f"{GREEN_BOLD}✓{RESET} Generated HTML report: {html_report}")
-								print(f"     Open in browser to see line-by-line coverage details")
-							else:
-								print(f"{RED_BOLD}✗{RESET} Failed to generate HTML report: {output}")
-						
-						# Generate XML report if requested
-						if args.coverage_xml:
-							xml_report = os.path.join(coverage_dir, "coverage.xml")
-							success, output = generate_gcovr_report(project_root, coverage_dir, xml_report, "xml", gcovr_path)
-							if success:
-								print(f"{GREEN_BOLD}✓{RESET} Generated XML report: {xml_report}")
-							else:
-								print(f"{RED_BOLD}✗{RESET} Failed to generate XML report: {output}")
-					else:
-						# Try lcov as fallback
-						lcov_path = find_lcov()
-						if lcov_path:
-							print(f"{GREEN_BOLD}✓{RESET} Found lcov: {lcov_path}")
-							lcov_file = os.path.join(coverage_dir, "coverage.info")
-							success, output = generate_lcov_report(project_root, coverage_dir, lcov_file, lcov_path)
-							if success:
-								print(f"{GREEN_BOLD}✓{RESET} {output}")
-								html_report = os.path.join(coverage_dir, "html", "index.html")
-							else:
-								print(f"{RED_BOLD}✗{RESET} {output}")
-						else:
-							# Fallback: create a simple summary from .gcov files
-							print(f"{RED_BOLD}⚠{RESET} Neither gcovr nor lcov found. Generating basic summary from .gcov files.")
-							print("  Install gcovr for better reports: pip install gcovr")
-							print("  Or install lcov: apt-get install lcov or brew install lcov")
-							
-							# Create a simple text summary
-							txt_report = os.path.join(coverage_dir, "coverage_summary.txt")
-							try:
-								with open(txt_report, "w") as f:
-									f.write("NeuronDB Code Coverage Summary (from .gcov files)\n")
-									f.write("=" * 80 + "\n\n")
-									f.write(f"Coverage data files found: {len(gcov_files)}\n")
-									f.write(f"Coverage directory: {coverage_dir}\n\n")
-									f.write("Note: Install gcovr or lcov for detailed coverage percentages.\n")
-									f.write("      gcovr: pip install gcovr\n")
-									f.write("      lcov: apt-get install lcov or brew install lcov\n")
-									f.write("\n")
-									f.write("Detailed .gcov files are available in the coverage directory.\n")
-									f.write("Each .gcov file shows:\n")
-									f.write("  - Line numbers\n")
-									f.write("  - Execution counts (how many times each line was executed)\n")
-									f.write("  - Uncovered lines (marked with #####)\n")
-								print(f"{GREEN_BOLD}✓{RESET} Created basic summary: {txt_report}")
-							except Exception as e:
-								if args.verbose:
-									print(f"Warning: Failed to create summary file: {e}", file=sys.stderr)
-					
-					# Print coverage report with detailed breakdown
-					print_coverage_report(coverage_dir, summary, html_report, xml_report, files, project_root)
-				else:
-					print(f"{RED_BOLD}✗{RESET} Failed to collect coverage data")
-					print("  Make sure code was compiled with coverage flags and tests were executed.")
-		
-		print()
 
 	if _shutdown_requested:
 		return 130  # Exit code for SIGINT

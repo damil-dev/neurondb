@@ -190,9 +190,12 @@ neurondb_text_classify(PG_FUNCTION_ARGS)
 		}
 
 		/* Prepare category lists */
-		categories = (char **) palloc0(sizeof(char *) * MAX_CATEGORIES);
+		nalloc(categories, char *, MAX_CATEGORIES);
 		NDB_CHECK_ALLOC(categories, "categories");
-		category_counts = (int *) palloc0(sizeof(int) * MAX_CATEGORIES);
+		MemSet(categories, 0, sizeof(char *) * MAX_CATEGORIES);
+		nalloc(category_counts, int, MAX_CATEGORIES);
+		NDB_CHECK_ALLOC(category_counts, "category_counts");
+		MemSet(category_counts, 0, sizeof(int) * MAX_CATEGORIES);
 		NDB_CHECK_ALLOC(category_counts, "category_counts");
 
 		/* Fill category names (de-duplication) */
@@ -298,8 +301,8 @@ neurondb_text_classify(PG_FUNCTION_ARGS)
 			int			total_count = 0;
 
 			NDB_SPI_SESSION_END(spi_session);
-			results = (ClassifyResult *) palloc0(
-												 n_categories * sizeof(ClassifyResult));
+			nalloc(results, ClassifyResult, n_categories);
+			MemSet(results, 0, sizeof(ClassifyResult) * n_categories);
 			NDB_CHECK_ALLOC(results, "results");
 
 			for (i = 0; i < n_categories; i++)
@@ -474,7 +477,8 @@ neurondb_sentiment_analysis(PG_FUNCTION_ARGS)
 		if (num_tokens == 0)
 			num_tokens = 1;
 
-		result = (SentimentResult *) palloc0(sizeof(SentimentResult));
+		nalloc(result, SentimentResult, 1);
+		MemSet(result, 0, sizeof(SentimentResult));
 		NDB_CHECK_ALLOC(result, "result");
 		result->positive = ((float4) pos) / num_tokens;
 		result->negative = ((float4) neg) / num_tokens;
@@ -604,8 +608,8 @@ neurondb_named_entity_recognition(PG_FUNCTION_ARGS)
 					(errmsg("NER entity table fetch failed")));
 		}
 
-		entities =
-			(NERResult *) palloc0(MAX_ENTITIES * sizeof(NERResult));
+		nalloc(entities, NERResult, MAX_ENTITIES);
+		MemSet(entities, 0, sizeof(NERResult) * MAX_ENTITIES);
 
 		for (t = 0; t < num_tokens && n_entities < MAX_ENTITIES; t++)
 		{
@@ -662,8 +666,8 @@ neurondb_named_entity_recognition(PG_FUNCTION_ARGS)
 							  &datum_array,
 							  &nulls,
 							  &n_types);
-			filtered = (NERResult *) palloc0(
-											 MAX_ENTITIES * sizeof(NERResult));
+			nalloc(filtered, NERResult, MAX_ENTITIES);
+			MemSet(filtered, 0, sizeof(NERResult) * MAX_ENTITIES);
 			NDB_CHECK_ALLOC(filtered, "filtered");
 			for (e = 0; e < n_entities; e++)
 			{
@@ -849,7 +853,8 @@ neurondb_text_summarize(PG_FUNCTION_ARGS)
 			char	  **stopwords;
 
 			n_stopwords = SPI_processed;
-			stopwords = (char **) palloc0(n_stopwords * sizeof(char *));
+			nalloc(stopwords, char *, n_stopwords);
+			MemSet(stopwords, 0, sizeof(char *) * n_stopwords);
 			NDB_CHECK_ALLOC(stopwords, "stopwords");
 			for (i = 0; i < n_stopwords; i++)
 			{
@@ -987,7 +992,9 @@ text_model_serialize_to_bytea(int vocab_size, int feature_dim, const char *task_
 	appendBinaryStringInfo(&buf, task_type, task_len);
 
 	total_size = VARHDRSZ + buf.len;
-	result = (bytea *) palloc(total_size);
+	char *tmp = NULL;
+	nalloc(tmp, char, total_size);
+	result = (bytea *) tmp;
 	NDB_CHECK_ALLOC(result, "result");
 	SET_VARSIZE(result, total_size);
 	memcpy(VARDATA(result), buf.data, buf.len);
@@ -1099,7 +1106,8 @@ text_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 												 CStringGetDatum(metrics_json.data)));
 	nfree(metrics_json.data);
 
-	state = (TextGpuModelState *) palloc0(sizeof(TextGpuModelState));
+		nalloc(state, TextGpuModelState, 1);
+		MemSet(state, 0, sizeof(TextGpuModelState));
 	NDB_CHECK_ALLOC(state, "state");
 	state->model_blob = model_data;
 	state->metrics = metrics;
@@ -1247,7 +1255,9 @@ text_gpu_serialize(const MLGpuModel *model, bytea * *payload_out,
 	}
 
 	payload_size = VARSIZE(state->model_blob);
-	payload_copy = (bytea *) palloc(payload_size);
+	char *tmp = NULL;
+	nalloc(tmp, char, payload_size);
+	payload_copy = (bytea *) tmp;
 	NDB_CHECK_ALLOC(payload_copy, "payload_copy");
 	memcpy(payload_copy, state->model_blob, payload_size);
 
@@ -1287,7 +1297,9 @@ text_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 	}
 
 	payload_size = VARSIZE(payload);
-	payload_copy = (bytea *) palloc(payload_size);
+	char *tmp = NULL;
+	nalloc(tmp, char, payload_size);
+	payload_copy = (bytea *) tmp;
 	NDB_CHECK_ALLOC(payload_copy, "payload_copy");
 	memcpy(payload_copy, payload, payload_size);
 
@@ -1299,7 +1311,8 @@ text_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 		return false;
 	}
 
-	state = (TextGpuModelState *) palloc0(sizeof(TextGpuModelState));
+		nalloc(state, TextGpuModelState, 1);
+		MemSet(state, 0, sizeof(TextGpuModelState));
 	NDB_CHECK_ALLOC(state, "state");
 	state->model_blob = payload_copy;
 	state->vocab_size = vocab_size;
@@ -1310,7 +1323,9 @@ text_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 	if (metadata != NULL)
 	{
 		int			metadata_size = VARSIZE(metadata);
-		Jsonb	   *metadata_copy = (Jsonb *) palloc(metadata_size);
+		char *tmp = NULL;
+		nalloc(tmp, char, metadata_size);
+		Jsonb *metadata_copy = (Jsonb *) tmp;
 
 		NDB_CHECK_ALLOC(metadata_copy, "metadata_copy");
 		memcpy(metadata_copy, metadata, metadata_size);

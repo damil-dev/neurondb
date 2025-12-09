@@ -20,12 +20,13 @@
  * Usage:
  *	 nalloc(model, LinRegModel, 1);
  *	 nalloc(coeffs, double, n_features);
+ *
+ * TEMPORARY DEBUGGING: Forced to pure palloc0 to isolate allocator issues
  */
+#undef nalloc
 #define nalloc(ptr, type, count)				\
-	Assert((ptr) == NULL);						\
 	do {									\
-		Assert((ptr) == NULL);				\
-		(ptr) = (type *) palloc0(sizeof(type) * (count));	\
+		(ptr) = (type *) palloc0(sizeof(type) * (Size) (count));	\
 	} while (0)
 
 /*
@@ -50,13 +51,15 @@
  * Usage:
  *	 nfree(model);
  *	 nfree(coeffs);
+ *
+ * TEMPORARY DEBUGGING: Forced to pure pfree to isolate allocator issues
  */
+#undef nfree
 #define nfree(ptr)					\
 	do {								\
 		if ((ptr) != NULL)				\
 		{								\
 			pfree(ptr);					\
-			(ptr) = NULL;				\
 		}								\
 	} while (0)
 

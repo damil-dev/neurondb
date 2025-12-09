@@ -941,9 +941,7 @@ ndb_llm_route_embed(const NdbLLMConfig *cfg,
 					}
 					else
 					{
-						input_data = (float *) palloc(
-													  token_length
-													  * sizeof(float));
+						nalloc(input_data, float, token_length);
 						for (i = 0; i < token_length;
 							 i++)
 							input_data[i] = (float)
@@ -994,10 +992,7 @@ ndb_llm_route_embed(const NdbLLMConfig *cfg,
 							*dim_out =
 								output_tensor
 								->size;
-							*vec_out = (float *) palloc(
-														*dim_out
-														* sizeof(
-																 float));
+							nalloc(*vec_out, float, *dim_out);
 							memcpy(*vec_out,
 								   output_tensor
 								   ->data,
@@ -1312,10 +1307,14 @@ ndb_llm_route_complete_batch(const NdbLLMConfig *cfg,
 	/* Initialize output */
 	out->num_items = num_prompts;
 	out->num_success = 0;
-	out->texts = (char **) palloc0(num_prompts * sizeof(char *));
-	out->tokens_in = (int *) palloc0(num_prompts * sizeof(int));
-	out->tokens_out = (int *) palloc0(num_prompts * sizeof(int));
-	out->http_status = (int *) palloc0(num_prompts * sizeof(int));
+		nalloc(out->texts, char *, num_prompts);
+		MemSet(out->texts, 0, sizeof(char *) * num_prompts);
+		nalloc(out->tokens_in, int, num_prompts);
+		MemSet(out->tokens_in, 0, sizeof(int) * num_prompts);
+		nalloc(out->tokens_out, int, num_prompts);
+		MemSet(out->tokens_out, 0, sizeof(int) * num_prompts);
+		nalloc(out->http_status, int, num_prompts);
+		MemSet(out->http_status, 0, sizeof(int) * num_prompts);
 
 	if (cfg->provider == NULL || provider_is(cfg->provider, "huggingface")
 		|| provider_is(cfg->provider, "hf-http")
@@ -1333,8 +1332,8 @@ ndb_llm_route_complete_batch(const NdbLLMConfig *cfg,
 			char	   *gpu_err = NULL;
 
 
-			batch_results = (NdbCudaHfBatchResult *) palloc0(
-															 num_prompts * sizeof(NdbCudaHfBatchResult));
+			nalloc(batch_results, NdbCudaHfBatchResult, num_prompts);
+			MemSet(batch_results, 0, sizeof(NdbCudaHfBatchResult) * num_prompts);
 			rc = neurondb_gpu_hf_complete_batch(cfg->model,
 												prompts,
 												num_prompts,
@@ -1552,8 +1551,10 @@ ndb_llm_route_rerank_batch(const NdbLLMConfig *cfg,
 	}
 
 	/* Initialize output */
-	*scores_out = (float **) palloc0(num_queries * sizeof(float *));
-	*nscores_out = (int *) palloc0(num_queries * sizeof(int));
+		nalloc(*scores_out, float *, num_queries);
+		MemSet(*scores_out, 0, sizeof(float *) * num_queries);
+		nalloc(*nscores_out, int, num_queries);
+		MemSet(*nscores_out, 0, sizeof(int) * num_queries);
 
 	/* For now, process sequentially */
 	for (i = 0; i < num_queries; i++)
@@ -1638,8 +1639,10 @@ ndb_llm_route_embed_batch(const NdbLLMConfig *cfg,
 	}
 
 	/* Initialize output */
-	vecs = (float **) palloc0(num_texts * sizeof(float *));
-	dims = (int *) palloc0(num_texts * sizeof(int));
+		nalloc(vecs, float *, num_texts);
+		MemSet(vecs, 0, sizeof(float *) * num_texts);
+		nalloc(dims, int, num_texts);
+		MemSet(dims, 0, sizeof(int) * num_texts);
 
 	if (cfg->provider == NULL || provider_is(cfg->provider, "huggingface")
 		|| provider_is(cfg->provider, "hf-http"))

@@ -138,7 +138,9 @@ lightgbm_model_serialize_to_bytea(int n_estimators, int max_depth, float learnin
 	appendBinaryStringInfo(&buf, boosting_type, type_len);
 
 	total_size = VARHDRSZ + buf.len;
-	result = (bytea *) palloc(total_size);
+	char *tmp = NULL;
+	nalloc(tmp, char, total_size);
+	result = (bytea *) tmp;
 	SET_VARSIZE(result, total_size);
 	memcpy(VARDATA(result), buf.data, buf.len);
 	nfree(buf.data);
@@ -261,7 +263,8 @@ lightgbm_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 												 CStringGetDatum(metrics_json.data)));
 	nfree(metrics_json.data);
 
-	state = (LightGBMGpuModelState *) palloc0(sizeof(LightGBMGpuModelState));
+		nalloc(state, LightGBMGpuModelState, 1);
+		MemSet(state, 0, sizeof(LightGBMGpuModelState));
 	state->model_blob = model_data;
 	state->metrics = metrics;
 	state->n_estimators = n_estimators;
@@ -402,7 +405,9 @@ lightgbm_gpu_serialize(const MLGpuModel *model, bytea * *payload_out,
 	}
 
 	payload_size = VARSIZE(state->model_blob);
-	payload_copy = (bytea *) palloc(payload_size);
+	char *tmp = NULL;
+	nalloc(tmp, char, payload_size);
+	payload_copy = (bytea *) tmp;
 	memcpy(payload_copy, state->model_blob, payload_size);
 
 	if (payload_out != NULL)
@@ -443,7 +448,9 @@ lightgbm_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 	}
 
 	payload_size = VARSIZE(payload);
-	payload_copy = (bytea *) palloc(payload_size);
+	char *tmp = NULL;
+	nalloc(tmp, char, payload_size);
+	payload_copy = (bytea *) tmp;
 	memcpy(payload_copy, payload, payload_size);
 
 	if (lightgbm_model_deserialize_from_bytea(payload_copy, &n_estimators, &max_depth, &learning_rate, &n_features, boosting_type, sizeof(boosting_type)) != 0)
@@ -454,7 +461,8 @@ lightgbm_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 		return false;
 	}
 
-	state = (LightGBMGpuModelState *) palloc0(sizeof(LightGBMGpuModelState));
+		nalloc(state, LightGBMGpuModelState, 1);
+		MemSet(state, 0, sizeof(LightGBMGpuModelState));
 	state->model_blob = payload_copy;
 	state->n_estimators = n_estimators;
 	state->max_depth = max_depth;
@@ -466,7 +474,9 @@ lightgbm_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 	if (metadata != NULL)
 	{
 		int			metadata_size = VARSIZE(metadata);
-		Jsonb	   *metadata_copy = (Jsonb *) palloc(metadata_size);
+		char *tmp = NULL;
+		nalloc(tmp, char, metadata_size);
+		Jsonb *metadata_copy = (Jsonb *) tmp;
 
 		memcpy(metadata_copy, metadata, metadata_size);
 		state->metrics = metadata_copy;

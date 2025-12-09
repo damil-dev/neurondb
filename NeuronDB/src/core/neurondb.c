@@ -72,7 +72,12 @@ new_vector(int dim)
 						VECTOR_MAX_DIM)));
 
 	size = VECTOR_SIZE(dim);
-	result = (Vector *) palloc0(size);
+	{
+		char *tmp = NULL;
+		nalloc(tmp, char, size);
+		result = (Vector *) tmp;
+		MemSet(result, 0, size);
+	}
 	SET_VARSIZE(result, size);
 	result->dim = dim;
 
@@ -121,7 +126,11 @@ copy_vector(Vector *vector)
 				(errcode(ERRCODE_DATA_CORRUPTED),
 				 errmsg("invalid vector size: %d", size)));
 
-	result = (Vector *) palloc(size);
+	{
+		char *tmp = NULL;
+		nalloc(tmp, char, size);
+		result = (Vector *) tmp;
+	}
 	memcpy(result, vector, size);
 	return result;
 }
@@ -160,7 +169,7 @@ vector_in_internal(char *str, int *out_dim, bool check)
 	if (*ptr == '[' || *ptr == '{')
 		ptr++;
 
-	data = (float4 *) palloc(sizeof(float4) * capacity);
+	nalloc(data, float4, capacity);
 
 	while (*ptr && *ptr != ']' && *ptr != '}')
 	{
@@ -825,7 +834,7 @@ vector_to_array(PG_FUNCTION_ARGS)
 	vec = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(vec);
 
-	elems = (Datum *) palloc(sizeof(Datum) * vec->dim);
+	nalloc(elems, Datum, vec->dim);
 
 	for (i = 0; i < vec->dim; i++)
 		elems[i] = Float4GetDatum(vec->data[i]);

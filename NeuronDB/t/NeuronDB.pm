@@ -384,18 +384,18 @@ sub test_gpu_features {
 	
 	# Check if GPU is enabled
 	my $result = $node->psql($dbname, q{
-		SELECT current_setting('neurondb.gpu_enabled', true) AS gpu_enabled;
+		SELECT current_setting('neurondb.compute_mode', true) AS compute_mode;
 	}, tuples_only => 1);
 	
 	unless ($result->{success}) {
 		return (0, "Cannot check GPU status: $result->{stderr}");
 	}
 	
-	my $gpu_enabled = $result->{stdout};
-	chomp $gpu_enabled;
+	my $compute_mode = $result->{stdout};
+	chomp $compute_mode;
 	
-	if ($gpu_enabled ne 'on') {
-		return (1, "GPU not enabled (skipped)");
+	if ($compute_mode ne '1') {  # 1 = GPU mode, 0 = CPU mode, 2 = AUTO mode
+		return (1, "GPU not enabled (compute_mode=$compute_mode, expected 1 for GPU mode)");
 	}
 	
 	# Test GPU info function

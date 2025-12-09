@@ -1,5 +1,5 @@
 -- Extension created in 01_types_basic
-SET neurondb.gpu_enabled = off;
+SET neurondb.compute_mode = off;
 
 -- Quantization detail: All supported formats, their storage size, and characteristics
 -- Each query below provides the quantized binary size for a vector of four dimensions: [1, -1, 0, 3]

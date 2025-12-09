@@ -7,7 +7,7 @@
 DO $$
 DECLARE
 	gpu_mode TEXT;
-	current_gpu_enabled TEXT;
+	current_compute_mode TEXT;
 	current_gpu_kernels TEXT;
 	num_rows_val TEXT;
 	table_exists BOOLEAN;
@@ -28,22 +28,22 @@ BEGIN
 		
 		-- Verify GPU configuration matches test_settings
 		BEGIN
-			SELECT current_setting('neurondb.gpu_enabled', true) INTO current_gpu_enabled;
+			SELECT current_setting('neurondb.compute_mode', true) INTO current_compute_mode;
 		EXCEPTION WHEN OTHERS THEN
-			current_gpu_enabled := NULL;
+			current_compute_mode := NULL;
 		END;
 		
 		-- Only verify if gpu_mode was actually set
 		IF gpu_mode IS NOT NULL THEN
 			IF gpu_mode = 'gpu' THEN
 				-- Verify GPU is enabled (should be set by test runner)
-				IF current_gpu_enabled IS NOT NULL AND current_gpu_enabled != 'on' THEN
-					RAISE WARNING 'GPU mode expected but neurondb.gpu_enabled = % (expected: on)', current_gpu_enabled;
+				IF current_compute_mode IS NOT NULL AND current_compute_mode != '1' THEN
+					RAISE WARNING 'GPU mode expected but neurondb.compute_mode = % (expected: 1)', current_compute_mode;
 				END IF;
-			ELSE
-				-- Verify GPU is disabled (should be set by test runner)
-				IF current_gpu_enabled IS NOT NULL AND current_gpu_enabled != 'off' THEN
-					RAISE WARNING 'CPU mode expected but neurondb.gpu_enabled = % (expected: off)', current_gpu_enabled;
+			ELSIF gpu_mode = 'cpu' THEN
+				-- Verify CPU mode (should be set by test runner)
+				IF current_compute_mode IS NOT NULL AND current_compute_mode != '0' THEN
+					RAISE WARNING 'CPU mode expected but neurondb.compute_mode = % (expected: 0)', current_compute_mode;
 				END IF;
 			END IF;
 		END IF;

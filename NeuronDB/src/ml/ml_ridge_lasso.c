@@ -6856,6 +6856,7 @@ ridge_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 
 	bytea *gpu_payload = NULL;
 	char *base = NULL;
+	char *tmp = NULL;
 	NdbCudaRidgeModelHeader *hdr = NULL;
 	float *coef_dest = NULL;
 	size_t		payload_bytes;
@@ -6887,7 +6888,9 @@ ridge_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 
 	payload_bytes = sizeof(NdbCudaRidgeModelHeader) +
 		sizeof(float) * (size_t) ridge_model->n_features;
-	gpu_payload = (bytea *) palloc(VARHDRSZ + payload_bytes);
+	tmp = NULL;
+	nalloc(tmp, char, VARHDRSZ + payload_bytes);
+	gpu_payload = (bytea *) tmp;
 	NDB_CHECK_ALLOC(gpu_payload, "gpu_payload");
 	SET_VARSIZE(gpu_payload, VARHDRSZ + payload_bytes);
 	base = VARDATA(gpu_payload);
@@ -7219,6 +7222,7 @@ lasso_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 
 	bytea *gpu_payload = NULL;
 	char *base = NULL;
+	char *tmp = NULL;
 	NdbCudaLassoModelHeader *hdr = NULL;
 	float *coef_dest = NULL;
 	size_t		payload_bytes;
@@ -7250,7 +7254,9 @@ lasso_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 
 	payload_bytes = sizeof(NdbCudaLassoModelHeader) +
 		sizeof(float) * (size_t) lasso_model->n_features;
-	gpu_payload = (bytea *) palloc(VARHDRSZ + payload_bytes);
+	tmp = NULL;
+	nalloc(tmp, char, VARHDRSZ + payload_bytes);
+	gpu_payload = (bytea *) tmp;
 	NDB_CHECK_ALLOC(gpu_payload, "gpu_payload");
 	SET_VARSIZE(gpu_payload, VARHDRSZ + payload_bytes);
 	base = VARDATA(gpu_payload);

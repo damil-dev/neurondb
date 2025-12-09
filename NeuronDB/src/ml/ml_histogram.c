@@ -122,7 +122,7 @@ similarity_histogram(PG_FUNCTION_ARGS)
 				 errmsg("Need at least 2 vectors")));
 
 	/* Sample random pairs and compute distances */
-	distances = (double *) palloc(sizeof(double) * num_samples);
+	nalloc(distances, double, num_samples);
 
 	for (i = 0; i < num_samples; i++)
 	{

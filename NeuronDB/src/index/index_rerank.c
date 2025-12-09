@@ -49,7 +49,7 @@ get_rerank_cache_table(const char *tbl, const char *col)
 
 	Assert(tbl != NULL && col != NULL);
 
-	buf = (char *) palloc(strlen(tbl) + strlen(col) + 32);
+	nalloc(buf, char, strlen(tbl) + strlen(col) + 32);
 
 	snprintf(buf,
 			 strlen(tbl) + strlen(col) + 32,

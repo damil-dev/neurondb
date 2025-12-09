@@ -206,14 +206,14 @@ During `initdb`, the container sets the following defaults in `postgresql.conf`:
 
 ```conf
 shared_preload_libraries = 'neurondb'
-neurondb.gpu_enabled = off
+neurondb.compute_mode = off
 neurondb.automl.use_gpu = off
 ```
 
 Modify at runtime:
 
 ```sql
-ALTER SYSTEM SET neurondb.gpu_enabled = on;
+ALTER SYSTEM SET neurondb.compute_mode = on;
 SELECT pg_reload_conf();
 ```
 
@@ -429,7 +429,7 @@ docker compose --profile cuda up -d neurondb-cuda
 # Test GPU functions
 psql "postgresql://neurondb:neurondb@localhost:5434/neurondb" <<EOF
 SELECT neurondb.gpu_device_info();
-SELECT neurondb.gpu_enabled();
+SELECT neurondb.compute_mode();
 EOF
 ```
 

@@ -13,7 +13,7 @@ SET neurondb.llm_fail_open = on;
 \echo 'NOTE: Image and multimodal embedding tests run with fail_open mode enabled.'
 \echo '      To generate real embeddings, configure:'
 \echo '      - neurondb.llm_api_key (Hugging Face API key)'
-\echo '      - Or enable GPU embedding via GUC (ALTER SYSTEM SET neurondb.gpu_enabled = on)'
+\echo '      - Or enable GPU embedding via GUC (ALTER SYSTEM SET neurondb.compute_mode = on)'
 \echo '      Without configuration, these functions return fallback embeddings (graceful fallback).'
 \echo ''
 

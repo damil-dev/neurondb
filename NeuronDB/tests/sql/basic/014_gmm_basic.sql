@@ -24,7 +24,7 @@ DECLARE
 	current_gpu_enabled TEXT;
 BEGIN
 	SELECT setting_value INTO gpu_mode FROM test_settings WHERE setting_key = 'gpu_mode';
-	SELECT current_setting('neurondb.gpu_enabled', true) INTO current_gpu_enabled;
+	SELECT current_setting('neurondb.compute_mode', true) INTO current_gpu_enabled;
 	IF gpu_mode = 'gpu' THEN
 		SELECT neurondb_gpu_enable();
 	END IF;
@@ -122,7 +122,7 @@ BEGIN
 	EXCEPTION WHEN OTHERS THEN
 		-- If training fails, try with CPU explicitly disabled
 		BEGIN
-			SET neurondb.gpu_enabled = off;
+			SET neurondb.compute_mode = off;
 			model_id_val := neurondb.train(
 				'default',
 				'gmm',

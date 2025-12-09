@@ -22,18 +22,18 @@ BEGIN
 	SELECT setting_value INTO gpu_kernels_val FROM test_settings WHERE setting_key = 'gpu_kernels';
 	
 	-- Verify GPU configuration matches test_settings (set by test runner)
-	SELECT current_setting('neurondb.gpu_enabled', true) INTO current_gpu_enabled;
+	SELECT current_setting('neurondb.compute_mode', true) INTO current_gpu_enabled;
 	SELECT current_setting('neurondb.gpu_kernels', true) INTO current_gpu_kernels;
 	
 	IF gpu_mode = 'gpu' THEN
 		-- Verify GPU is enabled (should be set by test runner)
 		IF current_gpu_enabled != 'on' THEN
-			RAISE WARNING 'GPU mode expected but neurondb.gpu_enabled = % (expected: on)', current_gpu_enabled;
+			RAISE WARNING 'GPU mode expected but neurondb.compute_mode = % (expected: on)', current_gpu_enabled;
 		END IF;
 	ELSE
 		-- Verify GPU is disabled (should be set by test runner)
 		IF current_gpu_enabled != 'off' THEN
-			RAISE WARNING 'CPU mode expected but neurondb.gpu_enabled = % (expected: off)', current_gpu_enabled;
+			RAISE WARNING 'CPU mode expected but neurondb.compute_mode = % (expected: off)', current_gpu_enabled;
 		END IF;
 	END IF;
 END $$;
@@ -46,7 +46,7 @@ END $$;
 \echo 'GPU Configuration'
 \echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
 -- GPU already configured via test_settings above
-SELECT current_setting('neurondb.gpu_enabled', true) AS gpu_available;
+SELECT current_setting('neurondb.compute_mode', true) AS gpu_available;
 
 /*
  * ---- GPU INFORMATION TESTS ----
@@ -174,12 +174,12 @@ FROM neurondb_gpu_info()
 WHERE is_available = true;
 
 \echo 'Test 8: GPU Enable/Disable'
-SET neurondb.gpu_enabled = off;
+SET neurondb.compute_mode = off;
 SELECT 
 	'GPU Disabled' AS status,
 	neurondb_gpu_enable() AS enable_result;
 
-SET neurondb.gpu_enabled = on;
+SET neurondb.compute_mode = on;
 SELECT 
 	'GPU Enabled' AS status,
 	neurondb_gpu_enable() AS enable_result;
@@ -194,7 +194,7 @@ DO $$
 DECLARE
 	result double precision;
 BEGIN
-	SET neurondb.gpu_enabled = off;
+	SET neurondb.compute_mode = off;
 	BEGIN
 		result := vector_l2_distance_gpu('[1,2,3]'::vector, '[4,5,6]'::vector);
 	EXCEPTION WHEN OTHERS THEN 
@@ -202,7 +202,7 @@ BEGIN
 		-- Error handled correctly
 		NULL;
 	END;
-	SET neurondb.gpu_enabled = on;
+	SET neurondb.compute_mode = on;
 END$$;
 
 \echo 'Error Test 2: Invalid kernel configuration'

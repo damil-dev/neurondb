@@ -678,8 +678,9 @@ rocm_backend_dbscan_impl(const float *vectors,
 	 */
 	Assert(vectors && cluster_ids && num_vectors > 0 && dim > 0);
 
-	bool *visited = (bool *)palloc0(num_vectors * sizeof(bool));
-	int *neighbors = (int *)palloc(num_vectors * sizeof(int));
+	bool *visited = NULL;
+	nalloc(visited, bool, num_vectors);
+	nalloc(neighbors, int, num_vectors);
 	int cluster_id = -1;
 
 	/* Initialize all points as unclassified */
@@ -920,7 +921,7 @@ ndb_rocm_launch_kmeans_assign(const float *vectors,
 		|| assignments == NULL)
 		return -1;
 
-	assign32 = (int32_t *)palloc(sizeof(int32_t) * num_vectors);
+	nalloc(assign32, int32_t, num_vectors);
 
 	rc = gpu_kmeans_assign_hip(vectors,
 		centroids,
@@ -962,8 +963,8 @@ ndb_rocm_launch_kmeans_update(const float *vectors,
 		|| centroids == NULL)
 		return -1;
 
-	assign32 = (int32_t *)palloc(sizeof(int32_t) * num_vectors);
-	counts = (int32_t *)palloc0(sizeof(int32_t) * k);
+	nalloc(assign32, int32_t, num_vectors);
+		nalloc(counts, int32_t, k);
 
 	for (i = 0; i < num_vectors; i++)
 		assign32[i] = (int32_t)assignments[i];

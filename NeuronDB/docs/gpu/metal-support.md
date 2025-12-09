@@ -10,7 +10,7 @@ Metal support enables GPU acceleration on Apple Silicon (M1, M2, M3) Macs.
 
 ```conf
 shared_preload_libraries = 'neurondb'
-neurondb.gpu_enabled = true
+neurondb.compute_mode = true
 neurondb.gpu_backend = 'metal'
 ```
 

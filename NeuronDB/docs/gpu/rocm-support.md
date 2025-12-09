@@ -10,7 +10,7 @@ ROCm support enables AMD GPU acceleration for NeuronDB operations.
 
 ```conf
 shared_preload_libraries = 'neurondb'
-neurondb.gpu_enabled = true
+neurondb.compute_mode = true
 neurondb.gpu_backend = 'rocm'
 neurondb.gpu_device = 0
 ```

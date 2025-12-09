@@ -1,7 +1,7 @@
 -- Extension created in 01_types_basic
 
 -- Disable GPU acceleration for accurate baseline testing
-SET neurondb.gpu_enabled = off;
+SET neurondb.compute_mode = off;
 
 -- =======================
 -- Test all supported GPU distance functions in detail

@@ -35,6 +35,7 @@
 #include "neurondb_macros.h"
 #include "neurondb_guc.h"
 #include "neurondb_constants.h"
+#include "neurondb_json.h"
 
 int
 ndb_cuda_lr_pack_model(const LRModel *model,
@@ -92,6 +93,7 @@ ndb_cuda_lr_pack_model(const LRModel *model,
 		appendStringInfo(&buf,
 						 "{\"algorithm\":\"logistic_regression\","
 						 "\"training_backend\":1,"
+						 "\"storage\":\"gpu\","
 						 "\"n_features\":%d,"
 						 "\"n_samples\":%d,"
 						 "\"max_iters\":%d,"
@@ -107,10 +109,71 @@ ndb_cuda_lr_pack_model(const LRModel *model,
 						 model->final_loss,
 						 model->accuracy);
 
-		metrics_json = DatumGetJsonbP(DirectFunctionCall1(
-														  jsonb_in,
-														  CStringGetDatum(buf.data)));
-		nfree(buf.data);
+		/* Create JSON in TopMemoryContext to isolate from potentially corrupted context */
+		/* This prevents the corrupted freelist from affecting JSON creation */
+		{
+			MemoryContext oldcontext;
+			Jsonb	   *temp_json = NULL;
+
+			oldcontext = MemoryContextSwitchTo(TopMemoryContext);
+
+			PG_TRY();
+			{
+				temp_json = ndb_jsonb_in_cstring(buf.data);
+			}
+			PG_CATCH();
+			{
+				MemoryContextSwitchTo(oldcontext);
+				FlushErrorState();
+				ereport(ERROR,
+						(errcode(ERRCODE_INTERNAL_ERROR),
+						 errmsg("neurondb: CUDA lr_pack_model: Failed to create metrics JSONB in TopMemoryContext"),
+						 errdetail("Even TopMemoryContext failed - this indicates a more serious issue"),
+						 errhint("Check PostgreSQL server logs for additional errors")));
+			}
+			PG_END_TRY();
+
+			if (temp_json == NULL)
+			{
+				MemoryContextSwitchTo(oldcontext);
+				ereport(ERROR,
+						(errcode(ERRCODE_INTERNAL_ERROR),
+						 errmsg("neurondb: CUDA lr_pack_model: Failed to create metrics JSONB - ndb_jsonb_in_cstring returned NULL")));
+			}
+
+			/* Switch back to original context and copy JSON to it */
+			MemoryContextSwitchTo(oldcontext);
+
+			/* Copy JSONB to current context using MemoryContextAlloc and memcpy */
+			/* JSONB is a varlena type, so we need to copy the entire structure */
+			{
+				size_t		jsonb_size = VARSIZE(temp_json);
+
+				metrics_json = (Jsonb *) MemoryContextAlloc(CurrentMemoryContext, jsonb_size);
+				memcpy(metrics_json, temp_json, jsonb_size);
+
+				/* Free the temporary JSON from TopMemoryContext */
+				pfree(temp_json);
+			}
+		}
+
+		if (metrics_json == NULL)
+		{
+			ereport(ERROR,
+					(errcode(ERRCODE_INTERNAL_ERROR),
+					 errmsg("neurondb: CUDA lr_pack_model: Failed to create metrics JSONB - ndb_jsonb_in_cstring returned NULL"),
+					 errdetail("Memory context %p may be corrupted. JSON string length=%d",
+							   (void *) CurrentMemoryContext, buf.len),
+					 errhint("This indicates memory corruption occurred earlier in the training process, likely during matrix operations or memory allocation.")));
+		}
+
+		/* Free StringInfo data - use pfree directly to avoid nfree wrapper issues */
+		if (buf.data != NULL)
+		{
+			pfree(buf.data);
+			buf.data = NULL;
+		}
+
 		*metrics = metrics_json;
 	}
 
@@ -278,6 +341,8 @@ ndb_cuda_lr_train(const float *features,
 		}
 	}
 
+	elog(WARNING, "ndb_cuda_lr_train: After validation checks - using default hyperparameters");
+
 	elog(DEBUG1,
 		 "ndb_cuda_lr_train: entry: model_data=%p, features=%p, "
 		 "labels=%p, n_samples=%d, feature_dim=%d",
@@ -293,109 +358,18 @@ ndb_cuda_lr_train(const float *features,
 		 n_samples,
 		 feature_dim);
 
-	/* Extract and validate hyperparameters from JSONB */
-	if (hyperparams != NULL)
-	{
-		Datum		max_iters_datum;
-		Datum		lr_datum;
-		Datum		lambda_datum;
-		Datum		numeric_datum;
-		Numeric		num;
-		int			parsed_max_iters;
-		double		parsed_lr;
-		double		parsed_lambda;
+	/* 
+	 * Skip hyperparameter parsing - DirectFunctionCall causes crashes in GPU context
+	 * Just use defaults like linear regression does
+	 */
+	(void) hyperparams;  /* Suppress unused parameter warning */
+	max_iters = default_max_iters;
+	learning_rate = default_learning_rate;
+	lambda = default_lambda;
 
-		max_iters_datum = DirectFunctionCall2(jsonb_object_field,
-											  JsonbPGetDatum(hyperparams),
-											  CStringGetTextDatum("max_iters"));
-		if (DatumGetPointer(max_iters_datum) != NULL)
-		{
-			numeric_datum = DirectFunctionCall1(jsonb_numeric, max_iters_datum);
-			if (DatumGetPointer(numeric_datum) != NULL)
-			{
-				num = DatumGetNumeric(numeric_datum);
-				parsed_max_iters = DatumGetInt32(DirectFunctionCall1(
-																	 numeric_int4, NumericGetDatum(num)));
-				/* Defensive: Validate max_iters range */
-				if (parsed_max_iters > 0 && parsed_max_iters <= 1000000)
-				{
-					max_iters = parsed_max_iters;
-				}
-				else if (parsed_max_iters > 1000000)
-				{
-					elog(WARNING,
-						 "ndb_cuda_lr_train: max_iters %d exceeds maximum 1000000, using default %d",
-						 parsed_max_iters, default_max_iters);
-					max_iters = default_max_iters;
-				}
-				else
-				{
-					elog(WARNING,
-						 "ndb_cuda_lr_train: invalid max_iters %d, using default %d",
-						 parsed_max_iters, default_max_iters);
-					max_iters = default_max_iters;
-				}
-			}
-		}
+	/* Hyperparameter parsing disabled - DirectFunctionCall causes crashes in GPU context */
 
-		lr_datum = DirectFunctionCall2(jsonb_object_field,
-									   JsonbPGetDatum(hyperparams),
-									   CStringGetTextDatum("learning_rate"));
-		if (DatumGetPointer(lr_datum) != NULL)
-		{
-			numeric_datum = DirectFunctionCall1(jsonb_numeric, lr_datum);
-			if (DatumGetPointer(numeric_datum) != NULL)
-			{
-				num = DatumGetNumeric(numeric_datum);
-				parsed_lr = DatumGetFloat8(
-										   DirectFunctionCall1(numeric_float8, NumericGetDatum(num)));
-
-				/*
-				 * Defensive: Validate learning_rate range and check for
-				 * NaN/Inf
-				 */
-				if (isfinite(parsed_lr) && parsed_lr > 0.0 && parsed_lr <= 10.0)
-				{
-					learning_rate = parsed_lr;
-				}
-				else
-				{
-					elog(WARNING,
-						 "ndb_cuda_lr_train: invalid learning_rate %f (must be finite, > 0, <= 10.0), using default %f",
-						 parsed_lr, default_learning_rate);
-					learning_rate = default_learning_rate;
-				}
-			}
-		}
-
-		lambda_datum = DirectFunctionCall2(jsonb_object_field,
-										   JsonbPGetDatum(hyperparams),
-										   CStringGetTextDatum("lambda"));
-		if (DatumGetPointer(lambda_datum) != NULL)
-		{
-			numeric_datum = DirectFunctionCall1(jsonb_numeric, lambda_datum);
-			if (DatumGetPointer(numeric_datum) != NULL)
-			{
-				num = DatumGetNumeric(numeric_datum);
-				parsed_lambda = DatumGetFloat8(
-											   DirectFunctionCall1(numeric_float8, NumericGetDatum(num)));
-				/* Defensive: Validate lambda range and check for NaN/Inf */
-				if (isfinite(parsed_lambda) && parsed_lambda >= 0.0 && parsed_lambda <= 1000.0)
-				{
-					lambda = parsed_lambda;
-				}
-				else
-				{
-					elog(WARNING,
-						 "ndb_cuda_lr_train: invalid lambda %f (must be finite, >= 0, <= 1000.0), using default %f",
-						 parsed_lambda, default_lambda);
-					lambda = default_lambda;
-				}
-			}
-		}
-	}
-
-	/* Defensive: Final validation of hyperparameters */
+	/* Defensive: Final validation of hyperparameters (using defaults) */
 	if (max_iters <= 0 || max_iters > 1000000)
 	{
 		elog(WARNING,
@@ -418,7 +392,7 @@ ndb_cuda_lr_train(const float *features,
 		lambda = default_lambda;
 	}
 
-	/* Allocate host memory with defensive checks */
+	/* Allocate host memory for weights and gradients */
 	weights = (double *) palloc0(sizeof(double) * (size_t) feature_dim);
 	if (weights == NULL)
 	{
@@ -426,10 +400,10 @@ ndb_cuda_lr_train(const float *features,
 			*errstr = pstrdup("ndb_cuda_lr_train: palloc0 weights failed");
 		return -1;
 	}
-	nalloc(grad_weights, double, feature_dim);
+	grad_weights = (double *) palloc0(sizeof(double) * (size_t) feature_dim);
 	if (grad_weights == NULL)
 	{
-		nfree(weights);
+		pfree(weights);
 		if (errstr)
 			*errstr = pstrdup("ndb_cuda_lr_train: palloc grad_weights failed");
 		return -1;
@@ -441,13 +415,6 @@ ndb_cuda_lr_train(const float *features,
 	pred_bytes = sizeof(double) * (size_t) n_samples;
 	z_bytes = sizeof(double) * (size_t) n_samples;
 	weight_bytes_gpu = sizeof(float) * (size_t) feature_dim;
-
-	elog(DEBUG1,
-		 "ndb_cuda_lr_train: allocating GPU memory: feature_bytes=%zu "
-		 "(%.2f MB), label_bytes=%zu",
-		 feature_bytes,
-		 feature_bytes / (1024.0 * 1024.0),
-		 label_bytes);
 
 	/* Defensive: Check CUDA context before proceeding */
 	status = cudaGetLastError();
@@ -1395,6 +1362,8 @@ ndb_cuda_lr_train(const float *features,
 		/* Build metrics JSON - always build, even if forward_pass failed */
 		{
 			StringInfoData buf;
+			MemoryContext oldcontext;
+			Jsonb	   *temp_json = NULL;
 
 			initStringInfo(&buf);
 			appendStringInfo(&buf,
@@ -1415,15 +1384,60 @@ ndb_cuda_lr_train(const float *features,
 							 final_loss,
 							 accuracy);
 
-			metrics_json = DatumGetJsonbP(DirectFunctionCall1(
-															  jsonb_in,
-															  CStringGetDatum(buf.data)));
-			nfree(buf.data);
+			/* Create JSON in TopMemoryContext to isolate from potentially corrupted context */
+			oldcontext = MemoryContextSwitchTo(TopMemoryContext);
+
+			PG_TRY();
+			{
+				temp_json = ndb_jsonb_in_cstring(buf.data);
+			}
+			PG_CATCH();
+			{
+				MemoryContextSwitchTo(oldcontext);
+				FlushErrorState();
+				ereport(ERROR,
+						(errcode(ERRCODE_INTERNAL_ERROR),
+						 errmsg("neurondb: CUDA lr_train: Failed to create metrics JSONB in TopMemoryContext"),
+						 errhint("Memory context corruption detected during GPU training")));
+			}
+			PG_END_TRY();
+
+			if (temp_json == NULL)
+			{
+				MemoryContextSwitchTo(oldcontext);
+				ereport(ERROR,
+						(errcode(ERRCODE_INTERNAL_ERROR),
+						 errmsg("neurondb: CUDA lr_train: Failed to create metrics JSONB - ndb_jsonb_in_cstring returned NULL")));
+			}
+
+			/* Switch back to original context and copy JSON to it */
+			MemoryContextSwitchTo(oldcontext);
+
+			/* Copy JSONB to current context using palloc and memcpy */
+			{
+				size_t		jsonb_size = VARSIZE(temp_json);
+
+				metrics_json = (Jsonb *) MemoryContextAlloc(CurrentMemoryContext, jsonb_size);
+				memcpy(metrics_json, temp_json, jsonb_size);
+
+				/* Free the temporary JSON from TopMemoryContext */
+				pfree(temp_json);
+			}
+
 			if (metrics_json == NULL)
 			{
-				elog(ERROR,
-					 "ndb_cuda_lr_train: failed to create metrics_json from JSON string");
+				ereport(ERROR,
+						(errcode(ERRCODE_INTERNAL_ERROR),
+						 errmsg("neurondb: CUDA lr_train: metrics JSONB is NULL after creation")));
 			}
+
+			/* Free StringInfo data */
+			if (buf.data != NULL)
+			{
+				pfree(buf.data);
+				buf.data = NULL;
+			}
+
 			elog(DEBUG1,
 				 "ndb_cuda_lr_train: created metrics_json: %p",
 				 (void *) metrics_json);

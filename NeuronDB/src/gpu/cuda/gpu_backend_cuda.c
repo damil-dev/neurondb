@@ -694,8 +694,9 @@ ndb_cuda_launch_kmeans_update(const float *vectors,
 		|| centroids == NULL)
 		return -1;
 
-	assign32 = (int32_t *) palloc(sizeof(int32_t) * num_vectors);
-	counts = (int32_t *) palloc0(sizeof(int32_t) * k);
+	nalloc(assign32, int32_t, num_vectors);
+	nalloc(counts, int32_t, k);
+	MemSet(counts, 0, sizeof(int32_t) * k);
 
 	for (i = 0; i < num_vectors; i++)
 		assign32[i] = (int32_t) assignments[i];

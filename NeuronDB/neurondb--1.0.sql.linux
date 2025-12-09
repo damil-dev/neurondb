@@ -707,7 +707,7 @@ COMMENT ON FUNCTION neurondb_onnx_info IS 'Return ONNX runtime availability and 
 CREATE FUNCTION embed_text(text, text DEFAULT NULL) RETURNS vector
     AS 'MODULE_PATHNAME', 'embed_text'
     LANGUAGE C STABLE;
-COMMENT ON FUNCTION embed_text IS 'Generate text embedding with GPU acceleration support: (text, model_name). Uses CUDA-accelerated inference when available, falls back to ONNX Runtime or remote API. Configure via neurondb.llm_provider and neurondb.gpu_enabled.';
+COMMENT ON FUNCTION embed_text IS 'Generate text embedding with GPU acceleration support: (text, model_name). Uses CUDA-accelerated inference when available, falls back to ONNX Runtime or remote API. Configure via neurondb.llm_provider and neurondb.compute_mode.';
 
 CREATE FUNCTION embed_text_batch(text[], text DEFAULT NULL) RETURNS vector[]
     AS 'MODULE_PATHNAME', 'embed_text_batch'
@@ -814,7 +814,7 @@ CREATE FUNCTION rerank_cross_encoder(text, text[], text DEFAULT 'ms-marco-MiniLM
     RETURNS TABLE(idx integer, score real)
     AS 'MODULE_PATHNAME', 'rerank_cross_encoder'
     LANGUAGE C STABLE;
-COMMENT ON FUNCTION rerank_cross_encoder IS 'Cross-encoder reranking with GPU acceleration support: (query, candidates, model, top_k). Uses CUDA-accelerated inference when available, falls back to ONNX Runtime or remote API. Configure via neurondb.llm_provider and neurondb.gpu_enabled.';
+COMMENT ON FUNCTION rerank_cross_encoder IS 'Cross-encoder reranking with GPU acceleration support: (query, candidates, model, top_k). Uses CUDA-accelerated inference when available, falls back to ONNX Runtime or remote API. Configure via neurondb.llm_provider and neurondb.compute_mode.';
 
 CREATE FUNCTION rerank_llm(text, text[], text DEFAULT 'gpt-3.5-turbo', integer DEFAULT 10)
     RETURNS TABLE(idx integer, score real)
@@ -3745,7 +3745,7 @@ COMMENT ON FUNCTION neurondb.llm_gpu_utilization IS 'Get GPU utilization metrics
 --   neurondb.llm_fail_open      - Fail open on provider errors (default: true)
 --
 -- GPU Settings:
---   neurondb.gpu_enabled        - Enable GPU acceleration (default: false)
+--   neurondb.compute_mode        - Enable GPU acceleration (default: false)
 --   neurondb.gpu_device         - GPU device ID to use (default: 0)
 --   neurondb.gpu_batch_size     - Batch size for GPU operations (default: 1000)
 --   neurondb.gpu_streams        - Number of CUDA streams (default: 4)
@@ -3763,7 +3763,7 @@ COMMENT ON FUNCTION neurondb.llm_gpu_utilization IS 'Get GPU utilization metrics
 --
 -- GPU Preference:
 --   When neurondb.llm_provider is set to 'huggingface-local' or 'hf-local',
---   and neurondb.gpu_enabled is true, the system will:
+--   and neurondb.compute_mode is set to 'gpu' (1) or 'auto' (2), the system will:
 --   1. Try CUDA-accelerated inference first (if GPU available)
 --   2. Fall back to ONNX Runtime with GPU (if available)
 --   3. Fall back to ONNX Runtime with CPU (if GPU unavailable)
@@ -3772,7 +3772,7 @@ COMMENT ON FUNCTION neurondb.llm_gpu_utilization IS 'Get GPU utilization metrics
 -- Example configuration:
 --   SET neurondb.llm_provider = 'huggingface-local';
 --   SET neurondb.llm_model = 'sentence-transformers/all-MiniLM-L6-v2';
---   SET neurondb.gpu_enabled = true;
+--   SET neurondb.compute_mode = 1;  -- 1=gpu, 2=auto, 0=cpu
 --   SET neurondb.gpu_device = 0;
 -- ============================================================================
 
@@ -3781,7 +3781,7 @@ COMMENT ON FUNCTION neurondb.llm_gpu_utilization IS 'Get GPU utilization metrics
 CREATE FUNCTION ndb_llm_complete(prompt text, params text DEFAULT '{}') RETURNS text
     AS 'MODULE_PATHNAME', 'ndb_llm_complete'
     LANGUAGE C STABLE;
-COMMENT ON FUNCTION ndb_llm_complete IS 'LLM completion with GPU acceleration support: ndb_llm_complete(prompt, params) where params is JSON text with optional model, max_tokens, temperature, etc. Uses CUDA-accelerated inference when available, falls back to ONNX Runtime or remote API. Configure via neurondb.llm_provider and neurondb.gpu_enabled.';
+COMMENT ON FUNCTION ndb_llm_complete IS 'LLM completion with GPU acceleration support: ndb_llm_complete(prompt, params) where params is JSON text with optional model, max_tokens, temperature, etc. Uses CUDA-accelerated inference when available, falls back to ONNX Runtime or remote API. Configure via neurondb.llm_provider and neurondb.compute_mode.';
 
 CREATE FUNCTION ndb_llm_image_analyze(image_data bytea, prompt text DEFAULT NULL, params text DEFAULT '{}', model text DEFAULT NULL) RETURNS text
     AS 'MODULE_PATHNAME', 'ndb_llm_image_analyze'
@@ -3791,12 +3791,12 @@ COMMENT ON FUNCTION ndb_llm_image_analyze IS 'LLM image analysis (vision) using 
 CREATE FUNCTION ndb_llm_embed(text_input text, model text) RETURNS vector
     AS 'MODULE_PATHNAME', 'ndb_llm_embed'
     LANGUAGE C STABLE;
-COMMENT ON FUNCTION ndb_llm_embed IS 'LLM embedding with GPU acceleration support. Uses CUDA-accelerated inference when available, falls back to ONNX Runtime or remote API. Configure via neurondb.llm_provider and neurondb.gpu_enabled.';
+COMMENT ON FUNCTION ndb_llm_embed IS 'LLM embedding with GPU acceleration support. Uses CUDA-accelerated inference when available, falls back to ONNX Runtime or remote API. Configure via neurondb.llm_provider and neurondb.compute_mode.';
 
 CREATE FUNCTION ndb_llm_rerank(query text, documents text[], model text, top_k integer) RETURNS TABLE(idx integer, score real)
     AS 'MODULE_PATHNAME', 'ndb_llm_rerank'
     LANGUAGE C STABLE;
-COMMENT ON FUNCTION ndb_llm_rerank IS 'LLM-based reranking with GPU acceleration support. Uses CUDA-accelerated inference when available, falls back to ONNX Runtime or remote API. Configure via neurondb.llm_provider and neurondb.gpu_enabled.';
+COMMENT ON FUNCTION ndb_llm_rerank IS 'LLM-based reranking with GPU acceleration support. Uses CUDA-accelerated inference when available, falls back to ONNX Runtime or remote API. Configure via neurondb.llm_provider and neurondb.compute_mode.';
 
 CREATE FUNCTION ndb_llm_enqueue(operation text, model text, input_text text, tenant_id text) RETURNS bigint
     AS 'MODULE_PATHNAME', 'ndb_llm_enqueue'
@@ -3835,7 +3835,7 @@ CREATE FUNCTION ndb_llm_complete_batch(
 )
 	AS 'MODULE_PATHNAME', 'ndb_llm_complete_batch'
 	LANGUAGE C STABLE;
-COMMENT ON FUNCTION ndb_llm_complete_batch IS 'Batch LLM completion with GPU acceleration support: ndb_llm_complete_batch(prompts, params) processes multiple prompts in parallel using GPU when available. Uses CUDA-accelerated inference when available, falls back to ONNX Runtime or remote API. Configure via neurondb.llm_provider and neurondb.gpu_enabled.';
+COMMENT ON FUNCTION ndb_llm_complete_batch IS 'Batch LLM completion with GPU acceleration support: ndb_llm_complete_batch(prompts, params) processes multiple prompts in parallel using GPU when available. Uses CUDA-accelerated inference when available, falls back to ONNX Runtime or remote API. Configure via neurondb.llm_provider and neurondb.compute_mode.';
 
 CREATE FUNCTION ndb_llm_rerank_batch(
 	queries text[],
@@ -3849,7 +3849,7 @@ CREATE FUNCTION ndb_llm_rerank_batch(
 )
 	AS 'MODULE_PATHNAME', 'ndb_llm_rerank_batch'
 	LANGUAGE C STABLE;
-COMMENT ON FUNCTION ndb_llm_rerank_batch IS 'Batch LLM reranking with GPU acceleration support: ndb_llm_rerank_batch(queries, documents_array, model, top_k) processes multiple query-document pairs in parallel using GPU when available. Uses CUDA-accelerated inference when available, falls back to ONNX Runtime or remote API. Configure via neurondb.llm_provider and neurondb.gpu_enabled.';
+COMMENT ON FUNCTION ndb_llm_rerank_batch IS 'Batch LLM reranking with GPU acceleration support: ndb_llm_rerank_batch(queries, documents_array, model, top_k) processes multiple query-document pairs in parallel using GPU when available. Uses CUDA-accelerated inference when available, falls back to ONNX Runtime or remote API. Configure via neurondb.llm_provider and neurondb.compute_mode.';
 
 -- ============================================================================
 -- DISTRIBUTED QUERY FUNCTIONS
@@ -5108,7 +5108,7 @@ BEGIN
 	END CASE;
 END;
 $$;
-COMMENT ON FUNCTION neurondb.embed IS 'Unified embedding function with GPU acceleration support: embed(model, text, task). Uses CUDA-accelerated inference when available, falls back to ONNX Runtime or remote API. Configure via neurondb.llm_provider and neurondb.gpu_enabled.';
+COMMENT ON FUNCTION neurondb.embed IS 'Unified embedding function with GPU acceleration support: embed(model, text, task). Uses CUDA-accelerated inference when available, falls back to ONNX Runtime or remote API. Configure via neurondb.llm_provider and neurondb.compute_mode.';
 
 CREATE OR REPLACE FUNCTION neurondb.classify(
 	model text,
@@ -5419,7 +5419,7 @@ COMMENT ON FUNCTION neurondb.llm IS
 	'Unified LLM/HuggingFace API: llm(task, model, input_text, input_array, params, max_length) returns JSONB result. 
 	Supported tasks: tokenize, detokenize, embed, complete, classify, ner, qa, rerank, summarize, translate, fill_mask, text2text, zero_shot_classify.
 	Uses GPU acceleration when available, falls back to ONNX Runtime or remote API.
-	Configure via neurondb.llm_provider and neurondb.gpu_enabled.';
+	Configure via neurondb.llm_provider and neurondb.compute_mode.';
 
 -- ============================================================================
 -- UNIFIED TOKENIZATION API
@@ -5531,7 +5531,7 @@ COMMENT ON FUNCTION neurondb.transform IS
 	'Unified transform API (PostgresML-compatible): transform(model, text, task) returns JSONB result. 
 	Supported tasks: embedding, classification, ner, summarization, translation, fill_mask, text2text, zero_shot_classification.
 	Uses GPU acceleration when available, falls back to ONNX Runtime or remote API.
-	Configure via neurondb.llm_provider and neurondb.gpu_enabled.';
+	Configure via neurondb.llm_provider and neurondb.compute_mode.';
 
 -- ============================================================================
 -- TASK-SPECIFIC FUNCTIONS

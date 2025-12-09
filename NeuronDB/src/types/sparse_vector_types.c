@@ -55,7 +55,7 @@ sparse_vector_in(PG_FUNCTION_ARGS)
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
 					 errmsg("sparse_vector parsing failed: %s", errstr)));
-			pfree(errstr);
+			nfree(errstr);
 		}
 		else
 		{

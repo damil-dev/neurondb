@@ -350,8 +350,18 @@ ndb_gpu_lr_train(const float *features,
 
 	if (errstr)
 		*errstr = NULL;
-	if (!active_backend || active_backend->lr_train == NULL)
+	if (!active_backend)
+	{
+		if (errstr)
+			*errstr = pstrdup("ndb_gpu_lr_train: active_backend is NULL");
 		return -1;
+	}
+	if (active_backend->lr_train == NULL)
+	{
+		if (errstr)
+			*errstr = psprintf("ndb_gpu_lr_train: backend->lr_train is NULL (backend=%s)", active_backend->name ? active_backend->name : "unknown");
+		return -1;
+	}
 
 	elog(DEBUG1,
 		 "ndb_gpu_lr_train: calling backend->lr_train, metrics=%p",
@@ -409,35 +419,47 @@ ndb_gpu_linreg_train(const float *features,
 					 Jsonb * *metrics,
 					 char **errstr)
 {
+	int			rc;
+
+	/* CPU mode: never run GPU code */
+	if (NDB_COMPUTE_MODE_IS_CPU())
+	{
+		if (errstr)
+			*errstr = NULL;
+		return -1;
+	}
+
 	if (errstr)
 		*errstr = NULL;
 	if (!active_backend)
 	{
-		elog(DEBUG1, "ndb_gpu_linreg_train: active_backend is NULL");
+		if (errstr)
+			*errstr = pstrdup("ndb_gpu_linreg_train: active_backend is NULL");
 		return -1;
 	}
 	if (active_backend->linreg_train == NULL)
 	{
-		elog(DEBUG1, "ndb_gpu_linreg_train: active_backend->linreg_train is NULL (backend=%s)",
-			 active_backend->name ? active_backend->name : "unknown");
+		if (errstr)
+			*errstr = psprintf("ndb_gpu_linreg_train: backend->linreg_train is NULL (backend=%s)", active_backend->name ? active_backend->name : "unknown");
 		return -1;
 	}
-	ereport(DEBUG2,
-			(errmsg("ndb_gpu_linreg_train: calling backend->linreg_train"),
-			 errdetail("backend=%s, features=%p, targets=%p, n_samples=%d, feature_dim=%d",
-					   active_backend->name ? active_backend->name : "unknown",
-					   (void *) features,
-					   (void *) targets,
-					   n_samples,
-					   feature_dim)));
-	return active_backend->linreg_train(features,
-										targets,
-										n_samples,
-										feature_dim,
-										hyperparams,
-										model_data,
-										metrics,
-										errstr);
+
+	elog(DEBUG1,
+		 "ndb_gpu_linreg_train: calling backend->linreg_train, metrics=%p",
+		 (void *) metrics);
+	rc = active_backend->linreg_train(features,
+									  targets,
+									  n_samples,
+									  feature_dim,
+									  hyperparams,
+									  model_data,
+									  metrics,
+									  errstr);
+	elog(DEBUG1,
+		 "ndb_gpu_linreg_train: backend->linreg_train returned %d, *metrics=%p",
+		 rc,
+		 metrics ? (void *) *metrics : NULL);
+	return rc;
 }
 
 int

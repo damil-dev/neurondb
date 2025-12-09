@@ -644,7 +644,7 @@ check_hnsw_connectivity(Relation index, ValidateResult * result)
 			int			queueTail = 0;
 			int			queueSize = totalNodes;
 
-			queue = (BlockNumber *) palloc(queueSize * sizeof(BlockNumber));
+			nalloc(queue, BlockNumber, queueSize);
 			queue[queueTail++] = entryPoint;
 			visited[entryPoint] = true;
 
@@ -1144,7 +1144,7 @@ neurondb_rebuild_index(PG_FUNCTION_ARGS)
 			session = ndb_spi_session_begin(CurrentMemoryContext, false);
 			if (session == NULL)
 			{
-				pfree(indexInfo);
+				nfree(indexInfo);
 				nfree(inner_indexName);
 				nfree(rebuildCmd);
 				ereport(ERROR,

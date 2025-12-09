@@ -93,6 +93,7 @@ vector_quantize_fp16(PG_FUNCTION_ARGS)
 	Vector *vec = NULL;
 	bytea *result = NULL;
 	uint16_t *fp16_data = NULL;
+	char *tmp = NULL;
 	int			i;
 	size_t		size;
 
@@ -122,7 +123,8 @@ vector_quantize_fp16(PG_FUNCTION_ARGS)
 				(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
 				 errmsg("vector size exceeds maximum allocation")));
 
-	result = (bytea *) palloc(VARHDRSZ + size);
+	nalloc(tmp, char, VARHDRSZ + size);
+	result = (bytea *) tmp;
 	if (result == NULL)
 		ereport(ERROR,
 				(errcode(ERRCODE_OUT_OF_MEMORY),
@@ -209,6 +211,7 @@ vector_quantize_int8(PG_FUNCTION_ARGS)
 	Vector *max_vec = NULL;
 	bytea *result = NULL;
 	int8 *int8_data = NULL;
+	char *tmp = NULL;
 	int			i;
 	size_t		size;
 	float		scale;
@@ -251,7 +254,8 @@ vector_quantize_int8(PG_FUNCTION_ARGS)
 				(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
 				 errmsg("vector size exceeds maximum allocation")));
 
-	result = (bytea *) palloc(VARHDRSZ + size);
+	nalloc(tmp, char, VARHDRSZ + size);
+	result = (bytea *) tmp;
 	if (result == NULL)
 		ereport(ERROR,
 				(errcode(ERRCODE_OUT_OF_MEMORY),
@@ -512,7 +516,12 @@ vector_quantize_binary(PG_FUNCTION_ARGS)
 	 * proper cleanup
 	 */
 	/* Note: For variable-length PostgreSQL types, palloc0 is standard */
-	result = (BinaryVec *) palloc0(size);
+		{
+			char *tmp = NULL;
+			nalloc(tmp, char, size);
+			result = (BinaryVec *) tmp;
+			MemSet(result, 0, size);
+		}
 	if (result == NULL)
 		ereport(ERROR,
 				(errcode(ERRCODE_OUT_OF_MEMORY),

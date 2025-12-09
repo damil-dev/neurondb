@@ -483,12 +483,13 @@ dl_predict(PG_FUNCTION_ARGS)
 					else
 					{
 						/* Create input tensor from input_data array */
-						input_tensor = (ONNXTensor *) palloc0(sizeof(ONNXTensor));
+						nalloc(input_tensor, ONNXTensor, 1);
+						MemSet(input_tensor, 0, sizeof(ONNXTensor));
 						input_tensor->ndim = 1;
-						input_tensor->shape = (int64 *) palloc(sizeof(int64) * 1);
+						nalloc(input_tensor->shape, int64, 1);
 						input_tensor->shape[0] = n_inputs;
 						input_tensor->size = n_inputs;
-						input_tensor->data = (float *) palloc(sizeof(float) * n_inputs);
+						nalloc(input_tensor->data, float, n_inputs);
 
 						/* Copy input data */
 						for (d = 0; d < n_inputs; d++)
@@ -579,7 +580,7 @@ dl_predict(PG_FUNCTION_ARGS)
 	}
 
 	/* Generate predictions */
-	predictions = (float *) palloc(n_outputs * sizeof(float));
+	nalloc(predictions, float, n_outputs);
 #ifdef HAVE_ONNX_RUNTIME
 	/* If we have ONNX output, use it */
 	if (output_tensor != NULL && output_tensor->data != NULL)
@@ -636,7 +637,7 @@ dl_predict(PG_FUNCTION_ARGS)
 	}
 
 	/* Build result array */
-	elems = (Datum *) palloc(n_outputs * sizeof(Datum));
+	nalloc(elems, Datum, n_outputs);
 	for (i = 0; i < n_outputs; i++)
 		elems[i] = Float4GetDatum(predictions[i]);
 
