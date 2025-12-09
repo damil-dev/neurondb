@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * handlers.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/server/handlers.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package server
 
 import (
@@ -10,7 +23,7 @@ import (
 	"github.com/neurondb/NeuronMCP/pkg/mcp"
 )
 
-// min returns the minimum of two integers
+/* min returns the minimum of two integers */
 func min(a, b int) int {
 	if a < b {
 		return a
@@ -18,16 +31,16 @@ func min(a, b int) int {
 	return b
 }
 
-// setupToolHandlers sets up tool-related MCP handlers
+/* setupToolHandlers sets up tool-related MCP handlers */
 func (s *Server) setupToolHandlers() {
-	// List tools handler
+  /* List tools handler */
 	s.mcpServer.SetHandler("tools/list", s.handleListTools)
 
-	// Call tool handler
+  /* Call tool handler */
 	s.mcpServer.SetHandler("tools/call", s.handleCallTool)
 }
 
-// handleListTools handles the tools/list request
+/* handleListTools handles the tools/list request */
 func (s *Server) handleListTools(ctx context.Context, params json.RawMessage) (interface{}, error) {
 	definitions := s.toolRegistry.GetAllDefinitions()
 	filtered := s.filterToolsByFeatures(definitions)
@@ -44,7 +57,7 @@ func (s *Server) handleListTools(ctx context.Context, params json.RawMessage) (i
 	return mcp.ListToolsResponse{Tools: mcpTools}, nil
 }
 
-// handleCallTool handles the tools/call request
+/* handleCallTool handles the tools/call request */
 func (s *Server) handleCallTool(ctx context.Context, params json.RawMessage) (interface{}, error) {
 	var req mcp.CallToolRequest
 	if err := json.Unmarshal(params, &req); err != nil {
@@ -68,7 +81,7 @@ func (s *Server) handleCallTool(ctx context.Context, params json.RawMessage) (in
 	})
 }
 
-// executeTool executes a tool and returns the response
+/* executeTool executes a tool and returns the response */
 func (s *Server) executeTool(ctx context.Context, toolName string, arguments map[string]interface{}) (*middleware.MCPResponse, error) {
 	if toolName == "" {
 		return &middleware.MCPResponse{
@@ -94,7 +107,7 @@ func (s *Server) executeTool(ctx context.Context, toolName string, arguments map
 		}, nil
 	}
 
-	// Log tool execution start
+  /* Log tool execution start */
 	s.logger.Info("Executing tool", map[string]interface{}{
 		"tool_name": toolName,
 		"arguments_count": len(arguments),
@@ -113,7 +126,7 @@ func (s *Server) executeTool(ctx context.Context, toolName string, arguments map
 	return s.formatToolResult(result)
 }
 
-// formatToolResult formats a tool result as an MCP response
+/* formatToolResult formats a tool result as an MCP response */
 func (s *Server) formatToolResult(result *tools.ToolResult) (*middleware.MCPResponse, error) {
 	if !result.Success {
 		return s.formatToolError(result), nil
@@ -128,7 +141,7 @@ func (s *Server) formatToolResult(result *tools.ToolResult) (*middleware.MCPResp
 	}, nil
 }
 
-// formatToolError formats a tool error as an MCP response
+/* formatToolError formats a tool error as an MCP response */
 func (s *Server) formatToolError(result *tools.ToolResult) *middleware.MCPResponse {
 	errorText := "Unknown error"
 	errorMetadata := make(map[string]interface{})

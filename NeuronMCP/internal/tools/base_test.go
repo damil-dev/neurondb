@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * base_test.go
+ *    Tool implementation for NeuronMCP
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/tools/base_test.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package tools
 
 import (
@@ -82,7 +95,7 @@ func TestBaseTool_ValidateParams(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Should not panic
+    /* Should not panic */
 			func() {
 				defer func() {
 					if r := recover(); r != nil {
@@ -107,7 +120,7 @@ func TestBaseTool_ValidateParams_NilSchema(t *testing.T) {
 		t.Fatal("NewBaseTool() returned nil")
 	}
 
-	// Should not panic with nil schema
+  /* Should not panic with nil schema */
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -115,7 +128,7 @@ func TestBaseTool_ValidateParams_NilSchema(t *testing.T) {
 			}
 		}()
 		valid, errors := tool.ValidateParams(map[string]interface{}{"test": "value"}, nil)
-		// With nil schema, validation might pass or fail, but should not crash
+   /* With nil schema, validation might pass or fail, but should not crash */
 		if valid {
 			t.Log("ValidateParams() returned valid=true with nil schema (may be acceptable)")
 		}
@@ -128,7 +141,7 @@ func TestBaseTool_ValidateParams_InvalidSchema(t *testing.T) {
 		"invalid": "schema",
 	})
 
-	// Should not panic with invalid schema
+  /* Should not panic with invalid schema */
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -142,10 +155,10 @@ func TestBaseTool_ValidateParams_InvalidSchema(t *testing.T) {
 }
 
 func TestBaseTool_NilTool(t *testing.T) {
-	// Test that methods don't crash on nil tool
-	// Note: In Go, calling methods on nil will panic, but we want to ensure
-	// our code doesn't create nil tools. This test verifies that NewBaseTool
-	// never returns nil.
+  /* Test that methods don't crash on nil tool */
+  /* Note: In Go, calling methods on nil will panic, but we want to ensure */
+  /* our code doesn't create nil tools. This test verifies that NewBaseTool */
+  /* never returns nil. */
 	tool := NewBaseTool("test", "test", nil)
 	if tool == nil {
 		t.Fatal("NewBaseTool() should never return nil")
@@ -171,7 +184,7 @@ func TestSuccess(t *testing.T) {
 		t.Error("Success() should have data")
 	}
 
-	// Test with nil data
+  /* Test with nil data */
 	result = Success(nil, nil)
 	if result == nil {
 		t.Fatal("Success() returned nil")
@@ -180,7 +193,7 @@ func TestSuccess(t *testing.T) {
 		t.Error("Success() should return success=true even with nil data")
 	}
 
-	// Test with nil metadata
+  /* Test with nil metadata */
 	result = Success(data, nil)
 	if result == nil {
 		t.Fatal("Success() returned nil")
@@ -213,7 +226,7 @@ func TestError(t *testing.T) {
 		t.Errorf("Error() code = %v, want %v", result.Error.Code, code)
 	}
 
-	// Test with empty message - should not crash
+  /* Test with empty message - should not crash */
 	result = Error("", "", nil)
 	if result == nil {
 		t.Fatal("Error() returned nil")
@@ -225,7 +238,7 @@ func TestError(t *testing.T) {
 		t.Fatal("Error() should have error even with empty message")
 	}
 
-	// Test with nil details
+  /* Test with nil details */
 	result = Error(message, code, nil)
 	if result == nil {
 		t.Fatal("Error() returned nil")
@@ -236,7 +249,7 @@ func TestError(t *testing.T) {
 }
 
 func TestNewBaseTool(t *testing.T) {
-	// Test with valid inputs
+  /* Test with valid inputs */
 	tool := NewBaseTool("test", "description", map[string]interface{}{})
 	if tool == nil {
 		t.Fatal("NewBaseTool() returned nil")
@@ -248,13 +261,13 @@ func TestNewBaseTool(t *testing.T) {
 		t.Errorf("Description() = %v, want description", tool.Description())
 	}
 
-	// Test with empty name - should not crash
+  /* Test with empty name - should not crash */
 	tool = NewBaseTool("", "description", map[string]interface{}{})
 	if tool == nil {
 		t.Fatal("NewBaseTool() returned nil")
 	}
 
-	// Test with nil schema - should not crash
+  /* Test with nil schema - should not crash */
 	tool2 := NewBaseTool("test", "description", nil)
 	if tool2 == nil {
 		t.Fatal("NewBaseTool() returned nil")

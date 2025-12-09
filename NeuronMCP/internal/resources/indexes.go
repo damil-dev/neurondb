@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * indexes.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/resources/indexes.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package resources
 
 import (
@@ -6,37 +19,37 @@ import (
 	"github.com/neurondb/NeuronMCP/internal/database"
 )
 
-// IndexesResource provides vector indexes information
+/* IndexesResource provides vector indexes information */
 type IndexesResource struct {
 	*BaseResource
 }
 
-// NewIndexesResource creates a new indexes resource
+/* NewIndexesResource creates a new indexes resource */
 func NewIndexesResource(db *database.Database) *IndexesResource {
 	return &IndexesResource{BaseResource: NewBaseResource(db)}
 }
 
-// URI returns the resource URI
+/* URI returns the resource URI */
 func (r *IndexesResource) URI() string {
 	return "neurondb://indexes"
 }
 
-// Name returns the resource name
+/* Name returns the resource name */
 func (r *IndexesResource) Name() string {
 	return "Vector Indexes"
 }
 
-// Description returns the resource description
+/* Description returns the resource description */
 func (r *IndexesResource) Description() string {
 	return "Status and information about vector indexes"
 }
 
-// MimeType returns the MIME type
+/* MimeType returns the MIME type */
 func (r *IndexesResource) MimeType() string {
 	return "application/json"
 }
 
-// GetContent returns the indexes content
+/* GetContent returns the indexes content */
 func (r *IndexesResource) GetContent(ctx context.Context) (interface{}, error) {
 	query := `
 		SELECT 

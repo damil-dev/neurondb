@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * embeddings_complete.go
+ *    Tool implementation for NeuronMCP
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/tools/embeddings_complete.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package tools
 
 import (
@@ -9,14 +22,14 @@ import (
 	"github.com/neurondb/NeuronMCP/internal/logging"
 )
 
-// EmbedImageTool generates image embeddings
+/* EmbedImageTool generates image embeddings */
 type EmbedImageTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewEmbedImageTool creates a new image embedding tool
+/* NewEmbedImageTool creates a new image embedding tool */
 func NewEmbedImageTool(db *database.Database, logger *logging.Logger) *EmbedImageTool {
 	return &EmbedImageTool{
 		BaseTool: NewBaseTool(
@@ -43,7 +56,7 @@ func NewEmbedImageTool(db *database.Database, logger *logging.Logger) *EmbedImag
 	}
 }
 
-// Execute executes the image embedding generation
+/* Execute executes the image embedding generation */
 func (t *EmbedImageTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -66,7 +79,7 @@ func (t *EmbedImageTool) Execute(ctx context.Context, params map[string]interfac
 		}), nil
 	}
 
-	// Decode base64 image data
+  /* Decode base64 image data */
 	imageBytes, err := base64.StdEncoding.DecodeString(imageData)
 	if err != nil {
 		return Error(fmt.Sprintf("Invalid base64 image data: %v", err), "VALIDATION_ERROR", map[string]interface{}{
@@ -95,14 +108,14 @@ func (t *EmbedImageTool) Execute(ctx context.Context, params map[string]interfac
 	}), nil
 }
 
-// EmbedMultimodalTool generates multimodal embeddings
+/* EmbedMultimodalTool generates multimodal embeddings */
 type EmbedMultimodalTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewEmbedMultimodalTool creates a new multimodal embedding tool
+/* NewEmbedMultimodalTool creates a new multimodal embedding tool */
 func NewEmbedMultimodalTool(db *database.Database, logger *logging.Logger) *EmbedMultimodalTool {
 	return &EmbedMultimodalTool{
 		BaseTool: NewBaseTool(
@@ -133,7 +146,7 @@ func NewEmbedMultimodalTool(db *database.Database, logger *logging.Logger) *Embe
 	}
 }
 
-// Execute executes the multimodal embedding generation
+/* Execute executes the multimodal embedding generation */
 func (t *EmbedMultimodalTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -164,7 +177,7 @@ func (t *EmbedMultimodalTool) Execute(ctx context.Context, params map[string]int
 		}), nil
 	}
 
-	// Decode base64 image data
+  /* Decode base64 image data */
 	imageBytes, err := base64.StdEncoding.DecodeString(imageData)
 	if err != nil {
 		return Error(fmt.Sprintf("Invalid base64 image data: %v", err), "VALIDATION_ERROR", map[string]interface{}{
@@ -193,14 +206,14 @@ func (t *EmbedMultimodalTool) Execute(ctx context.Context, params map[string]int
 	}), nil
 }
 
-// EmbedCachedTool generates cached embeddings
+/* EmbedCachedTool generates cached embeddings */
 type EmbedCachedTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewEmbedCachedTool creates a new cached embedding tool
+/* NewEmbedCachedTool creates a new cached embedding tool */
 func NewEmbedCachedTool(db *database.Database, logger *logging.Logger) *EmbedCachedTool {
 	return &EmbedCachedTool{
 		BaseTool: NewBaseTool(
@@ -227,7 +240,7 @@ func NewEmbedCachedTool(db *database.Database, logger *logging.Logger) *EmbedCac
 	}
 }
 
-// Execute executes the cached embedding generation
+/* Execute executes the cached embedding generation */
 func (t *EmbedCachedTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -270,14 +283,14 @@ func (t *EmbedCachedTool) Execute(ctx context.Context, params map[string]interfa
 	}), nil
 }
 
-// ConfigureEmbeddingModelTool configures embedding model
+/* ConfigureEmbeddingModelTool configures embedding model */
 type ConfigureEmbeddingModelTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewConfigureEmbeddingModelTool creates a new embedding model configuration tool
+/* NewConfigureEmbeddingModelTool creates a new embedding model configuration tool */
 func NewConfigureEmbeddingModelTool(db *database.Database, logger *logging.Logger) *ConfigureEmbeddingModelTool {
 	return &ConfigureEmbeddingModelTool{
 		BaseTool: NewBaseTool(
@@ -303,7 +316,7 @@ func NewConfigureEmbeddingModelTool(db *database.Database, logger *logging.Logge
 	}
 }
 
-// Execute executes the embedding model configuration
+/* Execute executes the embedding model configuration */
 func (t *ConfigureEmbeddingModelTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -349,14 +362,14 @@ func (t *ConfigureEmbeddingModelTool) Execute(ctx context.Context, params map[st
 	}), nil
 }
 
-// GetEmbeddingModelConfigTool gets embedding model configuration
+/* GetEmbeddingModelConfigTool gets embedding model configuration */
 type GetEmbeddingModelConfigTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewGetEmbeddingModelConfigTool creates a new get embedding model config tool
+/* NewGetEmbeddingModelConfigTool creates a new get embedding model config tool */
 func NewGetEmbeddingModelConfigTool(db *database.Database, logger *logging.Logger) *GetEmbeddingModelConfigTool {
 	return &GetEmbeddingModelConfigTool{
 		BaseTool: NewBaseTool(
@@ -378,7 +391,7 @@ func NewGetEmbeddingModelConfigTool(db *database.Database, logger *logging.Logge
 	}
 }
 
-// Execute executes the get embedding model config
+/* Execute executes the get embedding model config */
 func (t *GetEmbeddingModelConfigTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -416,14 +429,14 @@ func (t *GetEmbeddingModelConfigTool) Execute(ctx context.Context, params map[st
 	}), nil
 }
 
-// ListEmbeddingModelConfigsTool lists all embedding model configurations
+/* ListEmbeddingModelConfigsTool lists all embedding model configurations */
 type ListEmbeddingModelConfigsTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewListEmbeddingModelConfigsTool creates a new list embedding model configs tool
+/* NewListEmbeddingModelConfigsTool creates a new list embedding model configs tool */
 func NewListEmbeddingModelConfigsTool(db *database.Database, logger *logging.Logger) *ListEmbeddingModelConfigsTool {
 	return &ListEmbeddingModelConfigsTool{
 		BaseTool: NewBaseTool(
@@ -440,7 +453,7 @@ func NewListEmbeddingModelConfigsTool(db *database.Database, logger *logging.Log
 	}
 }
 
-// Execute executes the list embedding model configs
+/* Execute executes the list embedding model configs */
 func (t *ListEmbeddingModelConfigsTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	query := "SELECT * FROM list_embedding_model_configs()"
 	results, err := t.executor.ExecuteQuery(ctx, query, nil)
@@ -459,14 +472,14 @@ func (t *ListEmbeddingModelConfigsTool) Execute(ctx context.Context, params map[
 	}), nil
 }
 
-// DeleteEmbeddingModelConfigTool deletes embedding model configuration
+/* DeleteEmbeddingModelConfigTool deletes embedding model configuration */
 type DeleteEmbeddingModelConfigTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewDeleteEmbeddingModelConfigTool creates a new delete embedding model config tool
+/* NewDeleteEmbeddingModelConfigTool creates a new delete embedding model config tool */
 func NewDeleteEmbeddingModelConfigTool(db *database.Database, logger *logging.Logger) *DeleteEmbeddingModelConfigTool {
 	return &DeleteEmbeddingModelConfigTool{
 		BaseTool: NewBaseTool(
@@ -488,7 +501,7 @@ func NewDeleteEmbeddingModelConfigTool(db *database.Database, logger *logging.Lo
 	}
 }
 
-// Execute executes the delete embedding model config
+/* Execute executes the delete embedding model config */
 func (t *DeleteEmbeddingModelConfigTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -525,6 +538,7 @@ func (t *DeleteEmbeddingModelConfigTool) Execute(ctx context.Context, params map
 		"model_name": modelName,
 	}), nil
 }
+
 
 
 

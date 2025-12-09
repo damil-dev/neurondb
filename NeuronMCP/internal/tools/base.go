@@ -1,3 +1,19 @@
+/*-------------------------------------------------------------------------
+ *
+ * base.go
+ *    Base tool types and utilities for NeuronMCP
+ *
+ * Provides common functionality for all tools including result types,
+ * validation, and base tool structure.
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/tools/base.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package tools
 
 import (
@@ -5,7 +21,7 @@ import (
 	"reflect"
 )
 
-// ToolResult represents the result of tool execution
+/* ToolResult represents the result of tool execution */
 type ToolResult struct {
 	Success  bool                   `json:"success"`
 	Data     interface{}            `json:"data,omitempty"`
@@ -13,21 +29,21 @@ type ToolResult struct {
 	Metadata map[string]interface{} `json:"metadata,omitempty"`
 }
 
-// ToolError represents a tool execution error
+/* ToolError represents a tool execution error */
 type ToolError struct {
 	Message string      `json:"message"`
 	Code    string      `json:"code,omitempty"`
 	Details interface{} `json:"details,omitempty"`
 }
 
-// BaseTool provides common functionality for tools
+/* BaseTool provides common functionality for tools */
 type BaseTool struct {
 	name        string
 	description string
 	inputSchema map[string]interface{}
 }
 
-// NewBaseTool creates a new base tool
+/* NewBaseTool creates a new base tool */
 func NewBaseTool(name, description string, inputSchema map[string]interface{}) *BaseTool {
 	return &BaseTool{
 		name:        name,
@@ -36,26 +52,25 @@ func NewBaseTool(name, description string, inputSchema map[string]interface{}) *
 	}
 }
 
-// Name returns the tool name
+/* Name returns the tool name */
 func (b *BaseTool) Name() string {
 	return b.name
 }
 
-// Description returns the tool description
+/* Description returns the tool description */
 func (b *BaseTool) Description() string {
 	return b.description
 }
 
-// InputSchema returns the input schema
+/* InputSchema returns the input schema */
 func (b *BaseTool) InputSchema() map[string]interface{} {
 	return b.inputSchema
 }
 
-// ValidateParams validates parameters against the schema
+/* ValidateParams validates parameters against the schema */
 func (b *BaseTool) ValidateParams(params map[string]interface{}, schema map[string]interface{}) (bool, []string) {
 	var errors []string
 
-	// Check required fields
 	if required, ok := schema["required"].([]interface{}); ok {
 		for _, req := range required {
 			if reqStr, ok := req.(string); ok {
@@ -66,7 +81,6 @@ func (b *BaseTool) ValidateParams(params map[string]interface{}, schema map[stri
 		}
 	}
 
-	// Validate parameter types
 	if properties, ok := schema["properties"].(map[string]interface{}); ok {
 		for key, value := range params {
 			if propSchema, exists := properties[key]; exists {
@@ -117,7 +131,6 @@ func validateType(value interface{}, schema map[string]interface{}) string {
 		}
 	}
 
-	// Validate enum
 	if enum, ok := schema["enum"].([]interface{}); ok {
 		found := false
 		for _, e := range enum {
@@ -131,7 +144,6 @@ func validateType(value interface{}, schema map[string]interface{}) string {
 		}
 	}
 
-	// Validate number constraints
 	if schemaType == "number" || schemaType == "integer" {
 		if min, ok := schema["minimum"].(float64); ok {
 			if val, ok := value.(float64); ok && val < min {
@@ -148,7 +160,7 @@ func validateType(value interface{}, schema map[string]interface{}) string {
 	return ""
 }
 
-// Success creates a success result
+/* Success creates a success result */
 func Success(data interface{}, metadata map[string]interface{}) *ToolResult {
 	return &ToolResult{
 		Success:  true,
@@ -157,7 +169,7 @@ func Success(data interface{}, metadata map[string]interface{}) *ToolResult {
 	}
 }
 
-// Error creates an error result
+/* Error creates an error result */
 func Error(message, code string, details interface{}) *ToolResult {
 	return &ToolResult{
 		Success: false,

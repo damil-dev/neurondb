@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * timeseries.go
+ *    Tool implementation for NeuronMCP
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/tools/timeseries.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package tools
 
 import (
@@ -8,14 +21,14 @@ import (
 	"github.com/neurondb/NeuronMCP/internal/logging"
 )
 
-// TimeSeriesTool performs time series analysis
+/* TimeSeriesTool performs time series analysis */
 type TimeSeriesTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewTimeSeriesTool creates a new time series tool
+/* NewTimeSeriesTool creates a new time series tool */
 func NewTimeSeriesTool(db *database.Database, logger *logging.Logger) *TimeSeriesTool {
 	return &TimeSeriesTool{
 		BaseTool: NewBaseTool(
@@ -66,7 +79,7 @@ func NewTimeSeriesTool(db *database.Database, logger *logging.Logger) *TimeSerie
 	}
 }
 
-// Execute executes time series analysis
+/* Execute executes time series analysis */
 func (t *TimeSeriesTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -126,6 +139,7 @@ func (t *TimeSeriesTool) Execute(ctx context.Context, params map[string]interfac
 		"count":     len(results),
 	}), nil
 }
+
 
 
 

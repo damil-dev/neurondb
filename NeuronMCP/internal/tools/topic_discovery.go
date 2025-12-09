@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * topic_discovery.go
+ *    Tool implementation for NeuronMCP
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/tools/topic_discovery.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package tools
 
 import (
@@ -8,14 +21,14 @@ import (
 	"github.com/neurondb/NeuronMCP/internal/logging"
 )
 
-// TopicDiscoveryTool performs topic modeling and discovery
+/* TopicDiscoveryTool performs topic modeling and discovery */
 type TopicDiscoveryTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewTopicDiscoveryTool creates a new topic discovery tool
+/* NewTopicDiscoveryTool creates a new topic discovery tool */
 func NewTopicDiscoveryTool(db *database.Database, logger *logging.Logger) *TopicDiscoveryTool {
 	return &TopicDiscoveryTool{
 		BaseTool: NewBaseTool(
@@ -54,7 +67,7 @@ func NewTopicDiscoveryTool(db *database.Database, logger *logging.Logger) *Topic
 	}
 }
 
-// Execute executes topic discovery
+/* Execute executes topic discovery */
 func (t *TopicDiscoveryTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -79,7 +92,7 @@ func (t *TopicDiscoveryTool) Execute(ctx context.Context, params map[string]inte
 		return Error("table and text_column are required", "VALIDATION_ERROR", nil), nil
 	}
 
-	// Use NeuronDB topic discovery function
+  /* Use NeuronDB topic discovery function */
 	query := "SELECT * FROM discover_topics($1::text, $2::text, $3::int, $4::text)"
 	queryParams := []interface{}{table, textColumn, numTopics, algorithm}
 
@@ -100,6 +113,7 @@ func (t *TopicDiscoveryTool) Execute(ctx context.Context, params map[string]inte
 		"count":      len(results),
 	}), nil
 }
+
 
 
 

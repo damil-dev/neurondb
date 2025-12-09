@@ -1,3 +1,19 @@
+/*-------------------------------------------------------------------------
+ *
+ * vector.go
+ *    Vector search and embedding tools for NeuronMCP
+ *
+ * Provides tools for vector similarity search with multiple distance metrics
+ * and text embedding generation.
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/tools/vector.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package tools
 
 import (
@@ -8,14 +24,14 @@ import (
 	"github.com/neurondb/NeuronMCP/internal/logging"
 )
 
-// VectorSearchTool performs vector similarity search
+/* VectorSearchTool performs vector similarity search */
 type VectorSearchTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewVectorSearchTool creates a new vector search tool
+/* NewVectorSearchTool creates a new vector search tool */
 func NewVectorSearchTool(db *database.Database, logger *logging.Logger) *VectorSearchTool {
 	return &VectorSearchTool{
 		BaseTool: NewBaseTool(
@@ -64,7 +80,7 @@ func NewVectorSearchTool(db *database.Database, logger *logging.Logger) *VectorS
 	}
 }
 
-// Execute executes the vector search
+/* Execute executes the vector search */
 func (t *VectorSearchTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -136,14 +152,14 @@ func (t *VectorSearchTool) Execute(ctx context.Context, params map[string]interf
 	}), nil
 }
 
-// VectorSearchL2Tool performs L2 distance vector search
+/* VectorSearchL2Tool performs L2 distance vector search */
 type VectorSearchL2Tool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewVectorSearchL2Tool creates a new L2 vector search tool
+/* NewVectorSearchL2Tool creates a new L2 vector search tool */
 func NewVectorSearchL2Tool(db *database.Database, logger *logging.Logger) *VectorSearchL2Tool {
 	return &VectorSearchL2Tool{
 		BaseTool: NewBaseTool(
@@ -165,7 +181,7 @@ func NewVectorSearchL2Tool(db *database.Database, logger *logging.Logger) *Vecto
 	}
 }
 
-// Execute executes the L2 vector search
+/* Execute executes the L2 vector search */
 func (t *VectorSearchL2Tool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -199,14 +215,14 @@ func (t *VectorSearchL2Tool) Execute(ctx context.Context, params map[string]inte
 	}), nil
 }
 
-// VectorSearchCosineTool performs cosine distance vector search
+/* VectorSearchCosineTool performs cosine distance vector search */
 type VectorSearchCosineTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewVectorSearchCosineTool creates a new cosine vector search tool
+/* NewVectorSearchCosineTool creates a new cosine vector search tool */
 func NewVectorSearchCosineTool(db *database.Database, logger *logging.Logger) *VectorSearchCosineTool {
 	return &VectorSearchCosineTool{
 		BaseTool: NewBaseTool(
@@ -228,7 +244,7 @@ func NewVectorSearchCosineTool(db *database.Database, logger *logging.Logger) *V
 	}
 }
 
-// Execute executes the cosine vector search
+/* Execute executes the cosine vector search */
 func (t *VectorSearchCosineTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -262,14 +278,14 @@ func (t *VectorSearchCosineTool) Execute(ctx context.Context, params map[string]
 	}), nil
 }
 
-// VectorSearchInnerProductTool performs inner product distance vector search
+/* VectorSearchInnerProductTool performs inner product distance vector search */
 type VectorSearchInnerProductTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewVectorSearchInnerProductTool creates a new inner product vector search tool
+/* NewVectorSearchInnerProductTool creates a new inner product vector search tool */
 func NewVectorSearchInnerProductTool(db *database.Database, logger *logging.Logger) *VectorSearchInnerProductTool {
 	return &VectorSearchInnerProductTool{
 		BaseTool: NewBaseTool(
@@ -291,7 +307,7 @@ func NewVectorSearchInnerProductTool(db *database.Database, logger *logging.Logg
 	}
 }
 
-// Execute executes the inner product vector search
+/* Execute executes the inner product vector search */
 func (t *VectorSearchInnerProductTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -325,14 +341,14 @@ func (t *VectorSearchInnerProductTool) Execute(ctx context.Context, params map[s
 	}), nil
 }
 
-// GenerateEmbeddingTool generates text embeddings
+/* GenerateEmbeddingTool generates text embeddings */
 type GenerateEmbeddingTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewGenerateEmbeddingTool creates a new embedding generation tool
+/* NewGenerateEmbeddingTool creates a new embedding generation tool */
 func NewGenerateEmbeddingTool(db *database.Database, logger *logging.Logger) *GenerateEmbeddingTool {
 	return &GenerateEmbeddingTool{
 		BaseTool: NewBaseTool(
@@ -358,7 +374,7 @@ func NewGenerateEmbeddingTool(db *database.Database, logger *logging.Logger) *Ge
 	}
 }
 
-// Execute executes the embedding generation
+/* Execute executes the embedding generation */
 func (t *GenerateEmbeddingTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	t.logger.Info("GenerateEmbeddingTool.Execute called", map[string]interface{}{
 		"params": params,
@@ -386,12 +402,9 @@ func (t *GenerateEmbeddingTool) Execute(ctx context.Context, params map[string]i
 		modelName = "default"
 	}
 
-	// Try embed_text first (C function, most reliable), then fallback to neurondb.embed
 	var result interface{}
 	var err error
 	
-	// First try: embed_text(text, model) - direct C function
-	// Cast vector to text so pgx can scan it
 	query := "SELECT embed_text($1, $2)::text AS embedding"
 	queryParams := []interface{}{text, modelName}
 	
@@ -402,20 +415,16 @@ func (t *GenerateEmbeddingTool) Execute(ctx context.Context, params map[string]i
 		"query": query,
 	})
 	
-	// Use embedding timeout for embedding queries
 	result, err = t.executor.ExecuteQueryOneWithTimeout(ctx, query, queryParams, EmbeddingQueryTimeout)
 	if err != nil {
-		// Fallback: neurondb.embed(model, input_text, task) - PL/pgSQL wrapper
 		t.logger.Warn("embed_text failed, trying neurondb.embed fallback", map[string]interface{}{
 			"error": err.Error(),
 			"model": modelName,
 		})
 		
-		// Cast vector to text so pgx can scan it
 		query = "SELECT neurondb.embed($1, $2, 'embedding')::text AS embedding"
 		queryParams = []interface{}{modelName, text}
 		
-		// Use embedding timeout for fallback query too
 		result, err = t.executor.ExecuteQueryOneWithTimeout(ctx, query, queryParams, EmbeddingQueryTimeout)
 		if err != nil {
 			t.logger.Error("Embedding generation failed with both methods", err, params)
@@ -431,14 +440,14 @@ func (t *GenerateEmbeddingTool) Execute(ctx context.Context, params map[string]i
 	return Success(result, map[string]interface{}{"model": modelName}), nil
 }
 
-// BatchEmbeddingTool generates embeddings for multiple texts
+/* BatchEmbeddingTool generates embeddings for multiple texts */
 type BatchEmbeddingTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewBatchEmbeddingTool creates a new batch embedding tool
+/* NewBatchEmbeddingTool creates a new batch embedding tool */
 func NewBatchEmbeddingTool(db *database.Database, logger *logging.Logger) *BatchEmbeddingTool {
 	return &BatchEmbeddingTool{
 		BaseTool: NewBaseTool(
@@ -467,7 +476,7 @@ func NewBatchEmbeddingTool(db *database.Database, logger *logging.Logger) *Batch
 	}
 }
 
-// Execute executes the batch embedding
+/* Execute executes the batch embedding */
 func (t *BatchEmbeddingTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -500,7 +509,6 @@ func (t *BatchEmbeddingTool) Execute(ctx context.Context, params map[string]inte
 		modelName = "default"
 	}
 
-	// Convert []interface{} to []string for PostgreSQL text[] array
 	textStrings := make([]string, 0, textsCount)
 	for i, text := range texts {
 		if textStr, ok := text.(string); ok {
@@ -524,8 +532,6 @@ func (t *BatchEmbeddingTool) Execute(ctx context.Context, params map[string]inte
 		}
 	}
 
-	// Use NeuronDB's batch embedding function: neurondb.embed_batch(model, texts[])
-	// Cast vector[] to text[] array, then to JSON so pgx can scan it
 	query := "SELECT json_agg(embedding::text) AS embeddings FROM unnest(neurondb.embed_batch($1, $2::text[])) AS embedding"
 	queryParams := []interface{}{modelName, textStrings}
 
@@ -536,7 +542,6 @@ func (t *BatchEmbeddingTool) Execute(ctx context.Context, params map[string]inte
 		"query": query,
 	})
 
-	// Use embedding timeout for batch embeddings (can take longer)
 	result, err := t.executor.ExecuteQueryOneWithTimeout(ctx, query, queryParams, EmbeddingQueryTimeout)
 	if err != nil {
 		t.logger.Error("Batch embedding failed", err, params)

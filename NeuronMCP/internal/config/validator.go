@@ -1,29 +1,42 @@
+/*-------------------------------------------------------------------------
+ *
+ * validator.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/config/validator.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package config
 
 import "fmt"
 
-// ConfigValidator validates configuration
+/* ConfigValidator validates configuration */
 type ConfigValidator struct{}
 
-// NewConfigValidator creates a new config validator
+/* NewConfigValidator creates a new config validator */
 func NewConfigValidator() *ConfigValidator {
 	return &ConfigValidator{}
 }
 
-// Validate validates the complete server configuration
+/* Validate validates the complete server configuration */
 func (v *ConfigValidator) Validate(config *ServerConfig) (bool, []string) {
 	var errors []string
 
-	// Validate database config
+  /* Validate database config */
 	errors = append(errors, v.validateDatabase(&config.Database)...)
 
-	// Validate server settings
+  /* Validate server settings */
 	errors = append(errors, v.validateServer(&config.Server)...)
 
-	// Validate logging
+  /* Validate logging */
 	errors = append(errors, v.validateLogging(&config.Logging)...)
 
-	// Validate features
+  /* Validate features */
 	errors = append(errors, v.validateFeatures(&config.Features)...)
 
 	return len(errors) == 0, errors

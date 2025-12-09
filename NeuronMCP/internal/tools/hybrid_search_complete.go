@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * hybrid_search_complete.go
+ *    Tool implementation for NeuronMCP
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/tools/hybrid_search_complete.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package tools
 
 import (
@@ -9,14 +22,14 @@ import (
 	"github.com/neurondb/NeuronMCP/internal/logging"
 )
 
-// ReciprocalRankFusionTool performs reciprocal rank fusion
+/* ReciprocalRankFusionTool performs reciprocal rank fusion */
 type ReciprocalRankFusionTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewReciprocalRankFusionTool creates a new RRF tool
+/* NewReciprocalRankFusionTool creates a new RRF tool */
 func NewReciprocalRankFusionTool(db *database.Database, logger *logging.Logger) *ReciprocalRankFusionTool {
 	return &ReciprocalRankFusionTool{
 		BaseTool: NewBaseTool(
@@ -47,7 +60,7 @@ func NewReciprocalRankFusionTool(db *database.Database, logger *logging.Logger) 
 	}
 }
 
-// Execute executes RRF
+/* Execute executes RRF */
 func (t *ReciprocalRankFusionTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -67,7 +80,7 @@ func (t *ReciprocalRankFusionTool) Execute(ctx context.Context, params map[strin
 		return Error("rankings cannot be empty", "VALIDATION_ERROR", nil), nil
 	}
 
-	// Format rankings array for PostgreSQL
+  /* Format rankings array for PostgreSQL */
 	var rankingStrs []string
 	for _, ranking := range rankings {
 		if arr, ok := ranking.([]interface{}); ok {
@@ -98,14 +111,14 @@ func (t *ReciprocalRankFusionTool) Execute(ctx context.Context, params map[strin
 	}), nil
 }
 
-// SemanticKeywordSearchTool performs semantic + keyword search
+/* SemanticKeywordSearchTool performs semantic + keyword search */
 type SemanticKeywordSearchTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewSemanticKeywordSearchTool creates a new semantic-keyword search tool
+/* NewSemanticKeywordSearchTool creates a new semantic-keyword search tool */
 func NewSemanticKeywordSearchTool(db *database.Database, logger *logging.Logger) *SemanticKeywordSearchTool {
 	return &SemanticKeywordSearchTool{
 		BaseTool: NewBaseTool(
@@ -143,7 +156,7 @@ func NewSemanticKeywordSearchTool(db *database.Database, logger *logging.Logger)
 	}
 }
 
-// Execute executes semantic-keyword search
+/* Execute executes semantic-keyword search */
 func (t *SemanticKeywordSearchTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -185,14 +198,14 @@ func (t *SemanticKeywordSearchTool) Execute(ctx context.Context, params map[stri
 	}), nil
 }
 
-// MultiVectorSearchTool performs multi-vector search
+/* MultiVectorSearchTool performs multi-vector search */
 type MultiVectorSearchTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewMultiVectorSearchTool creates a new multi-vector search tool
+/* NewMultiVectorSearchTool creates a new multi-vector search tool */
 func NewMultiVectorSearchTool(db *database.Database, logger *logging.Logger) *MultiVectorSearchTool {
 	return &MultiVectorSearchTool{
 		BaseTool: NewBaseTool(
@@ -235,7 +248,7 @@ func NewMultiVectorSearchTool(db *database.Database, logger *logging.Logger) *Mu
 	}
 }
 
-// Execute executes multi-vector search
+/* Execute executes multi-vector search */
 func (t *MultiVectorSearchTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -260,7 +273,7 @@ func (t *MultiVectorSearchTool) Execute(ctx context.Context, params map[string]i
 		return Error("table and query_vectors are required", "VALIDATION_ERROR", nil), nil
 	}
 
-	// Format vectors array
+  /* Format vectors array */
 	var vecStrs []string
 	for _, vec := range queryVectors {
 		if arr, ok := vec.([]interface{}); ok {
@@ -289,14 +302,14 @@ func (t *MultiVectorSearchTool) Execute(ctx context.Context, params map[string]i
 	}), nil
 }
 
-// FacetedVectorSearchTool performs faceted search
+/* FacetedVectorSearchTool performs faceted search */
 type FacetedVectorSearchTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewFacetedVectorSearchTool creates a new faceted search tool
+/* NewFacetedVectorSearchTool creates a new faceted search tool */
 func NewFacetedVectorSearchTool(db *database.Database, logger *logging.Logger) *FacetedVectorSearchTool {
 	return &FacetedVectorSearchTool{
 		BaseTool: NewBaseTool(
@@ -334,7 +347,7 @@ func NewFacetedVectorSearchTool(db *database.Database, logger *logging.Logger) *
 	}
 }
 
-// Execute executes faceted search
+/* Execute executes faceted search */
 func (t *FacetedVectorSearchTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -376,14 +389,14 @@ func (t *FacetedVectorSearchTool) Execute(ctx context.Context, params map[string
 	}), nil
 }
 
-// TemporalVectorSearchTool performs temporal search
+/* TemporalVectorSearchTool performs temporal search */
 type TemporalVectorSearchTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewTemporalVectorSearchTool creates a new temporal search tool
+/* NewTemporalVectorSearchTool creates a new temporal search tool */
 func NewTemporalVectorSearchTool(db *database.Database, logger *logging.Logger) *TemporalVectorSearchTool {
 	return &TemporalVectorSearchTool{
 		BaseTool: NewBaseTool(
@@ -426,7 +439,7 @@ func NewTemporalVectorSearchTool(db *database.Database, logger *logging.Logger) 
 	}
 }
 
-// Execute executes temporal search
+/* Execute executes temporal search */
 func (t *TemporalVectorSearchTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -472,14 +485,14 @@ func (t *TemporalVectorSearchTool) Execute(ctx context.Context, params map[strin
 	}), nil
 }
 
-// DiverseVectorSearchTool performs diverse search
+/* DiverseVectorSearchTool performs diverse search */
 type DiverseVectorSearchTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewDiverseVectorSearchTool creates a new diverse search tool
+/* NewDiverseVectorSearchTool creates a new diverse search tool */
 func NewDiverseVectorSearchTool(db *database.Database, logger *logging.Logger) *DiverseVectorSearchTool {
 	return &DiverseVectorSearchTool{
 		BaseTool: NewBaseTool(
@@ -520,7 +533,7 @@ func NewDiverseVectorSearchTool(db *database.Database, logger *logging.Logger) *
 	}
 }
 
-// Execute executes diverse search
+/* Execute executes diverse search */
 func (t *DiverseVectorSearchTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -564,6 +577,7 @@ func (t *DiverseVectorSearchTool) Execute(ctx context.Context, params map[string
 		"count": len(results),
 	}), nil
 }
+
 
 
 

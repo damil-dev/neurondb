@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * dataset_loading.go
+ *    Tool implementation for NeuronMCP
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/tools/dataset_loading.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package tools
 
 import (
@@ -14,14 +27,14 @@ import (
 	"github.com/neurondb/NeuronMCP/internal/logging"
 )
 
-// DatasetLoadingTool loads HuggingFace datasets
+/* DatasetLoadingTool loads HuggingFace datasets */
 type DatasetLoadingTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewDatasetLoadingTool creates a new dataset loading tool
+/* NewDatasetLoadingTool creates a new dataset loading tool */
 func NewDatasetLoadingTool(db *database.Database, logger *logging.Logger) *DatasetLoadingTool {
 	return &DatasetLoadingTool{
 		BaseTool: NewBaseTool(
@@ -66,7 +79,7 @@ func NewDatasetLoadingTool(db *database.Database, logger *logging.Logger) *Datas
 	}
 }
 
-// Execute executes the dataset loading
+/* Execute executes the dataset loading */
 func (t *DatasetLoadingTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -90,12 +103,12 @@ func (t *DatasetLoadingTool) Execute(ctx context.Context, params map[string]inte
 		return Error("dataset_name is required and cannot be empty", "VALIDATION_ERROR", nil), nil
 	}
 
-	// For all datasets, use inline Python code (works in Docker)
-	// This avoids needing external script files
+  /* For all datasets, use inline Python code (works in Docker) */
+  /* This avoids needing external script files */
 	return t.loadGenericDataset(ctx, datasetName, split, limit)
 }
 
-// findDatasetScript finds the dataset loading Python script
+/* findDatasetScript finds the dataset loading Python script */
 func (t *DatasetLoadingTool) findDatasetScript() string {
 	possiblePaths := []string{
 		"NeuronDB/dataset/gen_dataset_enhanced.py",
@@ -104,7 +117,7 @@ func (t *DatasetLoadingTool) findDatasetScript() string {
 		"/Users/ibrarahmed/pgelephant/pge/neurondb/NeuronDB/dataset/gen_dataset_enhanced.py",
 	}
 
-	// Try relative to current working directory
+  /* Try relative to current working directory */
 	cwd, _ := os.Getwd()
 	for dir := cwd; dir != "/"; dir = filepath.Dir(dir) {
 		testPath := filepath.Join(dir, "NeuronDB", "dataset", "gen_dataset_enhanced.py")
@@ -113,7 +126,7 @@ func (t *DatasetLoadingTool) findDatasetScript() string {
 		}
 	}
 
-	// Try predefined paths
+  /* Try predefined paths */
 	for _, path := range possiblePaths {
 		if absPath, err := filepath.Abs(path); err == nil {
 			if _, err := os.Stat(absPath); err == nil {
@@ -125,7 +138,7 @@ func (t *DatasetLoadingTool) findDatasetScript() string {
 	return ""
 }
 
-// buildScriptArgs builds command line arguments for the dataset script
+/* buildScriptArgs builds command line arguments for the dataset script */
 func (t *DatasetLoadingTool) buildScriptArgs(datasetName string, limit int) []string {
 	scriptPath := t.findDatasetScript()
 	if scriptPath == "" {
@@ -150,15 +163,15 @@ func (t *DatasetLoadingTool) buildScriptArgs(datasetName string, limit int) []st
 	return args
 }
 
-// scriptExists checks if the script file exists
+/* scriptExists checks if the script file exists */
 func (t *DatasetLoadingTool) scriptExists(scriptPath string) bool {
 	_, err := os.Stat(scriptPath)
 	return err == nil
 }
 
-// loadGenericDataset loads a generic HuggingFace dataset using inline Python
+/* loadGenericDataset loads a generic HuggingFace dataset using inline Python */
 func (t *DatasetLoadingTool) loadGenericDataset(ctx context.Context, datasetName, split string, limit int) (*ToolResult, error) {
-	// Create Python code to load the dataset
+  /* Create Python code to load the dataset */
 	pythonCode := fmt.Sprintf(`
 import os
 import sys
@@ -295,7 +308,7 @@ except Exception as e:
     sys.exit(1)
 `, datasetName, split, limit)
 
-	// Set up environment
+  /* Set up environment */
 	cfgMgr := config.NewConfigManager()
 	cfgMgr.Load("")
 	dbCfg := cfgMgr.GetDatabaseConfig()
@@ -312,10 +325,10 @@ except Exception as e:
 		env = append(env, fmt.Sprintf("PGPASSWORD=%s", *pwd))
 	}
 
-	// Execute Python
+  /* Execute Python */
 	cmd := exec.CommandContext(ctx, "python3", "-c", pythonCode)
 	cmd.Env = env
-	// CombinedOutput() captures both stdout and stderr
+  /* CombinedOutput() captures both stdout and stderr */
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -334,12 +347,12 @@ except Exception as e:
 		), nil
 	}
 
-	// Parse JSON output
+  /* Parse JSON output */
 	outputStr := strings.TrimSpace(string(output))
 	rowsLoaded := 0
 	tableName := ""
 
-	// Try to extract JSON from output
+  /* Try to extract JSON from output */
 	if strings.Contains(outputStr, "{") {
 		jsonStart := strings.Index(outputStr, "{")
 		jsonEnd := strings.LastIndex(outputStr, "}") + 1
@@ -371,18 +384,18 @@ except Exception as e:
 	}), nil
 }
 
-// extractRowsLoaded extracts the number of rows loaded from script output
+/* extractRowsLoaded extracts the number of rows loaded from script output */
 func (t *DatasetLoadingTool) extractRowsLoaded(output string) int {
-	// Look for patterns like "loaded: 1000", "inserted: 500", etc.
+  /* Look for patterns like "loaded: 1000", "inserted: 500", etc. */
 	lines := strings.Split(output, "\n")
 	for _, line := range lines {
 		lower := strings.ToLower(line)
 		if strings.Contains(lower, "loaded") || strings.Contains(lower, "inserted") {
-			// Try to extract number
+    /* Try to extract number */
 			words := strings.Fields(line)
 			for i, word := range words {
 				if (strings.Contains(word, "loaded") || strings.Contains(word, "inserted")) && i+1 < len(words) {
-					// Next word might be the number
+      /* Next word might be the number */
 					var num int
 					if _, err := fmt.Sscanf(words[i+1], "%d", &num); err == nil {
 						return num
@@ -393,3 +406,4 @@ func (t *DatasetLoadingTool) extractRowsLoaded(output string) int {
 	}
 	return 0
 }
+

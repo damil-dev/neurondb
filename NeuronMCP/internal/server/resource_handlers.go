@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * resource_handlers.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/server/resource_handlers.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package server
 
 import (
@@ -8,16 +21,16 @@ import (
 	"github.com/neurondb/NeuronMCP/pkg/mcp"
 )
 
-// setupResourceHandlers sets up resource-related MCP handlers
+/* setupResourceHandlers sets up resource-related MCP handlers */
 func (s *Server) setupResourceHandlers() {
-	// List resources handler
+  /* List resources handler */
 	s.mcpServer.SetHandler("resources/list", s.handleListResources)
 
-	// Read resource handler
+  /* Read resource handler */
 	s.mcpServer.SetHandler("resources/read", s.handleReadResource)
 }
 
-// handleListResources handles the resources/list request
+/* handleListResources handles the resources/list request */
 func (s *Server) handleListResources(ctx context.Context, params json.RawMessage) (interface{}, error) {
 	definitions := s.resources.ListResources()
 	
@@ -34,7 +47,7 @@ func (s *Server) handleListResources(ctx context.Context, params json.RawMessage
 	return mcp.ListResourcesResponse{Resources: mcpDefs}, nil
 }
 
-// handleReadResource handles the resources/read request
+/* handleReadResource handles the resources/read request */
 func (s *Server) handleReadResource(ctx context.Context, params json.RawMessage) (interface{}, error) {
 	var req mcp.ReadResourceRequest
 	if err := json.Unmarshal(params, &req); err != nil {

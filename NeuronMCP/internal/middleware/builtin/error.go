@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * error.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/middleware/builtin/error.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package builtin
 
 import (
@@ -7,13 +20,13 @@ import (
 	"github.com/neurondb/NeuronMCP/internal/middleware"
 )
 
-// ErrorHandlingMiddleware handles errors
+/* ErrorHandlingMiddleware handles errors */
 type ErrorHandlingMiddleware struct {
 	logger          *logging.Logger
 	enableErrorStack bool
 }
 
-// NewErrorHandlingMiddleware creates a new error handling middleware
+/* NewErrorHandlingMiddleware creates a new error handling middleware */
 func NewErrorHandlingMiddleware(logger *logging.Logger, enableStack bool) *ErrorHandlingMiddleware {
 	return &ErrorHandlingMiddleware{
 		logger:            logger,
@@ -21,29 +34,29 @@ func NewErrorHandlingMiddleware(logger *logging.Logger, enableStack bool) *Error
 	}
 }
 
-// Name returns the middleware name
+/* Name returns the middleware name */
 func (m *ErrorHandlingMiddleware) Name() string {
 	return "error-handling"
 }
 
-// Order returns the execution order
+/* Order returns the execution order */
 func (m *ErrorHandlingMiddleware) Order() int {
 	return 100
 }
 
-// Enabled returns whether the middleware is enabled
+/* Enabled returns whether the middleware is enabled */
 func (m *ErrorHandlingMiddleware) Enabled() bool {
 	return true
 }
 
-// Execute executes the middleware
+/* Execute executes the middleware */
 func (m *ErrorHandlingMiddleware) Execute(ctx context.Context, req *middleware.MCPRequest, next middleware.Handler) (*middleware.MCPResponse, error) {
 	resp, err := next(ctx)
 	if err != nil {
 		errorMsg := err.Error()
 		var stack string
 		if m.enableErrorStack {
-			// In Go, we'd need to get stack trace differently
+    /* In Go, we'd need to get stack trace differently */
 			stack = ""
 		}
 

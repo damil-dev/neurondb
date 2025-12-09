@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * onnx.go
+ *    Tool implementation for NeuronMCP
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/tools/onnx.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package tools
 
 import (
@@ -8,14 +21,14 @@ import (
 	"github.com/neurondb/NeuronMCP/internal/logging"
 )
 
-// ONNXTool manages ONNX models
+/* ONNXTool manages ONNX models */
 type ONNXTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewONNXTool creates a new ONNX tool
+/* NewONNXTool creates a new ONNX tool */
 func NewONNXTool(db *database.Database, logger *logging.Logger) *ONNXTool {
 	return &ONNXTool{
 		BaseTool: NewBaseTool(
@@ -51,7 +64,7 @@ func NewONNXTool(db *database.Database, logger *logging.Logger) *ONNXTool {
 	}
 }
 
-// Execute executes ONNX operation
+/* Execute executes ONNX operation */
 func (t *ONNXTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -110,6 +123,7 @@ func (t *ONNXTool) Execute(ctx context.Context, params map[string]interface{}) (
 		"operation": operation,
 	}), nil
 }
+
 
 
 

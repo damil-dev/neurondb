@@ -1,3 +1,19 @@
+/*-------------------------------------------------------------------------
+ *
+ * connection.go
+ *    Database connection management for NeuronMCP
+ *
+ * Provides PostgreSQL connection pooling, retry logic, and connection
+ * management with NeuronDB type registration.
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/database/connection.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package database
 
 import (
@@ -12,7 +28,7 @@ import (
 	"github.com/neurondb/NeuronMCP/internal/config"
 )
 
-// Database manages PostgreSQL connections
+/* Database manages PostgreSQL connections */
 type Database struct {
 	pool     *pgxpool.Pool
 	host     string
@@ -21,17 +37,17 @@ type Database struct {
 	user     string
 }
 
-// NewDatabase creates a new database instance
+/* NewDatabase creates a new database instance */
 func NewDatabase() *Database {
 	return &Database{}
 }
 
-// Connect connects to the database using the provided configuration
+/* Connect connects to the database using the provided configuration */
 func (d *Database) Connect(cfg *config.DatabaseConfig) error {
 	return d.ConnectWithRetry(cfg, 3, 2*time.Second)
 }
 
-// ConnectWithRetry connects to the database with retry logic
+/* ConnectWithRetry connects to the database with retry logic */
 func (d *Database) ConnectWithRetry(cfg *config.DatabaseConfig, maxRetries int, retryDelay time.Duration) error {
 	var connStr string
 	var err error
@@ -39,7 +55,6 @@ func (d *Database) ConnectWithRetry(cfg *config.DatabaseConfig, maxRetries int, 
 	if cfg.ConnectionString != nil && *cfg.ConnectionString != "" {
 		connStr = *cfg.ConnectionString
 	} else {
-		// Build connection string from components
 		host := cfg.GetHost()
 		port := cfg.GetPort()
 		db := cfg.GetDatabase()
@@ -49,7 +64,6 @@ func (d *Database) ConnectWithRetry(cfg *config.DatabaseConfig, maxRetries int, 
 			password = *cfg.Password
 		}
 
-		// Build connection string properly
 		connStr = fmt.Sprintf("host=%s port=%d user=%s dbname=%s",
 			host, port, user, db)
 		
@@ -57,7 +71,6 @@ func (d *Database) ConnectWithRetry(cfg *config.DatabaseConfig, maxRetries int, 
 			connStr += fmt.Sprintf(" password=%s", password)
 		}
 
-		// Add SSL if configured
 		if cfg.SSL != nil {
 			if sslBool, ok := cfg.SSL.(bool); ok {
 				if sslBool {
@@ -69,12 +82,10 @@ func (d *Database) ConnectWithRetry(cfg *config.DatabaseConfig, maxRetries int, 
 				connStr += fmt.Sprintf(" sslmode=%s", sslStr)
 			}
 		} else {
-			// Default to prefer SSL
 			connStr += " sslmode=prefer"
 		}
 	}
 
-	// Parse connection string
 	poolConfig, err := pgxpool.ParseConfig(connStr)
 	if err != nil {
 		host := cfg.GetHost()
@@ -84,18 +95,13 @@ func (d *Database) ConnectWithRetry(cfg *config.DatabaseConfig, maxRetries int, 
 		return fmt.Errorf("failed to parse connection string for database '%s' on host '%s:%d' as user '%s': %w (connection string format may be invalid)", db, host, port, user, err)
 	}
 
-	// Register NeuronDB custom types (vector, vector[], etc.)
-	// These OIDs are from NeuronDB extension
-	// Note: We cast to text in queries for compatibility, but register types for future use
+	/* Register NeuronDB custom types (vector, vector[], etc.) */
 	poolConfig.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
-		// Register vector type (OID 17648) as text for scanning
-		// This allows pgx to handle vector types by treating them as text
 		conn.TypeMap().RegisterType(&pgtype.Type{
 			Codec: &pgtype.TextCodec{},
 			Name:  "vector",
 			OID:   17648,
 		})
-		// Register vector[] type (OID 17656) as text array
 		conn.TypeMap().RegisterType(&pgtype.Type{
 			Codec: &pgtype.ArrayCodec{ElementType: &pgtype.Type{Name: "text", Codec: &pgtype.TextCodec{}}},
 			Name:  "_vector",
@@ -104,7 +110,6 @@ func (d *Database) ConnectWithRetry(cfg *config.DatabaseConfig, maxRetries int, 
 		return nil
 	}
 
-	// Apply pool settings
 	if cfg.Pool != nil {
 		poolConfig.MinConns = int32(cfg.Pool.GetMin())
 		poolConfig.MaxConns = int32(cfg.Pool.GetMax())
@@ -112,17 +117,14 @@ func (d *Database) ConnectWithRetry(cfg *config.DatabaseConfig, maxRetries int, 
 		poolConfig.MaxConnLifetime = time.Hour
 		poolConfig.HealthCheckPeriod = 1 * time.Minute
 	} else {
-		// Set defaults to prevent immediate connection attempts
-		poolConfig.MinConns = 0  // Don't create connections until needed
+		poolConfig.MinConns = 0
 		poolConfig.MaxConns = 10
 		poolConfig.HealthCheckPeriod = 1 * time.Minute
 	}
 
-	// Store connection info for error messages
 	var host, dbName, dbUser string
 	var dbPort int
 	if cfg.ConnectionString != nil && *cfg.ConnectionString != "" {
-		// Try to extract info from connection string if possible
 		host = "unknown"
 		dbName = "unknown"
 		dbUser = "unknown"
@@ -138,13 +140,11 @@ func (d *Database) ConnectWithRetry(cfg *config.DatabaseConfig, maxRetries int, 
 	d.database = dbName
 	d.user = dbUser
 
-	// Retry connection
 	var pool *pgxpool.Pool
 	var lastErr error
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		pool, err = pgxpool.NewWithConfig(context.Background(), poolConfig)
 		if err == nil {
-			// Test the connection
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			if err := pool.Ping(ctx); err == nil {
@@ -159,27 +159,25 @@ func (d *Database) ConnectWithRetry(cfg *config.DatabaseConfig, maxRetries int, 
 
 		if attempt < maxRetries-1 {
 			time.Sleep(retryDelay)
-			retryDelay *= 2 // Exponential backoff
+			retryDelay *= 2
 		}
 	}
 
 	return fmt.Errorf("failed to connect to database '%s' on host '%s:%d' as user '%s' after %d attempts (last error: %v)", dbName, host, dbPort, dbUser, maxRetries, lastErr)
 }
 
-// IsConnected checks if the database is connected
+/* IsConnected checks if the database is connected */
 func (d *Database) IsConnected() bool {
 	return d.pool != nil
 }
 
-// Query executes a query and returns rows with automatic reconnection
+/* Query executes a query and returns rows with automatic reconnection */
 func (d *Database) Query(ctx context.Context, query string, args ...interface{}) (pgx.Rows, error) {
 	if d.pool == nil {
 		return nil, fmt.Errorf("database connection not established: database '%s' on host '%s:%d' as user '%s' (connection pool is nil, ensure Connect() was called successfully)", d.database, d.host, d.port, d.user)
 	}
 	
-	// Check if pool is healthy
 	if err := d.pool.Ping(ctx); err != nil {
-		// Connection lost - try to reconnect
 		return nil, fmt.Errorf("database connection lost: database '%s' on host '%s:%d' as user '%s': %w (connection pool ping failed, may need to reconnect)", d.database, d.host, d.port, d.user, err)
 	}
 	
@@ -190,16 +188,15 @@ func (d *Database) Query(ctx context.Context, query string, args ...interface{})
 	return rows, nil
 }
 
-// QueryRow executes a query and returns a single row
+/* QueryRow executes a query and returns a single row */
 func (d *Database) QueryRow(ctx context.Context, query string, args ...interface{}) pgx.Row {
 	if d.pool == nil {
-		// Return a row that will error on scan
 		return &errorRow{err: fmt.Errorf("database connection not established: database '%s' on host '%s:%d' as user '%s' (connection pool is nil, ensure Connect() was called successfully)", d.database, d.host, d.port, d.user)}
 	}
 	return d.pool.QueryRow(ctx, query, args...)
 }
 
-// Exec executes a query without returning rows
+/* Exec executes a query without returning rows */
 func (d *Database) Exec(ctx context.Context, query string, args ...interface{}) (pgconn.CommandTag, error) {
 	if d.pool == nil {
 		return pgconn.CommandTag{}, fmt.Errorf("database connection not established: database '%s' on host '%s:%d' as user '%s' (connection pool is nil, ensure Connect() was called successfully)", d.database, d.host, d.port, d.user)
@@ -211,7 +208,7 @@ func (d *Database) Exec(ctx context.Context, query string, args ...interface{}) 
 	return tag, nil
 }
 
-// Begin starts a transaction
+/* Begin starts a transaction */
 func (d *Database) Begin(ctx context.Context) (pgx.Tx, error) {
 	if d.pool == nil {
 		return nil, fmt.Errorf("database connection not established: database '%s' on host '%s:%d' as user '%s' (connection pool is nil, ensure Connect() was called successfully)", d.database, d.host, d.port, d.user)
@@ -223,14 +220,14 @@ func (d *Database) Begin(ctx context.Context) (pgx.Tx, error) {
 	return tx, nil
 }
 
-// Close closes the connection pool
+/* Close closes the connection pool */
 func (d *Database) Close() {
 	if d.pool != nil {
 		d.pool.Close()
 	}
 }
 
-// TestConnection tests the database connection
+/* TestConnection tests the database connection */
 func (d *Database) TestConnection(ctx context.Context) error {
 	if d.pool == nil {
 		return fmt.Errorf("database connection not established: database '%s' on host '%s:%d' as user '%s' (connection pool is nil, ensure Connect() was called successfully)", d.database, d.host, d.port, d.user)
@@ -242,7 +239,7 @@ func (d *Database) TestConnection(ctx context.Context) error {
 	return nil
 }
 
-// GetPoolStats returns pool statistics
+/* GetPoolStats returns pool statistics */
 func (d *Database) GetPoolStats() *PoolStats {
 	if d.pool == nil {
 		return nil
@@ -256,7 +253,7 @@ func (d *Database) GetPoolStats() *PoolStats {
 	}
 }
 
-// PoolStats holds connection pool statistics
+/* PoolStats holds connection pool statistics */
 type PoolStats struct {
 	TotalConns      int32
 	AcquiredConns   int32
@@ -264,13 +261,12 @@ type PoolStats struct {
 	ConstructingConns int32
 }
 
-// EscapeIdentifier escapes a SQL identifier
+/* EscapeIdentifier escapes a SQL identifier */
 func EscapeIdentifier(identifier string) string {
-	// Simple escaping - in production, use pgx's built-in escaping
 	return fmt.Sprintf(`"%s"`, identifier)
 }
 
-// errorRow is a row that always returns an error
+/* errorRow is a row that always returns an error */
 type errorRow struct {
 	err error
 }

@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * gpu.go
+ *    Tool implementation for NeuronMCP
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/tools/gpu.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package tools
 
 import (
@@ -8,14 +21,14 @@ import (
 	"github.com/neurondb/NeuronMCP/internal/logging"
 )
 
-// GPUMonitoringTool monitors GPU information
+/* GPUMonitoringTool monitors GPU information */
 type GPUMonitoringTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewGPUMonitoringTool creates a new GPU monitoring tool
+/* NewGPUMonitoringTool creates a new GPU monitoring tool */
 func NewGPUMonitoringTool(db *database.Database, logger *logging.Logger) *GPUMonitoringTool {
 	return &GPUMonitoringTool{
 		BaseTool: NewBaseTool(
@@ -32,7 +45,7 @@ func NewGPUMonitoringTool(db *database.Database, logger *logging.Logger) *GPUMon
 	}
 }
 
-// Execute executes GPU info query
+/* Execute executes GPU info query */
 func (t *GPUMonitoringTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	query := "SELECT * FROM neurondb.gpu_info()"
 	result, err := t.executor.ExecuteQueryOne(ctx, query, nil)
@@ -45,6 +58,7 @@ func (t *GPUMonitoringTool) Execute(ctx context.Context, params map[string]inter
 
 	return Success(result, nil), nil
 }
+
 
 
 

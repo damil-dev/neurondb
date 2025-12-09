@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * main.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/cmd/neurondb-mcp-client/main.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package main
 
 import (
@@ -37,7 +50,7 @@ func main() {
 
 	flag.Parse()
 
-	// Validate arguments
+  /* Validate arguments */
 	if *configPath == "" {
 		fmt.Fprintf(os.Stderr, "Error: -c/--config is required\n")
 		flag.Usage()
@@ -56,17 +69,17 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Load configuration
+  /* Load configuration */
 	config, err := client.LoadConfig(*configPath, *serverName)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error loading configuration: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Initialize output manager
+  /* Initialize output manager */
 	outputMgr := client.NewOutputManager(*output)
 
-	// Create and connect client
+  /* Create and connect client */
 	mcpClient, err := client.NewMCPClient(config, *verbose)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error creating MCP client: %v\n", err)
@@ -79,9 +92,9 @@ func main() {
 	}
 	defer mcpClient.Disconnect()
 
-	// Execute commands
+  /* Execute commands */
 	if *execute != "" {
-		// Single command execution
+   /* Single command execution */
 		result, err := mcpClient.ExecuteCommand(*execute)
 		if err != nil {
 			result = map[string]interface{}{
@@ -97,7 +110,7 @@ func main() {
 			fmt.Printf("Command executed: %s\n", *execute)
 		}
 	} else if *file != "" {
-		// Batch command execution
+   /* Batch command execution */
 		commands, err := readCommandsFile(*file)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error reading command file: %v\n", err)
@@ -123,7 +136,7 @@ func main() {
 		}
 	}
 
-	// Save output
+  /* Save output */
 	outputFile, err := outputMgr.Save()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error saving output: %v\n", err)
@@ -142,7 +155,7 @@ func readCommandsFile(filePath string) ([]string, error) {
 	lines := splitLines(string(data))
 	for _, line := range lines {
 		line = trimSpace(line)
-		// Skip empty lines and comments
+   /* Skip empty lines and comments */
 		if line == "" || line[0] == '#' {
 			continue
 		}

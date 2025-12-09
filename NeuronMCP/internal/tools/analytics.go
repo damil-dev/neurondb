@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * analytics.go
+ *    Tool implementation for NeuronMCP
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/tools/analytics.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package tools
 
 import (
@@ -8,14 +21,14 @@ import (
 	"github.com/neurondb/NeuronMCP/internal/logging"
 )
 
-// ClusterDataTool performs clustering on data
+/* ClusterDataTool performs clustering on data */
 type ClusterDataTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewClusterDataTool creates a new cluster data tool
+/* NewClusterDataTool creates a new cluster data tool */
 func NewClusterDataTool(db *database.Database, logger *logging.Logger) *ClusterDataTool {
 	return &ClusterDataTool{
 		BaseTool: NewBaseTool(
@@ -67,7 +80,7 @@ func NewClusterDataTool(db *database.Database, logger *logging.Logger) *ClusterD
 	}
 }
 
-// Execute executes the clustering
+/* Execute executes the clustering */
 func (t *ClusterDataTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -194,14 +207,14 @@ func (t *ClusterDataTool) Execute(ctx context.Context, params map[string]interfa
 	}), nil
 }
 
-// DetectOutliersTool detects outliers in data
+/* DetectOutliersTool detects outliers in data */
 type DetectOutliersTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewDetectOutliersTool creates a new detect outliers tool
+/* NewDetectOutliersTool creates a new detect outliers tool */
 func NewDetectOutliersTool(db *database.Database, logger *logging.Logger) *DetectOutliersTool {
 	return &DetectOutliersTool{
 		BaseTool: NewBaseTool(
@@ -232,7 +245,7 @@ func NewDetectOutliersTool(db *database.Database, logger *logging.Logger) *Detec
 	}
 }
 
-// Execute executes the outlier detection
+/* Execute executes the outlier detection */
 func (t *DetectOutliersTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -274,7 +287,7 @@ func (t *DetectOutliersTool) Execute(ctx context.Context, params map[string]inte
 		}), nil
 	}
 
-	// Use NeuronDB's outlier detection function: detect_outliers_zscore(table, column, threshold, method)
+  /* Use NeuronDB's outlier detection function: detect_outliers_zscore(table, column, threshold, method) */
 	query := `SELECT detect_outliers_zscore($1, $2, $3, 'zscore') AS outliers`
 	result, err := t.executor.ExecuteQueryOne(ctx, query, []interface{}{table, vectorColumn, threshold})
 	if err != nil {
@@ -294,14 +307,14 @@ func (t *DetectOutliersTool) Execute(ctx context.Context, params map[string]inte
 	}), nil
 }
 
-// ReduceDimensionalityTool reduces dimensionality using PCA
+/* ReduceDimensionalityTool reduces dimensionality using PCA */
 type ReduceDimensionalityTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewReduceDimensionalityTool creates a new reduce dimensionality tool
+/* NewReduceDimensionalityTool creates a new reduce dimensionality tool */
 func NewReduceDimensionalityTool(db *database.Database, logger *logging.Logger) *ReduceDimensionalityTool {
 	return &ReduceDimensionalityTool{
 		BaseTool: NewBaseTool(
@@ -332,7 +345,7 @@ func NewReduceDimensionalityTool(db *database.Database, logger *logging.Logger) 
 	}
 }
 
-// Execute executes the dimensionality reduction
+/* Execute executes the dimensionality reduction */
 func (t *ReduceDimensionalityTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -374,10 +387,10 @@ func (t *ReduceDimensionalityTool) Execute(ctx context.Context, params map[strin
 		}), nil
 	}
 
-	// PCA in NeuronDB is typically done through training a model
-	// Use neurondb.train with 'pca' algorithm or use dimensionality reduction functions
-	// For now, we'll use a direct approach - PCA might need to be implemented differently
-	// Check if there's a compute_pca function or use train with pca algorithm
+  /* PCA in NeuronDB is typically done through training a model */
+  /* Use neurondb.train with 'pca' algorithm or use dimensionality reduction functions */
+  /* For now, we'll use a direct approach - PCA might need to be implemented differently */
+  /* Check if there's a compute_pca function or use train with pca algorithm */
 	query := `SELECT neurondb.train('default', 'pca', $1, NULL, ARRAY[$2], jsonb_build_object('n_components', $3)) AS pca_model_id`
 	result, err := t.executor.ExecuteQueryOne(ctx, query, []interface{}{table, vectorColumn, nComponents})
 	if err != nil {

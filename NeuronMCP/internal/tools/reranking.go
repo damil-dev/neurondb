@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * reranking.go
+ *    Tool implementation for NeuronMCP
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/tools/reranking.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package tools
 
 import (
@@ -9,14 +22,14 @@ import (
 	"github.com/neurondb/NeuronMCP/internal/logging"
 )
 
-// RerankCrossEncoderTool performs cross-encoder reranking
+/* RerankCrossEncoderTool performs cross-encoder reranking */
 type RerankCrossEncoderTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewRerankCrossEncoderTool creates a new cross-encoder reranking tool
+/* NewRerankCrossEncoderTool creates a new cross-encoder reranking tool */
 func NewRerankCrossEncoderTool(db *database.Database, logger *logging.Logger) *RerankCrossEncoderTool {
 	return &RerankCrossEncoderTool{
 		BaseTool: NewBaseTool(
@@ -55,7 +68,7 @@ func NewRerankCrossEncoderTool(db *database.Database, logger *logging.Logger) *R
 	}
 }
 
-// Execute executes cross-encoder reranking
+/* Execute executes cross-encoder reranking */
 func (t *RerankCrossEncoderTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -80,7 +93,7 @@ func (t *RerankCrossEncoderTool) Execute(ctx context.Context, params map[string]
 		return Error("query and documents are required", "VALIDATION_ERROR", nil), nil
 	}
 
-	// Format documents array
+  /* Format documents array */
 	var docStrs []string
 	for _, doc := range documents {
 		if docStr, ok := doc.(string); ok {
@@ -108,14 +121,14 @@ func (t *RerankCrossEncoderTool) Execute(ctx context.Context, params map[string]
 	}), nil
 }
 
-// RerankLLMTool performs LLM-based reranking
+/* RerankLLMTool performs LLM-based reranking */
 type RerankLLMTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewRerankLLMTool creates a new LLM reranking tool
+/* NewRerankLLMTool creates a new LLM reranking tool */
 func NewRerankLLMTool(db *database.Database, logger *logging.Logger) *RerankLLMTool {
 	return &RerankLLMTool{
 		BaseTool: NewBaseTool(
@@ -154,7 +167,7 @@ func NewRerankLLMTool(db *database.Database, logger *logging.Logger) *RerankLLMT
 	}
 }
 
-// Execute executes LLM reranking
+/* Execute executes LLM reranking */
 func (t *RerankLLMTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -179,7 +192,7 @@ func (t *RerankLLMTool) Execute(ctx context.Context, params map[string]interface
 		return Error("query and documents are required", "VALIDATION_ERROR", nil), nil
 	}
 
-	// Format documents array
+  /* Format documents array */
 	var docStrs []string
 	for _, doc := range documents {
 		if docStr, ok := doc.(string); ok {
@@ -207,14 +220,14 @@ func (t *RerankLLMTool) Execute(ctx context.Context, params map[string]interface
 	}), nil
 }
 
-// RerankCohereTool performs Cohere reranking
+/* RerankCohereTool performs Cohere reranking */
 type RerankCohereTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewRerankCohereTool creates a new Cohere reranking tool
+/* NewRerankCohereTool creates a new Cohere reranking tool */
 func NewRerankCohereTool(db *database.Database, logger *logging.Logger) *RerankCohereTool {
 	return &RerankCohereTool{
 		BaseTool: NewBaseTool(
@@ -248,7 +261,7 @@ func NewRerankCohereTool(db *database.Database, logger *logging.Logger) *RerankC
 	}
 }
 
-// Execute executes Cohere reranking
+/* Execute executes Cohere reranking */
 func (t *RerankCohereTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -269,7 +282,7 @@ func (t *RerankCohereTool) Execute(ctx context.Context, params map[string]interf
 		return Error("query and documents are required", "VALIDATION_ERROR", nil), nil
 	}
 
-	// Format documents array
+  /* Format documents array */
 	var docStrs []string
 	for _, doc := range documents {
 		if docStr, ok := doc.(string); ok {
@@ -297,14 +310,14 @@ func (t *RerankCohereTool) Execute(ctx context.Context, params map[string]interf
 	}), nil
 }
 
-// RerankColBERTTool performs ColBERT reranking
+/* RerankColBERTTool performs ColBERT reranking */
 type RerankColBERTTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewRerankColBERTTool creates a new ColBERT reranking tool
+/* NewRerankColBERTTool creates a new ColBERT reranking tool */
 func NewRerankColBERTTool(db *database.Database, logger *logging.Logger) *RerankColBERTTool {
 	return &RerankColBERTTool{
 		BaseTool: NewBaseTool(
@@ -336,7 +349,7 @@ func NewRerankColBERTTool(db *database.Database, logger *logging.Logger) *Rerank
 	}
 }
 
-// Execute executes ColBERT reranking
+/* Execute executes ColBERT reranking */
 func (t *RerankColBERTTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -357,7 +370,7 @@ func (t *RerankColBERTTool) Execute(ctx context.Context, params map[string]inter
 		return Error("query and documents are required", "VALIDATION_ERROR", nil), nil
 	}
 
-	// Format documents array
+  /* Format documents array */
 	var docStrs []string
 	for _, doc := range documents {
 		if docStr, ok := doc.(string); ok {
@@ -385,14 +398,14 @@ func (t *RerankColBERTTool) Execute(ctx context.Context, params map[string]inter
 	}), nil
 }
 
-// RerankLTRTool performs learning-to-rank reranking
+/* RerankLTRTool performs learning-to-rank reranking */
 type RerankLTRTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewRerankLTRTool creates a new LTR reranking tool
+/* NewRerankLTRTool creates a new LTR reranking tool */
 func NewRerankLTRTool(db *database.Database, logger *logging.Logger) *RerankLTRTool {
 	return &RerankLTRTool{
 		BaseTool: NewBaseTool(
@@ -427,7 +440,7 @@ func NewRerankLTRTool(db *database.Database, logger *logging.Logger) *RerankLTRT
 	}
 }
 
-// Execute executes LTR reranking
+/* Execute executes LTR reranking */
 func (t *RerankLTRTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -446,7 +459,7 @@ func (t *RerankLTRTool) Execute(ctx context.Context, params map[string]interface
 		return Error("query, documents, feature_table, and model_table are required", "VALIDATION_ERROR", nil), nil
 	}
 
-	// Format documents array
+  /* Format documents array */
 	var docStrs []string
 	for _, doc := range documents {
 		if docStr, ok := doc.(string); ok {
@@ -474,14 +487,14 @@ func (t *RerankLTRTool) Execute(ctx context.Context, params map[string]interface
 	}), nil
 }
 
-// RerankEnsembleTool performs ensemble reranking
+/* RerankEnsembleTool performs ensemble reranking */
 type RerankEnsembleTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewRerankEnsembleTool creates a new ensemble reranking tool
+/* NewRerankEnsembleTool creates a new ensemble reranking tool */
 func NewRerankEnsembleTool(db *database.Database, logger *logging.Logger) *RerankEnsembleTool {
 	return &RerankEnsembleTool{
 		BaseTool: NewBaseTool(
@@ -518,7 +531,7 @@ func NewRerankEnsembleTool(db *database.Database, logger *logging.Logger) *Reran
 	}
 }
 
-// Execute executes ensemble reranking
+/* Execute executes ensemble reranking */
 func (t *RerankEnsembleTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
@@ -541,7 +554,7 @@ func (t *RerankEnsembleTool) Execute(ctx context.Context, params map[string]inte
 		return Error("rerankers and weights arrays must have the same length", "VALIDATION_ERROR", nil), nil
 	}
 
-	// Format arrays
+  /* Format arrays */
 	var docStrs []string
 	for _, doc := range documents {
 		if docStr, ok := doc.(string); ok {

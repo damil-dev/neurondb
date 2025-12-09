@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * postgresql_advanced.go
+ *    Tool implementation for NeuronMCP
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/tools/postgresql_advanced.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package tools
 
 import (
@@ -8,14 +21,14 @@ import (
 	"github.com/neurondb/NeuronMCP/internal/logging"
 )
 
-// PostgreSQLConnectionsTool retrieves detailed connection information
+/* PostgreSQLConnectionsTool retrieves detailed connection information */
 type PostgreSQLConnectionsTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewPostgreSQLConnectionsTool creates a new PostgreSQL connections tool
+/* NewPostgreSQLConnectionsTool creates a new PostgreSQL connections tool */
 func NewPostgreSQLConnectionsTool(db *database.Database, logger *logging.Logger) *PostgreSQLConnectionsTool {
 	return &PostgreSQLConnectionsTool{
 		BaseTool: NewBaseTool(
@@ -32,7 +45,7 @@ func NewPostgreSQLConnectionsTool(db *database.Database, logger *logging.Logger)
 	}
 }
 
-// Execute executes the connections query
+/* Execute executes the connections query */
 func (t *PostgreSQLConnectionsTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	query := `
 		SELECT 
@@ -69,14 +82,14 @@ func (t *PostgreSQLConnectionsTool) Execute(ctx context.Context, params map[stri
 	}), nil
 }
 
-// PostgreSQLLocksTool retrieves lock information
+/* PostgreSQLLocksTool retrieves lock information */
 type PostgreSQLLocksTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewPostgreSQLLocksTool creates a new PostgreSQL locks tool
+/* NewPostgreSQLLocksTool creates a new PostgreSQL locks tool */
 func NewPostgreSQLLocksTool(db *database.Database, logger *logging.Logger) *PostgreSQLLocksTool {
 	return &PostgreSQLLocksTool{
 		BaseTool: NewBaseTool(
@@ -93,7 +106,7 @@ func NewPostgreSQLLocksTool(db *database.Database, logger *logging.Logger) *Post
 	}
 }
 
-// Execute executes the locks query
+/* Execute executes the locks query */
 func (t *PostgreSQLLocksTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	query := `
 		SELECT 
@@ -133,14 +146,14 @@ func (t *PostgreSQLLocksTool) Execute(ctx context.Context, params map[string]int
 	}), nil
 }
 
-// PostgreSQLReplicationTool retrieves replication status
+/* PostgreSQLReplicationTool retrieves replication status */
 type PostgreSQLReplicationTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewPostgreSQLReplicationTool creates a new PostgreSQL replication tool
+/* NewPostgreSQLReplicationTool creates a new PostgreSQL replication tool */
 func NewPostgreSQLReplicationTool(db *database.Database, logger *logging.Logger) *PostgreSQLReplicationTool {
 	return &PostgreSQLReplicationTool{
 		BaseTool: NewBaseTool(
@@ -157,7 +170,7 @@ func NewPostgreSQLReplicationTool(db *database.Database, logger *logging.Logger)
 	}
 }
 
-// Execute executes the replication query
+/* Execute executes the replication query */
 func (t *PostgreSQLReplicationTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	query := `
 		SELECT 
@@ -192,14 +205,14 @@ func (t *PostgreSQLReplicationTool) Execute(ctx context.Context, params map[stri
 	}), nil
 }
 
-// PostgreSQLSettingsTool retrieves configuration settings
+/* PostgreSQLSettingsTool retrieves configuration settings */
 type PostgreSQLSettingsTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewPostgreSQLSettingsTool creates a new PostgreSQL settings tool
+/* NewPostgreSQLSettingsTool creates a new PostgreSQL settings tool */
 func NewPostgreSQLSettingsTool(db *database.Database, logger *logging.Logger) *PostgreSQLSettingsTool {
 	return &PostgreSQLSettingsTool{
 		BaseTool: NewBaseTool(
@@ -221,7 +234,7 @@ func NewPostgreSQLSettingsTool(db *database.Database, logger *logging.Logger) *P
 	}
 }
 
-// Execute executes the settings query
+/* Execute executes the settings query */
 func (t *PostgreSQLSettingsTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	pattern, _ := params["pattern"].(string)
 
@@ -284,14 +297,14 @@ func (t *PostgreSQLSettingsTool) Execute(ctx context.Context, params map[string]
 	}), nil
 }
 
-// PostgreSQLExtensionsTool lists installed extensions
+/* PostgreSQLExtensionsTool lists installed extensions */
 type PostgreSQLExtensionsTool struct {
 	*BaseTool
 	executor *QueryExecutor
 	logger   *logging.Logger
 }
 
-// NewPostgreSQLExtensionsTool creates a new PostgreSQL extensions tool
+/* NewPostgreSQLExtensionsTool creates a new PostgreSQL extensions tool */
 func NewPostgreSQLExtensionsTool(db *database.Database, logger *logging.Logger) *PostgreSQLExtensionsTool {
 	return &PostgreSQLExtensionsTool{
 		BaseTool: NewBaseTool(
@@ -308,7 +321,7 @@ func NewPostgreSQLExtensionsTool(db *database.Database, logger *logging.Logger) 
 	}
 }
 
-// Execute executes the extensions query
+/* Execute executes the extensions query */
 func (t *PostgreSQLExtensionsTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	query := `
 		SELECT 
@@ -338,6 +351,7 @@ func (t *PostgreSQLExtensionsTool) Execute(ctx context.Context, params map[strin
 		"count": len(results),
 	}), nil
 }
+
 
 
 

@@ -1,8 +1,21 @@
+/*-------------------------------------------------------------------------
+ *
+ * schema.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/internal/config/schema.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package config
 
 import "time"
 
-// ServerConfig is the root configuration structure
+/* ServerConfig is the root configuration structure */
 type ServerConfig struct {
 	Database DatabaseConfig `json:"database"`
 	Server   ServerSettings `json:"server"`
@@ -12,7 +25,7 @@ type ServerConfig struct {
 	Middleware []MiddlewareConfig `json:"middleware,omitempty"`
 }
 
-// DatabaseConfig holds database connection configuration
+/* DatabaseConfig holds database connection configuration */
 type DatabaseConfig struct {
 	ConnectionString *string   `json:"connectionString,omitempty"`
 	Host             *string   `json:"host,omitempty"`
@@ -24,7 +37,7 @@ type DatabaseConfig struct {
 	SSL              interface{} `json:"ssl,omitempty"` // bool or SSLConfig
 }
 
-// PoolConfig holds connection pool settings
+/* PoolConfig holds connection pool settings */
 type PoolConfig struct {
 	Min                   *int `json:"min,omitempty"`
 	Max                   *int `json:"max,omitempty"`
@@ -32,7 +45,7 @@ type PoolConfig struct {
 	ConnectionTimeoutMillis *int `json:"connectionTimeoutMillis,omitempty"`
 }
 
-// SSLConfig holds SSL configuration
+/* SSLConfig holds SSL configuration */
 type SSLConfig struct {
 	RejectUnauthorized *bool   `json:"rejectUnauthorized,omitempty"`
 	CA                 *string `json:"ca,omitempty"`
@@ -40,7 +53,7 @@ type SSLConfig struct {
 	Key                *string `json:"key,omitempty"`
 }
 
-// ServerSettings holds server configuration
+/* ServerSettings holds server configuration */
 type ServerSettings struct {
 	Name            *string `json:"name,omitempty"`
 	Version         *string `json:"version,omitempty"`
@@ -50,7 +63,7 @@ type ServerSettings struct {
 	EnableHealthCheck *bool `json:"enableHealthCheck,omitempty"`
 }
 
-// LoggingConfig holds logging configuration
+/* LoggingConfig holds logging configuration */
 type LoggingConfig struct {
 	Level              string  `json:"level"`
 	Format             string  `json:"format"`
@@ -60,7 +73,7 @@ type LoggingConfig struct {
 	EnableErrorStack      *bool `json:"enableErrorStack,omitempty"`
 }
 
-// FeaturesConfig holds feature flags and settings
+/* FeaturesConfig holds feature flags and settings */
 type FeaturesConfig struct {
 	Vector        *VectorFeatureConfig        `json:"vector,omitempty"`
 	ML            *MLFeatureConfig            `json:"ml,omitempty"`
@@ -76,7 +89,7 @@ type FeaturesConfig struct {
 	Indexing      *IndexingFeatureConfig      `json:"indexing,omitempty"`
 }
 
-// VectorFeatureConfig holds vector feature settings
+/* VectorFeatureConfig holds vector feature settings */
 type VectorFeatureConfig struct {
 	Enabled             bool    `json:"enabled"`
 	DefaultDistanceMetric *string `json:"defaultDistanceMetric,omitempty"`
@@ -84,7 +97,7 @@ type VectorFeatureConfig struct {
 	DefaultLimit          *int    `json:"defaultLimit,omitempty"`
 }
 
-// MLFeatureConfig holds ML feature settings
+/* MLFeatureConfig holds ML feature settings */
 type MLFeatureConfig struct {
 	Enabled        bool     `json:"enabled"`
 	Algorithms     []string `json:"algorithms,omitempty"`
@@ -92,70 +105,70 @@ type MLFeatureConfig struct {
 	GPUEnabled     *bool    `json:"gpuEnabled,omitempty"`
 }
 
-// AnalyticsFeatureConfig holds analytics feature settings
+/* AnalyticsFeatureConfig holds analytics feature settings */
 type AnalyticsFeatureConfig struct {
 	Enabled      bool `json:"enabled"`
 	MaxClusters  *int `json:"maxClusters,omitempty"`
 	MaxIterations *int `json:"maxIterations,omitempty"`
 }
 
-// RAGFeatureConfig holds RAG feature settings
+/* RAGFeatureConfig holds RAG feature settings */
 type RAGFeatureConfig struct {
 	Enabled        bool `json:"enabled"`
 	DefaultChunkSize *int `json:"defaultChunkSize,omitempty"`
 	DefaultOverlap   *int `json:"defaultOverlap,omitempty"`
 }
 
-// ProjectsFeatureConfig holds projects feature settings
+/* ProjectsFeatureConfig holds projects feature settings */
 type ProjectsFeatureConfig struct {
 	Enabled    bool `json:"enabled"`
 	MaxProjects *int `json:"maxProjects,omitempty"`
 }
 
-// GPUFeatureConfig holds GPU feature settings
+/* GPUFeatureConfig holds GPU feature settings */
 type GPUFeatureConfig struct {
 	Enabled  bool `json:"enabled"`
 	DeviceID *int `json:"deviceId,omitempty"`
 }
 
-// QuantizationFeatureConfig holds quantization feature settings
+/* QuantizationFeatureConfig holds quantization feature settings */
 type QuantizationFeatureConfig struct {
 	Enabled      bool    `json:"enabled"`
 	DefaultMethod *string `json:"defaultMethod,omitempty"`
 }
 
-// DimensionalityFeatureConfig holds dimensionality feature settings
+/* DimensionalityFeatureConfig holds dimensionality feature settings */
 type DimensionalityFeatureConfig struct {
 	Enabled      bool `json:"enabled"`
 	MaxComponents *int `json:"maxComponents,omitempty"`
 }
 
-// RerankingFeatureConfig holds reranking feature settings
+/* RerankingFeatureConfig holds reranking feature settings */
 type RerankingFeatureConfig struct {
 	Enabled     bool     `json:"enabled"`
 	DefaultModel *string `json:"defaultModel,omitempty"`
 }
 
-// HybridFeatureConfig holds hybrid search feature settings
+/* HybridFeatureConfig holds hybrid search feature settings */
 type HybridFeatureConfig struct {
 	Enabled          bool    `json:"enabled"`
 	DefaultVectorWeight *float64 `json:"defaultVectorWeight,omitempty"`
 }
 
-// WorkersFeatureConfig holds workers feature settings
+/* WorkersFeatureConfig holds workers feature settings */
 type WorkersFeatureConfig struct {
 	Enabled   bool `json:"enabled"`
 	MaxWorkers *int `json:"maxWorkers,omitempty"`
 }
 
-// IndexingFeatureConfig holds indexing feature settings
+/* IndexingFeatureConfig holds indexing feature settings */
 type IndexingFeatureConfig struct {
 	Enabled              bool `json:"enabled"`
 	DefaultHNSWM        *int `json:"defaultHNSWM,omitempty"`
 	DefaultHNSWEFConstruction *int `json:"defaultHNSWEFConstruction,omitempty"`
 }
 
-// PluginConfig holds plugin configuration
+/* PluginConfig holds plugin configuration */
 type PluginConfig struct {
 	Name     string                 `json:"name"`
 	Enabled  bool                   `json:"enabled"`
@@ -163,7 +176,7 @@ type PluginConfig struct {
 	Config   map[string]interface{} `json:"config,omitempty"`
 }
 
-// MiddlewareConfig holds middleware configuration
+/* MiddlewareConfig holds middleware configuration */
 type MiddlewareConfig struct {
 	Name     string                 `json:"name"`
 	Enabled  bool                   `json:"enabled"`
@@ -171,7 +184,7 @@ type MiddlewareConfig struct {
 	Config   map[string]interface{} `json:"config,omitempty"`
 }
 
-// Helper methods for getting values with defaults
+/* Helper methods for getting values with defaults */
 
 func (c *DatabaseConfig) GetHost() string {
 	if c.Host != nil {
