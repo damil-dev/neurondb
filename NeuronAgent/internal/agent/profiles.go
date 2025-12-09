@@ -1,10 +1,23 @@
+/*-------------------------------------------------------------------------
+ *
+ * profiles.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronAgent/internal/agent/profiles.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package agent
 
 import (
 	"github.com/neurondb/NeuronAgent/internal/db"
 )
 
-// Profile represents a predefined agent profile
+/* Profile represents a predefined agent profile */
 type Profile struct {
 	Name         string
 	Description  string
@@ -14,7 +27,7 @@ type Profile struct {
 	EnabledTools []string
 }
 
-// GetDefaultProfiles returns default agent profiles
+/* GetDefaultProfiles returns default agent profiles */
 func GetDefaultProfiles() []Profile {
 	return []Profile{
 		{
@@ -68,7 +81,7 @@ func GetDefaultProfiles() []Profile {
 	}
 }
 
-// CreateAgentFromProfile creates an agent from a profile
+/* CreateAgentFromProfile creates an agent from a profile */
 func CreateAgentFromProfile(profile Profile) *db.Agent {
 	return &db.Agent{
 		Name:         profile.Name,
@@ -80,7 +93,7 @@ func CreateAgentFromProfile(profile Profile) *db.Agent {
 	}
 }
 
-// FindProfile finds a profile by name
+/* FindProfile finds a profile by name */
 func FindProfile(name string) *Profile {
 	profiles := GetDefaultProfiles()
 	for _, p := range profiles {

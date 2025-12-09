@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * memory.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronAgent/internal/agent/memory.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package agent
 
 import (
@@ -34,7 +47,7 @@ func NewMemoryManager(db *db.DB, queries *db.Queries, embedClient *neurondb.Embe
 }
 
 func (m *MemoryManager) Retrieve(ctx context.Context, agentID uuid.UUID, queryEmbedding []float32, topK int) ([]MemoryChunk, error) {
-	// Record metrics
+  /* Record metrics */
 	defer func() {
 		metrics.RecordMemoryRetrieval(agentID.String())
 	}()
@@ -60,24 +73,24 @@ func (m *MemoryManager) Retrieve(ctx context.Context, agentID uuid.UUID, queryEm
 }
 
 func (m *MemoryManager) StoreChunks(ctx context.Context, agentID, sessionID uuid.UUID, content string, toolResults []ToolResult) {
-	// Compute importance score (heuristic: length, user flags, etc.)
+  /* Compute importance score (heuristic: length, user flags, etc.) */
 	importance := m.computeImportance(content, toolResults)
 
-	// Only store if importance > threshold
+  /* Only store if importance > threshold */
 	if importance < 0.3 {
 		return
 	}
 
-	// Compute embedding
+  /* Compute embedding */
 	embeddingModel := "all-MiniLM-L6-v2"
 	embedding, err := m.embed.Embed(ctx, content, embeddingModel)
 	if err != nil {
-		// Log error but don't fail (async operation)
-		// Error is already detailed in embedding client
+   /* Log error but don't fail (async operation) */
+   /* Error is already detailed in embedding client */
 		return
 	}
 
-	// Store chunk
+  /* Store chunk */
 	_, err = m.queries.CreateMemoryChunk(ctx, &db.MemoryChunk{
 		AgentID:         agentID,
 		SessionID:       &sessionID,
@@ -86,31 +99,31 @@ func (m *MemoryManager) StoreChunks(ctx context.Context, agentID, sessionID uuid
 		ImportanceScore: importance,
 	})
 	if err != nil {
-		// Log error but don't fail (async operation)
-		// Error is already detailed in queries.CreateMemoryChunk
+   /* Log error but don't fail (async operation) */
+   /* Error is already detailed in queries.CreateMemoryChunk */
 		return
 	}
 
-	// Record metrics
+  /* Record metrics */
 	metrics.RecordMemoryChunkStored(agentID.String())
 }
 
 func (m *MemoryManager) computeImportance(content string, toolResults []ToolResult) float64 {
-	score := 0.5 // Base score
+ 	score := 0.5 /* Base score */
 
-	// Increase score based on content length (longer = more important)
+  /* Increase score based on content length (longer = more important) */
 	if len(content) > 500 {
 		score += 0.2
 	} else if len(content) > 200 {
 		score += 0.1
 	}
 
-	// Increase score if tool results present (actionable information)
+  /* Increase score if tool results present (actionable information) */
 	if len(toolResults) > 0 {
 		score += 0.2
 	}
 
-	// Increase score if content contains important keywords
+  /* Increase score if content contains important keywords */
 	importantKeywords := []string{"error", "solution", "important", "note", "warning", "summary"}
 	contentLower := strings.ToLower(content)
 	for _, keyword := range importantKeywords {
@@ -120,7 +133,7 @@ func (m *MemoryManager) computeImportance(content string, toolResults []ToolResu
 		}
 	}
 
-	// Cap at 1.0
+  /* Cap at 1.0 */
 	if score > 1.0 {
 		score = 1.0
 	}

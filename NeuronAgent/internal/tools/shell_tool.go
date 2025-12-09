@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * shell_tool.go
+ *    Tool implementation for NeuronMCP
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronAgent/internal/tools/shell_tool.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package tools
 
 import (
@@ -12,7 +25,7 @@ import (
 )
 
 type ShellTool struct {
-	allowedCommands []string // Whitelist of allowed commands
+ 	allowedCommands []string /* Whitelist of allowed commands */
 	timeout         time.Duration
 }
 
@@ -27,7 +40,7 @@ func NewShellTool() *ShellTool {
 }
 
 func (t *ShellTool) Execute(ctx context.Context, tool *db.Tool, args map[string]interface{}) (string, error) {
-	// Shell tool is heavily restricted - only allow specific commands
+  /* Shell tool is heavily restricted - only allow specific commands */
 	command, ok := args["command"].(string)
 	if !ok {
 		argKeys := make([]string, 0, len(args))
@@ -38,7 +51,7 @@ func (t *ShellTool) Execute(ctx context.Context, tool *db.Tool, args map[string]
 			tool.Name, len(args), argKeys)
 	}
 
-	// Parse command
+  /* Parse command */
 	parts := strings.Fields(command)
 	if len(parts) == 0 {
 		return "", fmt.Errorf("shell tool execution failed: tool_name='%s', handler_type='shell', command='%s', command_length=%d, validation_error='empty command'",
@@ -47,7 +60,7 @@ func (t *ShellTool) Execute(ctx context.Context, tool *db.Tool, args map[string]
 
 	cmdName := parts[0]
 
-	// Check if command is in allowlist
+  /* Check if command is in allowlist */
 	allowed := false
 	for _, allowedCmd := range t.allowedCommands {
 		if cmdName == allowedCmd {
@@ -65,11 +78,11 @@ func (t *ShellTool) Execute(ctx context.Context, tool *db.Tool, args map[string]
 			tool.Name, commandPreview, len(command), cmdName, t.allowedCommands)
 	}
 
-	// Create context with timeout
+  /* Create context with timeout */
 	ctx, cancel := context.WithTimeout(ctx, t.timeout)
 	defer cancel()
 
-	// Execute command
+  /* Execute command */
 	cmd := exec.CommandContext(ctx, cmdName, parts[1:]...)
 	output, err := cmd.CombinedOutput()
 	exitCode := 0

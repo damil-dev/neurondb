@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * validator.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronAgent/internal/auth/validator.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package auth
 
 import (
@@ -29,7 +42,7 @@ func (r *RateLimiter) CheckLimit(keyID string, limitPerMin int) bool {
 	rl, exists := r.limits[keyID]
 
 	if !exists || now.After(rl.resetTime) {
-		// Reset or create
+   /* Reset or create */
 		r.limits[keyID] = &rateLimit{
 			count:     1,
 			resetTime: now.Add(1 * time.Minute),
@@ -45,5 +58,5 @@ func (r *RateLimiter) CheckLimit(keyID string, limitPerMin int) bool {
 	return true
 }
 
-// HasRole and RequireRole are now in roles.go
+/* HasRole and RequireRole are now in roles.go */
 

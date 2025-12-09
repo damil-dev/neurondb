@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * errors.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronAgent/internal/utils/errors.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package utils
 
 import (
@@ -5,7 +18,7 @@ import (
 	"strings"
 )
 
-// SanitizeValue sanitizes sensitive data in error messages
+/* SanitizeValue sanitizes sensitive data in error messages */
 func SanitizeValue(value interface{}) string {
 	if value == nil {
 		return "<nil>"
@@ -13,7 +26,7 @@ func SanitizeValue(value interface{}) string {
 	
 	str := fmt.Sprintf("%v", value)
 	
-	// Sanitize passwords, tokens, and other sensitive data
+  /* Sanitize passwords, tokens, and other sensitive data */
 	if strings.Contains(strings.ToLower(str), "password") ||
 		strings.Contains(strings.ToLower(str), "token") ||
 		strings.Contains(strings.ToLower(str), "secret") ||
@@ -21,7 +34,7 @@ func SanitizeValue(value interface{}) string {
 		return "<redacted>"
 	}
 	
-	// Truncate long strings
+  /* Truncate long strings */
 	if len(str) > 100 {
 		return str[:100] + "..."
 	}
@@ -29,14 +42,14 @@ func SanitizeValue(value interface{}) string {
 	return str
 }
 
-// FormatConnectionInfo formats database connection information for error messages
+/* FormatConnectionInfo formats database connection information for error messages */
 func FormatConnectionInfo(host string, port int, database string, user string) string {
 	return fmt.Sprintf("database '%s' on host '%s:%d' as user '%s'", database, host, port, user)
 }
 
-// FormatQueryContext formats query execution context for error messages
+/* FormatQueryContext formats query execution context for error messages */
 func FormatQueryContext(query string, paramCount int, operation string, table string) string {
-	// Truncate long queries
+  /* Truncate long queries */
 	queryPreview := query
 	if len(queryPreview) > 200 {
 		queryPreview = queryPreview[:200] + "..."
@@ -55,7 +68,7 @@ func FormatQueryContext(query string, paramCount int, operation string, table st
 	return strings.Join(parts, ", ")
 }
 
-// FormatToolContext formats tool execution context for error messages
+/* FormatToolContext formats tool execution context for error messages */
 func FormatToolContext(toolName string, handlerType string, argCount int, argKeys []string) string {
 	parts := []string{
 		fmt.Sprintf("tool_name='%s'", toolName),
@@ -74,7 +87,7 @@ func FormatToolContext(toolName string, handlerType string, argCount int, argKey
 	return strings.Join(parts, ", ")
 }
 
-// FormatParamValues formats parameter values for error messages (sanitized)
+/* FormatParamValues formats parameter values for error messages (sanitized) */
 func FormatParamValues(params []interface{}) string {
 	if len(params) == 0 {
 		return "[]"
@@ -82,7 +95,7 @@ func FormatParamValues(params []interface{}) string {
 	
 	var values []string
 	for i, param := range params {
-		if i >= 5 { // Limit to first 5 params
+  		if i >= 5 { /* Limit to first 5 params */
 			values = append(values, fmt.Sprintf("... (%d more)", len(params)-5))
 			break
 		}
@@ -92,7 +105,7 @@ func FormatParamValues(params []interface{}) string {
 	return "[" + strings.Join(values, ", ") + "]"
 }
 
-// BuildErrorContext builds a detailed error message with context
+/* BuildErrorContext builds a detailed error message with context */
 func BuildErrorContext(operation string, resourceType string, resourceName string, resourceID string, details string, err error) string {
 	parts := []string{operation}
 	

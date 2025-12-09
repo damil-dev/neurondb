@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * scheduler.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronAgent/internal/jobs/scheduler.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package jobs
 
 import (
@@ -32,17 +45,17 @@ func NewScheduler(queue *Queue) *Scheduler {
 		jobs:   make(map[string]*ScheduledJob),
 		ctx:    ctx,
 		cancel: cancel,
-		ticker: time.NewTicker(1 * time.Minute), // Check every minute
+  		ticker: time.NewTicker(1 * time.Minute), /* Check every minute */
 	}
 }
 
-// Start starts the scheduler
+/* Start starts the scheduler */
 func (s *Scheduler) Start() {
 	s.wg.Add(1)
 	go s.run()
 }
 
-// Stop stops the scheduler
+/* Stop stops the scheduler */
 func (s *Scheduler) Stop() {
 	s.cancel()
 	s.ticker.Stop()
@@ -52,7 +65,7 @@ func (s *Scheduler) Stop() {
 func (s *Scheduler) run() {
 	defer s.wg.Done()
 
-	// Check immediately
+  /* Check immediately */
 	s.checkAndRun()
 
 	for {
@@ -77,7 +90,7 @@ func (s *Scheduler) checkAndRun() {
 	}
 	s.mu.RUnlock()
 
-	// Run jobs
+  /* Run jobs */
 	for _, job := range jobsToRun {
 		s.runJob(job)
 	}
@@ -87,22 +100,22 @@ func (s *Scheduler) runJob(job *ScheduledJob) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	// Enqueue job
+  /* Enqueue job */
 	_, err := s.queue.Enqueue(ctx, job.JobType, nil, nil, job.Payload, 0)
 	if err != nil {
 		return
 	}
 
-	// Calculate next run time (simplified - in production use cron parser)
+  /* Calculate next run time (simplified - in production use cron parser) */
 	s.mu.Lock()
-	job.NextRun = time.Now().Add(1 * time.Hour) // Default: run every hour
+ 	job.NextRun = time.Now().Add(1 * time.Hour) /* Default: run every hour */
 	s.mu.Unlock()
 }
 
-// Schedule adds a scheduled job
+/* Schedule adds a scheduled job */
 func (s *Scheduler) Schedule(id, cronExpr, jobType string, payload map[string]interface{}) error {
-	// Parse cron expression (simplified - in production use robfig/cron)
-	// For now, parse simple patterns like "0 * * * *" (every hour)
+  /* Parse cron expression (simplified - in production use robfig/cron) */
+  /* For now, parse simple patterns like "0 * * * *" (every hour) */
 	nextRun := parseCronExpression(cronExpr)
 	
 	s.mu.Lock()
@@ -119,21 +132,21 @@ func (s *Scheduler) Schedule(id, cronExpr, jobType string, payload map[string]in
 	return nil
 }
 
-// parseCronExpression parses a simple cron expression (simplified)
+/* parseCronExpression parses a simple cron expression (simplified) */
 func parseCronExpression(expr string) time.Time {
-	// Default: run every hour
-	// In production, use a proper cron parser like robfig/cron
+  /* Default: run every hour */
+  /* In production, use a proper cron parser like robfig/cron */
 	return time.Now().Add(1 * time.Hour)
 }
 
-// Unschedule removes a scheduled job
+/* Unschedule removes a scheduled job */
 func (s *Scheduler) Unschedule(id string) {
 	s.mu.Lock()
 	delete(s.jobs, id)
 	s.mu.Unlock()
 }
 
-// List returns all scheduled jobs
+/* List returns all scheduled jobs */
 func (s *Scheduler) List() []*ScheduledJob {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * planner.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronAgent/internal/agent/planner.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package agent
 
 import (
@@ -11,14 +24,14 @@ type Planner struct {
 
 func NewPlanner() *Planner {
 	return &Planner{
-		maxIterations: 10, // Prevent infinite loops
+  		maxIterations: 10, /* Prevent infinite loops */
 	}
 }
 
-// Plan creates a multi-step plan for complex tasks
+/* Plan creates a multi-step plan for complex tasks */
 func (p *Planner) Plan(ctx context.Context, userMessage string, availableTools []string) ([]PlanStep, error) {
-	// Simple implementation: single step plan
-	// In production, this would use an LLM to break down complex tasks
+  /* Simple implementation: single step plan */
+  /* In production, this would use an LLM to break down complex tasks */
 	steps := []PlanStep{
 		{
 			Action:   "execute",
@@ -35,7 +48,7 @@ type PlanStep struct {
 	Payload map[string]interface{}
 }
 
-// ExecutePlan executes a multi-step plan
+/* ExecutePlan executes a multi-step plan */
 func (p *Planner) ExecutePlan(ctx context.Context, steps []PlanStep, executor func(step PlanStep) (interface{}, error)) ([]interface{}, error) {
 	var results []interface{}
 	iterations := 0

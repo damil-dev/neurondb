@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * sql_tool.go
+ *    Tool implementation for NeuronMCP
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronAgent/internal/tools/sql_tool.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package tools
 
 import (
@@ -14,7 +27,7 @@ type SQLTool struct {
 }
 
 func NewSQLTool(queries *db.Queries) *SQLTool {
-	// DB will be set by the registry during initialization
+  /* DB will be set by the registry during initialization */
 	return &SQLTool{db: nil}
 }
 
@@ -29,7 +42,7 @@ func (t *SQLTool) Execute(ctx context.Context, tool *db.Tool, args map[string]in
 			tool.Name, len(args), argKeys)
 	}
 
-	// Security: Only allow SELECT, EXPLAIN, and schema introspection queries
+  /* Security: Only allow SELECT, EXPLAIN, and schema introspection queries */
 	queryUpper := strings.TrimSpace(strings.ToUpper(query))
 	queryType := "UNKNOWN"
 	if strings.HasPrefix(queryUpper, "SELECT") {
@@ -53,7 +66,7 @@ func (t *SQLTool) Execute(ctx context.Context, tool *db.Tool, args map[string]in
 			tool.Name, queryType, queryPreview, len(query))
 	}
 
-	// Check for dangerous keywords
+  /* Check for dangerous keywords */
 	dangerous := []string{"DROP", "DELETE", "UPDATE", "INSERT", "ALTER", "CREATE", "TRUNCATE"}
 	var foundKeywords []string
 	for _, keyword := range dangerous {
@@ -70,7 +83,7 @@ func (t *SQLTool) Execute(ctx context.Context, tool *db.Tool, args map[string]in
 			tool.Name, queryType, queryPreview, len(query), foundKeywords)
 	}
 
-	// Execute query (read-only)
+  /* Execute query (read-only) */
 	if t.db == nil {
 		return "", fmt.Errorf("SQL tool execution failed: tool_name='%s', handler_type='sql', query_type='%s', query_length=%d, database_connection='not_initialized'",
 			tool.Name, queryType, len(query))
@@ -92,7 +105,7 @@ func (t *SQLTool) Execute(ctx context.Context, tool *db.Tool, args map[string]in
 	}
 	defer rows.Close()
 
-	// Convert results to JSON
+  /* Convert results to JSON */
 	var results []map[string]interface{}
 	columns, err := rows.Columns()
 	if err != nil {

@@ -1,22 +1,35 @@
+/*-------------------------------------------------------------------------
+ *
+ * types.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronAgent/pkg/neurondb/types.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package neurondb
 
-// Vector represents a NeuronDB vector type
+/* Vector represents a NeuronDB vector type */
 type Vector []float32
 
-// EmbeddingResult contains the result of an embedding operation
+/* EmbeddingResult contains the result of an embedding operation */
 type EmbeddingResult struct {
 	Embedding Vector
 	Dimension int
 }
 
-// LLMGenerateResult contains the result of an LLM generation
+/* LLMGenerateResult contains the result of an LLM generation */
 type LLMGenerateResult struct {
 	Output      string
 	TokensUsed  int
 	FinishReason string
 }
 
-// LLMConfig contains configuration for LLM generation
+/* LLMConfig contains configuration for LLM generation */
 type LLMConfig struct {
 	Model       string
 	Temperature *float64

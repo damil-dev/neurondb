@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * config.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronAgent/internal/config/config.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package config
 
 import (
@@ -54,7 +67,7 @@ func LoadConfig(path string) (*Config, error) {
 		return nil, fmt.Errorf("failed to parse config: %w", err)
 	}
 
-	// Override with environment variables
+  /* Override with environment variables */
 	if err := LoadFromEnv(&config); err != nil {
 		return nil, fmt.Errorf("failed to load from env: %w", err)
 	}
@@ -63,5 +76,5 @@ func LoadConfig(path string) (*Config, error) {
 }
 
 
-// DefaultConfig is now in defaults.go
+/* DefaultConfig is now in defaults.go */
 

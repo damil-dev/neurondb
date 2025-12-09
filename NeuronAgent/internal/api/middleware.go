@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * middleware.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronAgent/internal/api/middleware.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package api
 
 import (
@@ -15,17 +28,17 @@ type contextKey string
 
 const apiKeyContextKey contextKey = "api_key"
 
-// AuthMiddleware authenticates requests using API keys
+/* AuthMiddleware authenticates requests using API keys */
 func AuthMiddleware(keyManager *auth.APIKeyManager, rateLimiter *auth.RateLimiter) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Skip auth for health and metrics endpoints
+    /* Skip auth for health and metrics endpoints */
 			if r.URL.Path == "/health" || r.URL.Path == "/metrics" {
 				next.ServeHTTP(w, r)
 				return
 			}
 
-			// Get API key from header
+    /* Get API key from header */
 			authHeader := r.Header.Get("Authorization")
 			if authHeader == "" {
 				requestID := GetRequestID(r.Context())
@@ -33,7 +46,7 @@ func AuthMiddleware(keyManager *auth.APIKeyManager, rateLimiter *auth.RateLimite
 				return
 			}
 
-			// Extract key (format: "Bearer <key>" or "ApiKey <key>")
+    /* Extract key (format: "Bearer <key>" or "ApiKey <key>") */
 			parts := strings.Fields(authHeader)
 			if len(parts) != 2 {
 				requestID := GetRequestID(r.Context())
@@ -48,11 +61,11 @@ func AuthMiddleware(keyManager *auth.APIKeyManager, rateLimiter *auth.RateLimite
 			}
 			fmt.Printf("[MIDDLEWARE] Extracted key: prefix=%s, len=%d\n", keyPrefix, len(key))
 
-			// Validate key
+    /* Validate key */
 			apiKey, err := keyManager.ValidateAPIKey(r.Context(), key)
 			if err != nil {
 				requestID := GetRequestID(r.Context())
-				// Log the actual error for debugging
+     /* Log the actual error for debugging */
 				prefix := key
 				if len(prefix) > 8 {
 					prefix = prefix[:8]
@@ -63,21 +76,21 @@ func AuthMiddleware(keyManager *auth.APIKeyManager, rateLimiter *auth.RateLimite
 			}
 			fmt.Printf("[MIDDLEWARE] Authentication succeeded: prefix=%s\n", apiKey.KeyPrefix)
 
-			// Check rate limit
+    /* Check rate limit */
 			if !rateLimiter.CheckLimit(apiKey.ID.String(), apiKey.RateLimitPerMin) {
 				requestID := GetRequestID(r.Context())
 				respondError(w, WrapError(NewError(http.StatusTooManyRequests, "rate limit exceeded", nil), requestID))
 				return
 			}
 
-			// Add API key to context
+    /* Add API key to context */
 			ctx := context.WithValue(r.Context(), apiKeyContextKey, apiKey)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
 }
 
-// CORSMiddleware adds CORS headers
+/* CORSMiddleware adds CORS headers */
 func CORSMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -93,19 +106,19 @@ func CORSMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// LoggingMiddleware logs requests with structured logging and metrics
+/* LoggingMiddleware logs requests with structured logging and metrics */
 func LoggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		
-		// Wrap response writer to capture status code
+   /* Wrap response writer to capture status code */
 		wrapped := &responseWriter{ResponseWriter: w, statusCode: http.StatusOK}
 		
 		next.ServeHTTP(wrapped, r)
 		
 		duration := time.Since(start)
 		
-		// Record metrics
+   /* Record metrics */
 		endpoint := r.URL.Path
 		metrics.RecordHTTPRequest(r.Method, endpoint, wrapped.statusCode, duration)
 	})

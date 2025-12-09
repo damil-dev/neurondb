@@ -1,10 +1,23 @@
+/*-------------------------------------------------------------------------
+ *
+ * defaults.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronAgent/internal/config/defaults.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package config
 
 import (
 	"time"
 )
 
-// DefaultConfig returns a configuration with sensible defaults
+/* DefaultConfig returns a configuration with sensible defaults */
 func DefaultConfig() *Config {
 	return &Config{
 		Server: ServerConfig{
@@ -34,7 +47,7 @@ func DefaultConfig() *Config {
 	}
 }
 
-// DevelopmentConfig returns a configuration optimized for development
+/* DevelopmentConfig returns a configuration optimized for development */
 func DevelopmentConfig() *Config {
 	cfg := DefaultConfig()
 	cfg.Logging.Level = "debug"
@@ -44,7 +57,7 @@ func DevelopmentConfig() *Config {
 	return cfg
 }
 
-// ProductionConfig returns a configuration optimized for production
+/* ProductionConfig returns a configuration optimized for production */
 func ProductionConfig() *Config {
 	cfg := DefaultConfig()
 	cfg.Logging.Level = "warn"

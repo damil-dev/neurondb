@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * api_key.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronAgent/internal/auth/api_key.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package auth
 
 import (
@@ -18,9 +31,9 @@ func NewAPIKeyManager(queries *db.Queries) *APIKeyManager {
 	return &APIKeyManager{queries: queries}
 }
 
-// GenerateAPIKey generates a new API key
+/* GenerateAPIKey generates a new API key */
 func (m *APIKeyManager) GenerateAPIKey(ctx context.Context, organizationID, userID *string, rateLimit int, roles []string) (string, *db.APIKey, error) {
-	// Generate random key (32 bytes = 44 base64 chars)
+  /* Generate random key (32 bytes = 44 base64 chars) */
 	keyBytes := make([]byte, 32)
 	if _, err := rand.Read(keyBytes); err != nil {
 		return "", nil, fmt.Errorf("failed to generate key: %w", err)
@@ -40,7 +53,7 @@ func (m *APIKeyManager) GenerateAPIKey(ctx context.Context, organizationID, user
 		UserID:          userID,
 		RateLimitPerMin: rateLimit,
 		Roles:           roles,
-		Metadata:        make(db.JSONBMap), // Initialize empty metadata
+  		Metadata:        make(db.JSONBMap), /* Initialize empty metadata */
 	}
 
 	if err := m.queries.CreateAPIKey(ctx, apiKey); err != nil {
@@ -50,12 +63,12 @@ func (m *APIKeyManager) GenerateAPIKey(ctx context.Context, organizationID, user
 	return key, apiKey, nil
 }
 
-// ValidateAPIKey validates an API key and returns the key record
+/* ValidateAPIKey validates an API key and returns the key record */
 func (m *APIKeyManager) ValidateAPIKey(ctx context.Context, key string) (*db.APIKey, error) {
 	prefix := GetKeyPrefix(key)
 	fmt.Printf("[AUTH] ValidateAPIKey: prefix=%s, key_len=%d\n", prefix, len(key))
 
-	// Find key by prefix
+  /* Find key by prefix */
 	apiKey, err := m.queries.GetAPIKeyByPrefix(ctx, prefix)
 	if err != nil {
 		fmt.Printf("[AUTH] GetAPIKeyByPrefix failed: prefix=%s, error=%v\n", prefix, err)
@@ -63,20 +76,20 @@ func (m *APIKeyManager) ValidateAPIKey(ctx context.Context, key string) (*db.API
 	}
 	fmt.Printf("[AUTH] GetAPIKeyByPrefix succeeded: prefix=%s, hash=%s\n", apiKey.KeyPrefix, apiKey.KeyHash[:30])
 
-	// Verify key
+  /* Verify key */
 	if !VerifyAPIKey(key, apiKey.KeyHash) {
 		fmt.Printf("[AUTH] Key verification failed: prefix=%s\n", prefix)
 		return nil, fmt.Errorf("invalid API key: key verification failed")
 	}
 	fmt.Printf("[AUTH] Key verification succeeded: prefix=%s\n", prefix)
 
-	// Update last used
+  /* Update last used */
 	_ = m.queries.UpdateAPIKeyLastUsed(ctx, apiKey.ID)
 
 	return apiKey, nil
 }
 
-// DeleteAPIKey deletes an API key
+/* DeleteAPIKey deletes an API key */
 func (m *APIKeyManager) DeleteAPIKey(ctx context.Context, id uuid.UUID) error {
 	return m.queries.DeleteAPIKey(ctx, id)
 }

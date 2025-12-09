@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * sandbox.go
+ *    Tool implementation for NeuronMCP
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronAgent/internal/tools/sandbox.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package tools
 
 import (
@@ -10,14 +23,14 @@ import (
 	"time"
 )
 
-// Sandbox provides security sandboxing for tool execution
+/* Sandbox provides security sandboxing for tool execution */
 type Sandbox struct {
 	chrootPath string
-	maxMemory  int64 // in bytes
-	maxCPU     int   // percentage
+ 	maxMemory  int64 /* in bytes */
+ 	maxCPU     int /* percentage */
 }
 
-// NewSandbox creates a new sandbox (Unix/Linux only)
+/* NewSandbox creates a new sandbox (Unix/Linux only) */
 func NewSandbox(chrootPath string, maxMemory int64, maxCPU int) *Sandbox {
 	return &Sandbox{
 		chrootPath: chrootPath,
@@ -26,7 +39,7 @@ func NewSandbox(chrootPath string, maxMemory int64, maxCPU int) *Sandbox {
 	}
 }
 
-// ApplyResourceLimits applies resource limits to a command
+/* ApplyResourceLimits applies resource limits to a command */
 func (s *Sandbox) ApplyResourceLimits(cmd *exec.Cmd) error {
 	if runtime.GOOS == "linux" || runtime.GOOS == "darwin" {
 		if cmd.SysProcAttr == nil {
@@ -34,7 +47,7 @@ func (s *Sandbox) ApplyResourceLimits(cmd *exec.Cmd) error {
 		}
 		cmd.SysProcAttr.Setpgid = true
 
-		// Set resource limits using rlimit
+   /* Set resource limits using rlimit */
 		if s.maxMemory > 0 {
 			var rlimit syscall.Rlimit
 			if err := syscall.Getrlimit(syscall.RLIMIT_AS, &rlimit); err == nil {
@@ -44,26 +57,26 @@ func (s *Sandbox) ApplyResourceLimits(cmd *exec.Cmd) error {
 			}
 		}
 
-		// Set CPU time limit (soft limit)
+   /* Set CPU time limit (soft limit) */
 		if s.maxCPU > 0 {
 			var rlimit syscall.Rlimit
 			if err := syscall.Getrlimit(syscall.RLIMIT_CPU, &rlimit); err == nil {
-				// maxCPU is percentage, convert to seconds (approximate)
-				cpuSeconds := uint64(s.maxCPU * 60) // Allow maxCPU minutes
+     /* maxCPU is percentage, convert to seconds (approximate) */
+    				cpuSeconds := uint64(s.maxCPU * 60) /* Allow maxCPU minutes */
 				rlimit.Cur = cpuSeconds
 				rlimit.Max = cpuSeconds
 				syscall.Setrlimit(syscall.RLIMIT_CPU, &rlimit)
 			}
 		}
 
-		// Context timeout is handled by exec.CommandContext when creating the command
+   /* Context timeout is handled by exec.CommandContext when creating the command */
 	}
 	return nil
 }
 
-// Chroot applies chroot if configured (requires root privileges)
-// Note: This requires the process to run as root and the chroot directory
-// to be properly set up with necessary files (binaries, libraries, etc.)
+/* Chroot applies chroot if configured (requires root privileges) */
+/* Note: This requires the process to run as root and the chroot directory */
+/* to be properly set up with necessary files (binaries, libraries, etc.) */
 func (s *Sandbox) Chroot(cmd *exec.Cmd) error {
 	if s.chrootPath == "" {
 		return nil
@@ -73,33 +86,33 @@ func (s *Sandbox) Chroot(cmd *exec.Cmd) error {
 		return fmt.Errorf("chroot path does not exist: %s", s.chrootPath)
 	}
 
-	// Chroot requires root privileges
-	// In production, this should be handled by the system or container
-	// For now, we set the working directory as a safer alternative
+  /* Chroot requires root privileges */
+  /* In production, this should be handled by the system or container */
+  /* For now, we set the working directory as a safer alternative */
 	if cmd.Dir == "" {
 		cmd.Dir = s.chrootPath
 	}
 
-	// Actual chroot would be:
-	// if runtime.GOOS == "linux" {
-	//     if cmd.SysProcAttr == nil {
-	//         cmd.SysProcAttr = &syscall.SysProcAttr{}
-	//     }
-	//     cmd.SysProcAttr.Chroot = s.chrootPath
-	// }
-	// But this requires root and proper setup
+  /* Actual chroot would be: */
+  /* if runtime.GOOS == "linux" { */
+  /* if cmd.SysProcAttr == nil { */
+  /* cmd.SysProcAttr = &syscall.SysProcAttr{} */
+  /* } */
+  /* cmd.SysProcAttr.Chroot = s.chrootPath */
+  /* } */
+  /* But this requires root and proper setup */
 
 	return nil
 }
 
-// SetTimeout sets a timeout for command execution
-// Note: exec.Cmd doesn't have a settable Context field directly.
-// The context should be set when creating the command with exec.CommandContext
+/* SetTimeout sets a timeout for command execution */
+/* Note: exec.Cmd doesn't have a settable Context field directly. */
+/* The context should be set when creating the command with exec.CommandContext */
 func SetTimeout(cmd *exec.Cmd, timeout time.Duration) *exec.Cmd {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	// Note: cancel should be called after command completes
-	// For now, we return a new command with context
-	// In practice, use exec.CommandContext when creating the command
+  /* Note: cancel should be called after command completes */
+  /* For now, we return a new command with context */
+  /* In practice, use exec.CommandContext when creating the command */
 	_ = cancel
 	_ = ctx
 	return cmd

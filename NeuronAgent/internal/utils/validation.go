@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * validation.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronAgent/internal/utils/validation.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package utils
 
 import (
@@ -12,12 +25,12 @@ var (
 	urlRegex   = regexp.MustCompile(`^https?://[^\s/$.?#].[^\s]*$`)
 )
 
-// ValidateEmail validates an email address
+/* ValidateEmail validates an email address */
 func ValidateEmail(email string) bool {
 	return emailRegex.MatchString(email)
 }
 
-// ValidateURL validates a URL
+/* ValidateURL validates a URL */
 func ValidateURL(urlStr string) bool {
 	if !urlRegex.MatchString(urlStr) {
 		return false
@@ -26,28 +39,28 @@ func ValidateURL(urlStr string) bool {
 	return err == nil
 }
 
-// ValidateRequired checks if a string is not empty
+/* ValidateRequired checks if a string is not empty */
 func ValidateRequired(s string) bool {
 	return strings.TrimSpace(s) != ""
 }
 
-// ValidateLength checks if string length is within range
+/* ValidateLength checks if string length is within range */
 func ValidateLength(s string, min, max int) bool {
 	length := len(strings.TrimSpace(s))
 	return length >= min && length <= max
 }
 
-// ValidateMinLength checks if string meets minimum length
+/* ValidateMinLength checks if string meets minimum length */
 func ValidateMinLength(s string, min int) bool {
 	return len(strings.TrimSpace(s)) >= min
 }
 
-// ValidateMaxLength checks if string doesn't exceed maximum length
+/* ValidateMaxLength checks if string doesn't exceed maximum length */
 func ValidateMaxLength(s string, max int) bool {
 	return len(strings.TrimSpace(s)) <= max
 }
 
-// ValidateIn checks if value is in allowed list
+/* ValidateIn checks if value is in allowed list */
 func ValidateIn(value string, allowed ...string) bool {
 	for _, a := range allowed {
 		if value == a {
@@ -57,7 +70,7 @@ func ValidateIn(value string, allowed ...string) bool {
 	return false
 }
 
-// ValidateRegex validates string against regex pattern
+/* ValidateRegex validates string against regex pattern */
 func ValidateRegex(s, pattern string) bool {
 	re, err := regexp.Compile(pattern)
 	if err != nil {
@@ -66,22 +79,22 @@ func ValidateRegex(s, pattern string) bool {
 	return re.MatchString(s)
 }
 
-// ValidateUUID validates UUID format
+/* ValidateUUID validates UUID format */
 func ValidateUUID(s string) bool {
 	return IsValidUUID(s)
 }
 
-// ValidateIntRange validates integer is in range
+/* ValidateIntRange validates integer is in range */
 func ValidateIntRange(n, min, max int) bool {
 	return n >= min && n <= max
 }
 
-// ValidateFloatRange validates float is in range
+/* ValidateFloatRange validates float is in range */
 func ValidateFloatRange(f, min, max float64) bool {
 	return f >= min && f <= max
 }
 
-// ValidateAll validates all validators and returns first error
+/* ValidateAll validates all validators and returns first error */
 func ValidateAll(validators ...func() error) error {
 	for _, validator := range validators {
 		if err := validator(); err != nil {
@@ -91,7 +104,7 @@ func ValidateAll(validators ...func() error) error {
 	return nil
 }
 
-// ValidateEmailWithError validates email and returns error
+/* ValidateEmailWithError validates email and returns error */
 func ValidateEmailWithError(email string) error {
 	if !ValidateEmail(email) {
 		return fmt.Errorf("invalid email format: %s", email)
@@ -99,7 +112,7 @@ func ValidateEmailWithError(email string) error {
 	return nil
 }
 
-// ValidateURLWithError validates URL and returns error
+/* ValidateURLWithError validates URL and returns error */
 func ValidateURLWithError(urlStr string) error {
 	if !ValidateURL(urlStr) {
 		return fmt.Errorf("invalid URL format: %s", urlStr)
@@ -107,7 +120,7 @@ func ValidateURLWithError(urlStr string) error {
 	return nil
 }
 
-// ValidateRequiredWithError validates required field and returns error
+/* ValidateRequiredWithError validates required field and returns error */
 func ValidateRequiredWithError(s, fieldName string) error {
 	if !ValidateRequired(s) {
 		return fmt.Errorf("%s is required", fieldName)

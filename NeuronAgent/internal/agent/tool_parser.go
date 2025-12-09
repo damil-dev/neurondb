@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * tool_parser.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronAgent/internal/agent/tool_parser.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package agent
 
 import (
@@ -7,23 +20,23 @@ import (
 	"strings"
 )
 
-// ParseToolCalls extracts tool calls from LLM response
-// Supports OpenAI format and custom formats
+/* ParseToolCalls extracts tool calls from LLM response */
+/* Supports OpenAI format and custom formats */
 func ParseToolCalls(response string) ([]ToolCall, error) {
-	// Try OpenAI JSON format first
+  /* Try OpenAI JSON format first */
 	if strings.Contains(response, "tool_calls") || strings.Contains(response, "function") {
 		return parseOpenAIFormat(response)
 	}
 
-	// Try custom format: <tool:name:args>
+  /* Try custom format: <tool:name:args> */
 	return parseCustomFormat(response)
 }
 
 func parseOpenAIFormat(response string) ([]ToolCall, error) {
-	// Look for JSON structure with tool_calls
+  /* Look for JSON structure with tool_calls */
 	var toolCalls []ToolCall
 
-	// Try to find JSON object with tool_calls
+  /* Try to find JSON object with tool_calls */
 	jsonRegex := regexp.MustCompile(`\{[^{}]*"tool_calls"[^{}]*\}`)
 	matches := jsonRegex.FindAllString(response, -1)
 
@@ -57,7 +70,7 @@ func parseOpenAIFormat(response string) ([]ToolCall, error) {
 }
 
 func parseCustomFormat(response string) ([]ToolCall, error) {
-	// Custom format: <tool:name:{"arg":"value"}>
+  /* Custom format: <tool:name:{"arg":"value"}> */
 	pattern := regexp.MustCompile(`<tool:([^:]+):([^>]+)>`)
 	matches := pattern.FindAllStringSubmatch(response, -1)
 
@@ -72,7 +85,7 @@ func parseCustomFormat(response string) ([]ToolCall, error) {
 
 		var args map[string]interface{}
 		if err := json.Unmarshal([]byte(argsStr), &args); err != nil {
-			// If not JSON, create a simple map
+    /* If not JSON, create a simple map */
 			args = map[string]interface{}{
 				"input": argsStr,
 			}

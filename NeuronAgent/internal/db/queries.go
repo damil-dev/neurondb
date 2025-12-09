@@ -1,3 +1,19 @@
+/*-------------------------------------------------------------------------
+ *
+ * queries.go
+ *    Database queries for NeuronAgent
+ *
+ * Provides database query functions for agents, sessions, messages,
+ * memory chunks, tools, jobs, and API keys.
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronAgent/internal/db/queries.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package db
 
 import (
@@ -10,7 +26,7 @@ import (
 	"github.com/neurondb/NeuronAgent/internal/utils"
 )
 
-// Agent queries
+/* Agent queries */
 const (
 	createAgentQuery = `
 		INSERT INTO neurondb_agent.agents 
@@ -32,7 +48,7 @@ const (
 	deleteAgentQuery = `DELETE FROM neurondb_agent.agents WHERE id = $1`
 )
 
-// Session queries
+/* Session queries */
 const (
 	createSessionQuery = `
 		INSERT INTO neurondb_agent.sessions (agent_id, external_user_id, metadata)
@@ -50,7 +66,7 @@ const (
 	deleteSessionQuery = `DELETE FROM neurondb_agent.sessions WHERE id = $1`
 )
 
-// Message queries
+/* Message queries */
 const (
 	createMessageQuery = `
 		INSERT INTO neurondb_agent.messages 
@@ -71,7 +87,7 @@ const (
 		LIMIT $2`
 )
 
-// Memory chunk queries
+/* Memory chunk queries */
 const (
 	createMemoryChunkQuery = `
 		INSERT INTO neurondb_agent.memory_chunks 
@@ -88,7 +104,7 @@ const (
 		LIMIT $3`
 )
 
-// Tool queries
+/* Tool queries */
 const (
 	createToolQuery = `
 		INSERT INTO neurondb_agent.tools 
@@ -110,7 +126,7 @@ const (
 	deleteToolQuery = `DELETE FROM neurondb_agent.tools WHERE name = $1`
 )
 
-// Job queries
+/* Job queries */
 const (
 	createJobQuery = `
 		INSERT INTO neurondb_agent.jobs 
@@ -149,7 +165,7 @@ const (
 		LIMIT $3 OFFSET $4`
 )
 
-// API Key queries
+/* API Key queries */
 const (
 	createAPIKeyQuery = `
 		INSERT INTO neurondb_agent.api_keys 
@@ -174,7 +190,7 @@ const (
 	deleteAPIKeyQuery = `DELETE FROM neurondb_agent.api_keys WHERE id = $1`
 )
 
-// NeuronDB function wrappers
+/* NeuronDB function wrappers */
 const (
 	embedTextQuery   = `SELECT neurondb_embed($1, $2) AS embedding`
 	llmGenerateQuery = `SELECT neurondb_llm_generate($1, $2, $3) AS output`
@@ -182,7 +198,7 @@ const (
 
 type Queries struct {
 	db       *sqlx.DB
-	connInfo func() string // Function to get connection info string
+	connInfo func() string
 }
 
 func NewQueries(db *sqlx.DB) *Queries {
@@ -194,12 +210,12 @@ func NewQueries(db *sqlx.DB) *Queries {
 	}
 }
 
-// SetConnInfoFunc sets a function to retrieve connection info for error messages
+/* SetConnInfoFunc sets a function to retrieve connection info for error messages */
 func (q *Queries) SetConnInfoFunc(fn func() string) {
 	q.connInfo = fn
 }
 
-// getConnInfoString returns connection info string
+/* getConnInfoString returns connection info string */
 func (q *Queries) getConnInfoString() string {
 	if q.connInfo != nil {
 		return q.connInfo()
@@ -207,14 +223,14 @@ func (q *Queries) getConnInfoString() string {
 	return "unknown database connection"
 }
 
-// formatQueryError formats a detailed query error message
+/* formatQueryError formats a detailed query error message */
 func (q *Queries) formatQueryError(operation string, query string, paramCount int, table string, err error) error {
 	queryContext := utils.FormatQueryContext(query, paramCount, operation, table)
 	connInfo := q.getConnInfoString()
 	return fmt.Errorf("query execution failed on %s: %s, error=%w", connInfo, queryContext, err)
 }
 
-// Agent methods
+/* Agent methods */
 func (q *Queries) CreateAgent(ctx context.Context, agent *Agent) error {
 	params := []interface{}{agent.Name, agent.Description, agent.SystemPrompt, agent.ModelName,
 		agent.MemoryTable, agent.EnabledTools, agent.Config}
@@ -274,7 +290,7 @@ func (q *Queries) DeleteAgent(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
-// Session methods
+/* Session methods */
 func (q *Queries) CreateSession(ctx context.Context, session *Session) error {
 	params := []interface{}{session.AgentID, session.ExternalUserID, session.Metadata}
 	err := q.db.GetContext(ctx, session, createSessionQuery, params...)
@@ -324,7 +340,7 @@ func (q *Queries) DeleteSession(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
-// Message methods
+/* Message methods */
 func (q *Queries) CreateMessage(ctx context.Context, message *Message) (*Message, error) {
 	params := []interface{}{message.SessionID, message.Role, message.Content, message.ToolName,
 		message.ToolCallID, message.TokenCount, message.Metadata}
@@ -355,9 +371,8 @@ func (q *Queries) GetRecentMessages(ctx context.Context, sessionID uuid.UUID, li
 	return messages, nil
 }
 
-// Memory chunk methods
+/* Memory chunk methods */
 func (q *Queries) CreateMemoryChunk(ctx context.Context, chunk *MemoryChunk) (*MemoryChunk, error) {
-	// Convert embedding to string format for neurondb_vector
 	embeddingStr := formatVector(chunk.Embedding)
 	params := []interface{}{chunk.AgentID, chunk.SessionID, chunk.MessageID, chunk.Content,
 		embeddingStr, chunk.ImportanceScore, chunk.Metadata}
@@ -384,7 +399,7 @@ func (q *Queries) SearchMemory(ctx context.Context, agentID uuid.UUID, queryEmbe
 	return chunks, nil
 }
 
-// Tool methods
+/* Tool methods */
 func (q *Queries) CreateTool(ctx context.Context, tool *Tool) error {
 	params := []interface{}{tool.Name, tool.Description, tool.ArgSchema, tool.HandlerType,
 		tool.HandlerConfig, tool.Enabled}
@@ -446,7 +461,7 @@ func (q *Queries) DeleteTool(ctx context.Context, name string) error {
 	return nil
 }
 
-// Job methods
+/* Job methods */
 func (q *Queries) CreateJob(ctx context.Context, job *Job) (*Job, error) {
 	params := []interface{}{job.AgentID, job.SessionID, job.Type, job.Status, job.Priority,
 		job.Payload, job.MaxRetries}
@@ -477,9 +492,9 @@ func (q *Queries) GetJob(ctx context.Context, id int64) (*Job, error) {
 func (q *Queries) ClaimJob(ctx context.Context) (*Job, error) {
 	var job Job
 	err := q.db.GetContext(ctx, &job, claimJobQuery)
-	if err == sql.ErrNoRows {
-		return nil, nil // No jobs available
-	}
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
 	if err != nil {
 		return nil, q.formatQueryError("UPDATE", claimJobQuery, 0, "neurondb_agent.jobs", err)
 	}
@@ -513,9 +528,8 @@ func (q *Queries) ListJobs(ctx context.Context, agentID *uuid.UUID, sessionID *u
 	return jobs, nil
 }
 
-// API Key methods
+/* API Key methods */
 func (q *Queries) CreateAPIKey(ctx context.Context, apiKey *APIKey) error {
-	// Convert metadata to JSONB-compatible format using JSONBMap.Value()
 	metadataValue, err := apiKey.Metadata.Value()
 	if err != nil {
 		return fmt.Errorf("failed to convert metadata: %w", err)
@@ -540,7 +554,6 @@ func (q *Queries) GetAPIKeyByPrefix(ctx context.Context, prefix string) (*APIKey
 			return nil, fmt.Errorf("API key not found on %s: query='%s', key_prefix='%s', table='neurondb_agent.api_keys', error=%w",
 				q.getConnInfoString(), getAPIKeyByPrefixQuery, prefix, err)
 		}
-		// Return detailed error for debugging
 		return nil, fmt.Errorf("API key lookup failed on %s: query='%s', key_prefix='%s', error=%w (error_type=%T)",
 			q.getConnInfoString(), getAPIKeyByPrefixQuery, prefix, err, err)
 	}
@@ -594,7 +607,7 @@ func (q *Queries) DeleteAPIKey(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
-// Helper function to format vector for PostgreSQL
+/* formatVector formats vector for PostgreSQL */
 func formatVector(vec []float32) string {
 	if len(vec) == 0 {
 		return "[]"

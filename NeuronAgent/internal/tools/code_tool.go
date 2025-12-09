@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * code_tool.go
+ *    Tool implementation for NeuronMCP
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronAgent/internal/tools/code_tool.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package tools
 
 import (
@@ -12,7 +25,7 @@ import (
 )
 
 type CodeTool struct {
-	allowedDirs []string // Allowed directories for code analysis
+ 	allowedDirs []string /* Allowed directories for code analysis */
 }
 
 func NewCodeTool() *CodeTool {
@@ -32,7 +45,7 @@ func (t *CodeTool) Execute(ctx context.Context, tool *db.Tool, args map[string]i
 			tool.Name, len(args), argKeys)
 	}
 
-	// Security: Check if path is in allowed directories
+  /* Security: Check if path is in allowed directories */
 	allowed := false
 	absPath, err := filepath.Abs(path)
 	if err != nil {
@@ -129,7 +142,7 @@ func (t *CodeTool) listDirectory(tool *db.Tool, path string) (string, error) {
 }
 
 func (t *CodeTool) analyzeCode(tool *db.Tool, path string) (string, error) {
-	// Simple code analysis - count lines, functions, etc.
+  /* Simple code analysis - count lines, functions, etc. */
 	content, err := os.ReadFile(path)
 	if err != nil {
 		return "", fmt.Errorf("code tool file read failed: tool_name='%s', handler_type='code', path='%s', action='analyze', error=%w",

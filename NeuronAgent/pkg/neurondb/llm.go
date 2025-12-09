@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * llm.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronAgent/pkg/neurondb/llm.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package neurondb
 
 import (
@@ -10,19 +23,19 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-// LLMClient handles LLM generation via NeuronDB
+/* LLMClient handles LLM generation via NeuronDB */
 type LLMClient struct {
 	db *sqlx.DB
 }
 
-// NewLLMClient creates a new LLM client
+/* NewLLMClient creates a new LLM client */
 func NewLLMClient(db *sqlx.DB) *LLMClient {
 	return &LLMClient{db: db}
 }
 
-// Generate generates text using the LLM with the given prompt and config
+/* Generate generates text using the LLM with the given prompt and config */
 func (c *LLMClient) Generate(ctx context.Context, prompt string, config LLMConfig) (*LLMGenerateResult, error) {
-	// Build parameters JSON
+  /* Build parameters JSON */
 	params := make(map[string]interface{})
 	if config.Temperature != nil {
 		params["temperature"] = *config.Temperature
@@ -40,13 +53,13 @@ func (c *LLMClient) Generate(ctx context.Context, prompt string, config LLMConfi
 			config.Model, len(prompt), err)
 	}
 
-	// Try neurondb_llm_generate first, fallback to neurondb_llm_complete
+  /* Try neurondb_llm_generate first, fallback to neurondb_llm_complete */
 	var output string
 	query := `SELECT neurondb_llm_generate($1, $2, $3::jsonb) AS output`
 	
 	err = c.db.GetContext(ctx, &output, query, config.Model, prompt, paramsJSON)
 	if err != nil {
-		// Fallback to neurondb_llm_complete if available
+   /* Fallback to neurondb_llm_complete if available */
 		query = `SELECT neurondb_llm_complete($1, $2, $3::jsonb) AS output`
 		err = c.db.GetContext(ctx, &output, query, config.Model, prompt, paramsJSON)
 		if err != nil {
@@ -70,15 +83,15 @@ func (c *LLMClient) Generate(ctx context.Context, prompt string, config LLMConfi
 
 	return &LLMGenerateResult{
 		Output:      output,
-		TokensUsed:  0, // Token count would need to be extracted from response
+  		TokensUsed:  0, /* Token count would need to be extracted from response */
 		FinishReason: "stop",
 	}, nil
 }
 
-// GenerateStream generates text with streaming support
-// Uses a cursor-based approach to stream results chunk by chunk
+/* GenerateStream generates text with streaming support */
+/* Uses a cursor-based approach to stream results chunk by chunk */
 func (c *LLMClient) GenerateStream(ctx context.Context, prompt string, config LLMConfig, writer io.Writer) error {
-	// Build parameters JSON
+  /* Build parameters JSON */
 	params := make(map[string]interface{})
 	if config.Temperature != nil {
 		params["temperature"] = *config.Temperature
@@ -96,12 +109,12 @@ func (c *LLMClient) GenerateStream(ctx context.Context, prompt string, config LL
 		return fmt.Errorf("failed to marshal params: %w", err)
 	}
 
-	// Try streaming query - if not supported, fall back to chunked writes
+  /* Try streaming query - if not supported, fall back to chunked writes */
 	query := `SELECT neurondb_llm_generate_stream($1, $2, $3::jsonb) AS chunk`
 	
 	rows, err := c.db.QueryContext(ctx, query, config.Model, prompt, paramsJSON)
 	if err != nil {
-		// Fallback: generate full response and write in chunks
+   /* Fallback: generate full response and write in chunks */
 		result, err := c.Generate(ctx, prompt, config)
 		if err != nil {
 			promptTokens := len(strings.Split(prompt, " "))
@@ -109,7 +122,7 @@ func (c *LLMClient) GenerateStream(ctx context.Context, prompt string, config LL
 				config.Model, len(prompt), promptTokens, err)
 		}
 		
-		// Write in chunks to simulate streaming
+   /* Write in chunks to simulate streaming */
 		chunkSize := 100
 		output := []byte(result.Output)
 		for i := 0; i < len(output); i += chunkSize {
@@ -120,7 +133,7 @@ func (c *LLMClient) GenerateStream(ctx context.Context, prompt string, config LL
 			if _, err := writer.Write(output[i:end]); err != nil {
 				return err
 			}
-			// Small delay to simulate streaming
+    /* Small delay to simulate streaming */
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
@@ -131,7 +144,7 @@ func (c *LLMClient) GenerateStream(ctx context.Context, prompt string, config LL
 	}
 	defer rows.Close()
 
-	// Stream chunks from database
+  /* Stream chunks from database */
 		for rows.Next() {
 		var chunk string
 		if err := rows.Scan(&chunk); err != nil {
@@ -143,7 +156,7 @@ func (c *LLMClient) GenerateStream(ctx context.Context, prompt string, config LL
 			return err
 		}
 		
-		// Check context
+   /* Check context */
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
@@ -154,52 +167,52 @@ func (c *LLMClient) GenerateStream(ctx context.Context, prompt string, config LL
 	return rows.Err()
 }
 
-// GenerateWithTools generates text with tool calling support
+/* GenerateWithTools generates text with tool calling support */
 func (c *LLMClient) GenerateWithTools(ctx context.Context, prompt string, config LLMConfig, tools []ToolDefinition) (*LLMGenerateResult, []ToolCall, error) {
-	// Add tools to the prompt or use a tool-aware function
-	// This is a simplified version - full implementation would handle tool schemas
+  /* Add tools to the prompt or use a tool-aware function */
+  /* This is a simplified version - full implementation would handle tool schemas */
 	result, err := c.Generate(ctx, prompt, config)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// Parse tool calls from response (would need proper parsing logic)
+  /* Parse tool calls from response (would need proper parsing logic) */
 	toolCalls := parseToolCalls(result.Output)
 
 	return result, toolCalls, nil
 }
 
-// ToolDefinition represents a tool that can be called by the LLM
+/* ToolDefinition represents a tool that can be called by the LLM */
 type ToolDefinition struct {
 	Name        string                 `json:"name"`
 	Description string                 `json:"description"`
 	Parameters  map[string]interface{} `json:"parameters"`
 }
 
-// ToolCall represents a tool call from the LLM
+/* ToolCall represents a tool call from the LLM */
 type ToolCall struct {
 	ID        string                 `json:"id"`
 	Name      string                 `json:"name"`
 	Arguments map[string]interface{} `json:"arguments"`
 }
 
-// parseToolCalls parses tool calls from LLM response
-// Attempts to extract tool calls from various formats
+/* parseToolCalls parses tool calls from LLM response */
+/* Attempts to extract tool calls from various formats */
 func parseToolCalls(output string) []ToolCall {
 	var toolCalls []ToolCall
 	
-	// Try to find JSON tool calls in the response
-	// Look for patterns like {"tool_calls": [...]} or "function_call": {...}
+  /* Try to find JSON tool calls in the response */
+  /* Look for patterns like {"tool_calls": [...]} or "function_call": {...} */
 	
-	// Method 1: Look for complete JSON object with tool_calls
+  /* Method 1: Look for complete JSON object with tool_calls */
 	if strings.Contains(output, "tool_calls") {
-		// Try to extract JSON object
+   /* Try to extract JSON object */
 		start := strings.Index(output, `"tool_calls"`)
 		if start != -1 {
-			// Find the opening brace before tool_calls
+    /* Find the opening brace before tool_calls */
 			objStart := strings.LastIndex(output[:start], "{")
 			if objStart != -1 {
-				// Find matching closing brace
+     /* Find matching closing brace */
 				braceCount := 0
 				objEnd := -1
 				for i := objStart; i < len(output); i++ {
@@ -232,7 +245,7 @@ func parseToolCalls(output string) []ToolCall {
 										if argsMap, ok := args.(map[string]interface{}); ok {
 											call.Arguments = argsMap
 										} else if argsStr, ok := args.(string); ok {
-											// Try to parse JSON string
+            /* Try to parse JSON string */
 											var argsMap map[string]interface{}
 											if err := json.Unmarshal([]byte(argsStr), &argsMap); err == nil {
 												call.Arguments = argsMap
@@ -252,9 +265,9 @@ func parseToolCalls(output string) []ToolCall {
 		}
 	}
 	
-	// Method 2: Look for function_call pattern
+  /* Method 2: Look for function_call pattern */
 	if len(toolCalls) == 0 && strings.Contains(output, "function_call") {
-		// Similar extraction logic for function_call format
+   /* Similar extraction logic for function_call format */
 		start := strings.Index(output, `"function_call"`)
 		if start != -1 {
 			objStart := strings.LastIndex(output[:start], "{")

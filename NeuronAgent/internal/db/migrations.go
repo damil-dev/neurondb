@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * migrations.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronAgent/internal/db/migrations.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package db
 
 import (
@@ -17,7 +30,7 @@ type MigrationRunner struct {
 func NewMigrationRunner(db *sqlx.DB, migrationsDir string) (*MigrationRunner, error) {
 	schemaMgr := NewSchemaManager(db)
 	
-	// Get absolute path
+  /* Get absolute path */
 	absPath, err := filepath.Abs(migrationsDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get absolute path: %w", err)
@@ -29,7 +42,7 @@ func NewMigrationRunner(db *sqlx.DB, migrationsDir string) (*MigrationRunner, er
 		migrationsDir: absPath,
 	}
 
-	// Load migrations
+  /* Load migrations */
 	if err := schemaMgr.LoadMigrations(absPath); err != nil {
 		return nil, fmt.Errorf("failed to load migrations: %w", err)
 	}
@@ -37,12 +50,12 @@ func NewMigrationRunner(db *sqlx.DB, migrationsDir string) (*MigrationRunner, er
 	return runner, nil
 }
 
-// Run runs all pending migrations
+/* Run runs all pending migrations */
 func (mr *MigrationRunner) Run(ctx context.Context) error {
 	return mr.schemaMgr.Migrate(ctx)
 }
 
-// Status returns migration status
+/* Status returns migration status */
 func (mr *MigrationRunner) Status(ctx context.Context) (int, int, error) {
 	current, err := mr.schemaMgr.GetCurrentVersion(ctx)
 	if err != nil {
@@ -52,7 +65,7 @@ func (mr *MigrationRunner) Status(ctx context.Context) (int, int, error) {
 	return current, total, nil
 }
 
-// Rollback rolls back the last migration
+/* Rollback rolls back the last migration */
 func (mr *MigrationRunner) Rollback(ctx context.Context) error {
 	return mr.schemaMgr.Rollback(ctx)
 }

@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * prometheus.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronAgent/internal/metrics/prometheus.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package metrics
 
 import (
@@ -10,7 +23,7 @@ import (
 )
 
 var (
-	// Request metrics
+  /* Request metrics */
 	httpRequestsTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "neurondb_agent_http_requests_total",
@@ -28,7 +41,7 @@ var (
 		[]string{"method", "endpoint"},
 	)
 
-	// Agent metrics
+  /* Agent metrics */
 	agentExecutionsTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "neurondb_agent_executions_total",
@@ -46,7 +59,7 @@ var (
 		[]string{"agent_id"},
 	)
 
-	// LLM metrics
+  /* LLM metrics */
 	llmCallsTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "neurondb_agent_llm_calls_total",
@@ -63,7 +76,7 @@ var (
 		[]string{"model", "type"},
 	)
 
-	// Memory metrics
+  /* Memory metrics */
 	memoryChunksStored = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "neurondb_agent_memory_chunks_stored_total",
@@ -80,7 +93,7 @@ var (
 		[]string{"agent_id"},
 	)
 
-	// Tool metrics
+  /* Tool metrics */
 	toolExecutionsTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "neurondb_agent_tool_executions_total",
@@ -98,7 +111,7 @@ var (
 		[]string{"tool_name"},
 	)
 
-	// Job metrics
+  /* Job metrics */
 	jobsQueued = promauto.NewGauge(
 		prometheus.GaugeOpts{
 			Name: "neurondb_agent_jobs_queued",
@@ -115,53 +128,53 @@ var (
 	)
 )
 
-// RecordHTTPRequest records an HTTP request
+/* RecordHTTPRequest records an HTTP request */
 func RecordHTTPRequest(method, endpoint string, status int, duration time.Duration) {
 	httpRequestsTotal.WithLabelValues(method, endpoint, http.StatusText(status)).Inc()
 	httpRequestDuration.WithLabelValues(method, endpoint).Observe(duration.Seconds())
 }
 
-// RecordAgentExecution records an agent execution
+/* RecordAgentExecution records an agent execution */
 func RecordAgentExecution(agentID, status string, duration time.Duration) {
 	agentExecutionsTotal.WithLabelValues(agentID, status).Inc()
 	agentExecutionDuration.WithLabelValues(agentID).Observe(duration.Seconds())
 }
 
-// RecordLLMCall records an LLM call
+/* RecordLLMCall records an LLM call */
 func RecordLLMCall(model, status string, promptTokens, completionTokens int) {
 	llmCallsTotal.WithLabelValues(model, status).Inc()
 	llmTokensTotal.WithLabelValues(model, "prompt").Add(float64(promptTokens))
 	llmTokensTotal.WithLabelValues(model, "completion").Add(float64(completionTokens))
 }
 
-// RecordMemoryChunkStored records a memory chunk being stored
+/* RecordMemoryChunkStored records a memory chunk being stored */
 func RecordMemoryChunkStored(agentID string) {
 	memoryChunksStored.WithLabelValues(agentID).Inc()
 }
 
-// RecordMemoryRetrieval records a memory retrieval
+/* RecordMemoryRetrieval records a memory retrieval */
 func RecordMemoryRetrieval(agentID string) {
 	memoryRetrievalsTotal.WithLabelValues(agentID).Inc()
 }
 
-// RecordToolExecution records a tool execution
+/* RecordToolExecution records a tool execution */
 func RecordToolExecution(toolName, status string, duration time.Duration) {
 	toolExecutionsTotal.WithLabelValues(toolName, status).Inc()
 	toolExecutionDuration.WithLabelValues(toolName).Observe(duration.Seconds())
 }
 
-// RecordJobQueued records a job being queued
+/* RecordJobQueued records a job being queued */
 func RecordJobQueued() {
 	jobsQueued.Inc()
 }
 
-// RecordJobProcessed records a job being processed
+/* RecordJobProcessed records a job being processed */
 func RecordJobProcessed(jobType, status string) {
 	jobsProcessedTotal.WithLabelValues(jobType, status).Inc()
 	jobsQueued.Dec()
 }
 
-// Handler returns the Prometheus metrics handler
+/* Handler returns the Prometheus metrics handler */
 func Handler() http.Handler {
 	return promhttp.Handler()
 }

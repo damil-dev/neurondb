@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * executor.go
+ *    Tool implementation for NeuronMCP
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronAgent/internal/tools/executor.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package tools
 
 import (
@@ -9,13 +22,13 @@ import (
 	"github.com/neurondb/NeuronAgent/internal/metrics"
 )
 
-// Executor handles tool execution with timeout and error handling
+/* Executor handles tool execution with timeout and error handling */
 type Executor struct {
 	registry *Registry
 	timeout  time.Duration
 }
 
-// NewExecutor creates a new tool executor
+/* NewExecutor creates a new tool executor */
 func NewExecutor(registry *Registry, timeout time.Duration) *Executor {
 	return &Executor{
 		registry: registry,
@@ -23,19 +36,19 @@ func NewExecutor(registry *Registry, timeout time.Duration) *Executor {
 	}
 }
 
-// Execute executes a tool with timeout
+/* Execute executes a tool with timeout */
 func (e *Executor) Execute(ctx context.Context, tool *db.Tool, args map[string]interface{}) (string, error) {
 	start := time.Now()
 	
-	// Create context with timeout
+  /* Create context with timeout */
 	ctx, cancel := context.WithTimeout(ctx, e.timeout)
 	defer cancel()
 
-	// Execute tool
+  /* Execute tool */
 	result, err := e.registry.Execute(ctx, tool, args)
 	duration := time.Since(start)
 	
-	// Record metrics
+  /* Record metrics */
 	status := "success"
 	if err != nil {
 		status = "error"
@@ -54,7 +67,7 @@ func (e *Executor) Execute(ctx context.Context, tool *db.Tool, args map[string]i
 	return result, nil
 }
 
-// ExecuteByName executes a tool by name
+/* ExecuteByName executes a tool by name */
 func (e *Executor) ExecuteByName(ctx context.Context, toolName string, args map[string]interface{}) (string, error) {
 	tool, err := e.registry.Get(toolName)
 	if err != nil {

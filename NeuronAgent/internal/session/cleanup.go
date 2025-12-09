@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * cleanup.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronAgent/internal/session/cleanup.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package session
 
 import (
@@ -28,12 +41,12 @@ func NewCleanupService(queries *db.Queries, interval, maxAge time.Duration) *Cle
 	}
 }
 
-// Start starts the cleanup service
+/* Start starts the cleanup service */
 func (s *CleanupService) Start() {
 	go s.run()
 }
 
-// Stop stops the cleanup service
+/* Stop stops the cleanup service */
 func (s *CleanupService) Stop() {
 	s.cancel()
 	<-s.done
@@ -45,7 +58,7 @@ func (s *CleanupService) run() {
 	ticker := time.NewTicker(s.interval)
 	defer ticker.Stop()
 
-	// Run immediately on start
+  /* Run immediately on start */
 	s.cleanup()
 
 	for {
@@ -62,10 +75,10 @@ func (s *CleanupService) cleanup() {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	// Delete sessions older than maxAge
+  /* Delete sessions older than maxAge */
 	cutoffTime := time.Now().Add(-s.maxAge)
 	
-	// Get all agents to check their sessions
+  /* Get all agents to check their sessions */
 	agents, err := s.queries.ListAgents(ctx)
 	if err != nil {
 		return
