@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * worker.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronAgent/internal/jobs/worker.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package jobs
 
 import (
@@ -78,18 +91,18 @@ func (w *Worker) processJob(job *db.Job) {
 			completedAt = &now
 		} else {
 			status = "queued" // Retry - will be picked up again
-			// Don't set completedAt for retries
+    /* Don't set completedAt for retries */
 		}
 	} else {
-		// Success
+   /* Success */
 		now := time.Now()
 		completedAt = &now
 	}
 
-	// Record metrics
+  /* Record metrics */
 	metrics.RecordJobProcessed(job.Type, status)
 
-	// Use proper time handling for UpdateJob
+  /* Use proper time handling for UpdateJob */
 	var completedAtVal *sql.NullTime
 	if completedAt != nil {
 		completedAtVal = &sql.NullTime{

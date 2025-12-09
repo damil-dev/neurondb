@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * registry.go
+ *    Tool implementation for NeuronMCP
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronAgent/internal/tools/registry.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package tools
 
 import (
@@ -8,7 +21,7 @@ import (
 	"github.com/neurondb/NeuronAgent/internal/db"
 )
 
-// Registry manages tool registration and execution
+/* Registry manages tool registration and execution */
 type Registry struct {
 	queries  *db.Queries
 	db       *db.DB
@@ -16,7 +29,7 @@ type Registry struct {
 	mu       sync.RWMutex
 }
 
-// NewRegistry creates a new tool registry
+/* NewRegistry creates a new tool registry */
 func NewRegistry(queries *db.Queries, database *db.DB) *Registry {
 	registry := &Registry{
 		queries:  queries,
@@ -24,7 +37,7 @@ func NewRegistry(queries *db.Queries, database *db.DB) *Registry {
 		handlers: make(map[string]ToolHandler),
 	}
 
-	// Register built-in handlers
+  /* Register built-in handlers */
 	sqlTool := NewSQLTool(queries)
 	sqlTool.db = database
 	registry.RegisterHandler("sql", sqlTool)
@@ -35,15 +48,15 @@ func NewRegistry(queries *db.Queries, database *db.DB) *Registry {
 	return registry
 }
 
-// RegisterHandler registers a tool handler for a specific handler type
+/* RegisterHandler registers a tool handler for a specific handler type */
 func (r *Registry) RegisterHandler(handlerType string, handler ToolHandler) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.handlers[handlerType] = handler
 }
 
-// Get retrieves a tool from the database
-// Implements agent.ToolRegistry interface
+/* Get retrieves a tool from the database */
+/* Implements agent.ToolRegistry interface */
 func (r *Registry) Get(name string) (*db.Tool, error) {
 	tool, err := r.queries.GetTool(context.Background(), name)
 	if err != nil {
@@ -52,13 +65,13 @@ func (r *Registry) Get(name string) (*db.Tool, error) {
 	return tool, nil
 }
 
-// Execute executes a tool with the given arguments
-// Implements agent.ToolRegistry interface
+/* Execute executes a tool with the given arguments */
+/* Implements agent.ToolRegistry interface */
 func (r *Registry) Execute(ctx context.Context, tool *db.Tool, args map[string]interface{}) (string, error) {
 	return r.ExecuteTool(ctx, tool, args)
 }
 
-// ExecuteTool executes a tool with the given arguments (internal method)
+/* ExecuteTool executes a tool with the given arguments (internal method) */
 func (r *Registry) ExecuteTool(ctx context.Context, tool *db.Tool, args map[string]interface{}) (string, error) {
 	if !tool.Enabled {
 		argKeys := make([]string, 0, len(args))
@@ -69,7 +82,7 @@ func (r *Registry) ExecuteTool(ctx context.Context, tool *db.Tool, args map[stri
 			tool.Name, tool.HandlerType, len(args), argKeys)
 	}
 
-	// Validate arguments
+  /* Validate arguments */
 	if err := ValidateArgs(args, tool.ArgSchema); err != nil {
 		argKeys := make([]string, 0, len(args))
 		for k := range args {
@@ -79,7 +92,7 @@ func (r *Registry) ExecuteTool(ctx context.Context, tool *db.Tool, args map[stri
 			tool.Name, tool.HandlerType, len(args), argKeys, err)
 	}
 
-	// Get handler
+  /* Get handler */
 	r.mu.RLock()
 	handler, exists := r.handlers[tool.HandlerType]
 	r.mu.RUnlock()
@@ -97,7 +110,7 @@ func (r *Registry) ExecuteTool(ctx context.Context, tool *db.Tool, args map[stri
 			tool.Name, tool.HandlerType, len(args), argKeys, availableHandlers)
 	}
 
-	// Execute tool
+  /* Execute tool */
 	result, err := handler.Execute(ctx, tool, args)
 	if err != nil {
 		argKeys := make([]string, 0, len(args))
@@ -110,7 +123,7 @@ func (r *Registry) ExecuteTool(ctx context.Context, tool *db.Tool, args map[stri
 	return result, nil
 }
 
-// ListTools returns all enabled tools
+/* ListTools returns all enabled tools */
 func (r *Registry) ListTools(ctx context.Context) ([]db.Tool, error) {
 	return r.queries.ListTools(ctx)
 }

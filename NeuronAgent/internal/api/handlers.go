@@ -1,3 +1,18 @@
+/*-------------------------------------------------------------------------
+ *
+ * handlers.go
+ *    API handlers for NeuronAgent
+ *
+ * Provides HTTP handlers for agents, sessions, messages, and other API endpoints.
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronAgent/internal/api/handlers.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package api
 
 import (
@@ -27,7 +42,7 @@ func NewHandlers(queries *db.Queries, runtime *agent.Runtime) *Handlers {
 	}
 }
 
-// Agents
+/* Agents */
 
 func (h *Handlers) CreateAgent(w http.ResponseWriter, r *http.Request) {
 	requestID := GetRequestID(r.Context())
@@ -46,7 +61,7 @@ func (h *Handlers) CreateAgent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate request
+  /* Validate request */
 	if !ValidateAndRespond(w, func() error { return ValidateCreateAgentRequest(&req) }) {
 		return
 	}
@@ -125,7 +140,7 @@ func (h *Handlers) UpdateAgent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate request
+  /* Validate request */
 	if !ValidateAndRespond(w, func() error { return ValidateCreateAgentRequest(&req) }) {
 		return
 	}
@@ -137,7 +152,7 @@ func (h *Handlers) UpdateAgent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Update fields
+  /* Update fields */
 	agent.Name = req.Name
 	agent.Description = req.Description
 	agent.SystemPrompt = req.SystemPrompt
@@ -173,7 +188,7 @@ func (h *Handlers) DeleteAgent(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// Sessions
+/* Sessions */
 
 func (h *Handlers) CreateSession(w http.ResponseWriter, r *http.Request) {
 	var req CreateSessionRequest
@@ -183,7 +198,7 @@ func (h *Handlers) CreateSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate request
+  /* Validate request */
 	if !ValidateAndRespond(w, func() error { return ValidateCreateSessionRequest(&req) }) {
 		return
 	}
@@ -237,7 +252,7 @@ func (h *Handlers) ListSessions(w http.ResponseWriter, r *http.Request) {
 
 	limit := 50
 	offset := 0
-	// Parse query parameters for pagination
+  /* Parse query parameters for pagination */
 	if l := r.URL.Query().Get("limit"); l != "" {
 		fmt.Sscanf(l, "%d", &limit)
 	}
@@ -260,7 +275,7 @@ func (h *Handlers) ListSessions(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, responses)
 }
 
-// Messages
+/* Messages */
 
 func (h *Handlers) SendMessage(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
@@ -279,12 +294,12 @@ func (h *Handlers) SendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate request
+  /* Validate request */
 	if !ValidateAndRespond(w, func() error { return ValidateSendMessageRequest(&req) }) {
 		return
 	}
 
-	// Check if streaming is requested
+  /* Check if streaming is requested */
 	if req.Stream {
 		StreamResponse(w, r, h.runtime, sessionID.String(), req.Content)
 		return
@@ -298,7 +313,7 @@ func (h *Handlers) SendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Record metrics
+  /* Record metrics */
 	duration := time.Since(start)
 	metrics.RecordAgentExecution(state.AgentID.String(), "success", duration)
 
@@ -325,7 +340,7 @@ func (h *Handlers) GetMessages(w http.ResponseWriter, r *http.Request) {
 
 	limit := 100
 	offset := 0
-	// Parse query parameters
+  /* Parse query parameters */
 	if l := r.URL.Query().Get("limit"); l != "" {
 		_, _ = fmt.Sscanf(l, "%d", &limit)
 	}
@@ -348,7 +363,7 @@ func (h *Handlers) GetMessages(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, responses)
 }
 
-// Helper functions
+/* Helper functions */
 
 func toAgentResponse(a *db.Agent) AgentResponse {
 	return AgentResponse{

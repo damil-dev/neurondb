@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * jsonb_scanner.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronAgent/internal/db/jsonb_scanner.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package db
 
 import (
@@ -5,12 +18,12 @@ import (
 	"encoding/json"
 )
 
-// JSONBMap is a custom type for scanning JSONB into map[string]interface{}
+/* JSONBMap is a custom type for scanning JSONB into map[string]interface{} */
 type JSONBMap map[string]interface{}
 
-// Scan implements the sql.Scanner interface for JSONBMap
+/* Scan implements the sql.Scanner interface for JSONBMap */
 func (m *JSONBMap) Scan(value interface{}) error {
-	// Always initialize to empty map first
+  /* Always initialize to empty map first */
 	*m = make(JSONBMap)
 	
 	if value == nil {
@@ -24,7 +37,7 @@ func (m *JSONBMap) Scan(value interface{}) error {
 	case string:
 		bytes = []byte(v)
 	default:
-		// For unknown types, just return empty map (don't error)
+   /* For unknown types, just return empty map (don't error) */
 		return nil
 	}
 
@@ -34,8 +47,8 @@ func (m *JSONBMap) Scan(value interface{}) error {
 
 	var result map[string]interface{}
 	if err := json.Unmarshal(bytes, &result); err != nil {
-		// If unmarshal fails, return empty map instead of error
-		// This handles cases where the JSONB might be malformed
+   /* If unmarshal fails, return empty map instead of error */
+   /* This handles cases where the JSONB might be malformed */
 		return nil
 	}
 
@@ -43,7 +56,7 @@ func (m *JSONBMap) Scan(value interface{}) error {
 	return nil
 }
 
-// Value implements the driver.Valuer interface for JSONBMap
+/* Value implements the driver.Valuer interface for JSONBMap */
 func (m JSONBMap) Value() (driver.Value, error) {
 	if m == nil || len(m) == 0 {
 		return "{}", nil
@@ -51,7 +64,7 @@ func (m JSONBMap) Value() (driver.Value, error) {
 	return json.Marshal(m)
 }
 
-// ToMap converts JSONBMap to map[string]interface{}
+/* ToMap converts JSONBMap to map[string]interface{} */
 func (m JSONBMap) ToMap() map[string]interface{} {
 	if m == nil {
 		return make(map[string]interface{})
@@ -59,7 +72,7 @@ func (m JSONBMap) ToMap() map[string]interface{} {
 	return map[string]interface{}(m)
 }
 
-// FromMap creates JSONBMap from map[string]interface{}
+/* FromMap creates JSONBMap from map[string]interface{} */
 func FromMap(m map[string]interface{}) JSONBMap {
 	if m == nil {
 		return make(JSONBMap)

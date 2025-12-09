@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * retry.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronAgent/internal/jobs/retry.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package jobs
 
 import (
@@ -6,7 +19,7 @@ import (
 	"time"
 )
 
-// RetryConfig configures retry behavior
+/* RetryConfig configures retry behavior */
 type RetryConfig struct {
 	MaxRetries      int
 	InitialDelay    time.Duration
@@ -15,7 +28,7 @@ type RetryConfig struct {
 	Jitter          bool
 }
 
-// DefaultRetryConfig returns default retry configuration
+/* DefaultRetryConfig returns default retry configuration */
 func DefaultRetryConfig() RetryConfig {
 	return RetryConfig{
 		MaxRetries:       3,
@@ -26,19 +39,19 @@ func DefaultRetryConfig() RetryConfig {
 	}
 }
 
-// CalculateDelay calculates the delay for a retry attempt
+/* CalculateDelay calculates the delay for a retry attempt */
 func CalculateDelay(attempt int, config RetryConfig) time.Duration {
-	// Exponential backoff: delay = initial * (multiplier ^ attempt)
+  /* Exponential backoff: delay = initial * (multiplier ^ attempt) */
 	delay := float64(config.InitialDelay) * math.Pow(config.BackoffMultiplier, float64(attempt))
 	
-	// Cap at max delay
+  /* Cap at max delay */
 	if delay > float64(config.MaxDelay) {
 		delay = float64(config.MaxDelay)
 	}
 	
-	// Add jitter (random variation) to prevent thundering herd
+  /* Add jitter (random variation) to prevent thundering herd */
 	if config.Jitter {
-		// Jitter: ±25% variation
+   /* Jitter: ±25% variation */
 		jitter := delay * 0.25
 		delay = delay - jitter + (jitter * 2 * (float64(time.Now().UnixNano()%100) / 100))
 	}
@@ -46,18 +59,18 @@ func CalculateDelay(attempt int, config RetryConfig) time.Duration {
 	return time.Duration(delay)
 }
 
-// ShouldRetry determines if a job should be retried based on error
+/* ShouldRetry determines if a job should be retried based on error */
 func ShouldRetry(err error, attempt int, maxRetries int) bool {
 	if attempt >= maxRetries {
 		return false
 	}
 	
-	// Don't retry on certain errors (e.g., validation errors)
-	// In production, you'd check error types
+  /* Don't retry on certain errors (e.g., validation errors) */
+  /* In production, you'd check error types */
 	return true
 }
 
-// RetryWithBackoff retries a function with exponential backoff
+/* RetryWithBackoff retries a function with exponential backoff */
 func RetryWithBackoff(ctx context.Context, config RetryConfig, fn func() error) error {
 	var lastErr error
 	
@@ -68,7 +81,7 @@ func RetryWithBackoff(ctx context.Context, config RetryConfig, fn func() error) 
 			lastErr = err
 		}
 		
-		// Don't wait after last attempt
+   /* Don't wait after last attempt */
 		if attempt < config.MaxRetries {
 			delay := CalculateDelay(attempt, config)
 			
@@ -76,7 +89,7 @@ func RetryWithBackoff(ctx context.Context, config RetryConfig, fn func() error) 
 			case <-ctx.Done():
 				return ctx.Err()
 			case <-time.After(delay):
-				// Continue to next attempt
+     /* Continue to next attempt */
 			}
 		}
 	}

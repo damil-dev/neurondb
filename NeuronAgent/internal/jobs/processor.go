@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * processor.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronAgent/internal/jobs/processor.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package jobs
 
 import (
@@ -60,7 +73,7 @@ func (p *Processor) processHTTPCall(ctx context.Context, job *db.Job) (map[strin
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	// Add headers
+  /* Add headers */
 	if headers, ok := job.Payload["headers"].(map[string]interface{}); ok {
 		for k, v := range headers {
 			if str, ok := v.(string); ok {
@@ -75,7 +88,7 @@ func (p *Processor) processHTTPCall(ctx context.Context, job *db.Job) (map[strin
 	}
 	defer resp.Body.Close()
 
-	// Read response body (limit to 1MB)
+  /* Read response body (limit to 1MB) */
 	bodyBytes, err := io.ReadAll(io.LimitReader(resp.Body, 1024*1024))
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response: %w", err)
@@ -100,13 +113,13 @@ func (p *Processor) processSQLTask(ctx context.Context, job *db.Job) (map[string
 		return nil, fmt.Errorf("query is required")
 	}
 
-	// Security: Only allow SELECT queries
+  /* Security: Only allow SELECT queries */
 	queryUpper := strings.TrimSpace(strings.ToUpper(query))
 	if !strings.HasPrefix(queryUpper, "SELECT") {
 		return nil, fmt.Errorf("only SELECT queries are allowed in background jobs")
 	}
 
-	// Check for dangerous keywords
+  /* Check for dangerous keywords */
 	dangerous := []string{"DROP", "DELETE", "UPDATE", "INSERT", "ALTER", "CREATE", "TRUNCATE", "EXEC", "EXECUTE"}
 	for _, keyword := range dangerous {
 		if strings.Contains(queryUpper, keyword) {
@@ -114,14 +127,14 @@ func (p *Processor) processSQLTask(ctx context.Context, job *db.Job) (map[string
 		}
 	}
 
-	// Execute query
+  /* Execute query */
 	rows, err := p.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("query execution failed: %w", err)
 	}
 	defer rows.Close()
 
-	// Convert results to JSON
+  /* Convert results to JSON */
 	var results []map[string]interface{}
 	columns, err := rows.Columns()
 	if err != nil {
@@ -141,7 +154,7 @@ func (p *Processor) processSQLTask(ctx context.Context, job *db.Job) (map[string
 
 		row := make(map[string]interface{})
 		for i, col := range columns {
-			// Handle different types
+    /* Handle different types */
 			val := values[i]
 			if val != nil {
 				switch v := val.(type) {
@@ -175,7 +188,7 @@ func (p *Processor) processShellTask(ctx context.Context, job *db.Job) (map[stri
 		return nil, fmt.Errorf("command is required")
 	}
 
-	// Security: Only allow whitelisted commands
+  /* Security: Only allow whitelisted commands */
 	allowedCommands := []string{"ls", "pwd", "cat", "grep", "find", "head", "tail", "wc", "sort", "uniq", "echo", "date", "whoami"}
 	
 	parts := strings.Fields(command)
@@ -196,11 +209,11 @@ func (p *Processor) processShellTask(ctx context.Context, job *db.Job) (map[stri
 		return nil, fmt.Errorf("command not allowed: %s", cmdName)
 	}
 
-	// Create context with timeout
+  /* Create context with timeout */
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	// Execute command
+  /* Execute command */
 	cmd := exec.CommandContext(ctx, cmdName, parts[1:]...)
 	output, err := cmd.CombinedOutput()
 	
@@ -215,7 +228,7 @@ func (p *Processor) processShellTask(ctx context.Context, job *db.Job) (map[stri
 			result["exit_code"] = exitError.ExitCode()
 		}
 		result["error"] = err.Error()
-		return result, nil // Return result with error info, don't fail the job
+  		return result, nil /* Return result with error info, don't fail the job */
 	}
 
 	return result, nil

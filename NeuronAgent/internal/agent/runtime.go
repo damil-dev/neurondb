@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * runtime.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronAgent/internal/agent/runtime.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package agent
 
 import (
@@ -60,7 +73,7 @@ type TokenUsage struct {
 	TotalTokens      int
 }
 
-// ToolRegistry interface for tool management
+/* ToolRegistry interface for tool management */
 type ToolRegistry interface {
 	Get(name string) (*db.Tool, error)
 	Execute(ctx context.Context, tool *db.Tool, args map[string]interface{}) (string, error)
@@ -85,7 +98,7 @@ func (r *Runtime) Execute(ctx context.Context, sessionID uuid.UUID, userMessage 
 		UserMessage: userMessage,
 	}
 
-	// Step 1: Load agent and session
+  /* Step 1: Load agent and session */
 	session, err := r.queries.GetSession(ctx, sessionID)
 	if err != nil {
 		return nil, fmt.Errorf("agent execution failed at step 1 (load session): session_id='%s', user_message_length=%d, error=%w",
@@ -99,7 +112,7 @@ func (r *Runtime) Execute(ctx context.Context, sessionID uuid.UUID, userMessage 
 			sessionID.String(), session.AgentID.String(), len(userMessage), err)
 	}
 
-	// Step 2: Load context (recent messages + memory)
+  /* Step 2: Load context (recent messages + memory) */
 	contextLoader := NewContextLoader(r.queries, r.memory, r.llm)
 	agentContext, err := contextLoader.Load(ctx, sessionID, agent.ID, userMessage, 20, 5)
 	if err != nil {
@@ -108,7 +121,7 @@ func (r *Runtime) Execute(ctx context.Context, sessionID uuid.UUID, userMessage 
 	}
 	state.Context = agentContext
 
-	// Step 3: Build prompt
+  /* Step 3: Build prompt */
 	prompt, err := r.prompt.Build(agent, agentContext, userMessage)
 	if err != nil {
 		messageCount := len(agentContext.Messages)
@@ -117,7 +130,7 @@ func (r *Runtime) Execute(ctx context.Context, sessionID uuid.UUID, userMessage 
 			sessionID.String(), agent.ID.String(), agent.Name, len(userMessage), messageCount, memoryChunkCount, err)
 	}
 
-	// Step 4: Call LLM via NeuronDB
+  /* Step 4: Call LLM via NeuronDB */
 	llmResponse, err := r.llm.Generate(ctx, agent.ModelName, prompt, agent.Config)
 	if err != nil {
 		promptTokens := EstimateTokens(prompt)
@@ -125,26 +138,26 @@ func (r *Runtime) Execute(ctx context.Context, sessionID uuid.UUID, userMessage 
 			sessionID.String(), agent.ID.String(), agent.Name, agent.ModelName, len(prompt), promptTokens, len(userMessage), err)
 	}
 	
-	// Update token count in response
+  /* Update token count in response */
 	if llmResponse.Usage.TotalTokens == 0 {
-		// Estimate if not provided
+   /* Estimate if not provided */
 		llmResponse.Usage.PromptTokens = EstimateTokens(prompt)
 		llmResponse.Usage.CompletionTokens = EstimateTokens(llmResponse.Content)
 		llmResponse.Usage.TotalTokens = llmResponse.Usage.PromptTokens + llmResponse.Usage.CompletionTokens
 	}
 
-	// Step 5: Parse tool calls from response
+  /* Step 5: Parse tool calls from response */
 	toolCalls, err := ParseToolCalls(llmResponse.Content)
 	if err == nil && len(toolCalls) > 0 {
 		llmResponse.ToolCalls = toolCalls
 	}
 	state.LLMResponse = llmResponse
 
-	// Step 6: Execute tools if any
+  /* Step 6: Execute tools if any */
 	if len(llmResponse.ToolCalls) > 0 {
 		state.ToolCalls = llmResponse.ToolCalls
 
-		// Execute tools
+   /* Execute tools */
 		toolResults, err := r.executeTools(ctx, agent, llmResponse.ToolCalls)
 		if err != nil {
 			toolNames := make([]string, len(llmResponse.ToolCalls))
@@ -156,7 +169,7 @@ func (r *Runtime) Execute(ctx context.Context, sessionID uuid.UUID, userMessage 
 		}
 		state.ToolResults = toolResults
 
-		// Step 7: Call LLM again with tool results
+   /* Step 7: Call LLM again with tool results */
 		finalPrompt, err := r.prompt.BuildWithToolResults(agent, agentContext, userMessage, llmResponse, toolResults)
 		if err != nil {
 			return nil, fmt.Errorf("agent execution failed at step 7 (build final prompt): session_id='%s', agent_id='%s', agent_name='%s', tool_result_count=%d, error=%w",
@@ -170,7 +183,7 @@ func (r *Runtime) Execute(ctx context.Context, sessionID uuid.UUID, userMessage 
 				sessionID.String(), agent.ID.String(), agent.Name, agent.ModelName, len(finalPrompt), finalPromptTokens, len(toolResults), err)
 		}
 		
-		// Update token counts
+   /* Update token counts */
 		if finalResponse.Usage.TotalTokens == 0 {
 			finalResponse.Usage.PromptTokens = EstimateTokens(finalPrompt)
 			finalResponse.Usage.CompletionTokens = EstimateTokens(finalResponse.Content)
@@ -183,18 +196,18 @@ func (r *Runtime) Execute(ctx context.Context, sessionID uuid.UUID, userMessage 
 		state.FinalAnswer = llmResponse.Content
 		state.TokensUsed = llmResponse.Usage.TotalTokens
 		if state.TokensUsed == 0 {
-			// Estimate if not provided
+    /* Estimate if not provided */
 			state.TokensUsed = EstimateTokens(prompt) + EstimateTokens(state.FinalAnswer)
 		}
 	}
 
-	// Step 8: Store messages with token counts
+  /* Step 8: Store messages with token counts */
 	if err := r.storeMessages(ctx, sessionID, userMessage, state.FinalAnswer, state.ToolCalls, state.ToolResults, state.TokensUsed); err != nil {
 		return nil, fmt.Errorf("agent execution failed at step 8 (store messages): session_id='%s', agent_id='%s', agent_name='%s', user_message_length=%d, final_answer_length=%d, tool_call_count=%d, tool_result_count=%d, total_tokens=%d, error=%w",
 			sessionID.String(), agent.ID.String(), agent.Name, len(userMessage), len(state.FinalAnswer), len(state.ToolCalls), len(state.ToolResults), state.TokensUsed, err)
 	}
 
-	// Step 9: Store memory chunks (async, non-blocking)
+  /* Step 9: Store memory chunks (async, non-blocking) */
 	go func() {
 		bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
@@ -208,7 +221,7 @@ func (r *Runtime) executeTools(ctx context.Context, agent *db.Agent, toolCalls [
 	results := make([]ToolResult, 0, len(toolCalls))
 
 	for _, call := range toolCalls {
-		// Get tool from registry
+   /* Get tool from registry */
 		tool, err := r.tools.Get(call.Name)
 		if err != nil {
 			argKeys := make([]string, 0, len(call.Arguments))
@@ -223,7 +236,7 @@ func (r *Runtime) executeTools(ctx context.Context, agent *db.Agent, toolCalls [
 			continue
 		}
 
-		// Check if tool is enabled for this agent
+   /* Check if tool is enabled for this agent */
 		if !contains(agent.EnabledTools, call.Name) {
 			results = append(results, ToolResult{
 				ToolCallID: call.ID,
@@ -233,7 +246,7 @@ func (r *Runtime) executeTools(ctx context.Context, agent *db.Agent, toolCalls [
 			continue
 		}
 
-		// Execute tool
+   /* Execute tool */
 		result, err := r.tools.Execute(ctx, tool, call.Arguments)
 		if err != nil {
 			argKeys := make([]string, 0, len(call.Arguments))
@@ -259,7 +272,7 @@ func (r *Runtime) executeTools(ctx context.Context, agent *db.Agent, toolCalls [
 }
 
 func (r *Runtime) storeMessages(ctx context.Context, sessionID uuid.UUID, userMsg, assistantMsg string, toolCalls []ToolCall, toolResults []ToolResult, totalTokens int) error {
-	// Store user message
+  /* Store user message */
 	userTokens := EstimateTokens(userMsg)
 	if _, err := r.queries.CreateMessage(ctx, &db.Message{
 		SessionID:  sessionID,
@@ -271,7 +284,7 @@ func (r *Runtime) storeMessages(ctx context.Context, sessionID uuid.UUID, userMs
 			sessionID.String(), len(userMsg), userTokens, err)
 	}
 
-	// Store tool calls as messages
+  /* Store tool calls as messages */
 	for _, call := range toolCalls {
 		callJSON, _ := json.Marshal(call.Arguments)
 		toolCallID := call.ID
@@ -287,7 +300,7 @@ func (r *Runtime) storeMessages(ctx context.Context, sessionID uuid.UUID, userMs
 		}
 	}
 
-	// Store tool results
+  /* Store tool results */
 	for _, result := range toolResults {
 		toolName := result.ToolCallID
 		toolCallID := result.ToolCallID
@@ -304,7 +317,7 @@ func (r *Runtime) storeMessages(ctx context.Context, sessionID uuid.UUID, userMs
 		}
 	}
 
-	// Store assistant message
+  /* Store assistant message */
 	assistantTokens := EstimateTokens(assistantMsg)
 	if _, err := r.queries.CreateMessage(ctx, &db.Message{
 		SessionID:  sessionID,
@@ -319,7 +332,7 @@ func (r *Runtime) storeMessages(ctx context.Context, sessionID uuid.UUID, userMs
 	return nil
 }
 
-// Helper function to check if a string is in an array
+/* Helper function to check if a string is in an array */
 func contains(arr pq.StringArray, s string) bool {
 	for _, item := range arr {
 		if item == s {

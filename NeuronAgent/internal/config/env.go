@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * env.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronAgent/internal/config/env.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package config
 
 import (
@@ -7,9 +20,9 @@ import (
 	"time"
 )
 
-// LoadFromEnv loads configuration from environment variables
+/* LoadFromEnv loads configuration from environment variables */
 func LoadFromEnv(cfg *Config) error {
-	// Server config
+  /* Server config */
 	if host := os.Getenv("SERVER_HOST"); host != "" {
 		cfg.Server.Host = host
 	}
@@ -29,7 +42,7 @@ func LoadFromEnv(cfg *Config) error {
 		}
 	}
 
-	// Database config
+  /* Database config */
 	if host := os.Getenv("DB_HOST"); host != "" {
 		cfg.Database.Host = host
 	}
@@ -63,12 +76,12 @@ func LoadFromEnv(cfg *Config) error {
 		}
 	}
 
-	// Auth config
+  /* Auth config */
 	if header := os.Getenv("AUTH_API_KEY_HEADER"); header != "" {
 		cfg.Auth.APIKeyHeader = header
 	}
 
-	// Logging config
+  /* Logging config */
 	if level := os.Getenv("LOG_LEVEL"); level != "" {
 		cfg.Logging.Level = level
 	}
@@ -79,7 +92,7 @@ func LoadFromEnv(cfg *Config) error {
 	return nil
 }
 
-// GetEnvOrDefault gets environment variable or returns default
+/* GetEnvOrDefault gets environment variable or returns default */
 func GetEnvOrDefault(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
@@ -87,7 +100,7 @@ func GetEnvOrDefault(key, defaultValue string) string {
 	return defaultValue
 }
 
-// GetEnvIntOrDefault gets environment variable as int or returns default
+/* GetEnvIntOrDefault gets environment variable as int or returns default */
 func GetEnvIntOrDefault(key string, defaultValue int) int {
 	if value := os.Getenv(key); value != "" {
 		if n, err := strconv.Atoi(value); err == nil {
@@ -97,7 +110,7 @@ func GetEnvIntOrDefault(key string, defaultValue int) int {
 	return defaultValue
 }
 
-// GetEnvDurationOrDefault gets environment variable as duration or returns default
+/* GetEnvDurationOrDefault gets environment variable as duration or returns default */
 func GetEnvDurationOrDefault(key string, defaultValue time.Duration) time.Duration {
 	if value := os.Getenv(key); value != "" {
 		if d, err := time.ParseDuration(value); err == nil {
@@ -107,7 +120,7 @@ func GetEnvDurationOrDefault(key string, defaultValue time.Duration) time.Durati
 	return defaultValue
 }
 
-// ValidateEnv validates required environment variables
+/* ValidateEnv validates required environment variables */
 func ValidateEnv() error {
 	required := []string{"DB_HOST", "DB_NAME", "DB_USER", "DB_PASSWORD"}
 	for _, key := range required {

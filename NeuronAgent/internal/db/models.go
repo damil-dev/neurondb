@@ -1,3 +1,19 @@
+/*-------------------------------------------------------------------------
+ *
+ * models.go
+ *    Database models for NeuronAgent
+ *
+ * Defines data structures for agents, sessions, messages, memory chunks,
+ * tools, jobs, and API keys.
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronAgent/internal/db/models.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package db
 
 import (
@@ -47,13 +63,13 @@ type MemoryChunk struct {
 	SessionID       *uuid.UUID             `db:"session_id"`
 	MessageID       *int64                 `db:"message_id"`
 	Content         string                 `db:"content"`
-	Embedding       []float32              `db:"embedding"` // Will be converted to/from neurondb_vector
+	Embedding       []float32              `db:"embedding"`
 	ImportanceScore float64                `db:"importance_score"`
 	Metadata        JSONBMap               `db:"metadata"`
 	CreatedAt       time.Time              `db:"created_at"`
 }
 
-// MemoryChunkWithSimilarity includes similarity score from vector search
+/* MemoryChunkWithSimilarity includes similarity score from vector search */
 type MemoryChunkWithSimilarity struct {
 	MemoryChunk
 	Similarity float64 `db:"similarity"`

@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * cache.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronAgent/internal/session/cache.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package session
 
 import (
@@ -29,7 +42,7 @@ func NewCache(ttl time.Duration) *Cache {
 		stop:          make(chan struct{}),
 	}
 
-	// Start cleanup goroutine
+  /* Start cleanup goroutine */
 	go cache.runCleanup()
 
 	return cache
@@ -55,7 +68,7 @@ func (c *Cache) Get(id uuid.UUID) *db.Session {
 	}
 
 	if time.Now().After(cached.expiresAt) {
-		// Expired, remove it
+   /* Expired, remove it */
 		c.mu.RUnlock()
 		c.mu.Lock()
 		delete(c.sessions, id)

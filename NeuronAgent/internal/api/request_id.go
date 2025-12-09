@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * request_id.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronAgent/internal/api/request_id.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package api
 
 import (
@@ -9,7 +22,7 @@ import (
 
 const requestIDKey contextKey = "request_id"
 
-// RequestIDMiddleware adds a unique request ID to each request
+/* RequestIDMiddleware adds a unique request ID to each request */
 func RequestIDMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requestID := r.Header.Get("X-Request-ID")
@@ -17,18 +30,18 @@ func RequestIDMiddleware(next http.Handler) http.Handler {
 			requestID = uuid.New().String()
 		}
 
-		// Add to context
+   /* Add to context */
 		ctx := context.WithValue(r.Context(), requestIDKey, requestID)
 		r = r.WithContext(ctx)
 
-		// Add to response header
+   /* Add to response header */
 		w.Header().Set("X-Request-ID", requestID)
 
 		next.ServeHTTP(w, r)
 	})
 }
 
-// GetRequestID gets the request ID from context
+/* GetRequestID gets the request ID from context */
 func GetRequestID(ctx context.Context) string {
 	if id, ok := ctx.Value(requestIDKey).(string); ok {
 		return id

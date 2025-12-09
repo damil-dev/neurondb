@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * validation.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronAgent/internal/api/validation.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package api
 
 import (
@@ -7,7 +20,7 @@ import (
 	"github.com/neurondb/NeuronAgent/internal/utils"
 )
 
-// ValidateCreateAgentRequest validates CreateAgentRequest
+/* ValidateCreateAgentRequest validates CreateAgentRequest */
 func ValidateCreateAgentRequest(req *CreateAgentRequest) error {
 	if err := utils.ValidateRequiredWithError(req.Name, "name"); err != nil {
 		return err
@@ -27,13 +40,13 @@ func ValidateCreateAgentRequest(req *CreateAgentRequest) error {
 	return nil
 }
 
-// ValidateCreateSessionRequest validates CreateSessionRequest
+/* ValidateCreateSessionRequest validates CreateSessionRequest */
 func ValidateCreateSessionRequest(req *CreateSessionRequest) error {
-	// AgentID is required (UUID validation happens in handler)
+  /* AgentID is required (UUID validation happens in handler) */
 	return nil
 }
 
-// ValidateSendMessageRequest validates SendMessageRequest
+/* ValidateSendMessageRequest validates SendMessageRequest */
 func ValidateSendMessageRequest(req *SendMessageRequest) error {
 	if err := utils.ValidateRequiredWithError(req.Content, "content"); err != nil {
 		return err
@@ -47,7 +60,7 @@ func ValidateSendMessageRequest(req *SendMessageRequest) error {
 	return nil
 }
 
-// ValidateAndRespond validates a request and responds with error if invalid
+/* ValidateAndRespond validates a request and responds with error if invalid */
 func ValidateAndRespond(w http.ResponseWriter, validator func() error) bool {
 	if err := validator(); err != nil {
 		respondError(w, NewError(http.StatusBadRequest, "validation failed", err))

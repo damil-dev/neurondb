@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * errors.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronAgent/internal/api/errors.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package api
 
 import (
@@ -87,7 +100,7 @@ var (
 	ErrInternal     = NewError(http.StatusInternalServerError, "internal server error", nil)
 )
 
-// WrapError wraps an error with request ID
+/* WrapError wraps an error with request ID */
 func WrapError(err *APIError, requestID string) *APIError {
 	if err == nil {
 		return nil

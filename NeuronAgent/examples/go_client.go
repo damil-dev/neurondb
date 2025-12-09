@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * go_client.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronAgent/examples/go_client.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package main
 
 import (
@@ -12,14 +25,14 @@ import (
 	"github.com/google/uuid"
 )
 
-// NeuronAgentClient is a Go client for NeuronAgent API
+/* NeuronAgentClient is a Go client for NeuronAgent API */
 type NeuronAgentClient struct {
 	BaseURL string
 	APIKey  string
 	Client  *http.Client
 }
 
-// NewNeuronAgentClient creates a new client instance
+/* NewNeuronAgentClient creates a new client instance */
 func NewNeuronAgentClient(baseURL, apiKey string) *NeuronAgentClient {
 	if baseURL == "" {
 		baseURL = "http://localhost:8080"
@@ -37,7 +50,7 @@ func NewNeuronAgentClient(baseURL, apiKey string) *NeuronAgentClient {
 	}
 }
 
-// Agent represents an agent configuration
+/* Agent represents an agent configuration */
 type Agent struct {
 	ID           uuid.UUID              `json:"id"`
 	Name         string                 `json:"name"`
@@ -50,7 +63,7 @@ type Agent struct {
 	UpdatedAt    time.Time              `json:"updated_at"`
 }
 
-// Session represents a conversation session
+/* Session represents a conversation session */
 type Session struct {
 	ID             uuid.UUID              `json:"id"`
 	AgentID        uuid.UUID              `json:"agent_id"`
@@ -60,7 +73,7 @@ type Session struct {
 	LastActivityAt time.Time              `json:"last_activity_at"`
 }
 
-// Message represents a message in a conversation
+/* Message represents a message in a conversation */
 type Message struct {
 	ID         int64                  `json:"id"`
 	SessionID  uuid.UUID              `json:"session_id"`
@@ -70,7 +83,7 @@ type Message struct {
 	CreatedAt  time.Time              `json:"created_at"`
 }
 
-// CreateAgentRequest is the request to create an agent
+/* CreateAgentRequest is the request to create an agent */
 type CreateAgentRequest struct {
 	Name         string                 `json:"name"`
 	Description  *string                `json:"description,omitempty"`
@@ -80,14 +93,14 @@ type CreateAgentRequest struct {
 	Config       map[string]interface{} `json:"config"`
 }
 
-// CreateSessionRequest is the request to create a session
+/* CreateSessionRequest is the request to create a session */
 type CreateSessionRequest struct {
 	AgentID       uuid.UUID              `json:"agent_id"`
 	ExternalUserID *string                `json:"external_user_id,omitempty"`
 	Metadata      map[string]interface{}  `json:"metadata,omitempty"`
 }
 
-// SendMessageRequest is the request to send a message
+/* SendMessageRequest is the request to send a message */
 type SendMessageRequest struct {
 	Content  string                 `json:"content"`
 	Role     string                 `json:"role"`
@@ -95,7 +108,7 @@ type SendMessageRequest struct {
 	Metadata map[string]interface{} `json:"metadata,omitempty"`
 }
 
-// SendMessageResponse is the response from sending a message
+/* SendMessageResponse is the response from sending a message */
 type SendMessageResponse struct {
 	SessionID   uuid.UUID `json:"session_id"`
 	AgentID     uuid.UUID `json:"agent_id"`
@@ -105,7 +118,7 @@ type SendMessageResponse struct {
 	ToolResults []interface{} `json:"tool_results"`
 }
 
-// makeRequest makes an authenticated HTTP request
+/* makeRequest makes an authenticated HTTP request */
 func (c *NeuronAgentClient) makeRequest(method, path string, body interface{}) (*http.Response, error) {
 	var reqBody io.Reader
 	if body != nil {
@@ -138,7 +151,7 @@ func (c *NeuronAgentClient) makeRequest(method, path string, body interface{}) (
 	return resp, nil
 }
 
-// HealthCheck checks if the server is healthy
+/* HealthCheck checks if the server is healthy */
 func (c *NeuronAgentClient) HealthCheck() error {
 	resp, err := http.Get(c.BaseURL + "/health")
 	if err != nil {
@@ -152,7 +165,7 @@ func (c *NeuronAgentClient) HealthCheck() error {
 	return nil
 }
 
-// CreateAgent creates a new agent
+/* CreateAgent creates a new agent */
 func (c *NeuronAgentClient) CreateAgent(req CreateAgentRequest) (*Agent, error) {
 	resp, err := c.makeRequest("POST", "/api/v1/agents", req)
 	if err != nil {
@@ -168,7 +181,7 @@ func (c *NeuronAgentClient) CreateAgent(req CreateAgentRequest) (*Agent, error) 
 	return &agent, nil
 }
 
-// GetAgent retrieves an agent by ID
+/* GetAgent retrieves an agent by ID */
 func (c *NeuronAgentClient) GetAgent(id uuid.UUID) (*Agent, error) {
 	resp, err := c.makeRequest("GET", "/api/v1/agents/"+id.String(), nil)
 	if err != nil {
@@ -184,7 +197,7 @@ func (c *NeuronAgentClient) GetAgent(id uuid.UUID) (*Agent, error) {
 	return &agent, nil
 }
 
-// ListAgents lists all agents
+/* ListAgents lists all agents */
 func (c *NeuronAgentClient) ListAgents() ([]Agent, error) {
 	resp, err := c.makeRequest("GET", "/api/v1/agents", nil)
 	if err != nil {
@@ -200,7 +213,7 @@ func (c *NeuronAgentClient) ListAgents() ([]Agent, error) {
 	return agents, nil
 }
 
-// CreateSession creates a new session
+/* CreateSession creates a new session */
 func (c *NeuronAgentClient) CreateSession(req CreateSessionRequest) (*Session, error) {
 	resp, err := c.makeRequest("POST", "/api/v1/sessions", req)
 	if err != nil {
@@ -216,7 +229,7 @@ func (c *NeuronAgentClient) CreateSession(req CreateSessionRequest) (*Session, e
 	return &session, nil
 }
 
-// SendMessage sends a message to the agent
+/* SendMessage sends a message to the agent */
 func (c *NeuronAgentClient) SendMessage(sessionID uuid.UUID, req SendMessageRequest) (*SendMessageResponse, error) {
 	resp, err := c.makeRequest("POST", "/api/v1/sessions/"+sessionID.String()+"/messages", req)
 	if err != nil {
@@ -232,7 +245,7 @@ func (c *NeuronAgentClient) SendMessage(sessionID uuid.UUID, req SendMessageRequ
 	return &response, nil
 }
 
-// GetMessages retrieves messages from a session
+/* GetMessages retrieves messages from a session */
 func (c *NeuronAgentClient) GetMessages(sessionID uuid.UUID, limit, offset int) ([]Message, error) {
 	path := fmt.Sprintf("/api/v1/sessions/%s/messages?limit=%d&offset=%d", sessionID.String(), limit, offset)
 	resp, err := c.makeRequest("GET", path, nil)
@@ -249,7 +262,7 @@ func (c *NeuronAgentClient) GetMessages(sessionID uuid.UUID, limit, offset int) 
 	return messages, nil
 }
 
-// Example usage
+/* Example usage */
 func main() {
 	apiKey := os.Getenv("NEURONAGENT_API_KEY")
 	if apiKey == "" {
@@ -260,7 +273,7 @@ func main() {
 
 	client := NewNeuronAgentClient("http://localhost:8080", apiKey)
 
-	// Health check
+  /* Health check */
 	fmt.Println("Checking server health...")
 	if err := client.HealthCheck(); err != nil {
 		fmt.Printf("❌ Server health check failed: %v\n", err)
@@ -268,7 +281,7 @@ func main() {
 	}
 	fmt.Println("✅ Server is healthy")
 
-	// Create an agent
+  /* Create an agent */
 	fmt.Println("\nCreating agent...")
 	agent, err := client.CreateAgent(CreateAgentRequest{
 		Name:         "go-example-agent",
@@ -287,7 +300,7 @@ func main() {
 	}
 	fmt.Printf("✅ Agent created: %s (%s)\n", agent.Name, agent.ID)
 
-	// Create a session
+  /* Create a session */
 	fmt.Println("\nCreating session...")
 	session, err := client.CreateSession(CreateSessionRequest{
 		AgentID:       agent.ID,
@@ -302,7 +315,7 @@ func main() {
 	}
 	fmt.Printf("✅ Session created: %s\n", session.ID)
 
-	// Send messages
+  /* Send messages */
 	messages := []string{
 		"Hello! Can you introduce yourself?",
 		"What can you help me with?",
@@ -324,7 +337,7 @@ func main() {
 		time.Sleep(1 * time.Second)
 	}
 
-	// Get conversation history
+  /* Get conversation history */
 	fmt.Println("\n📜 Retrieving conversation history...")
 	history, err := client.GetMessages(session.ID, 10, 0)
 	if err != nil {
@@ -339,7 +352,7 @@ func main() {
 	fmt.Println("\n✅ Example completed successfully!")
 }
 
-// Helper functions
+/* Helper functions */
 func stringPtr(s string) *string {
 	return &s
 }
@@ -350,6 +363,7 @@ func truncateString(s string, maxLen int) string {
 	}
 	return s[:maxLen] + "..."
 }
+
 
 
 

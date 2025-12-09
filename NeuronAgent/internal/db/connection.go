@@ -1,3 +1,19 @@
+/*-------------------------------------------------------------------------
+ *
+ * connection.go
+ *    Database connection management for NeuronAgent
+ *
+ * Provides PostgreSQL connection pooling, retry logic, and connection
+ * management with health checks.
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronAgent/internal/db/connection.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package db
 
 import (
@@ -11,7 +27,7 @@ import (
 	"github.com/neurondb/NeuronAgent/internal/utils"
 )
 
-// ConnectionInfo holds details about the database connection
+/* ConnectionInfo holds details about the database connection */
 type ConnectionInfo struct {
 	Host     string
 	Port     int
@@ -19,11 +35,11 @@ type ConnectionInfo struct {
 	User     string
 }
 
-// DB manages PostgreSQL connections
+/* DB manages PostgreSQL connections */
 type DB struct {
 	*sqlx.DB
 	poolConfig PoolConfig
-	connInfo   *ConnectionInfo // Stores connection details for error messages
+	connInfo   *ConnectionInfo
 }
 
 type PoolConfig struct {
@@ -33,14 +49,13 @@ type PoolConfig struct {
 	ConnMaxIdleTime time.Duration
 }
 
-// NewDB creates a new database instance
+/* NewDB creates a new database instance */
 func NewDB(connStr string, poolConfig PoolConfig) (*DB, error) {
 	return NewDBWithRetry(connStr, poolConfig, 3, 2*time.Second)
 }
 
-// NewDBWithRetry creates a new database instance with retry logic
+/* NewDBWithRetry creates a new database instance with retry logic */
 func NewDBWithRetry(connStr string, poolConfig PoolConfig, maxRetries int, retryDelay time.Duration) (*DB, error) {
-	// Parse connection string to extract connection info
 	connInfo := parseConnectionInfo(connStr)
 	
 	var db *sqlx.DB
@@ -49,7 +64,6 @@ func NewDBWithRetry(connStr string, poolConfig PoolConfig, maxRetries int, retry
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		db, err = sqlx.Connect("postgres", connStr)
 		if err == nil {
-			// Test the connection
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			pingErr := db.PingContext(ctx)
 			cancel()
@@ -71,7 +85,7 @@ func NewDBWithRetry(connStr string, poolConfig PoolConfig, maxRetries int, retry
 		
 		if attempt < maxRetries-1 {
 			time.Sleep(retryDelay)
-			retryDelay *= 2 // Exponential backoff
+			retryDelay *= 2
 		}
 	}
 	
@@ -79,7 +93,7 @@ func NewDBWithRetry(connStr string, poolConfig PoolConfig, maxRetries int, retry
 	return nil, fmt.Errorf("failed to connect to %s after %d attempts (last error: %w)", connInfoStr, maxRetries, err)
 }
 
-// parseConnectionInfo extracts connection information from connection string
+/* parseConnectionInfo extracts connection information from connection string */
 func parseConnectionInfo(connStr string) *ConnectionInfo {
 	info := &ConnectionInfo{
 		Host:     "unknown",
@@ -88,7 +102,6 @@ func parseConnectionInfo(connStr string) *ConnectionInfo {
 		User:     "unknown",
 	}
 	
-	// Simple parsing - in production, use proper connection string parser
 	parts := strings.Split(connStr, " ")
 	for _, part := range parts {
 		if strings.HasPrefix(part, "host=") {
@@ -105,7 +118,7 @@ func parseConnectionInfo(connStr string) *ConnectionInfo {
 	return info
 }
 
-// GetConnInfoString returns a formatted string of connection details
+/* GetConnInfoString returns a formatted string of connection details */
 func (d *DB) GetConnInfoString() string {
 	if d.connInfo == nil {
 		return "unknown database connection"
@@ -113,7 +126,7 @@ func (d *DB) GetConnInfoString() string {
 	return utils.FormatConnectionInfo(d.connInfo.Host, d.connInfo.Port, d.connInfo.Database, d.connInfo.User)
 }
 
-// HealthCheck tests the database connection
+/* HealthCheck tests the database connection */
 func (d *DB) HealthCheck(ctx context.Context) error {
 	if d.DB == nil {
 		return fmt.Errorf("database connection not established: %s (connection pool is nil, ensure NewDB() was called successfully)", d.GetConnInfoString())
@@ -127,7 +140,7 @@ func (d *DB) HealthCheck(ctx context.Context) error {
 	return nil
 }
 
-// Close closes the connection pool
+/* Close closes the connection pool */
 func (d *DB) Close() error {
 	if d.DB == nil {
 		return nil

@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * models.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronAgent/internal/api/models.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package api
 
 import (
@@ -6,7 +19,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// Request DTOs
+/* Request DTOs */
 
 type CreateAgentRequest struct {
 	Name         string                 `json:"name"`
@@ -31,7 +44,7 @@ type SendMessageRequest struct {
 	Metadata map[string]interface{} `json:"metadata"`
 }
 
-// Response DTOs
+/* Response DTOs */
 
 type AgentResponse struct {
 	ID           uuid.UUID              `json:"id"`

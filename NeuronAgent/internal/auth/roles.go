@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * roles.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronAgent/internal/auth/roles.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package auth
 
 import (
@@ -12,7 +25,7 @@ const (
 	RoleReadOnly = "read-only"
 )
 
-// HasRole checks if an API key has a specific role
+/* HasRole checks if an API key has a specific role */
 func HasRole(apiKey *db.APIKey, role string) bool {
 	for _, r := range apiKey.Roles {
 		if r == role {
@@ -22,7 +35,7 @@ func HasRole(apiKey *db.APIKey, role string) bool {
 	return false
 }
 
-// RequireRole checks if an API key has required role, returns error if not
+/* RequireRole checks if an API key has required role, returns error if not */
 func RequireRole(apiKey *db.APIKey, role string) error {
 	if !HasRole(apiKey, role) {
 		return fmt.Errorf("insufficient permissions: role %s required", role)
@@ -30,7 +43,7 @@ func RequireRole(apiKey *db.APIKey, role string) error {
 	return nil
 }
 
-// RequireAnyRole checks if an API key has any of the required roles
+/* RequireAnyRole checks if an API key has any of the required roles */
 func RequireAnyRole(apiKey *db.APIKey, roles ...string) error {
 	for _, role := range roles {
 		if HasRole(apiKey, role) {
@@ -40,7 +53,7 @@ func RequireAnyRole(apiKey *db.APIKey, roles ...string) error {
 	return fmt.Errorf("insufficient permissions: one of roles %v required", roles)
 }
 
-// RequireAllRoles checks if an API key has all of the required roles
+/* RequireAllRoles checks if an API key has all of the required roles */
 func RequireAllRoles(apiKey *db.APIKey, roles ...string) error {
 	for _, role := range roles {
 		if !HasRole(apiKey, role) {
@@ -50,22 +63,22 @@ func RequireAllRoles(apiKey *db.APIKey, roles ...string) error {
 	return nil
 }
 
-// CanCreate checks if API key can create resources
+/* CanCreate checks if API key can create resources */
 func CanCreate(apiKey *db.APIKey) bool {
 	return HasRole(apiKey, RoleAdmin) || HasRole(apiKey, RoleUser)
 }
 
-// CanUpdate checks if API key can update resources
+/* CanUpdate checks if API key can update resources */
 func CanUpdate(apiKey *db.APIKey) bool {
 	return HasRole(apiKey, RoleAdmin) || HasRole(apiKey, RoleUser)
 }
 
-// CanDelete checks if API key can delete resources
+/* CanDelete checks if API key can delete resources */
 func CanDelete(apiKey *db.APIKey) bool {
 	return HasRole(apiKey, RoleAdmin)
 }
 
-// CanRead checks if API key can read resources
+/* CanRead checks if API key can read resources */
 func CanRead(apiKey *db.APIKey) bool {
 	return HasRole(apiKey, RoleAdmin) || HasRole(apiKey, RoleUser) || HasRole(apiKey, RoleReadOnly)
 }

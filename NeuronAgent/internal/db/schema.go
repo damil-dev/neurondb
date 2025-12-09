@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * schema.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronAgent/internal/db/schema.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package db
 
 import (
@@ -29,7 +42,7 @@ func NewSchemaManager(db *sqlx.DB) *SchemaManager {
 	}
 }
 
-// LoadMigrations loads migrations from directory
+/* LoadMigrations loads migrations from directory */
 func (sm *SchemaManager) LoadMigrations(dir string) error {
 	files, err := os.ReadDir(dir)
 	if err != nil {
@@ -41,7 +54,7 @@ func (sm *SchemaManager) LoadMigrations(dir string) error {
 			continue
 		}
 
-		// Parse version from filename (e.g., "001_initial_schema.sql" -> 1)
+   /* Parse version from filename (e.g., "001_initial_schema.sql" -> 1) */
 		var version int
 		var name string
 		parts := strings.SplitN(strings.TrimSuffix(file.Name(), ".sql"), "_", 2)
@@ -52,7 +65,7 @@ func (sm *SchemaManager) LoadMigrations(dir string) error {
 			name = parts[1]
 		}
 
-		// Read SQL file
+   /* Read SQL file */
 		path := filepath.Join(dir, file.Name())
 		sql, err := os.ReadFile(path)
 		if err != nil {
@@ -66,7 +79,7 @@ func (sm *SchemaManager) LoadMigrations(dir string) error {
 		})
 	}
 
-	// Sort by version
+  /* Sort by version */
 	sort.Slice(sm.migrations, func(i, j int) bool {
 		return sm.migrations[i].Version < sm.migrations[j].Version
 	})
@@ -74,9 +87,9 @@ func (sm *SchemaManager) LoadMigrations(dir string) error {
 	return nil
 }
 
-// GetCurrentVersion gets the current migration version
+/* GetCurrentVersion gets the current migration version */
 func (sm *SchemaManager) GetCurrentVersion(ctx context.Context) (int, error) {
-	// Check if schema_migrations table exists
+  /* Check if schema_migrations table exists */
 	var exists bool
 	err := sm.db.GetContext(ctx, &exists, `
 		SELECT EXISTS (
@@ -101,9 +114,9 @@ func (sm *SchemaManager) GetCurrentVersion(ctx context.Context) (int, error) {
 	return version, nil
 }
 
-// Migrate runs all pending migrations
+/* Migrate runs all pending migrations */
 func (sm *SchemaManager) Migrate(ctx context.Context) error {
-	// Create schema_migrations table if it doesn't exist
+  /* Create schema_migrations table if it doesn't exist */
 	_, err := sm.db.ExecContext(ctx, `
 		CREATE SCHEMA IF NOT EXISTS neurondb_agent;
 		CREATE TABLE IF NOT EXISTS neurondb_agent.schema_migrations (
@@ -121,13 +134,13 @@ func (sm *SchemaManager) Migrate(ctx context.Context) error {
 		return fmt.Errorf("failed to get current version: %w", err)
 	}
 
-	// Run pending migrations
+  /* Run pending migrations */
 	for _, migration := range sm.migrations {
 		if migration.Version <= currentVersion {
 			continue
 		}
 
-		// Run migration in transaction
+   /* Run migration in transaction */
 		tx, err := sm.db.BeginTxx(ctx, nil)
 		if err != nil {
 			return fmt.Errorf("failed to begin transaction: %w", err)
@@ -139,7 +152,7 @@ func (sm *SchemaManager) Migrate(ctx context.Context) error {
 			return fmt.Errorf("failed to run migration %d: %w", migration.Version, err)
 		}
 
-		// Record migration
+   /* Record migration */
 		_, err = tx.ExecContext(ctx, `
 			INSERT INTO neurondb_agent.schema_migrations (version, name)
 			VALUES ($1, $2)
@@ -157,7 +170,7 @@ func (sm *SchemaManager) Migrate(ctx context.Context) error {
 	return nil
 }
 
-// Rollback rolls back the last migration (if supported)
+/* Rollback rolls back the last migration (if supported) */
 func (sm *SchemaManager) Rollback(ctx context.Context) error {
 	currentVersion, err := sm.GetCurrentVersion(ctx)
 	if err != nil {
@@ -168,7 +181,7 @@ func (sm *SchemaManager) Rollback(ctx context.Context) error {
 		return fmt.Errorf("no migrations to rollback")
 	}
 
-	// Find migration to rollback
+  /* Find migration to rollback */
 	var migrationToRollback *Migration
 	for _, m := range sm.migrations {
 		if m.Version == currentVersion {
@@ -181,8 +194,8 @@ func (sm *SchemaManager) Rollback(ctx context.Context) error {
 		return fmt.Errorf("migration version %d not found", currentVersion)
 	}
 
-	// Note: Full rollback requires storing rollback SQL
-	// For now, we just remove the version record
+  /* Note: Full rollback requires storing rollback SQL */
+  /* For now, we just remove the version record */
 	_, err = sm.db.ExecContext(ctx, `
 		DELETE FROM neurondb_agent.schema_migrations 
 		WHERE version = $1

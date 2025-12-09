@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * time.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronAgent/internal/utils/time.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package utils
 
 import (
@@ -13,17 +26,17 @@ const (
 	DateTimeFormat    = "2006-01-02 15:04:05"
 )
 
-// FormatTime formats time using ISO8601 format
+/* FormatTime formats time using ISO8601 format */
 func FormatTime(t time.Time) string {
 	return t.Format(ISO8601Format)
 }
 
-// ParseTime parses time from ISO8601 format
+/* ParseTime parses time from ISO8601 format */
 func ParseTime(s string) (time.Time, error) {
 	return time.Parse(ISO8601Format, s)
 }
 
-// FormatDuration formats duration as human-readable string
+/* FormatDuration formats duration as human-readable string */
 func FormatDuration(d time.Duration) string {
 	if d < time.Second {
 		return fmt.Sprintf("%dms", d.Milliseconds())
@@ -37,32 +50,32 @@ func FormatDuration(d time.Duration) string {
 	return fmt.Sprintf("%.2fh", d.Hours())
 }
 
-// ParseDuration parses duration string
+/* ParseDuration parses duration string */
 func ParseDuration(s string) (time.Duration, error) {
 	return time.ParseDuration(s)
 }
 
-// Now returns current time in UTC
+/* Now returns current time in UTC */
 func Now() time.Time {
 	return time.Now().UTC()
 }
 
-// UnixTimestamp returns Unix timestamp
+/* UnixTimestamp returns Unix timestamp */
 func UnixTimestamp(t time.Time) int64 {
 	return t.Unix()
 }
 
-// FromUnixTimestamp creates time from Unix timestamp
+/* FromUnixTimestamp creates time from Unix timestamp */
 func FromUnixTimestamp(ts int64) time.Time {
 	return time.Unix(ts, 0)
 }
 
-// IsExpired checks if a time is before now
+/* IsExpired checks if a time is before now */
 func IsExpired(t time.Time) bool {
 	return t.Before(time.Now())
 }
 
-// TimeAgo returns human-readable time ago string
+/* TimeAgo returns human-readable time ago string */
 func TimeAgo(t time.Time) string {
 	duration := time.Since(t)
 	

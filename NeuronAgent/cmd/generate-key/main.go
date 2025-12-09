@@ -1,3 +1,16 @@
+/*-------------------------------------------------------------------------
+ *
+ * main.go
+ *    Database operations
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronAgent/cmd/generate-key/main.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
 package main
 
 import (
@@ -26,7 +39,7 @@ func main() {
 	)
 	flag.Parse()
 
-	// Parse roles
+  /* Parse roles */
 	roleList := []string{}
 	if *roles != "" {
 		roleList = strings.Split(*roles, ",")
@@ -35,7 +48,7 @@ func main() {
 		}
 	}
 
-	// Connect to database
+  /* Connect to database */
 	cfg := config.DefaultConfig()
 	cfg.Database.Host = *dbHost
 	cfg.Database.Port = *dbPort
@@ -61,7 +74,7 @@ func main() {
 	queries := db.NewQueries(database.DB)
 	keyManager := auth.NewAPIKeyManager(queries)
 
-	// Generate key
+  /* Generate key */
 	ctx := context.Background()
 	var orgIDPtr, userIDPtr *string
 	if *orgID != "" {
