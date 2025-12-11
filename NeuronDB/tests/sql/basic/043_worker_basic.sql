@@ -71,6 +71,7 @@ SELECT
 	schemaname,
 	tablename,
 	CASE 
+ 		WHEN m.metrics IS NULL THEN 'CPU Training (default)'
 		WHEN tablename = 'neurondb_job_queue' THEN 'Queue Worker'
 		WHEN tablename = 'neurondb_query_metrics' THEN 'Tuner Worker'
 		WHEN tablename = 'neurondb_llm_jobs' THEN 'LLM Worker'

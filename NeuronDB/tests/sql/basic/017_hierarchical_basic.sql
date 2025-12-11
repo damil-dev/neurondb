@@ -26,7 +26,7 @@ BEGIN
 	SELECT setting_value INTO gpu_mode FROM test_settings WHERE setting_key = 'gpu_mode';
 	SELECT current_setting('neurondb.compute_mode', true) INTO current_gpu_enabled;
 	IF gpu_mode = 'gpu' THEN
-		SELECT neurondb_gpu_enable();
+		PERFORM neurondb_gpu_enable();
 	END IF;
 END $$;
 
@@ -102,7 +102,7 @@ FROM test_test_view;
 \echo 'Training'
 \echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
 
--- Hierarchical clustering has O(n³) complexity, so we sample a subset of data
+-- Hierarchical clustering has O(n²) complexity, so we sample a subset of data
 -- Create a temporary table with 200 sample rows for faster testing
 DROP TABLE IF EXISTS hierarchical_sample;
 CREATE TEMP TABLE hierarchical_sample AS
@@ -111,6 +111,8 @@ ORDER BY random()
 LIMIT 200;
 
 -- Test Hierarchical clustering with k=3, linkage='average'
+-- Note: Hierarchical clustering uses the direct cluster_hierarchical() function
+-- which returns cluster assignments directly, not a stored model_id
 WITH clusters AS (
 	SELECT unnest(cluster_hierarchical('hierarchical_sample', 'features', 3, 'average')) AS cluster_id
 )

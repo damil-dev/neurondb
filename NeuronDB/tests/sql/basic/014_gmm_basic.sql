@@ -26,7 +26,7 @@ BEGIN
 	SELECT setting_value INTO gpu_mode FROM test_settings WHERE setting_key = 'gpu_mode';
 	SELECT current_setting('neurondb.compute_mode', true) INTO current_gpu_enabled;
 	IF gpu_mode = 'gpu' THEN
-		SELECT neurondb_gpu_enable();
+		PERFORM neurondb_gpu_enable();
 	END IF;
 END $$;
 
@@ -120,9 +120,9 @@ BEGIN
 		);
 		CREATE TEMP TABLE gpu_model_temp AS SELECT model_id_val::integer AS model_id;
 	EXCEPTION WHEN OTHERS THEN
-		-- If training fails, try with CPU explicitly disabled
+		-- If training fails, try with CPU mode explicitly set
 		BEGIN
-			SET neurondb.compute_mode = off;
+			SET neurondb.compute_mode = 0;  -- 0 = cpu, 1 = gpu, 2 = auto
 			model_id_val := neurondb.train(
 				'default',
 				'gmm',
@@ -464,8 +464,10 @@ SELECT
 	ROUND(tm.inertia::numeric, 6) AS inertia,
 	tm.n_clusters,
 	CASE 
+		WHEN m.metrics IS NULL THEN 'CPU Training (default)'
 		WHEN m.metrics::jsonb->>'storage' = 'gpu' THEN 'GPU Training ✓'
 		WHEN m.metrics::jsonb->>'storage' = 'cpu' THEN 'CPU Training'
+		WHEN m.metrics::jsonb->>'storage' IS NULL OR m.metrics::jsonb->>'storage' = '' THEN 'CPU Training (default)'
 		ELSE 'Unknown'
 	END AS training_status,
 	tm.updated_at AS test_completed_at

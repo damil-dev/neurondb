@@ -483,9 +483,12 @@ SELECT
 	ROUND(tm.rmse::numeric, 6) AS rmse,
 	ROUND(tm.mae::numeric, 6) AS mae,
 	ROUND(tm.r_squared::numeric, 6) AS r_squared,
-	CASE 
+	CASE
+		WHEN m.metrics IS NULL THEN 'CPU Training (default)'
+		CASE 
 		WHEN m.metrics::jsonb->>'storage' = 'gpu' THEN 'GPU Training ✓'
 		WHEN m.metrics::jsonb->>'storage' = 'cpu' THEN 'CPU Training'
+		WHEN m.metrics::jsonb->>'storage' IS NULL OR m.metrics::jsonb->>'storage' = '' THEN 'CPU Training (default)'
 		ELSE 'Unknown'
 	END AS training_status,
 	tm.updated_at AS test_completed_at

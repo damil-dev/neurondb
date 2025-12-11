@@ -34,7 +34,7 @@ BEGIN
 	ELSE
 		-- Verify GPU is disabled (should be set by test runner)
 		IF current_gpu_enabled != 'off' THEN
-			RAISE WARNING 'CPU mode expected but neurondb.compute_mode = % (expected: off)', current_gpu_enabled;
+			RAISE WARNING 'CPU mode expected but neurondb.compute_mode = % (expected: 0)', current_gpu_enabled;
 		END IF;
 	END IF;
 END $$;
@@ -156,7 +156,7 @@ SELECT
 FROM gpu_model_temp_001;
 
 \echo 'Test 2: CPU training with default parameters'
-SET neurondb.compute_mode = off;
+SET neurondb.compute_mode = 0;
 DROP TABLE IF EXISTS cpu_model_temp_001;
 CREATE TEMP TABLE cpu_model_temp_001 AS
 SELECT neurondb.train('linear_regression', 
@@ -299,7 +299,7 @@ FROM (
 ) sub;
 
 \echo 'Predict Test 2: CPU batch prediction (1000 rows)'
-SET neurondb.compute_mode = off;
+SET neurondb.compute_mode = 0;
 SELECT 
 	'CPU Batch' AS test_type,
 	COUNT(*) AS n_predictions,
@@ -321,7 +321,7 @@ FROM test_test_view
 LIMIT 1;
 
 \echo 'Predict Test 4: Custom model batch (100 rows)'
-SET neurondb.compute_mode = off;
+SET neurondb.compute_mode = 0;
 SELECT 
 	'Custom Batch' AS test_type,
 	COUNT(*) AS n_predictions,
