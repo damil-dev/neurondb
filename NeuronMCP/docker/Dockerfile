@@ -1,5 +1,11 @@
 # Multi-stage build for NeuronMCP
-FROM golang:1.23-bookworm AS builder
+# Build arguments
+ARG GO_VERSION=1.23
+ARG VERSION=latest
+ARG BUILD_DATE
+ARG VCS_REF
+
+FROM golang:${GO_VERSION}-bookworm AS builder
 
 WORKDIR /build
 
@@ -10,11 +16,32 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s" -o neurondb-mcp ./cmd/neurondb-mcp
+# Build the application with version information
+ARG VERSION
+ARG BUILD_DATE
+ARG VCS_REF
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo \
+    -ldflags="-w -s -X main.version=${VERSION} -X main.buildDate=${BUILD_DATE} -X main.vcsRef=${VCS_REF}" \
+    -o neurondb-mcp ./cmd/neurondb-mcp
 
 # Final stage - use Debian slim for better compatibility
 FROM debian:bookworm-slim
+
+# Build arguments for labels
+ARG VERSION=latest
+ARG BUILD_DATE
+ARG VCS_REF
+
+# Add metadata labels
+LABEL org.opencontainers.image.title="NeuronMCP" \
+      org.opencontainers.image.description="Model Context Protocol server for NeuronDB PostgreSQL extension" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.created="${BUILD_DATE}" \
+      org.opencontainers.image.revision="${VCS_REF}" \
+      org.opencontainers.image.vendor="neurondb" \
+      org.opencontainers.image.licenses="AGPL-3.0" \
+      org.opencontainers.image.source="https://github.com/neurondb/NeurondB" \
+      maintainer="neurondb <admin@neurondb.com>"
 
 # Install runtime dependencies including Python3 for dataset loading
 RUN apt-get update && \
@@ -43,7 +70,13 @@ WORKDIR /app
 # Copy binary from builder
 COPY --from=builder /build/neurondb-mcp .
 
-# Change ownership to non-root user
+# Copy optional entrypoint script (can be overridden)
+# Copy as root first, then set permissions
+COPY docker/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh && \
+    chown root:root /usr/local/bin/docker-entrypoint.sh
+
+# Change ownership of app directory to non-root user
 RUN chown -R neuronmcp:neuronmcp /app
 
 # Switch to non-root user
@@ -52,6 +85,8 @@ USER neuronmcp
 # MCP protocol uses stdio, so we don't expose ports
 # Keep stdin/stdout/stderr available for MCP communication
 
-# Set entrypoint to ensure stdio is properly configured
-ENTRYPOINT ["./neurondb-mcp"]
+# Set entrypoint (can be overridden in docker-compose or runtime)
+# The entrypoint script performs validation and then executes the binary
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+CMD ["./neurondb-mcp"]
 

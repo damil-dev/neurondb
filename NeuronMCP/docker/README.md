@@ -341,13 +341,142 @@ docker build -f docker/Dockerfile -t neurondb-mcp:latest ..
 | Argument | Default | Description |
 |----------|---------|-------------|
 | `GO_VERSION` | `1.23` | Go version for builder stage |
+| `VERSION` | `latest` | Application version (used in labels) |
+| `BUILD_DATE` | - | Build date (ISO 8601 format) |
+| `VCS_REF` | - | Git commit hash or version control reference |
 
-Example:
+Example with all build arguments:
 
 ```bash
 docker build -f docker/Dockerfile \
   --build-arg GO_VERSION=1.23 \
+  --build-arg VERSION=1.0.0 \
+  --build-arg BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') \
+  --build-arg VCS_REF=$(git rev-parse --short HEAD) \
+  -t neurondb-mcp:1.0.0 ..
+```
+
+### Production Build
+
+For production builds with versioning:
+
+```bash
+VERSION=1.0.0
+BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+VCS_REF=$(git rev-parse --short HEAD)
+
+docker build -f docker/Dockerfile \
+  --build-arg GO_VERSION=1.23 \
+  --build-arg VERSION=${VERSION} \
+  --build-arg BUILD_DATE=${BUILD_DATE} \
+  --build-arg VCS_REF=${VCS_REF} \
+  -t neurondb-mcp:${VERSION} \
   -t neurondb-mcp:latest ..
+```
+
+## Production Deployment
+
+### Using Production Compose File
+
+The `docker-compose.prod.yml` file extends the base configuration with production-focused settings:
+
+- Enhanced resource limits
+- Structured JSON logging
+- Security hardening (read-only filesystem, dropped capabilities)
+- Production restart policies
+- Health checks with extended timeouts
+
+Start with production configuration:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+```
+
+### Production Environment Variables
+
+Create `.env.prod` for production:
+
+```env
+NEURONDB_HOST=neurondb-cpu
+NEURONDB_PORT=5432
+NEURONDB_DATABASE=neurondb
+NEURONDB_USER=neurondb
+NEURONDB_PASSWORD=<secure-password>
+NEURONDB_LOG_LEVEL=info
+NEURONDB_LOG_FORMAT=json
+NEURONDB_SSL_MODE=require
+```
+
+Load production environment:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.prod up -d
+```
+
+### Docker Entrypoint Script
+
+The container includes an optional entrypoint script (`docker-entrypoint.sh`) that:
+
+- Validates binary existence and permissions
+- Checks environment variables
+- Validates configuration file (if provided)
+- Logs startup information
+- Executes the NeuronMCP binary
+
+The entrypoint can be overridden in `docker-compose.yml`:
+
+```yaml
+services:
+  neurondb-mcp:
+    entrypoint: ["./neurondb-mcp"]  # Skip entrypoint script
+```
+
+## SSL/TLS Configuration
+
+### Secure Database Connections
+
+NeuronMCP supports SSL/TLS for secure database connections. Configure SSL in your environment:
+
+```env
+# SSL mode: disable, allow, prefer, require, verify-ca, verify-full
+NEURONDB_SSL_MODE=require
+
+# SSL certificate paths (inside container)
+NEURONDB_SSL_CERT=/app/ssl/client-cert.pem
+NEURONDB_SSL_KEY=/app/ssl/client-key.pem
+NEURONDB_SSL_ROOT_CERT=/app/ssl/ca-cert.pem
+```
+
+### Using Connection String with SSL
+
+```env
+NEURONDB_CONNECTION_STRING=postgresql://user:password@host:port/database?sslmode=require&sslcert=/app/ssl/client-cert.pem&sslkey=/app/ssl/client-key.pem&sslrootcert=/app/ssl/ca-cert.pem
+```
+
+### Mounting SSL Certificates
+
+In `docker-compose.yml`:
+
+```yaml
+services:
+  neurondb-mcp:
+    volumes:
+      - ./ssl:/app/ssl:ro
+    environment:
+      NEURONDB_SSL_MODE: require
+      NEURONDB_SSL_CERT: /app/ssl/client-cert.pem
+      NEURONDB_SSL_KEY: /app/ssl/client-key.pem
+      NEURONDB_SSL_ROOT_CERT: /app/ssl/ca-cert.pem
+```
+
+### SSL Certificate Permissions
+
+Ensure certificates have correct permissions:
+
+```bash
+chmod 600 /path/to/ssl/client-key.pem
+chmod 644 /path/to/ssl/client-cert.pem
+chmod 644 /path/to/ssl/ca-cert.pem
 ```
 
 ## Container Management
@@ -520,50 +649,158 @@ Check for typos in variable names.
 
 ## Security
 
-### Container Security
+### Container Security Best Practices
 
-- Container runs as non-root user `neuronmcp`
+The NeuronMCP Docker image implements multiple security best practices:
+
+#### Non-Root User
+- Container runs as non-root user `neuronmcp` (UID 1000)
+- Prevents privilege escalation attacks
+- Minimal filesystem permissions
+
+#### Minimal Base Image
 - Uses Debian slim base image
-- Minimal attack surface
-- No network endpoints (stdio only)
+- Reduced attack surface
+- Only essential runtime dependencies
+
+#### No Network Exposure
+- No HTTP endpoints or exposed ports
+- Communication via stdio only
+- No external attack surface
+
+#### Read-Only Filesystem (Production)
+
+In `docker-compose.prod.yml`, enable read-only root filesystem:
+
+```yaml
+services:
+  neurondb-mcp:
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,size=100m
+      - /var/tmp:noexec,nosuid,size=100m
+```
+
+#### Dropped Capabilities
+
+Production configuration drops all capabilities:
+
+```yaml
+services:
+  neurondb-mcp:
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+```
+
+#### Image Scanning
+
+Regularly scan images for vulnerabilities:
+
+```bash
+# Using Trivy
+trivy image neurondb-mcp:latest
+
+# Using Docker Scout
+docker scout cves neurondb-mcp:latest
+
+# Using Snyk
+snyk test --docker neurondb-mcp:latest
+```
 
 ### Credential Management
 
-Store credentials securely:
-
-**Docker Secrets:**
+#### Docker Secrets (Recommended for Production)
 
 ```yaml
+version: "3.9"
+
 secrets:
   db_password:
     file: ./secrets/db_password.txt
+  db_user:
+    file: ./secrets/db_user.txt
 
 services:
   neurondb-mcp:
     secrets:
       - db_password
+      - db_user
     environment:
       NEURONDB_PASSWORD_FILE: /run/secrets/db_password
+      NEURONDB_USER_FILE: /run/secrets/db_user
 ```
 
-**Environment Variables:**
+Create secrets directory:
 
-Use `.env` file with restricted permissions:
+```bash
+mkdir -p secrets
+chmod 700 secrets
+echo "your-secure-password" > secrets/db_password.txt
+chmod 600 secrets/db_password.txt
+```
+
+#### Environment Variables
+
+For development, use `.env` file with restricted permissions:
 
 ```bash
 chmod 600 .env
 ```
 
-**External Secrets Management:**
+Never commit `.env` files to version control. Use `.env.example` as a template.
 
-Integrate with HashiCorp Vault, AWS Secrets Manager, or similar.
+#### External Secrets Management
+
+Integrate with external secrets management systems:
+
+**HashiCorp Vault:**
+```bash
+# Retrieve secret and set as environment variable
+export NEURONDB_PASSWORD=$(vault kv get -field=password secret/neurondb)
+```
+
+**AWS Secrets Manager:**
+```bash
+export NEURONDB_PASSWORD=$(aws secretsmanager get-secret-value \
+  --secret-id neurondb/password --query SecretString --output text)
+```
+
+**Kubernetes Secrets:**
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: neurondb-credentials
+type: Opaque
+stringData:
+  password: your-secure-password
+```
 
 ### Network Security
 
-- Use Docker networks to isolate services
-- Restrict container network access
-- No external network exposure (stdio only)
-- Enable TLS/SSL for database connections
+- **Isolated Networks**: Use Docker networks to isolate services
+- **No External Exposure**: Container has no exposed ports
+- **TLS/SSL**: Enable TLS/SSL for all database connections in production
+- **Network Policies**: Implement network policies in orchestrated environments (Kubernetes, Docker Swarm)
+
+### Security Checklist
+
+Before deploying to production:
+
+- [ ] Use Docker secrets or external secrets management
+- [ ] Enable SSL/TLS for database connections
+- [ ] Use read-only filesystem where possible
+- [ ] Drop unnecessary capabilities
+- [ ] Set `no-new-privileges: true`
+- [ ] Regularly scan images for vulnerabilities
+- [ ] Use non-root user (already configured)
+- [ ] Restrict network access
+- [ ] Enable structured logging for audit trails
+- [ ] Set appropriate resource limits
+- [ ] Configure health checks
+- [ ] Use production restart policies
 
 ## Integration with NeuronDB
 
@@ -628,19 +865,295 @@ services:
           memory: 256M
 ```
 
-### Monitoring
+## Logging Integration
 
-Monitor container metrics:
+### Structured JSON Logging
+
+For production, use JSON logging format for easier parsing:
+
+```yaml
+services:
+  neurondb-mcp:
+    environment:
+      NEURONDB_LOG_FORMAT: json
+      NEURONDB_LOG_OUTPUT: stderr
+```
+
+### Docker Logging Drivers
+
+#### JSON File Driver (Default)
+
+Configure log rotation:
+
+```yaml
+services:
+  neurondb-mcp:
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
+```
+
+#### Syslog Driver
+
+Send logs to syslog:
+
+```yaml
+services:
+  neurondb-mcp:
+    logging:
+      driver: "syslog"
+      options:
+        syslog-address: "tcp://localhost:514"
+        syslog-facility: "daemon"
+        tag: "neurondb-mcp"
+```
+
+#### Fluentd Driver
+
+Send logs to Fluentd:
+
+```yaml
+services:
+  neurondb-mcp:
+    logging:
+      driver: "fluentd"
+      options:
+        fluentd-address: "localhost:24224"
+        tag: "neurondb.mcp"
+```
+
+#### Loki Driver
+
+Send logs to Grafana Loki:
+
+```yaml
+services:
+  neurondb-mcp:
+    logging:
+      driver: "loki"
+      options:
+        loki-url: "http://localhost:3100/loki/api/v1/push"
+        loki-batch-size: "400"
+```
+
+#### GELF Driver (Graylog)
+
+Send logs to Graylog:
+
+```yaml
+services:
+  neurondb-mcp:
+    logging:
+      driver: "gelf"
+      options:
+        gelf-address: "udp://localhost:12201"
+        tag: "neurondb-mcp"
+```
+
+### Log Aggregation Examples
+
+#### ELK Stack (Elasticsearch, Logstash, Kibana)
+
+```yaml
+services:
+  neurondb-mcp:
+    logging:
+      driver: "gelf"
+      options:
+        gelf-address: "udp://logstash:12201"
+        tag: "neurondb-mcp"
+```
+
+#### Splunk
+
+```yaml
+services:
+  neurondb-mcp:
+    logging:
+      driver: "splunk"
+      options:
+        splunk-token: "${SPLUNK_TOKEN}"
+        splunk-url: "https://splunk.example.com:8088"
+        splunk-source: "neurondb-mcp"
+        splunk-sourcetype: "json"
+```
+
+#### CloudWatch Logs (AWS)
+
+```yaml
+services:
+  neurondb-mcp:
+    logging:
+      driver: "awslogs"
+      options:
+        awslogs-group: "/docker/neurondb-mcp"
+        awslogs-region: "us-east-1"
+        awslogs-stream-prefix: "mcp"
+```
+
+#### Google Cloud Logging
+
+```yaml
+services:
+  neurondb-mcp:
+    logging:
+      driver: "gcplogs"
+      options:
+        gcp-project: "your-project-id"
+        gcp-log-cmd: "true"
+```
+
+### Log Parsing
+
+With JSON logging, parse logs easily:
+
+```bash
+# Extract error logs
+docker compose logs neurondb-mcp | jq 'select(.level == "error")'
+
+# Count log entries by level
+docker compose logs neurondb-mcp | jq -r '.level' | sort | uniq -c
+
+# Filter by timestamp
+docker compose logs neurondb-mcp | jq 'select(.time > "2024-01-01T00:00:00Z")'
+```
+
+## Monitoring
+
+### Container Metrics
+
+#### Docker Stats
+
+Monitor real-time container metrics:
 
 ```bash
 docker stats neurondb-mcp
 ```
 
-View logs for debugging:
+Output includes:
+- CPU usage percentage
+- Memory usage and limits
+- Network I/O
+- Block I/O
+
+#### cAdvisor
+
+Use cAdvisor for detailed container metrics:
+
+```yaml
+services:
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+```
+
+Access metrics at `http://localhost:8080/containers/neurondb-mcp`
+
+#### Prometheus
+
+Export Docker metrics to Prometheus:
+
+```yaml
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+```
+
+Configure `prometheus.yml`:
+
+```yaml
+scrape_configs:
+  - job_name: 'docker'
+    static_configs:
+      - targets: ['host.docker.internal:9323']
+```
+
+### Health Monitoring
+
+#### Health Check Status
+
+Check container health:
 
 ```bash
-docker compose logs -f neurondb-mcp
+docker inspect --format='{{.State.Health.Status}}' neurondb-mcp
 ```
+
+#### Health Check Logs
+
+View health check history:
+
+```bash
+docker inspect --format='{{json .State.Health}}' neurondb-mcp | jq
+```
+
+### Application Metrics
+
+#### Custom Metrics Endpoint
+
+If you need to expose application metrics, consider adding a sidecar container or using MCP resources:
+
+```bash
+# Query MCP resources for metrics
+docker compose exec neurondb-mcp ./neurondb-mcp <<EOF
+{"jsonrpc":"2.0","id":1,"method":"resources/read","params":{"uri":"neurondb://stats"}}
+EOF
+```
+
+### Alerting
+
+#### Prometheus Alertmanager
+
+Set up alerts for:
+
+- Container down
+- High CPU usage (>80%)
+- High memory usage (>90%)
+- Health check failures
+- Database connection errors
+
+Example alert rule:
+
+```yaml
+groups:
+  - name: neurondb_mcp
+    rules:
+      - alert: NeuronMCPDown
+        expr: up{job="neurondb-mcp"} == 0
+        for: 1m
+        annotations:
+          summary: "NeuronMCP container is down"
+```
+
+#### Grafana Dashboards
+
+Create dashboards for:
+
+- Container resource usage
+- Log volume and patterns
+- Error rates
+- Response times (if applicable)
+
+### Monitoring Best Practices
+
+1. **Set Up Alerts**: Configure alerts for critical metrics
+2. **Log Aggregation**: Centralize logs for analysis
+3. **Metrics Retention**: Configure appropriate retention periods
+4. **Dashboard Creation**: Create dashboards for key metrics
+5. **Regular Reviews**: Review metrics and logs regularly
+6. **Capacity Planning**: Monitor trends for capacity planning
 
 ## Support
 

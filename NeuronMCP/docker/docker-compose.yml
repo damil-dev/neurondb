@@ -46,6 +46,26 @@ services:
     # Keep container running
     restart: unless-stopped
     
+    # Health check: Verify binary exists and can be executed
+    # Note: MCP uses stdio, so we can't test actual MCP protocol without breaking stdio
+    # This checks that the binary is present and executable
+    healthcheck:
+      test: ["CMD", "test", "-f", "/app/neurondb-mcp", "-a", "-x", "/app/neurondb-mcp"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    
+    # Resource limits (adjust based on your requirements)
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 128M
+    
     networks:
       - default
       # Uncomment below to use shared neurondb-network for container-to-container communication
