@@ -18,6 +18,9 @@ import * as AnalyticsTools from "./analytics/index.js";
 // GPU tools
 import * as GPUTools from "./gpu/index.js";
 
+// PostgreSQL tools
+import * as PostgreSQLTools from "./postgresql/index.js";
+
 /**
  * Register all tools with the registry
  */
@@ -147,5 +150,15 @@ export function registerAllTools(registry: ToolRegistry, db: Database, logger: L
 	import("./drift/index.js").then((DriftTools) => {
 		registry.register(new DriftTools.DetectDataDriftTool(db, logger));
 	});
+
+	// PostgreSQL tools
+	registry.register(new PostgreSQLTools.PostgreSQLVersionTool(db, logger));
+	registry.register(new PostgreSQLTools.PostgreSQLStatsTool(db, logger));
+	registry.register(new PostgreSQLTools.PostgreSQLDatabaseListTool(db, logger));
+	registry.register(new PostgreSQLTools.PostgreSQLConnectionsTool(db, logger));
+	registry.register(new PostgreSQLTools.PostgreSQLLocksTool(db, logger));
+	registry.register(new PostgreSQLTools.PostgreSQLReplicationTool(db, logger));
+	registry.register(new PostgreSQLTools.PostgreSQLSettingsTool(db, logger));
+	registry.register(new PostgreSQLTools.PostgreSQLExtensionsTool(db, logger));
 }
 
