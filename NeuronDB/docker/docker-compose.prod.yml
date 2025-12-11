@@ -1,0 +1,229 @@
+# NeuronDB Docker Compose - Production Configuration
+# 
+# This file extends the base docker-compose.yml with production-focused settings:
+# - Enhanced resource limits and reservations
+# - Logging configuration
+# - Security enhancements
+# - Health checks with extended timeouts
+# - Restart policies
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Or override specific services:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up neurondb
+
+version: "3.9"
+
+services:
+  # CPU variant production settings
+  neurondb:
+    # Production resource limits (adjust based on your workload)
+    deploy:
+      resources:
+        limits:
+          cpus: '8'
+          memory: 8G
+        reservations:
+          cpus: '2'
+          memory: 2G
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    
+    # Production logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
+        labels: "service,environment"
+    
+    # Enhanced health check for production
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-neurondb}"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 5
+    
+    # Production restart policy
+    restart: unless-stopped
+    
+    # Environment-specific overrides
+    environment:
+      # Use scram-sha-256 for better security in production
+      POSTGRES_HOST_AUTH_METHOD: ${POSTGRES_HOST_AUTH_METHOD:-scram-sha-256}
+    
+    # Labels for production monitoring and management
+    labels:
+      - "com.neurondb.service=neurondb"
+      - "com.neurondb.variant=cpu"
+      - "com.neurondb.environment=production"
+      - "com.neurondb.version=${VERSION:-latest}"
+
+  # CUDA GPU variant production settings
+  neurondb-cuda:
+    profiles: ["cuda", "gpu"]
+    # Production resource limits for GPU workloads
+    deploy:
+      resources:
+        limits:
+          cpus: '16'
+          memory: 16G
+        reservations:
+          cpus: '4'
+          memory: 4G
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    
+    # Production logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
+        labels: "service,environment,gpu"
+    
+    # Enhanced health check for production
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-neurondb}"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 5
+    
+    # Production restart policy
+    restart: unless-stopped
+    
+    # Environment-specific overrides
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: ${POSTGRES_HOST_AUTH_METHOD:-scram-sha-256}
+    
+    # Labels for production monitoring and management
+    labels:
+      - "com.neurondb.service=neurondb"
+      - "com.neurondb.variant=cuda"
+      - "com.neurondb.environment=production"
+      - "com.neurondb.version=${VERSION:-latest}"
+
+  # ROCm GPU variant production settings
+  neurondb-rocm:
+    profiles: ["rocm", "gpu"]
+    # Production resource limits for GPU workloads
+    deploy:
+      resources:
+        limits:
+          cpus: '16'
+          memory: 16G
+        reservations:
+          cpus: '4'
+          memory: 4G
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    
+    # Production logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
+        labels: "service,environment,gpu"
+    
+    # Enhanced health check for production
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-neurondb}"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 5
+    
+    # Production restart policy
+    restart: unless-stopped
+    
+    # Environment-specific overrides
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: ${POSTGRES_HOST_AUTH_METHOD:-scram-sha-256}
+    
+    # Labels for production monitoring and management
+    labels:
+      - "com.neurondb.service=neurondb"
+      - "com.neurondb.variant=rocm"
+      - "com.neurondb.environment=production"
+      - "com.neurondb.version=${VERSION:-latest}"
+
+  # Metal GPU variant production settings
+  neurondb-metal:
+    profiles: ["metal", "gpu"]
+    # Production resource limits for GPU workloads
+    deploy:
+      resources:
+        limits:
+          cpus: '16'
+          memory: 16G
+        reservations:
+          cpus: '4'
+          memory: 4G
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    
+    # Production logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
+        labels: "service,environment,gpu"
+    
+    # Enhanced health check for production
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-neurondb}"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 5
+    
+    # Production restart policy
+    restart: unless-stopped
+    
+    # Environment-specific overrides
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: ${POSTGRES_HOST_AUTH_METHOD:-scram-sha-256}
+    
+    # Labels for production monitoring and management
+    labels:
+      - "com.neurondb.service=neurondb"
+      - "com.neurondb.variant=metal"
+      - "com.neurondb.environment=production"
+      - "com.neurondb.version=${VERSION:-latest}"
+
+# Production network configuration
+networks:
+  neurondb-network:
+    name: neurondb-network
+    driver: bridge
+    # For production, consider using an external network:
+    # external: true
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+

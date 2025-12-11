@@ -454,6 +454,15 @@ find_pg_config() {
 #=========================================================================
 
 install_dependencies() {
+    # Skip if SKIP_DEP_INSTALL is set (dependencies already checked and present)
+    if [[ "${SKIP_DEP_INSTALL:-0}" -eq 1 ]] || [[ "${SKIP_DEP_INSTALL:-}" == "1" ]]; then
+        log_info "Dependencies already satisfied - skipping installation step"
+        log_info "Skipping: package installation, waiting for package manager"
+        # Still re-detect PostgreSQL in case it was just installed
+        detect_postgresql
+        return 0
+    fi
+    
     section "Installing Dependencies"
     
     case "$PLATFORM" in
@@ -500,7 +509,10 @@ install_dependencies_macos() {
 }
 
 install_dependencies_ubuntu() {
-    wait_for_package_manager
+    # Skip waiting if SKIP_DEP_INSTALL is set
+    if [[ "${SKIP_DEP_INSTALL:-0}" -ne 1 ]] && [[ "${SKIP_DEP_INSTALL:-}" != "1" ]]; then
+        wait_for_package_manager
+    fi
     
     local packages=(
         "build-essential" "git" "curl" "wget" "ca-certificates"
@@ -523,7 +535,10 @@ install_dependencies_ubuntu() {
 }
 
 install_dependencies_rocky() {
-    wait_for_package_manager
+    # Skip waiting if SKIP_DEP_INSTALL is set
+    if [[ "${SKIP_DEP_INSTALL:-0}" -ne 1 ]] && [[ "${SKIP_DEP_INSTALL:-}" != "1" ]]; then
+        wait_for_package_manager
+    fi
     
     local pkg_manager="dnf"
     has_cmd dnf || pkg_manager="yum"
