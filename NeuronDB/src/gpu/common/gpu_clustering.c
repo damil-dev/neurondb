@@ -41,9 +41,6 @@ neurondb_gpu_kmeans(const float *vectors,
 	if (backend->launch_kmeans_assign == NULL
 		|| backend->launch_kmeans_update == NULL)
 	{
-		elog(DEBUG1,
-			 "neurondb: active GPU backend lacks k-means support; "
-			 "falling back to CPU");
 		return;
 	}
 
@@ -58,10 +55,6 @@ neurondb_gpu_kmeans(const float *vectors,
 										  NULL)
 			!= 0)
 		{
-			elog(DEBUG1,
-				 "neurondb: GPU k-means assign failed (iter "
-				 "%d); falling back",
-				 iter);
 			return;
 		}
 
@@ -74,10 +67,6 @@ neurondb_gpu_kmeans(const float *vectors,
 										  NULL)
 			!= 0)
 		{
-			elog(DEBUG1,
-				 "neurondb: GPU k-means update failed (iter "
-				 "%d); falling back",
-				 iter);
 			return;
 		}
 	}
@@ -105,6 +94,4 @@ neurondb_gpu_dbscan(const float *vectors,
 	if (!neurondb_gpu_is_available())
 		return;
 
-	elog(DEBUG1,
-		 "neurondb: GPU DBSCAN not implemented; using CPU fallback");
 }

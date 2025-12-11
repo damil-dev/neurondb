@@ -79,21 +79,15 @@ temporal_index_create(PG_FUNCTION_ARGS)
 	char *idx_tbl = NULL;
 	StringInfoData sql;
 	int			ret;
-
 	NdbSpiSession *session = NULL;
+
+	(void) decay_rate;		/* Reserved for future use */
 
 	tbl_str = text_to_cstring(table_name);
 	vec_str = text_to_cstring(vector_col);
 	ts_str = text_to_cstring(timestamp_col);
 	idx_tbl = get_temporal_index_table(tbl_str, vec_str);
 
-	elog(INFO,
-		 "neurondb: Creating temporal index on %s.%s with timestamp %s "
-		 "(decay=%.4f/day)",
-		 tbl_str,
-		 vec_str,
-		 ts_str,
-		 decay_rate);
 
 	session = ndb_spi_session_begin(CurrentMemoryContext, false);
 	if (session == NULL)

@@ -390,7 +390,6 @@ train_collaborative_filter(PG_FUNCTION_ARGS)
 		spec.num_features = n_factors;
 
 		model_id = ml_catalog_register_model(&spec);
-		elog(DEBUG1, "neurondb: ml_catalog returned model_id=%d (as int32)", model_id);
 		if (model_id <= 0)
 			ereport(ERROR,
 					(errcode(ERRCODE_INTERNAL_ERROR),
@@ -563,7 +562,6 @@ train_collaborative_filter(PG_FUNCTION_ARGS)
 
 		nfree(sql.data);
 		NDB_SPI_SESSION_END(train_als_spi_session);
-		elog(INFO, "Collaborative filter model created, model_id=%d", model_id);
 		PG_RETURN_INT32(model_id);
 	}
 }
@@ -2125,7 +2123,7 @@ typedef struct RecommenderGpuModelState
 }			RecommenderGpuModelState;
 
 static bytea *
-recommender_model_serialize_to_bytea(float **user_factors, int n_users, float **item_factors, int n_items, int n_factors, float lambda)
+recommender_model_serialize_to_bytea(float **user_factors, int n_users, float **item_factors, int n_items, int n_factors, float lambda, uint8 training_backend)
 {
 	StringInfoData buf;
 	int			total_size;
@@ -2135,7 +2133,18 @@ recommender_model_serialize_to_bytea(float **user_factors, int n_users, float **
 				i,
 				f;
 
+	/* Validate training_backend */
+	if (training_backend > 1)
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_INTERNAL_ERROR),
+				 errmsg("neurondb: recommender_model_serialize_to_bytea: invalid training_backend %d (must be 0 or 1)",
+						training_backend)));
+	}
+
 	initStringInfo(&buf);
+	/* Write training_backend first (0=CPU, 1=GPU) - unified storage format */
+	appendBinaryStringInfo(&buf, (char *) &training_backend, sizeof(uint8));
 	appendBinaryStringInfo(&buf, (char *) &n_users, sizeof(int));
 	appendBinaryStringInfo(&buf, (char *) &n_items, sizeof(int));
 	appendBinaryStringInfo(&buf, (char *) &n_factors, sizeof(int));
@@ -2156,14 +2165,10 @@ recommender_model_serialize_to_bytea(float **user_factors, int n_users, float **
 	nfree(buf.data);
 
 	return result;
-	memcpy(VARDATA(result), buf.data, buf.len);
-	nfree(buf.data);
-
-	return result;
 }
 
 static int
-recommender_model_deserialize_from_bytea(const bytea * data, float ***user_factors_out, int *n_users_out, float ***item_factors_out, int *n_items_out, int *n_factors_out, float *lambda_out)
+recommender_model_deserialize_from_bytea(const bytea * data, float ***user_factors_out, int *n_users_out, float ***item_factors_out, int *n_items_out, int *n_factors_out, float *lambda_out, uint8 * training_backend_out)
 {
 	const char *buf;
 	int			offset = 0;
@@ -2172,11 +2177,17 @@ recommender_model_deserialize_from_bytea(const bytea * data, float ***user_facto
 				f;
 	float **user_factors = NULL;
 	float **item_factors = NULL;
+	uint8		training_backend = 0;
 
-	if (data == NULL || VARSIZE(data) < VARHDRSZ + sizeof(int) * 3 + sizeof(float))
+	if (data == NULL || VARSIZE(data) < VARHDRSZ + sizeof(uint8) + sizeof(int) * 3 + sizeof(float))
 		return -1;
 
 	buf = VARDATA(data);
+	/* Read training_backend first (unified storage format) */
+	training_backend = (uint8) buf[offset];
+	offset += sizeof(uint8);
+	if (training_backend_out != NULL)
+		*training_backend_out = training_backend;
 	memcpy(n_users_out, buf + offset, sizeof(int));
 	offset += sizeof(int);
 	memcpy(n_items_out, buf + offset, sizeof(int));
@@ -2340,12 +2351,12 @@ recommender_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errs
 	}
 
 	/* Serialize model */
-	model_data = recommender_model_serialize_to_bytea(user_factors, n_users, item_factors, n_items, n_factors, lambda);
+	model_data = recommender_model_serialize_to_bytea(user_factors, n_users, item_factors, n_items, n_factors, lambda, 0); /* training_backend=0 for CPU */
 
 	/* Build metrics */
 	initStringInfo(&metrics_json);
 	appendStringInfo(&metrics_json,
-					 "{\"storage\":\"cpu\",\"n_users\":%d,\"n_items\":%d,\"n_factors\":%d,\"lambda\":%.6f,\"n_samples\":%d}",
+					 "{\"storage\":\"cpu\",\"training_backend\":0,\"n_users\":%d,\"n_items\":%d,\"n_factors\":%d,\"lambda\":%.6f,\"n_samples\":%d}",
 					 n_users, n_items, n_factors, lambda, nvec);
 	metrics = ndb_jsonb_in_cstring(metrics_json.data);
 	nfree(metrics_json.data);
@@ -2417,12 +2428,17 @@ recommender_gpu_predict(const MLGpuModel *model, const float *input, int input_d
 	/* Deserialize if needed */
 	if (state->user_factors == NULL)
 	{
-		if (recommender_model_deserialize_from_bytea(state->model_blob,
-													 &user_factors, &n_users, &item_factors, &n_items, &n_factors, &lambda) != 0)
 		{
-			if (errstr != NULL)
-				*errstr = pstrdup("recommender_gpu_predict: failed to deserialize");
-			return false;
+			uint8		training_backend = 0;
+
+			if (recommender_model_deserialize_from_bytea(state->model_blob,
+													 &user_factors, &n_users, &item_factors, &n_items, &n_factors, &lambda,
+													 &training_backend) != 0)
+			{
+				if (errstr != NULL)
+					*errstr = pstrdup("recommender_gpu_predict: failed to deserialize");
+				return false;
+			}
 		}
 		((RecommenderGpuModelState *) state)->user_factors = user_factors;
 		((RecommenderGpuModelState *) state)->item_factors = item_factors;
@@ -2573,13 +2589,18 @@ recommender_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 	nalloc(payload_copy, bytea, payload_size);
 	memcpy(payload_copy, payload, payload_size);
 
-	if (recommender_model_deserialize_from_bytea(payload_copy,
-												 &user_factors, &n_users, &item_factors, &n_items, &n_factors, &lambda) != 0)
 	{
-		nfree(payload_copy);
-		if (errstr != NULL)
-			*errstr = pstrdup("recommender_gpu_deserialize: failed to deserialize");
-		return false;
+		uint8		training_backend = 0;
+
+		if (recommender_model_deserialize_from_bytea(payload_copy,
+													 &user_factors, &n_users, &item_factors, &n_items, &n_factors, &lambda,
+													 &training_backend) != 0)
+		{
+			nfree(payload_copy);
+			if (errstr != NULL)
+				*errstr = pstrdup("recommender_gpu_deserialize: failed to deserialize");
+			return false;
+		}
 	}
 
 	state = (RecommenderGpuModelState *) palloc0(sizeof(RecommenderGpuModelState));

@@ -49,20 +49,14 @@ hybrid_index_create(PG_FUNCTION_ARGS)
 	char *txt_str = NULL;
 	StringInfoData sql;
 	int			ret;
-
 	NdbSpiSession *session = NULL;
+
+	(void) fusion_weight;		/* Reserved for future use */
 
 	tbl_str = text_to_cstring(table_name);
 	vec_str = text_to_cstring(vector_col);
 	txt_str = text_to_cstring(text_col);
 
-	elog(INFO,
-		 "neurondb: Creating hybrid index on %s (%s vector, %s text, "
-		 "weight=%.2f)",
-		 tbl_str,
-		 vec_str,
-		 txt_str,
-		 fusion_weight);
 
 	session = ndb_spi_session_begin(CurrentMemoryContext, false);
 	if (session == NULL)
@@ -129,10 +123,6 @@ hybrid_index_create(PG_FUNCTION_ARGS)
 	ndb_spi_session_end(&session);
 
 	/* In production: store fusion config and columns in metadata */
-	elog(INFO,
-		 "neurondb: Hybrid index set up complete with "
-		 "fusion_weight=%.2f",
-		 fusion_weight);
 
 	PG_RETURN_BOOL(true);
 }

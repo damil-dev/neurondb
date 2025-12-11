@@ -166,10 +166,6 @@ ndb_cuda_init(void)
 	 */
 	if (cuda_ctx.initialized && cuda_ctx.init_pid != current_pid)
 	{
-		elog(DEBUG1,
-			 "neurondb: Detected fork (parent PID %d, current PID %d) - resetting CUDA",
-			 cuda_ctx.init_pid,
-			 current_pid);
 
 		cudaDeviceReset();
 
@@ -229,10 +225,6 @@ ndb_cuda_init(void)
 	cuda_ctx.initialized = true;
 	cuda_ctx.init_pid = current_pid;
 
-	elog(DEBUG1,
-		 "neurondb: CUDA initialized successfully in process %d (device %d)",
-		 current_pid,
-		 cuda_ctx.device_id);
 
 	return 0;
 }

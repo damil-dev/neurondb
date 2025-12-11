@@ -187,7 +187,6 @@ register_hybrid_scan_planner_hook(void)
 	/* Install planner hook */
 	prev_planner_hook = planner_hook;
 	planner_hook = hybrid_planner_hook;
-	elog(DEBUG1, "neurondb: registered hybrid scan planner hook");
 }
 
 /*
@@ -833,5 +832,4 @@ register_hybrid_scan_provider(void)
 	/* CustomScan methods are used when CustomScan nodes are created */
 	register_hybrid_scan_planner_hook();
 
-	elog(DEBUG1, "neurondb: Hybrid scan provider registered");
 }

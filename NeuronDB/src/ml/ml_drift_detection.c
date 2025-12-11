@@ -112,9 +112,6 @@ detect_centroid_drift(PG_FUNCTION_ARGS)
 	current_tbl = text_to_cstring(current_table);
 	current_col = text_to_cstring(current_column);
 
-	elog(DEBUG1,
-		 "neurondb: Drift detection: baseline=%s.%s, current=%s.%s",
-		 baseline_tbl, baseline_col, current_tbl, current_col);
 
 	/* Fetch vectors */
 	baseline_vecs = neurondb_fetch_vectors_from_table(
@@ -165,9 +162,6 @@ detect_centroid_drift(PG_FUNCTION_ARGS)
 
 	if (n_baseline < 10 || n_current < 10)
 	{
-		elog(DEBUG1,
-			 "Need at least 10 vectors in each dataset (baseline=%d, current=%d)",
-			 n_baseline, n_current);
 		ereport(ERROR,
 				(errcode(ERRCODE_DATA_EXCEPTION),
 				 errmsg("Need at least 10 vectors in each dataset (baseline=%d, current=%d)",
@@ -231,9 +225,6 @@ detect_centroid_drift(PG_FUNCTION_ARGS)
 	normalized_drift = drift_distance / avg_std;
 	is_significant = (normalized_drift > 3.0);
 
-	elog(DEBUG1,
-		 "neurondb: Drift distance=%.4f, normalized=%.4f, significant=%s",
-		 drift_distance, normalized_drift, is_significant ? "YES" : "NO");
 
 	/* Build result tuple */
 	if (get_call_result_type(fcinfo, NULL, &tupdesc) != TYPEFUNC_COMPOSITE)

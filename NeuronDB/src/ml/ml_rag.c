@@ -200,10 +200,6 @@ neurondb_embed_text(PG_FUNCTION_ARGS)
 	model_name = text_to_cstring(model_text);
 	input_str = text_to_cstring(input_text);
 
-	elog(DEBUG1,
-		 "neurondb_embed_text: model='%s', use_gpu=%d",
-		 model_name,
-		 use_gpu);
 
 	/* Setup LLM config for embedding */
 	memset(&cfg, 0, sizeof(cfg));

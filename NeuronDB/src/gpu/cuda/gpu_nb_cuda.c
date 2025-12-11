@@ -291,6 +291,12 @@ ndb_cuda_nb_train(const float *features,
 	int			j;
 	int			rc = -1;
 
+	/* Initialize output pointers to NULL */
+	if (model_data)
+		*model_data = NULL;
+	if (metrics)
+		*metrics = NULL;
+
 	/* CPU mode: never execute GPU code */
 	if (NDB_COMPUTE_MODE_IS_CPU())
 	{
@@ -351,8 +357,6 @@ ndb_cuda_nb_train(const float *features,
 		return -1;
 	}
 
-	elog(DEBUG1, "ndb_cuda_nb_train: entry: n_samples=%d, feature_dim=%d, class_count=%d",
-		 n_samples, feature_dim, class_count);
 
 	/* Allocate host memory with overflow checks */
 	/* Note: palloc never returns NULL in PostgreSQL - it errors on failure */
@@ -412,18 +416,14 @@ ndb_cuda_nb_train(const float *features,
 	 * CUDA context issues in forked PostgreSQL backends. If GPU training
 	 * consistently fails, disable GPU or use CPU training.
 	 */
-	elog(DEBUG1, "ndb_cuda_nb_train: Calling ndb_cuda_nb_count_classes");
 	if (ndb_cuda_nb_count_classes(labels, n_samples, class_count, class_counts) != 0)
 	{
 		if (errstr && *errstr == NULL)
 			*errstr = pstrdup("CUDA class counting failed");
 		goto cleanup;
 	}
-	elog(DEBUG1, "ndb_cuda_nb_train: count_classes returned, class_counts[0]=%d, class_counts[1]=%d",
-		 class_counts[0], class_counts[1]);
 
 	/* Step 2: Compute class priors with division by zero protection */
-	elog(DEBUG1, "ndb_cuda_nb_train: Computing class priors");
 	if (n_samples <= 0)
 	{
 		if (errstr)
@@ -448,7 +448,6 @@ ndb_cuda_nb_train(const float *features,
 			class_priors[i] = 1e-10;	/* Avoid log(0) */
 		}
 	}
-	elog(DEBUG1, "ndb_cuda_nb_train: Class priors computed, calling ndb_cuda_nb_compute_means");
 
 	/* Step 3: Compute means using CUDA */
 	if (ndb_cuda_nb_compute_means(features, labels, n_samples, feature_dim, class_count, means, class_counts) != 0)

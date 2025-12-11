@@ -211,13 +211,6 @@ ndb_rocm_ridge_train(const float *features,
 		return -1;
 	}
 
-	elog(DEBUG1,
-		 "ndb_rocm_ridge_train: entry: model_data=%p, features=%p, targets=%p, n_samples=%d, feature_dim=%d",
-		 model_data,
-		 features,
-		 targets,
-		 n_samples,
-		 feature_dim);
 
 	/* Extract and validate lambda from hyperparameters */
 	if (hyperparams != NULL)
@@ -285,11 +278,6 @@ ndb_rocm_ridge_train(const float *features,
 		feature_bytes = sizeof(float) * (size_t) n_samples * (size_t) feature_dim;
 		target_bytes = sizeof(double) * (size_t) n_samples;
 
-		elog(DEBUG1,
-			 "ndb_rocm_ridge_train: allocating GPU memory: feature_bytes=%zu (%.2f MB), target_bytes=%zu",
-			 feature_bytes,
-			 feature_bytes / (1024.0 * 1024.0),
-			 target_bytes);
 
 		/* Defensive: Check HIP context before proceeding */
 		status = hipGetLastError();
@@ -465,7 +453,6 @@ gpu_cleanup:
 
 cpu_fallback:
 	/* Fallback to CPU computation */
-	elog(DEBUG1, "ndb_rocm_ridge_train: falling back to CPU computation");
 	for (i = 0; i < n_samples; i++)
 	{
 		const float *row = features + (i * feature_dim);

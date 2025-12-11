@@ -274,7 +274,7 @@ ml_catalog_register_model(const MLCatalogModelSpec *spec)
 	{
 		meta_txt = ndb_jsonb_out_cstring(metrics);
 		elog(DEBUG2, "neurondb: ml_catalog_register_model: metrics JSON: %s", meta_txt);
-		nfree(meta_txt);
+		pfree(meta_txt);
 	}
 
 	/* Validate project_name one more time before using it in SQL */
@@ -358,7 +358,6 @@ ml_catalog_register_model(const MLCatalogModelSpec *spec)
 		goto error;
 	}
 
-	elog(DEBUG1, "neurondb: ml_catalog_register_model: acquired project_id %d", project_id);
 
 	/*
 	 * Acquire advisory lock to prevent race conditions during version
@@ -392,7 +391,6 @@ ml_catalog_register_model(const MLCatalogModelSpec *spec)
 	}
 
 	ndb_spi_stringinfo_free(spi_session, &sql);
-	elog(DEBUG1, "neurondb: ml_catalog_register_model: calculated version %d for project_id %d", version, project_id);
 
 	/* Insert model row with quoted string literals for SQL safety */
 	ndb_spi_stringinfo_init(spi_session, &insert_sql);
@@ -407,8 +405,8 @@ ml_catalog_register_model(const MLCatalogModelSpec *spec)
 										 DirectFunctionCall1(quote_literal,
 															 PointerGetDatum(algorithm_text)));
 		algorithm_quoted = text_to_cstring(quoted_algorithm);
-		nfree(algorithm_text);
-		nfree(quoted_algorithm);
+		pfree(algorithm_text);
+		pfree(quoted_algorithm);
 	}
 	{
 		text *table_text = NULL;
@@ -419,8 +417,8 @@ ml_catalog_register_model(const MLCatalogModelSpec *spec)
 									 DirectFunctionCall1(quote_literal,
 														 PointerGetDatum(table_text)));
 		table_quoted = text_to_cstring(quoted_table);
-		nfree(table_text);
-		nfree(quoted_table);
+		pfree(table_text);
+		pfree(quoted_table);
 	}
 	column_quoted = NULL;
 	if (training_column != NULL)
@@ -433,8 +431,8 @@ ml_catalog_register_model(const MLCatalogModelSpec *spec)
 									  DirectFunctionCall1(quote_literal,
 														  PointerGetDatum(column_text)));
 		column_quoted = text_to_cstring(quoted_column);
-		nfree(column_text);
-		nfree(quoted_column);
+		pfree(column_text);
+		pfree(quoted_column);
 	}
 
 	params_txt = NULL;
@@ -449,8 +447,6 @@ ml_catalog_register_model(const MLCatalogModelSpec *spec)
 			params_txt = ndb_jsonb_out_cstring(parameters);
 			if (params_txt == NULL || strlen(params_txt) == 0)
 			{
-				elog(DEBUG1,
-					 "neurondb: ml_catalog_register_model: parameters JSONB conversion returned NULL or empty, using NULL");
 				params_quoted = NULL;
 			}
 			else
@@ -460,8 +456,8 @@ ml_catalog_register_model(const MLCatalogModelSpec *spec)
 											  DirectFunctionCall1(quote_literal,
 																  PointerGetDatum(params_text)));
 				params_quoted = text_to_cstring(quoted_params);
-				nfree(params_text);
-				nfree(quoted_params);
+				pfree(params_text);
+				pfree(quoted_params);
 			}
 		}
 		PG_CATCH();
@@ -486,19 +482,17 @@ ml_catalog_register_model(const MLCatalogModelSpec *spec)
 			metrics_txt = ndb_jsonb_out_cstring(metrics);
 			if (metrics_txt == NULL || strlen(metrics_txt) == 0)
 			{
-				elog(DEBUG1,
-					 "neurondb: ml_catalog_register_model: metrics JSONB conversion returned NULL or empty, using NULL");
 				metrics_quoted = NULL;
 			}
 			else
 			{
 				metrics_text = cstring_to_text(metrics_txt);
 				quoted_metrics = DatumGetTextP(
-											   DirectFunctionCall1(quote_literal,
-																   PointerGetDatum(metrics_text)));
+												   DirectFunctionCall1(quote_literal,
+																	   PointerGetDatum(metrics_text)));
 				metrics_quoted = text_to_cstring(quoted_metrics);
-				nfree(metrics_text);
-				nfree(quoted_metrics);
+				pfree(metrics_text);
+				pfree(quoted_metrics);
 			}
 		}
 		PG_CATCH();
@@ -547,18 +541,16 @@ ml_catalog_register_model(const MLCatalogModelSpec *spec)
 						 algorithm_quoted,
 						 table_quoted,
 						 column_quoted != NULL ? column_quoted : "NULL",
-						 params_quoted != NULL && strlen(params_quoted) > 0 ? params_quoted : "NULL",
-						 metrics_quoted != NULL && strlen(metrics_quoted) > 0 ? metrics_quoted : "NULL",
-						 time_ms_str != NULL ? time_ms_str : "NULL",
-						 num_samples_str != NULL ? num_samples_str : "NULL",
-						 num_features_str != NULL ? num_features_str : "NULL");
+				 params_quoted != NULL && strlen(params_quoted) > 0 ? params_quoted : "NULL",
+				 metrics_quoted != NULL && strlen(metrics_quoted) > 0 ? metrics_quoted : "NULL",
+			 time_ms_str != NULL ? time_ms_str : "NULL",
+			 num_samples_str != NULL ? num_samples_str : "NULL",
+			 num_features_str != NULL ? num_features_str : "NULL");
 
-		nfree(time_ms_str);
-		nfree(num_samples_str);
-		nfree(num_features_str);
-	}
-
-	/* Note: Enum values should be added during extension installation via neurondb--1.0.sql.
+	if (time_ms_str) pfree(time_ms_str);
+	if (num_samples_str) pfree(num_samples_str);
+	if (num_features_str) pfree(num_features_str);
+	}	/* Note: Enum values should be added during extension installation via neurondb--1.0.sql.
 	 * We use ::text::enum cast to allow using enum values that may have been added in the same
 	 * transaction (though PostgreSQL generally doesn't allow this, the cast is a workaround).
 	 * If the enum value doesn't exist, the INSERT will fail with a helpful error message. */
@@ -580,7 +572,6 @@ ml_catalog_register_model(const MLCatalogModelSpec *spec)
 		error_code = 7;
 		goto error;
 	}
-	elog(DEBUG1, "neurondb: ml_catalog_register_model: retrieved model_id=%d", model_id);
 
 	Assert(model_id > 0);
 	if (model_id <= 0)
@@ -608,7 +599,6 @@ ml_catalog_register_model(const MLCatalogModelSpec *spec)
 		nulls[0] = ' ';
 		nulls[1] = ' ';
 
-		elog(DEBUG1, "neurondb: ml_catalog_register_model: updating model_data for model_id %d", model_id);
 		ret = ndb_spi_execute_with_args(spi_session, sql.data, 2, argtypes, values, nulls, false, 0);
 		if (ret != SPI_OK_UPDATE || SPI_processed != 1)
 		{
@@ -620,13 +610,13 @@ ml_catalog_register_model(const MLCatalogModelSpec *spec)
 	}
 
 	ndb_spi_stringinfo_free(spi_session, &insert_sql);
-	nfree(algorithm_quoted);
-	nfree(table_quoted);
-	nfree(column_quoted);
-	nfree(params_txt);
-	nfree(params_quoted);
-	nfree(metrics_txt);
-	nfree(metrics_quoted);
+	if (algorithm_quoted) pfree(algorithm_quoted);
+	if (table_quoted) pfree(table_quoted);
+	if (column_quoted) pfree(column_quoted);
+	if (params_txt) pfree(params_txt);
+	if (params_quoted) pfree(params_quoted);
+	if (metrics_txt) pfree(metrics_txt);
+	if (metrics_quoted) pfree(metrics_quoted);
 
 	goto success;
 
@@ -854,7 +844,6 @@ ml_catalog_fetch_model_payload(int32 model_id,
 					if (jsonb_val == NULL)
 					{
 						*parameters_out = NULL;
-						elog(DEBUG1, "neurondb: ml_catalog_fetch_model_payload: parameters is NULL for model_id %d", model_id);
 					}
 					else
 					{
@@ -872,7 +861,6 @@ ml_catalog_fetch_model_payload(int32 model_id,
 					if (jsonb_val == NULL)
 					{
 						*metrics_out = NULL;
-						elog(DEBUG1, "neurondb: ml_catalog_fetch_model_payload: metrics is NULL for model_id %d", model_id);
 					}
 					else
 					{
@@ -880,11 +868,9 @@ ml_catalog_fetch_model_payload(int32 model_id,
 						*metrics_out = jsonb_val;
 					}
 				}
-				elog(DEBUG1, "neurondb: ml_catalog_fetch_model_payload: all fields retrieved, returning true");
 			}
 			else
 			{
-				elog(DEBUG1, "neurondb: ml_catalog_fetch_model_payload: model_id %d not found in catalog", model_id);
 			}
 		}
 		else
@@ -898,7 +884,6 @@ ml_catalog_fetch_model_payload(int32 model_id,
 	}
 	PG_CATCH();
 	{
-		elog(DEBUG1, "neurondb: ml_catalog_fetch_model_payload: caught exception, cleaning up");
 		ndb_spi_stringinfo_free(spi_session, &sql);
 		NDB_SPI_SESSION_END(spi_session);
 		PG_RE_THROW();
@@ -907,7 +892,6 @@ ml_catalog_fetch_model_payload(int32 model_id,
 
 	ereport(DEBUG2, (errmsg("ml_catalog_fetch_model_payload: about to end SPI session, spi_session=%p", (void *) spi_session)));
 	NDB_SPI_SESSION_END(spi_session);
-	elog(DEBUG1, "neurondb: ml_catalog_fetch_model_payload: SPI session ended");
 
 	/* Ensure we're in the caller's context before returning */
 	if (caller_context != NULL && CurrentMemoryContext != caller_context)
@@ -916,7 +900,6 @@ ml_catalog_fetch_model_payload(int32 model_id,
 		MemoryContextSwitchTo(caller_context);
 	}
 
-	elog(DEBUG1, "neurondb: ml_catalog_fetch_model_payload: about to return, found=%d", found);
 	ereport(DEBUG2, (errmsg("ml_catalog_fetch_model_payload: CurrentMemoryContext=%p, caller_context=%p", (void *) CurrentMemoryContext, (void *) caller_context)));
 
 	/* Store return value to avoid potential stack issues */

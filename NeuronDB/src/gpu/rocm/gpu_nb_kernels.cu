@@ -137,7 +137,7 @@ ndb_rocm_nb_count_classes(const double *labels,
 		return -1;
 
 	/* NOTE: CUDA backend is already initialized by ndb_gpu_cuda_init()
-	 * No need for redundant cudaFree(0) or cudaSetDevice() calls here.
+	 * No need for redundant hipFree(0) or hipSetDevice() calls here.
 	 * The redundant initialization was causing crashes in forked processes.
 	 */
 
@@ -148,23 +148,23 @@ ndb_rocm_nb_count_classes(const double *labels,
 	{
 		int device;
 		void *test_ptr = NULL;
-		hipError_t check_status = cudaGetDevice(&device);
+		hipError_t check_status = hipGetDevice(&device);
 		if (check_status != hipSuccess)
 		{
-			fprintf(stderr, "ndb_rocm_nb_count_classes: cudaGetDevice failed: %s\n", 
-				cudaGetErrorString(check_status));
+			fprintf(stderr, "ndb_rocm_nb_count_classes: hipGetDevice failed: %s\n", 
+				hipGetErrorString(check_status));
 			return -1;
 		}
-		fprintf(stderr, "ndb_rocm_nb_count_classes: Using CUDA device %d\n", device);
+		fprintf(stderr, "ndb_rocm_nb_count_classes: Using HIP device %d\n", device);
 		
 		/* Try a test allocation */
-		fprintf(stderr, "ndb_rocm_nb_count_classes: Testing cudaMalloc with 1024 bytes\n");
-		check_status = cudaMalloc(&test_ptr, 1024);
-		fprintf(stderr, "ndb_rocm_nb_count_classes: cudaMalloc test result: %s (ptr=%p)\n",
-			cudaGetErrorString(check_status), test_ptr);
+		fprintf(stderr, "ndb_rocm_nb_count_classes: Testing hipMalloc with 1024 bytes\n");
+		check_status = hipMalloc(&test_ptr, 1024);
+		fprintf(stderr, "ndb_rocm_nb_count_classes: hipMalloc test result: %s (ptr=%p)\n",
+			hipGetErrorString(check_status), test_ptr);
 		if (check_status == hipSuccess && test_ptr != NULL)
 		{
-			cudaFree(test_ptr);
+			hipFree(test_ptr);
 			fprintf(stderr, "ndb_rocm_nb_count_classes: Test allocation succeeded\n");
 		}
 		else
@@ -175,41 +175,41 @@ ndb_rocm_nb_count_classes(const double *labels,
 	}
 
 	fprintf(stderr, "ndb_rocm_nb_count_classes: Allocating %zu bytes for labels\n", label_bytes);
-	status = cudaMalloc((void **)&d_labels, label_bytes);
-	fprintf(stderr, "ndb_rocm_nb_count_classes: cudaMalloc for labels returned: %s\n",
-		cudaGetErrorString(status));
+	status = hipMalloc((void **)&d_labels, label_bytes);
+	fprintf(stderr, "ndb_rocm_nb_count_classes: hipMalloc for labels returned: %s\n",
+		hipGetErrorString(status));
 	if (status != hipSuccess)
 		return -1;
 
 	fprintf(stderr, "ndb_rocm_nb_count_classes: Allocating %zu bytes for class_counts\n", count_bytes);
-	status = cudaMalloc((void **)&d_class_counts, count_bytes);
-	fprintf(stderr, "ndb_rocm_nb_count_classes: cudaMalloc for class_counts returned: %s\n",
-		cudaGetErrorString(status));
+	status = hipMalloc((void **)&d_class_counts, count_bytes);
+	fprintf(stderr, "ndb_rocm_nb_count_classes: hipMalloc for class_counts returned: %s\n",
+		hipGetErrorString(status));
 	if (status != hipSuccess)
 	{
-		cudaFree(d_labels);
+		hipFree(d_labels);
 		return -1;
 	}
 
-	fprintf(stderr, "ndb_rocm_nb_count_classes: Calling cudaMemset\n");
-	status = cudaMemset(d_class_counts, 0, count_bytes);
-	fprintf(stderr, "ndb_rocm_nb_count_classes: cudaMemset returned: %s\n",
-		cudaGetErrorString(status));
+	fprintf(stderr, "ndb_rocm_nb_count_classes: Calling hipMemset\n");
+	status = hipMemset(d_class_counts, 0, count_bytes);
+	fprintf(stderr, "ndb_rocm_nb_count_classes: hipMemset returned: %s\n",
+		hipGetErrorString(status));
 	if (status != hipSuccess)
 	{
-		cudaFree(d_class_counts);
-		cudaFree(d_labels);
+		hipFree(d_class_counts);
+		hipFree(d_labels);
 		return -1;
 	}
 
-	fprintf(stderr, "ndb_rocm_nb_count_classes: Calling cudaMemcpy H2D\n");
-	status = cudaMemcpy(d_labels, labels, label_bytes, cudaMemcpyHostToDevice);
-	fprintf(stderr, "ndb_rocm_nb_count_classes: cudaMemcpy H2D returned: %s\n",
-		cudaGetErrorString(status));
+	fprintf(stderr, "ndb_rocm_nb_count_classes: Calling hipMemcpy H2D\n");
+	status = hipMemcpy(d_labels, labels, label_bytes, hipMemcpyHostToDevice);
+	fprintf(stderr, "ndb_rocm_nb_count_classes: hipMemcpy H2D returned: %s\n",
+		hipGetErrorString(status));
 	if (status != hipSuccess)
 	{
-		cudaFree(d_class_counts);
-		cudaFree(d_labels);
+		hipFree(d_class_counts);
+		hipFree(d_labels);
 		return -1;
 	}
 
@@ -224,38 +224,38 @@ ndb_rocm_nb_count_classes(const double *labels,
 
 	status = hipGetLastError();
 	fprintf(stderr, "ndb_rocm_nb_count_classes: hipGetLastError returned: %s\n",
-		cudaGetErrorString(status));
+		hipGetErrorString(status));
 	if (status != hipSuccess)
 	{
-		cudaFree(d_class_counts);
-		cudaFree(d_labels);
+		hipFree(d_class_counts);
+		hipFree(d_labels);
 		return -1;
 	}
 
-	fprintf(stderr, "ndb_rocm_nb_count_classes: Calling cudaDeviceSynchronize\n");
-	status = cudaDeviceSynchronize();
-	fprintf(stderr, "ndb_rocm_nb_count_classes: cudaDeviceSynchronize returned: %s\n",
-		cudaGetErrorString(status));
+	fprintf(stderr, "ndb_rocm_nb_count_classes: Calling hipDeviceSynchronize\n");
+	status = hipDeviceSynchronize();
+	fprintf(stderr, "ndb_rocm_nb_count_classes: hipDeviceSynchronize returned: %s\n",
+		hipGetErrorString(status));
 	if (status != hipSuccess)
 	{
-		cudaFree(d_class_counts);
-		cudaFree(d_labels);
+		hipFree(d_class_counts);
+		hipFree(d_labels);
 		return -1;
 	}
 
-	fprintf(stderr, "ndb_rocm_nb_count_classes: Calling cudaMemcpy D2H\n");
-	status = cudaMemcpy(class_counts, d_class_counts, count_bytes, cudaMemcpyDeviceToHost);
-	fprintf(stderr, "ndb_rocm_nb_count_classes: cudaMemcpy D2H returned: %s\n",
-		cudaGetErrorString(status));
+	fprintf(stderr, "ndb_rocm_nb_count_classes: Calling hipMemcpy D2H\n");
+	status = hipMemcpy(class_counts, d_class_counts, count_bytes, hipMemcpyDeviceToHost);
+	fprintf(stderr, "ndb_rocm_nb_count_classes: hipMemcpy D2H returned: %s\n",
+		hipGetErrorString(status));
 	if (status != hipSuccess)
 	{
-		cudaFree(d_class_counts);
-		cudaFree(d_labels);
+		hipFree(d_class_counts);
+		hipFree(d_labels);
 		return -1;
 	}
 
-	cudaFree(d_class_counts);
-	cudaFree(d_labels);
+	hipFree(d_class_counts);
+	hipFree(d_labels);
 	return 0;
 }
 
@@ -291,18 +291,18 @@ ndb_rocm_nb_compute_means(const float *features,
 		return -1;
 
 	/* Initialize CUDA runtime if needed (for consistency with count_classes) */
-	status = cudaFree(0);
+	status = hipFree(0);
 	if (status != hipSuccess && status != hipErrorInitializationError)
 		return -1;
 
 	/* Check CUDA device availability */
 	int device_count = 0;
-	status = cudaGetDeviceCount(&device_count);
+	status = hipGetDeviceCount(&device_count);
 	if (status != hipSuccess || device_count <= 0)
 		return -1;
 
 	/* Ensure device is set */
-	status = cudaSetDevice(0);
+	status = hipSetDevice(0);
 	if (status != hipSuccess)
 		return -1;
 
@@ -311,71 +311,71 @@ ndb_rocm_nb_compute_means(const float *features,
 	mean_bytes = sizeof(double) * (size_t)n_classes * (size_t)feature_dim;
 	count_bytes = sizeof(int) * (size_t)n_classes;
 
-	status = cudaMalloc((void **)&d_features, feature_bytes);
+	status = hipMalloc((void **)&d_features, feature_bytes);
 	if (status != hipSuccess)
 		return -1;
 
-	status = cudaMalloc((void **)&d_labels, label_bytes);
+	status = hipMalloc((void **)&d_labels, label_bytes);
 	if (status != hipSuccess)
 	{
-		cudaFree(d_features);
-		return -1;
-	}
-
-	status = cudaMalloc((void **)&d_means, mean_bytes);
-	if (status != hipSuccess)
-	{
-		cudaFree(d_labels);
-		cudaFree(d_features);
+		hipFree(d_features);
 		return -1;
 	}
 
-	status = cudaMalloc((void **)&d_class_counts, count_bytes);
+	status = hipMalloc((void **)&d_means, mean_bytes);
 	if (status != hipSuccess)
 	{
-		cudaFree(d_means);
-		cudaFree(d_labels);
-		cudaFree(d_features);
+		hipFree(d_labels);
+		hipFree(d_features);
 		return -1;
 	}
 
-	status = cudaMemset(d_means, 0, mean_bytes);
+	status = hipMalloc((void **)&d_class_counts, count_bytes);
 	if (status != hipSuccess)
 	{
-		cudaFree(d_class_counts);
-		cudaFree(d_means);
-		cudaFree(d_labels);
-		cudaFree(d_features);
+		hipFree(d_means);
+		hipFree(d_labels);
+		hipFree(d_features);
 		return -1;
 	}
 
-	status = cudaMemcpy(d_features, features, feature_bytes, cudaMemcpyHostToDevice);
+	status = hipMemset(d_means, 0, mean_bytes);
 	if (status != hipSuccess)
 	{
-		cudaFree(d_class_counts);
-		cudaFree(d_means);
-		cudaFree(d_labels);
-		cudaFree(d_features);
+		hipFree(d_class_counts);
+		hipFree(d_means);
+		hipFree(d_labels);
+		hipFree(d_features);
 		return -1;
 	}
 
-	status = cudaMemcpy(d_labels, labels, label_bytes, cudaMemcpyHostToDevice);
+	status = hipMemcpy(d_features, features, feature_bytes, hipMemcpyHostToDevice);
 	if (status != hipSuccess)
 	{
-		cudaFree(d_class_counts);
-		cudaFree(d_means);
-		cudaFree(d_labels);
-		cudaFree(d_features);
+		hipFree(d_class_counts);
+		hipFree(d_means);
+		hipFree(d_labels);
+		hipFree(d_features);
 		return -1;
 	}
 
-	status = cudaMemcpy(d_class_counts, class_counts, count_bytes, cudaMemcpyHostToDevice);
+	status = hipMemcpy(d_labels, labels, label_bytes, hipMemcpyHostToDevice);
 	if (status != hipSuccess)
 	{
-		cudaFree(d_class_counts);
-		cudaFree(d_means);
-		cudaFree(d_labels);
-		cudaFree(d_features);
+		hipFree(d_class_counts);
+		hipFree(d_means);
+		hipFree(d_labels);
+		hipFree(d_features);
+		return -1;
+	}
+
+	status = hipMemcpy(d_class_counts, class_counts, count_bytes, hipMemcpyHostToDevice);
+	if (status != hipSuccess)
+	{
+		hipFree(d_class_counts);
+		hipFree(d_means);
+		hipFree(d_labels);
+		hipFree(d_features);
 		return -1;
 	}
 
@@ -388,37 +388,37 @@ ndb_rocm_nb_compute_means(const float *features,
 	status = hipGetLastError();
 	if (status != hipSuccess)
 	{
-		cudaFree(d_class_counts);
-		cudaFree(d_means);
-		cudaFree(d_labels);
-		cudaFree(d_features);
+		hipFree(d_class_counts);
+		hipFree(d_means);
+		hipFree(d_labels);
+		hipFree(d_features);
 		return -1;
 	}
 
-	status = cudaDeviceSynchronize();
+	status = hipDeviceSynchronize();
 	if (status != hipSuccess)
 	{
-		cudaFree(d_class_counts);
-		cudaFree(d_means);
-		cudaFree(d_labels);
-		cudaFree(d_features);
+		hipFree(d_class_counts);
+		hipFree(d_means);
+		hipFree(d_labels);
+		hipFree(d_features);
 		return -1;
 	}
 
-	status = cudaMemcpy(means, d_means, mean_bytes, cudaMemcpyDeviceToHost);
+	status = hipMemcpy(means, d_means, mean_bytes, hipMemcpyDeviceToHost);
 	if (status != hipSuccess)
 	{
-		cudaFree(d_class_counts);
-		cudaFree(d_means);
-		cudaFree(d_labels);
-		cudaFree(d_features);
+		hipFree(d_class_counts);
+		hipFree(d_means);
+		hipFree(d_labels);
+		hipFree(d_features);
 		return -1;
 	}
 
-	cudaFree(d_class_counts);
-	cudaFree(d_means);
-	cudaFree(d_labels);
-	cudaFree(d_features);
+	hipFree(d_class_counts);
+	hipFree(d_means);
+	hipFree(d_labels);
+	hipFree(d_features);
 	return 0;
 }
 
@@ -456,19 +456,19 @@ ndb_rocm_nb_compute_variances(const float *features,
 	if (feature_dim > 1024)
 		return -1;
 
-	/* Initialize CUDA runtime if needed (for consistency with count_classes) */
-	status = cudaFree(0);
+	/* Initialize HIP runtime if needed (for consistency with count_classes) */
+	status = hipFree(0);
 	if (status != hipSuccess && status != hipErrorInitializationError)
 		return -1;
 
-	/* Check CUDA device availability */
+	/* Check HIP device availability */
 	int device_count = 0;
-	status = cudaGetDeviceCount(&device_count);
+	status = hipGetDeviceCount(&device_count);
 	if (status != hipSuccess || device_count <= 0)
 		return -1;
 
 	/* Ensure device is set */
-	status = cudaSetDevice(0);
+	status = hipSetDevice(0);
 	if (status != hipSuccess)
 		return -1;
 
@@ -478,96 +478,96 @@ ndb_rocm_nb_compute_variances(const float *features,
 	variance_bytes = sizeof(double) * (size_t)n_classes * (size_t)feature_dim;
 	count_bytes = sizeof(int) * (size_t)n_classes;
 
-	status = cudaMalloc((void **)&d_features, feature_bytes);
+	status = hipMalloc((void **)&d_features, feature_bytes);
 	if (status != hipSuccess)
 		return -1;
 
-	status = cudaMalloc((void **)&d_labels, label_bytes);
+	status = hipMalloc((void **)&d_labels, label_bytes);
 	if (status != hipSuccess)
 	{
-		cudaFree(d_features);
-		return -1;
-	}
-
-	status = cudaMalloc((void **)&d_means, mean_bytes);
-	if (status != hipSuccess)
-	{
-		cudaFree(d_labels);
-		cudaFree(d_features);
+		hipFree(d_features);
 		return -1;
 	}
 
-	status = cudaMalloc((void **)&d_variances, variance_bytes);
+	status = hipMalloc((void **)&d_means, mean_bytes);
 	if (status != hipSuccess)
 	{
-		cudaFree(d_means);
-		cudaFree(d_labels);
-		cudaFree(d_features);
+		hipFree(d_labels);
+		hipFree(d_features);
 		return -1;
 	}
 
-	status = cudaMalloc((void **)&d_class_counts, count_bytes);
+	status = hipMalloc((void **)&d_variances, variance_bytes);
 	if (status != hipSuccess)
 	{
-		cudaFree(d_variances);
-		cudaFree(d_means);
-		cudaFree(d_labels);
-		cudaFree(d_features);
+		hipFree(d_means);
+		hipFree(d_labels);
+		hipFree(d_features);
 		return -1;
 	}
 
-	status = cudaMemset(d_variances, 0, variance_bytes);
+	status = hipMalloc((void **)&d_class_counts, count_bytes);
 	if (status != hipSuccess)
 	{
-		cudaFree(d_class_counts);
-		cudaFree(d_variances);
-		cudaFree(d_means);
-		cudaFree(d_labels);
-		cudaFree(d_features);
+		hipFree(d_variances);
+		hipFree(d_means);
+		hipFree(d_labels);
+		hipFree(d_features);
 		return -1;
 	}
 
-	status = cudaMemcpy(d_features, features, feature_bytes, cudaMemcpyHostToDevice);
+	status = hipMemset(d_variances, 0, variance_bytes);
 	if (status != hipSuccess)
 	{
-		cudaFree(d_class_counts);
-		cudaFree(d_variances);
-		cudaFree(d_means);
-		cudaFree(d_labels);
-		cudaFree(d_features);
+		hipFree(d_class_counts);
+		hipFree(d_variances);
+		hipFree(d_means);
+		hipFree(d_labels);
+		hipFree(d_features);
 		return -1;
 	}
 
-	status = cudaMemcpy(d_labels, labels, label_bytes, cudaMemcpyHostToDevice);
+	status = hipMemcpy(d_features, features, feature_bytes, hipMemcpyHostToDevice);
 	if (status != hipSuccess)
 	{
-		cudaFree(d_class_counts);
-		cudaFree(d_variances);
-		cudaFree(d_means);
-		cudaFree(d_labels);
-		cudaFree(d_features);
+		hipFree(d_class_counts);
+		hipFree(d_variances);
+		hipFree(d_means);
+		hipFree(d_labels);
+		hipFree(d_features);
 		return -1;
 	}
 
-	status = cudaMemcpy(d_means, means, mean_bytes, cudaMemcpyHostToDevice);
+	status = hipMemcpy(d_labels, labels, label_bytes, hipMemcpyHostToDevice);
 	if (status != hipSuccess)
 	{
-		cudaFree(d_class_counts);
-		cudaFree(d_variances);
-		cudaFree(d_means);
-		cudaFree(d_labels);
-		cudaFree(d_features);
+		hipFree(d_class_counts);
+		hipFree(d_variances);
+		hipFree(d_means);
+		hipFree(d_labels);
+		hipFree(d_features);
 		return -1;
 	}
 
-	status = cudaMemcpy(d_class_counts, class_counts, count_bytes, cudaMemcpyHostToDevice);
+	status = hipMemcpy(d_means, means, mean_bytes, hipMemcpyHostToDevice);
 	if (status != hipSuccess)
 	{
-		cudaFree(d_class_counts);
-		cudaFree(d_variances);
-		cudaFree(d_means);
-		cudaFree(d_labels);
-		cudaFree(d_features);
+		hipFree(d_class_counts);
+		hipFree(d_variances);
+		hipFree(d_means);
+		hipFree(d_labels);
+		hipFree(d_features);
+		return -1;
+	}
+
+	status = hipMemcpy(d_class_counts, class_counts, count_bytes, hipMemcpyHostToDevice);
+	if (status != hipSuccess)
+	{
+		hipFree(d_class_counts);
+		hipFree(d_variances);
+		hipFree(d_means);
+		hipFree(d_labels);
+		hipFree(d_features);
 		return -1;
 	}
 
@@ -580,41 +580,41 @@ ndb_rocm_nb_compute_variances(const float *features,
 	status = hipGetLastError();
 	if (status != hipSuccess)
 	{
-		cudaFree(d_class_counts);
-		cudaFree(d_variances);
-		cudaFree(d_means);
-		cudaFree(d_labels);
-		cudaFree(d_features);
+		hipFree(d_class_counts);
+		hipFree(d_variances);
+		hipFree(d_means);
+		hipFree(d_labels);
+		hipFree(d_features);
 		return -1;
 	}
 
-	status = cudaDeviceSynchronize();
+	status = hipDeviceSynchronize();
 	if (status != hipSuccess)
 	{
-		cudaFree(d_class_counts);
-		cudaFree(d_variances);
-		cudaFree(d_means);
-		cudaFree(d_labels);
-		cudaFree(d_features);
+		hipFree(d_class_counts);
+		hipFree(d_variances);
+		hipFree(d_means);
+		hipFree(d_labels);
+		hipFree(d_features);
 		return -1;
 	}
 
-	status = cudaMemcpy(variances, d_variances, variance_bytes, cudaMemcpyDeviceToHost);
+	status = hipMemcpy(variances, d_variances, variance_bytes, hipMemcpyDeviceToHost);
 	if (status != hipSuccess)
 	{
-		cudaFree(d_class_counts);
-		cudaFree(d_variances);
-		cudaFree(d_means);
-		cudaFree(d_labels);
-		cudaFree(d_features);
+		hipFree(d_class_counts);
+		hipFree(d_variances);
+		hipFree(d_means);
+		hipFree(d_labels);
+		hipFree(d_features);
 		return -1;
 	}
 
-	cudaFree(d_class_counts);
-	cudaFree(d_variances);
-	cudaFree(d_means);
-	cudaFree(d_labels);
-	cudaFree(d_features);
+	hipFree(d_class_counts);
+	hipFree(d_variances);
+	hipFree(d_means);
+	hipFree(d_labels);
+	hipFree(d_features);
 	return 0;
 }
 

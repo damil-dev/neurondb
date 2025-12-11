@@ -229,9 +229,6 @@ neuranq_main(Datum main_arg)
 			MemoryContext oldcontext =
 				MemoryContextSwitchTo(TopMemoryContext);
 
-			elog(DEBUG1,
-				"neurondb: exception in neuranq main loop - "
-				"recovering");
 			FlushErrorState();
 
 			/* Transaction already aborted in process_job_batch() */
@@ -290,9 +287,6 @@ process_job_batch(void)
 			ndb_spi_session_end(&session);
 			PopActiveSnapshot();
 			CommitTransactionCommand();
-			elog(DEBUG1,
-				"neurondb: queue worker waiting for extension "
-				"to be created");
 			return;
 		}
 
@@ -408,9 +402,6 @@ process_job_batch(void)
 			}
 			}
 
-			elog(DEBUG1,
-				"neurondb: neuranq processed %d jobs",
-				processed);
 
 			if (neuranq_state && neuranq_state->lock)
 			{
@@ -428,9 +419,6 @@ process_job_batch(void)
 	PG_CATCH();
 	{
 		ndb_spi_session_end(&session);
-		elog(DEBUG1,
-			"neurondb: exception in process_job_batch - "
-			"recovering");
 		FlushErrorState();
 
 		if (IsTransactionState())
@@ -453,32 +441,15 @@ execute_job(int64 job_id,
 	{
 		if (strcmp(job_type, "embed") == 0)
 		{
-			elog(DEBUG1,
-				"neurondb: processing embed job " NDB_INT64_FMT
-				": %s",
-				NDB_INT64_CAST(job_id),
-				payload);
 			success = true;
 		} else if (strcmp(job_type, "rerank") == 0)
 		{
-			elog(DEBUG1,
-				"neurondb: processing rerank "
-				"job " NDB_INT64_FMT,
-				NDB_INT64_CAST(job_id));
 			success = true;
 		} else if (strcmp(job_type, "cache_refresh") == 0)
 		{
-			elog(DEBUG1,
-				"neurondb: processing cache_refresh "
-				"job " NDB_INT64_FMT,
-				NDB_INT64_CAST(job_id));
 			success = true;
 		} else if (strcmp(job_type, "http_call") == 0)
 		{
-			elog(INFO,
-				"neurondb: processing http_call "
-				"job " NDB_INT64_FMT,
-				NDB_INT64_CAST(job_id));
 			success = true;
 		} else
 		{
@@ -529,9 +500,6 @@ neuranq_run_once(PG_FUNCTION_ARGS)
 
 	PG_TRY();
 	{
-		elog(INFO,
-			"neurondb: manually triggering neuranq batch "
-			"processing");
 		process_job_batch();
 	}
 	PG_CATCH();

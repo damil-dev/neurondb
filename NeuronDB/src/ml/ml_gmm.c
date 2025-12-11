@@ -339,16 +339,11 @@ cluster_gmm(PG_FUNCTION_ARGS)
 						(model.variances[k][d] / N_k[k]) + GMM_EPSILON;
 			}
 
-			nfree(N_k);
-		}
-
-		if ((iter + 1) % 10 == 0)
-			elog(DEBUG1,
-				 "neurondb: GMM iteration %d, log_likelihood=%.6f",
-				 iter + 1, log_likelihood);
+		nfree(N_k);
 	}
+}
 
-	nalloc(result_datums, Datum, nvec * num_components);
+nalloc(result_datums, Datum, nvec * num_components);
 	for (i = 0; i < nvec; i++)
 	{
 		for (k = 0; k < num_components; k++)
@@ -564,7 +559,7 @@ train_gmm_model_id(PG_FUNCTION_ARGS)
 	int32		model_id = 0;
 	Jsonb	   *metrics = NULL;
 	MLCatalogModelSpec spec = {0};
-	StringInfoData metrics_json = {0};
+	Jsonb	   *params_jsonb = NULL;
 	text	   *table_name = NULL;
 	text	   *vector_column = NULL;
 
@@ -747,11 +742,135 @@ train_gmm_model_id(PG_FUNCTION_ARGS)
 
 	model_data = gmm_model_serialize_to_bytea(&model, 0);
 
-	initStringInfo(&metrics_json);
-	appendStringInfo(&metrics_json, "{\"training_backend\":0, \"k\": %d, \"dim\": %d, \"max_iters\": %d}",
-					 model.k, model.dim, max_iters);
-	metrics = ndb_jsonb_in_cstring(metrics_json.data);
-	nfree(metrics_json.data);
+	/* Build parameters JSON using JSONB API */
+	{
+		JsonbParseState *state = NULL;
+		JsonbValue	jkey;
+		JsonbValue	jval;
+
+		JsonbValue *final_value = NULL;
+		Numeric		k_num,
+					max_iters_num;
+
+		PG_TRY();
+		{
+			(void) pushJsonbValue(&state, WJB_BEGIN_OBJECT, NULL);
+
+			/* Add k */
+			jkey.type = jbvString;
+			jkey.val.string.val = "k";
+			jkey.val.string.len = strlen("k");
+			(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+			k_num = DatumGetNumeric(DirectFunctionCall1(int4_numeric, Int32GetDatum(model.k)));
+			jval.type = jbvNumeric;
+			jval.val.numeric = k_num;
+			(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+
+			/* Add max_iters */
+			jkey.val.string.val = "max_iters";
+			jkey.val.string.len = strlen("max_iters");
+			(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+			max_iters_num = DatumGetNumeric(DirectFunctionCall1(int4_numeric, Int32GetDatum(max_iters)));
+			jval.type = jbvNumeric;
+			jval.val.numeric = max_iters_num;
+			(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+
+			final_value = pushJsonbValue(&state, WJB_END_OBJECT, NULL);
+
+			if (final_value == NULL)
+			{
+				elog(ERROR, "neurondb: train_gmm: pushJsonbValue(WJB_END_OBJECT) returned NULL for parameters");
+			}
+
+			params_jsonb = JsonbValueToJsonb(final_value);
+		}
+		PG_CATCH();
+		{
+			ErrorData  *edata = CopyErrorData();
+
+			elog(ERROR, "neurondb: train_gmm: parameters JSONB construction failed: %s", edata->message);
+			FlushErrorState();
+			params_jsonb = NULL;
+		}
+		PG_END_TRY();
+	}
+
+	/* Build metrics JSON using JSONB API */
+	{
+		JsonbParseState *state = NULL;
+		JsonbValue	jkey;
+		JsonbValue	jval;
+
+		JsonbValue *final_value = NULL;
+		Numeric		training_backend_num,
+					k_num,
+					dim_num,
+					max_iters_num;
+
+		PG_TRY();
+		{
+			(void) pushJsonbValue(&state, WJB_BEGIN_OBJECT, NULL);
+
+			/* Add training_backend */
+			jkey.type = jbvString;
+			jkey.val.string.val = "training_backend";
+			jkey.val.string.len = strlen("training_backend");
+			(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+			training_backend_num = DatumGetNumeric(DirectFunctionCall1(int4_numeric, Int32GetDatum(0)));
+			jval.type = jbvNumeric;
+			jval.val.numeric = training_backend_num;
+			(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+
+			/* Add k */
+			jkey.val.string.val = "k";
+			jkey.val.string.len = strlen("k");
+			(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+			k_num = DatumGetNumeric(DirectFunctionCall1(int4_numeric, Int32GetDatum(model.k)));
+			jval.type = jbvNumeric;
+			jval.val.numeric = k_num;
+			(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+
+			/* Add dim */
+			jkey.val.string.val = "dim";
+			jkey.val.string.len = strlen("dim");
+			(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+			dim_num = DatumGetNumeric(DirectFunctionCall1(int4_numeric, Int32GetDatum(model.dim)));
+			jval.type = jbvNumeric;
+			jval.val.numeric = dim_num;
+			(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+
+			/* Add max_iters */
+			jkey.val.string.val = "max_iters";
+			jkey.val.string.len = strlen("max_iters");
+			(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+			max_iters_num = DatumGetNumeric(DirectFunctionCall1(int4_numeric, Int32GetDatum(max_iters)));
+			jval.type = jbvNumeric;
+			jval.val.numeric = max_iters_num;
+			(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+
+			final_value = pushJsonbValue(&state, WJB_END_OBJECT, NULL);
+
+			if (final_value == NULL)
+			{
+				elog(ERROR, "neurondb: train_gmm: pushJsonbValue(WJB_END_OBJECT) returned NULL for metrics");
+			}
+
+			metrics = JsonbValueToJsonb(final_value);
+		}
+		PG_CATCH();
+		{
+			ErrorData  *edata = CopyErrorData();
+
+			elog(ERROR, "neurondb: train_gmm: metrics JSONB construction failed: %s", edata->message);
+			FlushErrorState();
+			metrics = NULL;
+		}
+		PG_END_TRY();
+	}
+
+	if (metrics == NULL)
+	{
+	}
 
 	memset(&spec, 0, sizeof(MLCatalogModelSpec));
 	spec.project_name = NULL;
@@ -759,6 +878,7 @@ train_gmm_model_id(PG_FUNCTION_ARGS)
 	spec.training_table = tbl_str;
 	spec.training_column = NULL;
 	spec.model_data = model_data;
+	spec.parameters = params_jsonb;
 	spec.metrics = metrics;
 	spec.num_samples = nvec;
 	spec.num_features = dim;
@@ -1415,23 +1535,18 @@ gmm_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 	metrics = NULL;
 
 	rc = backend->gmm_train(spec->feature_matrix,
-							spec->sample_count,
-							spec->feature_dim,
-							n_components,
-							spec->hyperparameters,
-							&payload,
-							&metrics,
-							errstr);
+						spec->sample_count,
+						spec->feature_dim,
+						n_components,
+						spec->hyperparameters,
+						&payload,
+						&metrics,
+						errstr);
 	if (rc != 0 || payload == NULL)
 	{
-		if (payload != NULL)
-			nfree(payload);
-		if (metrics != NULL)
-			nfree(metrics);
+		/* On error, GPU backend should have cleaned up - don't free here */
 		return false;
-	}
-
-	if (model->backend_state != NULL)
+	}	if (model->backend_state != NULL)
 	{
 		gmm_gpu_release_state((GmmGpuModelState *) model->backend_state);
 		model->backend_state = NULL;

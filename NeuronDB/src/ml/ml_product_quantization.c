@@ -233,12 +233,6 @@ train_pq_codebook(PG_FUNCTION_ARGS)
 	tbl_str = text_to_cstring(table_name);
 	col_str = text_to_cstring(column_name);
 
-	elog(DEBUG1,
-		 "neurondb: Starting PQ training for table = %s.%s, m=%d, ksub=%d",
-		 tbl_str,
-		 col_str,
-		 m,
-		 ksub);
 
 	/*
 	 * Pull training vectors from the table: neurondb_fetch_vectors_from_table
@@ -316,12 +310,6 @@ train_pq_codebook(PG_FUNCTION_ARGS)
 		float **subspace_data = NULL;
 		int			start_dim = sub * codebook.dsub;
 
-		elog(DEBUG1,
-			 "neurondb: Training PQ subspace %d of %d (dims %d-%d)",
-			 sub + 1,
-			 m,
-			 start_dim,
-			 start_dim + codebook.dsub - 1);
 
 		/*
 		 * Extract subspace vectors from data (copy block of contiguous
@@ -1112,7 +1100,7 @@ typedef struct ProductQuantizationGpuModelState
 }			ProductQuantizationGpuModelState;
 
 static bytea *
-pq_codebook_serialize_to_bytea(const PQCodebook * codebook)
+pq_codebook_serialize_to_bytea(const PQCodebook * codebook, uint8 training_backend)
 {
 	int			result_size;
 	bytea *result = NULL;
@@ -1120,15 +1108,27 @@ pq_codebook_serialize_to_bytea(const PQCodebook * codebook)
 	int			sub,
 				i;
 
+	/* Validate training_backend */
+	if (training_backend > 1)
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_INTERNAL_ERROR),
+				 errmsg("neurondb: pq_codebook_serialize_to_bytea: invalid training_backend %d (must be 0 or 1)",
+						training_backend)));
+	}
+
 	{
 		char *result_raw = NULL;
-		result_size = sizeof(int) * 3 + codebook->m * codebook->ksub * codebook->dsub * sizeof(float);
+		result_size = sizeof(uint8) + sizeof(int) * 3 + codebook->m * codebook->ksub * codebook->dsub * sizeof(float);
 		nalloc(result_raw, char, VARHDRSZ + result_size);
 		result = (bytea *) result_raw;
 		SET_VARSIZE(result, VARHDRSZ + result_size);
 		result_ptr = VARDATA(result);
 	}
 
+	/* Write training_backend first (0=CPU, 1=GPU) - unified storage format */
+	memcpy(result_ptr, &training_backend, sizeof(uint8));
+	result_ptr += sizeof(uint8);
 	memcpy(result_ptr, &codebook->m, sizeof(int));
 	result_ptr += sizeof(int);
 	memcpy(result_ptr, &codebook->ksub, sizeof(int));
@@ -1147,17 +1147,23 @@ pq_codebook_serialize_to_bytea(const PQCodebook * codebook)
 }
 
 static int
-pq_codebook_deserialize_from_bytea(const bytea * data, PQCodebook * codebook)
+pq_codebook_deserialize_from_bytea(const bytea * data, PQCodebook * codebook, uint8 * training_backend_out)
 {
 	const char *buf;
 	int			offset = 0;
 	int			sub,
 				i;
+	uint8		training_backend = 0;
 
-	if (data == NULL || VARSIZE(data) < VARHDRSZ + sizeof(int) * 3)
+	if (data == NULL || VARSIZE(data) < VARHDRSZ + sizeof(uint8) + sizeof(int) * 3)
 		return -1;
 
 	buf = VARDATA(data);
+	/* Read training_backend first (unified storage format) */
+	training_backend = (uint8) buf[offset];
+	offset += sizeof(uint8);
+	if (training_backend_out != NULL)
+		*training_backend_out = training_backend;
 	memcpy(&codebook->m, buf + offset, sizeof(int));
 	offset += sizeof(int);
 	memcpy(&codebook->ksub, buf + offset, sizeof(int));
@@ -1344,12 +1350,12 @@ product_quantization_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, ch
 	}
 
 	/* Serialize model */
-	model_data = pq_codebook_serialize_to_bytea(&codebook);
+	model_data = pq_codebook_serialize_to_bytea(&codebook, 0); /* training_backend=0 for CPU */
 
 	/* Build metrics */
 	initStringInfo(&metrics_json);
 	appendStringInfo(&metrics_json,
-					 "{\"storage\":\"cpu\",\"m\":%d,\"ksub\":%d,\"dsub\":%d,\"dim\":%d,\"n_samples\":%d}",
+					 "{\"storage\":\"cpu\",\"training_backend\":0,\"m\":%d,\"ksub\":%d,\"dsub\":%d,\"dim\":%d,\"n_samples\":%d}",
 					 m, ksub, codebook.dsub, dim, nvec);
 	metrics = DatumGetJsonbP(DirectFunctionCall1(jsonb_in,
 												 CStringGetTextDatum(metrics_json.data)));
@@ -1440,11 +1446,15 @@ product_quantization_gpu_predict(const MLGpuModel *model, const float *input, in
 	{
 		PQCodebook	temp_codebook;
 
-		if (pq_codebook_deserialize_from_bytea(state->model_blob, &temp_codebook) != 0)
 		{
-			if (errstr != NULL)
-				*errstr = pstrdup("product_quantization_gpu_predict: failed to deserialize");
-			return false;
+			uint8		training_backend = 0;
+
+			if (pq_codebook_deserialize_from_bytea(state->model_blob, &temp_codebook, &training_backend) != 0)
+			{
+				if (errstr != NULL)
+					*errstr = pstrdup("product_quantization_gpu_predict: failed to deserialize");
+				return false;
+			}
 		}
 		{
 			PQCodebook *codebook_ptr = NULL;
@@ -1610,12 +1620,16 @@ product_quantization_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 		memcpy(payload_copy, payload, payload_size);
 	}
 
-	if (pq_codebook_deserialize_from_bytea(payload_copy, &codebook) != 0)
 	{
-		nfree(payload_copy);
-		if (errstr != NULL)
-			*errstr = pstrdup("product_quantization_gpu_deserialize: failed to deserialize");
-		return false;
+		uint8		training_backend = 0;
+
+		if (pq_codebook_deserialize_from_bytea(payload_copy, &codebook, &training_backend) != 0)
+		{
+			nfree(payload_copy);
+			if (errstr != NULL)
+				*errstr = pstrdup("product_quantization_gpu_deserialize: failed to deserialize");
+			return false;
+		}
 	}
 
 	state = (ProductQuantizationGpuModelState *) palloc0(sizeof(ProductQuantizationGpuModelState));

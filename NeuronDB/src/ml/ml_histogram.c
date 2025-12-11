@@ -110,9 +110,6 @@ similarity_histogram(PG_FUNCTION_ARGS)
 	tbl_str = text_to_cstring(table_name);
 	vec_col_str = text_to_cstring(vector_column);
 
-	elog(DEBUG1,
-		 "neurondb: Computing similarity histogram (%d samples)",
-		 num_samples);
 
 	/* Fetch vectors */
 	vectors = neurondb_fetch_vectors_from_table(tbl_str, vec_col_str, &nvec, &dim);
@@ -162,9 +159,6 @@ similarity_histogram(PG_FUNCTION_ARGS)
 	p95 = distances[(int) (num_samples * 0.95)];
 	p99 = distances[(int) (num_samples * 0.99)];
 
-	elog(DEBUG1,
-		 "neurondb: Distance stats: min=%.4f, max=%.4f, mean=%.4f, p50=%.4f",
-		 min_dist, max_dist, mean_dist, p50);
 
 	if (get_call_result_type(fcinfo, NULL, &tupdesc) != TYPEFUNC_COMPOSITE)
 		ereport(ERROR,

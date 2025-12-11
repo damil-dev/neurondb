@@ -90,9 +90,6 @@ ndb_rls_init(Relation rel, EState * estate)
 
 	if (state->hasRLS)
 	{
-		elog(DEBUG1,
-			 "neurondb: RLS enabled for relation %s",
-			 RelationGetRelationName(rel));
 
 		state->policies = ndb_get_row_security_policies(rel, state->userId);
 
@@ -106,9 +103,6 @@ ndb_rls_init(Relation rel, EState * estate)
 	}
 	else
 	{
-		elog(DEBUG1,
-			 "neurondb: No RLS policies for relation %s",
-			 RelationGetRelationName(rel));
 	}
 
 	return state;
@@ -342,15 +336,6 @@ neurondb_test_rls(PG_FUNCTION_ARGS)
 	hasRLS = (rel->rd_rel->relrowsecurity
 			  && rel->rd_rel->relforcerowsecurity);
 
-	if (hasRLS)
-		elog(DEBUG1,
-			 "neurondb: Relation %s has RLS enabled",
-			 RelationGetRelationName(rel));
-	else
-		elog(DEBUG1,
-			 "neurondb: Relation %s has NO RLS",
-			 RelationGetRelationName(rel));
-
 	table_close(rel, AccessShareLock);
 
 	PG_RETURN_BOOL(hasRLS);
@@ -389,8 +374,6 @@ ndb_index_scan_rls_filter(IndexScanDesc scan, ItemPointer tid)
 			 * This is a fallback - ideally index AMs should cooperate with
 			 * RLS
 			 */
-			elog(DEBUG1,
-				 "neurondb: scan->opaque already in use, RLS state allocated separately");
 			rlsState = ndb_rls_init(scan->heapRelation, NULL);
 			/* Store in xs_want_itup as fallback when opaque is in use */
 			scan->xs_want_itup = (void *) rlsState;
@@ -459,10 +442,6 @@ ndb_rls_filter_results(Relation rel,
 
 	ndb_rls_end(rlsState);
 
-	elog(DEBUG1,
-		 "neurondb: RLS filtered %d -> %d results",
-		 count,
-		 resultCount);
 
 	return resultCount;
 }

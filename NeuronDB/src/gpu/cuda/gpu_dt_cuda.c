@@ -640,7 +640,9 @@ dt_build_tree_gpu(const float *features,
 	if (node->left == NULL)
 	{
 		nfree(left_indices);
+		left_indices = NULL;
 		nfree(right_indices);
+		right_indices = NULL;
 		nfree(node);
 		return NULL;
 	}
@@ -652,7 +654,9 @@ dt_build_tree_gpu(const float *features,
 	{
 		dt_free_tree(node->left);
 		nfree(left_indices);
+		left_indices = NULL;
 		nfree(right_indices);
+		right_indices = NULL;
 		nfree(node);
 		return NULL;
 	}
@@ -681,6 +685,12 @@ ndb_cuda_dt_train(const float *features,
 	int *indices = NULL;
 	int			i;
 	int			rc = -1;
+
+	/* Initialize output pointers to NULL */
+	if (model_data)
+		*model_data = NULL;
+	if (metrics)
+		*metrics = NULL;
 
 	/* CPU mode: never execute GPU code */
 	if (NDB_COMPUTE_MODE_IS_CPU())
@@ -728,6 +738,9 @@ ndb_cuda_dt_train(const float *features,
 	/* Extract hyperparameters - wrap in PG_TRY to handle JSONB parsing errors */
 	if (hyperparams != NULL)
 	{
+		/* Detoast hyperparameters to ensure stable pointer */
+		Jsonb *detoasted_hyperparams = (Jsonb *) PG_DETOAST_DATUM(PointerGetDatum(hyperparams));
+		
 		PG_TRY();
 		{
 			Datum		max_depth_datum;
@@ -739,7 +752,7 @@ ndb_cuda_dt_train(const float *features,
 
 			max_depth_datum = DirectFunctionCall2(
 												  jsonb_object_field,
-												  JsonbPGetDatum(hyperparams),
+												  JsonbPGetDatum(detoasted_hyperparams),
 												  CStringGetTextDatum("max_depth"));
 			if (DatumGetPointer(max_depth_datum) != NULL)
 			{
@@ -760,7 +773,7 @@ ndb_cuda_dt_train(const float *features,
 
 			min_samples_split_datum = DirectFunctionCall2(
 														  jsonb_object_field,
-														  JsonbPGetDatum(hyperparams),
+														  JsonbPGetDatum(detoasted_hyperparams),
 														  CStringGetTextDatum("min_samples_split"));
 			if (DatumGetPointer(min_samples_split_datum) != NULL)
 			{
@@ -779,7 +792,7 @@ ndb_cuda_dt_train(const float *features,
 
 			is_classification_datum = DirectFunctionCall2(
 														  jsonb_object_field,
-														  JsonbPGetDatum(hyperparams),
+														  JsonbPGetDatum(detoasted_hyperparams),
 														  CStringGetTextDatum("is_classification"));
 			if (DatumGetPointer(is_classification_datum) != NULL)
 			{
@@ -791,7 +804,7 @@ ndb_cuda_dt_train(const float *features,
 
 			class_count_datum = DirectFunctionCall2(
 													jsonb_object_field,
-													JsonbPGetDatum(hyperparams),
+													JsonbPGetDatum(detoasted_hyperparams),
 													CStringGetTextDatum("class_count"));
 			if (DatumGetPointer(class_count_datum) != NULL)
 			{

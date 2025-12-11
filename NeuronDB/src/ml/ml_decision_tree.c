@@ -44,6 +44,7 @@
 #include "neurondb_macros.h"
 #include "neurondb_json.h"
 #include "neurondb_constants.h"
+#include "neurondb_guc.h"
 
 #ifdef NDB_GPU_CUDA
 #include "neurondb_cuda_runtime.h"
@@ -175,7 +176,6 @@ dt_dataset_load(const char *quoted_tbl,
 					 quoted_tbl,
 					 quoted_feat,
 					 quoted_label);
-	elog(DEBUG1, "dt_dataset_load: executing query: %s", query.data);
 
 	NDB_SPI_SESSION_BEGIN(dt_load_spi_session, oldcontext);
 
@@ -871,7 +871,7 @@ dt_model_deserialize(const bytea * data, uint8 * training_backend_out)
 		nfree(model);
 		return NULL;
 	}
-	model->model_id = pq_getmsgint(&buf, 4);
+	model->model_id = (int32) pq_getmsgint(&buf, 4);
 
 	if (buf.cursor + 4 > buf.len)
 	{
@@ -879,7 +879,10 @@ dt_model_deserialize(const bytea * data, uint8 * training_backend_out)
 		nfree(model);
 		return NULL;
 	}
-	model->n_features = pq_getmsgint(&buf, 4);
+	{
+		unsigned int raw_value = pq_getmsgint(&buf, 4);
+		model->n_features = (int32) raw_value;
+	}
 
 	if (buf.cursor + 4 > buf.len)
 	{
@@ -887,7 +890,7 @@ dt_model_deserialize(const bytea * data, uint8 * training_backend_out)
 		nfree(model);
 		return NULL;
 	}
-	model->n_samples = pq_getmsgint(&buf, 4);
+	model->n_samples = (int32) pq_getmsgint(&buf, 4);
 
 	if (buf.cursor + 4 > buf.len)
 	{
@@ -895,7 +898,7 @@ dt_model_deserialize(const bytea * data, uint8 * training_backend_out)
 		nfree(model);
 		return NULL;
 	}
-	model->max_depth = pq_getmsgint(&buf, 4);
+	model->max_depth = (int32) pq_getmsgint(&buf, 4);
 
 	if (buf.cursor + 4 > buf.len)
 	{
@@ -903,10 +906,8 @@ dt_model_deserialize(const bytea * data, uint8 * training_backend_out)
 		nfree(model);
 		return NULL;
 	}
-	model->min_samples_split = pq_getmsgint(&buf, 4);
+	model->min_samples_split = (int32) pq_getmsgint(&buf, 4);
 
-	elog(DEBUG1, "dt_model_deserialize: model_id=%d, n_features=%d, n_samples=%d, max_depth=%d, min_samples_split=%d, data_size=%d",
-		 model->model_id, model->n_features, model->n_samples, model->max_depth, model->min_samples_split, buf.len);
 
 	if (model->n_features <= 0 || model->n_features > 10000)
 	{
@@ -1008,8 +1009,60 @@ dt_try_gpu_predict_catalog(int32 model_id, const Vector *feature_vec, double *re
 	if (payload == NULL)
 		goto cleanup;
 
-	if (!dt_metadata_is_gpu(metrics))
-		goto cleanup;
+	/* Check if this is a GPU model - either by metrics or by payload format */
+	{
+		bool		is_gpu_model = false;
+		uint32		payload_size;
+
+		/* First check metrics for training_backend */
+		if (dt_metadata_is_gpu(metrics))
+		{
+			is_gpu_model = true;
+		}
+		else
+		{
+			/* If metrics check didn't find GPU indicator, check payload format */
+			/* GPU models start with NdbCudaDtModelHeader, CPU models start with uint8 training_backend */
+			payload_size = VARSIZE(payload) - VARHDRSZ;
+			
+			/* CPU format: first byte is training_backend (uint8), then model_id (int32) */
+			/* GPU format: first field is feature_dim (int32) */
+			/* Check if payload looks like GPU format (starts with int32, not uint8) */
+			if (payload_size >= sizeof(int32))
+			{
+				const int32 *first_int = (const int32 *) VARDATA(payload);
+				int32		first_value = *first_int;
+				
+				/* If first 4 bytes look like a reasonable feature_dim, check for GPU format */
+				if (first_value > 0 && first_value <= 100000)
+				{
+					/* Check if payload size matches GPU format */
+					if (payload_size >= sizeof(NdbCudaDtModelHeader))
+					{
+						const NdbCudaDtModelHeader *hdr = (const NdbCudaDtModelHeader *) VARDATA(payload);
+						
+						/* Validate header fields match the first int32 */
+						if (hdr->feature_dim == first_value &&
+							hdr->n_samples >= 0 && hdr->n_samples <= 1000000000 &&
+							hdr->node_count > 0 && hdr->node_count <= 1000000)
+						{
+							size_t		expected_gpu_size = sizeof(NdbCudaDtModelHeader) +
+								sizeof(NdbCudaDtNode) * (size_t) hdr->node_count;
+							
+							/* Size matches GPU format - likely a GPU model */
+							if (payload_size >= expected_gpu_size && payload_size < expected_gpu_size + 1000)
+							{
+								is_gpu_model = true;
+							}
+						}
+					}
+				}
+			}
+		}
+
+		if (!is_gpu_model)
+			goto cleanup;
+	}
 
 	if (ndb_gpu_dt_predict(payload,
 						   feature_vec->data,
@@ -1058,6 +1111,93 @@ dt_load_model_from_catalog(int32 model_id, DTModel **out)
 		return false;
 	}
 
+	/* Skip GPU models - they should be handled by GPU prediction */
+	/* Check both metrics and payload format to determine if this is a GPU model */
+	{
+		bool		is_gpu_model = false;
+		uint32		payload_size;
+
+		/* First check metrics for training_backend */
+		if (metrics != NULL)
+		{
+			JsonbIterator *it = NULL;
+			JsonbValue	v;
+			JsonbIteratorToken r;
+
+			it = JsonbIteratorInit((JsonbContainer *) & metrics->root);
+			while ((r = JsonbIteratorNext(&it, &v, true)) != WJB_DONE)
+			{
+				if (r == WJB_KEY && v.type == jbvString)
+				{
+					char	   *key = pnstrdup(v.val.string.val, v.val.string.len);
+
+					if (strcmp(key, "training_backend") == 0)
+					{
+						r = JsonbIteratorNext(&it, &v, true);
+						if (r == WJB_VALUE && v.type == jbvNumeric)
+						{
+							int			backend = DatumGetInt32(DirectFunctionCall1(numeric_int4, NumericGetDatum(v.val.numeric)));
+
+							is_gpu_model = (backend == 1);
+						}
+					}
+					nfree(key);
+				}
+			}
+		}
+
+		/* If metrics check didn't find GPU indicator, check payload format */
+		/* GPU models start with NdbCudaDtModelHeader, CPU models start with uint8 training_backend */
+		if (!is_gpu_model)
+		{
+			payload_size = VARSIZE(payload) - VARHDRSZ;
+			
+			/* CPU format: first byte is training_backend (uint8), then model_id (int32) */
+			/* GPU format: first field is feature_dim (int32) */
+			/* Check if payload looks like GPU format (starts with int32, not uint8) */
+			if (payload_size >= sizeof(int32))
+			{
+				const int32 *first_int = (const int32 *) VARDATA(payload);
+				int32		first_value = *first_int;
+				
+				/* If first 4 bytes look like a reasonable feature_dim, check for GPU format */
+				if (first_value > 0 && first_value <= 100000)
+				{
+					/* Check if payload size matches GPU format */
+					if (payload_size >= sizeof(NdbCudaDtModelHeader))
+					{
+						const NdbCudaDtModelHeader *hdr = (const NdbCudaDtModelHeader *) VARDATA(payload);
+						
+						/* Validate header fields match the first int32 */
+						if (hdr->feature_dim == first_value &&
+							hdr->n_samples >= 0 && hdr->n_samples <= 1000000000 &&
+							hdr->node_count > 0 && hdr->node_count <= 1000000)
+						{
+							size_t		expected_gpu_size = sizeof(NdbCudaDtModelHeader) +
+								sizeof(NdbCudaDtNode) * (size_t) hdr->node_count;
+							
+							/* Size matches GPU format - likely a GPU model */
+							if (payload_size >= expected_gpu_size && payload_size < expected_gpu_size + 1000)
+							{
+								is_gpu_model = true;
+							}
+						}
+					}
+				}
+			}
+		}
+
+		if (is_gpu_model)
+		{
+			if (payload)
+				nfree(payload);
+			if (metrics)
+				nfree(metrics);
+			return false;
+		}
+	}
+	
+	/* Unified format supports both CPU and GPU - deserialize if training_backend is 0 or 1 */
 	*out = dt_model_deserialize(payload, NULL);
 	if (*out == NULL)
 	{
@@ -1121,8 +1261,6 @@ train_decision_tree_classifier(PG_FUNCTION_ARGS)
 	DTModel *model = NULL;
 	bytea *model_blob = NULL;
 	MLCatalogModelSpec spec;
-	StringInfoData paramsbuf;
-	StringInfoData metricsbuf;
 
 	Jsonb *params_jsonb = NULL;
 	Jsonb *metrics_jsonb = NULL;
@@ -1203,7 +1341,6 @@ train_decision_tree_classifier(PG_FUNCTION_ARGS)
 									&gpu_err) &&
 			gpu_result.spec.model_data != NULL)
 		{
-			elog(DEBUG1, "neurondb: dt: GPU training succeeded");
 			spec = gpu_result.spec;
 
 			if (spec.training_table == NULL)
@@ -1240,12 +1377,10 @@ train_decision_tree_classifier(PG_FUNCTION_ARGS)
 		}
 		if (gpu_err)
 		{
-			elog(DEBUG1, "neurondb: dt: GPU training failed: %s", gpu_err);
 			nfree(gpu_err);
 		}
 		else
 		{
-			elog(DEBUG1, "neurondb: dt: GPU training returned false (no error string)");
 		}
 		if (gpu_hyperparams)
 			nfree(gpu_hyperparams);
@@ -1288,14 +1423,61 @@ train_decision_tree_classifier(PG_FUNCTION_ARGS)
 				 errmsg("neurondb: dt: failed to serialize model")));
 	}
 
-	initStringInfo(&paramsbuf);
-	appendStringInfo(&paramsbuf, "{\"max_depth\":%d,\"min_samples_split\":%d}",
-					 max_depth, min_samples_split);
-	/* Use ndb_jsonb_in_cstring like other ML algorithms fix */
-	params_jsonb = ndb_jsonb_in_cstring(paramsbuf.data);
+	/* Build parameters JSON using JSONB API */
+	{
+		JsonbParseState *state = NULL;
+		JsonbValue	jkey;
+		JsonbValue	jval;
+
+		JsonbValue *final_value = NULL;
+		Numeric		max_depth_num,
+					min_samples_split_num;
+
+		PG_TRY();
+		{
+			(void) pushJsonbValue(&state, WJB_BEGIN_OBJECT, NULL);
+
+			/* Add max_depth */
+			jkey.type = jbvString;
+			jkey.val.string.val = "max_depth";
+			jkey.val.string.len = strlen("max_depth");
+			(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+			max_depth_num = DatumGetNumeric(DirectFunctionCall1(int4_numeric, Int32GetDatum(max_depth)));
+			jval.type = jbvNumeric;
+			jval.val.numeric = max_depth_num;
+			(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+
+			/* Add min_samples_split */
+			jkey.val.string.val = "min_samples_split";
+			jkey.val.string.len = strlen("min_samples_split");
+			(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+			min_samples_split_num = DatumGetNumeric(DirectFunctionCall1(int4_numeric, Int32GetDatum(min_samples_split)));
+			jval.type = jbvNumeric;
+			jval.val.numeric = min_samples_split_num;
+			(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+
+			final_value = pushJsonbValue(&state, WJB_END_OBJECT, NULL);
+
+			if (final_value == NULL)
+			{
+				elog(ERROR, "neurondb: train_decision_tree_classifier: pushJsonbValue(WJB_END_OBJECT) returned NULL for parameters");
+			}
+
+			params_jsonb = JsonbValueToJsonb(final_value);
+		}
+		PG_CATCH();
+		{
+			ErrorData  *edata = CopyErrorData();
+
+			elog(ERROR, "neurondb: train_decision_tree_classifier: parameters JSONB construction failed: %s", edata->message);
+			FlushErrorState();
+			params_jsonb = NULL;
+		}
+		PG_END_TRY();
+	}
+
 	if (params_jsonb == NULL)
 	{
-		nfree(paramsbuf.data);
 		dt_free_tree(model->root);
 		nfree(model);
 		nfree(indices);
@@ -1304,28 +1486,108 @@ train_decision_tree_classifier(PG_FUNCTION_ARGS)
 		nfree(feat_str);
 		nfree(label_str);
 		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
-				 errmsg("neurondb: train_decision_tree_classifier: failed to parse parameters JSON")));
+				(errcode(ERRCODE_INTERNAL_ERROR),
+				 errmsg("neurondb: train_decision_tree_classifier: failed to create parameters JSONB")));
 	}
-	nfree(paramsbuf.data);
-	paramsbuf.data = NULL;
 
-	initStringInfo(&metricsbuf);
-	appendStringInfo(&metricsbuf,
-					 "{\"algorithm\":\"decision_tree\","
-					 "\"storage\":\"cpu\","
-					 "\"n_features\":%d,"
-					 "\"n_samples\":%d,"
-					 "\"max_depth\":%d,"
-					 "\"min_samples_split\":%d}",
-					 dataset.feature_dim, dataset.n_samples, max_depth, min_samples_split);
-	/* Use ndb_jsonb_in_cstring like other ML algorithms fix */
-	metrics_jsonb = ndb_jsonb_in_cstring(metricsbuf.data);
+	/* Build metrics JSON using JSONB API */
+	{
+		JsonbParseState *state = NULL;
+		JsonbValue	jkey;
+		JsonbValue	jval;
+
+		JsonbValue *final_value = NULL;
+		Numeric		n_features_num,
+					n_samples_num,
+					max_depth_num,
+					min_samples_split_num;
+
+		PG_TRY();
+		{
+			(void) pushJsonbValue(&state, WJB_BEGIN_OBJECT, NULL);
+
+			/* Add algorithm */
+			jkey.type = jbvString;
+			jkey.val.string.val = "algorithm";
+			jkey.val.string.len = strlen("algorithm");
+			(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+			jval.type = jbvString;
+			jval.val.string.val = "decision_tree";
+			jval.val.string.len = strlen("decision_tree");
+			(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+
+			/* Add storage */
+			jkey.val.string.val = "storage";
+			jkey.val.string.len = strlen("storage");
+			(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+			jval.type = jbvString;
+			jval.val.string.val = "cpu";
+			jval.val.string.len = strlen("cpu");
+			(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+
+			/* Add n_features */
+			jkey.val.string.val = "n_features";
+			jkey.val.string.len = strlen("n_features");
+			(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+			n_features_num = DatumGetNumeric(DirectFunctionCall1(int4_numeric, Int32GetDatum(dataset.feature_dim)));
+			jval.type = jbvNumeric;
+			jval.val.numeric = n_features_num;
+			(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+
+			/* Add n_samples */
+			jkey.val.string.val = "n_samples";
+			jkey.val.string.len = strlen("n_samples");
+			(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+			n_samples_num = DatumGetNumeric(DirectFunctionCall1(int4_numeric, Int32GetDatum(dataset.n_samples)));
+			jval.type = jbvNumeric;
+			jval.val.numeric = n_samples_num;
+			(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+
+			/* Add max_depth */
+			jkey.val.string.val = "max_depth";
+			jkey.val.string.len = strlen("max_depth");
+			(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+			max_depth_num = DatumGetNumeric(DirectFunctionCall1(int4_numeric, Int32GetDatum(max_depth)));
+			jval.type = jbvNumeric;
+			jval.val.numeric = max_depth_num;
+			(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+
+			/* Add min_samples_split */
+			jkey.val.string.val = "min_samples_split";
+			jkey.val.string.len = strlen("min_samples_split");
+			(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+			min_samples_split_num = DatumGetNumeric(DirectFunctionCall1(int4_numeric, Int32GetDatum(min_samples_split)));
+			jval.type = jbvNumeric;
+			jval.val.numeric = min_samples_split_num;
+			(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+
+			final_value = pushJsonbValue(&state, WJB_END_OBJECT, NULL);
+
+			if (final_value == NULL)
+			{
+				elog(ERROR, "neurondb: train_decision_tree_classifier: pushJsonbValue(WJB_END_OBJECT) returned NULL for metrics");
+			}
+
+			metrics_jsonb = JsonbValueToJsonb(final_value);
+		}
+		PG_CATCH();
+		{
+			ErrorData  *edata = CopyErrorData();
+
+			elog(ERROR, "neurondb: train_decision_tree_classifier: metrics JSONB construction failed: %s", edata->message);
+			FlushErrorState();
+			metrics_jsonb = NULL;
+		}
+		PG_END_TRY();
+	}
+
 	if (metrics_jsonb == NULL)
 	{
-		if (paramsbuf.data != NULL)
-			nfree(paramsbuf.data);
-		nfree(metricsbuf.data);
+		if (params_jsonb != NULL)
+		{
+			nfree(params_jsonb);
+			params_jsonb = NULL;
+		}
 		dt_free_tree(model->root);
 		nfree(model);
 		nfree(indices);
@@ -1334,11 +1596,9 @@ train_decision_tree_classifier(PG_FUNCTION_ARGS)
 		nfree(feat_str);
 		nfree(label_str);
 		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
-				 errmsg("neurondb: train_decision_tree_classifier: failed to parse metrics JSON")));
+				(errcode(ERRCODE_INTERNAL_ERROR),
+				 errmsg("neurondb: train_decision_tree_classifier: failed to create metrics JSONB")));
 	}
-	nfree(metricsbuf.data);
-	metricsbuf.data = NULL;
 
 	memset(&spec, 0, sizeof(spec));
 	spec.algorithm = "decision_tree";
@@ -1356,9 +1616,6 @@ train_decision_tree_classifier(PG_FUNCTION_ARGS)
 	nfree(model);
 	nfree(indices);
 	nfree(model_blob);
-
-	nfree(paramsbuf.data);
-	nfree(metricsbuf.data);
 
 	dt_dataset_free(&dataset);
 	nfree(tbl_str);
@@ -1456,9 +1713,6 @@ dt_predict_batch(const DTModel *model,
 
 	if (model == NULL || model->root == NULL || features == NULL || labels == NULL || n_samples <= 0)
 	{
-		elog(DEBUG1,
-			 "neurondb: dt_predict_batch: early return - model=%p, model->root=%p, features=%p, labels=%p, n_samples=%d",
-			 (void *) model, model ? (void *) model->root : NULL, (void *) features, (void *) labels, n_samples);
 		if (tp_out)
 			*tp_out = 0;
 		if (tn_out)
@@ -1470,9 +1724,6 @@ dt_predict_batch(const DTModel *model,
 		return;
 	}
 
-	elog(DEBUG1,
-		 "neurondb: dt_predict_batch: starting - n_samples=%d, feature_dim=%d, model->n_features=%d",
-		 n_samples, feature_dim, model->n_features);
 
 	for (i = 0; i < n_samples; i++)
 	{
@@ -1484,7 +1735,6 @@ dt_predict_batch(const DTModel *model,
 
 		if (!isfinite(y_true))
 		{
-			elog(DEBUG1, "neurondb: dt_predict_batch: sample %d - skipping non-finite y_true=%.6f", i, y_true);
 			continue;
 		}
 
@@ -1497,7 +1747,6 @@ dt_predict_batch(const DTModel *model,
 		prediction = dt_tree_predict(model->root, row, feature_dim);
 		if (!isfinite(prediction))
 		{
-			elog(DEBUG1, "neurondb: dt_predict_batch: sample %d - skipping non-finite prediction=%.6f", i, prediction);
 			continue;
 		}
 
@@ -1509,9 +1758,6 @@ dt_predict_batch(const DTModel *model,
 
 		if (i < 10 || (i % 100 == 0))
 		{
-			elog(DEBUG1,
-				 "neurondb: dt_predict_batch: sample %d - y_true=%.6f (class=%d), prediction=%.6f (class=%d)",
-				 i, y_true, true_class, prediction, pred_class);
 		}
 
 		if (true_class == 1 && pred_class == 1)
@@ -1543,9 +1789,6 @@ dt_predict_batch(const DTModel *model,
 					class1_count++;
 			}
 		}
-		elog(DEBUG1,
-			 "neurondb: dt_predict_batch: summary - processed=%d, class0=%d, class1=%d, tp=%d, tn=%d, fp=%d, fn=%d",
-			 i, class0_count, class1_count, tp, tn, fp, fn);
 	}
 
 	if (tp_out)
@@ -1581,7 +1824,6 @@ evaluate_decision_tree_by_model_id(PG_FUNCTION_ARGS)
 	int			ret;
 	int			nvec = 0;
 	int			i;
-	int			j;
 	Oid			feat_type_oid = InvalidOid;
 	bool		feat_is_array = false;
 	double		accuracy = 0.0;
@@ -1596,7 +1838,6 @@ evaluate_decision_tree_by_model_id(PG_FUNCTION_ARGS)
 	StringInfoData query;
 
 	DTModel *model = NULL;
-	StringInfoData jsonbuf;
 
 	Jsonb *result_jsonb = NULL;
 	bytea *gpu_payload = NULL;
@@ -1631,11 +1872,11 @@ evaluate_decision_tree_by_model_id(PG_FUNCTION_ARGS)
 	{
 		if (ml_catalog_fetch_model_payload(model_id, &gpu_payload, NULL, &gpu_metrics))
 		{
-			is_gpu_model = dt_metadata_is_gpu(gpu_metrics);
 			/* Validate GPU payload */
 			if (gpu_payload == NULL)
 			{
-				nfree(gpu_metrics);
+				if (gpu_metrics)
+					nfree(gpu_metrics);
 				nfree(tbl_str);
 				nfree(feat_str);
 				nfree(targ_str);
@@ -1644,11 +1885,64 @@ evaluate_decision_tree_by_model_id(PG_FUNCTION_ARGS)
 						 errmsg("neurondb: evaluate_decision_tree_by_model_id: model %d has NULL payload",
 								model_id)));
 			}
-			is_gpu_model = dt_metadata_is_gpu(gpu_metrics);
+			
+			/* Check if this is a GPU model - either by metrics or by payload format */
+			{
+				uint32		payload_size;
+
+				/* First check metrics for training_backend */
+				if (dt_metadata_is_gpu(gpu_metrics))
+				{
+					is_gpu_model = true;
+				}
+				else
+				{
+					/* If metrics check didn't find GPU indicator, check payload format */
+					/* GPU models start with NdbCudaDtModelHeader, CPU models start with uint8 training_backend */
+					payload_size = VARSIZE(gpu_payload) - VARHDRSZ;
+					
+					/* CPU format: first byte is training_backend (uint8), then model_id (int32) */
+					/* GPU format: first field is feature_dim (int32) */
+					/* Check if payload looks like GPU format (starts with int32, not uint8) */
+					if (payload_size >= sizeof(int32))
+					{
+						const int32 *first_int = (const int32 *) VARDATA(gpu_payload);
+						int32		first_value = *first_int;
+						
+						/* If first 4 bytes look like a reasonable feature_dim, check for GPU format */
+						if (first_value > 0 && first_value <= 100000)
+						{
+							/* Check if payload size matches GPU format */
+							if (payload_size >= sizeof(NdbCudaDtModelHeader))
+							{
+								const NdbCudaDtModelHeader *hdr = (const NdbCudaDtModelHeader *) VARDATA(gpu_payload);
+								
+								/* Validate header fields match the first int32 */
+								if (hdr->feature_dim == first_value &&
+									hdr->n_samples >= 0 && hdr->n_samples <= 1000000000 &&
+									hdr->node_count > 0 && hdr->node_count <= 1000000)
+								{
+									size_t		expected_gpu_size = sizeof(NdbCudaDtModelHeader) +
+										sizeof(NdbCudaDtNode) * (size_t) hdr->node_count;
+									
+									/* Size matches GPU format - likely a GPU model */
+									if (payload_size >= expected_gpu_size && payload_size < expected_gpu_size + 1000)
+									{
+										is_gpu_model = true;
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+			
 			if (!is_gpu_model)
 			{
-				nfree(gpu_payload);
-				nfree(gpu_metrics);
+				if (gpu_payload)
+					nfree(gpu_payload);
+				if (gpu_metrics)
+					nfree(gpu_metrics);
 				nfree(tbl_str);
 				nfree(feat_str);
 				nfree(targ_str);
@@ -1665,7 +1959,7 @@ evaluate_decision_tree_by_model_id(PG_FUNCTION_ARGS)
 			nfree(targ_str);
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-					 errmsg("neurondb: evaluate_decision_tree_by_model_id: model %d exists but has corrupted data and no GPU fallback available",
+					 errmsg("neurondb: evaluate_decision_tree_by_model_id: model %d not found",
 							model_id)));
 		}
 	}
@@ -1682,7 +1976,6 @@ evaluate_decision_tree_by_model_id(PG_FUNCTION_ARGS)
 					 quote_identifier(tbl_str),
 					 quote_identifier(feat_str),
 					 quote_identifier(targ_str));
-	elog(DEBUG1, "evaluate_decision_tree_by_model_id: executing query: %s", query.data);
 
 	ret = ndb_spi_execute(spi_session, query.data, true, 0);
 	if (ret != SPI_OK_SELECT)
@@ -1765,422 +2058,80 @@ evaluate_decision_tree_by_model_id(PG_FUNCTION_ARGS)
 	if (feat_type_oid == FLOAT8ARRAYOID || feat_type_oid == FLOAT4ARRAYOID)
 		feat_is_array = true;
 
-	if (is_gpu_model && neurondb_gpu_is_available())
+	/* Unified evaluation: Determine predict function based on compute mode */
+	/* All metrics calculation is the same - only difference is predict function */
 	{
-#ifdef NDB_GPU_CUDA
-		const NdbCudaDtModelHeader *gpu_hdr;
-
-		int *h_labels = NULL;
-		float *h_features = NULL;
+		bool		use_gpu_predict = false;
+		int			processed_count = 0;
 		int			feat_dim = 0;
-		int			valid_rows = 0;
-		size_t		payload_size;
+		const NdbCudaDtModelHeader *gpu_hdr = NULL;
 
-		payload_size = VARSIZE(gpu_payload) - VARHDRSZ;
-		if (payload_size < sizeof(NdbCudaDtModelHeader))
+		/* Determine if we should use GPU predict or CPU predict based on compute mode */
+		if (is_gpu_model && neurondb_gpu_is_available() && !NDB_COMPUTE_MODE_IS_CPU())
 		{
-			elog(DEBUG1,
-				 "neurondb: evaluate_decision_tree_by_model_id: GPU payload too small (%zu bytes), falling back to CPU",
-				 payload_size);
-			goto cpu_evaluation_path;
-		}
-
-		gpu_hdr = (const NdbCudaDtModelHeader *) VARDATA(gpu_payload);
-		if (gpu_hdr == NULL)
-		{
-			elog(DEBUG1,
-				 "neurondb: evaluate_decision_tree_by_model_id: NULL GPU header, falling back to CPU");
-			goto cpu_evaluation_path;
-		}
-
-		feat_dim = gpu_hdr->feature_dim;
-		if (feat_dim <= 0 || feat_dim > 100000)
-		{
-			elog(DEBUG1,
-				 "neurondb: evaluate_decision_tree_by_model_id: invalid feature_dim (%d), falling back to CPU",
-				 feat_dim);
-			goto cpu_evaluation_path;
-		}
-
-		{
-			size_t		features_size = sizeof(float) * (size_t) nvec * (size_t) feat_dim;
-			size_t		labels_size = sizeof(int) * (size_t) nvec;
-
-			if (features_size > MaxAllocSize || labels_size > MaxAllocSize)
+			/* GPU model and GPU mode: use GPU predict */
+			if (gpu_payload != NULL && VARSIZE(gpu_payload) - VARHDRSZ >= sizeof(NdbCudaDtModelHeader))
 			{
-				elog(DEBUG1,
-					 "neurondb: evaluate_decision_tree_by_model_id: allocation size too large (features=%zu, labels=%zu), falling back to CPU",
-					 features_size, labels_size);
-				goto cpu_evaluation_path;
+				gpu_hdr = (const NdbCudaDtModelHeader *) VARDATA(gpu_payload);
+				feat_dim = gpu_hdr->feature_dim;
+				use_gpu_predict = true;
 			}
-
-			nalloc(h_features, float, nvec * feat_dim);
-			nalloc(h_labels, int, nvec);
-
-			if (h_features == NULL || h_labels == NULL)
+		}
+		else if (model != NULL)
+		{
+			/* CPU model or CPU mode: use CPU predict */
+			feat_dim = model->n_features;
+			use_gpu_predict = false;
+		}
+		else if (is_gpu_model && gpu_payload != NULL)
+		{
+			/* GPU model but CPU mode: convert to CPU format for CPU predict */
+			if (VARSIZE(gpu_payload) - VARHDRSZ >= sizeof(NdbCudaDtModelHeader))
 			{
-				elog(DEBUG1,
-					 "neurondb: evaluate_decision_tree_by_model_id: memory allocation failed, falling back to CPU");
-				nfree(h_features);
-				nfree(h_labels);
-				goto cpu_evaluation_path;
+				gpu_hdr = (const NdbCudaDtModelHeader *) VARDATA(gpu_payload);
+				feat_dim = gpu_hdr->feature_dim;
+
+				/* Try to deserialize GPU model as CPU model */
+				model = dt_model_deserialize(gpu_payload, NULL);
+				if (model == NULL)
+				{
+					NDB_SPI_SESSION_END(spi_session);
+					nfree(gpu_payload);
+					nfree(gpu_metrics);
+					nfree(tbl_str);
+					nfree(feat_str);
+					nfree(targ_str);
+					ndb_spi_stringinfo_free(spi_session, &query);
+					ereport(ERROR,
+							(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+							 errmsg("neurondb: evaluate_decision_tree_by_model_id: failed to convert GPU model to CPU format"),
+							 errdetail("GPU model conversion failed for model %d", model_id),
+							 errhint("GPU model cannot be evaluated in CPU mode. Use GPU mode or retrain the model.")));
+				}
+				use_gpu_predict = false;
 			}
 		}
 
-		/*
-		 * Extract features and labels from SPI results - optimized batch
-		 * extraction
-		 */
-		/* Cache TupleDesc to avoid repeated lookups */
+		/* Ensure we have a valid model or GPU payload */
+		if (model == NULL && !use_gpu_predict)
 		{
-			TupleDesc	tupdesc = SPI_tuptable->tupdesc;
-
-			if (tupdesc == NULL)
-			{
-				elog(DEBUG1,
-					 "neurondb: evaluate_decision_tree_by_model_id: NULL TupleDesc, falling back to CPU");
-				nfree(h_features);
-				nfree(h_labels);
-				goto cpu_evaluation_path;
-			}
-
-			for (i = 0; i < nvec; i++)
-			{
-				HeapTuple	tuple;
-				Datum		feat_datum;
-				Datum		targ_datum;
-				bool		feat_null;
-				bool		targ_null;
-				Vector *vec = NULL;
-				ArrayType *arr = NULL;
-				float *feat_row = NULL;
-
-				if (SPI_tuptable == NULL || SPI_tuptable->vals == NULL || i >= SPI_processed)
-					break;
-
-				tuple = SPI_tuptable->vals[i];
-				if (tuple == NULL)
-					continue;
-
-				feat_datum = SPI_getbinval(tuple, tupdesc, 1, &feat_null);
-				targ_datum = SPI_getbinval(tuple, tupdesc, 2, &targ_null);
-
-				if (feat_null || targ_null)
-					continue;
-
-				if (valid_rows >= nvec)
-				{
-					elog(DEBUG1,
-						 "neurondb: evaluate_decision_tree_by_model_id: valid_rows overflow, breaking");
-					break;
-				}
-
-				feat_row = h_features + (valid_rows * feat_dim);
-				if (feat_row == NULL || feat_row < h_features || feat_row >= h_features + (nvec * feat_dim))
-				{
-					elog(DEBUG1,
-						 "neurondb: evaluate_decision_tree_by_model_id: feat_row out of bounds, skipping row");
-					continue;
-				}
-
-				h_labels[valid_rows] = (int) rint(DatumGetFloat8(targ_datum));
-
-				/* Extract feature vector - optimized paths */
-				if (feat_is_array)
-				{
-					arr = DatumGetArrayTypeP(feat_datum);
-					if (ARR_NDIM(arr) != 1 || ARR_DIMS(arr)[0] != feat_dim)
-						continue;
-					if (feat_type_oid == FLOAT8ARRAYOID)
-					{
-						/* Optimized: bulk conversion with loop unrolling hint */
-						float8	   *data = (float8 *) ARR_DATA_PTR(arr);
-						int			j_remain = feat_dim % 4;
-						int			j_end = feat_dim - j_remain;
-
-						/*
-						 * Process 4 elements at a time for better cache
-						 * locality
-						 */
-						for (j = 0; j < j_end; j += 4)
-						{
-							feat_row[j] = (float) data[j];
-							feat_row[j + 1] = (float) data[j + 1];
-							feat_row[j + 2] = (float) data[j + 2];
-							feat_row[j + 3] = (float) data[j + 3];
-						}
-						/* Handle remaining elements */
-						for (j = j_end; j < feat_dim; j++)
-							feat_row[j] = (float) data[j];
-					}
-					else
-					{
-						/* FLOAT4ARRAYOID: direct memcpy (already optimal) */
-						float4	   *data = (float4 *) ARR_DATA_PTR(arr);
-
-						memcpy(feat_row, data, sizeof(float) * feat_dim);
-					}
-				}
-				else
-				{
-					/* Vector type: direct memcpy (already optimal) */
-					vec = DatumGetVector(feat_datum);
-					if (vec->dim != feat_dim)
-						continue;
-					memcpy(feat_row, vec->data, sizeof(float) * feat_dim);
-				}
-
-				valid_rows++;
-			}
-		}
-
-		if (valid_rows == 0)
-		{
-			nfree(h_features);
-			nfree(h_labels);
+			NDB_SPI_SESSION_END(spi_session);
 			nfree(gpu_payload);
 			nfree(gpu_metrics);
 			nfree(tbl_str);
 			nfree(feat_str);
 			nfree(targ_str);
 			ndb_spi_stringinfo_free(spi_session, &query);
-			NDB_SPI_SESSION_END(spi_session);
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-					 errmsg("neurondb: evaluate_decision_tree_by_model_id: no valid rows found")));
-		}
-
-		/* Use optimized GPU batch evaluation */
-		{
-			int			rc;
-
-			char *gpu_errstr = NULL;
-
-			/* Defensive checks before GPU call */
-			if (h_features == NULL || h_labels == NULL || valid_rows <= 0 || feat_dim <= 0)
-			{
-				elog(DEBUG1,
-					 "neurondb: evaluate_decision_tree_by_model_id: invalid inputs for GPU evaluation (features=%p, labels=%p, rows=%d, dim=%d), falling back to CPU",
-					 (void *) h_features, (void *) h_labels, valid_rows, feat_dim);
-				nfree(h_features);
-				nfree(h_labels);
-				goto cpu_evaluation_path;
-			}
-
-			PG_TRY();
-			{
-				rc = ndb_cuda_dt_evaluate_batch(gpu_payload,
-												h_features,
-												h_labels,
-												valid_rows,
-												feat_dim,
-												&accuracy,
-												&precision,
-												&recall,
-												&f1_score,
-												&gpu_errstr);
-
-				if (rc == 0)
-				{
-					/* Success - cleanup and build result */
-					/* Free GPU-allocated memory before ending SPI */
-					nfree(h_features);
-					nfree(h_labels);
-					if (gpu_payload)
-						nfree(gpu_payload);
-					if (gpu_metrics)
-						nfree(gpu_metrics);
-					if (gpu_errstr)
-						nfree(gpu_errstr);
-					nfree(tbl_str);
-					nfree(feat_str);
-					nfree(targ_str);
-					ndb_spi_stringinfo_free(spi_session, &query);
-
-					/* End SPI session BEFORE creating JSONB */
-					NDB_SPI_SESSION_END(spi_session);
-
-					/* Switch to oldcontext to create JSONB */
-					MemoryContextSwitchTo(oldcontext);
-
-					/* Build result JSON string */
-					initStringInfo(&jsonbuf);
-					appendStringInfo(&jsonbuf,
-									 "{\"accuracy\":%.6f,\"precision\":%.6f,\"recall\":%.6f,\"f1_score\":%.6f,\"n_samples\":%d}",
-									 accuracy,
-									 precision,
-									 recall,
-									 f1_score,
-									 valid_rows);
-
-					/* Create JSONB in oldcontext using ndb_jsonb_in_cstring */
-					result_jsonb = ndb_jsonb_in_cstring(jsonbuf.data);
-					nfree(jsonbuf.data);
-
-					if (result_jsonb == NULL)
-					{
-						ereport(ERROR,
-								(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
-								 errmsg("neurondb: evaluate_decision_tree_by_model_id: failed to parse metrics JSON")));
-					}
-
-					PG_RETURN_JSONB_P(result_jsonb);
-				}
-				else
-				{
-					/* GPU evaluation failed - fall back to CPU */
-					elog(DEBUG1,
-						 "neurondb: evaluate_decision_tree_by_model_id: GPU batch evaluation failed: %s, falling back to CPU",
-						 gpu_errstr ? gpu_errstr : "unknown error");
-					if (gpu_errstr)
-						nfree(gpu_errstr);
-					nfree(h_features);
-					nfree(h_labels);
-					goto cpu_evaluation_path;
-				}
-			}
-			PG_CATCH();
-			{
-				elog(DEBUG1,
-					 "neurondb: evaluate_decision_tree_by_model_id: exception during GPU evaluation, falling back to CPU");
-				nfree(h_features);
-				nfree(h_labels);
-				goto cpu_evaluation_path;
-			}
-			PG_END_TRY();
-		}
-#endif							/* NDB_GPU_CUDA */
-	}
-#ifndef NDB_GPU_CUDA
-	/* When CUDA is not available, always use CPU path */
-	if (false)
-	{
-	}
-#endif
-
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-label"
-cpu_evaluation_path:
-#pragma GCC diagnostic pop
-
-	/* CPU evaluation path */
-	/* Use optimized batch prediction */
-	{
-		float *h_features = NULL;
-		double *h_labels = NULL;
-		int			feat_dim = 0;
-		int			valid_rows = 0;
-
-		/* Determine feature dimension from model */
-		if (model != NULL)
-			feat_dim = model->n_features;
-		else if (is_gpu_model && gpu_payload != NULL)
-		{
-			const NdbCudaDtModelHeader *gpu_hdr;
-
-			gpu_hdr = (const NdbCudaDtModelHeader *) VARDATA(gpu_payload);
-			feat_dim = gpu_hdr->feature_dim;
-		}
-		else
-		{
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-					 errmsg("neurondb: evaluate_decision_tree_by_model_id: could not determine feature dimension")));
+					 errmsg("neurondb: evaluate_decision_tree_by_model_id: no valid model found"),
+					 errdetail("Neither CPU model nor GPU payload is available"),
+					 errhint("Verify the model exists in the catalog and is in the correct format.")));
 		}
 
 		if (feat_dim <= 0)
 		{
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-					 errmsg("neurondb: evaluate_decision_tree_by_model_id: invalid feature dimension %d",
-							feat_dim)));
-		}
-
-		/* Allocate host buffers for features and labels */
-		nalloc(h_features, float, nvec * feat_dim);
-		nalloc(h_labels, double, nvec);
-
-		/*
-		 * Extract features and labels from SPI results - optimized batch
-		 * extraction
-		 */
-		/* Cache TupleDesc to avoid repeated lookups */
-		{
-			TupleDesc	tupdesc = SPI_tuptable->tupdesc;
-
-			for (i = 0; i < nvec; i++)
-			{
-				HeapTuple	tuple = SPI_tuptable->vals[i];
-				Datum		feat_datum;
-				Datum		targ_datum;
-				bool		feat_null;
-				bool		targ_null;
-				Vector *vec = NULL;
-				ArrayType *arr = NULL;
-				float *feat_row = NULL;
-
-				feat_datum = SPI_getbinval(tuple, tupdesc, 1, &feat_null);
-				targ_datum = SPI_getbinval(tuple, tupdesc, 2, &targ_null);
-
-				if (feat_null || targ_null)
-					continue;
-
-				feat_row = h_features + (valid_rows * feat_dim);
-				h_labels[valid_rows] = DatumGetFloat8(targ_datum);
-
-				/* Extract feature vector - optimized paths */
-				if (feat_is_array)
-				{
-					arr = DatumGetArrayTypeP(feat_datum);
-					if (ARR_NDIM(arr) != 1 || ARR_DIMS(arr)[0] != feat_dim)
-						continue;
-					if (feat_type_oid == FLOAT8ARRAYOID)
-					{
-						/* Optimized: bulk conversion with loop unrolling hint */
-						float8	   *data = (float8 *) ARR_DATA_PTR(arr);
-						int			j_remain = feat_dim % 4;
-						int			j_end = feat_dim - j_remain;
-
-						/*
-						 * Process 4 elements at a time for better cache
-						 * locality
-						 */
-						for (j = 0; j < j_end; j += 4)
-						{
-							feat_row[j] = (float) data[j];
-							feat_row[j + 1] = (float) data[j + 1];
-							feat_row[j + 2] = (float) data[j + 2];
-							feat_row[j + 3] = (float) data[j + 3];
-						}
-						/* Handle remaining elements */
-						for (j = j_end; j < feat_dim; j++)
-							feat_row[j] = (float) data[j];
-					}
-					else
-					{
-						/* FLOAT4ARRAYOID: direct memcpy (already optimal) */
-						float4	   *data = (float4 *) ARR_DATA_PTR(arr);
-
-						memcpy(feat_row, data, sizeof(float) * feat_dim);
-					}
-				}
-				else
-				{
-					/* Vector type: direct memcpy (already optimal) */
-					vec = DatumGetVector(feat_datum);
-					if (vec->dim != feat_dim)
-						continue;
-					memcpy(feat_row, vec->data, sizeof(float) * feat_dim);
-				}
-
-				valid_rows++;
-			}
-		}
-
-		if (valid_rows == 0)
-		{
-			nfree(h_features);
-			nfree(h_labels);
+			NDB_SPI_SESSION_END(spi_session);
 			if (model != NULL)
 			{
 				if (model->root != NULL)
@@ -2193,144 +2144,323 @@ cpu_evaluation_path:
 			nfree(feat_str);
 			nfree(targ_str);
 			ndb_spi_stringinfo_free(spi_session, &query);
-			NDB_SPI_SESSION_END(spi_session);
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-					 errmsg("neurondb: evaluate_decision_tree_by_model_id: no valid rows found")));
+					 errmsg("neurondb: evaluate_decision_tree_by_model_id: invalid feature dimension %d",
+							feat_dim)));
 		}
 
-		/* For GPU models, we cannot evaluate on CPU without model conversion */
-		if (is_gpu_model && model == NULL)
+		/* Unified evaluation loop - prediction based on compute mode */
+		for (i = 0; i < nvec; i++)
 		{
-			nfree(h_features);
-			nfree(h_labels);
-			nfree(gpu_payload);
-			nfree(gpu_metrics);
-			nfree(tbl_str);
-			nfree(feat_str);
-			nfree(targ_str);
-			ndb_spi_stringinfo_free(spi_session, &query);
-			NDB_SPI_SESSION_END(spi_session);
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("neurondb: evaluate_decision_tree_by_model_id: GPU model evaluation requires GPU evaluation kernel")));
+			HeapTuple	tuple;
+			TupleDesc	tupdesc;
+			Datum		feat_datum;
+			Datum		targ_datum;
+			bool		feat_null;
+			bool		targ_null;
+			int			y_true;
+			int			y_pred = -1;
+			int			actual_dim;
+			float	   *feat_row = NULL;
+
+			if (SPI_tuptable == NULL || SPI_tuptable->vals == NULL ||
+				i >= SPI_processed || SPI_tuptable->vals[i] == NULL)
+				continue;
+
+			tuple = SPI_tuptable->vals[i];
+			tupdesc = SPI_tuptable->tupdesc;
+			if (tupdesc == NULL)
+				continue;
+
+			feat_datum = SPI_getbinval(tuple, tupdesc, 1, &feat_null);
+			if (tupdesc->natts < 2)
+				continue;
+			targ_datum = SPI_getbinval(tuple, tupdesc, 2, &targ_null);
+
+			if (feat_null || targ_null)
+				continue;
+
+			y_true = (int) rint(DatumGetFloat8(targ_datum));
+
+			/* Extract features and determine dimension */
+			if (feat_is_array)
+			{
+				ArrayType *arr = DatumGetArrayTypeP(feat_datum);
+				if (arr == NULL || ARR_NDIM(arr) != 1)
+					continue;
+				actual_dim = ARR_DIMS(arr)[0];
+			}
+			else
+			{
+				Vector *vec = DatumGetVector(feat_datum);
+				if (vec == NULL)
+					continue;
+				actual_dim = vec->dim;
+			}
+
+			/* Validate feature dimension matches model */
+			if (actual_dim != feat_dim)
+				continue;
+
+			/* Extract features to float array for prediction */
+			{
+				int			j;
+				double		prediction = 0.0;
+
+				nalloc(feat_row, float, feat_dim);
+				if (feat_is_array)
+				{
+					ArrayType *arr = DatumGetArrayTypeP(feat_datum);
+					if (feat_type_oid == FLOAT8ARRAYOID)
+					{
+						float8	   *data = (float8 *) ARR_DATA_PTR(arr);
+						for (j = 0; j < feat_dim; j++)
+							feat_row[j] = (float) data[j];
+					}
+					else
+					{
+						float4	   *data = (float4 *) ARR_DATA_PTR(arr);
+						memcpy(feat_row, data, sizeof(float) * feat_dim);
+					}
+				}
+				else
+				{
+					Vector *vec = DatumGetVector(feat_datum);
+					memcpy(feat_row, vec->data, sizeof(float) * feat_dim);
+				}
+
+				/* Call appropriate predict function based on compute mode */
+				if (use_gpu_predict)
+				{
+					/* GPU predict path - prediction based on compute mode */
+#ifdef NDB_GPU_CUDA
+					int			predict_rc;
+					char	   *gpu_err = NULL;
+
+					predict_rc = ndb_gpu_dt_predict(gpu_payload,
+													 feat_row,
+													 feat_dim,
+													 &prediction,
+													 &gpu_err);
+					if (predict_rc != 0)
+					{
+						/* GPU predict failed - check compute mode */
+						if (NDB_REQUIRE_GPU())
+						{
+							/* Strict GPU mode: error out */
+							if (gpu_err)
+								nfree(gpu_err);
+							nfree(feat_row);
+							NDB_SPI_SESSION_END(spi_session);
+							if (model != NULL)
+							{
+								if (model->root != NULL)
+									dt_free_tree(model->root);
+								nfree(model);
+							}
+							nfree(gpu_payload);
+							nfree(gpu_metrics);
+							nfree(tbl_str);
+							nfree(feat_str);
+							nfree(targ_str);
+							ndb_spi_stringinfo_free(spi_session, &query);
+							ereport(ERROR,
+									(errcode(ERRCODE_INTERNAL_ERROR),
+									 errmsg("neurondb: evaluate_decision_tree_by_model_id: GPU prediction failed in GPU mode"),
+									 errdetail("GPU prediction failed for row %d: %s", i, gpu_err ? gpu_err : "unknown error"),
+									 errhint("GPU mode requires GPU prediction to succeed. Check GPU availability and model compatibility.")));
+						}
+						else
+						{
+							/* AUTO mode: fall back to CPU if available */
+							if (gpu_err)
+								nfree(gpu_err);
+							if (model != NULL)
+							{
+								/* Use CPU model for prediction */
+								prediction = dt_tree_predict(model->root, feat_row, feat_dim);
+							}
+							else
+							{
+								/* No CPU model available - cannot fall back */
+								if (gpu_err)
+									nfree(gpu_err);
+								nfree(feat_row);
+								continue;
+							}
+						}
+					}
+					if (gpu_err)
+						nfree(gpu_err);
+#endif
+				}
+				else
+				{
+					/* CPU predict path - prediction based on compute mode */
+					if (model == NULL || model->root == NULL)
+					{
+						nfree(feat_row);
+						continue;
+					}
+
+					/* Use CPU model for prediction */
+					prediction = dt_tree_predict(model->root, feat_row, feat_dim);
+				}
+
+				y_pred = (int) rint(prediction);
+			}
+
+			/* Compute confusion matrix (same for both CPU and GPU) */
+			if (y_true == 1)
+			{
+				if (y_pred == 1)
+					tp++;
+				else
+					fn++;
+			}
+			else
+			{
+				if (y_pred == 1)
+					fp++;
+				else
+					tn++;
+			}
+
+			processed_count++;
+			nfree(feat_row);
 		}
 
-		/* Ensure model is not NULL before prediction */
-		if (model == NULL)
+		/* Calculate metrics from confusion matrix (same for both CPU and GPU) */
+		if (processed_count > 0)
 		{
-			nfree(h_features);
-			nfree(h_labels);
-			nfree(gpu_payload);
-			nfree(gpu_metrics);
-			nfree(tbl_str);
-			nfree(feat_str);
-			nfree(targ_str);
-			ndb_spi_stringinfo_free(spi_session, &query);
-			NDB_SPI_SESSION_END(spi_session);
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-					 errmsg("neurondb: evaluate_decision_tree_by_model_id: model is NULL")));
-		}
-
-		/* Use batch prediction helper */
-		/* Add debug logging before prediction */
-		if (model != NULL)
-		{
-			elog(DEBUG1,
-				 "neurondb: evaluate_decision_tree_by_model_id: CPU batch prediction: model->n_features=%d, model->root=%p, valid_rows=%d, feat_dim=%d",
-				 model->n_features, (void *) model->root, valid_rows, feat_dim);
+			accuracy = (double) (tp + tn) / (tp + tn + fp + fn);
+			precision = (tp + fp > 0) ? (double) tp / (tp + fp) : 0.0;
+			recall = (tp + fn > 0) ? (double) tp / (tp + fn) : 0.0;
+			f1_score = (precision + recall > 0)
+				? 2.0 * precision * recall / (precision + recall)
+				: 0.0;
 		}
 		else
 		{
-			elog(DEBUG1,
-				 "neurondb: evaluate_decision_tree_by_model_id: model is NULL before CPU batch prediction");
+			accuracy = 0.0;
+			precision = 0.0;
+			recall = 0.0;
+			f1_score = 0.0;
 		}
 
-		dt_predict_batch(model,
-						 h_features,
-						 h_labels,
-						 valid_rows,
-						 feat_dim,
-						 &tp,
-						 &tn,
-						 &fp,
-						 &fn);
-
-		elog(DEBUG1,
-			 "neurondb: evaluate_decision_tree_by_model_id: after batch prediction: tp=%d, tn=%d, fp=%d, fn=%d, valid_rows=%d",
-			 tp, tn, fp, fn, valid_rows);
-
-		/* Compute metrics */
-		if (valid_rows > 0)
-		{
-			accuracy = (double) (tp + tn) / (double) valid_rows;
-
-			if ((tp + fp) > 0)
-				precision = (double) tp / (double) (tp + fp);
-			else
-				precision = 0.0;
-
-			if ((tp + fn) > 0)
-				recall = (double) tp / (double) (tp + fn);
-			else
-				recall = 0.0;
-
-			if ((precision + recall) > 0.0)
-				f1_score = 2.0 * (precision * recall) / (precision + recall);
-			else
-				f1_score = 0.0;
-		}
-
-		nfree(h_features);
-		nfree(h_labels);
+		/* Cleanup */
 		if (model != NULL)
 		{
 			if (model->root != NULL)
 				dt_free_tree(model->root);
 			nfree(model);
 		}
-		nfree(gpu_payload);
-		nfree(gpu_metrics);
+		if (gpu_payload != NULL)
+			nfree(gpu_payload);
+		if (gpu_metrics != NULL)
+			nfree(gpu_metrics);
 	}
 
+	/* Build JSONB result */
 	ndb_spi_stringinfo_free(spi_session, &query);
 	NDB_SPI_SESSION_END(spi_session);
+
+	/* Switch to old context and build JSONB directly using JSONB API */
+	MemoryContextSwitchTo(oldcontext);
+	{
+		JsonbParseState *state = NULL;
+		JsonbValue	jkey;
+		JsonbValue	jval;
+		JsonbValue *final_value = NULL;
+		Numeric		accuracy_num,
+					precision_num,
+					recall_num,
+					f1_score_num,
+					n_samples_num;
+
+		PG_TRY();
+		{
+			(void) pushJsonbValue(&state, WJB_BEGIN_OBJECT, NULL);
+
+			jkey.type = jbvString;
+			jkey.val.string.val = "accuracy";
+			jkey.val.string.len = strlen("accuracy");
+			(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+			accuracy_num = DatumGetNumeric(DirectFunctionCall1(float8_numeric, Float8GetDatum(accuracy)));
+			jval.type = jbvNumeric;
+			jval.val.numeric = accuracy_num;
+			(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+
+			jkey.val.string.val = "precision";
+			jkey.val.string.len = strlen("precision");
+			(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+			precision_num = DatumGetNumeric(DirectFunctionCall1(float8_numeric, Float8GetDatum(precision)));
+			jval.type = jbvNumeric;
+			jval.val.numeric = precision_num;
+			(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+
+			jkey.val.string.val = "recall";
+			jkey.val.string.len = strlen("recall");
+			(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+			recall_num = DatumGetNumeric(DirectFunctionCall1(float8_numeric, Float8GetDatum(recall)));
+			jval.type = jbvNumeric;
+			jval.val.numeric = recall_num;
+			(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+
+			jkey.val.string.val = "f1_score";
+			jkey.val.string.len = strlen("f1_score");
+			(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+			f1_score_num = DatumGetNumeric(DirectFunctionCall1(float8_numeric, Float8GetDatum(f1_score)));
+			jval.type = jbvNumeric;
+			jval.val.numeric = f1_score_num;
+			(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+
+			jkey.val.string.val = "n_samples";
+			jkey.val.string.len = strlen("n_samples");
+			(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+			n_samples_num = DatumGetNumeric(DirectFunctionCall1(int4_numeric, Int32GetDatum(tp + tn + fp + fn)));
+			jval.type = jbvNumeric;
+			jval.val.numeric = n_samples_num;
+			(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+
+			final_value = pushJsonbValue(&state, WJB_END_OBJECT, NULL);
+
+			if (final_value == NULL)
+			{
+				elog(ERROR, "neurondb: evaluate_decision_tree_by_model_id: pushJsonbValue(WJB_END_OBJECT) returned NULL");
+			}
+
+			result_jsonb = JsonbValueToJsonb(final_value);
+		}
+		PG_CATCH();
+		{
+			ErrorData  *edata = CopyErrorData();
+
+			elog(ERROR, "neurondb: evaluate_decision_tree_by_model_id: JSONB construction failed: %s", edata->message);
+			FlushErrorState();
+			result_jsonb = NULL;
+		}
+		PG_END_TRY();
+	}
+
+	if (result_jsonb == NULL)
+	{
+		nfree(tbl_str);
+		nfree(feat_str);
+		nfree(targ_str);
+		ereport(ERROR,
+				(errcode(ERRCODE_INTERNAL_ERROR),
+				 errmsg("neurondb: evaluate_decision_tree_by_model_id: failed to create JSONB result")));
+	}
+
 	nfree(tbl_str);
 	nfree(feat_str);
 	nfree(targ_str);
-
-	/* Build jsonb result */
-	initStringInfo(&jsonbuf);
-	appendStringInfo(&jsonbuf,
-					 "{\"accuracy\":%.6f,\"precision\":%.6f,\"recall\":%.6f,\"f1_score\":%.6f,\"n_samples\":%d}",
-					 accuracy,
-					 precision,
-					 recall,
-					 f1_score,
-					 nvec);
-
-	/* Use ndb_jsonb_in_cstring like other ML algorithms fix */
-	result_jsonb = ndb_jsonb_in_cstring(jsonbuf.data);
-	if (result_jsonb == NULL)
-	{
-		nfree(jsonbuf.data);
-
-		/*
-		 * Note: model, h_features, h_labels, gpu_payload, gpu_metrics,
-		 * tbl_str, feat_str, targ_str, and query have already been freed
-		 * above
-		 */
-		NDB_SPI_SESSION_END(spi_session);
-		MemoryContextSwitchTo(oldcontext);
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
-				 errmsg("neurondb: evaluate_decision_tree_by_model_id: failed to parse metrics JSON")));
-	}
-	nfree(jsonbuf.data);
-	MemoryContextSwitchTo(oldcontext);
 	PG_RETURN_JSONB_P(result_jsonb);
 }
+
+/* Old GPU evaluation kernel code removed - replaced with unified evaluation pattern above */
 
 #include "neurondb_gpu_model.h"
 
@@ -2373,6 +2503,7 @@ dt_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 	if (spec->sample_count <= 0 || spec->feature_dim <= 0)
 		return false;
 
+	/* Initialize output parameters to NULL */
 	payload = NULL;
 	metrics = NULL;
 
@@ -2387,10 +2518,7 @@ dt_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 
 	if (rc != 0 || payload == NULL)
 	{
-		if (payload != NULL)
-			nfree(payload);
-		if (metrics != NULL)
-			nfree(metrics);
+		/* On error, GPU backend should have cleaned up - don't free here */
 		return false;
 	}
 
@@ -2407,7 +2535,7 @@ dt_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 
 	if (metrics != NULL)
 	{
-		state->metrics = (Jsonb *) PG_DETOAST_DATUM_COPY(PointerGetDatum(metrics));
+		state->metrics = metrics;
 	}
 	else
 	{
@@ -2527,7 +2655,14 @@ dt_gpu_serialize(const MLGpuModel *model, bytea * *payload_out,
 
 	if (metadata_out != NULL && state->metrics != NULL)
 	{
-		*metadata_out = (Jsonb *) PG_DETOAST_DATUM_COPY(PointerGetDatum(state->metrics));
+		text   *metrics_text = DatumGetTextP(DirectFunctionCall1(jsonb_out,
+											 PointerGetDatum(state->metrics)));
+		char   *metrics_cstr = text_to_cstring(metrics_text);
+		Jsonb  *metrics_copy = ndb_jsonb_in_cstring(metrics_cstr);
+
+		pfree(metrics_text);
+		nfree(metrics_cstr);
+		*metadata_out = metrics_copy;
 	}
 	else if (metadata_out != NULL)
 	{
@@ -2604,7 +2739,13 @@ dt_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 
 	if (metadata != NULL)
 	{
-		state->metrics = (Jsonb *) PG_DETOAST_DATUM_COPY(PointerGetDatum(metadata));
+		text   *metadata_text = DatumGetTextP(DirectFunctionCall1(jsonb_out,
+											 PointerGetDatum(metadata)));
+		char   *metadata_cstr = text_to_cstring(metadata_text);
+
+		state->metrics = ndb_jsonb_in_cstring(metadata_cstr);
+		pfree(metadata_text);
+		nfree(metadata_cstr);
 	}
 	else
 	{

@@ -38,7 +38,7 @@
 #define DBSCAN_UNDEFINED		-2
 
 /* Forward declaration */
-static int	dbscan_model_deserialize_from_bytea(const bytea * data, float ***centers_out, int *n_clusters_out, int *dim_out, double *eps_out, int *min_pts_out);
+static int	dbscan_model_deserialize_from_bytea(const bytea * data, float ***centers_out, int *n_clusters_out, int *dim_out, double *eps_out, int *min_pts_out, uint8 * training_backend_out);
 
 typedef struct DBSCANState
 {
@@ -230,9 +230,6 @@ cluster_dbscan(PG_FUNCTION_ARGS)
 	tbl_str = text_to_cstring(table_name);
 	col_str = text_to_cstring(column_name);
 
-	elog(DEBUG1,
-		 "neurondb: DBSCAN clustering on %s.%s (eps=%.6f, min_pts=%d)",
-		 tbl_str, col_str, eps, min_pts);
 
 	/* Initialize state structure to zero */
 	memset(&state, 0, sizeof(state));
@@ -324,9 +321,6 @@ cluster_dbscan(PG_FUNCTION_ARGS)
 		nfree(neighbors);
 	}
 
-	elog(DEBUG1,
-		 "neurondb: DBSCAN completed with %d clusters, %d points",
-		 state.next_cluster, state.nvec);
 
 	nalloc(out_datums, Datum, state.nvec);
 	for (i = 0; i < state.nvec; i++)
@@ -410,9 +404,13 @@ predict_dbscan(PG_FUNCTION_ARGS)
 			if (model_payload != NULL)
 			{
 				/* Deserialize model to get cluster centers, eps, and min_pts */
-				if (dbscan_model_deserialize_from_bytea(model_payload,
-														&cluster_centers, &n_clusters, &dim, &eps, &min_pts) == 0)
 				{
+					uint8		training_backend = 0;
+
+					if (dbscan_model_deserialize_from_bytea(model_payload,
+															&cluster_centers, &n_clusters, &dim, &eps, &min_pts,
+															&training_backend) == 0)
+					{
 					/* Validate feature dimension matches model dimension */
 					if (n_elems == dim && n_clusters > 0)
 					{
@@ -473,6 +471,7 @@ predict_dbscan(PG_FUNCTION_ARGS)
 				{
 					/* Failed to deserialize model */
 					cluster_id = DBSCAN_NOISE;
+				}
 				}
 			}
 			else
@@ -602,13 +601,17 @@ evaluate_dbscan_by_model_id(PG_FUNCTION_ARGS)
 		{
 			if (model_payload != NULL && VARSIZE(model_payload) > VARHDRSZ)
 			{
-				if (dbscan_model_deserialize_from_bytea(model_payload,
-														&centers,
-														&n_clusters,
-														&model_dim,
-														&eps,
-														&min_pts) == 0)
 				{
+					uint8		training_backend = 0;
+
+					if (dbscan_model_deserialize_from_bytea(model_payload,
+															&centers,
+															&n_clusters,
+															&model_dim,
+															&eps,
+															&min_pts,
+															&training_backend) == 0)
+					{
 					/* Fetch data points */
 					data = neurondb_fetch_vectors_from_table(tbl_str, feat_str, &n_points, &model_dim);
 
@@ -697,6 +700,7 @@ evaluate_dbscan_by_model_id(PG_FUNCTION_ARGS)
 					eps = 0.5;
 					min_pts = 5;
 				}
+				}
 			}
 			else
 			{
@@ -756,7 +760,7 @@ typedef struct DBSCANGpuModelState
 }			DBSCANGpuModelState;
 
 static bytea *
-dbscan_model_serialize_to_bytea(float **cluster_centers, int n_clusters, int dim, double eps, int min_pts)
+dbscan_model_serialize_to_bytea(float **cluster_centers, int n_clusters, int dim, double eps, int min_pts, uint8 training_backend)
 {
 	StringInfoData buf;
 	int			i,
@@ -766,7 +770,18 @@ dbscan_model_serialize_to_bytea(float **cluster_centers, int n_clusters, int dim
 	char *result_bytes = NULL;
 	bytea *result = NULL;
 
+	/* Validate training_backend */
+	if (training_backend > 1)
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_INTERNAL_ERROR),
+				 errmsg("neurondb: dbscan_model_serialize_to_bytea: invalid training_backend %d (must be 0 or 1)",
+						training_backend)));
+	}
+
 	initStringInfo(&buf);
+	/* Write training_backend first (0=CPU, 1=GPU) - unified storage format */
+	appendBinaryStringInfo(&buf, (char *) &training_backend, sizeof(uint8));
 	appendBinaryStringInfo(&buf, (char *) &n_clusters, sizeof(int));
 	appendBinaryStringInfo(&buf, (char *) &dim, sizeof(int));
 	appendBinaryStringInfo(&buf, (char *) &eps, sizeof(double));
@@ -787,18 +802,24 @@ dbscan_model_serialize_to_bytea(float **cluster_centers, int n_clusters, int dim
 }
 
 static int
-dbscan_model_deserialize_from_bytea(const bytea * data, float ***centers_out, int *n_clusters_out, int *dim_out, double *eps_out, int *min_pts_out)
+dbscan_model_deserialize_from_bytea(const bytea * data, float ***centers_out, int *n_clusters_out, int *dim_out, double *eps_out, int *min_pts_out, uint8 * training_backend_out)
 {
 	const char *buf;
 	int			offset = 0;
 	int			i,
 				j;
 	float **centers = NULL;
+	uint8		training_backend = 0;
 
-	if (data == NULL || VARSIZE(data) < VARHDRSZ + sizeof(int) * 2 + sizeof(double) + sizeof(int))
+	if (data == NULL || VARSIZE(data) < VARHDRSZ + sizeof(uint8) + sizeof(int) * 2 + sizeof(double) + sizeof(int))
 		return -1;
 
 	buf = VARDATA(data);
+	/* Read training_backend first (unified storage format) */
+	training_backend = (uint8) buf[offset];
+	offset += sizeof(uint8);
+	if (training_backend_out != NULL)
+		*training_backend_out = training_backend;
 	memcpy(n_clusters_out, buf + offset, sizeof(int));
 	offset += sizeof(int);
 	memcpy(dim_out, buf + offset, sizeof(int));
@@ -981,12 +1002,12 @@ dbscan_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 	}
 
 	/* Serialize model */
-	model_data = dbscan_model_serialize_to_bytea(cluster_centers, n_clusters, dim, eps, min_pts);
+	model_data = dbscan_model_serialize_to_bytea(cluster_centers, n_clusters, dim, eps, min_pts, 0); /* training_backend=0 for CPU */
 
 	/* Build metrics */
 	initStringInfo(&metrics_json);
 	appendStringInfo(&metrics_json,
-					 "{\"storage\":\"cpu\",\"n_clusters\":%d,\"eps\":%.6f,\"min_pts\":%d,\"dim\":%d,\"n_samples\":%d}",
+					 "{\"storage\":\"cpu\",\"training_backend\":0,\"n_clusters\":%d,\"eps\":%.6f,\"min_pts\":%d,\"dim\":%d,\"n_samples\":%d}",
 					 n_clusters, eps, min_pts, dim, nvec);
 	metrics = DatumGetJsonbP(DirectFunctionCall1(jsonb_in,
 												 CStringGetTextDatum(metrics_json.data)));
@@ -1064,12 +1085,17 @@ dbscan_gpu_predict(const MLGpuModel *model, const float *input, int input_dim,
 		return false;
 	}
 
-	if (dbscan_model_deserialize_from_bytea(state->model_blob,
-											&centers, &n_clusters, &dim, &eps, &min_pts) != 0)
 	{
-		if (errstr != NULL)
-			*errstr = pstrdup("dbscan_gpu_predict: failed to deserialize");
-		return false;
+		uint8		training_backend = 0;
+
+		if (dbscan_model_deserialize_from_bytea(state->model_blob,
+												&centers, &n_clusters, &dim, &eps, &min_pts,
+												&training_backend) != 0)
+		{
+			if (errstr != NULL)
+				*errstr = pstrdup("dbscan_gpu_predict: failed to deserialize");
+			return false;
+		}
 	}
 
 	if (input_dim != dim)
@@ -1227,13 +1253,18 @@ dbscan_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 	payload_copy = (bytea *) payload_bytes;
 	memcpy(payload_copy, payload, payload_size);
 
-	if (dbscan_model_deserialize_from_bytea(payload_copy,
-											&centers, &n_clusters, &dim, &eps, &min_pts) != 0)
 	{
-		nfree(payload_copy);
-		if (errstr != NULL)
-			*errstr = pstrdup("dbscan_gpu_deserialize: failed to deserialize");
-		return false;
+		uint8		training_backend = 0;
+
+		if (dbscan_model_deserialize_from_bytea(payload_copy,
+												&centers, &n_clusters, &dim, &eps, &min_pts,
+												&training_backend) != 0)
+		{
+			nfree(payload_copy);
+			if (errstr != NULL)
+				*errstr = pstrdup("dbscan_gpu_deserialize: failed to deserialize");
+			return false;
+		}
 	}
 
 	{

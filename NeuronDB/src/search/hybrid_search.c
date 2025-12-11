@@ -154,14 +154,6 @@ hybrid_search(PG_FUNCTION_ARGS)
 		txt_str = text_to_cstring(query_text);
 		filter_str = text_to_cstring(filters);
 
-		elog(DEBUG1,
-			 "neurondb: Hybrid search on '%s' (query='%s', filters='%s', vec_dim=%d, weight=%.2f, limit=%d)",
-			 tbl_str,
-			 txt_str,
-			 filter_str,
-			 query_vec->dim,
-			 vector_weight,
-			 limit);
 
 		session = ndb_spi_session_begin(CurrentMemoryContext, false);
 		if (session == NULL)
@@ -385,9 +377,6 @@ reciprocal_rank_fusion(PG_FUNCTION_ARGS)
 	rankings = PG_GETARG_ARRAYTYPE_P(0);
 	k = PG_GETARG_FLOAT8(1);
 
-	elog(DEBUG1,
-		 "neurondb: Computing Reciprocal Rank Fusion with k=%.2f",
-		 k);
 
 	if (ARR_NDIM(rankings) != 1)
 		ereport(ERROR,
@@ -587,13 +576,6 @@ semantic_keyword_search(PG_FUNCTION_ARGS)
 	tbl_str = text_to_cstring(table_name);
 	kw_str = text_to_cstring(keyword_query);
 
-	elog(DEBUG1,
-		 "neurondb: Semantic + Keyword search on '%s' for '%s' "
-		 "(vec_dim=%d), top_k=%d",
-		 tbl_str,
-		 kw_str,
-		 semantic_query->dim,
-		 top_k);
 	session = ndb_spi_session_begin(CurrentMemoryContext, false);
 	if (session == NULL)
 		ereport(ERROR, (errmsg("semantic_keyword_search: failed to begin SPI session")));
@@ -731,13 +713,6 @@ multi_vector_search(PG_FUNCTION_ARGS)
 
 		nvecs = ArrayGetNItems(
 							   ARR_NDIM(query_vectors), ARR_DIMS(query_vectors));
-		elog(DEBUG1,
-			 "neurondb: Multi-vector search on '%s' with %d queries, "
-			 "agg=%s, top_k=%d",
-			 tbl_str,
-			 nvecs,
-			 agg_str,
-			 top_k);
 		session = ndb_spi_session_begin(CurrentMemoryContext, false);
 		if (session == NULL)
 			ereport(ERROR, (errmsg("multi_vector_search: failed to begin SPI session")));
@@ -914,12 +889,6 @@ faceted_vector_search(PG_FUNCTION_ARGS)
 	tbl_str = text_to_cstring(table_name);
 	facet_str = text_to_cstring(facet_column);
 
-	elog(DEBUG1,
-		 "neurondb: Faceted search on '%s' with facets='%s', limit=%d (vec_dim=%d)",
-		 tbl_str,
-		 facet_str,
-		 per_facet_limit,
-		 query_vec->dim);
 	session = ndb_spi_session_begin(CurrentMemoryContext, false);
 	if (session == NULL)
 		ereport(ERROR, (errmsg("faceted_vector_search: failed to begin SPI session")));
@@ -1043,13 +1012,6 @@ temporal_vector_search(PG_FUNCTION_ARGS)
 	tbl_str = text_to_cstring(table_name);
 	ts_str = text_to_cstring(timestamp_col);
 
-	elog(DEBUG1,
-		 "neurondb: Temporal search on '%s'.%s with decay=%.4f, top_k=%d (vec_dim=%d)",
-		 tbl_str,
-		 ts_str,
-		 decay_rate,
-		 top_k,
-		 query_vec->dim);
 	session = ndb_spi_session_begin(CurrentMemoryContext, false);
 	if (session == NULL)
 		ereport(ERROR, (errmsg("temporal_vector_search: failed to begin SPI session")));
@@ -1176,12 +1138,6 @@ diverse_vector_search(PG_FUNCTION_ARGS)
 	top_k = PG_GETARG_INT32(3);
 	tbl_str = text_to_cstring(table_name);
 
-	elog(DEBUG1,
-		 "neurondb: Diverse search on '%s' with lambda=%.2f, top_k=%d (vec_dim=%d)",
-		 tbl_str,
-		 lambda,
-		 top_k,
-		 query_vec->dim);
 	session = ndb_spi_session_begin(CurrentMemoryContext, false);
 	if (session == NULL)
 		ereport(ERROR, (errmsg("diverse_vector_search: failed to begin SPI session")));

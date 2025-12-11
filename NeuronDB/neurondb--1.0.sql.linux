@@ -1281,6 +1281,12 @@ CREATE FUNCTION train_lightgbm_regressor(text, text, text, integer DEFAULT 100)
     LANGUAGE C STABLE;
 COMMENT ON FUNCTION train_lightgbm_regressor IS 'Train LightGBM regressor: (table, feature_col, label_col, n_estimators) returns model_id';
 
+CREATE FUNCTION predict_lightgbm(integer, real[])
+    RETURNS float8
+    AS 'MODULE_PATHNAME', 'predict_lightgbm'
+    LANGUAGE C STABLE STRICT;
+COMMENT ON FUNCTION predict_lightgbm(integer, real[]) IS 'Predict using LightGBM model by model_id';
+
 -- ============================================================================
 -- DIMENSIONALITY REDUCTION
 -- ============================================================================
@@ -4967,6 +4973,8 @@ BEGIN
 			RETURN predict_svm_model_id(model_id, features);
 		WHEN 'xgboost' THEN
 			RETURN predict_xgboost(model_id, vector_to_array(features));
+		WHEN 'lightgbm' THEN
+			RETURN predict_lightgbm(model_id, vector_to_array(features));
 		WHEN 'neural_network' THEN
 			RETURN predict_neural_network(model_id, vector_to_array(features));
 		WHEN 'naive_bayes' THEN

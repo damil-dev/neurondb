@@ -226,85 +226,85 @@ ndb_rocm_gmm_estep(const float *features,
 
 	hipGetLastError();
 
-	status = cudaMalloc((void **)&d_features, feature_bytes);
+	status = hipMalloc((void **)&d_features, feature_bytes);
 	if (status != hipSuccess)
 		return -1;
 
-	status = cudaMalloc((void **)&d_mixing, mixing_bytes);
+	status = hipMalloc((void **)&d_mixing, mixing_bytes);
 	if (status != hipSuccess)
 	{
-		cudaFree(d_features);
-		return -1;
-	}
-
-	status = cudaMalloc((void **)&d_means, mean_bytes);
-	if (status != hipSuccess)
-	{
-		cudaFree(d_mixing);
-		cudaFree(d_features);
+		hipFree(d_features);
 		return -1;
 	}
 
-	status = cudaMalloc((void **)&d_variances, variance_bytes);
+	status = hipMalloc((void **)&d_means, mean_bytes);
 	if (status != hipSuccess)
 	{
-		cudaFree(d_means);
-		cudaFree(d_mixing);
-		cudaFree(d_features);
+		hipFree(d_mixing);
+		hipFree(d_features);
 		return -1;
 	}
 
-	status = cudaMalloc((void **)&d_resp, resp_bytes);
+	status = hipMalloc((void **)&d_variances, variance_bytes);
 	if (status != hipSuccess)
 	{
-		cudaFree(d_variances);
-		cudaFree(d_means);
-		cudaFree(d_mixing);
-		cudaFree(d_features);
+		hipFree(d_means);
+		hipFree(d_mixing);
+		hipFree(d_features);
 		return -1;
 	}
 
-	status = cudaMemcpy(d_features, features, feature_bytes, cudaMemcpyHostToDevice);
+	status = hipMalloc((void **)&d_resp, resp_bytes);
 	if (status != hipSuccess)
 	{
-		cudaFree(d_resp);
-		cudaFree(d_variances);
-		cudaFree(d_means);
-		cudaFree(d_mixing);
-		cudaFree(d_features);
+		hipFree(d_variances);
+		hipFree(d_means);
+		hipFree(d_mixing);
+		hipFree(d_features);
 		return -1;
 	}
 
-	status = cudaMemcpy(d_mixing, mixing_coeffs, mixing_bytes, cudaMemcpyHostToDevice);
+	status = hipMemcpy(d_features, features, feature_bytes, hipMemcpyHostToDevice);
 	if (status != hipSuccess)
 	{
-		cudaFree(d_resp);
-		cudaFree(d_variances);
-		cudaFree(d_means);
-		cudaFree(d_mixing);
-		cudaFree(d_features);
+		hipFree(d_resp);
+		hipFree(d_variances);
+		hipFree(d_means);
+		hipFree(d_mixing);
+		hipFree(d_features);
 		return -1;
 	}
 
-	status = cudaMemcpy(d_means, means, mean_bytes, cudaMemcpyHostToDevice);
+	status = hipMemcpy(d_mixing, mixing_coeffs, mixing_bytes, hipMemcpyHostToDevice);
 	if (status != hipSuccess)
 	{
-		cudaFree(d_resp);
-		cudaFree(d_variances);
-		cudaFree(d_means);
-		cudaFree(d_mixing);
-		cudaFree(d_features);
+		hipFree(d_resp);
+		hipFree(d_variances);
+		hipFree(d_means);
+		hipFree(d_mixing);
+		hipFree(d_features);
 		return -1;
 	}
 
-	status = cudaMemcpy(d_variances, variances, variance_bytes, cudaMemcpyHostToDevice);
+	status = hipMemcpy(d_means, means, mean_bytes, hipMemcpyHostToDevice);
 	if (status != hipSuccess)
 	{
-		cudaFree(d_resp);
-		cudaFree(d_variances);
-		cudaFree(d_means);
-		cudaFree(d_mixing);
-		cudaFree(d_features);
+		hipFree(d_resp);
+		hipFree(d_variances);
+		hipFree(d_means);
+		hipFree(d_mixing);
+		hipFree(d_features);
+		return -1;
+	}
+
+	status = hipMemcpy(d_variances, variances, variance_bytes, hipMemcpyHostToDevice);
+	if (status != hipSuccess)
+	{
+		hipFree(d_resp);
+		hipFree(d_variances);
+		hipFree(d_means);
+		hipFree(d_mixing);
+		hipFree(d_features);
 		return -1;
 	}
 
@@ -318,41 +318,41 @@ ndb_rocm_gmm_estep(const float *features,
 	status = hipGetLastError();
 	if (status != hipSuccess)
 	{
-		cudaFree(d_resp);
-		cudaFree(d_variances);
-		cudaFree(d_means);
-		cudaFree(d_mixing);
-		cudaFree(d_features);
+		hipFree(d_resp);
+		hipFree(d_variances);
+		hipFree(d_means);
+		hipFree(d_mixing);
+		hipFree(d_features);
 		return -1;
 	}
 
-	status = cudaDeviceSynchronize();
+	status = hipDeviceSynchronize();
 	if (status != hipSuccess)
 	{
-		cudaFree(d_resp);
-		cudaFree(d_variances);
-		cudaFree(d_means);
-		cudaFree(d_mixing);
-		cudaFree(d_features);
+		hipFree(d_resp);
+		hipFree(d_variances);
+		hipFree(d_means);
+		hipFree(d_mixing);
+		hipFree(d_features);
 		return -1;
 	}
 
-	status = cudaMemcpy(responsibilities, d_resp, resp_bytes, cudaMemcpyDeviceToHost);
+	status = hipMemcpy(responsibilities, d_resp, resp_bytes, hipMemcpyDeviceToHost);
 	if (status != hipSuccess)
 	{
-		cudaFree(d_resp);
-		cudaFree(d_variances);
-		cudaFree(d_means);
-		cudaFree(d_mixing);
-		cudaFree(d_features);
+		hipFree(d_resp);
+		hipFree(d_variances);
+		hipFree(d_means);
+		hipFree(d_mixing);
+		hipFree(d_features);
 		return -1;
 	}
 
-	cudaFree(d_resp);
-	cudaFree(d_variances);
-	cudaFree(d_means);
-	cudaFree(d_mixing);
-	cudaFree(d_features);
+	hipFree(d_resp);
+	hipFree(d_variances);
+	hipFree(d_means);
+	hipFree(d_mixing);
+	hipFree(d_features);
 	return 0;
 }
 
@@ -404,85 +404,85 @@ ndb_rocm_gmm_mstep(const float *features,
 
 	hipGetLastError();
 
-	status = cudaMalloc((void **)&d_features, feature_bytes);
+	status = hipMalloc((void **)&d_features, feature_bytes);
 	if (status != hipSuccess)
 	{
 		free(N_k);
 		return -1;
 	}
 
-	status = cudaMalloc((void **)&d_resp, resp_bytes);
+	status = hipMalloc((void **)&d_resp, resp_bytes);
 	if (status != hipSuccess)
 	{
-		cudaFree(d_features);
+		hipFree(d_features);
 		free(N_k);
 		return -1;
 	}
 
-	status = cudaMalloc((void **)&d_N_k, Nk_bytes);
+	status = hipMalloc((void **)&d_N_k, Nk_bytes);
 	if (status != hipSuccess)
 	{
-		cudaFree(d_resp);
-		cudaFree(d_features);
+		hipFree(d_resp);
+		hipFree(d_features);
 		free(N_k);
 		return -1;
 	}
 
-	status = cudaMalloc((void **)&d_mixing, mixing_bytes);
+	status = hipMalloc((void **)&d_mixing, mixing_bytes);
 	if (status != hipSuccess)
 	{
-		cudaFree(d_N_k);
-		cudaFree(d_resp);
-		cudaFree(d_features);
+		hipFree(d_N_k);
+		hipFree(d_resp);
+		hipFree(d_features);
 		free(N_k);
 		return -1;
 	}
 
-	status = cudaMalloc((void **)&d_means, mean_bytes);
+	status = hipMalloc((void **)&d_means, mean_bytes);
 	if (status != hipSuccess)
 	{
-		cudaFree(d_mixing);
-		cudaFree(d_N_k);
-		cudaFree(d_resp);
-		cudaFree(d_features);
+		hipFree(d_mixing);
+		hipFree(d_N_k);
+		hipFree(d_resp);
+		hipFree(d_features);
 		free(N_k);
 		return -1;
 	}
 
-	status = cudaMalloc((void **)&d_variances, variance_bytes);
+	status = hipMalloc((void **)&d_variances, variance_bytes);
 	if (status != hipSuccess)
 	{
-		cudaFree(d_means);
-		cudaFree(d_mixing);
-		cudaFree(d_N_k);
-		cudaFree(d_resp);
-		cudaFree(d_features);
+		hipFree(d_means);
+		hipFree(d_mixing);
+		hipFree(d_N_k);
+		hipFree(d_resp);
+		hipFree(d_features);
 		free(N_k);
 		return -1;
 	}
 
-	status = cudaMemcpy(d_features, features, feature_bytes, cudaMemcpyHostToDevice);
+	status = hipMemcpy(d_features, features, feature_bytes, hipMemcpyHostToDevice);
 	if (status != hipSuccess)
 	{
-		cudaFree(d_variances);
-		cudaFree(d_means);
-		cudaFree(d_mixing);
-		cudaFree(d_N_k);
-		cudaFree(d_resp);
-		cudaFree(d_features);
+		hipFree(d_variances);
+		hipFree(d_means);
+		hipFree(d_mixing);
+		hipFree(d_N_k);
+		hipFree(d_resp);
+		hipFree(d_features);
 		free(N_k);
 		return -1;
 	}
 
-	status = cudaMemcpy(d_resp, responsibilities, resp_bytes, cudaMemcpyHostToDevice);
+	status = hipMemcpy(d_resp, responsibilities, resp_bytes, hipMemcpyHostToDevice);
 	if (status != hipSuccess)
 	{
-		cudaFree(d_variances);
-		cudaFree(d_means);
-		cudaFree(d_mixing);
-		cudaFree(d_N_k);
-		cudaFree(d_resp);
-		cudaFree(d_features);
+		hipFree(d_variances);
+		hipFree(d_means);
+		hipFree(d_mixing);
+		hipFree(d_N_k);
+		hipFree(d_resp);
+		hipFree(d_features);
 		free(N_k);
 		return -1;
 	}
@@ -498,38 +498,38 @@ ndb_rocm_gmm_mstep(const float *features,
 	status = hipGetLastError();
 	if (status != hipSuccess)
 	{
-		cudaFree(d_variances);
-		cudaFree(d_means);
-		cudaFree(d_mixing);
-		cudaFree(d_N_k);
-		cudaFree(d_resp);
-		cudaFree(d_features);
+		hipFree(d_variances);
+		hipFree(d_means);
+		hipFree(d_mixing);
+		hipFree(d_N_k);
+		hipFree(d_resp);
+		hipFree(d_features);
 		free(N_k);
 		return -1;
 	}
 
-	status = cudaDeviceSynchronize();
+	status = hipDeviceSynchronize();
 	if (status != hipSuccess)
 	{
-		cudaFree(d_variances);
-		cudaFree(d_means);
-		cudaFree(d_mixing);
-		cudaFree(d_N_k);
-		cudaFree(d_resp);
-		cudaFree(d_features);
+		hipFree(d_variances);
+		hipFree(d_means);
+		hipFree(d_mixing);
+		hipFree(d_N_k);
+		hipFree(d_resp);
+		hipFree(d_features);
 		free(N_k);
 		return -1;
 	}
 
-	status = cudaMemcpy(N_k, d_N_k, Nk_bytes, cudaMemcpyDeviceToHost);
+	status = hipMemcpy(N_k, d_N_k, Nk_bytes, hipMemcpyDeviceToHost);
 	if (status != hipSuccess)
 	{
-		cudaFree(d_variances);
-		cudaFree(d_means);
-		cudaFree(d_mixing);
-		cudaFree(d_N_k);
-		cudaFree(d_resp);
-		cudaFree(d_features);
+		hipFree(d_variances);
+		hipFree(d_means);
+		hipFree(d_mixing);
+		hipFree(d_N_k);
+		hipFree(d_resp);
+		hipFree(d_features);
 		free(N_k);
 		return -1;
 	}
@@ -552,12 +552,12 @@ ndb_rocm_gmm_mstep(const float *features,
 	status = hipGetLastError();
 	if (status != hipSuccess)
 	{
-		cudaFree(d_variances);
-		cudaFree(d_means);
-		cudaFree(d_mixing);
-		cudaFree(d_N_k);
-		cudaFree(d_resp);
-		cudaFree(d_features);
+		hipFree(d_variances);
+		hipFree(d_means);
+		hipFree(d_mixing);
+		hipFree(d_N_k);
+		hipFree(d_resp);
+		hipFree(d_features);
 		free(N_k);
 		return -1;
 	}
@@ -572,61 +572,61 @@ ndb_rocm_gmm_mstep(const float *features,
 	status = hipGetLastError();
 	if (status != hipSuccess)
 	{
-		cudaFree(d_variances);
-		cudaFree(d_means);
-		cudaFree(d_mixing);
-		cudaFree(d_N_k);
-		cudaFree(d_resp);
-		cudaFree(d_features);
+		hipFree(d_variances);
+		hipFree(d_means);
+		hipFree(d_mixing);
+		hipFree(d_N_k);
+		hipFree(d_resp);
+		hipFree(d_features);
 		free(N_k);
 		return -1;
 	}
 
-	status = cudaDeviceSynchronize();
+	status = hipDeviceSynchronize();
 	if (status != hipSuccess)
 	{
-		cudaFree(d_variances);
-		cudaFree(d_means);
-		cudaFree(d_mixing);
-		cudaFree(d_N_k);
-		cudaFree(d_resp);
-		cudaFree(d_features);
+		hipFree(d_variances);
+		hipFree(d_means);
+		hipFree(d_mixing);
+		hipFree(d_N_k);
+		hipFree(d_resp);
+		hipFree(d_features);
 		free(N_k);
 		return -1;
 	}
 
-	status = cudaMemcpy(means, d_means, mean_bytes, cudaMemcpyDeviceToHost);
+	status = hipMemcpy(means, d_means, mean_bytes, hipMemcpyDeviceToHost);
 	if (status != hipSuccess)
 	{
-		cudaFree(d_variances);
-		cudaFree(d_means);
-		cudaFree(d_mixing);
-		cudaFree(d_N_k);
-		cudaFree(d_resp);
-		cudaFree(d_features);
+		hipFree(d_variances);
+		hipFree(d_means);
+		hipFree(d_mixing);
+		hipFree(d_N_k);
+		hipFree(d_resp);
+		hipFree(d_features);
 		free(N_k);
 		return -1;
 	}
 
-	status = cudaMemcpy(variances, d_variances, variance_bytes, cudaMemcpyDeviceToHost);
+	status = hipMemcpy(variances, d_variances, variance_bytes, hipMemcpyDeviceToHost);
 	if (status != hipSuccess)
 	{
-		cudaFree(d_variances);
-		cudaFree(d_means);
-		cudaFree(d_mixing);
-		cudaFree(d_N_k);
-		cudaFree(d_resp);
-		cudaFree(d_features);
+		hipFree(d_variances);
+		hipFree(d_means);
+		hipFree(d_mixing);
+		hipFree(d_N_k);
+		hipFree(d_resp);
+		hipFree(d_features);
 		free(N_k);
 		return -1;
 	}
 
-	cudaFree(d_variances);
-	cudaFree(d_means);
-	cudaFree(d_mixing);
-	cudaFree(d_N_k);
-	cudaFree(d_resp);
-	cudaFree(d_features);
+	hipFree(d_variances);
+	hipFree(d_means);
+	hipFree(d_mixing);
+	hipFree(d_N_k);
+	hipFree(d_resp);
+	hipFree(d_features);
 	free(N_k);
 	return 0;
 }

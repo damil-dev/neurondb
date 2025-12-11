@@ -102,7 +102,6 @@ llm_acquire_token(void)
 	}
 	LWLockRelease(llm_rl_lock);
 	/* Rate limit exceeded - log reason */
-	elog(DEBUG1, "neurondb: llm_acquire_token: rate limit exceeded (tokens: %.2f, capacity: %d)", llm_rl->tokens, cap);
 	return false;
 }
 

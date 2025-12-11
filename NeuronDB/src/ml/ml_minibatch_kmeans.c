@@ -40,7 +40,7 @@
 #include <float.h>
 
 /* Forward declarations */
-static int	kmeans_model_deserialize_from_bytea(const bytea * data, float ***centers_out, int *num_clusters_out, int *dim_out);
+static int	kmeans_model_deserialize_from_bytea(const bytea * data, float ***centers_out, int *num_clusters_out, int *dim_out, uint8 * training_backend_out);
 bool		minibatch_kmeans_gpu_serialize(const MLGpuModel *model, bytea * *payload_out, Jsonb * *metadata_out, char **errstr);
 
 /*
@@ -252,13 +252,6 @@ cluster_minibatch_kmeans(PG_FUNCTION_ARGS)
 	tbl_str = text_to_cstring(table_name);
 	col_str = text_to_cstring(column_name);
 
-	elog(DEBUG1,
-		 "neurondb: Mini-batch K-means on %s.%s (k=%d, batch=%d, iters=%d)",
-		 tbl_str,
-		 col_str,
-		 num_clusters,
-		 batch_size,
-		 max_iters);
 
 	/* Fetch training data */
 	data = neurondb_fetch_vectors_from_table(tbl_str, col_str, &nvec, &dim);
@@ -381,12 +374,6 @@ cluster_minibatch_kmeans(PG_FUNCTION_ARGS)
 		}
 
 		nfree(batch_assignments);
-
-		if ((iter + 1) % 10 == 0)
-			elog(DEBUG1,
-				 "neurondb: Mini-batch K-means iteration %d/%d",
-				 iter + 1,
-				 max_iters);
 	}
 
 	/* Final assignment: assign all points to nearest centroid */
@@ -500,10 +487,14 @@ predict_minibatch_kmeans(PG_FUNCTION_ARGS)
 		{
 			if (model_payload != NULL && VARSIZE(model_payload) > VARHDRSZ)
 			{
-				if (kmeans_model_deserialize_from_bytea(model_payload,
-														&centers,
-														&num_clusters,
-														&model_dim) == 0)
+				{
+					uint8		training_backend = 0;
+
+					if (kmeans_model_deserialize_from_bytea(model_payload,
+															&centers,
+															&num_clusters,
+															&model_dim,
+															&training_backend) == 0)
 				{
 					if (n_elems == model_dim && num_clusters > 0)
 					{
@@ -542,6 +533,7 @@ predict_minibatch_kmeans(PG_FUNCTION_ARGS)
 				{
 					cluster_id = 0;
 				}
+				} /* Close training_backend block */
 			}
 			else
 			{
@@ -842,9 +834,9 @@ evaluate_minibatch_kmeans_by_model_id(PG_FUNCTION_ARGS)
 	PG_RETURN_JSONB_P(result);
 }
 
-/* Helper functions for model serialization (reuse k-means format) */
+/* Helper functions for model serialization (reuse k-means format with unified storage) */
 static bytea *
-kmeans_model_serialize_to_bytea(float **centers, int num_clusters, int dim)
+kmeans_model_serialize_to_bytea(float **centers, int num_clusters, int dim, uint8 training_backend)
 {
 	StringInfoData buf;
 	int			i,
@@ -852,7 +844,18 @@ kmeans_model_serialize_to_bytea(float **centers, int num_clusters, int dim)
 	int			total_size;
 	bytea *result = NULL;
 
+	/* Validate training_backend */
+	if (training_backend > 1)
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_INTERNAL_ERROR),
+				 errmsg("neurondb: kmeans_model_serialize_to_bytea: invalid training_backend %d (must be 0 or 1)",
+						training_backend)));
+	}
+
 	initStringInfo(&buf);
+	/* Write training_backend first (0=CPU, 1=GPU) - unified storage format */
+	appendBinaryStringInfo(&buf, (char *) &training_backend, sizeof(uint8));
 	appendBinaryStringInfo(&buf, (char *) &num_clusters, sizeof(int));
 	appendBinaryStringInfo(&buf, (char *) &dim, sizeof(int));
 
@@ -874,18 +877,24 @@ kmeans_model_serialize_to_bytea(float **centers, int num_clusters, int dim)
 }
 
 int
-kmeans_model_deserialize_from_bytea(const bytea * data, float ***centers_out, int *num_clusters_out, int *dim_out)
+kmeans_model_deserialize_from_bytea(const bytea * data, float ***centers_out, int *num_clusters_out, int *dim_out, uint8 * training_backend_out)
 {
 	const char *buf;
 	int			offset = 0;
 	int			i,
 				j;
 	float	  **centers = NULL;
+	uint8		training_backend = 0;
 
-	if (data == NULL || VARSIZE(data) < VARHDRSZ + sizeof(int) * 2)
+	if (data == NULL || VARSIZE(data) < VARHDRSZ + sizeof(uint8) + sizeof(int) * 2)
 		return -1;
 
 	buf = VARDATA(data);
+	/* Read training_backend first (unified storage format) */
+	training_backend = (uint8) buf[offset];
+	offset += sizeof(uint8);
+	if (training_backend_out != NULL)
+		*training_backend_out = training_backend;
 	memcpy(num_clusters_out, buf + offset, sizeof(int));
 	offset += sizeof(int);
 	memcpy(dim_out, buf + offset, sizeof(int));
@@ -1086,13 +1095,13 @@ minibatch_kmeans_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char *
 		nfree(batch_assignments);
 	}
 
-	/* Serialize model (reuse k-means format) */
-	model_data = kmeans_model_serialize_to_bytea(centroids, num_clusters, dim);
+	/* Serialize model (reuse k-means format with unified storage) */
+	model_data = kmeans_model_serialize_to_bytea(centroids, num_clusters, dim, 0); /* training_backend=0 for CPU */
 
 	/* Build metrics */
 	initStringInfo(&metrics_json);
 	appendStringInfo(&metrics_json,
-					 "{\"storage\":\"cpu\",\"k\":%d,\"dim\":%d,\"batch_size\":%d,\"max_iters\":%d,\"n_samples\":%d}",
+					 "{\"storage\":\"cpu\",\"training_backend\":0,\"k\":%d,\"dim\":%d,\"batch_size\":%d,\"max_iters\":%d,\"n_samples\":%d}",
 					 num_clusters, dim, batch_size, max_iters, nvec);
 	metrics = DatumGetJsonbP(DirectFunctionCall1(jsonb_in,
 												 CStringGetTextDatum(metrics_json.data)));
@@ -1178,12 +1187,17 @@ minibatch_kmeans_gpu_predict(const MLGpuModel *model, const float *input, int in
 		return false;
 	}
 
-	if (kmeans_model_deserialize_from_bytea(state->model_blob,
-											&centers, &num_clusters, &dim) != 0)
 	{
-		if (errstr != NULL)
-			*errstr = pstrdup("minibatch_kmeans_gpu_predict: failed to deserialize");
-		return false;
+		uint8		training_backend = 0;
+
+		if (kmeans_model_deserialize_from_bytea(state->model_blob,
+												&centers, &num_clusters, &dim,
+												&training_backend) != 0)
+		{
+			if (errstr != NULL)
+				*errstr = pstrdup("minibatch_kmeans_gpu_predict: failed to deserialize");
+			return false;
+		}
 	}
 
 	if (input_dim != dim)
@@ -1366,13 +1380,18 @@ minibatch_kmeans_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 		memcpy(payload_copy, payload, payload_size);
 	}
 
-	if (kmeans_model_deserialize_from_bytea(payload_copy,
-											&centers, &num_clusters, &dim) != 0)
 	{
-		nfree(payload_copy);
-		if (errstr != NULL)
-			*errstr = pstrdup("minibatch_kmeans_gpu_deserialize: failed to deserialize");
-		return false;
+		uint8		training_backend = 0;
+
+		if (kmeans_model_deserialize_from_bytea(payload_copy,
+											&centers, &num_clusters, &dim,
+											&training_backend) != 0)
+		{
+			nfree(payload_copy);
+			if (errstr != NULL)
+				*errstr = pstrdup("minibatch_kmeans_gpu_deserialize: failed to deserialize");
+			return false;
+		}
 	}
 
 	for (int c = 0; c < num_clusters; c++)

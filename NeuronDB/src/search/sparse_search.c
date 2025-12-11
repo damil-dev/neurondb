@@ -50,6 +50,15 @@ sparse_search(PG_FUNCTION_ARGS)
 	Tuplestorestate *tupstore = NULL;
 	MemoryContext per_query_ctx;
 	MemoryContext oldcontext;
+	NdbSpiSession *session = NULL;
+	StringInfoData sql;
+	int			ret;
+	Datum		values[2];
+	bool		nulls[2] = {false, false};
+	Oid			argtypes[1];
+	Datum		args[1];
+	char	   *tbl_str;
+	char	   *col_str;
 
 	/* Validate argument count */
 	if (PG_NARGS() < 4)
@@ -63,15 +72,8 @@ sparse_search(PG_FUNCTION_ARGS)
 	k = PG_GETARG_INT32(3);
 	rsinfo = (ReturnSetInfo *) fcinfo->resultinfo;
 
-	NdbSpiSession *session = NULL;
-	StringInfoData sql;
-	int			ret;
-	Datum		values[2];
-	bool		nulls[2] = {false, false};
-	Oid			argtypes[1];
-	Datum		args[1];
-	char	   *tbl_str = text_to_cstring(table_name);
-	char	   *col_str = text_to_cstring(sparse_col);
+	tbl_str = text_to_cstring(table_name);
+	col_str = text_to_cstring(sparse_col);
 
 	if (rsinfo == NULL || !IsA(rsinfo, ReturnSetInfo))
 		ereport(ERROR,
@@ -170,15 +172,6 @@ splade_embed(PG_FUNCTION_ARGS)
 {
 	text	   *input_text;
 	char	   *input_str;
-
-	/* Validate argument count */
-	if (PG_NARGS() < 1)
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				 errmsg("neurondb: splade_embed requires at least 1 argument")));
-
-	input_text = PG_GETARG_TEXT_PP(0);
-	input_str = text_to_cstring(input_text);
 #ifdef HAVE_ONNX_RUNTIME
 	ONNXModelSession *session = NULL;
 	ONNXTensor *input_tensor = NULL;
@@ -191,10 +184,20 @@ splade_embed(PG_FUNCTION_ARGS)
 	int		   *indices = NULL;
 	float	   *values = NULL;
 	int			sparse_count = 0;
+	int64	   *shape = NULL;
+	float	   *data = NULL;
+	char	   *sparse_vec_raw = NULL;
+#endif
 
-	int64 *shape = NULL;
-	float *data = NULL;
-	char *sparse_vec_raw = NULL;
+	/* Validate argument count */
+	if (PG_NARGS() < 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: splade_embed requires at least 1 argument")));
+
+	input_text = PG_GETARG_TEXT_PP(0);
+	input_str = text_to_cstring(input_text);
+#ifdef HAVE_ONNX_RUNTIME
 
 	/* Load SPLADE model (default model name) */
 	session = neurondb_onnx_get_or_load_model("splade", ONNX_MODEL_EMBEDDING);
@@ -298,15 +301,6 @@ colbertv2_embed(PG_FUNCTION_ARGS)
 {
 	text	   *input_text;
 	char	   *input_str;
-
-	/* Validate argument count */
-	if (PG_NARGS() < 1)
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				 errmsg("neurondb: colbertv2_embed requires at least 1 argument")));
-
-	input_text = PG_GETARG_TEXT_PP(0);
-	input_str = text_to_cstring(input_text);
 #ifdef HAVE_ONNX_RUNTIME
 	ONNXModelSession *session = NULL;
 	ONNXTensor *input_tensor = NULL;
@@ -321,10 +315,20 @@ colbertv2_embed(PG_FUNCTION_ARGS)
 	float	   *values = NULL;
 	int			sparse_count = 0;
 	int			output_dim;
+	int64	   *shape = NULL;
+	float	   *data = NULL;
+	char	   *sparse_vec_raw = NULL;
+#endif
 
-	int64 *shape = NULL;
-	float *data = NULL;
-	char *sparse_vec_raw = NULL;
+	/* Validate argument count */
+	if (PG_NARGS() < 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: colbertv2_embed requires at least 1 argument")));
+
+	input_text = PG_GETARG_TEXT_PP(0);
+	input_str = text_to_cstring(input_text);
+#ifdef HAVE_ONNX_RUNTIME
 
 	session = neurondb_onnx_get_or_load_model("colbertv2", ONNX_MODEL_EMBEDDING);
 	if (session == NULL || !session->is_loaded)
@@ -561,6 +565,12 @@ bm25_score(PG_FUNCTION_ARGS)
 	int			i,
 				j;
 	double		doc_length;
+	double		avg_doc_length = 100.0;
+	double		N = 1000.0;
+	int			n_qi;
+	double		idf;
+	double		tf;
+	double		bm25_term;
 
 	/* Validate argument count */
 	if (PG_NARGS() < 2 || PG_NARGS() > 4)
@@ -574,12 +584,6 @@ bm25_score(PG_FUNCTION_ARGS)
 	b = PG_ARGISNULL(3) ? 0.75 : PG_GETARG_FLOAT8(3);
 	query_str = text_to_cstring(query_text);
 	doc_str = text_to_cstring(doc_text);
-	double		avg_doc_length = 100.0;
-	double		N = 1000.0;
-	int			n_qi;
-	double		idf;
-	double		tf;
-	double		bm25_term;
 
 	/* Tokenize query and document */
 	nalloc(query_tokens, char *, max_tokens);

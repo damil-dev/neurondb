@@ -60,7 +60,6 @@ ndb_spi_session_begin(MemoryContext parent_context, bool assume_spi_connected)
 	{
 		session->we_connected_spi = false;
 		session->spi_context = CurrentMemoryContext;
-		elog(DEBUG1, "neurondb: SPI session: assuming SPI already connected");
 	}
 	else
 	{
@@ -73,7 +72,6 @@ ndb_spi_session_begin(MemoryContext parent_context, bool assume_spi_connected)
 		}
 		session->we_connected_spi = true;
 		session->spi_context = CurrentMemoryContext;
-		elog(DEBUG1, "neurondb: SPI session: connected SPI (we_connected=true)");
 	}
 
 	return session;
@@ -90,11 +88,9 @@ ndb_spi_session_end(NdbSpiSession **session)
 		if ((*session)->parent_context != NULL)
 			MemoryContextSwitchTo((*session)->parent_context);
 		SPI_finish();
-		elog(DEBUG1, "neurondb: SPI session: finished SPI (we connected it)");
 	}
 	else
 	{
-		elog(DEBUG1, "neurondb: SPI session: not finishing SPI (caller connected it)");
 	}
 
 	nfree(*session);

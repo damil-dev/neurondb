@@ -165,10 +165,6 @@ ltr_rerank_pointwise(PG_FUNCTION_ARGS)
 	feature_matrix = (float8 *) ARR_DATA_PTR(feature_matrix_array);
 	weights = (float8 *) ARR_DATA_PTR(weights_array);
 
-	elog(DEBUG1,
-		 "neurondb: LTR reranking %d docs with %d features",
-		 num_docs,
-		 num_features);
 
 	/* Compute LTR scores using SIMD-optimized dot product */
 	nalloc(doc_scores, DocLTRScore, num_docs);

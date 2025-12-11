@@ -181,23 +181,23 @@ ndb_rocm_svm_launch_compute_kernel_row(const float *features,
 	size_t features_bytes = sizeof(float) * (size_t)n_samples * (size_t)feature_dim;
 	size_t row_bytes = sizeof(float) * (size_t)n_samples;
 
-	err = cudaMalloc((void **)&d_features, features_bytes);
+	err = hipMalloc((void **)&d_features, features_bytes);
 	if (err != hipSuccess)
 		return -1;
 
-	err = cudaMalloc((void **)&d_kernel_row, row_bytes);
+	err = hipMalloc((void **)&d_kernel_row, row_bytes);
 	if (err != hipSuccess)
 	{
-		cudaFree(d_features);
+		hipFree(d_features);
 		return -1;
 	}
 
 	/* Copy features to device */
-	err = cudaMemcpy(d_features, features, features_bytes, cudaMemcpyHostToDevice);
+	err = hipMemcpy(d_features, features, features_bytes, hipMemcpyHostToDevice);
 	if (err != hipSuccess)
 	{
-		cudaFree(d_features);
-		cudaFree(d_kernel_row);
+		hipFree(d_features);
+		hipFree(d_kernel_row);
 		return -1;
 	}
 
@@ -212,31 +212,31 @@ ndb_rocm_svm_launch_compute_kernel_row(const float *features,
 	err = hipGetLastError();
 	if (err != hipSuccess)
 	{
-		cudaFree(d_features);
-		cudaFree(d_kernel_row);
+		hipFree(d_features);
+		hipFree(d_kernel_row);
 		return -1;
 	}
 
 	/* Wait for kernel to complete */
-	err = cudaDeviceSynchronize();
+	err = hipDeviceSynchronize();
 	if (err != hipSuccess)
 	{
-		cudaFree(d_features);
-		cudaFree(d_kernel_row);
+		hipFree(d_features);
+		hipFree(d_kernel_row);
 		return -1;
 	}
 
 	/* Copy result back to host */
-	err = cudaMemcpy(kernel_row, d_kernel_row, row_bytes, cudaMemcpyDeviceToHost);
+	err = hipMemcpy(kernel_row, d_kernel_row, row_bytes, hipMemcpyDeviceToHost);
 	if (err != hipSuccess)
 	{
-		cudaFree(d_features);
-		cudaFree(d_kernel_row);
+		hipFree(d_features);
+		hipFree(d_kernel_row);
 		return -1;
 	}
 
-	cudaFree(d_features);
-	cudaFree(d_kernel_row);
+	hipFree(d_features);
+	hipFree(d_kernel_row);
 	return 0;
 }
 
@@ -270,44 +270,44 @@ ndb_rocm_svm_launch_compute_errors(const float *alphas,
 	size_t kernel_matrix_bytes = sizeof(float) * (size_t)n_samples * (size_t)n_samples;
 	size_t errors_bytes = sizeof(float) * (size_t)n_samples;
 
-	err = cudaMalloc((void **)&d_alphas, alphas_bytes);
+	err = hipMalloc((void **)&d_alphas, alphas_bytes);
 	if (err != hipSuccess)
 		return -1;
 
-	err = cudaMalloc((void **)&d_labels, labels_bytes);
+	err = hipMalloc((void **)&d_labels, labels_bytes);
 	if (err != hipSuccess)
 	{
-		cudaFree(d_alphas);
-		return -1;
-	}
-
-	err = cudaMalloc((void **)&d_kernel_matrix, kernel_matrix_bytes);
-	if (err != hipSuccess)
-	{
-		cudaFree(d_alphas);
-		cudaFree(d_labels);
+		hipFree(d_alphas);
 		return -1;
 	}
 
-	err = cudaMalloc((void **)&d_errors, errors_bytes);
+	err = hipMalloc((void **)&d_kernel_matrix, kernel_matrix_bytes);
 	if (err != hipSuccess)
 	{
-		cudaFree(d_alphas);
-		cudaFree(d_labels);
-		cudaFree(d_kernel_matrix);
+		hipFree(d_alphas);
+		hipFree(d_labels);
+		return -1;
+	}
+
+	err = hipMalloc((void **)&d_errors, errors_bytes);
+	if (err != hipSuccess)
+	{
+		hipFree(d_alphas);
+		hipFree(d_labels);
+		hipFree(d_kernel_matrix);
 		return -1;
 	}
 
 	/* Copy data to device */
-	err = cudaMemcpy(d_alphas, alphas, alphas_bytes, cudaMemcpyHostToDevice);
+	err = hipMemcpy(d_alphas, alphas, alphas_bytes, hipMemcpyHostToDevice);
 	if (err != hipSuccess)
 		goto cleanup;
 
-	err = cudaMemcpy(d_labels, labels, labels_bytes, cudaMemcpyHostToDevice);
+	err = hipMemcpy(d_labels, labels, labels_bytes, hipMemcpyHostToDevice);
 	if (err != hipSuccess)
 		goto cleanup;
 
-	err = cudaMemcpy(d_kernel_matrix, kernel_matrix, kernel_matrix_bytes, cudaMemcpyHostToDevice);
+	err = hipMemcpy(d_kernel_matrix, kernel_matrix, kernel_matrix_bytes, hipMemcpyHostToDevice);
 	if (err != hipSuccess)
 		goto cleanup;
 
@@ -325,30 +325,30 @@ ndb_rocm_svm_launch_compute_errors(const float *alphas,
 		goto cleanup;
 
 	/* Wait for kernel to complete */
-	err = cudaDeviceSynchronize();
+	err = hipDeviceSynchronize();
 	if (err != hipSuccess)
 		goto cleanup;
 
 	/* Copy result back to host */
-	err = cudaMemcpy(errors, d_errors, errors_bytes, cudaMemcpyDeviceToHost);
+	err = hipMemcpy(errors, d_errors, errors_bytes, hipMemcpyDeviceToHost);
 	if (err != hipSuccess)
 		goto cleanup;
 
-	cudaFree(d_alphas);
-	cudaFree(d_labels);
-	cudaFree(d_kernel_matrix);
-	cudaFree(d_errors);
+	hipFree(d_alphas);
+	hipFree(d_labels);
+	hipFree(d_kernel_matrix);
+	hipFree(d_errors);
 	return 0;
 
 cleanup:
 	if (d_alphas)
-		cudaFree(d_alphas);
+		hipFree(d_alphas);
 	if (d_labels)
-		cudaFree(d_labels);
+		hipFree(d_labels);
 	if (d_kernel_matrix)
-		cudaFree(d_kernel_matrix);
+		hipFree(d_kernel_matrix);
 	if (d_errors)
-		cudaFree(d_errors);
+		hipFree(d_errors);
 	return -1;
 }
 
@@ -377,31 +377,31 @@ ndb_rocm_svm_launch_update_errors(const float *kernel_row,
 	size_t kernel_row_bytes = sizeof(float) * (size_t)n_samples;
 	size_t errors_bytes = sizeof(float) * (size_t)n_samples;
 
-	err = cudaMalloc((void **)&d_kernel_row, kernel_row_bytes);
+	err = hipMalloc((void **)&d_kernel_row, kernel_row_bytes);
 	if (err != hipSuccess)
 		return -1;
 
-	err = cudaMalloc((void **)&d_errors, errors_bytes);
+	err = hipMalloc((void **)&d_errors, errors_bytes);
 	if (err != hipSuccess)
 	{
-		cudaFree(d_kernel_row);
+		hipFree(d_kernel_row);
 		return -1;
 	}
 
 	/* Copy data to device */
-	err = cudaMemcpy(d_kernel_row, kernel_row, kernel_row_bytes, cudaMemcpyHostToDevice);
+	err = hipMemcpy(d_kernel_row, kernel_row, kernel_row_bytes, hipMemcpyHostToDevice);
 	if (err != hipSuccess)
 	{
-		cudaFree(d_kernel_row);
-		cudaFree(d_errors);
+		hipFree(d_kernel_row);
+		hipFree(d_errors);
 		return -1;
 	}
 
-	err = cudaMemcpy(d_errors, errors, errors_bytes, cudaMemcpyHostToDevice);
+	err = hipMemcpy(d_errors, errors, errors_bytes, hipMemcpyHostToDevice);
 	if (err != hipSuccess)
 	{
-		cudaFree(d_kernel_row);
-		cudaFree(d_errors);
+		hipFree(d_kernel_row);
+		hipFree(d_errors);
 		return -1;
 	}
 
@@ -416,31 +416,31 @@ ndb_rocm_svm_launch_update_errors(const float *kernel_row,
 	err = hipGetLastError();
 	if (err != hipSuccess)
 	{
-		cudaFree(d_kernel_row);
-		cudaFree(d_errors);
+		hipFree(d_kernel_row);
+		hipFree(d_errors);
 		return -1;
 	}
 
 	/* Wait for kernel to complete */
-	err = cudaDeviceSynchronize();
+	err = hipDeviceSynchronize();
 	if (err != hipSuccess)
 	{
-		cudaFree(d_kernel_row);
-		cudaFree(d_errors);
+		hipFree(d_kernel_row);
+		hipFree(d_errors);
 		return -1;
 	}
 
 	/* Copy result back to host */
-	err = cudaMemcpy(errors, d_errors, errors_bytes, cudaMemcpyDeviceToHost);
+	err = hipMemcpy(errors, d_errors, errors_bytes, hipMemcpyDeviceToHost);
 	if (err != hipSuccess)
 	{
-		cudaFree(d_kernel_row);
-		cudaFree(d_errors);
+		hipFree(d_kernel_row);
+		hipFree(d_errors);
 		return -1;
 	}
 
-	cudaFree(d_kernel_row);
-	cudaFree(d_errors);
+	hipFree(d_kernel_row);
+	hipFree(d_errors);
 	return 0;
 }
 

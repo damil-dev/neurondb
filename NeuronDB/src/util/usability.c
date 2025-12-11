@@ -27,8 +27,6 @@ Datum
 create_model(PG_FUNCTION_ARGS)
 {
 	char	   *config_str = NULL;
-	char	   *name_str = NULL;
-	char	   *type_str = NULL;
 	NdbSpiSession *session = NULL;
 	text	   *config_json = NULL;
 	text	   *model_name = NULL;
@@ -44,15 +42,11 @@ create_model(PG_FUNCTION_ARGS)
 	model_type = PG_GETARG_TEXT_PP(1);
 	config_json = PG_GETARG_TEXT_PP(2);
 
-	name_str = text_to_cstring(model_name);
-	type_str = text_to_cstring(model_type);
+	(void) model_name;
+	(void) model_type;
 	config_str = text_to_cstring(config_json);
 	(void) config_str;
 
-	elog(DEBUG1,
-		 "neurondb: creating model '%s' of type '%s'",
-		 name_str,
-		 type_str);
 
 	session = ndb_spi_session_begin(CurrentMemoryContext, false);
 	if (session == NULL)
@@ -106,10 +100,6 @@ create_ann_index(PG_FUNCTION_ARGS)
 	text	   *column_name = NULL;
 	text	   *index_type = NULL;
 	text	   *options = NULL;
-	char *idx_str = NULL;
-	char *tbl_str = NULL;
-	char *col_str = NULL;
-	char *type_str = NULL;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 5)
@@ -123,19 +113,12 @@ create_ann_index(PG_FUNCTION_ARGS)
 	index_type = PG_GETARG_TEXT_PP(3);
 	options = PG_GETARG_TEXT_PP(4);
 
+	(void) index_name;
+	(void) table_name;
+	(void) column_name;
+	(void) index_type;
 	(void) options;
 
-	idx_str = text_to_cstring(index_name);
-	tbl_str = text_to_cstring(table_name);
-	col_str = text_to_cstring(column_name);
-	type_str = text_to_cstring(index_type);
-
-	elog(DEBUG1,
-		 "neurondb: creating %s index '%s' on %s(%s)",
-		 type_str,
-		 idx_str,
-		 tbl_str,
-		 col_str);
 
 	PG_RETURN_BOOL(true);
 }
@@ -159,9 +142,6 @@ explain_vector_query(PG_FUNCTION_ARGS)
 	query_str = text_to_cstring(query);
 	(void) query_str;
 
-	elog(DEBUG1, "neurondb: query plan: ANN index scan expected");
-	elog(DEBUG1, "neurondb: estimated recall: 0.95");
-	elog(DEBUG1, "neurondb: cache hits expected: high");
 
 	PG_RETURN_TEXT_P(cstring_to_text("Vector query plan generated"));
 }

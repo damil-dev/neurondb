@@ -311,6 +311,12 @@ ndb_cuda_rf_train(const float *features,
 	int			j;
 	int			rc = -1;
 
+	/* Initialize output pointers to NULL */
+	if (model_data)
+		*model_data = NULL;
+	if (metrics)
+		*metrics = NULL;
+
 	/* CPU mode: never execute GPU code */
 	if (NDB_COMPUTE_MODE_IS_CPU())
 	{
@@ -330,7 +336,88 @@ ndb_cuda_rf_train(const float *features,
 		return -1;
 	}
 
-	(void) hyperparams;
+	/* Parse hyperparameters if provided */
+	/* Note: hyperparameters may be NULL or corrupted JSONB, so we wrap all JSONB operations in error handling */
+	if (hyperparams != NULL)
+	{
+		Datum		n_trees_datum;
+		Datum		numeric_datum;
+		Numeric		num;
+		char	   *hyperparams_text = NULL;
+		bool		parse_success = false;
+
+		/* Try to parse hyperparameters - wrap in error handling to catch corrupted JSONB */
+		PG_TRY();
+		{
+			hyperparams_text = DatumGetCString(
+								DirectFunctionCall1(jsonb_out,
+													JsonbPGetDatum(hyperparams)));
+			if (hyperparams_text)
+				nfree(hyperparams_text);
+		}
+		PG_CATCH();
+		{
+			FlushErrorState();
+			/* If jsonb_out fails, the JSONB is likely corrupted - skip parsing entirely */
+			n_trees = default_n_trees;
+			parse_success = true; /* Mark as "handled" so we don't try to parse */
+		}
+		PG_END_TRY();
+
+		/* Only try to parse if jsonb_out succeeded */
+		if (!parse_success)
+		{
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wshadow=compatible-local"
+			PG_TRY();
+			{
+				n_trees_datum = DirectFunctionCall2(
+													jsonb_object_field,
+													JsonbPGetDatum(hyperparams),
+													CStringGetTextDatum("n_trees"));
+				if (DatumGetPointer(n_trees_datum) != NULL)
+				{
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wshadow=compatible-local"
+					PG_TRY();
+					{
+						numeric_datum = DirectFunctionCall1(
+														jsonb_numeric, n_trees_datum);
+						if (DatumGetPointer(numeric_datum) != NULL)
+						{
+							num = DatumGetNumeric(numeric_datum);
+							n_trees = DatumGetInt32(
+													DirectFunctionCall1(numeric_int4,
+																		NumericGetDatum(num)));
+							if (n_trees <= 0)
+								n_trees = default_n_trees;
+							if (n_trees > 10000)
+								n_trees = 10000;
+						}
+					}
+					PG_CATCH();
+					{
+						FlushErrorState();
+						n_trees = default_n_trees;
+					}
+					PG_END_TRY();
+#pragma GCC diagnostic pop
+				}
+			}
+			PG_CATCH();
+			{
+				FlushErrorState();
+				n_trees = default_n_trees;
+			}
+			PG_END_TRY();
+#pragma GCC diagnostic pop
+		}
+	}
+	else
+	{
+		n_trees = default_n_trees;
+	}
+
 	if (n_trees <= 0)
 		n_trees = default_n_trees;
 	if (class_count > 4096)
@@ -660,7 +747,18 @@ ndb_cuda_rf_train(const float *features,
 				? (gini_accumulator / (double) n_trees)
 				: 0.0;
 			spec.oob_accuracy = 0.0;
-			metrics_json = rf_build_metrics_json(&spec);
+			/* Wrap metrics JSON building in error handling to catch JSONB parsing errors */
+			PG_TRY();
+			{
+				metrics_json = rf_build_metrics_json(&spec);
+			}
+			PG_CATCH();
+			{
+				FlushErrorState();
+				elog(WARNING, "CUDA RF train: failed to build metrics JSON, continuing without metrics");
+				metrics_json = NULL;
+			}
+			PG_END_TRY();
 		}
 	}
 

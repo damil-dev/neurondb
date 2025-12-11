@@ -76,9 +76,6 @@ hnsw_tenant_create(PG_FUNCTION_ARGS)
 	maybe_build_hnsw_index(tbl_str, col_str, tenant_id);
 
 	index_tbl = get_hnsw_tenant_table(tbl_str, col_str, tenant_id);
-	elog(INFO,
-		 "neurondb: Created tenant-aware HNSW on %s.%s (tenant %d, quota=%d, ef=%d, max_level=%d, idx_tbl=%s)",
-		 tbl_str, col_str, tenant_id, quota_max, ef_search, max_level, index_tbl);
 
 	nfree(index_tbl);
 	PG_RETURN_BOOL(true);
@@ -110,8 +107,9 @@ hnsw_tenant_search(PG_FUNCTION_ARGS)
 		int32		tenant_id;
 		int32		k;
 		int16		ef_search = 100;	/* Default for demonstration */
-
 		NdbSpiSession *lookup_session = NULL;
+
+		(void) ef_search;		/* Reserved for future use */
 
 		/*
 		 * Read function arguments according to SQL signature: table_name,
@@ -203,9 +201,6 @@ hnsw_tenant_search(PG_FUNCTION_ARGS)
 			col_str = pstrdup("embedding"); /* Common default column name */
 		}
 
-		elog(DEBUG1,
-			 "HNSW tenant search: table=%s, col=%s, tenant=%d, query_dim=%d, k=%d, ef_search=%d",
-			 tbl_str, col_str, tenant_id, query->dim, k, ef_search);
 
 		funcctx = SRF_FIRSTCALL_INIT();
 

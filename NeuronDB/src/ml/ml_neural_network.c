@@ -486,7 +486,7 @@ neural_network_free(NeuralNetwork * net)
 
 /* Serialize neural network to bytea */
 static bytea *
-neural_network_serialize(const NeuralNetwork * net)
+neural_network_serialize(const NeuralNetwork * net, uint8 training_backend)
 {
 	StringInfoData buf;
 	int			i,
@@ -496,6 +496,15 @@ neural_network_serialize(const NeuralNetwork * net)
 
 	if (net == NULL)
 		return NULL;
+
+	/* Validate training_backend */
+	if (training_backend > 1)
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_INTERNAL_ERROR),
+				 errmsg("neurondb: neural_network_serialize: invalid training_backend %d (must be 0 or 1)",
+						training_backend)));
+	}
 
 	/* Validate model before serialization */
 	if (net->n_layers <= 0 || net->n_layers > 100)
@@ -531,6 +540,8 @@ neural_network_serialize(const NeuralNetwork * net)
 
 	pq_begintypsend(&buf);
 
+	/* Write training_backend first (0=CPU, 1=GPU) - unified storage format */
+	pq_sendbyte(&buf, training_backend);
 	/* Write header */
 	pq_sendint32(&buf, net->n_layers);
 	pq_sendint32(&buf, net->n_inputs);
@@ -611,7 +622,7 @@ neural_network_serialize(const NeuralNetwork * net)
 
 /* Deserialize neural network from bytea */
 static NeuralNetwork *
-neural_network_deserialize(const bytea * data)
+neural_network_deserialize(const bytea * data, uint8 * training_backend_out)
 {
 	NeuralNetwork *net = NULL;
 	StringInfoData buf;
@@ -620,12 +631,13 @@ neural_network_deserialize(const bytea * data)
 				k;
 	int			activation_len;
 	char *activation_buf = NULL;
+	uint8		training_backend = 0;
 
 	if (data == NULL)
 		return NULL;
 
 	/* Validate bytea size */
-	if (VARSIZE(data) < VARHDRSZ)
+	if (VARSIZE(data) < VARHDRSZ + sizeof(uint8))
 	{
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
@@ -638,7 +650,7 @@ neural_network_deserialize(const bytea * data)
 	buf.cursor = 0;
 
 	/* Check minimum size for header */
-	if (buf.len < 4 * 4 + 8 + 4)
+	if (buf.len < sizeof(uint8) + 4 * 4 + 8 + 4)
 	{
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
@@ -647,6 +659,10 @@ neural_network_deserialize(const bytea * data)
 
 	nalloc(net, NeuralNetwork, 1);
 
+	/* Read training_backend first (unified storage format) */
+	training_backend = (uint8) pq_getmsgint(&buf, 1);
+	if (training_backend_out != NULL)
+		*training_backend_out = training_backend;
 	/* Read header */
 	net->n_layers = pq_getmsgint(&buf, 4);
 	net->n_inputs = pq_getmsgint(&buf, 4);
@@ -1355,16 +1371,13 @@ train_neural_network(PG_FUNCTION_ARGS)
 
 				if (epoch % 10 == 0)
 				{
-					elog(DEBUG1,
-						 "Epoch %d: loss = %.6f",
-						 epoch, loss);
 				}
 			}
 
 			/* Serialize neural network with error handling */
 			PG_TRY();
 			{
-				serialized = neural_network_serialize(net);
+				serialized = neural_network_serialize(net, 0); /* training_backend=0 for CPU */
 				if (serialized == NULL)
 				{
 					nfree(sql.data);
@@ -1505,9 +1518,6 @@ train_neural_network(PG_FUNCTION_ARGS)
 
 			model_id = ml_catalog_register_model(&spec);
 
-			elog(DEBUG1,
-				 "neurondb: neural_network: training completed, model_id=%d",
-				 model_id);
 
 			nfree(sql.data);
 			NDB_SPI_SESSION_END(train_nn_spi_session);
@@ -1618,7 +1628,11 @@ predict_neural_network(PG_FUNCTION_ARGS)
 
 	PG_TRY();
 	{
-		net = neural_network_deserialize(model_data);
+		{
+			uint8		training_backend = 0;
+
+			net = neural_network_deserialize(model_data, &training_backend);
+		}
 		if (net == NULL)
 		{
 			MemoryContextSwitchTo(oldcontext);
@@ -2163,12 +2177,12 @@ neural_network_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **e
 	}
 
 	/* Serialize model */
-	model_data = neural_network_serialize(net);
+	model_data = neural_network_serialize(net, 0); /* training_backend=0 for CPU */
 
 	/* Build metrics */
 	initStringInfo(&metrics_json);
 	appendStringInfo(&metrics_json,
-					 "{\"storage\":\"cpu\",\"n_inputs\":%d,\"n_outputs\":%d,\"n_hidden_layers\":%d,\"activation\":\"%s\",\"learning_rate\":%.6f,\"epochs\":%d,\"final_loss\":%.6f,\"n_samples\":%d}",
+					 "{\"storage\":\"cpu\",\"training_backend\":0,\"n_inputs\":%d,\"n_outputs\":%d,\"n_hidden_layers\":%d,\"activation\":\"%s\",\"learning_rate\":%.6f,\"epochs\":%d,\"final_loss\":%.6f,\"n_samples\":%d}",
 					 dim, n_outputs, n_hidden, activation, learning_rate, epochs, loss, nvec);
 	metrics = DatumGetJsonbP(DirectFunctionCall1(jsonb_in,
 												 CStringGetTextDatum(metrics_json.data)));
@@ -2251,7 +2265,11 @@ neural_network_gpu_predict(const MLGpuModel *model, const float *input, int inpu
 	/* Deserialize network if not already loaded */
 	if (state->network == NULL)
 	{
-		net = neural_network_deserialize(state->model_blob);
+		{
+			uint8		training_backend = 0;
+
+			net = neural_network_deserialize(state->model_blob, &training_backend);
+		}
 		if (net == NULL)
 		{
 			if (errstr != NULL)
@@ -2387,7 +2405,11 @@ neural_network_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 	payload_copy = (bytea *) payload_copy_raw;
 	memcpy(payload_copy, payload, payload_size);
 
-	net = neural_network_deserialize(payload_copy);
+	{
+		uint8		training_backend = 0;
+
+		net = neural_network_deserialize(payload_copy, &training_backend);
+	}
 	if (net == NULL)
 	{
 		nfree(payload_copy);

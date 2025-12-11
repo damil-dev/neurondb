@@ -276,8 +276,6 @@ sample_and_tune(void)
 	if (ret != SPI_OK_SELECT || SPI_processed == 0)
 	{
 		ndb_spi_session_end(&session);
-		elog(DEBUG1,
-			 "neurondb: tuner waiting for extension to be created");
 		return;
 	}
 
@@ -437,10 +435,6 @@ rotate_caches(void)
 		}
 		else
 		{
-			elog(DEBUG1,
-				 "neurondb: rotated cache (removed " NDB_UINT64_FMT
-				 " entries)",
-				 NDB_UINT64_CAST(SPI_processed));
 		}
 
 		nfree(sql.data);

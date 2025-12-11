@@ -516,7 +516,6 @@ ivfbuild(Relation heap, Relation index, struct IndexInfo *indexInfo)
 	Size		centroidSize;
 	OffsetNumber offnum;
 
-	elog(INFO, "neurondb: Building IVF index on %s", RelationGetRelationName(index));
 
 	/* Initialize build state */
 	memset(&buildstate, 0, sizeof(buildstate));
@@ -1176,10 +1175,6 @@ ivfinsert(Relation index,
 		UnlockReleaseBuffer(meta_buf);
 	}
 
-	elog(DEBUG1,
-		 "ivfinsert: assigned to centroid %d (L2=%.4f), appended to list",
-		 min_idx,
-		 min_dist);
 
 	nfree(input_vec);
 	return true;
@@ -1950,7 +1945,6 @@ ivfgettuple(IndexScanDesc scan, ScanDirection dir)
 	/* Check if query vector is available */
 	if (!so->queryVector)
 	{
-		elog(DEBUG1, "ivfgettuple: No query vector available");
 		return false;
 	}
 
@@ -1972,7 +1966,6 @@ ivfgettuple(IndexScanDesc scan, ScanDirection dir)
 		if (meta->magicNumber != IVF_MAGIC_NUMBER)
 		{
 			UnlockReleaseBuffer(metaBuffer);
-			elog(DEBUG1, "ivfgettuple: Invalid magic number in metadata");
 			return false;
 		}
 
@@ -1980,7 +1973,6 @@ ivfgettuple(IndexScanDesc scan, ScanDirection dir)
 		if (meta->insertedVectors == 0)
 		{
 			UnlockReleaseBuffer(metaBuffer);
-			elog(DEBUG1, "ivfgettuple: Index is empty");
 			so->firstCall = false;
 			so->resultCount = 0;
 			return false;
@@ -1990,10 +1982,6 @@ ivfgettuple(IndexScanDesc scan, ScanDirection dir)
 		if (meta->dim > 0 && so->queryVector->dim != meta->dim)
 		{
 			UnlockReleaseBuffer(metaBuffer);
-			elog(DEBUG1,
-				 "ivfgettuple: Query vector dimension %d does not match index dimension %d",
-				 so->queryVector->dim,
-				 meta->dim);
 			so->firstCall = false;
 			so->resultCount = 0;
 			return false;
@@ -2027,7 +2015,6 @@ ivfgettuple(IndexScanDesc scan, ScanDirection dir)
 		/* Check if any results were found */
 		if (so->resultCount == 0)
 		{
-			elog(DEBUG1, "ivfgettuple: No results found after cluster search");
 		}
 
 		UnlockReleaseBuffer(metaBuffer);
@@ -2149,11 +2136,6 @@ kmeans_run(KMeansState * state)
 	float4		prevCost = FLT_MAX;
 	float4		cost;
 
-	elog(DEBUG1,
-		 "neurondb: Running KMeans with k=%d, n=%d, dim=%d",
-		 state->k,
-		 state->n,
-		 state->dim);
 
 	for (iter = 0; iter < state->maxIter; iter++)
 	{
@@ -2168,21 +2150,10 @@ kmeans_run(KMeansState * state)
 
 		if (fabs(prevCost - cost) < state->threshold)
 		{
-			elog(DEBUG1,
-				 "neurondb: KMeans converged at iteration %d "
-				 "(cost=%.4f)",
-				 iter,
-				 cost);
 			break;
 		}
 
 		prevCost = cost;
-
-		if (iter % 10 == 0)
-			elog(DEBUG1,
-				 "neurondb: KMeans iteration %d, cost=%.4f",
-				 iter,
-				 cost);
 	}
 }
 
@@ -2658,9 +2629,6 @@ ivfupdate(Relation index,
 	if (!ivfdelete(index, otid, values, isnull, heapRel, indexInfo))
 	{
 		/* If delete failed, still try to insert new value */
-		elog(DEBUG1,
-			 "neurondb: IVF update: delete of old value failed, "
-			 "proceeding with insert");
 	}
 
 	return ivfinsert(index, values, isnull, tid, heapRel,

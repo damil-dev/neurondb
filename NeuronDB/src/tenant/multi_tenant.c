@@ -127,11 +127,6 @@ create_tenant_worker(PG_FUNCTION_ARGS)
 		^ ((int32) GetCurrentTimestamp());
 
 	/* Safe, detailed notice */
-	elog(DEBUG1,
-		 "neurondb: registering worker type \"%s\" for tenant \"%s\" (worker_id=%d)",
-		 type_str,
-		 tid_str,
-		 worker_id);
 
 	/* All resources, even on elog, will be released by PG's memory context */
 
@@ -393,11 +388,6 @@ audit_log_query(PG_FUNCTION_ARGS)
 
 	vector_hash = compute_vector_hash(result_vectors);
 
-	elog(DEBUG1,
-		 "neurondb: audit_log(user=\"%s\", len(query)=%zu, vector_hash=%u)",
-		 user_str,
-		 strlen(query_str),
-		 vector_hash);
 
 	/* Get HMAC key from GUC or use default */
 	{

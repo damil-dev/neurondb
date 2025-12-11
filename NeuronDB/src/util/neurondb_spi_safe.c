@@ -69,7 +69,6 @@ ndb_spi_execute_safe(const char *query, bool read_only, long tcount)
 				 connect_ret);
 			return -1;
 		}
-		elog(DEBUG1, "neurondb: ndb_spi_execute_safe auto-connected SPI");
 	}
 
 	/*
@@ -93,11 +92,9 @@ ndb_spi_execute_safe(const char *query, bool read_only, long tcount)
 		 */
 		if (ret == SPI_ERROR_UNCONNECTED)
 		{
-			elog(DEBUG1, "neurondb: SPI_execute returned SPI_ERROR_UNCONNECTED, attempting to connect and retry");
 			if (SPI_connect() == SPI_OK_CONNECT)
 			{
 				ret = SPI_execute(query, read_only ? 1 : 0, tcount);
-				elog(DEBUG1, "neurondb: retry after SPI_connect returned %d", ret);
 			}
 			else
 			{

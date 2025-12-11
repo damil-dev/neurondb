@@ -40,10 +40,6 @@ neurondb_gpu_l2_distance(const float *vec1, const float *vec2, int dim)
 	backend = ndb_gpu_get_active_backend();
 	if (!backend || !backend->launch_l2_distance)
 	{
-		elog(DEBUG1,
-			 "neurondb: GPU l2 distance not implemented for backend "
-			 "%s; using CPU fallback",
-			 backend && backend->name ? backend->name : "unknown");
 		return -1.0f;
 	}
 
@@ -68,10 +64,6 @@ neurondb_gpu_cosine_distance(const float *vec1, const float *vec2, int dim)
 	backend = ndb_gpu_get_active_backend();
 	if (!backend || !backend->launch_cosine)
 	{
-		elog(DEBUG1,
-			 "neurondb: GPU cosine distance not implemented for "
-			 "backend %s; using CPU fallback",
-			 backend && backend->name ? backend->name : "unknown");
 		return -1.0f;
 	}
 
@@ -114,9 +106,6 @@ neurondb_gpu_inner_product(const float *vec1, const float *vec2, int dim)
 
 	/* Try to use backend if it supports inner product via cosine */
 	/* For now, use CPU fallback */
-	elog(DEBUG1,
-		 "neurondb: GPU inner product using CPU fallback (backend: %s)",
-		 backend->name ? backend->name : "unknown");
 
 	for (i = 0; i < dim; i++)
 		dot += vec1[i] * vec2[i];

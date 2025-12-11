@@ -121,14 +121,13 @@ rerank_index_create(PG_FUNCTION_ARGS)
 	char *cache_tbl = NULL;
 	StringInfoData sql;
 	int			ret;
-
 	NdbSpiSession *session = NULL;
+
+	(void) cache_size;		/* Reserved for future use */
+	(void) k_candidates;		/* Reserved for future use */
 
 	cache_tbl = get_rerank_cache_table(tbl_str, col_str);
 
-	elog(INFO,
-		 "neurondb: Creating rerank index on %s.%s (cache=%d, k=%d)",
-		 tbl_str, col_str, cache_size, k_candidates);
 
 	session = ndb_spi_session_begin(CurrentMemoryContext, false);
 	if (session == NULL)
@@ -395,9 +394,6 @@ rerank_index_warm(PG_FUNCTION_ARGS)
 
 	get_typlenbyvalalign(eltype, &elmlen, &elmbyval, &elmalign);
 
-	elog(INFO,
-		 "neurondb: Warming rerank index %s with %d queries",
-		 idx_str, nqueries);
 
 	cache_tbl = pstrdup(idx_str);
 

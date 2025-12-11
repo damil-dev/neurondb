@@ -293,9 +293,6 @@ validate_hnsw_index(Relation index)
 	result->errors = 0;
 	result->warnings = 0;
 
-	elog(INFO,
-		 "neurondb: Validating HNSW index %s",
-		 RelationGetRelationName(index));
 
 	/* Check metadata page */
 	appendStringInfo(&result->messages, "Checking metadata page... ");
@@ -466,9 +463,6 @@ validate_ivf_index(Relation index)
 	result->errors = 0;
 	result->warnings = 0;
 
-	elog(INFO,
-		 "neurondb: Validating IVF index %s",
-		 RelationGetRelationName(index));
 
 	appendStringInfo(&result->messages, "Checking centroids... ");
 	{
@@ -1082,9 +1076,6 @@ neurondb_rebuild_index(PG_FUNCTION_ARGS)
 	indexOid = PG_GETARG_OID(0);
 	indexRel = index_open(indexOid, AccessExclusiveLock);
 
-	elog(INFO,
-		 "neurondb: Rebuilding index %s",
-		 RelationGetRelationName(indexRel));
 
 	/* Get heap relation and index info for rebuild */
 	{
@@ -1158,9 +1149,6 @@ neurondb_rebuild_index(PG_FUNCTION_ARGS)
 			nfree(indexName);
 			nfree(rebuildCmd);
 
-			elog(INFO,
-				 "neurondb: Index %s rebuilt successfully",
-				 RelationGetRelationName(indexRel));
 		}
 
 		/* Reopen index to get updated relation for tracking */

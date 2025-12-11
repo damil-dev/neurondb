@@ -79,10 +79,6 @@ auto_route_query(PG_FUNCTION_ARGS)
 		use_ann = true;
 	}
 
-	elog(DEBUG1,
-		 "neurondb:auto_route_query: route=%s embedding_length=%d",
-		 use_ann ? "ANN" : "FTS",
-		 embedding_length);
 
 	if (query_str)
 		nfree(query_str);
@@ -131,11 +127,6 @@ learn_from_query(PG_FUNCTION_ARGS)
 		fingerprint = ((fingerprint << 5) + fingerprint)
 			+ (unsigned char) query_str[i];
 
-	elog(DEBUG1,
-		 "neurondb:learn_from_query: fprint=%llu recall=%.6f latency=%d",
-		 (unsigned long long) fingerprint,
-		 actual_recall,
-		 latency_ms);
 
 	session = ndb_spi_session_begin(CurrentMemoryContext, false);
 	if (session == NULL)
@@ -409,11 +400,6 @@ scale_precision(PG_FUNCTION_ARGS)
 	else
 		target_precision = 32;	/* float32 (full) */
 
-	elog(DEBUG1,
-		 "neurondb:scale_precision: target=%dbit (mem=%.3f recall=%.3f)",
-		 target_precision,
-		 memory_pressure,
-		 recall_target);
 
 	result = new_vector(input->dim);
 	if (result == NULL)
@@ -544,9 +530,6 @@ prefetch_entry_points(PG_FUNCTION_ARGS)
 	if (idx_str)
 		nfree(idx_str);
 
-	elog(DEBUG1,
-		 "neurondb:prefetch_entry_points: prefetched_count=%d",
-		 prefetched_count);
 
 	PG_RETURN_INT32(prefetched_count);
 }

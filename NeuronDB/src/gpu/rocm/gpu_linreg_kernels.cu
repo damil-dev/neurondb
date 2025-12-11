@@ -358,19 +358,19 @@ launch_linreg_eval_kernel(const float *features,
 		/* No samples to process - initialize outputs to zero */
 		if (sse_out != NULL)
 		{
-			err = cudaMemset(sse_out, 0, sizeof(double));
+			err = hipMemset(sse_out, 0, sizeof(double));
 			if (err != hipSuccess)
 				return err;
 		}
 		if (sae_out != NULL)
 		{
-			err = cudaMemset(sae_out, 0, sizeof(double));
+			err = hipMemset(sae_out, 0, sizeof(double));
 			if (err != hipSuccess)
 				return err;
 		}
 		if (count_out != NULL)
 		{
-			err = cudaMemset(count_out, 0, sizeof(long long));
+			err = hipMemset(count_out, 0, sizeof(long long));
 			if (err != hipSuccess)
 				return err;
 		}
@@ -387,15 +387,15 @@ launch_linreg_eval_kernel(const float *features,
 		return hipErrorInvalidValue;
 	
 	/* Initialize output accumulators to zero */
-	err = cudaMemset(sse_out, 0, sizeof(double));
+	err = hipMemset(sse_out, 0, sizeof(double));
 	if (err != hipSuccess)
 		return err;
 	
-	err = cudaMemset(sae_out, 0, sizeof(double));
+	err = hipMemset(sae_out, 0, sizeof(double));
 	if (err != hipSuccess)
 		return err;
 	
-	err = cudaMemset(count_out, 0, sizeof(long long));
+	err = hipMemset(count_out, 0, sizeof(long long));
 	if (err != hipSuccess)
 		return err;
 	

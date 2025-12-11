@@ -84,12 +84,6 @@ mdl_http(PG_FUNCTION_ARGS)
 	initStringInfo(&response);
 	cb.buf = &response;
 
-	elog(DEBUG1,
-		 "neurondb: HTTP %s %s (timeout=%dms, max_retries=%d)",
-		 method_str,
-		 url_str,
-		 timeout_ms,
-		 max_retries);
 
 	for (attempt = 1; attempt <= max_retries; attempt++)
 	{
@@ -237,7 +231,6 @@ mdl_llm(PG_FUNCTION_ARGS)
 	text	   *model = PG_GETARG_TEXT_PP(0);
 	text	   *prompt = PG_GETARG_TEXT_PP(1);
 	int32		max_tokens = PG_GETARG_INT32(2);
-	float4		temperature = PG_GETARG_FLOAT4(3);
 
 	char	   *model_str = text_to_cstring(model);
 	char	   *prompt_str = text_to_cstring(prompt);
@@ -249,11 +242,6 @@ mdl_llm(PG_FUNCTION_ARGS)
 	NdbSpiSession *spi_session = NULL;
 	MemoryContext oldcontext;
 
-	elog(DEBUG1,
-		 "neurondb: LLM call: model=%s; max_tokens=%d; temperature=%.2f",
-		 model_str,
-		 max_tokens,
-		 temperature);
 
 	/* Simple word-count for rough token estimation */
 	{
@@ -362,10 +350,6 @@ mdl_cache(PG_FUNCTION_ARGS)
 	NdbSpiSession *spi_session = NULL;
 	MemoryContext oldcontext;
 
-	elog(DEBUG1,
-		 "neurondb: Insert/Update cache: key='%s' ttl=%d",
-		 key_str,
-		 ttl_seconds);
 
 	oldcontext = CurrentMemoryContext;
 
@@ -435,11 +419,6 @@ mdl_trace(PG_FUNCTION_ARGS)
 	NdbSpiSession *spi_session = NULL;
 	MemoryContext oldcontext;
 
-	elog(DEBUG1,
-		 "neurondb: mdl_trace: id='%s', event='%s', meta='%s'",
-		 trace_str,
-		 event_str,
-		 meta_str);
 
 	oldcontext = CurrentMemoryContext;
 

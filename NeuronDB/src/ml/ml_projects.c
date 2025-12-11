@@ -37,6 +37,8 @@
 #include "neurondb_safe_memory.h"
 #include "neurondb_macros.h"
 #include "neurondb_spi.h"
+#include "neurondb_json.h"
+#include "lib/stringinfo.h"
 
 PG_FUNCTION_INFO_V1(neurondb_create_ml_project);
 PG_FUNCTION_INFO_V1(neurondb_list_ml_projects);
@@ -464,7 +466,6 @@ neurondb_train_kmeans_project(PG_FUNCTION_ARGS)
 	int			project_id;
 	int32		next_version_val;
 	int			next_version;
-	int32		model_id_val;
 	int			model_id;
 	int64		start_time;
 	int64		end_time;
@@ -563,51 +564,47 @@ neurondb_train_kmeans_project(PG_FUNCTION_ARGS)
 	}
 	next_version = next_version_val;
 
-	/* Create model record */
-	ndb_spi_stringinfo_free(spi_session, &sql);
-	ndb_spi_stringinfo_init(spi_session, &sql);
-	appendStringInfo(&sql,
-					 "INSERT INTO neurondb.ml_models "
-					 "(project_id, version, algorithm, status, training_table, "
-					 "training_column, parameters) "
-					 "VALUES (%d, %d, 'kmeans', 'training', %s, %s, '{\"k\": %d, "
-					 "\"max_iters\": %d}'::jsonb) "
-					 "RETURNING model_id",
-					 project_id,
-					 next_version,
-					 quote_literal_cstr(table_name),
-					 quote_literal_cstr(vector_col),
-					 num_clusters,
-					 max_iters);
-
-	ret = ndb_spi_execute(spi_session, sql.data, false, 0);
-	if (ret != SPI_OK_INSERT_RETURNING)
-	{
-		ndb_spi_stringinfo_free(spi_session, &sql);
-		NDB_SPI_SESSION_END(spi_session);
-		nfree(project_name);
-		nfree(table_name);
-		nfree(vector_col);
-		ereport(ERROR,
-				(errcode(ERRCODE_INTERNAL_ERROR),
-				 errmsg("neurondb: failed to create model record")));
-	}
-
-	if (!ndb_spi_get_int32(spi_session, 0, 1, &model_id_val))
-	{
-		ndb_spi_stringinfo_free(spi_session, &sql);
-		NDB_SPI_SESSION_END(spi_session);
-		nfree(project_name);
-		nfree(table_name);
-		nfree(vector_col);
-		ereport(ERROR,
-				(errcode(ERRCODE_INTERNAL_ERROR),
-				 errmsg("neurondb: failed to get model_id from result")));
-	}
-	model_id = model_id_val;
-
 	ndb_spi_stringinfo_free(spi_session, &sql);
 	NDB_SPI_SESSION_END(spi_session);
+
+	/* Create model record using catalog API */
+	{
+		Jsonb *parameters = NULL;
+		StringInfoData paramsbuf;
+		MLCatalogModelSpec spec;
+
+		/* Build parameters JSON */
+		initStringInfo(&paramsbuf);
+		appendStringInfo(&paramsbuf,
+						 "{\"k\": %d, \"max_iters\": %d}",
+						 num_clusters,
+						 max_iters);
+
+		parameters = ndb_jsonb_in_cstring(paramsbuf.data);
+		if (parameters == NULL)
+		{
+			nfree(paramsbuf.data);
+			nfree(project_name);
+			nfree(table_name);
+			nfree(vector_col);
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
+					 errmsg("neurondb: failed to parse parameters JSON for kmeans model")));
+		}
+		nfree(paramsbuf.data);
+
+		/* Register model in catalog */
+		memset(&spec, 0, sizeof(MLCatalogModelSpec));
+		spec.algorithm = "kmeans";
+		spec.model_type = "clustering";
+		spec.training_table = table_name;
+		spec.training_column = vector_col;
+		spec.project_name = project_name;
+		spec.parameters = parameters;
+		spec.model_data = NULL; /* Will be set after training */
+
+		model_id = ml_catalog_register_model(&spec);
+	}
 
 	/* Train the actual model (call existing cluster_kmeans) */
 

@@ -28,6 +28,7 @@
 #include "ml_svm_internal.h"
 #include "neurondb_cuda_svm.h"
 #include "neurondb_validation.h"
+#include "neurondb_json.h"
 #include "neurondb_safe_memory.h"
 #include "neurondb_macros.h"
 #include "neurondb_guc.h"
@@ -163,10 +164,63 @@ ndb_cuda_svm_pack_model(const SVMModel * model,
 						 model->n_support_vectors,
 						 model->C,
 						 model->max_iters);
+		
+		
+		/* Create JSON in TopMemoryContext to isolate from potentially corrupted context */
+		/* This prevents the corrupted freelist from affecting JSON creation */
+		{
+			MemoryContext oldcontext;
+			Jsonb	   *temp_json = NULL;
 
-		metrics_json = DatumGetJsonbP(DirectFunctionCall1(
-														  jsonb_in, CStringGetTextDatum(buf.data)));
-		nfree(buf.data);
+			oldcontext = MemoryContextSwitchTo(TopMemoryContext);
+
+			PG_TRY();
+			{
+				temp_json = ndb_jsonb_in_cstring(buf.data);
+			}
+			PG_CATCH();
+			{
+				ErrorData *edata = CopyErrorData();
+				MemoryContextSwitchTo(oldcontext);
+				if (edata)
+				{
+					FreeErrorData(edata);
+				}
+				else
+				{
+				}
+				pfree(buf.data);
+				FlushErrorState();
+				PG_RE_THROW();
+			}
+			PG_END_TRY();
+
+			if (temp_json == NULL)
+			{
+				MemoryContextSwitchTo(oldcontext);
+				pfree(buf.data);
+				ereport(ERROR,
+						(errcode(ERRCODE_INTERNAL_ERROR),
+						 errmsg("neurondb: CUDA svm_pack_model: Failed to create metrics JSONB - ndb_jsonb_in_cstring returned NULL")));
+			}
+
+			/* Switch back to original context and copy JSON to it */
+			MemoryContextSwitchTo(oldcontext);
+
+			/* Copy JSONB to current context using MemoryContextAlloc and memcpy */
+			/* JSONB is a varlena type, so we need to copy the entire structure */
+			{
+				/* TEMP FIX: Skip copy, use TopMemoryContext JSONB directly like Random Forest */
+				metrics_json = temp_json;
+				/*
+				size_t		jsonb_size = VARSIZE(temp_json);
+				metrics_json = (Jsonb *) MemoryContextAlloc(CurrentMemoryContext, jsonb_size);
+				memcpy(metrics_json, temp_json, jsonb_size);
+				*/
+			}
+		}
+		
+		pfree(buf.data);
 		*metrics = metrics_json;
 	}
 
@@ -209,6 +263,12 @@ ndb_cuda_svm_train(const float *features,
 	double	   *model_alphas = NULL;
 	float	   *model_support_vectors = NULL;
 	int		   *model_support_vector_indices = NULL;
+
+	/* Initialize output pointers to NULL */
+	if (model_data)
+		*model_data = NULL;
+	if (metrics)
+		*metrics = NULL;
 
 	/* CPU mode: never execute GPU code */
 	if (NDB_COMPUTE_MODE_IS_CPU())
@@ -253,55 +313,75 @@ ndb_cuda_svm_train(const float *features,
 		return -1;
 	}
 
-	/* Extract hyperparameters */
-	if (hyperparams != NULL)
+	/* Extract hyperparameters - wrap in PG_TRY/PG_CATCH to handle corrupted JSON, like linear/logistic regression */
+	if (hyperparams == NULL)
 	{
-		Datum		C_datum;
-		Datum		max_iters_datum;
-		Datum		numeric_datum;
-		Numeric		num;
-
-		C_datum = DirectFunctionCall2(
-									  jsonb_object_field,
-									  JsonbPGetDatum(hyperparams),
-									  CStringGetTextDatum("C"));
-		if (DatumGetPointer(C_datum) != NULL)
+		/* Use defaults - hyperparams is NULL for SVM (set in gpu_model_bridge.c) */
+		C = 1.0;
+		max_iters = 1000;
+	}
+	else
+	{
+		PG_TRY();
 		{
-			numeric_datum = DirectFunctionCall1(
-												jsonb_numeric, C_datum);
-			if (DatumGetPointer(numeric_datum) != NULL)
+			Datum		C_datum;
+			Datum		max_iters_datum;
+			Datum		numeric_datum;
+			Numeric		num;
+			Datum		hyperparams_datum;
+
+			/* Wrap JsonbPGetDatum in PG_TRY as well, in case pointer is corrupted */
+			hyperparams_datum = JsonbPGetDatum(hyperparams);
+			C_datum = DirectFunctionCall2(
+										  jsonb_object_field,
+										  hyperparams_datum,
+										  CStringGetTextDatum("C"));
+			if (DatumGetPointer(C_datum) != NULL)
 			{
-				num = DatumGetNumeric(numeric_datum);
-				C = DatumGetFloat8(
-								   DirectFunctionCall1(numeric_float8,
-													   NumericGetDatum(num)));
-				if (C <= 0.0)
-					C = 1.0;
-				if (C > 1000.0)
-					C = 1000.0;
+				numeric_datum = DirectFunctionCall1(
+													jsonb_numeric, C_datum);
+				if (DatumGetPointer(numeric_datum) != NULL)
+				{
+					num = DatumGetNumeric(numeric_datum);
+					C = DatumGetFloat8(
+									   DirectFunctionCall1(numeric_float8,
+														   NumericGetDatum(num)));
+					if (C <= 0.0)
+						C = 1.0;
+					if (C > 1000.0)
+						C = 1000.0;
+				}
+			}
+
+			max_iters_datum = DirectFunctionCall2(
+												  jsonb_object_field,
+												  hyperparams_datum,
+												  CStringGetTextDatum("max_iters"));
+			if (DatumGetPointer(max_iters_datum) != NULL)
+			{
+				numeric_datum = DirectFunctionCall1(
+													jsonb_numeric, max_iters_datum);
+				if (DatumGetPointer(numeric_datum) != NULL)
+				{
+					num = DatumGetNumeric(numeric_datum);
+					max_iters = DatumGetInt32(
+											  DirectFunctionCall1(numeric_int4,
+																  NumericGetDatum(num)));
+					if (max_iters <= 0)
+						max_iters = 1000;
+					if (max_iters > 100000)
+						max_iters = 100000;
+				}
 			}
 		}
-
-		max_iters_datum = DirectFunctionCall2(
-											  jsonb_object_field,
-											  JsonbPGetDatum(hyperparams),
-											  CStringGetTextDatum("max_iters"));
-		if (DatumGetPointer(max_iters_datum) != NULL)
+		PG_CATCH();
 		{
-			numeric_datum = DirectFunctionCall1(
-												jsonb_numeric, max_iters_datum);
-			if (DatumGetPointer(numeric_datum) != NULL)
-			{
-				num = DatumGetNumeric(numeric_datum);
-				max_iters = DatumGetInt32(
-										  DirectFunctionCall1(numeric_int4,
-															  NumericGetDatum(num)));
-				if (max_iters <= 0)
-					max_iters = 1000;
-				if (max_iters > 100000)
-					max_iters = 100000;
-			}
+			/* If hyperparams JSON is corrupted, just use default values */
+			FlushErrorState();
+			C = 1.0;
+			max_iters = 1000;
 		}
+		PG_END_TRY();
 	}
 
 	/* Limit iterations and samples for large datasets */
@@ -317,9 +397,10 @@ ndb_cuda_svm_train(const float *features,
 				*errstr = pstrdup("CUDA SVM train: non-finite value in labels array");
 			return -1;
 		}
-		/* SVM requires labels to be exactly -1 or 1 */
-		if (labels[i] != -1.0 && labels[i] != 1.0)
+		/* SVM requires labels to be exactly -1 or 1 (with small tolerance for floating point) */
+		if (fabs(labels[i] + 1.0) > 1e-6 && fabs(labels[i] - 1.0) > 1e-6)
 		{
+			/* Labels are normalized, so this should never happen - but if it does, return error */
 			if (errstr)
 				*errstr = pstrdup("CUDA SVM train: labels must be exactly -1.0 or 1.0");
 			return -1;
@@ -349,10 +430,20 @@ ndb_cuda_svm_train(const float *features,
 		return -1;
 	}
 
-	nalloc(alphas, float, sample_limit);
-	nalloc(errors, float, sample_limit);
-	nalloc(kernel_matrix, float, sample_limit * sample_limit);
-	nalloc(kernel_row, float, sample_limit);
+	PG_TRY();
+	{
+		nalloc(alphas, float, sample_limit);
+		nalloc(errors, float, sample_limit);
+		nalloc(kernel_matrix, float, sample_limit * sample_limit);
+		nalloc(kernel_row, float, sample_limit);
+	}
+	PG_CATCH();
+	{
+		if (errstr)
+			*errstr = pstrdup("CUDA SVM train: exception during memory allocation");
+		return -1;
+	}
+	PG_END_TRY();
 
 	if (alphas == NULL || errors == NULL || kernel_matrix == NULL || kernel_row == NULL)
 	{
@@ -370,20 +461,34 @@ ndb_cuda_svm_train(const float *features,
 	}
 
 	/* Pre-compute kernel matrix using GPU */
-	for (i = 0; i < sample_limit; i++)
+	PG_TRY();
 	{
-		if (ndb_cuda_svm_launch_compute_kernel_row(features, sample_limit, feature_dim, i, kernel_row) != 0)
+		for (i = 0; i < sample_limit; i++)
 		{
-			if (errstr)
-				*errstr = pstrdup("CUDA SVM train: failed to compute kernel matrix");
-			nfree(alphas);
-			nfree(errors);
-			nfree(kernel_matrix);
-			nfree(kernel_row);
-			return -1;
+			if (ndb_cuda_svm_launch_compute_kernel_row(features, sample_limit, feature_dim, i, kernel_row) != 0)
+			{
+				if (errstr)
+					*errstr = pstrdup("CUDA SVM train: failed to compute kernel matrix");
+				nfree(alphas);
+				nfree(errors);
+				nfree(kernel_matrix);
+				nfree(kernel_row);
+				return -1;
+			}
+			memcpy(kernel_matrix + i * sample_limit, kernel_row, sizeof(float) * (size_t) sample_limit);
 		}
-		memcpy(kernel_matrix + i * sample_limit, kernel_row, sizeof(float) * (size_t) sample_limit);
 	}
+	PG_CATCH();
+	{
+		if (alphas) nfree(alphas);
+		if (errors) nfree(errors);
+		if (kernel_matrix) nfree(kernel_matrix);
+		if (kernel_row) nfree(kernel_row);
+		if (errstr && *errstr == NULL)
+			*errstr = pstrdup("CUDA SVM train: exception during kernel matrix computation");
+		return -1;
+	}
+	PG_END_TRY();
 
 	/* Initialize errors: E_i = f(x_i) - y_i, where f(x_i) = 0 initially */
 	/* Also initialize alphas to small values to help convergence */
@@ -629,8 +734,8 @@ ndb_cuda_svm_predict(const bytea * model_data,
 	const		int32 *indices __attribute__((unused));
 	bytea	   *detoasted = NULL;
 	double		prediction;
-	int			i,
-				j;
+	int			sv_idx,
+				dim_idx;
 	size_t		expected_size;
 
 	if (errstr)
@@ -682,17 +787,17 @@ ndb_cuda_svm_predict(const bytea * model_data,
 
 	/* Compute prediction: f(x) = Σ(alpha_i * y_i * K(x_i, x)) + bias */
 	prediction = hdr->bias;
-	for (i = 0; i < hdr->n_support_vectors; i++)
+	for (sv_idx = 0; sv_idx < hdr->n_support_vectors; sv_idx++)
 	{
 		double		kernel_val = 0.0;
-		const float *sv = support_vectors + (i * feature_dim);
+		const float *sv = support_vectors + (sv_idx * feature_dim);
 
 		/* Linear kernel: K(x_i, x) = x_i · x */
-		for (j = 0; j < feature_dim; j++)
-			kernel_val += sv[j] * input[j];
+		for (dim_idx = 0; dim_idx < feature_dim; dim_idx++)
+			kernel_val += sv[dim_idx] * input[dim_idx];
 
 		/* Note: y_i is stored explicitly via alpha sign in model building */
-		prediction += alphas[i] * kernel_val;
+		prediction += alphas[sv_idx] * kernel_val;
 	}
 
 	*class_out = (prediction >= 0.0) ? 1 : 0;
@@ -719,7 +824,7 @@ ndb_cuda_svm_predict_batch(const bytea * model_data,
 	const char *base;
 	const NdbCudaSvmModelHeader *hdr;
 	bytea	   *detoasted = NULL;
-	int			i;
+	int			sample_idx;
 	int			rc;
 	size_t		expected_size;
 
@@ -775,9 +880,9 @@ ndb_cuda_svm_predict_batch(const bytea * model_data,
 	}
 
 	/* Predict for each sample */
-	for (i = 0; i < n_samples; i++)
+	for (sample_idx = 0; sample_idx < n_samples; sample_idx++)
 	{
-		const float *input = features + (i * feature_dim);
+		const float *input = features + (sample_idx * feature_dim);
 		int			class_out = 0;
 		double		confidence_out = 0.0;
 
@@ -791,11 +896,11 @@ ndb_cuda_svm_predict_batch(const bytea * model_data,
 		if (rc != 0)
 		{
 			/* On error, set default prediction */
-			predictions_out[i] = 0;
+			predictions_out[sample_idx] = 0;
 			continue;
 		}
 
-		predictions_out[i] = class_out;
+		predictions_out[sample_idx] = class_out;
 	}
 
 	/* Free detoasted copy */
@@ -824,7 +929,7 @@ ndb_cuda_svm_evaluate_batch(const bytea * model_data,
 	int			tn = 0;
 	int			fp = 0;
 	int			fn = 0;
-	int			i;
+	int			sample_idx;
 	int			total_correct = 0;
 	int			rc;
 
@@ -871,10 +976,10 @@ ndb_cuda_svm_evaluate_batch(const bytea * model_data,
 	}
 
 	/* Compute confusion matrix for binary classification */
-	for (i = 0; i < n_samples; i++)
+	for (sample_idx = 0; sample_idx < n_samples; sample_idx++)
 	{
-		int			true_label = labels[i];
-		int			pred_label = predictions[i];
+		int			true_label = labels[sample_idx];
+		int			pred_label = predictions[sample_idx];
 
 		if (true_label < 0 || true_label > 1)
 			continue;

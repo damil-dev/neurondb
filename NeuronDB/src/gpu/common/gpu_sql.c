@@ -629,10 +629,6 @@ hnsw_knn_search_gpu(PG_FUNCTION_ARGS)
 			backend = ndb_gpu_get_active_backend();
 			if (backend && backend->launch_l2_distance)
 			{
-				elog(DEBUG1,
-					 "hnsw_knn_search_gpu: GPU acceleration available "
-					 "for distance calculations (k=%d, ef_search=%d, dim=%d)",
-					 k, ef_search, query->dim);
 			}
 		}
 
@@ -836,16 +832,12 @@ hnsw_knn_search_gpu(PG_FUNCTION_ARGS)
 			nfree(candidateDists);
 			nfree(visited);
 
-			elog(DEBUG1,
-				 "hnsw_knn_search_gpu: Completed graph traversal, returning %d result(s)",
-				 resultCount);
 		}
 		else
 		{
 			results = NULL;
 			distances = NULL;
 			resultCount = 0;
-			elog(DEBUG1, "hnsw_knn_search_gpu: No entry point in index");
 		}
 
 		UnlockReleaseBuffer(metaBuffer);
@@ -1046,10 +1038,6 @@ ivf_knn_search_gpu(PG_FUNCTION_ARGS)
 			backend = ndb_gpu_get_active_backend();
 			if (backend && backend->launch_l2_distance)
 			{
-				elog(DEBUG1,
-					 "ivf_knn_search_gpu: GPU acceleration available "
-					 "for distance calculations (k=%d, nprobe=%d, dim=%d)",
-					 k, nprobe, query->dim);
 			}
 		}
 
@@ -1379,7 +1367,6 @@ ivf_knn_search_gpu(PG_FUNCTION_ARGS)
 			resultCount = 0;
 			results = NULL;
 			distances = NULL;
-			elog(DEBUG1, "ivf_knn_search_gpu: No centroids in index");
 		}
 
 		UnlockReleaseBuffer(metaBuffer);

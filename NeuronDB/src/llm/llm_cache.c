@@ -136,7 +136,6 @@ ndb_llm_cache_lookup(const char *key, int max_age_seconds, char **out_text)
 	session = ndb_spi_session_begin(oldcontext, false);
 	if (session == NULL)
 	{
-		elog(DEBUG1, "neurondb: ndb_llm_cache_lookup: failed to begin SPI session");
 		return false;
 	}
 
@@ -236,7 +235,6 @@ ndb_llm_cache_store(const char *key, const char *text)
 	session = ndb_spi_session_begin(oldcontext, false);
 	if (session == NULL)
 	{
-		elog(DEBUG1, "neurondb: ndb_llm_cache_store: failed to begin SPI session");
 		return;
 	}
 
@@ -341,7 +339,6 @@ ndb_llm_cache_evict_lru(int max_size)
 	session = ndb_spi_session_begin(oldcontext, false);
 	if (session == NULL)
 	{
-		elog(DEBUG1, "neurondb: ndb_llm_cache_evict_lru: failed to begin SPI session");
 		return 0;
 	}
 

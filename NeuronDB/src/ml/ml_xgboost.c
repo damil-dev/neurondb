@@ -23,6 +23,13 @@
 #include "catalog/pg_type.h"
 #include "access/htup_details.h"
 #include "utils/memutils.h"
+#include "lib/stringinfo.h"
+
+#include "neurondb_spi.h"
+#include "neurondb_safe_memory.h"
+#include "neurondb_macros.h"
+#include "neurondb_json.h"
+#include "ml_catalog.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -227,116 +234,130 @@ load_training_data(const char *table,
 }
 
 /*
- * Save XGBoost model binary to ml_models.
+ * Save XGBoost model binary to catalog using unified API.
  */
 static int32
-store_xgboost_model(const void *model_bytes, size_t model_len)
+store_xgboost_model(const void *model_bytes, size_t model_len,
+					const char *table_name, const char *feature_col,
+					const char *label_col, int n_estimators, int max_depth,
+					float learning_rate, int n_samples, int n_features,
+					const char *objective)
 {
-	int ret;
-	int32 model_id = 0;
-	Oid argtypes[2] = { BYTEAOID, TEXTOID };
-	Datum values[2];
-	char nulls[2] = { ' ', ' ' };
-	char *insert_cmd = "INSERT INTO ml_models(model, provider) VALUES ($1, "
-			   "$2) RETURNING id";
+	bytea *model_data = NULL;
+	Jsonb *metrics = NULL;
+	StringInfoData metricsbuf;
+	MLCatalogModelSpec spec;
+	int32 model_id;
+	char *model_data_bytes = NULL;
+	size_t total_size;
 
-	NdbSpiSession *spi_session = NULL;
-	MemoryContext oldcontext = CurrentMemoryContext;
+	/* Convert model_bytes to bytea */
+	total_size = VARHDRSZ + model_len;
+	nalloc(model_data_bytes, char, total_size);
+	model_data = (bytea *) model_data_bytes;
+	SET_VARSIZE(model_data, total_size);
+	memcpy(VARDATA(model_data), model_bytes, model_len);
 
-	NDB_SPI_SESSION_BEGIN(spi_session, oldcontext);
+	/* Build metrics JSON */
+	initStringInfo(&metricsbuf);
+	appendStringInfo(&metricsbuf,
+					 "{\"algorithm\":\"xgboost\","
+					 "\"training_backend\":0,"
+					 "\"n_estimators\":%d,"
+					 "\"max_depth\":%d,"
+					 "\"learning_rate\":%.6f,"
+					 "\"n_samples\":%d,"
+					 "\"n_features\":%d,"
+					 "\"objective\":\"%s\"}",
+					 n_estimators,
+					 max_depth,
+					 learning_rate,
+					 n_samples,
+					 n_features,
+					 objective ? objective : "reg:squarederror");
 
-	values[0] = PointerGetDatum(
-		cstring_to_bytea((const char *)model_bytes, model_len));
-	values[1] = CStringGetTextDatum("xgboost");
-
-	ret = ndb_spi_execute_with_args(
-		spi_session, insert_cmd, 2, argtypes, values, nulls, false, 1);
-	if (ret != SPI_OK_INSERT_RETURNING)
+	metrics = ndb_jsonb_in_cstring(metricsbuf.data);
+	if (metrics == NULL)
 	{
-		NDB_SPI_SESSION_END(spi_session);
-		elog(ERROR,
-			"SPI_execute_with_args failed to insert XGBoost model");
+		nfree(metricsbuf.data);
+		nfree(model_data);
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
+				 errmsg("neurondb: failed to parse metrics JSON for XGBoost model")));
 	}
+	nfree(metricsbuf.data);
 
-	if (SPI_processed > 0)
-	{
-		bool isnull;
-		model_id = ndb_spi_get_int32(spi_session, 0, 1, oldcontext, &isnull);
-		if (isnull)
-		{
-			NDB_SPI_SESSION_END(spi_session);
-			elog(ERROR, "Null model ID returned");
-		}
-	} else
-	{
-		NDB_SPI_SESSION_END(spi_session);
-		elog(ERROR, "No model id returned from insert");
-	}
+	/* Register in catalog */
+	memset(&spec, 0, sizeof(MLCatalogModelSpec));
+	spec.algorithm = "xgboost";
+	spec.model_type = (strcmp(objective, "multi:softmax") == 0) ? "classification" : "regression";
+	spec.training_table = table_name;
+	spec.training_column = label_col;
+	spec.model_data = model_data;
+	spec.metrics = metrics;
+	spec.num_samples = n_samples;
+	spec.num_features = n_features;
 
-	NDB_SPI_SESSION_END(spi_session);
+	model_id = ml_catalog_register_model(&spec);
 
 	return model_id;
 }
 
 /*
- * Retrieve XGBoost model binary from ml_models.
+ * Retrieve XGBoost model binary from catalog using unified API.
  */
 static void *
 fetch_xgboost_model(int32 model_id, size_t *model_size)
 {
-	int ret;
-	char select_cmd[256];
-	HeapTuple tup;
-	TupleDesc tupdesc;
-	bool isnull;
-	Datum modeldat;
-	bytea *model_bytea = NULL;
-	size_t len;
+	bytea *model_data = NULL;
+	Jsonb *parameters = NULL;
+	Jsonb *metrics = NULL;
 	void *data = NULL;
+	size_t len;
 
-	snprintf(select_cmd,
-		sizeof(select_cmd),
-		"SELECT model FROM ml_models WHERE id = %d",
-		model_id);
-
-	NdbSpiSession *spi_session = NULL;
-	MemoryContext oldcontext = CurrentMemoryContext;
-
-	NDB_SPI_SESSION_BEGIN(spi_session, oldcontext);
-
-	ret = ndb_spi_execute(spi_session, select_cmd, true, 1);
-
-	if (ret != SPI_OK_SELECT)
+	if (model_size == NULL)
 	{
-		NDB_SPI_SESSION_END(spi_session);
-		elog(ERROR, "SPI_execute failed for model select");
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: fetch_xgboost_model: model_size is NULL")));
 	}
 
-	if (SPI_processed == 0)
+	/* Fetch model from catalog */
+	if (!ml_catalog_fetch_model_payload(model_id, &model_data, &parameters, &metrics))
 	{
-		NDB_SPI_SESSION_END(spi_session);
-		elog(ERROR,
-			"Model with id %d not found in ml_models",
-			model_id);
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: XGBoost model with id %d not found in catalog",
+						model_id)));
 	}
 
-	bytea *model_bytea = NULL;
-	model_bytea = ndb_spi_get_bytea(spi_session, 0, 1, oldcontext, &isnull);
-	if (isnull || model_bytea == NULL)
+	if (model_data == NULL)
 	{
-		NDB_SPI_SESSION_END(spi_session);
-		elog(ERROR, "Null model returned");
+		if (metrics != NULL)
+			nfree(metrics);
+		if (parameters != NULL)
+			nfree(parameters);
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: XGBoost model with id %d has NULL model_data",
+						model_id)));
 	}
 
-	len = VARSIZE(model_bytea) - VARHDRSZ;
+	len = VARSIZE(model_data) - VARHDRSZ;
 	char *data_bytes = NULL;
 	nalloc(data_bytes, char, len);
 	data = data_bytes;
-	memcpy(data, VARDATA(model_bytea), len);
+	memcpy(data, VARDATA(model_data), len);
 
 	*model_size = len;
 
-	NDB_SPI_SESSION_END(spi_session);
+	/* Clean up */
+	nfree(model_data);
+	if (metrics != NULL)
+		nfree(metrics);
+	if (parameters != NULL)
+		nfree(parameters);
+
 	return data;
 }
 
@@ -385,14 +406,6 @@ train_xgboost_classifier(PG_FUNCTION_ARGS)
 	int32 model_id;
 
 		"neurondb: XGBoost Classifier: table=%s, feature=%s, label=%s, "
-		elog(DEBUG1,
-			"n_estimators=%d, max_depth=%d, learning_rate=%.3f",
-		table_str,
-		feature_str,
-		label_str,
-		n_estimators,
-		max_depth,
-		learning_rate);
 
 	load_training_data(table_str,
 		feature_str,
@@ -441,18 +454,12 @@ train_xgboost_classifier(PG_FUNCTION_ARGS)
 	{
 		if (XGBoosterSetParam(booster, keys[i], vals[i]) != 0)
 			elog(ERROR,
-				elog(DEBUG1,
-					"Failed to set XGBoost booster parameter: %s",
-				keys[i]);
 	}
 
 	for (iter = 0; iter < n_estimators; iter++)
 	{
 		if (XGBoosterUpdateOneIter(booster, iter, dtrain) != 0)
 			elog(ERROR,
-				elog(DEBUG1,
-					"Failed during XGBoost training iteration %d",
-				iter);
 	}
 
 	if (XGBoosterSaveModelToBuffer(
@@ -460,12 +467,18 @@ train_xgboost_classifier(PG_FUNCTION_ARGS)
 		!= 0)
 		elog(ERROR, "Failed to serialize XGBoost model");
 
-	model_id = store_xgboost_model(out_bytes, out_len);
+	model_id = store_xgboost_model(out_bytes, out_len,
+								  table_str, feature_str, label_str,
+								  n_estimators, max_depth, learning_rate,
+								  nrows, ncols, "multi:softmax");
 
 	(void)XGBoosterFree(booster);
 	(void)XGDMatrixFree(dtrain);
 	nfree(features);
 	nfree(labels);
+	nfree(table_str);
+	nfree(feature_str);
+	nfree(label_str);
 
 	PG_RETURN_INT32(model_id);
 }
@@ -512,14 +525,6 @@ train_xgboost_regressor(PG_FUNCTION_ARGS)
 	int32 model_id;
 
 		"neurondb: XGBoost Regressor: table=%s, feature=%s, target=%s, "
-		elog(DEBUG1,
-			"n_estimators=%d, max_depth=%d, learning_rate=%.3f",
-		table_str,
-		feature_str,
-		target_str,
-		n_estimators,
-		max_depth,
-		learning_rate);
 
 	load_training_data(table_str,
 		feature_str,
@@ -556,17 +561,11 @@ train_xgboost_regressor(PG_FUNCTION_ARGS)
 	{
 		if (XGBoosterSetParam(booster, keys[i], vals[i]) != 0)
 			elog(ERROR,
-				elog(DEBUG1,
-					"Failed to set XGBoost booster parameter: %s",
-				keys[i]);
 	}
 	for (iter = 0; iter < n_estimators; iter++)
 	{
 		if (XGBoosterUpdateOneIter(booster, iter, dtrain) != 0)
 			elog(ERROR,
-				elog(DEBUG1,
-					"Failed during XGBoost training iteration %d",
-				iter);
 	}
 
 	if (XGBoosterSaveModelToBuffer(
@@ -574,12 +573,18 @@ train_xgboost_regressor(PG_FUNCTION_ARGS)
 		!= 0)
 		elog(ERROR, "Failed to serialize XGBoost model");
 
-	model_id = store_xgboost_model(out_bytes, out_len);
+	model_id = store_xgboost_model(out_bytes, out_len,
+								  table_str, feature_str, target_str,
+								  n_estimators, max_depth, learning_rate,
+								  nrows, ncols, "reg:squarederror");
 
 	(void)XGBoosterFree(booster);
 	(void)XGDMatrixFree(dtrain);
 	nfree(features);
 	nfree(labels);
+	nfree(table_str);
+	nfree(feature_str);
+	nfree(target_str);
 
 	PG_RETURN_INT32(model_id);
 }
@@ -969,7 +974,7 @@ typedef struct XGBoostGpuModelState
 } XGBoostGpuModelState;
 
 static bytea *
-xgboost_model_serialize_to_bytea(int n_estimators, int max_depth, float learning_rate, int n_features, const char *objective)
+xgboost_model_serialize_to_bytea(int n_estimators, int max_depth, float learning_rate, int n_features, const char *objective, uint8 training_backend)
 {
 	StringInfoData buf;
 	int total_size;
@@ -977,7 +982,18 @@ xgboost_model_serialize_to_bytea(int n_estimators, int max_depth, float learning
 	int obj_len;
 	char *result_bytes = NULL;
 
+	/* Validate training_backend */
+	if (training_backend > 1)
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_INTERNAL_ERROR),
+				 errmsg("neurondb: xgboost_model_serialize_to_bytea: invalid training_backend %d (must be 0 or 1)",
+						training_backend)));
+	}
+
 	initStringInfo(&buf);
+	/* Write training_backend first (0=CPU, 1=GPU) - unified storage format */
+	appendBinaryStringInfo(&buf, (char *)&training_backend, sizeof(uint8));
 	appendBinaryStringInfo(&buf, (char *)&n_estimators, sizeof(int));
 	appendBinaryStringInfo(&buf, (char *)&max_depth, sizeof(int));
 	appendBinaryStringInfo(&buf, (char *)&learning_rate, sizeof(float));
@@ -997,16 +1013,22 @@ xgboost_model_serialize_to_bytea(int n_estimators, int max_depth, float learning
 }
 
 static int
-xgboost_model_deserialize_from_bytea(const bytea *data, int *n_estimators_out, int *max_depth_out, float *learning_rate_out, int *n_features_out, char *objective_out, int obj_max)
+xgboost_model_deserialize_from_bytea(const bytea *data, int *n_estimators_out, int *max_depth_out, float *learning_rate_out, int *n_features_out, char *objective_out, int obj_max, uint8 * training_backend_out)
 {
 	const char *buf;
 	int offset = 0;
 	int obj_len;
+	uint8		training_backend = 0;
 
-	if (data == NULL || VARSIZE(data) < VARHDRSZ + sizeof(int) * 3 + sizeof(float) + sizeof(int))
+	if (data == NULL || VARSIZE(data) < VARHDRSZ + sizeof(uint8) + sizeof(int) * 3 + sizeof(float) + sizeof(int))
 		return -1;
 
 	buf = VARDATA(data);
+	/* Read training_backend first (unified storage format) */
+	training_backend = (uint8) buf[offset];
+	offset += sizeof(uint8);
+	if (training_backend_out != NULL)
+		*training_backend_out = training_backend;
 	memcpy(n_estimators_out, buf + offset, sizeof(int));
 	offset += sizeof(int);
 	memcpy(max_depth_out, buf + offset, sizeof(int));
@@ -1098,12 +1120,12 @@ xgboost_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 	dim = spec->feature_dim;
 
 	/* Serialize model */
-	model_data = xgboost_model_serialize_to_bytea(n_estimators, max_depth, learning_rate, dim, objective);
+	model_data = xgboost_model_serialize_to_bytea(n_estimators, max_depth, learning_rate, dim, objective, 0); /* training_backend=0 for CPU */
 
 	/* Build metrics */
 	initStringInfo(&metrics_json);
 	appendStringInfo(&metrics_json,
-		"{\"storage\":\"cpu\",\"n_estimators\":%d,\"max_depth\":%d,\"learning_rate\":%.6f,\"n_features\":%d,\"objective\":\"%s\",\"n_samples\":%d}",
+		"{\"storage\":\"cpu\",\"training_backend\":0,\"n_estimators\":%d,\"max_depth\":%d,\"learning_rate\":%.6f,\"n_features\":%d,\"objective\":\"%s\",\"n_samples\":%d}",
 		n_estimators, max_depth, learning_rate, dim, objective, nvec);
 	metrics = DatumGetJsonbP(DirectFunctionCall1(jsonb_in,
 		CStringGetTextDatum(metrics_json.data)));
@@ -1296,12 +1318,16 @@ xgboost_gpu_deserialize(MLGpuModel *model, const bytea *payload,
 	payload_copy = (bytea *) payload_bytes;
 	memcpy(payload_copy, payload, payload_size);
 
-	if (xgboost_model_deserialize_from_bytea(payload_copy, &n_estimators, &max_depth, &learning_rate, &n_features, objective, sizeof(objective)) != 0)
 	{
-		nfree(payload_copy);
-		if (errstr != NULL)
-			*errstr = pstrdup("xgboost_gpu_deserialize: failed to deserialize");
-		return false;
+		uint8		training_backend = 0;
+
+		if (xgboost_model_deserialize_from_bytea(payload_copy, &n_estimators, &max_depth, &learning_rate, &n_features, objective, sizeof(objective), &training_backend) != 0)
+		{
+			nfree(payload_copy);
+			if (errstr != NULL)
+				*errstr = pstrdup("xgboost_gpu_deserialize: failed to deserialize");
+			return false;
+		}
 	}
 
 	nalloc(state, XGBoostGpuModelState, 1);

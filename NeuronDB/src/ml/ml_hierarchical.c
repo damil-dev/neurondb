@@ -37,7 +37,7 @@
 #include <float.h>
 
 /* Forward declaration */
-static int	hierarchical_model_deserialize_from_bytea(const bytea * data, float ***centers_out, int *n_clusters_out, int *dim_out, char *linkage_out, int linkage_max);
+static int	hierarchical_model_deserialize_from_bytea(const bytea * data, float ***centers_out, int *n_clusters_out, int *dim_out, char *linkage_out, int linkage_max, uint8 * training_backend_out);
 
 typedef struct ClusterNode
 {
@@ -199,9 +199,6 @@ cluster_hierarchical(PG_FUNCTION_ARGS)
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("linkage must be 'average', 'complete', or 'single'")));
 
-	elog(DEBUG1,
-		 "neurondb: hierarchical clustering (k=%d, linkage=%s)",
-		 num_clusters, linkage);
 
 	/* Fetch data from table */
 	data = neurondb_fetch_vectors_from_table(tbl_str, col_str, &nvec, &dim);
@@ -285,9 +282,6 @@ cluster_hierarchical(PG_FUNCTION_ARGS)
 				nvec = sampled_idx;
 			}
 
-			elog(INFO,
-				 "hierarchical clustering: using %d sampled points from %d total points",
-				 nvec, original_nvec);
 		}
 		else if (nvec > 5000)
 		{
@@ -388,11 +382,6 @@ cluster_hierarchical(PG_FUNCTION_ARGS)
 
 			n_active_clusters--;
 		}
-
-		if ((iter + 1) % 100 == 0)
-			elog(DEBUG1,
-				 "neurondb: hierarchical merge iteration %d (%d clusters remain)",
-				 iter + 1, n_active_clusters);
 	}
 
 	/* Assign cluster labels: 1-based */
@@ -514,18 +503,22 @@ predict_hierarchical_cluster(PG_FUNCTION_ARGS)
 		}
 
 		/* Deserialize model to get cluster centers */
-		if (hierarchical_model_deserialize_from_bytea(model_data,
-													  &cluster_centers,
-													  &n_clusters,
-													  &model_dim,
-													  linkage,
-													  sizeof(linkage)) != 0)
 		{
+			uint8		training_backend = 0;
+
+			if (hierarchical_model_deserialize_from_bytea(model_data,
+														  &cluster_centers,
+														  &n_clusters,
+														  &model_dim,
+														  linkage,
+														  sizeof(linkage),
+														  &training_backend) != 0)
+			{
 			nfree(features);
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("neurondb: predict_hierarchical_by_model_id: failed to deserialize model %d", model_id)));
-		}
+			}
 
 		/* Validate dimension match */
 		if (model_dim != n_features)
@@ -564,6 +557,7 @@ predict_hierarchical_cluster(PG_FUNCTION_ARGS)
 			for (c = 0; c < n_clusters; c++)
 				nfree(cluster_centers[c]);
 			nfree(cluster_centers);
+		}
 		}
 	}
 
@@ -693,13 +687,17 @@ evaluate_hierarchical_by_model_id(PG_FUNCTION_ARGS)
 		{
 			if (model_payload != NULL && VARSIZE(model_payload) > VARHDRSZ)
 			{
-				if (hierarchical_model_deserialize_from_bytea(model_payload,
-															  &centers,
-															  &n_clusters_found,
-															  &model_dim,
-															  linkage_str,
-															  sizeof(linkage_str)) == 0)
 				{
+					uint8		training_backend = 0;
+
+					if (hierarchical_model_deserialize_from_bytea(model_payload,
+																  &centers,
+																  &n_clusters_found,
+																  &model_dim,
+																  linkage_str,
+																  sizeof(linkage_str),
+																  &training_backend) == 0)
+					{
 					/* Fetch data points */
 					data = neurondb_fetch_vectors_from_table(tbl_str, feat_str, &n_points, &dim);
 
@@ -911,6 +909,7 @@ evaluate_hierarchical_by_model_id(PG_FUNCTION_ARGS)
 					calinski_harabasz = 0.0;
 					n_clusters_found = n_clusters;
 				}
+				}
 			}
 			else
 			{
@@ -966,7 +965,7 @@ typedef struct HierarchicalGpuModelState
 }			HierarchicalGpuModelState;
 
 static bytea *
-hierarchical_model_serialize_to_bytea(float **cluster_centers, int n_clusters, int dim, const char *linkage)
+hierarchical_model_serialize_to_bytea(float **cluster_centers, int n_clusters, int dim, const char *linkage, uint8 training_backend)
 {
 	StringInfoData buf;
 	int			i,
@@ -975,7 +974,18 @@ hierarchical_model_serialize_to_bytea(float **cluster_centers, int n_clusters, i
 	bytea *result = NULL;
 	int			linkage_len;
 
+	/* Validate training_backend */
+	if (training_backend > 1)
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_INTERNAL_ERROR),
+				 errmsg("neurondb: hierarchical_model_serialize_to_bytea: invalid training_backend %d (must be 0 or 1)",
+						training_backend)));
+	}
+
 	initStringInfo(&buf);
+	/* Write training_backend first (0=CPU, 1=GPU) - unified storage format */
+	appendBinaryStringInfo(&buf, (char *) &training_backend, sizeof(uint8));
 	appendBinaryStringInfo(&buf, (char *) &n_clusters, sizeof(int));
 	appendBinaryStringInfo(&buf, (char *) &dim, sizeof(int));
 	linkage_len = strlen(linkage);
@@ -1000,7 +1010,7 @@ hierarchical_model_serialize_to_bytea(float **cluster_centers, int n_clusters, i
 }
 
 static int
-hierarchical_model_deserialize_from_bytea(const bytea * data, float ***centers_out, int *n_clusters_out, int *dim_out, char *linkage_out, int linkage_max)
+hierarchical_model_deserialize_from_bytea(const bytea * data, float ***centers_out, int *n_clusters_out, int *dim_out, char *linkage_out, int linkage_max, uint8 * training_backend_out)
 {
 	const char *buf;
 	int			offset = 0;
@@ -1008,11 +1018,17 @@ hierarchical_model_deserialize_from_bytea(const bytea * data, float ***centers_o
 				j;
 	float **centers = NULL;
 	int			linkage_len;
+	uint8		training_backend = 0;
 
-	if (data == NULL || VARSIZE(data) < VARHDRSZ + sizeof(int) * 3)
+	if (data == NULL || VARSIZE(data) < VARHDRSZ + sizeof(uint8) + sizeof(int) * 3)
 		return -1;
 
 	buf = VARDATA(data);
+	/* Read training_backend first (unified storage format) */
+	training_backend = (uint8) buf[offset];
+	offset += sizeof(uint8);
+	if (training_backend_out != NULL)
+		*training_backend_out = training_backend;
 	memcpy(n_clusters_out, buf + offset, sizeof(int));
 	offset += sizeof(int);
 	memcpy(dim_out, buf + offset, sizeof(int));
@@ -1261,12 +1277,12 @@ hierarchical_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **err
 	}
 
 	/* Serialize model */
-	model_data = hierarchical_model_serialize_to_bytea(cluster_centers, num_clusters, dim, linkage);
+	model_data = hierarchical_model_serialize_to_bytea(cluster_centers, num_clusters, dim, linkage, 0); /* training_backend=0 for CPU */
 
 	/* Build metrics */
 	initStringInfo(&metrics_json);
 	appendStringInfo(&metrics_json,
-					 "{\"storage\":\"cpu\",\"n_clusters\":%d,\"linkage\":\"%s\",\"dim\":%d,\"n_samples\":%d}",
+					 "{\"storage\":\"cpu\",\"training_backend\":0,\"n_clusters\":%d,\"linkage\":\"%s\",\"dim\":%d,\"n_samples\":%d}",
 					 num_clusters, linkage, dim, nvec);
 	metrics = DatumGetJsonbP(DirectFunctionCall1(jsonb_in,
 												 CStringGetTextDatum(metrics_json.data)));
@@ -1350,12 +1366,17 @@ hierarchical_gpu_predict(const MLGpuModel *model, const float *input, int input_
 		return false;
 	}
 
-	if (hierarchical_model_deserialize_from_bytea(state->model_blob,
-												  &centers, &n_clusters, &dim, linkage, sizeof(linkage)) != 0)
 	{
-		if (errstr != NULL)
-			*errstr = pstrdup("hierarchical_gpu_predict: failed to deserialize");
-		return false;
+		uint8		training_backend = 0;
+
+		if (hierarchical_model_deserialize_from_bytea(state->model_blob,
+													  &centers, &n_clusters, &dim, linkage, sizeof(linkage),
+													  &training_backend) != 0)
+		{
+			if (errstr != NULL)
+				*errstr = pstrdup("hierarchical_gpu_predict: failed to deserialize");
+			return false;
+		}
 	}
 
 	if (input_dim != dim)
@@ -1511,13 +1532,18 @@ hierarchical_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 		memcpy(payload_copy, payload, payload_size);
 	}
 
-	if (hierarchical_model_deserialize_from_bytea(payload_copy,
-												  &centers, &n_clusters, &dim, linkage, sizeof(linkage)) != 0)
 	{
-		nfree(payload_copy);
-		if (errstr != NULL)
-			*errstr = pstrdup("hierarchical_gpu_deserialize: failed to deserialize");
-		return false;
+		uint8		training_backend = 0;
+
+		if (hierarchical_model_deserialize_from_bytea(payload_copy,
+													  &centers, &n_clusters, &dim, linkage, sizeof(linkage),
+													  &training_backend) != 0)
+		{
+			nfree(payload_copy);
+			if (errstr != NULL)
+				*errstr = pstrdup("hierarchical_gpu_deserialize: failed to deserialize");
+			return false;
+		}
 	}
 
 	for (int c = 0; c < n_clusters; c++)

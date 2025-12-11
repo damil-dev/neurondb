@@ -1401,9 +1401,6 @@ train_autoencoder(PG_FUNCTION_ARGS)
 
 		if (epoch % 10 == 0 || epoch == epochs - 1)
 		{
-			elog(DEBUG1,
-				 "Autoencoder epoch %d: reconstruction loss = %.6f",
-				 epoch, loss);
 		}
 	}
 

@@ -68,11 +68,6 @@ vector_wal_estimate_size(PG_FUNCTION_ARGS)
 	compression_ratio = 2.5;
 	estimated_compressed_size = (int32) (original_size / compression_ratio);
 
-	elog(DEBUG1,
-		 "neurondb: Estimated compression: %d -> %d bytes (%.1fx)",
-		 original_size,
-		 estimated_compressed_size,
-		 compression_ratio);
 
 	PG_RETURN_INT32(estimated_compressed_size);
 }
@@ -119,9 +114,6 @@ vector_wal_get_stats(PG_FUNCTION_ARGS)
 					 NDB_INT64_CAST(total_bytes_compressed),
 					 compression_ratio);
 
-	elog(DEBUG1,
-		 "neurondb: WAL compression stats: %.2fx ratio",
-		 compression_ratio);
 
 	PG_RETURN_TEXT_P(cstring_to_text(stats.data));
 }

@@ -47,6 +47,13 @@ create_ab_test(PG_FUNCTION_ARGS)
 	ArrayType  *model_ids = NULL;
 	ArrayType  *traffic_split = NULL;
 
+	char	   *name;
+	int			n_models;
+	int			n_splits;
+	StringInfoData result;
+	int			experiment_id = 0;
+	NdbSpiSession *spi_session = NULL;
+
 	/* Validate argument count */
 	if (PG_NARGS() != 3)
 		ereport(ERROR,
@@ -56,14 +63,6 @@ create_ab_test(PG_FUNCTION_ARGS)
 	experiment_name = PG_GETARG_TEXT_PP(0);
 	model_ids = PG_GETARG_ARRAYTYPE_P(1);
 	traffic_split = PG_GETARG_ARRAYTYPE_P(2);
-
-	char	   *name;
-	int			n_models;
-	int			n_splits;
-	StringInfoData result;
-	int			experiment_id = 0;
-	NdbSpiSession *spi_session = NULL;
-	MemoryContext oldcontext;
 
 	name = text_to_cstring(experiment_name);
 
@@ -145,16 +144,15 @@ create_ab_test(PG_FUNCTION_ARGS)
 	{
 		int			ret;
 		StringInfoData sql;
-		Jsonb *experiment_config = NULL;
+		Jsonb	   *experiment_config = NULL;
 		StringInfoData config_json;
+		NdbSpiSession *spi_session_inner = NULL;
+		MemoryContext oldcontext_inner = CurrentMemoryContext;
 
-		NdbSpiSession *spi_session = NULL;
-		MemoryContext oldcontext = CurrentMemoryContext;
-
-		NDB_SPI_SESSION_BEGIN(spi_session, oldcontext);
+		NDB_SPI_SESSION_BEGIN(spi_session_inner, oldcontext_inner);
 
 		/* Build experiment configuration JSONB */
-		ndb_spi_stringinfo_init(spi_session, &config_json);
+		ndb_spi_stringinfo_init(spi_session_inner, &config_json);
 		{
 			Datum		name_datum = CStringGetTextDatum(name);
 			Datum		name_quoted = DirectFunctionCall1(quote_literal, name_datum);
@@ -293,6 +291,15 @@ log_prediction(PG_FUNCTION_ARGS)
 	float8		confidence;
 	int32		latency_ms;
 
+	char	   *input_str = NULL;
+	char	   *pred_str = NULL;
+	int			ret;
+	StringInfoData sql;
+	Jsonb	   *input_jsonb = NULL;
+	StringInfoData input_json;
+	NdbSpiSession *spi_session = NULL;
+	MemoryContext oldcontext;
+
 	/* Validate minimum argument count */
 	if (PG_NARGS() < 3)
 		ereport(ERROR,
@@ -304,15 +311,6 @@ log_prediction(PG_FUNCTION_ARGS)
 	prediction = PG_GETARG_TEXT_PP(2);
 	confidence = PG_ARGISNULL(3) ? 1.0 : PG_GETARG_FLOAT8(3);
 	latency_ms = PG_ARGISNULL(4) ? 0 : PG_GETARG_INT32(4);
-
-	char *input_str = NULL;
-	char *pred_str = NULL;
-	int			ret;
-	StringInfoData sql;
-	Jsonb *input_jsonb = NULL;
-	StringInfoData input_json;
-	NdbSpiSession *spi_session = NULL;
-	MemoryContext oldcontext;
 
 	/* Defensive: validate inputs */
 	input_str = text_to_cstring(input_data);
@@ -415,15 +413,6 @@ monitor_model_performance(PG_FUNCTION_ARGS)
 	int32		model_id;
 	text	   *time_window = NULL;
 
-	/* Validate minimum argument count */
-	if (PG_NARGS() < 1)
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				 errmsg("neurondb: monitor_model_performance requires at least 1 argument")));
-
-	model_id = PG_GETARG_INT32(0);
-	time_window = PG_ARGISNULL(1) ? NULL : PG_GETARG_TEXT_PP(1);
-
 	char		   *window = NULL;
 	StringInfoData result;
 	int				predictions_count = 0;
@@ -434,6 +423,17 @@ monitor_model_performance(PG_FUNCTION_ARGS)
 	NdbSpiSession *spi_session = NULL;
 	MemoryContext oldcontext;
 	int				ret;
+
+	/* Validate minimum argument count */
+	if (PG_NARGS() < 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: monitor_model_performance requires at least 1 argument")));
+
+	model_id = PG_GETARG_INT32(0);
+	time_window = PG_ARGISNULL(1) ? NULL : PG_GETARG_TEXT_PP(1);
+	(void) oldcontext; /* unused */
+	(void) ret; /* unused */
 
 	window = time_window ? text_to_cstring(time_window) : pstrdup("1 hour");
 
@@ -448,44 +448,44 @@ monitor_model_performance(PG_FUNCTION_ARGS)
 
 	/* Query metrics from monitoring table */
 	{
-		int			ret;
+		int			ret_inner;
 		StringInfoData sql;
 
-		NdbSpiSession *spi_session = NULL;
-		MemoryContext oldcontext = CurrentMemoryContext;
+		NdbSpiSession *spi_session_inner = NULL;
+		MemoryContext oldcontext_inner = CurrentMemoryContext;
 
-		NDB_SPI_SESSION_BEGIN(spi_session, oldcontext);
+		NDB_SPI_SESSION_BEGIN(spi_session_inner, oldcontext_inner);
 
 		/* Query prediction count */
-		ndb_spi_stringinfo_init(spi_session, &sql);
+		ndb_spi_stringinfo_init(spi_session_inner, &sql);
 		appendStringInfo(&sql,
 						 "SELECT COUNT(*) FROM neurondb.ml_predictions "
 						 "WHERE model_id = %d AND predicted_at >= NOW() - INTERVAL '%s'",
 						 model_id, window);
 
-		ret = ndb_spi_execute(spi_session, sql.data, true, 1);
-		ndb_spi_stringinfo_free(spi_session, &sql);
+		ret_inner = ndb_spi_execute(spi_session_inner, sql.data, true, 1);
+		ndb_spi_stringinfo_free(spi_session_inner, &sql);
 
-		if (ret == SPI_OK_SELECT && SPI_processed > 0)
+		if (ret_inner == SPI_OK_SELECT && SPI_processed > 0)
 		{
 			int32		count32;
 
-			if (ndb_spi_get_int32(spi_session, 0, 1, &count32))
+			if (ndb_spi_get_int32(spi_session_inner, 0, 1, &count32))
 			{
 				predictions_count = (int64) count32;
 			}
 		}
 
 		/* Query latency metrics from prediction logs */
-		ndb_spi_stringinfo_init(spi_session, &sql);
+		ndb_spi_stringinfo_init(spi_session_inner, &sql);
 		appendStringInfo(&sql,
 						 "SELECT COALESCE(AVG((input_features->>'latency_ms')::int),0), "
 						 "COALESCE(PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY (input_features->>'latency_ms')::int),0) "
 						 "FROM neurondb.ml_predictions WHERE model_id = %d AND predicted_at >= NOW() - INTERVAL '%s'",
 						 model_id, window);
-		ret = ndb_spi_execute(spi_session, sql.data, true, 1);
-		ndb_spi_stringinfo_free(spi_session, &sql);
-		if (ret == SPI_OK_SELECT && SPI_processed > 0)
+		ret_inner = ndb_spi_execute(spi_session_inner, sql.data, true, 1);
+		ndb_spi_stringinfo_free(spi_session_inner, &sql);
+		if (ret_inner == SPI_OK_SELECT && SPI_processed > 0)
 		{
 			bool		isnull;
 
@@ -606,60 +606,57 @@ detect_model_drift(PG_FUNCTION_ARGS)
 	current_period = PG_GETARG_TEXT_PP(2);
 	threshold = PG_ARGISNULL(3) ? 0.05 : PG_GETARG_FLOAT8(3);
 
-	char		   *baseline;
-	char		   *current;
-	float			drift_score;
-	bool			drift_detected;
-	StringInfoData result;
-	int				ret;
-	StringInfoData sql;
-	float			baseline_accuracy = 0.0f;
-	float			current_accuracy = 0.0f;
-	NdbSpiSession *spi_session = NULL;
-	MemoryContext oldcontext;
-
-	baseline = text_to_cstring(baseline_period);
-	current = text_to_cstring(current_period);
-
-	/* Defensive: validate model_id */
-	if (model_id <= 0)
 	{
-		nfree(baseline);
-		nfree(current);
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				 errmsg("detect_model_drift: model_id must be positive")));
-	}
+		char		   *baseline;
+		char		   *current;
+		float			drift_score;
+		bool			drift_detected;
+		StringInfoData result;
+		float			baseline_accuracy = 0.0f;
+		float			current_accuracy = 0.0f;
 
-	if (threshold < 0.0 || threshold > 1.0)
-	{
-		nfree(baseline);
-		nfree(current);
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				 errmsg("detect_model_drift: threshold must be between 0 and 1")));
-	}
+		baseline = text_to_cstring(baseline_period);
+		current = text_to_cstring(current_period);
+
+		/* Defensive: validate model_id */
+		if (model_id <= 0)
+		{
+			nfree(baseline);
+			nfree(current);
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					 errmsg("detect_model_drift: model_id must be positive")));
+		}
+
+		if (threshold < 0.0 || threshold > 1.0)
+		{
+			nfree(baseline);
+			nfree(current);
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					 errmsg("detect_model_drift: threshold must be between 0 and 1")));
+		}
 
 	/* Calculate drift by comparing baseline and current period metrics */
 	{
-		int			ret;
-		StringInfoData sql;
-		float		baseline_accuracy = 0.0f;
-		float		current_accuracy = 0.0f;
+		int			ret_inner2;
+		StringInfoData sql_inner;
+		float		baseline_accuracy_inner = 0.0f;
+		float		current_accuracy_inner = 0.0f;
 
-		NdbSpiSession *spi_session = NULL;
-		MemoryContext oldcontext = CurrentMemoryContext;
+		NdbSpiSession *spi_session_inner2 = NULL;
+		MemoryContext oldcontext_inner2 = CurrentMemoryContext;
 
-		NDB_SPI_SESSION_BEGIN(spi_session, oldcontext);
+		NDB_SPI_SESSION_BEGIN(spi_session_inner2, oldcontext_inner2);
 
 		/* Query baseline period metrics */
-		ndb_spi_stringinfo_init(spi_session, &sql);
+		ndb_spi_stringinfo_init(spi_session_inner2, &sql_inner);
 		{
 			Datum		baseline_datum = CStringGetTextDatum(baseline);
 			Datum		baseline_quoted = DirectFunctionCall1(quote_literal, baseline_datum);
 			char	   *baseline_str = DatumGetCString(baseline_quoted);
 
-			appendStringInfo(&sql,
+			appendStringInfo(&sql_inner,
 							 "SELECT AVG(CASE WHEN prediction = actual THEN 1.0 ELSE 0.0 END) "
 							 "FROM neurondb.ml_predictions p "
 							 "JOIN neurondb.ml_trained_models m ON p.model_id = m.model_id "
@@ -669,10 +666,10 @@ detect_model_drift(PG_FUNCTION_ARGS)
 			nfree(baseline_str);
 		}
 
-		ret = ndb_spi_execute(spi_session, sql.data, true, 1);
-		ndb_spi_stringinfo_free(spi_session, &sql);
+		ret_inner2 = ndb_spi_execute(spi_session_inner2, sql_inner.data, true, 1);
+		ndb_spi_stringinfo_free(spi_session_inner2, &sql_inner);
 
-		if (ret == SPI_OK_SELECT && SPI_processed > 0)
+		if (ret_inner2 == SPI_OK_SELECT && SPI_processed > 0)
 		{
 			bool		isnull;
 
@@ -686,20 +683,20 @@ detect_model_drift(PG_FUNCTION_ARGS)
 														   &isnull);
 
 				if (!isnull)
-					baseline_accuracy = (float) DatumGetFloat8(baseline_datum);
+					baseline_accuracy_inner = (float) DatumGetFloat8(baseline_datum);
 				else
-					baseline_accuracy = 0.0f;
+					baseline_accuracy_inner = 0.0f;
 			}
 		}
 
 		/* Query current period metrics */
-		ndb_spi_stringinfo_init(spi_session, &sql);
+		ndb_spi_stringinfo_init(spi_session_inner2, &sql_inner);
 		{
 			Datum		current_datum = CStringGetTextDatum(current);
 			Datum		current_quoted = DirectFunctionCall1(quote_literal, current_datum);
 			char	   *current_str = DatumGetCString(current_quoted);
 
-			appendStringInfo(&sql,
+			appendStringInfo(&sql_inner,
 							 "SELECT AVG(CASE WHEN prediction = actual THEN 1.0 ELSE 0.0 END) "
 							 "FROM neurondb.ml_predictions p "
 							 "JOIN neurondb.ml_trained_models m ON p.model_id = m.model_id "
@@ -708,10 +705,10 @@ detect_model_drift(PG_FUNCTION_ARGS)
 			nfree(current_str);
 		}
 
-		ret = ndb_spi_execute(spi_session, sql.data, true, 1);
-		ndb_spi_stringinfo_free(spi_session, &sql);
+		ret_inner2 = ndb_spi_execute(spi_session_inner2, sql_inner.data, true, 1);
+		ndb_spi_stringinfo_free(spi_session_inner2, &sql_inner);
 
-		if (ret == SPI_OK_SELECT && SPI_processed > 0)
+		if (ret_inner2 == SPI_OK_SELECT && SPI_processed > 0)
 		{
 			bool		isnull;
 
@@ -725,13 +722,17 @@ detect_model_drift(PG_FUNCTION_ARGS)
 														  &isnull);
 
 				if (!isnull)
-					current_accuracy = (float) DatumGetFloat8(current_datum);
+					current_accuracy_inner = (float) DatumGetFloat8(current_datum);
 				else
-					current_accuracy = 0.0f;
+					current_accuracy_inner = 0.0f;
 			}
 		}
 
-		NDB_SPI_SESSION_END(spi_session);
+		NDB_SPI_SESSION_END(spi_session_inner2);
+
+		/* Assign inner values to outer variables */
+		baseline_accuracy = baseline_accuracy_inner;
+		current_accuracy = current_accuracy_inner;
 
 		/* Calculate drift score as absolute difference */
 		if (baseline_accuracy > 0.0f)
@@ -740,20 +741,21 @@ detect_model_drift(PG_FUNCTION_ARGS)
 			drift_score = current_accuracy > 0.0f ? 1.0f : 0.0f;
 	}
 
-	drift_detected = (drift_score > threshold);
+		drift_detected = (drift_score > threshold);
 
-	initStringInfo(&result);
-	appendStringInfo(&result,
-					 "{\"drift_detected\": %s, \"drift_score\": %.4f, "
-					 "\"threshold\": %.4f}",
-					 drift_detected ? "true" : "false",
-					 drift_score,
-					 threshold);
+		initStringInfo(&result);
+		appendStringInfo(&result,
+						 "{\"drift_detected\": %s, \"drift_score\": %.4f, "
+						 "\"threshold\": %.4f}",
+						 drift_detected ? "true" : "false",
+						 drift_score,
+						 threshold);
 
-	nfree(baseline);
-	nfree(current);
+		nfree(baseline);
+		nfree(current);
 
-	PG_RETURN_TEXT_P(cstring_to_text(result.data));
+		PG_RETURN_TEXT_P(cstring_to_text(result.data));
+	}
 }
 
 /*
@@ -768,6 +770,14 @@ create_model_version(PG_FUNCTION_ARGS)
 	text	   *version_tag = NULL;
 	text	   *description = NULL;
 
+	char		   *tag;
+	char		   *desc;
+	StringInfoData result;
+	int				version_id;
+	bytea		   *model_data = NULL;
+	Jsonb		   *parameters = NULL;
+	Jsonb		   *metrics = NULL;
+
 	/* Validate minimum argument count */
 	if (PG_NARGS() < 2)
 		ereport(ERROR,
@@ -777,14 +787,6 @@ create_model_version(PG_FUNCTION_ARGS)
 	model_id = PG_GETARG_INT32(0);
 	version_tag = PG_GETARG_TEXT_PP(1);
 	description = PG_ARGISNULL(2) ? NULL : PG_GETARG_TEXT_PP(2);
-
-	char		   *tag;
-	char		   *desc;
-	StringInfoData result;
-	int				version_id;
-	bytea *model_data = NULL;
-	Jsonb *parameters = NULL;
-	Jsonb *metrics = NULL;
 
 	tag = text_to_cstring(version_tag);
 	desc = description ? text_to_cstring(description) : pstrdup("");
@@ -801,9 +803,6 @@ create_model_version(PG_FUNCTION_ARGS)
 
 	/* Create version by copying model with new version tag */
 	{
-		bytea *model_data = NULL;
-		Jsonb *parameters = NULL;
-		Jsonb *metrics = NULL;
 
 		/* Fetch current model */
 		if (!ml_catalog_fetch_model_payload(model_id, &model_data,
@@ -892,19 +891,21 @@ rollback_model(PG_FUNCTION_ARGS)
 	model_id = PG_GETARG_INT32(0);
 	target_version = PG_GETARG_INT32(1);
 
-	StringInfoData result;
+	{
+		StringInfoData result;
 
-	/* Rollback model (production would restore from version) */
-	(void) model_id;
-	(void) target_version;
+		/* Rollback model (production would restore from version) */
+		(void) model_id;
+		(void) target_version;
 
-	initStringInfo(&result);
-	appendStringInfo(&result,
-					 "Model %d rolled back to version %d",
-					 model_id,
-					 target_version);
+		initStringInfo(&result);
+		appendStringInfo(&result,
+						 "Model %d rolled back to version %d",
+						 model_id,
+						 target_version);
 
-	PG_RETURN_TEXT_P(cstring_to_text(result.data));
+		PG_RETURN_TEXT_P(cstring_to_text(result.data));
+	}
 }
 
 /*
@@ -929,28 +930,30 @@ set_feature_flag(PG_FUNCTION_ARGS)
 	enabled = PG_GETARG_BOOL(1);
 	rollout_percentage = PG_ARGISNULL(2) ? 100.0 : PG_GETARG_FLOAT8(2);
 
-	char		   *name;
-	StringInfoData result;
+	{
+		char		   *name;
+		StringInfoData result;
 
-	name = text_to_cstring(flag_name);
+		name = text_to_cstring(flag_name);
 
-	if (rollout_percentage < 0.0 || rollout_percentage > 100.0)
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				 errmsg("rollout_percentage must be between 0 "
-						"and 100")));
+		if (rollout_percentage < 0.0 || rollout_percentage > 100.0)
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					 errmsg("rollout_percentage must be between 0 "
+							"and 100")));
 
-	/* Set feature flag (production would update configuration) */
-	initStringInfo(&result);
-	appendStringInfo(&result,
-					 "Feature flag '%s' set to %s with %.1f%% rollout",
-					 name,
-					 enabled ? "enabled" : "disabled",
-					 rollout_percentage);
+		/* Set feature flag (production would update configuration) */
+		initStringInfo(&result);
+		appendStringInfo(&result,
+						 "Feature flag '%s' set to %s with %.1f%% rollout",
+						 name,
+						 enabled ? "enabled" : "disabled",
+						 rollout_percentage);
 
-	nfree(name);
+		nfree(name);
 
-	PG_RETURN_TEXT_P(cstring_to_text(result.data));
+		PG_RETURN_TEXT_P(cstring_to_text(result.data));
+	}
 }
 
 /*
@@ -977,22 +980,24 @@ track_experiment_metric(PG_FUNCTION_ARGS)
 	value = PG_GETARG_FLOAT8(2);
 	variant = PG_ARGISNULL(3) ? NULL : PG_GETARG_TEXT_PP(3);
 
-	char		   *metric;
-	char		   *var;
+	{
+		char		   *metric;
+		char		   *var;
 
-	metric = text_to_cstring(metric_name);
-	var = variant ? text_to_cstring(variant) : pstrdup("control");
+		metric = text_to_cstring(metric_name);
+		var = variant ? text_to_cstring(variant) : pstrdup("control");
 
-	/* Track metric (production would insert into metrics table) */
-	(void) experiment_id;
-	(void) metric;
-	(void) value;
-	(void) var;
+		/* Track metric (production would insert into metrics table) */
+		(void) experiment_id;
+		(void) metric;
+		(void) value;
+		(void) var;
 
-	nfree(metric);
-	nfree(var);
+		nfree(metric);
+		nfree(var);
 
-	PG_RETURN_BOOL(true);
+		PG_RETURN_BOOL(true);
+	}
 }
 
 /*
@@ -1013,24 +1018,26 @@ get_experiment_results(PG_FUNCTION_ARGS)
 
 	experiment_id = PG_GETARG_INT32(0);
 
-	StringInfoData result;
+	{
+		StringInfoData result;
 
-	/* Get results (production would aggregate metrics) */
-	(void) experiment_id;
+		/* Get results (production would aggregate metrics) */
+		(void) experiment_id;
 
-	initStringInfo(&result);
-	appendStringInfo(&result,
-					 "{\"experiment_id\": %d, "
-					 "\"variants\": ["
-					 "{\"name\": \"control\", \"accuracy\": 0.85, \"samples\": "
-					 "5000}, "
-					 "{\"name\": \"treatment\", \"accuracy\": 0.88, \"samples\": "
-					 "5000}"
-					 "], "
-					 "\"winner\": \"treatment\", \"confidence\": 0.95}",
-					 experiment_id);
+		initStringInfo(&result);
+		appendStringInfo(&result,
+						 "{\"experiment_id\": %d, "
+						 "\"variants\": ["
+						 "{\"name\": \"control\", \"accuracy\": 0.85, \"samples\": "
+						 "5000}, "
+						 "{\"name\": \"treatment\", \"accuracy\": 0.88, \"samples\": "
+						 "5000}"
+						 "], "
+						 "\"winner\": \"treatment\", \"confidence\": 0.95}",
+						 experiment_id);
 
-	PG_RETURN_TEXT_P(cstring_to_text(result.data));
+		PG_RETURN_TEXT_P(cstring_to_text(result.data));
+	}
 }
 
 /*
@@ -1055,19 +1062,21 @@ audit_model_access(PG_FUNCTION_ARGS)
 	action = PG_GETARG_TEXT_PP(1);
 	user_id = PG_ARGISNULL(2) ? NULL : PG_GETARG_TEXT_PP(2);
 
-	char	   *action_str;
-	char	   *user;
+	{
+		char	   *action_str;
+		char	   *user;
 
-	action_str = text_to_cstring(action);
-	user = user_id ? text_to_cstring(user_id) : pstrdup("unknown");
+		action_str = text_to_cstring(action);
+		user = user_id ? text_to_cstring(user_id) : pstrdup("unknown");
 
-	/* Log audit event (production would insert into audit log) */
-	(void) model_id;
-	(void) action_str;
-	(void) user;
+		/* Log audit event (production would insert into audit log) */
+		(void) model_id;
+		(void) action_str;
+		(void) user;
 
-	nfree(action_str);
-	nfree(user);
+		nfree(action_str);
+		nfree(user);
 
-	PG_RETURN_BOOL(true);
+		PG_RETURN_BOOL(true);
+	}
 }

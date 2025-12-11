@@ -292,29 +292,29 @@ ndb_rocm_dt_launch_feature_stats(const float *features,
 		|| feature_dim <= 0 || feature_idx < 0 || feature_idx >= feature_dim)
 		return -1;
 
-	status = cudaMalloc((void **)&d_features, sizeof(float) * n_samples * feature_dim);
+	status = hipMalloc((void **)&d_features, sizeof(float) * n_samples * feature_dim);
 	if (status != hipSuccess)
 		goto error;
-	status = cudaMalloc((void **)&d_indices, sizeof(int) * n_samples);
+	status = hipMalloc((void **)&d_indices, sizeof(int) * n_samples);
 	if (status != hipSuccess)
 		goto error;
-	status = cudaMalloc((void **)&d_min, sizeof(float) * blocks);
+	status = hipMalloc((void **)&d_min, sizeof(float) * blocks);
 	if (status != hipSuccess)
 		goto error;
-	status = cudaMalloc((void **)&d_max, sizeof(float) * blocks);
+	status = hipMalloc((void **)&d_max, sizeof(float) * blocks);
 	if (status != hipSuccess)
 		goto error;
-	status = cudaMalloc((void **)&d_sum, sizeof(double) * blocks);
+	status = hipMalloc((void **)&d_sum, sizeof(double) * blocks);
 	if (status != hipSuccess)
 		goto error;
-	status = cudaMalloc((void **)&d_sumsq, sizeof(double) * blocks);
+	status = hipMalloc((void **)&d_sumsq, sizeof(double) * blocks);
 	if (status != hipSuccess)
 		goto error;
 
-	status = cudaMemcpy(d_features, features, sizeof(float) * n_samples * feature_dim, cudaMemcpyHostToDevice);
+	status = hipMemcpy(d_features, features, sizeof(float) * n_samples * feature_dim, hipMemcpyHostToDevice);
 	if (status != hipSuccess)
 		goto error;
-	status = cudaMemcpy(d_indices, indices, sizeof(int) * n_samples, cudaMemcpyHostToDevice);
+	status = hipMemcpy(d_indices, indices, sizeof(int) * n_samples, hipMemcpyHostToDevice);
 	if (status != hipSuccess)
 		goto error;
 
@@ -325,10 +325,10 @@ ndb_rocm_dt_launch_feature_stats(const float *features,
 		float h_max[1] = {-FLT_MAX};
 		double h_sum[1] = {0.0};
 		double h_sumsq[1] = {0.0};
-		cudaMemcpy(&d_min[i], h_min, sizeof(float), cudaMemcpyHostToDevice);
-		cudaMemcpy(&d_max[i], h_max, sizeof(float), cudaMemcpyHostToDevice);
-		cudaMemcpy(&d_sum[i], h_sum, sizeof(double), cudaMemcpyHostToDevice);
-		cudaMemcpy(&d_sumsq[i], h_sumsq, sizeof(double), cudaMemcpyHostToDevice);
+		hipMemcpy(&d_min[i], h_min, sizeof(float), hipMemcpyHostToDevice);
+		hipMemcpy(&d_max[i], h_max, sizeof(float), hipMemcpyHostToDevice);
+		hipMemcpy(&d_sum[i], h_sum, sizeof(double), hipMemcpyHostToDevice);
+		hipMemcpy(&d_sumsq[i], h_sumsq, sizeof(double), hipMemcpyHostToDevice);
 	}
 
 	hipLaunchKernelGGL(ndb_rocm_dt_feature_stats_kernel,
@@ -341,7 +341,7 @@ ndb_rocm_dt_launch_feature_stats(const float *features,
 	status = hipGetLastError();
 	if (status != hipSuccess)
 		goto error;
-	status = cudaDeviceSynchronize();
+	status = hipDeviceSynchronize();
 	if (status != hipSuccess)
 		goto error;
 
@@ -368,7 +368,7 @@ ndb_rocm_dt_launch_feature_stats(const float *features,
 		goto error;
 	}
 
-	status = cudaMemcpy(h_min, d_min, sizeof(float) * blocks, cudaMemcpyDeviceToHost);
+	status = hipMemcpy(h_min, d_min, sizeof(float) * blocks, hipMemcpyDeviceToHost);
 	if (status != hipSuccess)
 	{
 		free(h_min);
@@ -377,7 +377,7 @@ ndb_rocm_dt_launch_feature_stats(const float *features,
 		free(h_sumsq);
 		goto error;
 	}
-	status = cudaMemcpy(h_max, d_max, sizeof(float) * blocks, cudaMemcpyDeviceToHost);
+	status = hipMemcpy(h_max, d_max, sizeof(float) * blocks, hipMemcpyDeviceToHost);
 	if (status != hipSuccess)
 	{
 		free(h_min);
@@ -386,7 +386,7 @@ ndb_rocm_dt_launch_feature_stats(const float *features,
 		free(h_sumsq);
 		goto error;
 	}
-	status = cudaMemcpy(h_sum, d_sum, sizeof(double) * blocks, cudaMemcpyDeviceToHost);
+	status = hipMemcpy(h_sum, d_sum, sizeof(double) * blocks, hipMemcpyDeviceToHost);
 	if (status != hipSuccess)
 	{
 		free(h_min);
@@ -395,7 +395,7 @@ ndb_rocm_dt_launch_feature_stats(const float *features,
 		free(h_sumsq);
 		goto error;
 	}
-	status = cudaMemcpy(h_sumsq, d_sumsq, sizeof(double) * blocks, cudaMemcpyDeviceToHost);
+	status = hipMemcpy(h_sumsq, d_sumsq, sizeof(double) * blocks, hipMemcpyDeviceToHost);
 	if (status != hipSuccess)
 	{
 		free(h_min);
@@ -425,27 +425,27 @@ ndb_rocm_dt_launch_feature_stats(const float *features,
 	free(h_sum);
 	free(h_sumsq);
 
-	cudaFree(d_features);
-	cudaFree(d_indices);
-	cudaFree(d_min);
-	cudaFree(d_max);
-	cudaFree(d_sum);
-	cudaFree(d_sumsq);
+	hipFree(d_features);
+	hipFree(d_indices);
+	hipFree(d_min);
+	hipFree(d_max);
+	hipFree(d_sum);
+	hipFree(d_sumsq);
 	return 0;
 
 error:
 	if (d_features)
-		cudaFree(d_features);
+		hipFree(d_features);
 	if (d_indices)
-		cudaFree(d_indices);
+		hipFree(d_indices);
 	if (d_min)
-		cudaFree(d_min);
+		hipFree(d_min);
 	if (d_max)
-		cudaFree(d_max);
+		hipFree(d_max);
 	if (d_sum)
-		cudaFree(d_sum);
+		hipFree(d_sum);
 	if (d_sumsq)
-		cudaFree(d_sumsq);
+		hipFree(d_sumsq);
 	return -1;
 }
 
@@ -481,35 +481,35 @@ ndb_rocm_dt_launch_split_counts_classification(const float *features,
 		|| left_counts == NULL || right_counts == NULL)
 		return -1;
 
-	status = cudaMalloc((void **)&d_features, sizeof(float) * n_samples * feature_dim);
+	status = hipMalloc((void **)&d_features, sizeof(float) * n_samples * feature_dim);
 	if (status != hipSuccess)
 		goto error;
-	status = cudaMalloc((void **)&d_labels, sizeof(int) * n_samples);
+	status = hipMalloc((void **)&d_labels, sizeof(int) * n_samples);
 	if (status != hipSuccess)
 		goto error;
-	status = cudaMalloc((void **)&d_indices, sizeof(int) * n_samples);
+	status = hipMalloc((void **)&d_indices, sizeof(int) * n_samples);
 	if (status != hipSuccess)
 		goto error;
-	status = cudaMalloc((void **)&d_left_counts, sizeof(int) * class_count);
+	status = hipMalloc((void **)&d_left_counts, sizeof(int) * class_count);
 	if (status != hipSuccess)
 		goto error;
-	status = cudaMalloc((void **)&d_right_counts, sizeof(int) * class_count);
+	status = hipMalloc((void **)&d_right_counts, sizeof(int) * class_count);
 	if (status != hipSuccess)
 		goto error;
 
-	status = cudaMemcpy(d_features, features, sizeof(float) * n_samples * feature_dim, cudaMemcpyHostToDevice);
+	status = hipMemcpy(d_features, features, sizeof(float) * n_samples * feature_dim, hipMemcpyHostToDevice);
 	if (status != hipSuccess)
 		goto error;
-	status = cudaMemcpy(d_labels, labels, sizeof(int) * n_samples, cudaMemcpyHostToDevice);
+	status = hipMemcpy(d_labels, labels, sizeof(int) * n_samples, hipMemcpyHostToDevice);
 	if (status != hipSuccess)
 		goto error;
-	status = cudaMemcpy(d_indices, indices, sizeof(int) * n_samples, cudaMemcpyHostToDevice);
+	status = hipMemcpy(d_indices, indices, sizeof(int) * n_samples, hipMemcpyHostToDevice);
 	if (status != hipSuccess)
 		goto error;
-	status = cudaMemset(d_left_counts, 0, sizeof(int) * class_count);
+	status = hipMemset(d_left_counts, 0, sizeof(int) * class_count);
 	if (status != hipSuccess)
 		goto error;
-	status = cudaMemset(d_right_counts, 0, sizeof(int) * class_count);
+	status = hipMemset(d_right_counts, 0, sizeof(int) * class_count);
 	if (status != hipSuccess)
 		goto error;
 
@@ -523,35 +523,35 @@ ndb_rocm_dt_launch_split_counts_classification(const float *features,
 	status = hipGetLastError();
 	if (status != hipSuccess)
 		goto error;
-	status = cudaDeviceSynchronize();
+	status = hipDeviceSynchronize();
 	if (status != hipSuccess)
 		goto error;
 
-	status = cudaMemcpy(left_counts, d_left_counts, sizeof(int) * class_count, cudaMemcpyDeviceToHost);
+	status = hipMemcpy(left_counts, d_left_counts, sizeof(int) * class_count, hipMemcpyDeviceToHost);
 	if (status != hipSuccess)
 		goto error;
-	status = cudaMemcpy(right_counts, d_right_counts, sizeof(int) * class_count, cudaMemcpyDeviceToHost);
+	status = hipMemcpy(right_counts, d_right_counts, sizeof(int) * class_count, hipMemcpyDeviceToHost);
 	if (status != hipSuccess)
 		goto error;
 
-	cudaFree(d_features);
-	cudaFree(d_labels);
-	cudaFree(d_indices);
-	cudaFree(d_left_counts);
-	cudaFree(d_right_counts);
+	hipFree(d_features);
+	hipFree(d_labels);
+	hipFree(d_indices);
+	hipFree(d_left_counts);
+	hipFree(d_right_counts);
 	return 0;
 
 error:
 	if (d_features)
-		cudaFree(d_features);
+		hipFree(d_features);
 	if (d_labels)
-		cudaFree(d_labels);
+		hipFree(d_labels);
 	if (d_indices)
-		cudaFree(d_indices);
+		hipFree(d_indices);
 	if (d_left_counts)
-		cudaFree(d_left_counts);
+		hipFree(d_left_counts);
 	if (d_right_counts)
-		cudaFree(d_right_counts);
+		hipFree(d_right_counts);
 	return -1;
 }
 
@@ -598,51 +598,51 @@ ndb_rocm_dt_launch_split_stats_regression(const float *features,
 		|| right_sum == NULL || right_sumsq == NULL || right_count == NULL)
 		return -1;
 
-	status = cudaMalloc((void **)&d_features, sizeof(float) * n_samples * feature_dim);
+	status = hipMalloc((void **)&d_features, sizeof(float) * n_samples * feature_dim);
 	if (status != hipSuccess)
 		goto error;
-	status = cudaMalloc((void **)&d_labels, sizeof(double) * n_samples);
+	status = hipMalloc((void **)&d_labels, sizeof(double) * n_samples);
 	if (status != hipSuccess)
 		goto error;
-	status = cudaMalloc((void **)&d_indices, sizeof(int) * n_samples);
+	status = hipMalloc((void **)&d_indices, sizeof(int) * n_samples);
 	if (status != hipSuccess)
 		goto error;
-	status = cudaMalloc((void **)&d_left_sum, sizeof(double));
+	status = hipMalloc((void **)&d_left_sum, sizeof(double));
 	if (status != hipSuccess)
 		goto error;
-	status = cudaMalloc((void **)&d_left_sumsq, sizeof(double));
+	status = hipMalloc((void **)&d_left_sumsq, sizeof(double));
 	if (status != hipSuccess)
 		goto error;
-	status = cudaMalloc((void **)&d_left_count, sizeof(int));
+	status = hipMalloc((void **)&d_left_count, sizeof(int));
 	if (status != hipSuccess)
 		goto error;
-	status = cudaMalloc((void **)&d_right_sum, sizeof(double));
+	status = hipMalloc((void **)&d_right_sum, sizeof(double));
 	if (status != hipSuccess)
 		goto error;
-	status = cudaMalloc((void **)&d_right_sumsq, sizeof(double));
+	status = hipMalloc((void **)&d_right_sumsq, sizeof(double));
 	if (status != hipSuccess)
 		goto error;
-	status = cudaMalloc((void **)&d_right_count, sizeof(int));
+	status = hipMalloc((void **)&d_right_count, sizeof(int));
 	if (status != hipSuccess)
 		goto error;
 
-	status = cudaMemcpy(d_features, features, sizeof(float) * n_samples * feature_dim, cudaMemcpyHostToDevice);
+	status = hipMemcpy(d_features, features, sizeof(float) * n_samples * feature_dim, hipMemcpyHostToDevice);
 	if (status != hipSuccess)
 		goto error;
-	status = cudaMemcpy(d_labels, labels, sizeof(double) * n_samples, cudaMemcpyHostToDevice);
+	status = hipMemcpy(d_labels, labels, sizeof(double) * n_samples, hipMemcpyHostToDevice);
 	if (status != hipSuccess)
 		goto error;
-	status = cudaMemcpy(d_indices, indices, sizeof(int) * n_samples, cudaMemcpyHostToDevice);
+	status = hipMemcpy(d_indices, indices, sizeof(int) * n_samples, hipMemcpyHostToDevice);
 	if (status != hipSuccess)
 		goto error;
 
 	/* Initialize reduction variables */
-	cudaMemcpy(d_left_sum, &zero_d, sizeof(double), cudaMemcpyHostToDevice);
-	cudaMemcpy(d_left_sumsq, &zero_d, sizeof(double), cudaMemcpyHostToDevice);
-	cudaMemcpy(d_left_count, &zero_i, sizeof(int), cudaMemcpyHostToDevice);
-	cudaMemcpy(d_right_sum, &zero_d, sizeof(double), cudaMemcpyHostToDevice);
-	cudaMemcpy(d_right_sumsq, &zero_d, sizeof(double), cudaMemcpyHostToDevice);
-	cudaMemcpy(d_right_count, &zero_i, sizeof(int), cudaMemcpyHostToDevice);
+	hipMemcpy(d_left_sum, &zero_d, sizeof(double), hipMemcpyHostToDevice);
+	hipMemcpy(d_left_sumsq, &zero_d, sizeof(double), hipMemcpyHostToDevice);
+	hipMemcpy(d_left_count, &zero_i, sizeof(int), hipMemcpyHostToDevice);
+	hipMemcpy(d_right_sum, &zero_d, sizeof(double), hipMemcpyHostToDevice);
+	hipMemcpy(d_right_sumsq, &zero_d, sizeof(double), hipMemcpyHostToDevice);
+	hipMemcpy(d_right_count, &zero_i, sizeof(int), hipMemcpyHostToDevice);
 
 	hipLaunchKernelGGL(ndb_rocm_dt_split_stats_regression_kernel,
 		dim3(blocks),
@@ -655,59 +655,59 @@ ndb_rocm_dt_launch_split_stats_regression(const float *features,
 	status = hipGetLastError();
 	if (status != hipSuccess)
 		goto error;
-	status = cudaDeviceSynchronize();
+	status = hipDeviceSynchronize();
 	if (status != hipSuccess)
 		goto error;
 
-	status = cudaMemcpy(left_sum, d_left_sum, sizeof(double), cudaMemcpyDeviceToHost);
+	status = hipMemcpy(left_sum, d_left_sum, sizeof(double), hipMemcpyDeviceToHost);
 	if (status != hipSuccess)
 		goto error;
-	status = cudaMemcpy(left_sumsq, d_left_sumsq, sizeof(double), cudaMemcpyDeviceToHost);
+	status = hipMemcpy(left_sumsq, d_left_sumsq, sizeof(double), hipMemcpyDeviceToHost);
 	if (status != hipSuccess)
 		goto error;
-	status = cudaMemcpy(left_count, d_left_count, sizeof(int), cudaMemcpyDeviceToHost);
+	status = hipMemcpy(left_count, d_left_count, sizeof(int), hipMemcpyDeviceToHost);
 	if (status != hipSuccess)
 		goto error;
-	status = cudaMemcpy(right_sum, d_right_sum, sizeof(double), cudaMemcpyDeviceToHost);
+	status = hipMemcpy(right_sum, d_right_sum, sizeof(double), hipMemcpyDeviceToHost);
 	if (status != hipSuccess)
 		goto error;
-	status = cudaMemcpy(right_sumsq, d_right_sumsq, sizeof(double), cudaMemcpyDeviceToHost);
+	status = hipMemcpy(right_sumsq, d_right_sumsq, sizeof(double), hipMemcpyDeviceToHost);
 	if (status != hipSuccess)
 		goto error;
-	status = cudaMemcpy(right_count, d_right_count, sizeof(int), cudaMemcpyDeviceToHost);
+	status = hipMemcpy(right_count, d_right_count, sizeof(int), hipMemcpyDeviceToHost);
 	if (status != hipSuccess)
 		goto error;
 
-	cudaFree(d_features);
-	cudaFree(d_labels);
-	cudaFree(d_indices);
-	cudaFree(d_left_sum);
-	cudaFree(d_left_sumsq);
-	cudaFree(d_left_count);
-	cudaFree(d_right_sum);
-	cudaFree(d_right_sumsq);
-	cudaFree(d_right_count);
+	hipFree(d_features);
+	hipFree(d_labels);
+	hipFree(d_indices);
+	hipFree(d_left_sum);
+	hipFree(d_left_sumsq);
+	hipFree(d_left_count);
+	hipFree(d_right_sum);
+	hipFree(d_right_sumsq);
+	hipFree(d_right_count);
 	return 0;
 
 error:
 	if (d_features)
-		cudaFree(d_features);
+		hipFree(d_features);
 	if (d_labels)
-		cudaFree(d_labels);
+		hipFree(d_labels);
 	if (d_indices)
-		cudaFree(d_indices);
+		hipFree(d_indices);
 	if (d_left_sum)
-		cudaFree(d_left_sum);
+		hipFree(d_left_sum);
 	if (d_left_sumsq)
-		cudaFree(d_left_sumsq);
+		hipFree(d_left_sumsq);
 	if (d_left_count)
-		cudaFree(d_left_count);
+		hipFree(d_left_count);
 	if (d_right_sum)
-		cudaFree(d_right_sum);
+		hipFree(d_right_sum);
 	if (d_right_sumsq)
-		cudaFree(d_right_sumsq);
+		hipFree(d_right_sumsq);
 	if (d_right_count)
-		cudaFree(d_right_count);
+		hipFree(d_right_count);
 	return -1;
 }
 

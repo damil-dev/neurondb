@@ -1032,8 +1032,6 @@ linreg_try_gpu_predict_catalog(int32 model_id,
 							if (payload_size >= expected_gpu_size && payload_size < expected_gpu_size + 1000)
 							{
 								is_gpu_model = true;
-								elog(DEBUG1, "linreg_try_gpu_predict_catalog: detected GPU model by payload format (feature_dim=%d, n_samples=%d, payload_size=%u)",
-									 hdr->feature_dim, hdr->n_samples, payload_size);
 							}
 						}
 					}
@@ -1156,8 +1154,6 @@ linreg_load_model_from_catalog(int32 model_id, LinRegModel **out)
 							if (payload_size >= expected_gpu_size && payload_size < expected_gpu_size + 1000)
 							{
 								is_gpu_model = true;
-								elog(DEBUG1, "linreg_load_model_from_catalog: detected GPU model by payload format (feature_dim=%d, n_samples=%d, payload_size=%u)",
-									 hdr->feature_dim, hdr->n_samples, payload_size);
 							}
 						}
 					}
@@ -1167,7 +1163,6 @@ linreg_load_model_from_catalog(int32 model_id, LinRegModel **out)
 
 		if (is_gpu_model)
 		{
-			elog(DEBUG1, "linreg_load_model_from_catalog: skipping GPU model (model_id=%d), use GPU prediction path", model_id);
 			nfree(payload);
 			nfree(metrics);
 
@@ -1480,8 +1475,6 @@ train_linear_regression(PG_FUNCTION_ARGS)
 				size_t		expected_size;
 				uint32		payload_size;
 
-				elog(INFO,
-					 "neurondb: linear_regression: GPU training succeeded");
 
 				/* Validate GPU model data size before accessing */
 				payload_size = VARSIZE(gpu_result.spec.model_data) - VARHDRSZ;
@@ -1561,7 +1554,6 @@ train_linear_regression(PG_FUNCTION_ARGS)
 				{
 					/* GPU provided metrics - use them (they already have training_backend=1) */
 					updated_metrics = gpu_result.spec.metrics;
-					elog(INFO, "neurondb: linear_regression: Using GPU-provided metrics with training_backend=1");
 				}
 				else
 				{
@@ -1702,8 +1694,6 @@ train_linear_regression(PG_FUNCTION_ARGS)
 #else
 				MLCatalogModelSpec spec;
 
-				elog(INFO,
-					 "neurondb: linear_regression: GPU training succeeded");
 				spec = gpu_result.spec;
 
 				if (spec.training_table == NULL)
@@ -1769,7 +1759,7 @@ train_linear_regression(PG_FUNCTION_ARGS)
 			LinRegModel *model = NULL;
 			bytea *model_blob = NULL;
 			Jsonb *metrics_json = NULL;
-			StringInfoData metricsbuf = {0};
+			Jsonb *params_jsonb = NULL;
 			int			chunk_size;
 			int			offset = 0;
 			int			rows_in_chunk = 0;
@@ -1944,9 +1934,6 @@ train_linear_regression(PG_FUNCTION_ARGS)
 				/* Limit metrics computation to avoid excessive time */
 				metrics_chunk_size = (stream_accum.n_samples > 100000) ? 100000 : stream_accum.n_samples;
 
-				elog(DEBUG1,
-					 "neurondb: linear_regression: computing metrics on %d samples",
-					 metrics_chunk_size);
 
 				/* Metrics computation uses new SPI session */
 				{
@@ -1968,15 +1955,6 @@ train_linear_regression(PG_FUNCTION_ARGS)
 						int			metrics_i;
 
 						initStringInfo(&metrics_query);
-						elog(DEBUG1,
-							 "SELECT %s, %s FROM %s WHERE %s IS NOT NULL AND %s IS NOT NULL LIMIT %d OFFSET %d",
-							 quoted_feat,
-							 quoted_target,
-							 quoted_tbl,
-							 quoted_feat,
-							 quoted_target,
-							 10000,
-							 metrics_offset);
 						appendStringInfo(&metrics_query,
 										 "SELECT %s, %s FROM %s WHERE %s IS NOT NULL AND %s IS NOT NULL LIMIT %d OFFSET %d",
 										 quoted_feat,
@@ -2137,33 +2115,140 @@ train_linear_regression(PG_FUNCTION_ARGS)
 			 * serialization format for proper deserialization.
 			 */
 
-			/* Build metrics JSON */
-			initStringInfo(&metricsbuf);
-			appendStringInfo(&metricsbuf,
-							 "{\"algorithm\":\"linear_regression\","
-							 "\"training_backend\":0,"
-							 "\"n_features\":%d,"
-							 "\"n_samples\":%d,"
-							 "\"r_squared\":%.6f,"
-							 "\"mse\":%.6f,"
-							 "\"mae\":%.6f}",
-							 model->n_features,
-							 model->n_samples,
-							 model->r_squared,
-							 model->mse,
-							 model->mae);
+			/* Build parameters JSON using JSONB API (empty object for linear regression) */
+			{
+				JsonbParseState *state = NULL;
+				JsonbValue *final_value = NULL;
 
-			/* Use ndb_jsonb_in_cstring like test 006 fix */
-			metrics_json = ndb_jsonb_in_cstring(metricsbuf.data);
+				PG_TRY();
+				{
+					(void) pushJsonbValue(&state, WJB_BEGIN_OBJECT, NULL);
+					final_value = pushJsonbValue(&state, WJB_END_OBJECT, NULL);
+
+					if (final_value == NULL)
+					{
+						elog(ERROR, "neurondb: train_linear_regression: pushJsonbValue(WJB_END_OBJECT) returned NULL for parameters");
+					}
+
+					params_jsonb = JsonbValueToJsonb(final_value);
+				}
+				PG_CATCH();
+				{
+					ErrorData  *edata = CopyErrorData();
+
+					elog(ERROR, "neurondb: train_linear_regression: parameters JSONB construction failed: %s", edata->message);
+					FlushErrorState();
+					params_jsonb = NULL;
+				}
+				PG_END_TRY();
+			}
+
+			/* Build metrics JSON using JSONB API */
+			{
+				JsonbParseState *state = NULL;
+				JsonbValue	jkey;
+				JsonbValue	jval;
+
+				JsonbValue *final_value = NULL;
+				Numeric		n_features_num,
+							n_samples_num,
+							r_squared_num,
+							mse_num,
+							mae_num;
+
+				PG_TRY();
+				{
+					(void) pushJsonbValue(&state, WJB_BEGIN_OBJECT, NULL);
+
+					/* Add algorithm */
+					jkey.type = jbvString;
+					jkey.val.string.val = "algorithm";
+					jkey.val.string.len = strlen("algorithm");
+					(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+					jval.type = jbvString;
+					jval.val.string.val = "linear_regression";
+					jval.val.string.len = strlen("linear_regression");
+					(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+
+					/* Add training_backend */
+					jkey.val.string.val = "training_backend";
+					jkey.val.string.len = strlen("training_backend");
+					(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+					{
+						Numeric training_backend_num = DatumGetNumeric(DirectFunctionCall1(int4_numeric, Int32GetDatum(0)));
+						jval.type = jbvNumeric;
+						jval.val.numeric = training_backend_num;
+						(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+					}
+
+					/* Add n_features */
+					jkey.val.string.val = "n_features";
+					jkey.val.string.len = strlen("n_features");
+					(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+					n_features_num = DatumGetNumeric(DirectFunctionCall1(int4_numeric, Int32GetDatum(model->n_features)));
+					jval.type = jbvNumeric;
+					jval.val.numeric = n_features_num;
+					(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+
+					/* Add n_samples */
+					jkey.val.string.val = "n_samples";
+					jkey.val.string.len = strlen("n_samples");
+					(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+					n_samples_num = DatumGetNumeric(DirectFunctionCall1(int4_numeric, Int32GetDatum(model->n_samples)));
+					jval.type = jbvNumeric;
+					jval.val.numeric = n_samples_num;
+					(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+
+					/* Add r_squared */
+					jkey.val.string.val = "r_squared";
+					jkey.val.string.len = strlen("r_squared");
+					(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+					r_squared_num = DatumGetNumeric(DirectFunctionCall1(float8_numeric, Float8GetDatum(model->r_squared)));
+					jval.type = jbvNumeric;
+					jval.val.numeric = r_squared_num;
+					(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+
+					/* Add mse */
+					jkey.val.string.val = "mse";
+					jkey.val.string.len = strlen("mse");
+					(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+					mse_num = DatumGetNumeric(DirectFunctionCall1(float8_numeric, Float8GetDatum(model->mse)));
+					jval.type = jbvNumeric;
+					jval.val.numeric = mse_num;
+					(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+
+					/* Add mae */
+					jkey.val.string.val = "mae";
+					jkey.val.string.len = strlen("mae");
+					(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+					mae_num = DatumGetNumeric(DirectFunctionCall1(float8_numeric, Float8GetDatum(model->mae)));
+					jval.type = jbvNumeric;
+					jval.val.numeric = mae_num;
+					(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+
+					final_value = pushJsonbValue(&state, WJB_END_OBJECT, NULL);
+
+					if (final_value == NULL)
+					{
+						elog(ERROR, "neurondb: train_linear_regression: pushJsonbValue(WJB_END_OBJECT) returned NULL for metrics");
+					}
+
+					metrics_json = JsonbValueToJsonb(final_value);
+				}
+				PG_CATCH();
+				{
+					ErrorData  *edata = CopyErrorData();
+
+					elog(ERROR, "neurondb: train_linear_regression: metrics JSONB construction failed: %s", edata->message);
+					FlushErrorState();
+					metrics_json = NULL;
+				}
+				PG_END_TRY();
+			}
+
 			if (metrics_json == NULL)
 			{
-				nfree(metricsbuf.data);
-				ereport(ERROR,
-						(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
-						 errmsg("neurondb: failed to parse metrics JSON")));
 			}
-			nfree(metricsbuf.data);
-			metricsbuf.data = NULL;
 
 			/* Register in catalog */
 			{
@@ -2186,6 +2271,7 @@ train_linear_regression(PG_FUNCTION_ARGS)
 				spec.training_table = tbl_str;
 				spec.training_column = targ_str;
 				spec.model_data = model_blob;
+				spec.parameters = params_jsonb;
 				spec.metrics = metrics_json;
 
 				model_id = ml_catalog_register_model(&spec);
@@ -2800,54 +2886,41 @@ evaluate_linear_regression_by_model_id_jsonb(int32 model_id, text * table_name, 
 
 		/* First pass: compute mean of y using only valid rows (common for both CPU and GPU) */
 		/* We need to use the same rows that will be used in the second pass */
-		int			valid_count = 0;
-		
-		for (i = 0; i < nvec; i++)
 		{
-			HeapTuple	tuple = SPI_tuptable->vals[i];
-			TupleDesc	tupdesc = SPI_tuptable->tupdesc;
-			Datum		feat_datum;
-			Datum		targ_datum;
-			bool		feat_null;
-			bool		targ_null;
-			int			actual_dim;
-
-			feat_datum = SPI_getbinval(tuple, tupdesc, 1, &feat_null);
-			targ_datum = SPI_getbinval(tuple, tupdesc, 2, &targ_null);
-
-			/* Skip rows that will be skipped in second pass */
-			if (feat_null || targ_null)
-				continue;
-
-			/* Check feature dimension matches */
-			if (feat_is_array)
-			{
-				ArrayType *arr = DatumGetArrayTypeP(feat_datum);
-				if (ARR_NDIM(arr) != 1)
-					continue;
-				actual_dim = ARR_DIMS(arr)[0];
-			}
-			else
-			{
-				Vector *vec = DatumGetVector(feat_datum);
-				actual_dim = vec->dim;
-			}
-
-			/* Only count rows that will be used in evaluation */
-			y_mean += DatumGetFloat8(targ_datum);
-			valid_count++;
-		}
+			int			valid_count = 0;
 		
-		if (valid_count > 0)
-			y_mean /= valid_count;
-		else
-			y_mean = 0.0;
+			for (i = 0; i < nvec; i++)
+			{
+				HeapTuple	tuple = SPI_tuptable->vals[i];
+				TupleDesc	tupdesc = SPI_tuptable->tupdesc;
+				Datum		targ_datum;
+				bool		feat_null;
+				bool		targ_null;
+
+				(void) SPI_getbinval(tuple, tupdesc, 1, &feat_null);
+				targ_datum = SPI_getbinval(tuple, tupdesc, 2, &targ_null);
+
+				/* Skip rows that will be skipped in second pass */
+				if (feat_null || targ_null)
+					continue;
+
+				/* Only count rows that will be used in evaluation */
+				y_mean += DatumGetFloat8(targ_datum);
+				valid_count++;
+			}
+		
+			if (valid_count > 0)
+				y_mean /= valid_count;
+			else
+				y_mean = 0.0;
+		}
 
 		/* Second pass: unified evaluation loop - only difference is predict function */
 		/* Count actual rows processed to ensure correct normalization */
-		int			processed_count = 0;
+		{
+			int			processed_count = 0;
 		
-		for (i = 0; i < nvec; i++)
+			for (i = 0; i < nvec; i++)
 		{
 			HeapTuple	tuple = SPI_tuptable->vals[i];
 			TupleDesc	tupdesc = SPI_tuptable->tupdesc;
@@ -3063,8 +3136,7 @@ evaluate_linear_regression_by_model_id_jsonb(int32 model_id, text * table_name, 
 			 errmsg("neurondb: evaluate_linear_regression_by_model_id_jsonb: unexpected code path"),
 			 errdetail("Unified evaluation should have handled all cases")));
 	return NULL;
-
-	return result;
+	}
 }
 
 /*

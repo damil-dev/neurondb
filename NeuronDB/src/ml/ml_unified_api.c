@@ -258,10 +258,6 @@ neurondb_load_training_data(NdbSpiSession *session,
 
 	if (n_samples >= 200000)
 	{
-		elog(INFO,
-			 "neurondb_load_training_data: dataset has more than %d rows, "
-			 "limiting to %d samples to avoid memory allocation errors",
-			 200000, n_samples);
 	}
 
 	/*
@@ -1040,15 +1036,11 @@ neurondb_build_training_sql(MLAlgorithm algo, StringInfo sql, const char *table_
 
 		case ML_ALGO_HIERARCHICAL:
 			{
-				int			n_clusters = 3;
-
-				neurondb_parse_hyperparams_int(hyperparams, "n_clusters", &n_clusters, 3);
-				appendStringInfo(sql,
-								 "SELECT train_hierarchical_clustering(%s, %s, %d)",
-								 neurondb_quote_literal_cstr(table_name),
-								 neurondb_quote_literal_cstr(feature_list),
-								 n_clusters);
-				return true;
+				/* Hierarchical clustering uses direct function cluster_hierarchical()
+				 * which doesn't return a model_id. It's not supported through the
+				 * unified API SQL path. Return false to indicate special handling needed.
+				 */
+				return false;
 			}
 
 		case ML_ALGO_XGBOOST:
@@ -1056,14 +1048,22 @@ neurondb_build_training_sql(MLAlgorithm algo, StringInfo sql, const char *table_
 				int			n_estimators = 100;
 				int			max_depth_xgb = 3;
 				double		learning_rate_xgb = 0.1;
+				const char *feature_col_xgb;
 
 				neurondb_parse_hyperparams_int(hyperparams, "n_estimators", &n_estimators, 100);
 				neurondb_parse_hyperparams_int(hyperparams, "max_depth", &max_depth_xgb, 3);
 				neurondb_parse_hyperparams_float8(hyperparams, "learning_rate", &learning_rate_xgb, 0.1);
+				
+				/* Use first feature name if available, otherwise use feature_list */
+				if (feature_name_count > 0 && feature_names != NULL && feature_names[0] != NULL)
+					feature_col_xgb = feature_names[0];
+				else
+					feature_col_xgb = feature_list;
+				
 				appendStringInfo(sql,
 								 "SELECT train_xgboost_classifier(%s, %s, %s, %d, %d, %.6f)",
 								 neurondb_quote_literal_cstr(table_name),
-								 neurondb_quote_literal_cstr(feature_list),
+								 neurondb_quote_literal_cstr(feature_col_xgb),
 								 neurondb_quote_literal_or_null(target_column),
 								 n_estimators, max_depth_xgb, learning_rate_xgb);
 				return true;
@@ -1370,7 +1370,7 @@ neurondb_train(PG_FUNCTION_ARGS)
 	NdbSpiSession *spi_session = NULL;
 	StringInfoData sql;
 	int			ret;
-	int			model_id;
+	int			model_id = 0;	/* Initialize to 0 to avoid returning garbage if training fails */
 	MLCatalogModelSpec spec;
 	MLAlgorithm algo_enum;
 
@@ -1385,6 +1385,11 @@ neurondb_train(PG_FUNCTION_ARGS)
 	bool		gpu_available = false;
 	bool		load_success = false;
 	bool		gpu_train_result = false;
+
+	char *safe_algorithm = NULL;
+	char *safe_table_name = NULL;
+	char *safe_target_column = NULL;
+	char *safe_project_name = NULL;
 
 
 	if (PG_NARGS() != 6)
@@ -1418,6 +1423,7 @@ neurondb_train(PG_FUNCTION_ARGS)
 		strcmp(algorithm, NDB_ALGO_NAIVE_BAYES) != 0 &&
 		strcmp(algorithm, NDB_ALGO_DECISION_TREE) != 0 &&
 		strcmp(algorithm, NDB_ALGO_GMM) != 0 &&
+		strcmp(algorithm, NDB_ALGO_HIERARCHICAL) != 0 &&
 		strcmp(algorithm, NDB_ALGO_XGBOOST) != 0 &&
 		strcmp(algorithm, NDB_ALGO_CATBOOST) != 0 &&
 		strcmp(algorithm, NDB_ALGO_LIGHTGBM) != 0 &&
@@ -1689,7 +1695,6 @@ neurondb_train(PG_FUNCTION_ARGS)
 	data_loaded = false;
 
 	/* Log compute_mode for debugging */
-	elog(DEBUG1, "neurondb_train: compute_mode=%d (0=CPU, 1=GPU, 2=AUTO)", neurondb_compute_mode);
 
 	/* Check GPU availability first */
 	gpu_available = neurondb_gpu_is_available();
@@ -1751,6 +1756,20 @@ neurondb_train(PG_FUNCTION_ARGS)
 
 	/* Call GPU training with loaded data */
 	/* Only attempt GPU training if compute_mode allows it (not CPU mode) */
+
+	/*
+	 * CRITICAL: Save copies of all string arguments in TopMemoryContext
+	 * BEFORE GPU training, as GPU training may destroy the current context
+	 */
+	if (data_loaded && !NDB_COMPUTE_MODE_IS_CPU())
+	{
+		MemoryContext prev_context = MemoryContextSwitchTo(TopMemoryContext);
+		safe_algorithm = algorithm ? pstrdup(algorithm) : NULL;
+		safe_table_name = table_name ? pstrdup(table_name) : NULL;
+		safe_target_column = target_column ? pstrdup(target_column) : NULL;
+		safe_project_name = project_name ? pstrdup(project_name) : NULL;
+		MemoryContextSwitchTo(prev_context);
+	}
 
 	/*
 	 * Double-check CPU mode to be absolutely safe - NEVER attempt GPU in CPU
@@ -1816,8 +1835,6 @@ neurondb_train(PG_FUNCTION_ARGS)
 				 * mode
 				 */
 				/* Log compute_mode for debugging */
-				elog(DEBUG1, "PG_CATCH: compute_mode=%d (0=CPU, 1=GPU, 2=AUTO), NDB_COMPUTE_MODE_IS_CPU()=%d, NDB_REQUIRE_GPU()=%d",
-					 neurondb_compute_mode, NDB_COMPUTE_MODE_IS_CPU() ? 1 : 0, NDB_REQUIRE_GPU() ? 1 : 0);
 
 				/*
 				 * CPU mode: never error on GPU failures, just fall back to
@@ -1986,15 +2003,152 @@ neurondb_train(PG_FUNCTION_ARGS)
 				}
 				else
 				{
+					/* Check if GPU mode is required - if so, error out instead of falling back */
+					if (NDB_REQUIRE_GPU())
+					{
+						/* GPU mode: re-raise error, no fallback */
+						ErrorData *edata = NULL;
+						char *error_msg = NULL;
+						char *algorithm_safe = NULL;
+						MemoryContext safe_context;
+
+						/* Switch out of ErrorContext before CopyErrorData() */
+						safe_context = oldcontext;
+
+						/* Ensure we're not switching to ErrorContext */
+						if (safe_context == ErrorContext || safe_context == NULL)
+						{
+							safe_context = TopMemoryContext;
+						}
+
+						MemoryContextSwitchTo(safe_context);
+
+						/* Save algorithm before freeing (it might be NULL) */
+						algorithm_safe = algorithm ? pstrdup(algorithm) : NULL;
+
+						if (CurrentMemoryContext != ErrorContext)
+						{
+							edata = CopyErrorData();
+							if (edata)
+							{
+								/* Prefer detail message over main message for more specific errors */
+								if (edata->detail && strlen(edata->detail) > 0)
+								{
+									error_msg = pstrdup(edata->detail);
+								}
+								else if (edata->message && strlen(edata->message) > 0)
+								{
+									error_msg = pstrdup(edata->message);
+								}
+								/* Also set gpu_errmsg_ptr so it's included in the final error */
+								if (gpu_errmsg_ptr == NULL && error_msg != NULL)
+								{
+									gpu_errmsg_ptr = pstrdup(error_msg);
+								}
+							}
+							FlushErrorState();
+						}
+
+						if (algorithm_safe)
+							nfree(algorithm_safe);
+
+						/* Free loaded training data if it was loaded */
+						if (data_loaded && callcontext != NULL && MemoryContextIsValid(callcontext))
+						{
+							MemoryContextSwitchTo(callcontext);
+							if (feature_matrix)
+							{
+								nfree(feature_matrix);
+								feature_matrix = NULL;
+							}
+							if (label_vector)
+							{
+								nfree(label_vector);
+								label_vector = NULL;
+							}
+							data_loaded = false;
+							MemoryContextSwitchTo(safe_context);
+						}
+						else if (data_loaded)
+						{
+							feature_matrix = NULL;
+							label_vector = NULL;
+							data_loaded = false;
+						}
+
+						/* Free resources before error */
+						nfree(feature_list_str);
+						if (feature_names)
+						{
+							int			i;
+
+							MemoryContextSwitchTo(callcontext);
+							for (i = 0; i < feature_name_count; i++)
+							{
+								if (feature_names[i])
+								{
+									char	   *ptr = (char *) feature_names[i];
+
+									nfree(ptr);
+								}
+							}
+							nfree(feature_names);
+						}
+						if (model_name)
+							nfree(model_name);
+						ndb_spi_session_end(&spi_session);
+						MemoryContextSwitchTo(oldcontext);
+						neurondb_cleanup(oldcontext, callcontext);
+
+						/* Report error */
+						{
+							char *gpu_error_msg = NULL;
+							if (gpu_errmsg_ptr && strlen(gpu_errmsg_ptr) > 0)
+							{
+								gpu_error_msg = pstrdup(gpu_errmsg_ptr);
+							}
+							else if (error_msg)
+							{
+								gpu_error_msg = pstrdup(error_msg);
+							}
+							else
+							{
+								gpu_error_msg = psprintf("Exception during GPU training for algorithm '%s'", algorithm ? algorithm : "unknown");
+							}
+							if (gpu_errmsg_ptr)
+								nfree(gpu_errmsg_ptr);
+							if (error_msg)
+								pfree(error_msg);
+							if (edata)
+								FreeErrorData(edata);
+							
+							ereport(ERROR,
+									(errcode(ERRCODE_INTERNAL_ERROR),
+									 errmsg(NDB_ERR_PREFIX_TRAIN " GPU training failed - GPU mode requires GPU to be available"),
+									 errdetail("Algorithm: %s, Project: %s, Table: %s. Error: %s",
+											   algorithm ? algorithm : "unknown",
+											   project_name ? project_name : "unknown",
+											   table_name ? table_name : "unknown",
+											   gpu_error_msg),
+									 errhint("GPU training encountered an exception. Check GPU hardware, drivers, and configuration. "
+											 "Set compute_mode='auto' for automatic CPU fallback.")));
+							if (gpu_error_msg)
+								pfree(gpu_error_msg);
+						}
+					}
+					
 					/* AUTO mode: fall back to CPU */
 					/* Switch out of ErrorContext before any operations */
-					MemoryContext safe_context = oldcontext;
-
-					if (safe_context == ErrorContext || safe_context == NULL)
 					{
-						safe_context = TopMemoryContext;
-					}
-					MemoryContextSwitchTo(safe_context);
+						MemoryContext safe_context;
+
+						safe_context = oldcontext;
+
+						if (safe_context == ErrorContext || safe_context == NULL)
+						{
+							safe_context = TopMemoryContext;
+						}
+						MemoryContextSwitchTo(safe_context);
 
 					elog(WARNING,
 						 "%s: exception caught during GPU training, falling back to CPU (auto mode)",
@@ -2042,6 +2196,7 @@ neurondb_train(PG_FUNCTION_ARGS)
 						feature_matrix = NULL;
 						label_vector = NULL;
 						data_loaded = false;
+					}
 					}
 				}
 			}
@@ -2285,75 +2440,14 @@ neurondb_train(PG_FUNCTION_ARGS)
 				 * otherwise use fallback values
 				 */
 
-				/*
-				 * Copy algorithm - use spec.algorithm if it exists and is
-				 * valid, otherwise use algorithm
-				 */
-				PG_TRY();
-				{
-					if (spec.algorithm != NULL)
-					{
-						spec.algorithm = pstrdup(spec.algorithm);
-					}
-					else
-					{
-						spec.algorithm = pstrdup(algorithm);
-					}
-				}
-				PG_CATCH();
-				{
-					/* If copying spec.algorithm failed, use fallback */
-					FlushErrorState();
-					spec.algorithm = pstrdup(algorithm);
-				}
-				PG_END_TRY();
-
-				/*
-				 * Copy training_table - use spec.training_table if it exists,
-				 * otherwise use table_name
-				 */
-				PG_TRY();
-				{
-					if (spec.training_table != NULL)
-					{
-						spec.training_table = pstrdup(spec.training_table);
-					}
-					else
-					{
-						spec.training_table = pstrdup(table_name);
-					}
-				}
-				PG_CATCH();
-				{
-					FlushErrorState();
-					spec.training_table = pstrdup(table_name);
-				}
-				PG_END_TRY();
-
-				/*
-				 * Copy training_column - use spec.training_column if it
-				 * exists, otherwise use target_column
-				 */
-				if (target_column != NULL)
-				{
-					PG_TRY();
-					{
-						if (spec.training_column != NULL)
-						{
-							spec.training_column = pstrdup(spec.training_column);
-						}
-						else
-						{
-							spec.training_column = pstrdup(target_column);
-						}
-					}
-					PG_CATCH();
-					{
-						FlushErrorState();
-						spec.training_column = pstrdup(target_column);
-					}
-					PG_END_TRY();
-				}
+				/* Defensive: NULL-safe fallback - use safe copies from TopMemoryContext */
+				/* Use MemoryContextStrdup to ensure allocation in TopMemoryContext */
+				spec.algorithm = safe_algorithm ? MemoryContextStrdup(TopMemoryContext, safe_algorithm) : 
+								 (algorithm ? MemoryContextStrdup(TopMemoryContext, algorithm) : NULL);
+				spec.training_table = safe_table_name ? MemoryContextStrdup(TopMemoryContext, safe_table_name) : 
+									 (table_name ? MemoryContextStrdup(TopMemoryContext, table_name) : NULL);
+				spec.training_column = safe_target_column ? MemoryContextStrdup(TopMemoryContext, safe_target_column) : 
+									  (target_column ? MemoryContextStrdup(TopMemoryContext, target_column) : NULL);
 
 				/*
 				 * Copy project_name - always use fallback value since
@@ -2388,7 +2482,33 @@ neurondb_train(PG_FUNCTION_ARGS)
 				/* Verify model was registered and is visible */
 				if (model_id > 0)
 				{
-					elog(DEBUG1, "neurondb_train: registered model_id=%d, verifying it exists in catalog", model_id);
+					
+					/* Verify model actually exists in catalog */
+					ndb_spi_stringinfo_free(spi_session, &sql);
+					ndb_spi_stringinfo_init(spi_session, &sql);
+					appendStringInfo(&sql,
+									 "SELECT COUNT(*) FROM " NDB_FQ_ML_MODELS " WHERE " NDB_COL_MODEL_ID " = %d",
+									 model_id);
+					ret = ndb_spi_execute(spi_session, sql.data, true, 0);
+					
+					if (ret == SPI_OK_SELECT && SPI_processed > 0)
+					{
+						int32 count = 0;
+						if (ndb_spi_get_int32(spi_session, 0, 1, &count) && count == 0)
+						{
+							/* Model was not registered - this is an error */
+							ndb_spi_stringinfo_free(spi_session, &sql);
+							ndb_spi_session_end(&spi_session);
+							MemoryContextSwitchTo(oldcontext);
+							neurondb_cleanup(oldcontext, callcontext);
+							ndb_gpu_free_train_result(&gpu_result);
+							ereport(ERROR,
+									(errcode(ERRCODE_INTERNAL_ERROR),
+									 errmsg(NDB_ERR_PREFIX_TRAIN " GPU training registered model_id %d but model was not found in catalog", model_id),
+									 errdetail("Algorithm: %s, Project: %s, Table: %s. The model registration may have failed or been rolled back.", algorithm, project_name, table_name),
+									 errhint("This may indicate a transaction rollback or model registration failure. Check logs for details.")));
+						}
+					}
 				}
 			}
 			else
@@ -2585,6 +2705,8 @@ neurondb_train(PG_FUNCTION_ARGS)
 		}
 
 		/* GPU training failed - fall back to CPU training (AUTO mode) */
+		/* Explicitly reset model_id to 0 to ensure we don't return garbage from GPU result */
+		model_id = 0;
 		algo_enum = neurondb_algorithm_from_string(algorithm);
 
 		/* Build SQL for CPU training */
@@ -2709,7 +2831,6 @@ neurondb_train(PG_FUNCTION_ARGS)
 												target_column, hyperparams, feature_names, feature_name_count))
 				{
 					/* Execute CPU training via SQL */
-					elog(DEBUG1, "neurondb_train: executing CPU training SQL: %s", sql.data);
 					ret = ndb_spi_execute(spi_session, sql.data, true, 0);
 
 					if (ret == SPI_OK_SELECT && SPI_processed > 0)
@@ -2768,30 +2889,85 @@ neurondb_train(PG_FUNCTION_ARGS)
 											 target_column, hyperparams, feature_names, feature_name_count))
 		{
 			/* Execute CPU training via SQL */
-			elog(DEBUG1, "neurondb_train: executing CPU training SQL: %s", sql.data);
 			ret = ndb_spi_execute(spi_session, sql.data, true, 0);
+
 
 			if (ret == SPI_OK_SELECT && SPI_processed > 0)
 			{
-				int32		model_id_val;
+				int32		model_id_val = 0;	/* Initialize to 0 */
 
 				/* Get model_id from result */
 				if (ndb_spi_get_int32(spi_session, 0, 1, &model_id_val))
 				{
 
+					/* Validate model_id is positive - 0 or negative indicates failure */
+					if (model_id_val <= 0)
+					{
+						char *sql_copy = sql.data ? pstrdup(sql.data) : NULL;
+						ndb_spi_stringinfo_free(spi_session, &sql);
+						ndb_spi_session_end(&spi_session);
+						neurondb_cleanup(oldcontext, callcontext);
+						ereport(ERROR,
+								(errcode(ERRCODE_INTERNAL_ERROR),
+								 errmsg(NDB_ERR_PREFIX_TRAIN " CPU training returned invalid model_id: %d", model_id_val),
+								 errdetail("Algorithm: %s, Project: %s, Table: %s. The training function returned a non-positive model_id, which indicates the training or model registration failed.", algorithm, project_name, table_name),
+								 errhint("CPU training function may have failed. Check logs for details. SQL executed: %s", sql_copy ? sql_copy : "(unavailable)")));
+						if (sql_copy)
+							pfree(sql_copy);
+					}
+
 					if (model_id_val > 0)
 					{
 						model_id = model_id_val;
 
-						/* Update metrics to ensure storage='cpu' is set */
+						/* Verify model exists in catalog before updating */
 						ndb_spi_stringinfo_free(spi_session, &sql);
 						ndb_spi_stringinfo_init(spi_session, &sql);
 						appendStringInfo(&sql,
-										 "UPDATE " NDB_FQ_ML_MODELS " SET " NDB_COL_METRICS " = "
-										 "COALESCE(" NDB_COL_METRICS ", '{}'::jsonb) || '{\"training_backend\":0}'::jsonb "
-										 "WHERE " NDB_COL_MODEL_ID " = %d",
+										 "SELECT COUNT(*) FROM " NDB_FQ_ML_MODELS " WHERE " NDB_COL_MODEL_ID " = %d",
 										 model_id);
-						ndb_spi_execute(spi_session, sql.data, false, 0);
+						ret = ndb_spi_execute(spi_session, sql.data, true, 0);
+						
+						if (ret == SPI_OK_SELECT && SPI_processed > 0)
+						{
+							int32 count = 0;
+							if (ndb_spi_get_int32(spi_session, 0, 1, &count) && count > 0)
+							{
+								/* Model exists - update metrics to ensure storage='cpu' is set */
+								ndb_spi_stringinfo_free(spi_session, &sql);
+								ndb_spi_stringinfo_init(spi_session, &sql);
+								appendStringInfo(&sql,
+												 "UPDATE " NDB_FQ_ML_MODELS " SET " NDB_COL_METRICS " = "
+												 "COALESCE(" NDB_COL_METRICS ", '{}'::jsonb) || '{\"training_backend\":0}'::jsonb "
+												 "WHERE " NDB_COL_MODEL_ID " = %d",
+												 model_id);
+								ndb_spi_execute(spi_session, sql.data, false, 0);
+							}
+							else
+							{
+								/* Model was not registered - this is an error */
+								ndb_spi_stringinfo_free(spi_session, &sql);
+								ndb_spi_session_end(&spi_session);
+								neurondb_cleanup(oldcontext, callcontext);
+								ereport(ERROR,
+										(errcode(ERRCODE_INTERNAL_ERROR),
+										 errmsg(NDB_ERR_PREFIX_TRAIN " CPU training returned model_id %d but model was not found in catalog", model_id_val),
+										 errdetail("Algorithm: %s, Project: %s, Table: %s. The training function may have returned a model_id without properly registering the model.", algorithm, project_name, table_name),
+										 errhint("This may indicate a transaction rollback or model registration failure. Check logs for details.")));
+							}
+						}
+						else
+						{
+							/* Could not verify model existence - treat as error */
+							ndb_spi_stringinfo_free(spi_session, &sql);
+							ndb_spi_session_end(&spi_session);
+							neurondb_cleanup(oldcontext, callcontext);
+							ereport(ERROR,
+									(errcode(ERRCODE_INTERNAL_ERROR),
+									 errmsg(NDB_ERR_PREFIX_TRAIN " CPU training returned model_id %d but could not verify model in catalog", model_id_val),
+									 errdetail("Algorithm: %s, Project: %s, Table: %s. SPI return code: %d", algorithm, project_name, table_name, ret),
+									 errhint("This may indicate a transaction issue. Check logs for details.")));
+						}
 					}
 					else
 					{
@@ -2834,7 +3010,7 @@ neurondb_train(PG_FUNCTION_ARGS)
 		{
 			/*
 			 * Algorithm doesn't have CPU training SQL - this shouldn't happen
-			 * for linear_regression
+			 * for most algorithms
 			 */
 			nfree(feature_list_str);
 			ndb_spi_stringinfo_free(spi_session, &sql);
@@ -2843,8 +3019,22 @@ neurondb_train(PG_FUNCTION_ARGS)
 			ereport(ERROR,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 					 errmsg(NDB_ERR_PREFIX_TRAIN " algorithm '%s' does not support CPU training fallback", algorithm),
-					 errdetail("GPU training failed and no CPU training implementation available"),
+					 errdetail("GPU training failed and no CPU training implementation available. Algorithm: %s, Project: %s, Table: %s", algorithm, project_name, table_name),
 					 errhint("Try a different algorithm or ensure GPU is properly configured.")));
+		}
+		
+		/* Ensure model_id was set by CPU training - if not, error out */
+		if (model_id <= 0)
+		{
+			nfree(feature_list_str);
+			ndb_spi_stringinfo_free(spi_session, &sql);
+			ndb_spi_session_end(&spi_session);
+			neurondb_cleanup(oldcontext, callcontext);
+			ereport(ERROR,
+					(errcode(ERRCODE_INTERNAL_ERROR),
+					 errmsg(NDB_ERR_PREFIX_TRAIN " CPU training fallback failed to return valid model_id"),
+					 errdetail("Algorithm: %s, Project: %s, Table: %s, model_id: %d", algorithm, project_name, table_name, model_id),
+					 errhint("CPU training may have failed. Check logs for details.")));
 		}
 	}
 
@@ -2879,12 +3069,65 @@ neurondb_train(PG_FUNCTION_ARGS)
 	MemoryContextSwitchTo(oldcontext);
 	neurondb_cleanup(oldcontext, callcontext);
 
+	/* Final validation: ensure we never return invalid model_id */
+	/* Do this before freeing strings so we can use them in error message */
+	if (model_id <= 0)
+	{
+		/* Use safe copies if available, otherwise create new copies */
+		char *algo_str = safe_algorithm ? pstrdup(safe_algorithm) : (algorithm ? pstrdup(algorithm) : NULL);
+		char *proj_str = safe_project_name ? pstrdup(safe_project_name) : (project_name ? pstrdup(project_name) : NULL);
+		char *table_str = safe_table_name ? pstrdup(safe_table_name) : (table_name ? pstrdup(table_name) : NULL);
+		
+		/* Free converted strings */
+		nfree(project_name);
+		nfree(algorithm);
+		nfree(table_name);
+		if (target_column)
+			nfree(target_column);
+
+		/* Free safe copies from TopMemoryContext */
+		if (safe_algorithm)
+			pfree(safe_algorithm);
+		if (safe_table_name)
+			pfree(safe_table_name);
+		if (safe_target_column)
+			pfree(safe_target_column);
+		if (safe_project_name)
+			pfree(safe_project_name);
+		
+		ereport(ERROR,
+				(errcode(ERRCODE_INTERNAL_ERROR),
+				 errmsg(NDB_ERR_PREFIX_TRAIN " training failed - invalid model_id %d returned", model_id),
+				 errdetail("Algorithm: %s, Project: %s, Table: %s. Both GPU and CPU training paths failed to produce a valid model.", 
+						   algo_str ? algo_str : "unknown",
+						   proj_str ? proj_str : "unknown", 
+						   table_str ? table_str : "unknown"),
+				 errhint("Check that the algorithm is supported, training data is valid, and both GPU and CPU training paths are properly configured.")));
+		
+		if (algo_str)
+			pfree(algo_str);
+		if (proj_str)
+			pfree(proj_str);
+		if (table_str)
+			pfree(table_str);
+	}
+
 	/* Free converted strings */
 	nfree(project_name);
 	nfree(algorithm);
 	nfree(table_name);
 	if (target_column)
 		nfree(target_column);
+
+	/* Free safe copies from TopMemoryContext */
+	if (safe_algorithm)
+		pfree(safe_algorithm);
+	if (safe_table_name)
+		pfree(safe_table_name);
+	if (safe_target_column)
+		pfree(safe_target_column);
+	if (safe_project_name)
+		pfree(safe_project_name);
 
 	PG_RETURN_INT32(model_id);
 }
@@ -2938,7 +3181,6 @@ neurondb_predict(PG_FUNCTION_ARGS)
 	appendStringInfo(&sql,
 					 "SELECT " NDB_COL_ALGORITHM "::text FROM " NDB_FQ_ML_MODELS " WHERE " NDB_COL_MODEL_ID " = %d",
 					 model_id);
-	elog(DEBUG1, "neurondb_predict: executing query: %s", sql.data);
 	ret = ndb_spi_execute(spi_session, sql.data, true, 0);
 	if (ret != SPI_OK_SELECT || SPI_processed == 0)
 	{
@@ -3134,10 +3376,6 @@ neurondb_predict(PG_FUNCTION_ARGS)
 
 			gpu_currently_enabled = (backend != NULL && neurondb_gpu_is_available());
 
-			elog(DEBUG1,
-				 "neurondb_predict: model trained on %s, GPU currently %s",
-				 is_gpu ? "GPU" : "CPU",
-				 gpu_currently_enabled ? "enabled" : "disabled");
 
 			if (is_gpu)
 			{
@@ -3286,10 +3524,6 @@ neurondb_predict(PG_FUNCTION_ARGS)
 
 			gpu_currently_enabled = (backend != NULL && neurondb_gpu_is_available());
 
-			elog(DEBUG1,
-				 "neurondb_predict: model trained on %s, GPU currently %s",
-				 is_gpu ? "GPU" : "CPU",
-				 gpu_currently_enabled ? "enabled" : "disabled");
 
 			if (is_gpu)
 			{
@@ -3552,7 +3786,6 @@ neurondb_load_model(PG_FUNCTION_ARGS)
 				 errmsg("Unsupported model format: %s. Supported: onnx, tensorflow, pytorch, sklearn", model_format)));
 	}
 
-	elog(DEBUG1, "neurondb_load_model context");
 	callcontext = AllocSetContextCreate(CurrentMemoryContext, "neurondb_load_model",
 										ALLOCSET_DEFAULT_SIZES);
 	oldcontext = MemoryContextSwitchTo(callcontext);
@@ -3675,7 +3908,6 @@ neurondb_evaluate(PG_FUNCTION_ARGS)
 	Jsonb *result = NULL;
 	NdbSpiSession *spi_session = NULL;
 
-	elog(DEBUG1, "neurondb_evaluate: function entry");
 	/* Suppress shadow warnings from nested PG_TRY blocks */
 	_Pragma("GCC diagnostic push")
 		_Pragma("GCC diagnostic ignored \"-Wshadow\"");
@@ -3739,7 +3971,6 @@ neurondb_evaluate(PG_FUNCTION_ARGS)
 	appendStringInfo(&sql,
 					 "SELECT " NDB_COL_ALGORITHM "::text FROM " NDB_FQ_ML_MODELS " WHERE " NDB_COL_MODEL_ID " = %d",
 					 model_id);
-	elog(DEBUG1, "neurondb_evaluate: executing query: %s", sql.data);
 	ret = ndb_spi_execute(spi_session, sql.data, true, 0);
 	NDB_CHECK_SPI_TUPTABLE();
 	if (ret != SPI_OK_SELECT || SPI_processed == 0)
@@ -3765,7 +3996,6 @@ neurondb_evaluate(PG_FUNCTION_ARGS)
 			nfree(algo_text);
 			isnull = false;
 		}
-		elog(DEBUG1, "neurondb_evaluate: retrieved algorithm='%s', isnull=%d", temp_algorithm, isnull);
 		if (isnull)
 		{
 			ndb_spi_session_end(&spi_session);
@@ -4131,6 +4361,7 @@ neurondb_evaluate(PG_FUNCTION_ARGS)
 		/* Suppress shadow warnings from nested PG_TRY blocks */
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wshadow"
+#pragma GCC diagnostic ignored "-Wshadow=compatible-local"
 		PG_TRY();
 		{
 			if (CurrentMemoryContext != ErrorContext)
@@ -4192,13 +4423,11 @@ neurondb_evaluate(PG_FUNCTION_ARGS)
 		/* Return error JSONB using proper PostgreSQL API */
 		{
 			StringInfoData error_json;
-			text *json_text = NULL;
 
 			ndb_spi_stringinfo_init(spi_session, &error_json);
 			appendStringInfo(&error_json, "{\"error\": \"%s\"}", error_msg);
 			
 			/* Use PostgreSQL's jsonb_in function to create proper JSONB */
-			json_text = cstring_to_text(error_json.data);
 			result = DatumGetJsonbP(DirectFunctionCall1(jsonb_in, 
 				PointerGetDatum(error_json.data)));
 			

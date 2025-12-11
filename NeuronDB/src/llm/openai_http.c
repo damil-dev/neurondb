@@ -385,7 +385,6 @@ ndb_openai_complete(const NdbLLMConfig *cfg,
 		{
 			Jsonb	   *jsonb = NULL;
 
-			elog(DEBUG1, "neurondb: ndb_openai_complete: failed to parse response (parse_result=%d)", parse_result);
 			/* Free response if it was partially allocated */
 			nfree(response.text);
 			nfree(response.error_message);
@@ -1058,7 +1057,6 @@ ndb_openai_rerank(const NdbLLMConfig *cfg,
 		}
 		if (strlen(docs[i]) == 0)
 		{
-			elog(DEBUG1, "neurondb: ndb_openai_rerank: empty doc at index %d", i);
 		}
 	}
 
