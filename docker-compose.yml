@@ -1,0 +1,790 @@
+# Unified Docker Compose Configuration for NeuronDB Ecosystem
+# Orchestrates NeuronDB, NeuronAgent, and NeuronMCP with automatic networking
+#
+# Modern Docker Compose (v2) - no version field required
+# Usage:
+#   CPU (default):  docker compose --profile default up -d
+#   CUDA GPU:      docker compose --profile cuda up -d
+#   ROCm GPU:       docker compose --profile rocm up -d
+#   Metal GPU:      docker compose --profile metal up -d
+#
+# All services automatically connect via shared 'neurondb-network'
+# NeuronAgent and NeuronMCP connect to NeuronDB using container names
+#
+# Modern Best Practices Implemented:
+#   - Docker Compose v2 (no version field)
+#   - init: true for proper signal handling
+#   - Labels for service metadata
+#   - Health checks for all services
+#   - Structured logging with rotation
+#   - Resource limits and reservations
+#   - Restart policies
+#   - Network isolation with IPAM
+#   - Profile-based service selection
+
+services:
+  neurondb:
+    profiles:
+    - default
+    - cpu
+    build:
+      context: ./NeuronDB
+      dockerfile: docker/Dockerfile
+      args:
+        PG_MAJOR: ${PG_MAJOR:-17}
+        ONNX_VERSION: ${ONNX_VERSION:-1.17.0}
+        VERSION: ${VERSION:-latest}
+        BUILD_DATE: ${BUILD_DATE:-}
+        VCS_REF: ${VCS_REF:-}
+    image: neurondb:cpu-pg17
+    container_name: neurondb-cpu
+    init: true
+    labels:
+    - com.neurondb.service=neurondb
+    - com.neurondb.variant=cpu
+    - com.neurondb.version=${VERSION:-latest}
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-neurondb}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-neurondb}
+      POSTGRES_DB: ${POSTGRES_DB:-neurondb}
+      POSTGRES_HOST_AUTH_METHOD: ${POSTGRES_HOST_AUTH_METHOD:-md5}
+    ports:
+    - ${POSTGRES_PORT:-5433}:5432
+    volumes:
+    - neurondb-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U ${POSTGRES_USER:-neurondb} -d ${POSTGRES_DB:-neurondb}
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+        compress: 'true'
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 4G
+        reservations:
+          cpus: '1'
+          memory: 1G
+    restart: unless-stopped
+    networks:
+    - neurondb-network
+  neurondb-cuda:
+    profiles:
+    - cuda
+    - gpu
+    build:
+      context: ./NeuronDB
+      dockerfile: docker/Dockerfile.gpu.cuda
+      args:
+        PG_MAJOR: ${PG_MAJOR:-17}
+        CUDA_VERSION: ${CUDA_VERSION:-12.4.1}
+        ONNX_VERSION: ${ONNX_VERSION:-1.17.0}
+        ENABLE_RAPIDS: ${ENABLE_RAPIDS:-0}
+        VERSION: ${VERSION:-latest}
+        BUILD_DATE: ${BUILD_DATE:-}
+        VCS_REF: ${VCS_REF:-}
+    image: neurondb:cuda-pg17
+    container_name: neurondb-cuda
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-neurondb}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-neurondb}
+      POSTGRES_DB: ${POSTGRES_DB:-neurondb}
+      POSTGRES_HOST_AUTH_METHOD: ${POSTGRES_HOST_AUTH_METHOD:-md5}
+      NVIDIA_VISIBLE_DEVICES: ${NVIDIA_VISIBLE_DEVICES:-all}
+      NVIDIA_DRIVER_CAPABILITIES: ${NVIDIA_DRIVER_CAPABILITIES:-compute,utility}
+      NEURONDB_GPU_ENABLED: ${NEURONDB_GPU_ENABLED:-on}
+    ports:
+    - ${POSTGRES_CUDA_PORT:-5434}:5432
+    deploy:
+      resources:
+        limits:
+          cpus: '8'
+          memory: 8G
+        reservations:
+          cpus: '2'
+          memory: 2G
+          devices:
+          - driver: nvidia
+            count: 1
+            capabilities:
+            - gpu
+    runtime: nvidia
+    volumes:
+    - neurondb-cuda-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U ${POSTGRES_USER:-neurondb}
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    restart: unless-stopped
+    networks:
+    - neurondb-network
+    init: true
+    labels:
+    - com.neurondb.service=neurondb
+    - com.neurondb.variant=cuda
+    - com.neurondb.version=${VERSION:-latest}
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+        compress: 'true'
+  neurondb-rocm:
+    profiles:
+    - rocm
+    - gpu
+    build:
+      context: ./NeuronDB
+      dockerfile: docker/Dockerfile.gpu.rocm
+      args:
+        PG_MAJOR: ${PG_MAJOR:-17}
+        ROCM_VERSION: ${ROCM_VERSION:-5.7}
+        ONNX_VERSION: ${ONNX_VERSION:-1.17.0}
+        VERSION: ${VERSION:-latest}
+        BUILD_DATE: ${BUILD_DATE:-}
+        VCS_REF: ${VCS_REF:-}
+    image: neurondb:rocm-pg17
+    container_name: neurondb-rocm
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-neurondb}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-neurondb}
+      POSTGRES_DB: ${POSTGRES_DB:-neurondb}
+      POSTGRES_HOST_AUTH_METHOD: ${POSTGRES_HOST_AUTH_METHOD:-md5}
+      NEURONDB_GPU_ENABLED: ${NEURONDB_GPU_ENABLED:-on}
+    ports:
+    - ${POSTGRES_ROCM_PORT:-5435}:5432
+    volumes:
+    - neurondb-rocm-data:/var/lib/postgresql/data
+    devices:
+    - /dev/kfd:/dev/kfd
+    - /dev/dri:/dev/dri
+    deploy:
+      resources:
+        limits:
+          cpus: '8'
+          memory: 8G
+        reservations:
+          cpus: '2'
+          memory: 2G
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U ${POSTGRES_USER:-neurondb}
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    restart: unless-stopped
+    networks:
+    - neurondb-network
+    init: true
+    labels:
+    - com.neurondb.service=neurondb
+    - com.neurondb.variant=rocm
+    - com.neurondb.version=${VERSION:-latest}
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+        compress: 'true'
+  neurondb-metal:
+    profiles:
+    - metal
+    - gpu
+    build:
+      context: ./NeuronDB
+      dockerfile: docker/Dockerfile.gpu.metal
+      args:
+        PG_MAJOR: ${PG_MAJOR:-17}
+        ONNX_VERSION: ${ONNX_VERSION:-1.17.0}
+        VERSION: ${VERSION:-latest}
+        BUILD_DATE: ${BUILD_DATE:-}
+        VCS_REF: ${VCS_REF:-}
+    image: neurondb:metal-pg17
+    container_name: neurondb-metal
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-neurondb}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-neurondb}
+      POSTGRES_DB: ${POSTGRES_DB:-neurondb}
+      POSTGRES_HOST_AUTH_METHOD: ${POSTGRES_HOST_AUTH_METHOD:-md5}
+      NEURONDB_GPU_ENABLED: ${NEURONDB_GPU_ENABLED:-on}
+    ports:
+    - ${POSTGRES_METAL_PORT:-5436}:5432
+    volumes:
+    - neurondb-metal-data:/var/lib/postgresql/data
+    platform: linux/arm64
+    deploy:
+      resources:
+        limits:
+          cpus: '8'
+          memory: 8G
+        reservations:
+          cpus: '2'
+          memory: 2G
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U ${POSTGRES_USER:-neurondb}
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    restart: unless-stopped
+    networks:
+    - neurondb-network
+    init: true
+    labels:
+    - com.neurondb.service=neurondb
+    - com.neurondb.variant=metal
+    - com.neurondb.version=${VERSION:-latest}
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+        compress: 'true'
+  neuronagent:
+    profiles:
+    - default
+    - cpu
+    build:
+      context: ./NeuronAgent
+      dockerfile: docker/Dockerfile
+      args:
+        VERSION: ${VERSION:-latest}
+        BUILD_DATE: ${BUILD_DATE:-}
+        VCS_REF: ${VCS_REF:-}
+    image: neuronagent:latest
+    container_name: neuronagent
+    init: true
+    labels:
+    - com.neurondb.service=neuronagent
+    - com.neurondb.variant=cpu
+    - com.neurondb.version=${VERSION:-latest}
+    depends_on:
+      neurondb:
+        condition: service_healthy
+    ports:
+    - ${SERVER_PORT:-8080}:8080
+    environment:
+      DB_HOST: ${DB_HOST:-neurondb-cpu}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME:-neurondb}
+      DB_USER: ${DB_USER:-neurondb}
+      DB_PASSWORD: ${DB_PASSWORD:-neurondb}
+      SERVER_HOST: ${SERVER_HOST:-0.0.0.0}
+      SERVER_PORT: ${SERVER_PORT:-8080}
+      SERVER_READ_TIMEOUT: ${SERVER_READ_TIMEOUT:-30s}
+      SERVER_WRITE_TIMEOUT: ${SERVER_WRITE_TIMEOUT:-30s}
+      DB_MAX_OPEN_CONNS: ${DB_MAX_OPEN_CONNS:-25}
+      DB_MAX_IDLE_CONNS: ${DB_MAX_IDLE_CONNS:-5}
+      DB_CONN_MAX_LIFETIME: ${DB_CONN_MAX_LIFETIME:-5m}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+      CONFIG_PATH: ${CONFIG_PATH:-}
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - nc -z localhost 8080 || exit 1
+      interval: 30s
+      timeout: 10s
+      start_period: 40s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    restart: unless-stopped
+    networks:
+    - neurondb-network
+  neuronagent-cuda:
+    profiles:
+    - cuda
+    - gpu
+    build:
+      context: ./NeuronAgent
+      dockerfile: docker/Dockerfile
+      args:
+        VERSION: ${VERSION:-latest}
+        BUILD_DATE: ${BUILD_DATE:-}
+        VCS_REF: ${VCS_REF:-}
+    image: neuronagent:latest
+    container_name: neuronagent-cuda
+    depends_on:
+      neurondb-cuda:
+        condition: service_healthy
+    ports:
+    - ${SERVER_PORT:-8080}:8080
+    environment:
+      DB_HOST: ${DB_HOST:-neurondb-cuda}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME:-neurondb}
+      DB_USER: ${DB_USER:-neurondb}
+      DB_PASSWORD: ${DB_PASSWORD:-neurondb}
+      SERVER_HOST: ${SERVER_HOST:-0.0.0.0}
+      SERVER_PORT: ${SERVER_PORT:-8080}
+      SERVER_READ_TIMEOUT: ${SERVER_READ_TIMEOUT:-30s}
+      SERVER_WRITE_TIMEOUT: ${SERVER_WRITE_TIMEOUT:-30s}
+      DB_MAX_OPEN_CONNS: ${DB_MAX_OPEN_CONNS:-25}
+      DB_MAX_IDLE_CONNS: ${DB_MAX_IDLE_CONNS:-5}
+      DB_CONN_MAX_LIFETIME: ${DB_CONN_MAX_LIFETIME:-5m}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+      CONFIG_PATH: ${CONFIG_PATH:-}
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - nc -z localhost 8080 || exit 1
+      interval: 10s
+      timeout: 10s
+      start_period: 40s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    restart: unless-stopped
+    networks:
+    - neurondb-network
+    init: true
+    labels:
+    - com.neurondb.service=neuronagent
+    - com.neurondb.variant=cuda
+    - com.neurondb.version=${VERSION:-latest}
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+        compress: 'true'
+  neuronagent-rocm:
+    profiles:
+    - rocm
+    - gpu
+    build:
+      context: ./NeuronAgent
+      dockerfile: docker/Dockerfile
+      args:
+        VERSION: ${VERSION:-latest}
+        BUILD_DATE: ${BUILD_DATE:-}
+        VCS_REF: ${VCS_REF:-}
+    image: neuronagent:latest
+    container_name: neuronagent-rocm
+    depends_on:
+      neurondb-rocm:
+        condition: service_healthy
+    ports:
+    - ${SERVER_PORT:-8080}:8080
+    environment:
+      DB_HOST: ${DB_HOST:-neurondb-rocm}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME:-neurondb}
+      DB_USER: ${DB_USER:-neurondb}
+      DB_PASSWORD: ${DB_PASSWORD:-neurondb}
+      SERVER_HOST: ${SERVER_HOST:-0.0.0.0}
+      SERVER_PORT: ${SERVER_PORT:-8080}
+      SERVER_READ_TIMEOUT: ${SERVER_READ_TIMEOUT:-30s}
+      SERVER_WRITE_TIMEOUT: ${SERVER_WRITE_TIMEOUT:-30s}
+      DB_MAX_OPEN_CONNS: ${DB_MAX_OPEN_CONNS:-25}
+      DB_MAX_IDLE_CONNS: ${DB_MAX_IDLE_CONNS:-5}
+      DB_CONN_MAX_LIFETIME: ${DB_CONN_MAX_LIFETIME:-5m}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+      CONFIG_PATH: ${CONFIG_PATH:-}
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - nc -z localhost 8080 || exit 1
+      interval: 10s
+      timeout: 10s
+      start_period: 40s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    restart: unless-stopped
+    networks:
+    - neurondb-network
+    init: true
+    labels:
+    - com.neurondb.service=neuronagent
+    - com.neurondb.variant=rocm
+    - com.neurondb.version=${VERSION:-latest}
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+        compress: 'true'
+  neuronagent-metal:
+    profiles:
+    - metal
+    - gpu
+    build:
+      context: ./NeuronAgent
+      dockerfile: docker/Dockerfile
+      args:
+        VERSION: ${VERSION:-latest}
+        BUILD_DATE: ${BUILD_DATE:-}
+        VCS_REF: ${VCS_REF:-}
+    image: neuronagent:latest
+    container_name: neuronagent-metal
+    depends_on:
+      neurondb-metal:
+        condition: service_healthy
+    ports:
+    - ${SERVER_PORT:-8080}:8080
+    environment:
+      DB_HOST: ${DB_HOST:-neurondb-metal}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME:-neurondb}
+      DB_USER: ${DB_USER:-neurondb}
+      DB_PASSWORD: ${DB_PASSWORD:-neurondb}
+      SERVER_HOST: ${SERVER_HOST:-0.0.0.0}
+      SERVER_PORT: ${SERVER_PORT:-8080}
+      SERVER_READ_TIMEOUT: ${SERVER_READ_TIMEOUT:-30s}
+      SERVER_WRITE_TIMEOUT: ${SERVER_WRITE_TIMEOUT:-30s}
+      DB_MAX_OPEN_CONNS: ${DB_MAX_OPEN_CONNS:-25}
+      DB_MAX_IDLE_CONNS: ${DB_MAX_IDLE_CONNS:-5}
+      DB_CONN_MAX_LIFETIME: ${DB_CONN_MAX_LIFETIME:-5m}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+      CONFIG_PATH: ${CONFIG_PATH:-}
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - nc -z localhost 8080 || exit 1
+      interval: 10s
+      timeout: 10s
+      start_period: 40s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    restart: unless-stopped
+    networks:
+    - neurondb-network
+    init: true
+    labels:
+    - com.neurondb.service=neuronagent
+    - com.neurondb.variant=metal
+    - com.neurondb.version=${VERSION:-latest}
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+        compress: 'true'
+  neuronmcp:
+    profiles:
+    - default
+    - cpu
+    build:
+      context: ./NeuronMCP
+      dockerfile: docker/Dockerfile
+      args:
+        VERSION: ${VERSION:-latest}
+        BUILD_DATE: ${BUILD_DATE:-}
+        VCS_REF: ${VCS_REF:-}
+    image: neurondb-mcp:latest
+    container_name: neurondb-mcp
+    init: true
+    labels:
+    - com.neurondb.service=neuronmcp
+    - com.neurondb.variant=cpu
+    - com.neurondb.version=${VERSION:-latest}
+    depends_on:
+      neurondb:
+        condition: service_healthy
+    environment:
+      NEURONDB_HOST: ${NEURONDB_HOST:-neurondb-cpu}
+      NEURONDB_PORT: ${NEURONDB_PORT:-5432}
+      NEURONDB_DATABASE: ${NEURONDB_DATABASE:-neurondb}
+      NEURONDB_USER: ${NEURONDB_USER:-neurondb}
+      NEURONDB_PASSWORD: ${NEURONDB_PASSWORD:-neurondb}
+      NEURONDB_CONNECTION_STRING: ${NEURONDB_CONNECTION_STRING:-}
+      NEURONDB_MCP_CONFIG: ${NEURONDB_MCP_CONFIG:-/app/mcp-config.json}
+      NEURONDB_LOG_LEVEL: ${NEURONDB_LOG_LEVEL:-info}
+      NEURONDB_LOG_FORMAT: ${NEURONDB_LOG_FORMAT:-text}
+      NEURONDB_LOG_OUTPUT: ${NEURONDB_LOG_OUTPUT:-stderr}
+      NEURONDB_ENABLE_GPU: ${NEURONDB_ENABLE_GPU:-false}
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+    healthcheck:
+      test:
+      - CMD
+      - test
+      - -f
+      - /app/neurondb-mcp
+      - -a
+      - -x
+      - /app/neurondb-mcp
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 128M
+    networks:
+    - neurondb-network
+  neuronmcp-cuda:
+    profiles:
+    - cuda
+    - gpu
+    build:
+      context: ./NeuronMCP
+      dockerfile: docker/Dockerfile
+      args:
+        VERSION: ${VERSION:-latest}
+        BUILD_DATE: ${BUILD_DATE:-}
+        VCS_REF: ${VCS_REF:-}
+    image: neurondb-mcp:latest
+    container_name: neurondb-mcp-cuda
+    depends_on:
+      neurondb-cuda:
+        condition: service_healthy
+    environment:
+      NEURONDB_HOST: ${NEURONDB_HOST:-neurondb-cuda}
+      NEURONDB_PORT: ${NEURONDB_PORT:-5432}
+      NEURONDB_DATABASE: ${NEURONDB_DATABASE:-neurondb}
+      NEURONDB_USER: ${NEURONDB_USER:-neurondb}
+      NEURONDB_PASSWORD: ${NEURONDB_PASSWORD:-neurondb}
+      NEURONDB_CONNECTION_STRING: ${NEURONDB_CONNECTION_STRING:-}
+      NEURONDB_MCP_CONFIG: ${NEURONDB_MCP_CONFIG:-/app/mcp-config.json}
+      NEURONDB_LOG_LEVEL: ${NEURONDB_LOG_LEVEL:-info}
+      NEURONDB_LOG_FORMAT: ${NEURONDB_LOG_FORMAT:-text}
+      NEURONDB_LOG_OUTPUT: ${NEURONDB_LOG_OUTPUT:-stderr}
+      NEURONDB_ENABLE_GPU: ${NEURONDB_ENABLE_GPU:-true}
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+    healthcheck:
+      test:
+      - CMD
+      - test
+      - -f
+      - /app/neurondb-mcp
+      - -a
+      - -x
+      - /app/neurondb-mcp
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 128M
+    networks:
+    - neurondb-network
+    init: true
+    labels:
+    - com.neurondb.service=neuronmcp
+    - com.neurondb.variant=cuda
+    - com.neurondb.version=${VERSION:-latest}
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+        compress: 'true'
+  neuronmcp-rocm:
+    profiles:
+    - rocm
+    - gpu
+    build:
+      context: ./NeuronMCP
+      dockerfile: docker/Dockerfile
+      args:
+        VERSION: ${VERSION:-latest}
+        BUILD_DATE: ${BUILD_DATE:-}
+        VCS_REF: ${VCS_REF:-}
+    image: neurondb-mcp:latest
+    container_name: neurondb-mcp-rocm
+    depends_on:
+      neurondb-rocm:
+        condition: service_healthy
+    environment:
+      NEURONDB_HOST: ${NEURONDB_HOST:-neurondb-rocm}
+      NEURONDB_PORT: ${NEURONDB_PORT:-5432}
+      NEURONDB_DATABASE: ${NEURONDB_DATABASE:-neurondb}
+      NEURONDB_USER: ${NEURONDB_USER:-neurondb}
+      NEURONDB_PASSWORD: ${NEURONDB_PASSWORD:-neurondb}
+      NEURONDB_CONNECTION_STRING: ${NEURONDB_CONNECTION_STRING:-}
+      NEURONDB_MCP_CONFIG: ${NEURONDB_MCP_CONFIG:-/app/mcp-config.json}
+      NEURONDB_LOG_LEVEL: ${NEURONDB_LOG_LEVEL:-info}
+      NEURONDB_LOG_FORMAT: ${NEURONDB_LOG_FORMAT:-text}
+      NEURONDB_LOG_OUTPUT: ${NEURONDB_LOG_OUTPUT:-stderr}
+      NEURONDB_ENABLE_GPU: ${NEURONDB_ENABLE_GPU:-true}
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+    healthcheck:
+      test:
+      - CMD
+      - test
+      - -f
+      - /app/neurondb-mcp
+      - -a
+      - -x
+      - /app/neurondb-mcp
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 128M
+    networks:
+    - neurondb-network
+    init: true
+    labels:
+    - com.neurondb.service=neuronmcp
+    - com.neurondb.variant=rocm
+    - com.neurondb.version=${VERSION:-latest}
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+        compress: 'true'
+  neuronmcp-metal:
+    profiles:
+    - metal
+    - gpu
+    build:
+      context: ./NeuronMCP
+      dockerfile: docker/Dockerfile
+      args:
+        VERSION: ${VERSION:-latest}
+        BUILD_DATE: ${BUILD_DATE:-}
+        VCS_REF: ${VCS_REF:-}
+    image: neurondb-mcp:latest
+    container_name: neurondb-mcp-metal
+    depends_on:
+      neurondb-metal:
+        condition: service_healthy
+    environment:
+      NEURONDB_HOST: ${NEURONDB_HOST:-neurondb-metal}
+      NEURONDB_PORT: ${NEURONDB_PORT:-5432}
+      NEURONDB_DATABASE: ${NEURONDB_DATABASE:-neurondb}
+      NEURONDB_USER: ${NEURONDB_USER:-neurondb}
+      NEURONDB_PASSWORD: ${NEURONDB_PASSWORD:-neurondb}
+      NEURONDB_CONNECTION_STRING: ${NEURONDB_CONNECTION_STRING:-}
+      NEURONDB_MCP_CONFIG: ${NEURONDB_MCP_CONFIG:-/app/mcp-config.json}
+      NEURONDB_LOG_LEVEL: ${NEURONDB_LOG_LEVEL:-info}
+      NEURONDB_LOG_FORMAT: ${NEURONDB_LOG_FORMAT:-text}
+      NEURONDB_LOG_OUTPUT: ${NEURONDB_LOG_OUTPUT:-stderr}
+      NEURONDB_ENABLE_GPU: ${NEURONDB_ENABLE_GPU:-true}
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+    healthcheck:
+      test:
+      - CMD
+      - test
+      - -f
+      - /app/neurondb-mcp
+      - -a
+      - -x
+      - /app/neurondb-mcp
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 128M
+    networks:
+    - neurondb-network
+    init: true
+    labels:
+    - com.neurondb.service=neuronmcp
+    - com.neurondb.variant=metal
+    - com.neurondb.version=${VERSION:-latest}
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+        compress: 'true'
+volumes:
+  neurondb-data: null
+  neurondb-cuda-data: null
+  neurondb-rocm-data: null
+  neurondb-metal-data: null
+networks:
+  neurondb-network:
+    name: neurondb-network
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+          gateway: 172.28.0.1
+    labels:
+      - "com.neurondb.network=main"
