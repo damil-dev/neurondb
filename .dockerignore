@@ -1,0 +1,75 @@
+# Docker ignore file for root-level builds
+# This prevents unnecessary files from being copied into build contexts
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+!README.md
+docs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+*.so
+*.o
+*.a
+bin/
+build/
+dist/
+
+# Logs
+*.log
+logs/
+
+# Environment files (use .env.example as template)
+.env
+.env.local
+.env.*.local
+
+# Docker files (don't copy into containers)
+docker-compose*.yml
+Dockerfile*
+.dockerignore
+
+# Test files
+test/
+tests/
+*.test
+*.spec
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Node modules (if any)
+node_modules/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Go build cache
+*.exe
+*.test
+
+# Coverage reports
+coverage/
+*.cover
+
