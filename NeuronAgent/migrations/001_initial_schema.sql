@@ -64,7 +64,7 @@ CREATE TABLE neurondb_agent.tools (
     name TEXT PRIMARY KEY,
     description TEXT NOT NULL,
     arg_schema JSONB NOT NULL,  -- JSON Schema for arguments
-    handler_type TEXT NOT NULL CHECK (handler_type IN ('sql', 'http', 'code', 'shell', 'queue')),
+    handler_type TEXT NOT NULL CHECK (handler_type IN ('sql', 'http', 'code', 'shell', 'queue', 'ml', 'vector', 'rag', 'analytics', 'hybrid_search', 'reranking')),
     handler_config JSONB DEFAULT '{}',
     enabled BOOLEAN DEFAULT true,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

@@ -19,6 +19,7 @@ import (
 	"sync"
 
 	"github.com/neurondb/NeuronAgent/internal/db"
+	"github.com/neurondb/NeuronAgent/pkg/neurondb"
 )
 
 /* Registry manages tool registration and execution */
@@ -48,6 +49,35 @@ func NewRegistry(queries *db.Queries, database *db.DB) *Registry {
 	return registry
 }
 
+/* NewRegistryWithNeuronDB creates a new tool registry with NeuronDB clients */
+func NewRegistryWithNeuronDB(queries *db.Queries, database *db.DB, neurondbClient interface{}) *Registry {
+	registry := NewRegistry(queries, database)
+
+	/* Register NeuronDB tool handlers if client is provided */
+	if client, ok := neurondbClient.(*neurondb.Client); ok {
+		if client.ML != nil {
+			registry.RegisterHandler("ml", NewMLTool(client.ML))
+		}
+		if client.Vector != nil {
+			registry.RegisterHandler("vector", NewVectorTool(client.Vector))
+		}
+		if client.RAG != nil {
+			registry.RegisterHandler("rag", NewRAGTool(client.RAG))
+		}
+		if client.Analytics != nil {
+			registry.RegisterHandler("analytics", NewAnalyticsTool(client.Analytics))
+		}
+		if client.HybridSearch != nil {
+			registry.RegisterHandler("hybrid_search", NewHybridSearchTool(client.HybridSearch))
+		}
+		if client.Reranking != nil {
+			registry.RegisterHandler("reranking", NewRerankingTool(client.Reranking))
+		}
+	}
+
+	return registry
+}
+
 /* RegisterHandler registers a tool handler for a specific handler type */
 func (r *Registry) RegisterHandler(handlerType string, handler ToolHandler) {
 	r.mu.Lock()
@@ -57,8 +87,8 @@ func (r *Registry) RegisterHandler(handlerType string, handler ToolHandler) {
 
 /* Get retrieves a tool from the database */
 /* Implements agent.ToolRegistry interface */
-func (r *Registry) Get(name string) (*db.Tool, error) {
-	tool, err := r.queries.GetTool(context.Background(), name)
+func (r *Registry) Get(ctx context.Context, name string) (*db.Tool, error) {
+	tool, err := r.queries.GetTool(ctx, name)
 	if err != nil {
 		return nil, fmt.Errorf("tool retrieval failed: tool_name='%s', error=%w", name, err)
 	}

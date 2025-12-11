@@ -30,6 +30,7 @@ type Runtime struct {
 	queries   *db.Queries
 	memory    *MemoryManager
 	planner   *Planner
+	reflector *Reflector
 	prompt    *PromptBuilder
 	llm       *LLMClient
 	tools     ToolRegistry
@@ -75,24 +76,35 @@ type TokenUsage struct {
 
 /* ToolRegistry interface for tool management */
 type ToolRegistry interface {
-	Get(name string) (*db.Tool, error)
+	Get(ctx context.Context, name string) (*db.Tool, error)
 	Execute(ctx context.Context, tool *db.Tool, args map[string]interface{}) (string, error)
 }
 
 func NewRuntime(db *db.DB, queries *db.Queries, tools ToolRegistry, embedClient *neurondb.EmbeddingClient) *Runtime {
+	llm := NewLLMClient(db)
 	return &Runtime{
-		db:      db,
-		queries: queries,
-		memory:  NewMemoryManager(db, queries, embedClient),
-		planner: NewPlanner(),
-		prompt:  NewPromptBuilder(),
-		llm:     NewLLMClient(db),
-		tools:   tools,
-		embed:   embedClient,
+		db:        db,
+		queries:   queries,
+		memory:    NewMemoryManager(db, queries, embedClient),
+		planner:   NewPlannerWithLLM(llm),
+		reflector: NewReflector(llm),
+		prompt:    NewPromptBuilder(),
+		llm:       llm,
+		tools:     tools,
+		embed:     embedClient,
 	}
 }
 
 func (r *Runtime) Execute(ctx context.Context, sessionID uuid.UUID, userMessage string) (*ExecutionState, error) {
+	/* Validate input */
+	if userMessage == "" {
+		return nil, fmt.Errorf("agent execution failed: session_id='%s', user_message_empty=true", sessionID.String())
+	}
+	if len(userMessage) > 100000 {
+		return nil, fmt.Errorf("agent execution failed: session_id='%s', user_message_too_large=true, length=%d, max_length=100000",
+			sessionID.String(), len(userMessage))
+	}
+
 	state := &ExecutionState{
 		SessionID:   sessionID,
 		UserMessage: userMessage,
@@ -153,7 +165,12 @@ func (r *Runtime) Execute(ctx context.Context, sessionID uuid.UUID, userMessage 
 	}
 	state.LLMResponse = llmResponse
 
-  /* Step 6: Execute tools if any */
+  /* Step 6: Execute tools if any (limit to prevent excessive tool calls) */
+	maxToolCalls := 20
+	if len(llmResponse.ToolCalls) > maxToolCalls {
+		llmResponse.ToolCalls = llmResponse.ToolCalls[:maxToolCalls]
+	}
+
 	if len(llmResponse.ToolCalls) > 0 {
 		state.ToolCalls = llmResponse.ToolCalls
 
@@ -218,57 +235,138 @@ func (r *Runtime) Execute(ctx context.Context, sessionID uuid.UUID, userMessage 
 }
 
 func (r *Runtime) executeTools(ctx context.Context, agent *db.Agent, toolCalls []ToolCall) ([]ToolResult, error) {
+	/* Check if tools can be executed in parallel */
+	if r.canExecuteParallel(toolCalls) {
+		return r.executeToolsParallel(ctx, agent, toolCalls)
+	}
+
+	/* Execute sequentially */
+	return r.executeToolsSequential(ctx, agent, toolCalls)
+}
+
+/* canExecuteParallel checks if tools can be executed in parallel */
+func (r *Runtime) canExecuteParallel(toolCalls []ToolCall) bool {
+	/* Simple heuristic: if multiple tools and none depend on others */
+	if len(toolCalls) <= 1 {
+		return false
+	}
+
+	/* Check for dependencies (simplified - in production would use dependency graph) */
+	/* For now, allow parallel execution if tools are different */
+	toolNames := make(map[string]bool)
+	for _, call := range toolCalls {
+		if toolNames[call.Name] {
+			/* Same tool called multiple times - might have dependencies */
+			return false
+		}
+		toolNames[call.Name] = true
+	}
+
+	return true
+}
+
+/* executeToolsParallel executes tools in parallel */
+func (r *Runtime) executeToolsParallel(ctx context.Context, agent *db.Agent, toolCalls []ToolCall) ([]ToolResult, error) {
+	type resultWithIndex struct {
+		index  int
+		result ToolResult
+	}
+
+	results := make([]ToolResult, len(toolCalls))
+	resultChan := make(chan resultWithIndex, len(toolCalls))
+
+	/* Execute all tools in parallel */
+	for i, call := range toolCalls {
+		go func(idx int, toolCall ToolCall) {
+			result := r.executeSingleTool(ctx, agent, toolCall)
+			resultChan <- resultWithIndex{index: idx, result: result}
+		}(i, call)
+	}
+
+	/* Collect results */
+	for i := 0; i < len(toolCalls); i++ {
+		ri := <-resultChan
+		results[ri.index] = ri.result
+	}
+
+	return results, nil
+}
+
+/* executeToolsSequential executes tools sequentially */
+func (r *Runtime) executeToolsSequential(ctx context.Context, agent *db.Agent, toolCalls []ToolCall) ([]ToolResult, error) {
 	results := make([]ToolResult, 0, len(toolCalls))
 
 	for _, call := range toolCalls {
-   /* Get tool from registry */
-		tool, err := r.tools.Get(call.Name)
-		if err != nil {
-			argKeys := make([]string, 0, len(call.Arguments))
-			for k := range call.Arguments {
-				argKeys = append(argKeys, k)
-			}
-			results = append(results, ToolResult{
-				ToolCallID: call.ID,
-				Error:      fmt.Errorf("tool retrieval failed for tool call: tool_call_id='%s', tool_name='%s', agent_id='%s', agent_name='%s', args_count=%d, arg_keys=[%v], error=%w",
-					call.ID, call.Name, agent.ID.String(), agent.Name, len(call.Arguments), argKeys, err),
-			})
-			continue
-		}
-
-   /* Check if tool is enabled for this agent */
-		if !contains(agent.EnabledTools, call.Name) {
-			results = append(results, ToolResult{
-				ToolCallID: call.ID,
-				Error:      fmt.Errorf("tool not enabled for agent: tool_call_id='%s', tool_name='%s', agent_id='%s', agent_name='%s', enabled_tools=[%v]",
-					call.ID, call.Name, agent.ID.String(), agent.Name, agent.EnabledTools),
-			})
-			continue
-		}
-
-   /* Execute tool */
-		result, err := r.tools.Execute(ctx, tool, call.Arguments)
-		if err != nil {
-			argKeys := make([]string, 0, len(call.Arguments))
-			for k := range call.Arguments {
-				argKeys = append(argKeys, k)
-			}
-			results = append(results, ToolResult{
-				ToolCallID: call.ID,
-				Content:    result,
-				Error:      fmt.Errorf("tool execution failed: tool_call_id='%s', tool_name='%s', handler_type='%s', agent_id='%s', agent_name='%s', args_count=%d, arg_keys=[%v], error=%w",
-					call.ID, call.Name, tool.HandlerType, agent.ID.String(), agent.Name, len(call.Arguments), argKeys, err),
-			})
-		} else {
-			results = append(results, ToolResult{
-				ToolCallID: call.ID,
-				Content:    result,
-				Error:      nil,
-			})
+		result := r.executeSingleTool(ctx, agent, call)
+		results = append(results, result)
+		
+		/* If tool failed and it's critical, stop execution */
+		if result.Error != nil {
+			/* Continue for now - could add critical flag to tools */
 		}
 	}
 
 	return results, nil
+}
+
+/* executeSingleTool executes a single tool */
+func (r *Runtime) executeSingleTool(ctx context.Context, agent *db.Agent, call ToolCall) ToolResult {
+	/* Add timeout context for tool execution (5 minutes max) */
+	toolCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer cancel()
+	
+	/* Check if context is already cancelled */
+	if ctx.Err() != nil {
+		return ToolResult{
+			ToolCallID: call.ID,
+			Error:      fmt.Errorf("tool execution cancelled: tool_call_id='%s', tool_name='%s', context_error=%w",
+				call.ID, call.Name, ctx.Err()),
+		}
+	}
+
+	/* Get tool from registry */
+	tool, err := r.tools.Get(toolCtx, call.Name)
+	if err != nil {
+		argKeys := make([]string, 0, len(call.Arguments))
+		for k := range call.Arguments {
+			argKeys = append(argKeys, k)
+		}
+		return ToolResult{
+			ToolCallID: call.ID,
+			Error:      fmt.Errorf("tool retrieval failed for tool call: tool_call_id='%s', tool_name='%s', agent_id='%s', agent_name='%s', args_count=%d, arg_keys=[%v], error=%w",
+				call.ID, call.Name, agent.ID.String(), agent.Name, len(call.Arguments), argKeys, err),
+		}
+	}
+
+	/* Check if tool is enabled for this agent */
+	if !contains(agent.EnabledTools, call.Name) {
+		return ToolResult{
+			ToolCallID: call.ID,
+			Error:      fmt.Errorf("tool not enabled for agent: tool_call_id='%s', tool_name='%s', agent_id='%s', agent_name='%s', enabled_tools=[%v]",
+				call.ID, call.Name, agent.ID.String(), agent.Name, agent.EnabledTools),
+		}
+	}
+
+	/* Execute tool */
+	result, err := r.tools.Execute(toolCtx, tool, call.Arguments)
+	if err != nil {
+		argKeys := make([]string, 0, len(call.Arguments))
+		for k := range call.Arguments {
+			argKeys = append(argKeys, k)
+		}
+		return ToolResult{
+			ToolCallID: call.ID,
+			Content:    result,
+			Error:      fmt.Errorf("tool execution failed: tool_call_id='%s', tool_name='%s', handler_type='%s', agent_id='%s', agent_name='%s', args_count=%d, arg_keys=[%v], error=%w",
+				call.ID, call.Name, tool.HandlerType, agent.ID.String(), agent.Name, len(call.Arguments), argKeys, err),
+		}
+	}
+
+	return ToolResult{
+		ToolCallID: call.ID,
+		Content:    result,
+		Error:      nil,
+	}
 }
 
 func (r *Runtime) storeMessages(ctx context.Context, sessionID uuid.UUID, userMsg, assistantMsg string, toolCalls []ToolCall, toolResults []ToolResult, totalTokens int) error {
@@ -330,6 +428,21 @@ func (r *Runtime) storeMessages(ctx context.Context, sessionID uuid.UUID, userMs
 	}
 
 	return nil
+}
+
+/* GetPlanner returns the planner */
+func (r *Runtime) GetPlanner() *Planner {
+	return r.planner
+}
+
+/* GetReflector returns the reflector */
+func (r *Runtime) GetReflector() *Reflector {
+	return r.reflector
+}
+
+/* GetMemoryManager returns the memory manager */
+func (r *Runtime) GetMemoryManager() *MemoryManager {
+	return r.memory
 }
 
 /* Helper function to check if a string is in an array */

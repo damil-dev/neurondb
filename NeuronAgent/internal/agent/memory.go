@@ -17,6 +17,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/neurondb/NeuronAgent/internal/db"
@@ -73,6 +74,14 @@ func (m *MemoryManager) Retrieve(ctx context.Context, agentID uuid.UUID, queryEm
 }
 
 func (m *MemoryManager) StoreChunks(ctx context.Context, agentID, sessionID uuid.UUID, content string, toolResults []ToolResult) {
+	/* Validate input */
+	if content == "" {
+		return /* Don't store empty content */
+	}
+	if len(content) > 50000 {
+		return /* Don't store extremely large content */
+	}
+
   /* Compute importance score (heuristic: length, user flags, etc.) */
 	importance := m.computeImportance(content, toolResults)
 
@@ -109,21 +118,21 @@ func (m *MemoryManager) StoreChunks(ctx context.Context, agentID, sessionID uuid
 }
 
 func (m *MemoryManager) computeImportance(content string, toolResults []ToolResult) float64 {
- 	score := 0.5 /* Base score */
+	score := 0.5 /* Base score */
 
-  /* Increase score based on content length (longer = more important) */
+	/* Increase score based on content length (longer = more important) */
 	if len(content) > 500 {
 		score += 0.2
 	} else if len(content) > 200 {
 		score += 0.1
 	}
 
-  /* Increase score if tool results present (actionable information) */
+	/* Increase score if tool results present (actionable information) */
 	if len(toolResults) > 0 {
 		score += 0.2
 	}
 
-  /* Increase score if content contains important keywords */
+	/* Increase score if content contains important keywords */
 	importantKeywords := []string{"error", "solution", "important", "note", "warning", "summary"}
 	contentLower := strings.ToLower(content)
 	for _, keyword := range importantKeywords {
@@ -133,10 +142,112 @@ func (m *MemoryManager) computeImportance(content string, toolResults []ToolResu
 		}
 	}
 
-  /* Cap at 1.0 */
+	/* Cap at 1.0 */
 	if score > 1.0 {
 		score = 1.0
 	}
 
 	return score
+}
+
+/* SummarizeMemory summarizes old memories to compress them */
+func (m *MemoryManager) SummarizeMemory(ctx context.Context, agentID uuid.UUID, maxChunks int) error {
+	/* Get old memory chunks */
+	query := `SELECT id, content, created_at
+		FROM neurondb_agent.memory_chunks
+		WHERE agent_id = $1
+		ORDER BY created_at ASC
+		LIMIT $2`
+	
+	type MemoryChunkRow struct {
+		ID        int64     `db:"id"`
+		Content   string    `db:"content"`
+		CreatedAt time.Time `db:"created_at"`
+	}
+	
+	var chunks []MemoryChunkRow
+	err := m.db.DB.SelectContext(ctx, &chunks, query, agentID, maxChunks)
+	if err != nil {
+		return fmt.Errorf("memory summarization failed: agent_id='%s', max_chunks=%d, error=%w",
+			agentID.String(), maxChunks, err)
+	}
+
+	if len(chunks) < 2 {
+		return nil /* Not enough chunks to summarize */
+	}
+
+	/* Combine chunks and create summary */
+	combinedContent := ""
+	for _, chunk := range chunks {
+		combinedContent += chunk.Content + "\n\n"
+	}
+
+	/* Summarize content - in production would use LLM */
+	/* For now, use intelligent truncation with key points */
+	summary := combinedContent
+	if len(summary) > 1000 {
+		/* Try to find a good breaking point */
+		truncateAt := 1000
+		for i := truncateAt; i > truncateAt-100 && i > 0; i-- {
+			if summary[i] == '.' || summary[i] == '\n' {
+				truncateAt = i + 1
+				break
+			}
+		}
+		summary = summary[:truncateAt] + "\n[Summary truncated]"
+	}
+
+	/* Create new summary chunk */
+	embeddingModel := "all-MiniLM-L6-v2"
+	embedding, err := m.embed.Embed(ctx, summary, embeddingModel)
+	if err != nil {
+		return fmt.Errorf("memory summarization embedding failed: agent_id='%s', summary_length=%d, error=%w",
+			agentID.String(), len(summary), err)
+	}
+
+	_, err = m.queries.CreateMemoryChunk(ctx, &db.MemoryChunk{
+		AgentID:         agentID,
+		Content:         summary,
+		Embedding:       embedding,
+		ImportanceScore: 0.8, /* Summaries are important */
+		Metadata: map[string]interface{}{
+			"type":        "summary",
+			"source_ids":  chunks,
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("memory summarization chunk creation failed: agent_id='%s', error=%w",
+			agentID.String(), err)
+	}
+
+	/* Delete old chunks */
+	chunkIDs := make([]int64, len(chunks))
+	for i, chunk := range chunks {
+		chunkIDs[i] = chunk.ID
+	}
+
+	deleteQuery := `DELETE FROM neurondb_agent.memory_chunks WHERE id = ANY($1)`
+	_, err = m.db.DB.ExecContext(ctx, deleteQuery, chunkIDs)
+	if err != nil {
+		return fmt.Errorf("memory summarization chunk deletion failed: agent_id='%s', chunks_count=%d, error=%w",
+			agentID.String(), len(chunkIDs), err)
+	}
+
+	return nil
+}
+
+/* ApplyTemporalDecay applies temporal decay to memory importance scores */
+func (m *MemoryManager) ApplyTemporalDecay(ctx context.Context, agentID uuid.UUID, decayRate float64) error {
+	/* Update importance scores based on age */
+	query := `UPDATE neurondb_agent.memory_chunks
+		SET importance_score = GREATEST(0.1, importance_score * POWER($1, EXTRACT(EPOCH FROM (NOW() - created_at)) / 86400.0))
+		WHERE agent_id = $2 AND created_at < NOW() - INTERVAL '7 days'`
+	
+	_, err := m.db.DB.ExecContext(ctx, query, decayRate, agentID)
+	if err != nil {
+		return fmt.Errorf("temporal decay application failed: agent_id='%s', decay_rate=%.2f, error=%w",
+			agentID.String(), decayRate, err)
+	}
+
+	return nil
 }

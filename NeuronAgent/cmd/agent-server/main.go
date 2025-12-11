@@ -83,8 +83,13 @@ func main() {
   /* Initialize components */
 	queries := db.NewQueries(database.DB)
 	queries.SetConnInfoFunc(database.GetConnInfoString)
-	embedClient := neurondb.NewEmbeddingClient(database.DB)
-	toolRegistry := tools.NewRegistry(queries, database)
+	
+	/* Initialize NeuronDB client */
+	neurondbClient := neurondb.NewClient(database.DB)
+	embedClient := neurondbClient.Embedding
+	
+	/* Initialize tool registry with NeuronDB clients */
+	toolRegistry := tools.NewRegistryWithNeuronDB(queries, database, neurondbClient)
 	runtime := agent.NewRuntime(database, queries, toolRegistry, embedClient)
 
   /* Initialize session management */
@@ -113,11 +118,21 @@ func main() {
 	apiRouter.HandleFunc("/agents/{id}", handlers.GetAgent).Methods("GET")
 	apiRouter.HandleFunc("/agents/{id}", handlers.UpdateAgent).Methods("PUT")
 	apiRouter.HandleFunc("/agents/{id}", handlers.DeleteAgent).Methods("DELETE")
+	apiRouter.HandleFunc("/agents/{id}/clone", handlers.CloneAgent).Methods("POST")
+	apiRouter.HandleFunc("/agents/{id}/plan", handlers.GeneratePlan).Methods("POST")
+	apiRouter.HandleFunc("/agents/{id}/reflect", handlers.ReflectOnResponse).Methods("POST")
+	apiRouter.HandleFunc("/agents/{id}/delegate", handlers.DelegateToAgent).Methods("POST")
+	apiRouter.HandleFunc("/agents/{id}/metrics", handlers.GetAgentMetrics).Methods("GET")
+	apiRouter.HandleFunc("/agents/{id}/costs", handlers.GetAgentCosts).Methods("GET")
 	apiRouter.HandleFunc("/sessions", handlers.CreateSession).Methods("POST")
 	apiRouter.HandleFunc("/sessions/{id}", handlers.GetSession).Methods("GET")
 	apiRouter.HandleFunc("/agents/{agent_id}/sessions", handlers.ListSessions).Methods("GET")
 	apiRouter.HandleFunc("/sessions/{session_id}/messages", handlers.SendMessage).Methods("POST")
 	apiRouter.HandleFunc("/sessions/{session_id}/messages", handlers.GetMessages).Methods("GET")
+	apiRouter.HandleFunc("/tools", handlers.CreateTool).Methods("POST")
+	apiRouter.HandleFunc("/tools/{name}/analytics", handlers.GetToolAnalytics).Methods("GET")
+	apiRouter.HandleFunc("/memory/{id}/summarize", handlers.SummarizeMemory).Methods("POST")
+	apiRouter.HandleFunc("/analytics/overview", handlers.GetAnalyticsOverview).Methods("GET")
 	apiRouter.HandleFunc("/ws", api.HandleWebSocket(runtime)).Methods("GET")
 
   /* Health check */
