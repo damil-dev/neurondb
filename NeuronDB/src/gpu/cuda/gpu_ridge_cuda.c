@@ -198,6 +198,12 @@ ndb_cuda_ridge_train(const float *features,
 	status = cudaSuccess;
 	rc = -1;
 
+	/* Initialize output pointers to NULL */
+	if (model_data)
+		*model_data = NULL;
+	if (metrics)
+		*metrics = NULL;
+
 	if (errstr)
 		*errstr = NULL;
 
@@ -239,13 +245,6 @@ ndb_cuda_ridge_train(const float *features,
 		return -1;
 	}
 
-	elog(DEBUG1,
-		 "ndb_cuda_ridge_train: entry: model_data=%p, features=%p, targets=%p, n_samples=%d, feature_dim=%d",
-		 model_data,
-		 features,
-		 targets,
-		 n_samples,
-		 feature_dim);
 
 	/* Extract and validate lambda from hyperparameters */
 	if (hyperparams != NULL)
@@ -309,11 +308,6 @@ ndb_cuda_ridge_train(const float *features,
 		feature_bytes = sizeof(float) * (size_t) n_samples * (size_t) feature_dim;
 		target_bytes = sizeof(double) * (size_t) n_samples;
 
-		elog(DEBUG1,
-			 "ndb_cuda_ridge_train: allocating GPU memory: feature_bytes=%zu (%.2f MB), target_bytes=%zu",
-			 feature_bytes,
-			 feature_bytes / (1024.0 * 1024.0),
-			 target_bytes);
 
 		/* Defensive: Check CUDA context before proceeding */
 		status = cudaGetLastError();
@@ -489,7 +483,6 @@ gpu_cleanup:
 
 cpu_fallback:
 	/* Fallback to CPU computation */
-	elog(DEBUG1, "ndb_cuda_ridge_train: falling back to CPU computation");
 	for (i = 0; i < n_samples; i++)
 	{
 		const float *row = features + (i * feature_dim);

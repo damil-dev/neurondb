@@ -139,9 +139,6 @@ vector_wal_compress(PG_FUNCTION_ARGS)
 
 	initStringInfo(&compressed);
 
-	elog(DEBUG1,
-		 "neurondb: Compressing vector using delta encoding, dim=%d",
-		 dim);
 
 	appendStringInfo(&compressed, "D%d:", dim);
 	i = 0;
@@ -193,9 +190,6 @@ vector_wal_decompress(PG_FUNCTION_ARGS)
 	comp_str = safe_text_to_cstring(compressed);
 	base_str = safe_text_to_cstring(base_vector);
 
-	elog(DEBUG1,
-		 "neurondb: Decompressing vector from delta encoding: \"%s\"",
-		 comp_str);
 
 	p = comp_str;
 	if (*p != 'D')
@@ -323,11 +317,6 @@ vector_wal_estimate_size(PG_FUNCTION_ARGS)
 	if (estimated_compressed_size < 0)
 		estimated_compressed_size = 0;
 
-	elog(DEBUG1,
-		 "neurondb: Estimated compression: %d -> %d bytes (%.1fx)",
-		 original_size,
-		 estimated_compressed_size,
-		 compression_ratio);
 
 	PG_RETURN_INT32(estimated_compressed_size);
 }
@@ -379,12 +368,6 @@ vector_wal_get_stats(PG_FUNCTION_ARGS)
 					 NDB_INT64_CAST(total_bytes_compressed),
 					 compression_ratio);
 
-	elog(DEBUG1,
-		 "neurondb: WAL compression stats: %.2fx ratio "
-		 "(original=" NDB_INT64_FMT ", compressed=" NDB_INT64_FMT ")",
-		 compression_ratio,
-		 NDB_INT64_CAST(total_bytes_original),
-		 NDB_INT64_CAST(total_bytes_compressed));
 
 	PG_RETURN_TEXT_P(cstring_to_text(stats.data));
 }

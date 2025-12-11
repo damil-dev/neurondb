@@ -469,11 +469,6 @@ hnsw_search_layer(Relation index,
 						 resultCount);
 	}
 
-	elog(DEBUG1,
-		 "neurondb: HNSW search_layer completed: entry=%u, level=%d, results=%d",
-		 currentEntry,
-		 currentLevel,
-		 *resultCount);
 }
 
 /*
@@ -628,10 +623,6 @@ hnswSearchLayerGreedy(Relation index,
 		UnlockReleaseBuffer(buf);
 	}
 
-	elog(DEBUG1,
-		 "neurondb: Greedy search at layer %d found block %u",
-		 layer,
-		 best);
 	return best;
 }
 
@@ -838,7 +829,4 @@ hnswSearchLayer0(Relation index,
 
 	hnswFreeSearchState(state);
 
-	elog(DEBUG1,
-		 "neurondb: HNSW layer-0 search returned %d results",
-		 *resultCount);
 }

@@ -424,9 +424,6 @@ neurondb_gpu_set_device(int device_id)
 
 	if (active_backend->set_device(device_id) != 0)
 	{
-		elog(DEBUG1,
-			 "neurondb: failed to switch GPU device to %d",
-			 device_id);
 		return;
 	}
 

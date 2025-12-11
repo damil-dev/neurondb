@@ -61,9 +61,6 @@ neurondb_ann_buffer_init(void)
 		ann_buffer_control->total_hits = 0;
 		ann_buffer_control->total_misses = 0;
 
-		elog(DEBUG1,
-			 "neurondb: ANN buffer initialized with %d entries",
-			 max_entries);
 	}
 }
 
@@ -104,9 +101,6 @@ neurondb_ann_buffer_get_centroid(PG_FUNCTION_ARGS)
 	if (!found)
 	{
 		ann_buffer_control->total_misses++;
-		elog(DEBUG1,
-			 "neurondb: Cache miss for centroid %d",
-			 centroid_id);
 		PG_RETURN_NULL();
 	}
 
@@ -144,10 +138,6 @@ neurondb_ann_buffer_put_centroid(PG_FUNCTION_ARGS)
 	ann_buffer_control->entries[slot].centroid_id = centroid_id;
 	ann_buffer_control->entries[slot].access_count = 0;
 	ann_buffer_control->entries[slot].valid = true;
-	elog(DEBUG1,
-		 "neurondb: Cached centroid %d in slot %d",
-		 centroid_id,
-		 slot);
 
 	PG_RETURN_BOOL(true);
 }

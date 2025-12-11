@@ -186,6 +186,12 @@ ndb_cuda_lasso_train(const float *features,
 	size_t		residual_bytes;
 	int			cleanup_needed = 0;
 
+	/* Initialize output pointers to NULL */
+	if (model_data)
+		*model_data = NULL;
+	if (metrics)
+		*metrics = NULL;
+
 	/* CPU mode: never execute GPU code */
 	if (NDB_COMPUTE_MODE_IS_CPU())
 	{

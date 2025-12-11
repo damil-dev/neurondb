@@ -67,11 +67,6 @@ neurondb_create_feature_store(PG_FUNCTION_ARGS)
 	NdbSpiSession *spi_session = NULL;
 	MemoryContext oldcontext;
 
-	elog(DEBUG1,
-		 "neurondb.create_feature_store: name='%s', entity_table='%s', entity_key='%s'",
-		 store_name,
-		 entity_table,
-		 entity_key);
 
 	oldcontext = CurrentMemoryContext;
 
@@ -163,12 +158,6 @@ neurondb_register_feature(PG_FUNCTION_ARGS)
 		? text_to_cstring(transformation_text)
 		: NULL;
 
-	elog(DEBUG1,
-		 "neurondb.register_feature: store=%d, feature='%s', type=%s, transformation='%s'",
-		 store_id,
-		 feature_name,
-		 feature_type,
-		 transformation ? transformation : "none");
 
 	oldcontext = CurrentMemoryContext;
 

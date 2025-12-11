@@ -190,9 +190,6 @@ discover_topics_simple(PG_FUNCTION_ARGS)
 
 		if (!changed)
 		{
-			elog(DEBUG1,
-				 "neurondb: Topic discovery converged at iteration %d",
-				 iter + 1);
 			break;
 		}
 

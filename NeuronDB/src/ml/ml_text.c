@@ -982,7 +982,9 @@ text_model_serialize_to_bytea(int vocab_size, int feature_dim, const char *task_
 {
 	StringInfoData buf;
 	int			total_size;
-		bytea *result = NULL;	int			task_len;
+	bytea	   *result = NULL;
+	int			task_len;
+	char	   *tmp = NULL;
 
 	initStringInfo(&buf);
 	appendBinaryStringInfo(&buf, (char *) &vocab_size, sizeof(int));
@@ -992,7 +994,6 @@ text_model_serialize_to_bytea(int vocab_size, int feature_dim, const char *task_
 	appendBinaryStringInfo(&buf, task_type, task_len);
 
 	total_size = VARHDRSZ + buf.len;
-	char *tmp = NULL;
 	nalloc(tmp, char, total_size);
 	result = (bytea *) tmp;
 	NDB_CHECK_ALLOC(result, "result");
@@ -1232,6 +1233,7 @@ text_gpu_serialize(const MLGpuModel *model, bytea * *payload_out,
 	const		TextGpuModelState *state;
 	bytea	   *payload_copy = NULL;
 	int			payload_size;
+	char	   *tmp = NULL;
 
 	if (errstr != NULL)
 		*errstr = NULL;
@@ -1255,7 +1257,6 @@ text_gpu_serialize(const MLGpuModel *model, bytea * *payload_out,
 	}
 
 	payload_size = VARSIZE(state->model_blob);
-	char *tmp = NULL;
 	nalloc(tmp, char, payload_size);
 	payload_copy = (bytea *) tmp;
 	NDB_CHECK_ALLOC(payload_copy, "payload_copy");
@@ -1286,6 +1287,7 @@ text_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 	JsonbIterator *it = NULL;
 	JsonbValue	v;
 	int			r;
+	char	   *tmp = NULL;
 
 	if (errstr != NULL)
 		*errstr = NULL;
@@ -1297,7 +1299,6 @@ text_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 	}
 
 	payload_size = VARSIZE(payload);
-	char *tmp = NULL;
 	nalloc(tmp, char, payload_size);
 	payload_copy = (bytea *) tmp;
 	NDB_CHECK_ALLOC(payload_copy, "payload_copy");
@@ -1322,10 +1323,13 @@ text_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 
 	if (metadata != NULL)
 	{
-		int			metadata_size = VARSIZE(metadata);
-		char *tmp = NULL;
-		nalloc(tmp, char, metadata_size);
-		Jsonb *metadata_copy = (Jsonb *) tmp;
+		int			metadata_size;
+		char	   *tmp2 = NULL;
+		Jsonb	   *metadata_copy;
+		
+		metadata_size = VARSIZE(metadata);
+		nalloc(tmp2, char, metadata_size);
+		metadata_copy = (Jsonb *) tmp2;
 
 		NDB_CHECK_ALLOC(metadata_copy, "metadata_copy");
 		memcpy(metadata_copy, metadata, metadata_size);

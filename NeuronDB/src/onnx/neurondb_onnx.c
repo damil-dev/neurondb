@@ -265,10 +265,6 @@ neurondb_onnx_load_model(const char *model_path,
 				}
 			}
 #else
-			elog(DEBUG1,
-				"ONNX Runtime CUDA provider not compiled in; "
-				"falling back to CPU for model: %s",
-				model_path);
 			provider = ONNX_PROVIDER_CPU;
 #endif
 			break;
@@ -282,11 +278,6 @@ neurondb_onnx_load_model(const char *model_path,
 				"provider (CoreML support TBD for ORT 1.17+)");
 			provider = ONNX_PROVIDER_CPU;
 #else
-			elog(DEBUG1,
-				"CoreML execution provider not supported "
-				"(non-macOS); falling back to CPU for model: "
-				"%s",
-				model_path);
 			provider = ONNX_PROVIDER_CPU;
 #endif
 			break;
@@ -320,11 +311,6 @@ neurondb_onnx_load_model(const char *model_path,
 
 	session->is_loaded = true;
 
-	ereport(DEBUG1,
-		(errmsg("Loaded ONNX model: %s", model_path),
-			errdetail("Type: %s; Execution Provider: %s",
-				neurondb_onnx_model_type_name(model_type),
-				neurondb_onnx_provider_name(provider))));
 
 	return session;
 }
@@ -632,9 +618,6 @@ onnx_cache_evict_lru(void)
 	else
 		g_model_cache_head = lru_entry->next;
 
-	ereport(DEBUG1,
-		(errmsg("Evicting ONNX model from cache: %s",
-			lru_entry->model_name)));
 
 	neurondb_onnx_unload_model(lru_entry->session);
 	nfree(lru_entry->model_name);

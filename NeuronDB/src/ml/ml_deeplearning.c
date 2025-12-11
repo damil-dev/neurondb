@@ -58,7 +58,6 @@ import_pytorch_model(PG_FUNCTION_ARGS)
 	char	   *type = model_type ? text_to_cstring(model_type)
 		: pstrdup("classifier");
 	StringInfoData result;
-	int			model_id;
 
 	/* Validate model type */
 	if (strcmp(type, "classifier") != 0 && strcmp(type, "regressor") != 0
@@ -138,16 +137,11 @@ import_pytorch_model(PG_FUNCTION_ARGS)
 		spec.num_samples = 0;
 		spec.num_features = 0;
 
-		model_id = ml_catalog_register_model(&spec);
+		(void) ml_catalog_register_model(&spec);
 		nfree(params_json.data);
 	}
 
 	initStringInfo(&result);
-	elog(DEBUG1,
-		 "PyTorch model '%s' imported with ID %d (type: %s)",
-		 name,
-		 model_id,
-		 type);
 
 	nfree(path);
 	nfree(name);
@@ -173,7 +167,6 @@ import_tensorflow_model(PG_FUNCTION_ARGS)
 	char	   *path = text_to_cstring(model_path);
 	char	   *name = text_to_cstring(model_name);
 	StringInfoData result;
-	int			model_id;
 
 	/* Defensive: validate model path */
 	if (path == NULL || strlen(path) == 0)
@@ -249,15 +242,11 @@ import_tensorflow_model(PG_FUNCTION_ARGS)
 		spec.num_samples = 0;
 		spec.num_features = 0;
 
-		model_id = ml_catalog_register_model(&spec);
+		(void) ml_catalog_register_model(&spec);
 		nfree(params_json.data);
 	}
 
 	initStringInfo(&result);
-	elog(DEBUG1,
-		 "TensorFlow model '%s' imported with ID %d",
-		 name,
-		 model_id);
 
 	nfree(path);
 	nfree(name);
@@ -280,7 +269,6 @@ import_onnx_model(PG_FUNCTION_ARGS)
 	char	   *path = text_to_cstring(model_path);
 	char	   *name = text_to_cstring(model_name);
 	StringInfoData result;
-	int			model_id;
 
 	/* Defensive: validate model path */
 	if (path == NULL || strlen(path) == 0)
@@ -350,16 +338,11 @@ import_onnx_model(PG_FUNCTION_ARGS)
 		spec.num_samples = 0;
 		spec.num_features = 0;
 
-		model_id = ml_catalog_register_model(&spec);
+		(void) ml_catalog_register_model(&spec);
 		nfree(params_json.data);
 	}
 
 	initStringInfo(&result);
-	elog(DEBUG1,
-		 "ONNX model '%s' imported with ID %d (optimized: %s)",
-		 name,
-		 model_id,
-		 optimize ? "yes" : "no");
 
 	nfree(path);
 	nfree(name);
@@ -539,8 +522,6 @@ dl_predict(PG_FUNCTION_ARGS)
 						}
 					}
 
-					elog(DEBUG1,
-						 "dl_predict: Using ONNX runtime for inference, output_dim=%d", n_outputs);
 #else
 					elog(WARNING,
 						 "dl_predict: ONNX runtime not available, using placeholder");
@@ -550,15 +531,11 @@ dl_predict(PG_FUNCTION_ARGS)
 				else if (strcmp(framework, "pytorch") == 0)
 				{
 					/* PyTorch inference - would use libtorch */
-					elog(DEBUG1,
-						 "dl_predict: PyTorch framework detected (inference not yet implemented)");
 					n_outputs = 10;
 				}
 				else if (strcmp(framework, "tensorflow") == 0)
 				{
 					/* TensorFlow inference - would use TensorFlow C API */
-					elog(DEBUG1,
-						 "dl_predict: TensorFlow framework detected (inference not yet implemented)");
 					n_outputs = 10;
 				}
 				else
@@ -682,10 +659,6 @@ finetune_dl_model(PG_FUNCTION_ARGS)
 	(void) table;
 
 	initStringInfo(&result);
-	elog(DEBUG1,
-		 "Model fine-tuned for %d epochs with learning rate %.6f",
-		 epochs,
-		 learning_rate);
 
 	nfree(table);
 
@@ -895,7 +868,6 @@ quantize_dl_model(PG_FUNCTION_ARGS)
 		? text_to_cstring(quantization_type)
 		: pstrdup("int8");
 	StringInfoData result;
-	int			quantized_model_id;
 
 	if (strcmp(quant_type, "int8") != 0 && strcmp(quant_type, "fp16") != 0
 		&& strcmp(quant_type, "dynamic") != 0)
@@ -906,13 +878,8 @@ quantize_dl_model(PG_FUNCTION_ARGS)
 
 	/* Quantize model (production would apply quantization) */
 	(void) model_id;
-	quantized_model_id = model_id + 10000;
 
 	initStringInfo(&result);
-	elog(DEBUG1,
-		 "Model quantized to %s, new model ID: %d",
-		 quant_type,
-		 quantized_model_id);
 
 	nfree(quant_type);
 

@@ -124,10 +124,6 @@ mmr_rerank(PG_FUNCTION_ARGS)
 
 	if (dim != query_dim)
 	{
-		elog(DEBUG1,
-			 "Query dimension %d != candidate dimension %d",
-			 query_dim,
-			 dim);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("Query dimension %d != candidate dimension %d",

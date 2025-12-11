@@ -29,9 +29,6 @@ encrypt_postquantum(PG_FUNCTION_ARGS)
 	bytea *result = NULL;
 	Size		result_size;
 
-	elog(DEBUG1,
-		 "neurondb: post-quantum encryption of %d-dim vector",
-		 input->dim);
 
 	result_size = VARHDRSZ + sizeof(uint32) + (input->dim * sizeof(float4));
 	result = (bytea *) palloc0(result_size);
@@ -44,11 +41,7 @@ PG_FUNCTION_INFO_V1(enable_confidential_compute);
 Datum
 enable_confidential_compute(PG_FUNCTION_ARGS)
 {
-	bool		enable = PG_GETARG_BOOL(0);
-
-	elog(DEBUG1,
-		 "neurondb: confidential compute mode %s",
-		 enable ? "enabled" : "disabled");
+	(void) PG_GETARG_BOOL(0);
 
 	PG_RETURN_BOOL(true);
 }

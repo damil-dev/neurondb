@@ -263,12 +263,6 @@ reduce_pca(PG_FUNCTION_ARGS)
 	tbl_str = text_to_cstring(table_name);
 	col_str = text_to_cstring(column_name);
 
-	elog(DEBUG1,
-		 "neurondb: PCA dimensionality reduction on %s.%s "
-		 "(n_components=%d)",
-		 tbl_str,
-		 col_str,
-		 n_components);
 
 	data = neurondb_fetch_vectors_from_table(tbl_str, col_str, &nvec, &dim);
 	if (data == NULL || nvec == 0)
@@ -679,12 +673,6 @@ detect_outliers(PG_FUNCTION_ARGS)
 	tbl_str = text_to_cstring(table_name);
 	col_str = text_to_cstring(column_name);
 
-	elog(DEBUG1,
-		 "neurondb: Isolation Forest on %s.%s (n_trees=%d, contamination=%.3f)",
-		 tbl_str,
-		 col_str,
-		 n_trees,
-		 contamination);
 
 	data = neurondb_fetch_vectors_from_table(tbl_str, col_str, &nvec, &dim);
 	if (nvec == 0)
@@ -825,11 +813,6 @@ build_knn_graph(PG_FUNCTION_ARGS)
 	tbl_str = text_to_cstring(table_name);
 	col_str = text_to_cstring(column_name);
 
-	elog(DEBUG1,
-		 "neurondb: Building KNN graph on %s.%s (k=%d)",
-		 tbl_str,
-		 col_str,
-		 k);
 
 	data = neurondb_fetch_vectors_from_table(tbl_str, col_str, &nvec, &dim);
 	if (data == NULL || nvec == 0)
@@ -1073,11 +1056,6 @@ compute_embedding_quality(PG_FUNCTION_ARGS)
 	col_str = text_to_cstring(column_name);
 	cluster_col_str = text_to_cstring(cluster_column);
 
-	elog(DEBUG1,
-		 "neurondb: Computing embedding quality for %s.%s (clusters=%s)",
-		 tbl_str,
-		 col_str,
-		 cluster_col_str);
 
 	data = neurondb_fetch_vectors_from_table(tbl_str, col_str, &nvec, &dim);
 	if (data == NULL || nvec == 0)

@@ -148,7 +148,7 @@ launch_lasso_compute_rho_kernel(const float *features,
 		return hipErrorInvalidValue;
 
 	/* Clear output */
-	cudaMemset(rho_out, 0, sizeof(double));
+	hipMemset(rho_out, 0, sizeof(double));
 
 	int threads_per_block = 256;
 	int blocks = (n_samples + threads_per_block - 1) / threads_per_block;
@@ -188,7 +188,7 @@ launch_lasso_compute_z_kernel(const float *features,
 		return hipErrorInvalidValue;
 
 	/* Clear output */
-	cudaMemset(z_out, 0, sizeof(double));
+	hipMemset(z_out, 0, sizeof(double));
 
 	int threads_per_block = 256;
 	int blocks = (n_samples + threads_per_block - 1) / threads_per_block;

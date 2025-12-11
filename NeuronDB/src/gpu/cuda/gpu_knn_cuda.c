@@ -312,8 +312,6 @@ ndb_cuda_knn_train(const float *features,
 		return -1;
 	}
 
-	elog(DEBUG1, "ndb_cuda_knn_train: entry: n_samples=%d, feature_dim=%d, k=%d, task_type=%d",
-		 n_samples, feature_dim, k, task_type);
 
 	/* Validate input data for NaN/Inf before processing */
 	for (i = 0; i < n_samples; i++)

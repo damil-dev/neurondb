@@ -79,15 +79,10 @@ sparse_index_create(PG_FUNCTION_ARGS)
 	char	   *idx_str = text_to_cstring(index_name);
 	StringInfoData sql;
 	int			ret;
-
 	NdbSpiSession *session = NULL;
 
-	elog(INFO,
-		 "neurondb: Creating sparse index %s on %s.%s (min_freq=%d)",
-		 idx_str,
-		 tbl_str,
-		 col_str,
-		 min_freq);
+	(void) min_freq;		/* Reserved for future use */
+
 	session = ndb_spi_session_begin(CurrentMemoryContext, false);
 	if (session == NULL)
 		elog(ERROR, "failed to begin SPI session");
@@ -143,7 +138,6 @@ sparse_index_create(PG_FUNCTION_ARGS)
 	nfree(sql.data);
 	ndb_spi_session_end(&session);
 
-	elog(INFO, "neurondb: Sparse index %s created successfully", idx_str);
 
 	PG_RETURN_BOOL(true);
 }

@@ -164,17 +164,13 @@ metal_backend_init_impl(void)
 		 "neurondb: Attempting Metal backend initialization (arch=%s, DEPLOYMENT_TARGET=%s)",
 		 arch,
 		 deploy);
-	elog(DEBUG1, "neurondb: Metal pre-check available=%s name='%s'", metal_backend_is_available() ? "YES" : "NO", metal_backend_device_name());
 
 	/* Try to initialize Metal */
 	ok = metal_backend_init();
 	if (!ok)
 	{
-		elog(DEBUG1, "neurondb: metal_backend_init() returned false; re-checking availability");
 		/* Initialization failed - try to get diagnostic info */
 		device_name = metal_backend_device_name();
-		elog(DEBUG1,
-			 "neurondb: Metal device_name after failure='%s' available=%s", device_name ? device_name : "(null)", metal_backend_is_available() ? "YES" : "NO");
 
 		/* Check if Metal is at least detectable (is_available checks this) */
 		if (metal_backend_is_available())
@@ -198,12 +194,10 @@ metal_backend_init_impl(void)
 	}
 
 	device_name = metal_backend_device_name();
-	elog(DEBUG1, "neurondb: Metal init succeeded device_name='%s'", device_name ? device_name : "(null)");
 	{
 		char		caps[512];
 
 		metal_backend_get_capabilities(caps, sizeof(caps));
-		elog(DEBUG1, "neurondb: Metal capabilities: %s", caps);
 	}
 	elog(LOG,
 		 "neurondb: Metal GPU backend initialized successfully "
@@ -227,9 +221,6 @@ metal_backend_is_available_impl(void)
 	bool		avail;
 
 	avail = metal_backend_is_available();
-	elog(DEBUG1,
-		 "neurondb: Metal backend availability = %s",
-		 avail ? "YES" : "NO");
 	return avail;
 	}
 
@@ -290,15 +281,6 @@ metal_backend_get_device_info_impl(int device_id, GPUDeviceInfo *info)
 	info->compute_minor = 0;
 	info->is_available = true;
 
-	elog(DEBUG1,
-		 "neurondb: Metal get_device_info: name='%s', total=%lld MB, "
-		 "free=%lld MB, "
-		 "major=%d, minor=%d",
-		 info->name,
-		 (long long) info->total_memory_mb,
-		 (long long) info->free_memory_mb,
-		 info->compute_major,
-		 info->compute_minor);
 
 	return true;
 }
@@ -644,9 +626,6 @@ metal_backend_kmeans_impl(const float *vectors,
 
 		if (!changed)
 		{
-			elog(DEBUG1,
-				 "kmeans: converged after %d iteration(s)",
-				 iter + 1);
 			break;
 		}
 
@@ -798,9 +777,6 @@ metal_backend_dbscan_impl(const float *vectors,
 	nfree(visited);
 	nfree(neighbors);
 
-	elog(DEBUG1,
-		 "neurondb: Metal DBSCAN: %d clusters (including noise)",
-		 cluster + 1);
 	return true;
 }
 
@@ -810,9 +786,6 @@ static bool
 __attribute__((unused))
 metal_backend_create_streams_impl(int num_streams)
 {
-	elog(DEBUG1,
-		 "neurondb: Metal create_streams: requested %d command queues",
-		 num_streams);
 	return true;
 }
 
@@ -820,8 +793,6 @@ static void
 __attribute__((unused))
 metal_backend_destroy_streams_impl(void)
 {
-	elog(DEBUG1,
-		 "neurondb: Metal destroy_streams: command queues released");
 	}
 
 static int
@@ -1346,7 +1317,45 @@ ndb_metal_rf_train(const float *features,
 	ereport(DEBUG2,
 			(errmsg("ndb_metal_rf_train: parameters validated, initializing variables")));
 
-	(void) hyperparams;
+	/* Parse hyperparameters if provided */
+	if (hyperparams != NULL)
+	{
+		Datum		n_trees_datum;
+		Datum		numeric_datum;
+		Numeric		num;
+
+		PG_TRY();
+		{
+			n_trees_datum = DirectFunctionCall2(
+												jsonb_object_field,
+												JsonbPGetDatum(hyperparams),
+												CStringGetTextDatum("n_trees"));
+			if (DatumGetPointer(n_trees_datum) != NULL)
+			{
+				numeric_datum = DirectFunctionCall1(
+													jsonb_numeric, n_trees_datum);
+				if (DatumGetPointer(numeric_datum) != NULL)
+				{
+					num = DatumGetNumeric(numeric_datum);
+					n_trees = DatumGetInt32(
+											DirectFunctionCall1(numeric_int4,
+																NumericGetDatum(num)));
+					if (n_trees <= 0)
+						n_trees = default_n_trees;
+					if (n_trees > 10000)
+						n_trees = 10000;
+				}
+			}
+		}
+		PG_CATCH();
+		{
+			FlushErrorState();
+			elog(DEBUG2, "Metal RF: Failed to parse hyperparameters JSONB, using default n_trees=%d", default_n_trees);
+			n_trees = default_n_trees;
+		}
+		PG_END_TRY();
+	}
+
 	if (n_trees <= 0)
 		n_trees = default_n_trees;
 
@@ -2737,7 +2746,6 @@ ndb_metal_linreg_train(const float *features,
 	{
 		if (errstr)
 			*errstr = pstrdup("invalid input parameters for Metal LinReg train");
-		elog(DEBUG1, "ndb_metal_linreg_train: invalid input parameters");
 		return -1;
 	}
 
@@ -3098,7 +3106,6 @@ ndb_metal_linreg_train(const float *features,
 		{
 			if (errstr && *errstr == NULL)
 				*errstr = pstrdup("Metal linreg pack failed");
-			elog(DEBUG1, "ndb_metal_linreg_train: pack failed with rc=%d", rc);
 		}
 
 		ereport(DEBUG2, (errmsg("ndb_metal_linreg_train: freeing model coefficients")));
@@ -3120,8 +3127,6 @@ ndb_metal_linreg_train(const float *features,
 		*model_data = payload;
 		if (metrics != NULL)
 			*metrics = metrics_json;
-		elog(DEBUG1, "ndb_metal_linreg_train: training succeeded, payload=%p, metrics=%p",
-			 (void *) payload, (void *) metrics_json);
 		ereport(DEBUG2, (errmsg("ndb_metal_linreg_train: returning success")));
 		return 0;
 	}
@@ -3132,8 +3137,6 @@ ndb_metal_linreg_train(const float *features,
 	if (metrics_json != NULL)
 		nfree(metrics_json);
 
-	elog(DEBUG1, "ndb_metal_linreg_train: training failed, rc=%d, payload=%p, errstr=%s",
-		 rc, (void *) payload, (errstr && *errstr) ? *errstr : "NULL");
 	return -1;
 }
 
@@ -5638,9 +5641,6 @@ ndb_metal_nb_train(const float *features,
 		return -1;
 	}
 
-	elog(DEBUG1,
-		 "neurondb: Metal NB train: n_samples=%d, feature_dim=%d, class_count=%d",
-		 n_samples, feature_dim, class_count);
 
 	/* Allocate host memory */
 	nalloc(class_counts, int, class_count);
@@ -6023,9 +6023,6 @@ ndb_metal_gmm_train(const float *features,
 		return -1;
 	}
 
-	elog(DEBUG1,
-		 "neurondb: Metal GMM train: n_samples=%d, feature_dim=%d, n_components=%d",
-		 n_samples, feature_dim, n_components);
 
 	/* Extract hyperparameters from JSONB */
 	if (hyperparams != NULL)
@@ -6487,9 +6484,6 @@ ndb_metal_knn_train(const float *features,
 		return -1;
 	}
 
-	elog(DEBUG1,
-		 "neurondb: Metal KNN train: n_samples=%d, feature_dim=%d, k=%d, task_type=%d",
-		 n_samples, feature_dim, k, task_type);
 
 	/* Extract hyperparameters if provided */
 	if (hyperparams != NULL)

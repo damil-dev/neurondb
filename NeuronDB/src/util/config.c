@@ -338,6 +338,9 @@ set_vector_config(PG_FUNCTION_ARGS)
 {
 	text	   *config_name;
 	text	   *config_value;
+	char	   *name_str = NULL;
+	char	   *value_str = NULL;
+	const		NeuronDBConfigOpt *opt;
 
 	/* Validate argument count */
 	if (PG_NARGS() < 2)
@@ -347,9 +350,6 @@ set_vector_config(PG_FUNCTION_ARGS)
 
 	config_name = PG_GETARG_TEXT_PP(0);
 	config_value = PG_GETARG_TEXT_PP(1);
-	char *name_str = NULL;
-	char *value_str = NULL;
-	const		NeuronDBConfigOpt *opt;
 
 	name_str = text_to_cstring(config_name);
 	value_str = text_to_cstring(config_value);
@@ -373,6 +373,9 @@ Datum
 get_vector_config(PG_FUNCTION_ARGS)
 {
 	text	   *config_name;
+	char *name_str = NULL;
+	const		NeuronDBConfigOpt *opt;
+	char *curr_value = NULL;
 
 	/* Validate argument count */
 	if (PG_NARGS() < 1)
@@ -381,9 +384,6 @@ get_vector_config(PG_FUNCTION_ARGS)
 				 errmsg("neurondb: get_vector_config requires at least 1 argument")));
 
 	config_name = PG_GETARG_TEXT_PP(0);
-	char *name_str = NULL;
-	const		NeuronDBConfigOpt *opt;
-	char *curr_value = NULL;
 
 	name_str = text_to_cstring(config_name);
 	opt = get_config_opt(name_str);
@@ -425,9 +425,6 @@ reset_vector_config(PG_FUNCTION_ARGS)
 		}
 	}
 
-	elog(DEBUG1,
-		 "neurondb: Reset %d settings to default values",
-		 reset_count);
 
 	PG_RETURN_BOOL(true);
 }

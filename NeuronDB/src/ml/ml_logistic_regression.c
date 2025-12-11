@@ -341,21 +341,12 @@ train_logistic_regression(PG_FUNCTION_ARGS)
 
 		if (nvec > max_samples)
 		{
-			elog(INFO,
-				 "neurondb: logistic_regression: dataset has %d rows, limiting to %d samples for training",
-				 nvec,
-				 max_samples);
 			nvec = max_samples;
 		}
 
 		if (NDB_SHOULD_TRY_GPU())
 			ndb_gpu_init_if_needed();
 
-		elog(DEBUG1,
-			 "neurondb: logistic_regression: checking GPU - compute_mode=%d, available=%d, kernel_enabled=%d",
-			 neurondb_compute_mode,
-			 neurondb_gpu_is_available() ? 1 : 0,
-			 ndb_gpu_kernel_enabled("lr_train") ? 1 : 0);
 
 		if (neurondb_gpu_is_available() && nvec > 0 && dim > 0 && nvec <= 1000000 && dim <= 10000
 			&& ndb_gpu_kernel_enabled("lr_train"))
@@ -369,20 +360,12 @@ train_logistic_regression(PG_FUNCTION_ARGS)
 
 			if (gpu_sample_limit <= 0 || gpu_sample_limit > 10000000)
 			{
-				elog(DEBUG1,
-					 "neurondb: logistic_regression: invalid gpu_sample_limit %d, skipping GPU",
-					 gpu_sample_limit);
 			}
 			else if (dim <= 0 || dim > 10000)
 			{
-				elog(DEBUG1,
-					 "neurondb: logistic_regression: invalid feature_dim %d, skipping GPU",
-					 dim);
 			}
 			else if (tbl_str == NULL || feat_str == NULL || targ_str == NULL)
 			{
-				elog(DEBUG1,
-					 "neurondb: logistic_regression: NULL table/column names, skipping GPU");
 			}
 			else
 			{
@@ -390,9 +373,6 @@ train_logistic_regression(PG_FUNCTION_ARGS)
 
 				PG_TRY();
 				{
-					elog(DEBUG1,
-						 "neurondb: logistic_regression: attempting GPU training with %d samples",
-						 gpu_sample_limit);
 
 					lr_dataset_load_limited(quoted_tbl,
 											quoted_feat,
@@ -402,44 +382,30 @@ train_logistic_regression(PG_FUNCTION_ARGS)
 
 					if (dataset.features == NULL)
 					{
-						elog(DEBUG1,
-							 "neurondb: logistic_regression: dataset.features is NULL after loading");
 						lr_dataset_free(&dataset);
 					}
 					else
 					{
 						if (dataset.labels == NULL)
 						{
-							elog(DEBUG1,
-								 "neurondb: logistic_regression: dataset.labels is NULL after loading");
 							lr_dataset_free(&dataset);
 						}
 						else
 						{
 							if (dataset.n_samples <= 0 || dataset.n_samples > 10000000)
 							{
-								elog(DEBUG1,
-									 "neurondb: logistic_regression: invalid n_samples %d after loading",
-									 dataset.n_samples);
 								lr_dataset_free(&dataset);
 							}
 							else
 							{
 								if (dataset.feature_dim <= 0 || dataset.feature_dim > 10000)
 								{
-									elog(DEBUG1,
-										 "neurondb: logistic_regression: invalid feature_dim %d after loading",
-										 dataset.feature_dim);
 									lr_dataset_free(&dataset);
 								}
 								else
 								{
 									if (dataset.n_samples * dataset.feature_dim > 100000000)
 									{
-										elog(DEBUG1,
-											 "neurondb: logistic_regression: dataset too large (%d x %d), skipping GPU",
-											 dataset.n_samples,
-											 dataset.feature_dim);
 										lr_dataset_free(&dataset);
 									}
 									else
@@ -447,14 +413,10 @@ train_logistic_regression(PG_FUNCTION_ARGS)
 										initStringInfo(&hyperbuf);
 										if (hyperbuf.data == NULL)
 										{
-											elog(DEBUG1,
-												 "neurondb: logistic_regression: failed to allocate hyperbuf");
 											lr_dataset_free(&dataset);
 										}
 										else
 										{
-											elog(DEBUG1,
-												 "neurondb: logistic_regression: building hyperparams JSON");
 											appendStringInfo(&hyperbuf,
 															 "{\"max_iters\":%d,\"learning_rate\":%.6f,\"lambda\":%.6f}",
 															 max_iters,
@@ -463,8 +425,6 @@ train_logistic_regression(PG_FUNCTION_ARGS)
 
 											if (hyperbuf.data == NULL || hyperbuf.len <= 0)
 											{
-												elog(DEBUG1,
-													 "neurondb: logistic_regression: failed to build hyperparams JSON");
 												nfree(hyperbuf.data);
 												lr_dataset_free(&dataset);
 											}
@@ -500,8 +460,6 @@ train_logistic_regression(PG_FUNCTION_ARGS)
 
 												if (gpu_hyperparams == NULL)
 												{
-													elog(DEBUG1,
-														 "neurondb: logistic_regression: gpu_hyperparams is NULL");
 													nfree(hyperbuf.data);
 													lr_dataset_free(&dataset);
 												}
@@ -509,8 +467,6 @@ train_logistic_regression(PG_FUNCTION_ARGS)
 												{
 													if (!neurondb_gpu_is_available())
 													{
-														elog(DEBUG1,
-															 "neurondb: logistic_regression: GPU no longer available");
 														if (gpu_hyperparams != NULL)
 															nfree(gpu_hyperparams);
 														nfree(hyperbuf.data);
@@ -520,32 +476,24 @@ train_logistic_regression(PG_FUNCTION_ARGS)
 													{
 														if (tbl_str == NULL || targ_str == NULL)
 														{
-															elog(DEBUG1,
-																 "neurondb: logistic_regression: NULL table/target strings before GPU call");
 															nfree(gpu_hyperparams);
 															nfree(hyperbuf.data);
 															lr_dataset_free(&dataset);
 														}
 														else if (dataset.features == NULL || dataset.labels == NULL)
 														{
-															elog(DEBUG1,
-																 "neurondb: logistic_regression: NULL dataset arrays before GPU call");
 															nfree(gpu_hyperparams);
 															nfree(hyperbuf.data);
 															lr_dataset_free(&dataset);
 														}
 														else if (dataset.n_samples <= 0 || dataset.feature_dim <= 0)
 														{
-															elog(DEBUG1,
-																 "neurondb: logistic_regression: invalid dataset dimensions before GPU call");
 															nfree(gpu_hyperparams);
 															nfree(hyperbuf.data);
 															lr_dataset_free(&dataset);
 														}
 														else if (!neurondb_gpu_is_available())
 														{
-															elog(DEBUG1,
-																 "neurondb: logistic_regression: GPU not available, using CPU");
 															nfree(gpu_hyperparams);
 															nfree(hyperbuf.data);
 															lr_dataset_free(&dataset);
@@ -582,9 +530,6 @@ train_logistic_regression(PG_FUNCTION_ARGS)
 
 																if (model_size == 0 || model_size > 100000000)
 																{
-																	elog(DEBUG1,
-																		 "neurondb: logistic_regression: invalid model_data size %zu",
-																		 model_size);
 																	gpu_training_succeeded = false;
 																}
 															}
@@ -606,8 +551,6 @@ train_logistic_regression(PG_FUNCTION_ARGS)
 				PG_CATCH();
 				{
 					/* Defensive: cleanup on error */
-					elog(DEBUG1,
-						 "neurondb: logistic_regression: exception during GPU dataset loading or training");
 					if (dataset.features != NULL || dataset.labels != NULL)
 						lr_dataset_free(&dataset);
 					if (gpu_hyperparams != NULL)
@@ -639,8 +582,6 @@ train_logistic_regression(PG_FUNCTION_ARGS)
 						int			i;
 						double		accuracy = 0.0;
 
-						elog(DEBUG1,
-							 "neurondb: logistic_regression: GPU training succeeded, converting to unified format");
 
 						/* Convert GPU format to unified format */
 						base = VARDATA(gpu_result.spec.model_data);
@@ -876,16 +817,11 @@ train_logistic_regression(PG_FUNCTION_ARGS)
 					/* GPU training failed - cleanup and fall back to CPU */
 					if (gpu_err != NULL)
 					{
-						elog(DEBUG1,
-							 "neurondb: logistic_regression: GPU training failed: %s",
-							 gpu_err);
 						nfree(gpu_err);
 						gpu_err = NULL;
 					}
 					else
 					{
-						elog(DEBUG1,
-							 "neurondb: logistic_regression: GPU training failed, falling back to CPU");
 					}
 
 					/*
@@ -965,10 +901,6 @@ train_logistic_regression(PG_FUNCTION_ARGS)
 			weights[k] = 0.0;
 	}
 
-	elog(DEBUG1,
-		 "neurondb: logistic_regression: processing %d rows in chunks of %d",
-		 nvec,
-		 chunk_size);
 
 	{
 		NdbSpiSession *stream_spi_session = NULL;
@@ -1008,12 +940,6 @@ train_logistic_regression(PG_FUNCTION_ARGS)
 				/* Log progress for large datasets */
 				if (offset % 100000 == 0 || offset >= nvec)
 				{
-					elog(DEBUG1,
-						 "neurondb: logistic_regression: iteration %d, processed %d/%d rows (%.1f%%)",
-						 iter,
-						 offset,
-						 nvec,
-						 (offset * 100.0) / nvec);
 				}
 			}
 
@@ -1048,10 +974,6 @@ train_logistic_regression(PG_FUNCTION_ARGS)
 			/* Log progress every 100 iterations */
 			if (iter % 100 == 0)
 			{
-				elog(DEBUG1,
-					 "neurondb: logistic_regression: iteration %d/%d completed",
-					 iter,
-					 max_iters);
 			}
 		}
 
@@ -1261,6 +1183,8 @@ train_logistic_regression(PG_FUNCTION_ARGS)
 		LRModel		model;
 		bytea	   *serialized = NULL;
 		MLCatalogModelSpec spec;
+		Jsonb	   *params_jsonb = NULL;
+		Jsonb	   *metrics_jsonb = NULL;
 
 		/* Build model struct */
 		/* Validate dim before using it - defensive check */
@@ -1292,10 +1216,6 @@ train_logistic_regression(PG_FUNCTION_ARGS)
 			model.weights = weights_tmp;
 		}
 
-		elog(DEBUG1,
-			 "neurondb: logistic_regression: saving model with n_features=%d, n_samples=%d",
-			 model.n_features,
-			 model.n_samples);
 		model.learning_rate = learning_rate;
 		model.lambda = lambda;
 		model.max_iters = max_iters;
@@ -1305,16 +1225,165 @@ train_logistic_regression(PG_FUNCTION_ARGS)
 		/* Serialize model with training_backend=0 (CPU) */
 		serialized = lr_model_serialize(&model, 0);
 
-		/* Build hyperparameters JSON */
-		nfree(hyperbuf.data);
-		hyperbuf.data = NULL;
-		initStringInfo(&hyperbuf);
-		appendStringInfo(&hyperbuf,
-						 "{\"max_iters\":%d,\"learning_rate\":%.6f,\"lambda\":%.6f}",
-						 max_iters,
-						 learning_rate,
-						 lambda);
-		/* Skip parameter and metrics JSONB creation to avoid issues */
+		/* Build parameters JSON using JSONB API */
+		{
+			JsonbParseState *state = NULL;
+			JsonbValue	jkey;
+			JsonbValue	jval;
+
+			JsonbValue *final_value = NULL;
+			Numeric		max_iters_num,
+						learning_rate_num,
+						lambda_num;
+
+			PG_TRY();
+			{
+				(void) pushJsonbValue(&state, WJB_BEGIN_OBJECT, NULL);
+
+				/* Add max_iters */
+				jkey.type = jbvString;
+				jkey.val.string.val = "max_iters";
+				jkey.val.string.len = strlen("max_iters");
+				(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+				max_iters_num = DatumGetNumeric(DirectFunctionCall1(int4_numeric, Int32GetDatum(max_iters)));
+				jval.type = jbvNumeric;
+				jval.val.numeric = max_iters_num;
+				(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+
+				/* Add learning_rate */
+				jkey.val.string.val = "learning_rate";
+				jkey.val.string.len = strlen("learning_rate");
+				(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+				learning_rate_num = DatumGetNumeric(DirectFunctionCall1(float8_numeric, Float8GetDatum(learning_rate)));
+				jval.type = jbvNumeric;
+				jval.val.numeric = learning_rate_num;
+				(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+
+				/* Add lambda */
+				jkey.val.string.val = "lambda";
+				jkey.val.string.len = strlen("lambda");
+				(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+				lambda_num = DatumGetNumeric(DirectFunctionCall1(float8_numeric, Float8GetDatum(lambda)));
+				jval.type = jbvNumeric;
+				jval.val.numeric = lambda_num;
+				(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+
+				final_value = pushJsonbValue(&state, WJB_END_OBJECT, NULL);
+
+				if (final_value == NULL)
+				{
+					elog(ERROR, "neurondb: train_logistic_regression: pushJsonbValue(WJB_END_OBJECT) returned NULL for parameters");
+				}
+
+				params_jsonb = JsonbValueToJsonb(final_value);
+			}
+			PG_CATCH();
+			{
+				ErrorData  *edata = CopyErrorData();
+
+				elog(ERROR, "neurondb: train_logistic_regression: parameters JSONB construction failed: %s", edata->message);
+				FlushErrorState();
+				params_jsonb = NULL;
+			}
+			PG_END_TRY();
+		}
+
+		/* Build metrics JSON using JSONB API */
+		{
+			JsonbParseState *state = NULL;
+			JsonbValue	jkey;
+			JsonbValue	jval;
+
+			JsonbValue *final_value = NULL;
+			Numeric		n_features_num,
+						n_samples_num,
+						final_loss_num,
+						accuracy_num;
+
+			PG_TRY();
+			{
+				(void) pushJsonbValue(&state, WJB_BEGIN_OBJECT, NULL);
+
+				/* Add algorithm */
+				jkey.type = jbvString;
+				jkey.val.string.val = "algorithm";
+				jkey.val.string.len = strlen("algorithm");
+				(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+				jval.type = jbvString;
+				jval.val.string.val = "logistic_regression";
+				jval.val.string.len = strlen("logistic_regression");
+				(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+
+				/* Add training_backend */
+				jkey.val.string.val = "training_backend";
+				jkey.val.string.len = strlen("training_backend");
+				(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+				{
+					Numeric training_backend_num = DatumGetNumeric(DirectFunctionCall1(int4_numeric, Int32GetDatum(0)));
+					jval.type = jbvNumeric;
+					jval.val.numeric = training_backend_num;
+					(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+				}
+
+				/* Add n_features */
+				jkey.val.string.val = "n_features";
+				jkey.val.string.len = strlen("n_features");
+				(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+				n_features_num = DatumGetNumeric(DirectFunctionCall1(int4_numeric, Int32GetDatum(dim)));
+				jval.type = jbvNumeric;
+				jval.val.numeric = n_features_num;
+				(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+
+				/* Add n_samples */
+				jkey.val.string.val = "n_samples";
+				jkey.val.string.len = strlen("n_samples");
+				(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+				n_samples_num = DatumGetNumeric(DirectFunctionCall1(int4_numeric, Int32GetDatum(nvec)));
+				jval.type = jbvNumeric;
+				jval.val.numeric = n_samples_num;
+				(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+
+				/* Add final_loss */
+				jkey.val.string.val = "final_loss";
+				jkey.val.string.len = strlen("final_loss");
+				(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+				final_loss_num = DatumGetNumeric(DirectFunctionCall1(float8_numeric, Float8GetDatum(final_loss)));
+				jval.type = jbvNumeric;
+				jval.val.numeric = final_loss_num;
+				(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+
+				/* Add accuracy */
+				jkey.val.string.val = "accuracy";
+				jkey.val.string.len = strlen("accuracy");
+				(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+				accuracy_num = DatumGetNumeric(DirectFunctionCall1(float8_numeric, Float8GetDatum(accuracy_val)));
+				jval.type = jbvNumeric;
+				jval.val.numeric = accuracy_num;
+				(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+
+				final_value = pushJsonbValue(&state, WJB_END_OBJECT, NULL);
+
+				if (final_value == NULL)
+				{
+					elog(ERROR, "neurondb: train_logistic_regression: pushJsonbValue(WJB_END_OBJECT) returned NULL for metrics");
+				}
+
+				metrics_jsonb = JsonbValueToJsonb(final_value);
+			}
+			PG_CATCH();
+			{
+				ErrorData  *edata = CopyErrorData();
+
+				elog(ERROR, "neurondb: train_logistic_regression: metrics JSONB construction failed: %s", edata->message);
+				FlushErrorState();
+				metrics_jsonb = NULL;
+			}
+			PG_END_TRY();
+		}
+
+		if (metrics_jsonb == NULL)
+		{
+		}
 
 		/* Register in catalog */
 		memset(&spec, 0, sizeof(spec));
@@ -1322,8 +1391,8 @@ train_logistic_regression(PG_FUNCTION_ARGS)
 		spec.model_type = "classification";
 		spec.training_table = tbl_str;
 		spec.training_column = targ_str;
-		spec.parameters = NULL; /* NULL parameters */
-		spec.metrics = NULL;	/* NULL metrics */
+		spec.parameters = params_jsonb;
+		spec.metrics = metrics_jsonb;
 		spec.model_data = serialized;
 		spec.training_time_ms = -1;
 		spec.num_samples = nvec;
@@ -1331,9 +1400,6 @@ train_logistic_regression(PG_FUNCTION_ARGS)
 
 		model_id = ml_catalog_register_model(&spec);
 
-		elog(DEBUG1,
-			 "logistic_regression: CPU training completed, model_id=%d",
-			 model_id);
 
 		nfree(model.weights);
 
@@ -1441,15 +1507,10 @@ predict_logistic_regression_model_id(PG_FUNCTION_ARGS)
 	/* Try GPU prediction first */
 	if (lr_try_gpu_predict_catalog(model_id, features, &probability))
 	{
-		elog(DEBUG1,
-			 "logistic_regression: GPU prediction succeeded, probability=%.6f",
-			 probability);
 		PG_RETURN_FLOAT8(probability);
 	}
 	else
 	{
-		elog(DEBUG1,
-			 "logistic_regression: GPU prediction failed or not available, trying CPU");
 	}
 
 	/*
@@ -1743,6 +1804,9 @@ evaluate_logistic_regression_by_model_id(PG_FUNCTION_ARGS)
 	NdbSpiSession *spi_session = NULL;
 	MemoryContext oldcontext;
 
+	/* Load model from catalog - try CPU first, then GPU */
+	LRModel *model = NULL;
+
 	if (PG_ARGISNULL(0))
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
@@ -1762,9 +1826,6 @@ evaluate_logistic_regression_by_model_id(PG_FUNCTION_ARGS)
 	tbl_str = text_to_cstring(table_name);
 	feat_str = text_to_cstring(feature_col);
 	targ_str = text_to_cstring(label_col);
-
-	/* Load model from catalog - try CPU first, then GPU */
-	LRModel *model = NULL;
 	if (!lr_load_model_from_catalog(model_id, &model))
 	{
 		/*
@@ -2900,12 +2961,7 @@ lr_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 	/* Store metrics in model state for later retrieval */
 	if (metrics != NULL)
 	{
-		/* Copy metrics to ensure they're in the correct memory context */
-		state->metrics = (Jsonb *) PG_DETOAST_DATUM_COPY(
-														 PointerGetDatum(metrics));
-		elog(DEBUG1,
-			 "lr_gpu_train: stored metrics in state: %p",
-			 (void *) state->metrics);
+		state->metrics = metrics;
 	}
 	else
 	{
@@ -3117,37 +3173,39 @@ lr_gpu_serialize(const MLGpuModel *model,
 		unified_payload = NULL;
 	}
 
-	/* Return stored metrics with training_backend updated */
-	if (metadata_out != NULL && state->metrics != NULL)
+	/* Return stored metrics; copy into caller context */
+	if (metadata_out != NULL)
 	{
-		/* Copy metrics and update training_backend to integer */
-		Jsonb	   *updated_metrics = NULL;
-		StringInfoData metrics_buf;
+		Jsonb	   *metrics_copy = NULL;
 
-		initStringInfo(&metrics_buf);
-		appendStringInfo(&metrics_buf,
+		if (state->metrics != NULL)
+		{
+			text   *metrics_text = DatumGetTextP(DirectFunctionCall1(jsonb_out,
+													 PointerGetDatum(state->metrics)));
+			char   *metrics_cstr = text_to_cstring(metrics_text);
+
+			metrics_copy = ndb_jsonb_in_cstring(metrics_cstr);
+			pfree(metrics_text);
+			nfree(metrics_cstr);
+		}
+		else
+		{
+			StringInfoData metrics_buf;
+
+			initStringInfo(&metrics_buf);
+			appendStringInfo(&metrics_buf,
 						 "{\"algorithm\":\"logistic_regression\","
 						 "\"training_backend\":1,"
 						 "\"n_features\":%d,"
 						 "\"n_samples\":%d}",
-						 state->feature_dim > 0 ? state->feature_dim : 0,
-						 state->n_samples > 0 ? state->n_samples : 0);
+					 state->feature_dim > 0 ? state->feature_dim : 0,
+					 state->n_samples > 0 ? state->n_samples : 0);
 
-		if (metrics_buf.data != NULL && metrics_buf.len > 0)
-		{
-			updated_metrics = ndb_jsonb_in_cstring(metrics_buf.data);
+			metrics_copy = ndb_jsonb_in_cstring(metrics_buf.data);
+			nfree(metrics_buf.data);
 		}
-		nfree(metrics_buf.data);
 
-		*metadata_out = updated_metrics;
-		elog(DEBUG1,
-			 "lr_gpu_serialize: returning updated metrics with training_backend=1");
-	}
-	else if (metadata_out != NULL)
-	{
-		*metadata_out = NULL;
-		elog(WARNING,
-			 "lr_gpu_serialize: state->metrics is NULL, cannot return metrics!");
+		*metadata_out = metrics_copy;
 	}
 
 	return true;
@@ -3230,7 +3288,18 @@ lr_gpu_deserialize(MLGpuModel *model,
 	state->model_blob = gpu_payload;
 	state->feature_dim = hdr->feature_dim;
 	state->n_samples = hdr->n_samples;
-	state->metrics = metadata != NULL ? (Jsonb *) PG_DETOAST_DATUM_COPY(PointerGetDatum(metadata)) : NULL;
+	state->metrics = NULL;
+
+	if (metadata != NULL)
+	{
+		text   *metadata_text = DatumGetTextP(DirectFunctionCall1(jsonb_out,
+											 PointerGetDatum(metadata)));
+		char   *metadata_cstr = text_to_cstring(metadata_text);
+
+		state->metrics = ndb_jsonb_in_cstring(metadata_cstr);
+		pfree(metadata_text);
+		nfree(metadata_cstr);
+	}
 
 	if (model->backend_state != NULL)
 		lr_gpu_release_state((LRGpuModelState *) model->backend_state);
@@ -3361,7 +3430,7 @@ lr_model_deserialize(const bytea * data, uint8 * training_backend_out)
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 						 errmsg("neurondb: lr_model_deserialize: model is in GPU format, not unified format"),
-						 errdetail("Model data appears to be in GPU format (%zu bytes, feature_dim=%d) but deserialization expects unified format. This indicates the model was not properly converted during training.",
+						 errdetail("Model data appears to be in GPU format (%d bytes, feature_dim=%d) but deserialization expects unified format. This indicates the model was not properly converted during training.",
 								   buf.len, first_value),
 						 errhint("GPU-trained models should be converted to unified format before storage. The training code should call lr_model_serialize() to convert GPU format to unified format.")));
 				return NULL;
@@ -3378,8 +3447,8 @@ lr_model_deserialize(const bytea * data, uint8 * training_backend_out)
 	{
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				 errmsg("neurondb: lr_model_deserialize: insufficient data in model (got %zu bytes, need at least %zu for header)",
-						buf.len, header_size),
+				 errmsg("neurondb: lr_model_deserialize: insufficient data in model (got %d bytes, need at least %zu for header)",
+						buf.len, (size_t) header_size),
 				 errdetail("Model data may be corrupted or in wrong format.")));
 		return NULL;
 	}
@@ -3430,10 +3499,10 @@ lr_model_deserialize(const bytea * data, uint8 * training_backend_out)
 		model = NULL;
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				 errmsg("neurondb: lr_model_deserialize: insufficient data for weights (got %zu bytes, need %zu for %d features)",
+				 errmsg("neurondb: lr_model_deserialize: insufficient data for weights (got %d bytes, need %zu for %d features)",
 						buf.len, expected_size, n_features_saved),
-				 errdetail("Model data may be corrupted or in wrong format. Expected %zu bytes (header %zu + %d weights * 8) but only have %zu bytes.",
-						   expected_size, header_size, n_features_saved, buf.len),
+				 errdetail("Model data may be corrupted or in wrong format. Expected %zu bytes (header %zu + %d weights * 8) but only have %d bytes.",
+						   expected_size, (size_t) header_size, n_features_saved, buf.len),
 				 errhint("This may indicate the model was stored in GPU format instead of unified format.")));
 		return NULL;
 	}
@@ -3513,10 +3582,6 @@ lr_try_gpu_predict_catalog(int32 model_id,
 	double		probability = 0.0;
 	bool		success = false;
 
-	elog(DEBUG1,
-		 "lr_try_gpu_predict_catalog: entry, model_id=%d, feature_dim=%d",
-		 model_id,
-		 feature_vec ? feature_vec->dim : -1);
 
 	/* Check compute mode - only try GPU if compute mode allows it */
 	if (!NDB_SHOULD_TRY_GPU())
@@ -3533,17 +3598,11 @@ lr_try_gpu_predict_catalog(int32 model_id,
 
 	if (!ml_catalog_fetch_model_payload(model_id, &payload, NULL, &metrics))
 	{
-		elog(DEBUG1,
-			 "lr_try_gpu_predict_catalog: failed to fetch model payload for model %d",
-			 model_id);
 		return false;
 	}
 
 	if (payload == NULL)
 	{
-		elog(DEBUG1,
-			 "lr_try_gpu_predict_catalog: payload is NULL for model %d",
-			 model_id);
 		goto cleanup;
 	}
 
@@ -3556,10 +3615,6 @@ lr_try_gpu_predict_catalog(int32 model_id,
 	 * training_backend flag is informational only, doesn't restrict
 	 * prediction
 	 */
-	elog(DEBUG1,
-		 "lr_try_gpu_predict_catalog: attempting GPU prediction for model %d, payload size=%d",
-		 model_id,
-		 VARSIZE(payload) - VARHDRSZ);
 
 #ifdef NDB_GPU_CUDA
 	/* Convert unified format to GPU format for prediction */
@@ -3579,8 +3634,6 @@ lr_try_gpu_predict_catalog(int32 model_id,
 		lr_model = lr_model_deserialize(payload, &training_backend);
 		if (lr_model == NULL)
 		{
-			elog(DEBUG1,
-				 "lr_try_gpu_predict_catalog: failed to deserialize unified format");
 			goto cleanup;
 		}
 
@@ -3618,10 +3671,6 @@ lr_try_gpu_predict_catalog(int32 model_id,
 		{
 			if (result_out != NULL)
 				*result_out = probability;
-			elog(DEBUG1,
-				 "logistic_regression: GPU prediction used for model %d probability=%.6f",
-				 model_id,
-				 probability);
 			success = true;
 		}
 		else if (gpu_err != NULL)
@@ -3650,8 +3699,6 @@ lr_try_gpu_predict_catalog(int32 model_id,
 	}
 #else
 	/* For non-CUDA builds, GPU prediction using CUDA format is not supported */
-	elog(DEBUG1,
-		 "lr_try_gpu_predict_catalog: CUDA format not supported in non-CUDA build");
 	success = false;
 #endif
 
@@ -3659,10 +3706,6 @@ lr_try_gpu_predict_catalog(int32 model_id,
 	{
 		if (result_out != NULL)
 			*result_out = probability;
-		elog(DEBUG1,
-			 "logistic_regression: GPU prediction used for model %d probability=%.6f",
-			 model_id,
-			 probability);
 		success = true;
 	}
 	else if (gpu_err != NULL)

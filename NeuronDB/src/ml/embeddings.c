@@ -1419,9 +1419,6 @@ configure_embedding_model(PG_FUNCTION_ARGS)
 				 errmsg("configure_embedding_model: failed to store configuration")));
 	}
 
-	elog(DEBUG1,
-		 "neurondb: configure_embedding_model: model='%s', config stored successfully",
-		 model_str);
 
 	nfree(model_str);
 	nfree(cfg_str);

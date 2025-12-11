@@ -291,6 +291,12 @@ ndb_cuda_linreg_train(const float *features,
 				k;
 	int			rc = -1;
 
+	/* Initialize output pointers to NULL */
+	if (model_data)
+		*model_data = NULL;
+	if (metrics)
+		*metrics = NULL;
+
 	/* Memory context check at start to catch early corruption */
 #ifdef MEMORY_CONTEXT_CHECKING
 	MemoryContextCheck(CurrentMemoryContext);
@@ -414,11 +420,6 @@ ndb_cuda_linreg_train(const float *features,
 			float	   *d_X_with_intercept = NULL;
 			size_t		X_bytes = sizeof(float) * (size_t) n_samples * (size_t) dim_with_intercept;
 
-			elog(DEBUG1,
-				 "neurondb: linear_regression: attempting cuBLAS path (handle=%p, n_samples=%d, dim=%d)",
-				 (void *) handle,
-				 n_samples,
-				 dim_with_intercept);
 
 			/* Allocate and build X matrix with intercept column */
 			err = cudaMalloc((void **) &d_X_with_intercept, X_bytes);
@@ -450,8 +451,6 @@ ndb_cuda_linreg_train(const float *features,
 			 * Use optimized custom kernel for X'X and X'y - it's correct and
 			 * fast
 			 */
-			elog(DEBUG1,
-				 "neurondb: linear_regression: using optimized custom kernel for X'X/X'y");
 			goto kernel_fallback;
 
 	kernel_fallback:

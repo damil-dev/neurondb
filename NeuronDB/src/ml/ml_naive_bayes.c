@@ -35,6 +35,8 @@
 #include "neurondb_safe_memory.h"
 #include "neurondb_macros.h"
 #include "neurondb_json.h"
+#include "neurondb_guc.h"
+#include "ml_gpu_naive_bayes.h"
 
 #ifdef NDB_GPU_CUDA
 #include "neurondb_cuda_runtime.h"
@@ -73,8 +75,8 @@ static void nb_free_model_and_metadata(GaussianNBModel * model,
 									   bytea * model_data,
 									   Jsonb * metrics);
 
-static bytea * nb_model_serialize_to_bytea(const GaussianNBModel * model);
-static GaussianNBModel * nb_model_deserialize_from_bytea(const bytea * data);
+static bytea * nb_model_serialize_to_bytea(const GaussianNBModel * model, uint8 training_backend);
+static GaussianNBModel * nb_model_deserialize_from_bytea(const bytea * data, uint8 * training_backend_out);
 
 static Datum nb_evaluate_naive_bayes_internal(FunctionCallInfo fcinfo);
 static void nb_predict_batch(const GaussianNBModel * model,
@@ -156,8 +158,6 @@ train_naive_bayes_classifier(PG_FUNCTION_ARGS)
 					 quote_identifier(tbl_str),
 					 quote_identifier(feat_str),
 					 quote_identifier(label_str));
-	elog(DEBUG1, "train_naive_bayes_classifier: executing query: %s",
-		 query.data);
 
 	ret = ndb_spi_execute_safe(query.data, true, 0);
 	NDB_CHECK_SPI_TUPTABLE();
@@ -587,9 +587,10 @@ nb_free_model_and_metadata(GaussianNBModel * model,
 
 /*
  * Serialize GaussianNBModel to bytea for storage
+ * Uses unified storage format with training_backend byte prefix
  */
 static bytea *
-nb_model_serialize_to_bytea(const GaussianNBModel * model)
+nb_model_serialize_to_bytea(const GaussianNBModel * model, uint8 training_backend)
 {
 	StringInfoData buf;
 	int			i,
@@ -598,7 +599,19 @@ nb_model_serialize_to_bytea(const GaussianNBModel * model)
 
 	bytea *result = NULL;
 
+	/* Validate training_backend */
+	if (training_backend > 1)
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_INTERNAL_ERROR),
+				 errmsg("neurondb: nb_model_serialize_to_bytea: invalid training_backend %d (must be 0 or 1)",
+						training_backend)));
+	}
+
 	initStringInfo(&buf);
+
+	/* Write training_backend first (0=CPU, 1=GPU) - unified storage format */
+	appendBinaryStringInfo(&buf, (char *) &training_backend, sizeof(uint8));
 
 	/* Write header: n_classes, n_features */
 	appendBinaryStringInfo(&buf, (char *) &model->n_classes,
@@ -642,15 +655,19 @@ nb_model_serialize_to_bytea(const GaussianNBModel * model)
 
  /*
   * Deserialize bytea to GaussianNBModel
+  * Supports unified storage format with training_backend byte prefix
+  * Also supports GPU format (NdbCudaNbModelHeader) for backward compatibility
   */
 static GaussianNBModel *
-nb_model_deserialize_from_bytea(const bytea * data)
+nb_model_deserialize_from_bytea(const bytea * data, uint8 * training_backend_out)
 {
 	GaussianNBModel *model = NULL;
 	const char *buf;
 	int			offset = 0;
 	int			i,
 				j;
+	uint8		training_backend = 0;
+	bool		is_gpu_format = false;
 
 	if (data == NULL || VARSIZE_ANY_EXHDR(data) < sizeof(int) * 2)
 		ereport(ERROR,
@@ -659,14 +676,89 @@ nb_model_deserialize_from_bytea(const bytea * data)
 
 	buf = VARDATA_ANY(data);
 
-	model = (GaussianNBModel *) palloc0(sizeof(GaussianNBModel));
-	NDB_CHECK_ALLOC(model, "model");
+	/* Detect format: GPU format starts with NdbCudaNbModelHeader (3 int32s) */
+	/* Unified format starts with training_backend (uint8, 0 or 1) */
+	/* Check if first byte is a valid training_backend (0 or 1) */
+	/* and if the data size matches unified format */
+	{
+		uint8		first_byte = (uint8) buf[0];
+		int			data_size = VARSIZE_ANY_EXHDR(data);
+		int			min_unified_size = sizeof(uint8) + sizeof(int) * 2; /* training_backend + n_classes + n_features */
 
-	/* Read header */
-	memcpy(&model->n_classes, buf + offset, sizeof(int));
-	offset += sizeof(int);
-	memcpy(&model->n_features, buf + offset, sizeof(int));
-	offset += sizeof(int);
+		/* If first byte is 0 or 1, it might be unified format */
+		/* But we need to verify by checking if the following ints are reasonable */
+		if (first_byte <= 1 && data_size >= min_unified_size)
+		{
+			int			n_classes_candidate;
+			int			n_features_candidate;
+
+			/* Read candidate values */
+			memcpy(&n_classes_candidate, buf + sizeof(uint8), sizeof(int));
+			memcpy(&n_features_candidate, buf + sizeof(uint8) + sizeof(int), sizeof(int));
+
+			/* Validate: n_classes should be 2, n_features should be reasonable */
+			if (n_classes_candidate == 2 && n_features_candidate > 0 && n_features_candidate <= 100000)
+			{
+				/* This looks like unified format */
+				is_gpu_format = false;
+			}
+			else
+			{
+				/* First byte might be part of GPU format's n_classes */
+				is_gpu_format = true;
+			}
+		}
+		else
+		{
+			/* First byte is not 0 or 1, must be GPU format */
+			is_gpu_format = true;
+		}
+	}
+
+	if (is_gpu_format)
+	{
+		/* GPU format: starts with NdbCudaNbModelHeader */
+		const NdbCudaNbModelHeader *gpu_hdr;
+
+		if (VARSIZE_ANY_EXHDR(data) < sizeof(NdbCudaNbModelHeader))
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					 errmsg("neurondb: invalid GPU model data: too small")));
+
+		gpu_hdr = (const NdbCudaNbModelHeader *) buf;
+		offset = sizeof(NdbCudaNbModelHeader);
+
+		model = (GaussianNBModel *) palloc0(sizeof(GaussianNBModel));
+		NDB_CHECK_ALLOC(model, "model");
+
+		model->n_classes = gpu_hdr->n_classes;
+		model->n_features = gpu_hdr->n_features;
+
+		if (training_backend_out != NULL)
+			*training_backend_out = 1; /* GPU */
+	}
+	else
+	{
+		/* Unified format: starts with training_backend byte */
+		if (VARSIZE_ANY_EXHDR(data) < sizeof(uint8) + sizeof(int) * 2)
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					 errmsg("neurondb: invalid unified model data: too small")));
+
+		training_backend = (uint8) buf[offset];
+		offset += sizeof(uint8);
+		if (training_backend_out != NULL)
+			*training_backend_out = training_backend;
+
+		model = (GaussianNBModel *) palloc0(sizeof(GaussianNBModel));
+		NDB_CHECK_ALLOC(model, "model");
+
+		/* Read header */
+		memcpy(&model->n_classes, buf + offset, sizeof(int));
+		offset += sizeof(int);
+		memcpy(&model->n_features, buf + offset, sizeof(int));
+		offset += sizeof(int);
+	}
 
 	/* Enforce binary-only behavior */
 	if (model->n_classes != 2)
@@ -684,20 +776,37 @@ nb_model_deserialize_from_bytea(const bytea * data)
 
 	/* Verify we have enough data */
 	{
-		int			expected_size = sizeof(int) * 2 +
-			sizeof(double) * model->n_classes +
-			sizeof(double) * model->n_classes *
-			model->n_features +
-			sizeof(double) * model->n_classes *
-			model->n_features;
+		int			expected_size;
 		int			actual_size = VARSIZE_ANY_EXHDR(data);
+
+		if (is_gpu_format)
+		{
+			/* GPU format: header (NdbCudaNbModelHeader) + data */
+			expected_size = sizeof(NdbCudaNbModelHeader) +
+				sizeof(double) * model->n_classes +
+				sizeof(double) * model->n_classes *
+				model->n_features +
+				sizeof(double) * model->n_classes *
+				model->n_features;
+		}
+		else
+		{
+			/* Unified format: training_backend + header + data */
+			expected_size = sizeof(uint8) + sizeof(int) * 2 +
+				sizeof(double) * model->n_classes +
+				sizeof(double) * model->n_classes *
+				model->n_features +
+				sizeof(double) * model->n_classes *
+				model->n_features;
+		}
 
 		if (actual_size < expected_size)
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("neurondb: invalid model data: expected %d "
-							"bytes, got %d bytes",
-							expected_size, actual_size)));
+							"bytes, got %d bytes (format: %s)",
+							expected_size, actual_size,
+							is_gpu_format ? "GPU" : "unified")));
 	}
 
 	/* Allocate arrays */
@@ -785,6 +894,7 @@ train_naive_bayes_classifier_model_id(PG_FUNCTION_ARGS)
 	MLCatalogModelSpec spec;
 
 	Jsonb *metrics = NULL;
+	Jsonb *params_jsonb = NULL;
 	int32		model_id;
 	Oid			feat_type_oid;
 	bool		feat_is_array;
@@ -813,9 +923,6 @@ train_naive_bayes_classifier_model_id(PG_FUNCTION_ARGS)
 					 quote_identifier(tbl_str),
 					 quote_identifier(feat_str),
 					 quote_identifier(label_str));
-	elog(DEBUG1,
-		 "train_naive_bayes_classifier_model_id: executing query: %s",
-		 query.data);
 
 	ret = ndb_spi_execute_safe(query.data, true, 0);
 	NDB_CHECK_SPI_TUPTABLE();
@@ -853,8 +960,9 @@ train_naive_bayes_classifier_model_id(PG_FUNCTION_ARGS)
 	/*
 	 * Serialize model to bytea BEFORE SPI_finish() - model arrays are in SPI
 	 * context
+	 * Use training_backend=0 for CPU training (unified storage format)
 	 */
-	model_data = nb_model_serialize_to_bytea(&model);
+	model_data = nb_model_serialize_to_bytea(&model, 0);
 
 	/* Free query.data while still in SPI context, before switching */
 	ndb_spi_stringinfo_free(train_nb_model_spi_session, &query);
@@ -877,25 +985,109 @@ train_naive_bayes_classifier_model_id(PG_FUNCTION_ARGS)
 
 	NDB_SPI_SESSION_END(train_nb_model_spi_session);
 
-	/* Build metrics JSONB */
+	/* Build parameters JSON using JSONB API (empty object for Naive Bayes) */
 	{
-		StringInfoData metrics_json;
+		JsonbParseState *state = NULL;
+		JsonbValue *final_value = NULL;
 
-		initStringInfo(&metrics_json);
-		appendStringInfo(&metrics_json,
-						 "{\"storage\": \"cpu\", \"n_classes\": %d, \"n_features\": %d}",
-						 n_classes, n_features);
-
-		/* Use ndb_jsonb_in_cstring like test 006 fix */
-		metrics = ndb_jsonb_in_cstring(metrics_json.data);
-		if (metrics == NULL)
+		PG_TRY();
 		{
-			nfree(metrics_json.data);
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
-					 errmsg("neurondb: failed to parse metrics JSON")));
+			(void) pushJsonbValue(&state, WJB_BEGIN_OBJECT, NULL);
+			final_value = pushJsonbValue(&state, WJB_END_OBJECT, NULL);
+
+			if (final_value == NULL)
+			{
+				elog(ERROR, "neurondb: train_naive_bayes: pushJsonbValue(WJB_END_OBJECT) returned NULL for parameters");
+			}
+
+			params_jsonb = JsonbValueToJsonb(final_value);
 		}
-		nfree(metrics_json.data);
+		PG_CATCH();
+		{
+			ErrorData  *edata = CopyErrorData();
+
+			elog(ERROR, "neurondb: train_naive_bayes: parameters JSONB construction failed: %s", edata->message);
+			FlushErrorState();
+			params_jsonb = NULL;
+		}
+		PG_END_TRY();
+	}
+
+	/* Build metrics JSON using JSONB API */
+	{
+		JsonbParseState *state = NULL;
+		JsonbValue	jkey;
+		JsonbValue	jval;
+
+		JsonbValue *final_value = NULL;
+		Numeric		n_classes_num,
+					n_features_num;
+
+		PG_TRY();
+		{
+			(void) pushJsonbValue(&state, WJB_BEGIN_OBJECT, NULL);
+
+			/* Add storage */
+			jkey.type = jbvString;
+			jkey.val.string.val = "storage";
+			jkey.val.string.len = strlen("storage");
+			(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+			jval.type = jbvString;
+			jval.val.string.val = "cpu";
+			jval.val.string.len = strlen("cpu");
+			(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+
+			/* Add training_backend */
+			jkey.val.string.val = "training_backend";
+			jkey.val.string.len = strlen("training_backend");
+			(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+			{
+				Numeric training_backend_num = DatumGetNumeric(DirectFunctionCall1(int4_numeric, Int32GetDatum(0)));
+				jval.type = jbvNumeric;
+				jval.val.numeric = training_backend_num;
+				(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+			}
+
+			/* Add n_classes */
+			jkey.val.string.val = "n_classes";
+			jkey.val.string.len = strlen("n_classes");
+			(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+			n_classes_num = DatumGetNumeric(DirectFunctionCall1(int4_numeric, Int32GetDatum(n_classes)));
+			jval.type = jbvNumeric;
+			jval.val.numeric = n_classes_num;
+			(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+
+			/* Add n_features */
+			jkey.val.string.val = "n_features";
+			jkey.val.string.len = strlen("n_features");
+			(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+			n_features_num = DatumGetNumeric(DirectFunctionCall1(int4_numeric, Int32GetDatum(n_features)));
+			jval.type = jbvNumeric;
+			jval.val.numeric = n_features_num;
+			(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+
+			final_value = pushJsonbValue(&state, WJB_END_OBJECT, NULL);
+
+			if (final_value == NULL)
+			{
+				elog(ERROR, "neurondb: train_naive_bayes: pushJsonbValue(WJB_END_OBJECT) returned NULL for metrics");
+			}
+
+			metrics = JsonbValueToJsonb(final_value);
+		}
+		PG_CATCH();
+		{
+			ErrorData  *edata = CopyErrorData();
+
+			elog(ERROR, "neurondb: train_naive_bayes: metrics JSONB construction failed: %s", edata->message);
+			FlushErrorState();
+			metrics = NULL;
+		}
+		PG_END_TRY();
+	}
+
+	if (metrics == NULL)
+	{
 	}
 
 	/* Store model in catalog */
@@ -905,6 +1097,7 @@ train_naive_bayes_classifier_model_id(PG_FUNCTION_ARGS)
 	spec.training_table = tbl_str;
 	spec.training_column = label_str;
 	spec.model_data = model_data;
+	spec.parameters = params_jsonb;
 	spec.metrics = metrics;
 	spec.num_samples = valid;
 	spec.num_features = dim;
@@ -1106,7 +1299,11 @@ predict_naive_bayes_model_id(PG_FUNCTION_ARGS)
 		model_data = copy;
 	}
 
-	model = nb_model_deserialize_from_bytea(model_data);
+	{
+		uint8		training_backend = 0;
+
+		model = nb_model_deserialize_from_bytea(model_data, &training_backend);
+	}
 
 	/* Enforce binary-only behavior */
 	if (model->n_classes != 2)
@@ -1420,7 +1617,11 @@ nb_evaluate_naive_bayes_internal(FunctionCallInfo fcinfo)
 		nalloc(copy_raw, char, data_len);
 		copy = (bytea *) copy_raw;
 		memcpy(copy, gpu_payload, data_len);
-		model = nb_model_deserialize_from_bytea(copy);
+		{
+			uint8		training_backend = 0;
+
+			model = nb_model_deserialize_from_bytea(copy, &training_backend);
+		}
 		nfree(copy);
 	}
 
@@ -1438,9 +1639,6 @@ nb_evaluate_naive_bayes_internal(FunctionCallInfo fcinfo)
 					 quote_identifier(tbl_str),
 					 quote_identifier(feat_str),
 					 quote_identifier(targ_str));
-	elog(DEBUG1,
-		 "evaluate_naive_bayes_by_model_id: executing query: %s",
-		 query.data);
 
 	ret = ndb_spi_execute_safe(query.data, true, 0);
 	NDB_CHECK_SPI_TUPTABLE();
@@ -2230,19 +2428,9 @@ cpu_evaluation_path:
 					 f1_score,
 					 n_samples_for_json);
 
-	result_jsonb = DatumGetJsonbP(DirectFunctionCall1(
-													  jsonb_in, CStringGetTextDatum(jsonbuf.data)));
-
-	nfree(jsonbuf.data);
-
-	/*
-	 * Copy result_jsonb to caller's context before SPI_finish(). This ensures
-	 * the JSONB remains valid after the SPI context is deleted. The JSONB is
-	 * allocated in SPI context and will be invalid after SPI_finish() deletes
-	 * that context.
-	 */
 	MemoryContextSwitchTo(oldcontext);
-	result_jsonb = (Jsonb *) PG_DETOAST_DATUM_COPY(JsonbPGetDatum(result_jsonb));
+	result_jsonb = ndb_jsonb_in_cstring(jsonbuf.data);
+	nfree(jsonbuf.data);
 
 	/* Now safe to finish SPI */
 	nfree(query.data);
@@ -2322,7 +2510,6 @@ nb_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec,
 		return false;
 	}
 
-	elog(DEBUG1, "naive_bayes: Calling backend->nb_train()");
 
 	payload = NULL;
 	rc = backend->nb_train(spec->feature_matrix,
@@ -2469,7 +2656,13 @@ nb_gpu_serialize(const MLGpuModel *model,
 	/* Copy metrics if present */
 	if (state->metrics != NULL && metadata_out != NULL)
 	{
-		metrics_copy = (Jsonb *) PG_DETOAST_DATUM_COPY(JsonbPGetDatum(state->metrics));
+		text   *metrics_text = DatumGetTextP(DirectFunctionCall1(jsonb_out,
+										 PointerGetDatum(state->metrics)));
+		char   *metrics_cstr = text_to_cstring(metrics_text);
+
+		metrics_copy = ndb_jsonb_in_cstring(metrics_cstr);
+		pfree(metrics_text);
+		nfree(metrics_cstr);
 	}
 
 	*payload_out = blob_copy;
@@ -2538,7 +2731,13 @@ nb_gpu_deserialize(MLGpuModel *model,
 
 	if (metadata != NULL)
 	{
-		state->metrics = (Jsonb *) PG_DETOAST_DATUM_COPY(JsonbPGetDatum(metadata));
+		text   *metadata_text = DatumGetTextP(DirectFunctionCall1(jsonb_out,
+										 PointerGetDatum(metadata)));
+		char   *metadata_cstr = text_to_cstring(metadata_text);
+
+		state->metrics = ndb_jsonb_in_cstring(metadata_cstr);
+		pfree(metadata_text);
+		nfree(metadata_cstr);
 	}
 
 	state->feature_dim = hdr->n_features;

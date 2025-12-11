@@ -74,11 +74,6 @@ vector_time_travel(PG_FUNCTION_ARGS)
 
 	tbl_str = text_to_cstring(table_name);
 
-	elog(INFO,
-		 "neurondb: vector_time_travel called for table '%s' at "
-		 "timestamp " INT64_FORMAT,
-		 tbl_str,
-		 (int64) system_time);
 
 	if (timestamp2tm(system_time, NULL, &tm, &fsec, NULL, NULL) != 0)
 		ereport(ERROR,
@@ -138,9 +133,6 @@ vector_time_travel(PG_FUNCTION_ARGS)
 						tbl_str)));
 	}
 
-	elog(INFO,
-		 "neurondb: table '%s' verified to exist for time-travel query",
-		 tbl_str);
 
 	initStringInfo(&sql);
 	appendStringInfo(&sql,
@@ -232,11 +224,6 @@ compress_cold_tier(PG_FUNCTION_ARGS)
 
 	tbl_str = text_to_cstring(table_name);
 
-	elog(INFO,
-		 "neurondb: compress_cold_tier called on table: %s, threshold "
-		 "age_days=%d",
-		 tbl_str,
-		 age_days);
 
 	/* Prepare temp memory context for robust memory cleanup */
 	tmpcontext = AllocSetContextCreate(CurrentMemoryContext,
@@ -347,11 +334,6 @@ compress_cold_tier(PG_FUNCTION_ARGS)
 		if (!isnull)
 			compressed_count = DatumGetInt64(d);
 	}
-	elog(DEBUG1,
-		 "neurondb: found " NDB_INT64_FMT
-		 " vector(s) older than threshold for compression in %s",
-		 NDB_INT64_CAST(compressed_count),
-		 tbl_str);
 
 	/* Step 3: If there are candidates, compress/move up to 1000 in a batch */
 	if (compressed_count > 0)
@@ -409,11 +391,6 @@ compress_cold_tier(PG_FUNCTION_ARGS)
 										 * batch */
 		}
 
-		elog(DEBUG1,
-			 "neurondb: attempted to move " NDB_INT64_FMT
-			 " vectors; " NDB_INT64_FMT " records processed",
-			 NDB_INT64_CAST(compressed_count),
-			 NDB_INT64_CAST(moved_count));
 
 		/* Mark original rows as compressed in the main table */
 		resetStringInfo(&sql);
@@ -435,11 +412,6 @@ compress_cold_tier(PG_FUNCTION_ARGS)
 	}
 	else
 	{
-		elog(DEBUG1,
-			 "neurondb: no candidate vectors found older than %d "
-			 "days in %s",
-			 age_days,
-			 tbl_str);
 	}
 
 	/* Clean up */
@@ -477,8 +449,9 @@ vacuum_vectors(PG_FUNCTION_ARGS)
 	bool		isnull;
 	MemoryContext oldcontext,
 				tmpcontext;
-
 	NdbSpiSession *session = NULL;
+
+	(void) live_tuples;		/* Reserved for future use */
 
 	if (PG_ARGISNULL(0) || PG_ARGISNULL(1))
 		ereport(ERROR,
@@ -490,11 +463,6 @@ vacuum_vectors(PG_FUNCTION_ARGS)
 
 	tbl_str = text_to_cstring(table_name);
 
-	elog(INFO,
-		 "neurondb: vacuum_vectors called with table \"%s\" "
-		 "vacuum_full=%s",
-		 tbl_str,
-		 full ? "true" : "false");
 
 	tmpcontext = AllocSetContextCreate(CurrentMemoryContext,
 									   "vacuum_vectors temp context",
@@ -557,12 +525,6 @@ vacuum_vectors(PG_FUNCTION_ARGS)
 								   &isnull);
 		if (!isnull)
 			live_tuples = DatumGetInt64(live_datum);
-		elog(DEBUG1,
-			 "neurondb: \"%s\" before vacuum - dead tuples: %ld, "
-			 "live: %ld",
-			 tbl_str,
-			 (long) dead_tuples,
-			 (long) live_tuples);
 	}
 	nfree(stat_sql.data);
 
@@ -592,10 +554,6 @@ vacuum_vectors(PG_FUNCTION_ARGS)
 	cleaned_count += orphan_count;
 	nfree(sql.data);
 
-	elog(DEBUG1,
-		 "neurondb: removed %ld orphaned vectors from \"%s\"",
-		 (long) orphan_count,
-		 tbl_str);
 
 	/* Step 3: Issue PostgreSQL VACUUM (FULL/standard as specified) */
 	initStringInfo(&sql);
@@ -606,7 +564,6 @@ vacuum_vectors(PG_FUNCTION_ARGS)
 		appendStringInfo(
 						 &sql, "VACUUM (ANALYZE, VERBOSE) %s;", tbl_str);
 
-	elog(DEBUG1, "neurondb: executing vacuum command: %s", sql.data);
 
 	ret = ndb_spi_execute(session, sql.data, false, 0);
 	if (ret < 0)
@@ -614,10 +571,6 @@ vacuum_vectors(PG_FUNCTION_ARGS)
 			 "neurondb: PostgreSQL VACUUM failed on \"%s\"",
 			 tbl_str);
 	else
-		elog(DEBUG1,
-			 "neurondb: PostgreSQL VACUUM completed successfully "
-			 "for \"%s\"",
-			 tbl_str);
 	nfree(sql.data);
 
 	/* Step 4: Update and persist neurondb-specific statistics */
@@ -717,11 +670,6 @@ rebalance_index(PG_FUNCTION_ARGS)
 
 	idx_str = text_to_cstring(index_name);
 
-	elog(INFO,
-		 "neurondb: rebalance_index called on \"%s\" with "
-		 "target_balance %.4f",
-		 idx_str,
-		 target_balance);
 
 	tmpcontext = AllocSetContextCreate(CurrentMemoryContext,
 									   "rebalance_index temp context",
@@ -803,10 +751,6 @@ rebalance_index(PG_FUNCTION_ARGS)
 		/* Ignore balance factor because we are about to update it */
 	}
 
-	elog(DEBUG1,
-		 "neurondb: index \"%s\" original: %ld nodes",
-		 idx_str,
-		 (long) total_nodes);
 
 	/*
 	 * In a full implementation we would: - examine all node-layers of HNSW
@@ -843,12 +787,6 @@ rebalance_index(PG_FUNCTION_ARGS)
 			 "neurondb: updating index metadata failed for \"%s\"",
 			 idx_str);
 
-	elog(DEBUG1,
-		 "neurondb: rebalanced (simulated) %ld edges in index \"%s\" "
-		 "(target balance=%.3f)",
-		 (long) rebalanced_edges,
-		 idx_str,
-		 target_balance);
 
 	nfree(sql.data);
 	nfree(idx_str);

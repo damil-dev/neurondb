@@ -353,12 +353,6 @@ model_backend_load(const char *path, ModelType type)
 			break;
 	}
 
-	elog(DEBUG1,
-		 "neurondb: Model backend loader: path='%s', type=%s, size=%lu, msg='%s'",
-		 path,
-		 model_type_to_cstr(type),
-		 (unsigned long) hdl->model_size_bytes,
-		 hdl->backend_msg);
 
 	return hdl;
 }
@@ -490,13 +484,6 @@ load_model(PG_FUNCTION_ARGS)
 	entry->next = model_registry_head;
 	model_registry_head = entry;
 
-	elog(DEBUG1,
-		 "neurondb: Registered and loaded model '%s' (type: %s, size: %lu bytes) from '%s'. Backend: %s",
-		 name_str,
-		 model_type_to_cstr(t),
-		 (unsigned long) handle->model_size_bytes,
-		 path_str,
-		 handle->backend_msg);
 
 	PG_RETURN_BOOL(true);
 }
@@ -538,9 +525,6 @@ predict(PG_FUNCTION_ARGS)
 				(errcode(ERRCODE_INTERNAL_ERROR),
 				 errmsg("neurondb: predict() CurrentMemoryContext is NULL")));
 	}
-	elog(DEBUG1,
-		 "neurondb: predict() memory context: current=%p, top=%p",
-		 (void *) CurrentMemoryContext, (void *) TopMemoryContext);
 
 	if (model_name == NULL)
 		ereport(ERROR,
@@ -721,14 +705,6 @@ predict(PG_FUNCTION_ARGS)
 						name_str, MODEL_HANDLE_MAGIC, m->model_handle->magic)));
 	}
 
-	elog(DEBUG1,
-		 "neurondb: [predict] Model '%s' (type=%s) on %d-dim vector; "
-		 "model loaded from '%s'; backend msg='%s'",
-		 name_str,
-		 model_type_to_cstr(m->type),
-		 input->dim,
-		 m->path,
-		 m->model_handle->backend_msg);
 
 	/* Check if backend is actually available (not just a stub) */
 	if (strstr(m->model_handle->backend_msg, "stub") != NULL)
@@ -958,12 +934,6 @@ predict_batch(PG_FUNCTION_ARGS)
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("neurondb: Input array for predict_batch contains nulls. Not supported.")));
 
-	elog(DEBUG1,
-		 "neurondb: [predict_batch] Model '%s' on batch: %ld vectors "
-		 "(backend: '%s')",
-		 name_str,
-		 (long) nvecs,
-		 m->model_handle->backend_msg);
 
 	/* Check if backend is actually available (not just a stub) */
 	if (strstr(m->model_handle->backend_msg, "stub") != NULL)
@@ -1406,13 +1376,6 @@ finetune_model(PG_FUNCTION_ARGS)
 		NDB_SPI_SESSION_END(finetune_spi_session);
 	}
 
-	elog(DEBUG1,
-		 "neurondb: Fine-tuned model '%s' using %d rows from '%s'. Config: %s. New version: %d",
-		 name_str,
-		 proc,
-		 table_str,
-		 config_str,
-		 m->model_handle->version);
 
 	PG_RETURN_BOOL(true);
 }
@@ -1482,11 +1445,6 @@ export_model(PG_FUNCTION_ARGS)
 
 	if (pg_strcasecmp(fmt_str, model_type_to_cstr(m->type)) != 0)
 	{
-		elog(DEBUG1,
-			 "neurondb: Model '%s' is type '%s' but export requested as '%s'. Compatibility not guaranteed.",
-			 name_str,
-			 model_type_to_cstr(m->type),
-			 fmt_str);
 	}
 
 	f = fopen(path_str, "wb");
@@ -1620,14 +1578,6 @@ export_model(PG_FUNCTION_ARGS)
 						path_str, strerror(saved_errno))));
 	}
 
-	elog(DEBUG1,
-		 "neurondb: Model '%s' (type=%s) exported to '%s' as format '%s'; size=%lu, version=%u",
-		 name_str,
-		 model_type_to_cstr(m->type),
-		 path_str,
-		 fmt_str,
-		 (unsigned long) sz,
-		 m->model_handle->version);
 
 	PG_RETURN_BOOL(true);
 }
@@ -1891,7 +1841,6 @@ export_model_to_onnx(PG_FUNCTION_ARGS)
 			 "python3 %s --export %s %s %s",
 			 full_script_path, temp_path, algorithm, output_path);
 
-	elog(DEBUG1, "neurondb: export_model_to_onnx: executing: %s", cmd_buf);
 
 	/* Execute Python script */
 	cmd_ret = system(cmd_buf);
@@ -1913,9 +1862,6 @@ export_model_to_onnx(PG_FUNCTION_ARGS)
 	/* Clean up temp file */
 	unlink(temp_path);
 
-	elog(DEBUG1,
-		 "neurondb: export_model_to_onnx: Model %d (algorithm=%s) exported to %s",
-		 model_id, algorithm, output_path);
 
 	nfree(model_data);
 	nfree(algorithm);
@@ -2030,7 +1976,6 @@ import_model_from_onnx(PG_FUNCTION_ARGS)
 			 "python3 %s --import %s %s %s",
 			 full_script_path, onnx_path, algorithm, temp_path);
 
-	elog(DEBUG1, "neurondb: import_model_from_onnx: executing: %s", cmd_buf);
 
 	/* Execute Python script */
 	cmd_ret = system(cmd_buf);
@@ -2177,9 +2122,6 @@ import_model_from_onnx(PG_FUNCTION_ARGS)
 		NDB_SPI_SESSION_END(import_spi_session);
 	}
 
-	elog(DEBUG1,
-		 "neurondb: import_model_from_onnx: Model %d (algorithm=%s) imported from %s",
-		 model_id, algorithm, onnx_path);
 
 	nfree(model_data);
 	nfree(onnx_path);

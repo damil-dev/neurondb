@@ -109,18 +109,18 @@ ndb_rocm_rf_histogram(const int *labels,
 	label_bytes = sizeof(int) * n_samples;
 	count_bytes = sizeof(int) * class_count;
 
-	status = cudaMalloc((void **)&d_labels, label_bytes);
+	status = hipMalloc((void **)&d_labels, label_bytes);
 	if (status != hipSuccess)
 		goto error;
-	status = cudaMalloc((void **)&d_counts, count_bytes);
+	status = hipMalloc((void **)&d_counts, count_bytes);
 	if (status != hipSuccess)
 		goto error;
 
-	status = cudaMemcpy(
-		d_labels, labels, label_bytes, cudaMemcpyHostToDevice);
+	status = hipMemcpy(
+		d_labels, labels, label_bytes, hipMemcpyHostToDevice);
 	if (status != hipSuccess)
 		goto error;
-	status = cudaMemset(d_counts, 0, count_bytes);
+	status = hipMemset(d_counts, 0, count_bytes);
 	if (status != hipSuccess)
 		goto error;
 
@@ -137,24 +137,24 @@ ndb_rocm_rf_histogram(const int *labels,
 	status = hipGetLastError();
 	if (status != hipSuccess)
 		goto error;
-	status = cudaDeviceSynchronize();
+	status = hipDeviceSynchronize();
 	if (status != hipSuccess)
 		goto error;
 
-	status = cudaMemcpy(
-		counts_out, d_counts, count_bytes, cudaMemcpyDeviceToHost);
+	status = hipMemcpy(
+		counts_out, d_counts, count_bytes, hipMemcpyDeviceToHost);
 	if (status != hipSuccess)
 		goto error;
 
-	cudaFree(d_labels);
-	cudaFree(d_counts);
+	hipFree(d_labels);
+	hipFree(d_counts);
 	return 0;
 
 error:
 	if (d_labels)
-		cudaFree(d_labels);
+		hipFree(d_labels);
 	if (d_counts)
-		cudaFree(d_counts);
+		hipFree(d_counts);
 	return -1;
 }
 
@@ -223,10 +223,10 @@ ndb_rocm_rf_launch_feature_stats(const float *features,
 		|| feature_idx >= feature_dim)
 		return -1;
 
-	status = cudaMemset(sum_dev, 0, sizeof(double));
+	status = hipMemset(sum_dev, 0, sizeof(double));
 	if (status != hipSuccess)
 		return -1;
-	status = cudaMemset(sumsq_dev, 0, sizeof(double));
+	status = hipMemset(sumsq_dev, 0, sizeof(double));
 	if (status != hipSuccess)
 		return -1;
 
@@ -248,7 +248,7 @@ ndb_rocm_rf_launch_feature_stats(const float *features,
 	status = hipGetLastError();
 	if (status != hipSuccess)
 		return -1;
-	status = cudaDeviceSynchronize();
+	status = hipDeviceSynchronize();
 	if (status != hipSuccess)
 		return -1;
 
@@ -276,10 +276,10 @@ ndb_rocm_rf_launch_split_counts(const float *features,
 		|| feature_idx >= feature_dim)
 		return -1;
 
-	status = cudaMemset(left_counts_dev, 0, sizeof(int) * class_count);
+	status = hipMemset(left_counts_dev, 0, sizeof(int) * class_count);
 	if (status != hipSuccess)
 		return -1;
-	status = cudaMemset(right_counts_dev, 0, sizeof(int) * class_count);
+	status = hipMemset(right_counts_dev, 0, sizeof(int) * class_count);
 	if (status != hipSuccess)
 		return -1;
 
@@ -303,7 +303,7 @@ ndb_rocm_rf_launch_split_counts(const float *features,
 	status = hipGetLastError();
 	if (status != hipSuccess)
 		return -1;
-	status = cudaDeviceSynchronize();
+	status = hipDeviceSynchronize();
 	if (status != hipSuccess)
 		return -1;
 
@@ -337,40 +337,40 @@ ndb_rocm_rf_infer(const NdbCudaRfNode *nodes,
 	for (i = 0; i < tree_count; i++)
 		total_nodes += trees[i].node_count;
 
-	status = cudaMalloc(
+	status = hipMalloc(
 		(void **)&d_nodes, sizeof(NdbCudaRfNode) * total_nodes);
 	if (status != hipSuccess)
 		goto error;
-	status = cudaMalloc(
+	status = hipMalloc(
 		(void **)&d_trees, sizeof(NdbCudaRfTreeHeader) * tree_count);
 	if (status != hipSuccess)
 		goto error;
-	status = cudaMalloc((void **)&d_input, sizeof(float) * feature_dim);
+	status = hipMalloc((void **)&d_input, sizeof(float) * feature_dim);
 	if (status != hipSuccess)
 		goto error;
-	status = cudaMalloc((void **)&d_votes, sizeof(int) * class_count);
+	status = hipMalloc((void **)&d_votes, sizeof(int) * class_count);
 	if (status != hipSuccess)
 		goto error;
 
-	status = cudaMemcpy(d_nodes,
+	status = hipMemcpy(d_nodes,
 		nodes,
 		sizeof(NdbCudaRfNode) * total_nodes,
-		cudaMemcpyHostToDevice);
+		hipMemcpyHostToDevice);
 	if (status != hipSuccess)
 		goto error;
-	status = cudaMemcpy(d_trees,
+	status = hipMemcpy(d_trees,
 		trees,
 		sizeof(NdbCudaRfTreeHeader) * tree_count,
-		cudaMemcpyHostToDevice);
+		hipMemcpyHostToDevice);
 	if (status != hipSuccess)
 		goto error;
-	status = cudaMemcpy(d_input,
+	status = hipMemcpy(d_input,
 		input,
 		sizeof(float) * feature_dim,
-		cudaMemcpyHostToDevice);
+		hipMemcpyHostToDevice);
 	if (status != hipSuccess)
 		goto error;
-	status = cudaMemset(d_votes, 0, sizeof(int) * class_count);
+	status = hipMemset(d_votes, 0, sizeof(int) * class_count);
 	if (status != hipSuccess)
 		goto error;
 
@@ -392,32 +392,32 @@ ndb_rocm_rf_infer(const NdbCudaRfNode *nodes,
 	status = hipGetLastError();
 	if (status != hipSuccess)
 		goto error;
-	status = cudaDeviceSynchronize();
+	status = hipDeviceSynchronize();
 	if (status != hipSuccess)
 		goto error;
 
-	status = cudaMemcpy(votes,
+	status = hipMemcpy(votes,
 		d_votes,
 		sizeof(int) * class_count,
-		cudaMemcpyDeviceToHost);
+		hipMemcpyDeviceToHost);
 	if (status != hipSuccess)
 		goto error;
 
-	cudaFree(d_nodes);
-	cudaFree(d_trees);
-	cudaFree(d_input);
-	cudaFree(d_votes);
+	hipFree(d_nodes);
+	hipFree(d_trees);
+	hipFree(d_input);
+	hipFree(d_votes);
 	return 0;
 
 error:
 	if (d_nodes)
-		cudaFree(d_nodes);
+		hipFree(d_nodes);
 	if (d_trees)
-		cudaFree(d_trees);
+		hipFree(d_trees);
 	if (d_input)
-		cudaFree(d_input);
+		hipFree(d_input);
 	if (d_votes)
-		cudaFree(d_votes);
+		hipFree(d_votes);
 	return -1;
 }
 
@@ -568,6 +568,6 @@ launch_rf_predict_batch_kernel(const NdbCudaRfNode *d_nodes,
 	if (status != hipSuccess)
 		return -1;
 
-	status = cudaDeviceSynchronize();
+	status = hipDeviceSynchronize();
 	return (status == hipSuccess) ? 0 : -1;
 }

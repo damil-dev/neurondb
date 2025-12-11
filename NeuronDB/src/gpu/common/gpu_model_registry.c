@@ -67,9 +67,6 @@ ndb_gpu_register_model_ops(const MLGpuModelOps *ops)
 		return false;
 	entry->ops = ops;
 
-	elog(DEBUG1,
-		 "neurondb: registered GPU model ops for %s (new=%d)",
-		 entry->algorithm, found ? 1 : 0);
 	return !found;
 }
 
@@ -80,18 +77,12 @@ ndb_gpu_lookup_model_ops(const char *algorithm)
 
 	if (algorithm == NULL || gpu_model_registry == NULL)
 	{
-		elog(DEBUG1,
-			 "neurondb: lookup failed - algorithm=%p registry=%p",
-			 (void *) algorithm, (void *) gpu_model_registry);
 		return NULL;
 	}
 
 	entry = (MLGpuModelEntry *) hash_search(
 											gpu_model_registry, algorithm, HASH_FIND, NULL);
 
-	elog(DEBUG1,
-		 "neurondb: lookup result for %s: entry=%p ops=%p",
-		 algorithm, (void *) entry, entry ? (void *) entry->ops : NULL);
 
 	if (entry == NULL)
 		return NULL;

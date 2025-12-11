@@ -181,40 +181,40 @@ ndb_rocm_knn_compute_distances(const float *query,
 
 	hipGetLastError();
 
-	status = cudaMalloc((void **)&d_query, query_bytes);
+	status = hipMalloc((void **)&d_query, query_bytes);
 	if (status != hipSuccess)
 		return -1;
 
-	status = cudaMalloc((void **)&d_training, training_bytes);
+	status = hipMalloc((void **)&d_training, training_bytes);
 	if (status != hipSuccess)
 	{
-		cudaFree(d_query);
-		return -1;
-	}
-
-	status = cudaMalloc((void **)&d_distances, distance_bytes);
-	if (status != hipSuccess)
-	{
-		cudaFree(d_training);
-		cudaFree(d_query);
+		hipFree(d_query);
 		return -1;
 	}
 
-	status = cudaMemcpy(d_query, query, query_bytes, cudaMemcpyHostToDevice);
+	status = hipMalloc((void **)&d_distances, distance_bytes);
 	if (status != hipSuccess)
 	{
-		cudaFree(d_distances);
-		cudaFree(d_training);
-		cudaFree(d_query);
+		hipFree(d_training);
+		hipFree(d_query);
 		return -1;
 	}
 
-	status = cudaMemcpy(d_training, training_features, training_bytes, cudaMemcpyHostToDevice);
+	status = hipMemcpy(d_query, query, query_bytes, hipMemcpyHostToDevice);
 	if (status != hipSuccess)
 	{
-		cudaFree(d_distances);
-		cudaFree(d_training);
-		cudaFree(d_query);
+		hipFree(d_distances);
+		hipFree(d_training);
+		hipFree(d_query);
+		return -1;
+	}
+
+	status = hipMemcpy(d_training, training_features, training_bytes, hipMemcpyHostToDevice);
+	if (status != hipSuccess)
+	{
+		hipFree(d_distances);
+		hipFree(d_training);
+		hipFree(d_query);
 		return -1;
 	}
 
@@ -228,33 +228,33 @@ ndb_rocm_knn_compute_distances(const float *query,
 	status = hipGetLastError();
 	if (status != hipSuccess)
 	{
-		cudaFree(d_distances);
-		cudaFree(d_training);
-		cudaFree(d_query);
+		hipFree(d_distances);
+		hipFree(d_training);
+		hipFree(d_query);
 		return -1;
 	}
 
-	status = cudaDeviceSynchronize();
+	status = hipDeviceSynchronize();
 	if (status != hipSuccess)
 	{
-		cudaFree(d_distances);
-		cudaFree(d_training);
-		cudaFree(d_query);
+		hipFree(d_distances);
+		hipFree(d_training);
+		hipFree(d_query);
 		return -1;
 	}
 
-	status = cudaMemcpy(distances, d_distances, distance_bytes, cudaMemcpyDeviceToHost);
+	status = hipMemcpy(distances, d_distances, distance_bytes, hipMemcpyDeviceToHost);
 	if (status != hipSuccess)
 	{
-		cudaFree(d_distances);
-		cudaFree(d_training);
-		cudaFree(d_query);
+		hipFree(d_distances);
+		hipFree(d_training);
+		hipFree(d_query);
 		return -1;
 	}
 
-	cudaFree(d_distances);
-	cudaFree(d_training);
-	cudaFree(d_query);
+	hipFree(d_distances);
+	hipFree(d_training);
+	hipFree(d_query);
 	return 0;
 }
 
@@ -299,51 +299,51 @@ ndb_rocm_knn_find_top_k(const float *distances,
 
 	hipGetLastError();
 
-	status = cudaMalloc((void **)&d_distances, distance_bytes);
+	status = hipMalloc((void **)&d_distances, distance_bytes);
 	if (status != hipSuccess)
 		return -1;
 
-	status = cudaMalloc((void **)&d_labels, label_bytes);
+	status = hipMalloc((void **)&d_labels, label_bytes);
 	if (status != hipSuccess)
 	{
-		cudaFree(d_distances);
-		return -1;
-	}
-
-	status = cudaMalloc((void **)&d_top_k_indices, indices_bytes);
-	if (status != hipSuccess)
-	{
-		cudaFree(d_labels);
-		cudaFree(d_distances);
+		hipFree(d_distances);
 		return -1;
 	}
 
-	status = cudaMalloc((void **)&d_prediction, pred_bytes);
+	status = hipMalloc((void **)&d_top_k_indices, indices_bytes);
 	if (status != hipSuccess)
 	{
-		cudaFree(d_top_k_indices);
-		cudaFree(d_labels);
-		cudaFree(d_distances);
+		hipFree(d_labels);
+		hipFree(d_distances);
 		return -1;
 	}
 
-	status = cudaMemcpy(d_distances, distances, distance_bytes, cudaMemcpyHostToDevice);
+	status = hipMalloc((void **)&d_prediction, pred_bytes);
 	if (status != hipSuccess)
 	{
-		cudaFree(d_prediction);
-		cudaFree(d_top_k_indices);
-		cudaFree(d_labels);
-		cudaFree(d_distances);
+		hipFree(d_top_k_indices);
+		hipFree(d_labels);
+		hipFree(d_distances);
 		return -1;
 	}
 
-	status = cudaMemcpy(d_labels, labels, label_bytes, cudaMemcpyHostToDevice);
+	status = hipMemcpy(d_distances, distances, distance_bytes, hipMemcpyHostToDevice);
 	if (status != hipSuccess)
 	{
-		cudaFree(d_prediction);
-		cudaFree(d_top_k_indices);
-		cudaFree(d_labels);
-		cudaFree(d_distances);
+		hipFree(d_prediction);
+		hipFree(d_top_k_indices);
+		hipFree(d_labels);
+		hipFree(d_distances);
+		return -1;
+	}
+
+	status = hipMemcpy(d_labels, labels, label_bytes, hipMemcpyHostToDevice);
+	if (status != hipSuccess)
+	{
+		hipFree(d_prediction);
+		hipFree(d_top_k_indices);
+		hipFree(d_labels);
+		hipFree(d_distances);
 		return -1;
 	}
 
@@ -356,37 +356,37 @@ ndb_rocm_knn_find_top_k(const float *distances,
 	status = hipGetLastError();
 	if (status != hipSuccess)
 	{
-		cudaFree(d_prediction);
-		cudaFree(d_top_k_indices);
-		cudaFree(d_labels);
-		cudaFree(d_distances);
+		hipFree(d_prediction);
+		hipFree(d_top_k_indices);
+		hipFree(d_labels);
+		hipFree(d_distances);
 		return -1;
 	}
 
-	status = cudaDeviceSynchronize();
+	status = hipDeviceSynchronize();
 	if (status != hipSuccess)
 	{
-		cudaFree(d_prediction);
-		cudaFree(d_top_k_indices);
-		cudaFree(d_labels);
-		cudaFree(d_distances);
+		hipFree(d_prediction);
+		hipFree(d_top_k_indices);
+		hipFree(d_labels);
+		hipFree(d_distances);
 		return -1;
 	}
 
-	status = cudaMemcpy(prediction_out, d_prediction, pred_bytes, cudaMemcpyDeviceToHost);
+	status = hipMemcpy(prediction_out, d_prediction, pred_bytes, hipMemcpyDeviceToHost);
 	if (status != hipSuccess)
 	{
-		cudaFree(d_prediction);
-		cudaFree(d_top_k_indices);
-		cudaFree(d_labels);
-		cudaFree(d_distances);
+		hipFree(d_prediction);
+		hipFree(d_top_k_indices);
+		hipFree(d_labels);
+		hipFree(d_distances);
 		return -1;
 	}
 
-	cudaFree(d_prediction);
-	cudaFree(d_top_k_indices);
-	cudaFree(d_labels);
-	cudaFree(d_distances);
+	hipFree(d_prediction);
+	hipFree(d_top_k_indices);
+	hipFree(d_labels);
+	hipFree(d_distances);
 	return 0;
 }
 

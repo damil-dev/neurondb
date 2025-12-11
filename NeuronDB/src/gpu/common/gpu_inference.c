@@ -50,9 +50,5 @@ neurondb_gpu_onnx_inference(void *model_handle,
 	backend = ndb_gpu_get_active_backend();
 	if (backend != NULL)
 	{
-		elog(DEBUG1,
-			 "neurondb: ONNX GPU inference not implemented for "
-			 "backend %s; using CPU fallback",
-			 backend->name ? backend->name : "unknown");
 	}
 }

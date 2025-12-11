@@ -163,11 +163,6 @@ neuranllm_main(Datum main_arg)
 						 "neurondb: LLM worker acquired "
 						 "NULL job_type or payload");
 
-				elog(DEBUG1,
-					 "neurondb: Processing LLM job %d "
-					 "(type=%s)",
-					 (int) job_id,
-					 job_type);
 
 				process_llm_job_safe(job_id,
 									 (const char *) job_type,
@@ -175,11 +170,11 @@ neuranllm_main(Datum main_arg)
 
 				if (job_type != NULL)
 				{
-					nfree(job_type);
+					nfree((void *) job_type);
 				}
 				if (payload != NULL)
 				{
-					nfree(payload);
+					nfree((void *) payload);
 				}
 			}
 

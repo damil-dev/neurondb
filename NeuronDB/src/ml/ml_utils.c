@@ -103,10 +103,6 @@ neurondb_fetch_vectors_from_table(const char *table,
 
 	if (*out_count >= 500000)
 	{
-		elog(DEBUG1,
-			 "neurondb_fetch_vectors_from_table: table has more than %d vectors, "
-			 "limiting to %d to avoid memory allocation errors",
-			 500000, *out_count);
 	}
 
 	if (SPI_tuptable == NULL || SPI_tuptable->vals == NULL ||

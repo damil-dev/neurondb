@@ -146,15 +146,6 @@ entrypoint_cache_lookup(Oid indexOid,
 
 	LWLockRelease(ep_cache->lock);
 
-	if (found)
-		elog(DEBUG1,
-			 "neurondb: Entrypoint cache HIT for index %u",
-			 indexOid);
-	else
-		elog(DEBUG1,
-			 "neurondb: Entrypoint cache MISS for index %u",
-			 indexOid);
-
 	return found;
 }
 
@@ -221,9 +212,6 @@ entrypoint_cache_store(Oid indexOid,
 		ep_cache->entries[victim].lastAccess = GetCurrentTimestamp();
 		ep_cache->entries[victim].valid = true;
 
-		elog(DEBUG1,
-			 "neurondb: Stored entrypoint in cache for index %u",
-			 indexOid);
 	}
 
 	LWLockRelease(ep_cache->lock);
@@ -248,10 +236,6 @@ entrypoint_cache_invalidate(Oid indexOid)
 			&& ep_cache->entries[i].indexOid == indexOid)
 		{
 			ep_cache->entries[i].valid = false;
-			elog(DEBUG1,
-				 "neurondb: Invalidated entrypoint cache for "
-				 "index %u",
-				 indexOid);
 			break;
 		}
 	}

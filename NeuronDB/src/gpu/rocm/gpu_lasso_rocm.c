@@ -391,7 +391,7 @@ ndb_rocm_lasso_train(const float *features,
 				goto cleanup;
 			}
 
-			cuda_err = cudaDeviceSynchronize();
+			cuda_err = hipDeviceSynchronize();
 			if (cuda_err != hipSuccess)
 			{
 				if (errstr)
@@ -424,7 +424,7 @@ ndb_rocm_lasso_train(const float *features,
 				goto cleanup;
 			}
 
-			cuda_err = cudaDeviceSynchronize();
+			cuda_err = hipDeviceSynchronize();
 			if (cuda_err != hipSuccess)
 			{
 				if (errstr)
@@ -473,7 +473,7 @@ ndb_rocm_lasso_train(const float *features,
 					goto cleanup;
 				}
 
-				cuda_err = cudaDeviceSynchronize();
+				cuda_err = hipDeviceSynchronize();
 				if (cuda_err != hipSuccess)
 				{
 					if (errstr)

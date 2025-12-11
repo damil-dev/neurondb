@@ -372,9 +372,40 @@ ndb_rocm_rf_train(const float *features,
 	/* Parse hyperparameters if provided */
 	if (hyperparams != NULL)
 	{
-		/* Extract n_trees from JSONB if present */
-		/* For now, use default */
-		(void) hyperparams;
+		Datum		n_trees_datum;
+		Datum		numeric_datum;
+		Numeric		num;
+
+		PG_TRY();
+		{
+			n_trees_datum = DirectFunctionCall2(
+												jsonb_object_field,
+												JsonbPGetDatum(hyperparams),
+												CStringGetTextDatum("n_trees"));
+			if (DatumGetPointer(n_trees_datum) != NULL)
+			{
+				numeric_datum = DirectFunctionCall1(
+													jsonb_numeric, n_trees_datum);
+				if (DatumGetPointer(numeric_datum) != NULL)
+				{
+					num = DatumGetNumeric(numeric_datum);
+					n_trees = DatumGetInt32(
+											DirectFunctionCall1(numeric_int4,
+																NumericGetDatum(num)));
+					if (n_trees <= 0)
+						n_trees = default_n_trees;
+					if (n_trees > 10000)
+						n_trees = 10000;
+				}
+			}
+		}
+		PG_CATCH();
+		{
+			FlushErrorState();
+			elog(DEBUG2, "ROCm RF: Failed to parse hyperparameters JSONB, using default n_trees=%d", default_n_trees);
+			n_trees = default_n_trees;
+		}
+		PG_END_TRY();
 	}
 
 	if (n_trees <= 0)

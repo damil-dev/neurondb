@@ -83,9 +83,6 @@ neurondb_gpu_quantize_fp16(const float *input, void *output, int count)
 										   input, output, count, NULL)
 				== 0)
 				return;
-			elog(DEBUG1,
-				 "neurondb: GPU quantize_fp16 failed, using CPU "
-				 "fallback");
 		}
 	}
 
@@ -135,8 +132,6 @@ neurondb_gpu_quantize_int4(const float *input, unsigned char *output, int count)
 			if (backend->launch_quant_int8(
 										   input, (int8_t *) output, count, scale, NULL) == 0)
 				return;
-			elog(DEBUG1,
-				 "neurondb: GPU quantize_int4 failed, using CPU fallback");
 		}
 	}
 
@@ -191,8 +186,6 @@ neurondb_gpu_quantize_fp8_e4m3(const float *input, unsigned char *output, int co
 			if (backend->launch_quant_fp8_e4m3(
 											   input, output, count, NULL) == 0)
 				return;
-			elog(DEBUG1,
-				 "neurondb: GPU quantize_fp8_e4m3 failed, using CPU fallback");
 		}
 	}
 
@@ -241,8 +234,6 @@ neurondb_gpu_quantize_fp8_e5m2(const float *input, unsigned char *output, int co
 			if (backend->launch_quant_fp8_e5m2(
 											   input, output, count, NULL) == 0)
 				return;
-			elog(DEBUG1,
-				 "neurondb: GPU quantize_fp8_e5m2 failed, using CPU fallback");
 		}
 	}
 
@@ -304,9 +295,6 @@ neurondb_gpu_quantize_int8(const float *input, int8 * output, int count)
 										   input, (int8_t *) output, count, scale, NULL)
 				== 0)
 				return;
-			elog(DEBUG1,
-				 "neurondb: GPU int8 quantization failed; using "
-				 "CPU fallback");
 		}
 	}
 
@@ -331,9 +319,6 @@ neurondb_gpu_quantize_binary(const float *input, uint8 * output, int count)
 											 input, (uint8_t *) output, count, NULL)
 				== 0)
 				return;
-			elog(DEBUG1,
-				 "neurondb: GPU binary quantization failed; "
-				 "using CPU fallback");
 		}
 	}
 

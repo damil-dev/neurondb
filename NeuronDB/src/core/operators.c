@@ -807,11 +807,6 @@ graph_knn(PG_FUNCTION_ARGS)
 		if (k <= 0)
 			ereport(ERROR, (errmsg("k must be positive")));
 
-		elog(DEBUG1,
-			 "Graph KNN: query_dim=%d, max_hops=%d, k=%d",
-			 query_vec->dim,
-			 max_hops,
-			 k);
 
 		funcctx = SRF_FIRSTCALL_INIT();
 		oldcontext =
@@ -983,11 +978,6 @@ hybrid_rank(PG_FUNCTION_ARGS)
 		ereport(ERROR,
 				(errmsg("query vector dimension must be positive")));
 
-	elog(DEBUG1,
-		 "Hybrid rank: relation=%s, query_dim=%d, text_len=%zu",
-		 text_to_cstring(relation_name),
-		 query_vec->dim,
-		 strlen(text_to_cstring(query_text)));
 
 	rel_str = text_to_cstring(relation_name);
 	txt_str = text_to_cstring(query_text);

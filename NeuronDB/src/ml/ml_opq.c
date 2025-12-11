@@ -122,9 +122,6 @@ train_opq_rotation(PG_FUNCTION_ARGS)
 	tbl_str = text_to_cstring(table_name);
 	col_str = text_to_cstring(vector_column);
 
-	elog(DEBUG1,
-		 "neurondb: Training OPQ rotation (m=%d subspaces)",
-		 num_subspaces);
 
 	/* Fetch training data */
 	data = neurondb_fetch_vectors_from_table(tbl_str, col_str, &nvec, &dim);
@@ -159,8 +156,6 @@ train_opq_rotation(PG_FUNCTION_ARGS)
 
 	if (dim % num_subspaces != 0)
 	{
-		elog(DEBUG1, "Vector dimension %d must be divisible by num_subspaces %d",
-			 dim, num_subspaces);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("Vector dimension %d must be divisible by num_subspaces %d",
@@ -346,9 +341,6 @@ train_opq_rotation(PG_FUNCTION_ARGS)
 		}
 		nfree(eigenvalues);
 
-		elog(DEBUG1,
-			 "OPQ: Computed PCA-based rotation matrix (dim=%d, subspaces=%d)",
-			 dim, num_subspaces);
 	}
 
 	/* Build result array */
@@ -559,11 +551,6 @@ predict_opq_rotation(PG_FUNCTION_ARGS)
 		Size		data_size = VARSIZE(model_data) - VARHDRSZ;
 		Size		expected_size = dim * dim * sizeof(float8);
 
-		elog(DEBUG1,
-			 "predict_opq_rotation: Attempting to load rotation from model_data "
-			 "(size=%zu, expected=%zu)",
-			 (size_t) data_size,
-			 (size_t) expected_size);
 
 		if (data_size >= expected_size)
 		{
@@ -575,8 +562,6 @@ predict_opq_rotation(PG_FUNCTION_ARGS)
 			NDB_CHECK_ALLOC(rotation_tmp, "rotation_tmp");
 			memcpy(rotation_tmp, VARDATA(model_data), expected_size);
 			rotation = rotation_tmp;
-			elog(DEBUG1,
-				 "predict_opq_rotation: Loaded rotation matrix from model_data");
 		}
 		else
 		{
@@ -597,8 +582,6 @@ predict_opq_rotation(PG_FUNCTION_ARGS)
 				}
 			}
 			rotation = rotation_tmp;
-			elog(DEBUG1,
-				 "predict_opq_rotation: Model data size mismatch, using identity matrix");
 		}
 	}
 	else if (found_rotation)
@@ -672,10 +655,6 @@ predict_opq_rotation(PG_FUNCTION_ARGS)
 							}
 							else
 							{
-								elog(DEBUG1,
-									 "predict_opq_rotation: Extracted rotation matrix from JSONB "
-									 "(%d elements)",
-									 idx);
 							}
 						}
 						nfree(key);
@@ -1081,7 +1060,7 @@ typedef struct OPQGpuModelState
 }			OPQGpuModelState;
 
 static bytea *
-opq_model_serialize_to_bytea(const PQCodebook * codebook, const float *rotation_matrix, int dim)
+opq_model_serialize_to_bytea(const PQCodebook * codebook, const float *rotation_matrix, int dim, uint8 training_backend)
 {
 	int			result_size;
 	bytea *result = NULL;
@@ -1090,7 +1069,16 @@ opq_model_serialize_to_bytea(const PQCodebook * codebook, const float *rotation_
 	int			sub,
 				i;
 
-	result_size = sizeof(int) * 4 + dim * dim * sizeof(float) +
+	/* Validate training_backend */
+	if (training_backend > 1)
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_INTERNAL_ERROR),
+				 errmsg("neurondb: opq_model_serialize_to_bytea: invalid training_backend %d (must be 0 or 1)",
+						training_backend)));
+	}
+
+	result_size = sizeof(uint8) + sizeof(int) * 4 + dim * dim * sizeof(float) +
 		codebook->m * codebook->ksub * codebook->dsub * sizeof(float);
 	nalloc(result_raw, char, VARHDRSZ + result_size);
 	result = (bytea *) result_raw;
@@ -1098,6 +1086,9 @@ opq_model_serialize_to_bytea(const PQCodebook * codebook, const float *rotation_
 	SET_VARSIZE(result, VARHDRSZ + result_size);
 	result_ptr = VARDATA(result);
 
+	/* Write training_backend first (0=CPU, 1=GPU) - unified storage format */
+	memcpy(result_ptr, &training_backend, sizeof(uint8));
+	result_ptr += sizeof(uint8);
 	memcpy(result_ptr, &codebook->m, sizeof(int));
 	result_ptr += sizeof(int);
 	memcpy(result_ptr, &codebook->ksub, sizeof(int));
@@ -1121,17 +1112,23 @@ opq_model_serialize_to_bytea(const PQCodebook * codebook, const float *rotation_
 }
 
 static int
-opq_model_deserialize_from_bytea(const bytea * data, PQCodebook * codebook, float **rotation_matrix_out, int *dim_out)
+opq_model_deserialize_from_bytea(const bytea * data, PQCodebook * codebook, float **rotation_matrix_out, int *dim_out, uint8 * training_backend_out)
 {
 	const char *buf;
 	int			offset = 0;
 	int			sub,
 				i;
+	uint8		training_backend = 0;
 
-	if (data == NULL || VARSIZE(data) < VARHDRSZ + sizeof(int) * 4)
+	if (data == NULL || VARSIZE(data) < VARHDRSZ + sizeof(uint8) + sizeof(int) * 4)
 		return -1;
 
 	buf = VARDATA(data);
+	/* Read training_backend first (unified storage format) */
+	training_backend = (uint8) buf[offset];
+	offset += sizeof(uint8);
+	if (training_backend_out != NULL)
+		*training_backend_out = training_backend;
 	memcpy(&codebook->m, buf + offset, sizeof(int));
 	offset += sizeof(int);
 	memcpy(&codebook->ksub, buf + offset, sizeof(int));
@@ -1344,12 +1341,12 @@ opq_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 	}
 
 	/* Serialize model */
-	model_data = opq_model_serialize_to_bytea(&codebook, rotation_matrix, dim);
+	model_data = opq_model_serialize_to_bytea(&codebook, rotation_matrix, dim, 0); /* training_backend=0 for CPU */
 
 	/* Build metrics */
 	initStringInfo(&metrics_json);
 	appendStringInfo(&metrics_json,
-					 "{\"storage\":\"cpu\",\"m\":%d,\"ksub\":%d,\"dsub\":%d,\"dim\":%d,\"n_samples\":%d}",
+					 "{\"storage\":\"cpu\",\"training_backend\":0,\"m\":%d,\"ksub\":%d,\"dsub\":%d,\"dim\":%d,\"n_samples\":%d}",
 					 m, ksub, codebook.dsub, dim, nvec);
 	metrics = DatumGetJsonbP(DirectFunctionCall1(jsonb_in,
 												 CStringGetTextDatum(metrics_json.data)));
@@ -1452,11 +1449,15 @@ opq_gpu_predict(const MLGpuModel *model, const float *input, int input_dim,
 		float *temp_rotation = NULL;
 		int			temp_dim = 0;
 
-		if (opq_model_deserialize_from_bytea(state->model_blob, &temp_codebook, &temp_rotation, &temp_dim) != 0)
+		{
+			uint8		training_backend = 0;
+
+			if (opq_model_deserialize_from_bytea(state->model_blob, &temp_codebook, &temp_rotation, &temp_dim, &training_backend) != 0)
 		{
 			if (errstr != NULL)
 				*errstr = pstrdup("opq_gpu_predict: failed to deserialize");
 			return false;
+		}
 		}
 		{
 			PQCodebook *codebook_ptr = NULL;
@@ -1628,7 +1629,6 @@ opq_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 	bytea	   *payload_copy = NULL;
 	int			payload_size;
 	PQCodebook	codebook;
-
 	float	   *rotation_matrix = NULL;
 	int			dim = 0;
 	JsonbIterator *it = NULL;
@@ -1654,12 +1654,16 @@ opq_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 		memcpy(payload_copy, payload, payload_size);
 	}
 
-	if (opq_model_deserialize_from_bytea(payload_copy, &codebook, &rotation_matrix, &dim) != 0)
 	{
-		nfree(payload_copy);
-		if (errstr != NULL)
-			*errstr = pstrdup("opq_gpu_deserialize: failed to deserialize");
-		return false;
+		uint8		training_backend = 0;
+
+		if (opq_model_deserialize_from_bytea(payload_copy, &codebook, &rotation_matrix, &dim, &training_backend) != 0)
+		{
+			nfree(payload_copy);
+			if (errstr != NULL)
+				*errstr = pstrdup("opq_gpu_deserialize: failed to deserialize");
+			return false;
+		}
 	}
 
 	state = (OPQGpuModelState *) palloc0(sizeof(OPQGpuModelState));

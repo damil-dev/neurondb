@@ -39,6 +39,7 @@
 #include "neurondb_sql.h"
 #include "neurondb_json.h"
 #include "utils/elog.h"
+#include "neurondb_guc.h"
 #ifdef NDB_GPU_CUDA
 #include "neurondb_gpu_model.h"
 #endif
@@ -174,7 +175,6 @@ knn_classify(PG_FUNCTION_ARGS)
 					 quote_identifier(tbl_str),
 					 quote_identifier(feat_str),
 					 quote_identifier(label_str));
-	elog(DEBUG1, "knn_classify: executing query: %s", query.data);
 
 	ret = ndb_spi_execute(classify_spi_session, query.data, true, 0);
 	if (ret != SPI_OK_SELECT)
@@ -417,7 +417,6 @@ knn_regress(PG_FUNCTION_ARGS)
 					 quote_identifier(tbl_str),
 					 quote_identifier(feat_str),
 					 quote_identifier(targ_str));
-	elog(DEBUG1, "knn_regress: executing query: %s", query.data);
 
 	ret = ndb_spi_execute(regress_spi_session, query.data, true, 0);
 	NDB_CHECK_SPI_TUPTABLE();
@@ -630,7 +629,6 @@ evaluate_knn_classifier(PG_FUNCTION_ARGS)
 					 quote_identifier(test_str),
 					 quote_identifier(feat_str),
 					 quote_identifier(label_str));
-	elog(DEBUG1, "evaluate_knn_classifier: executing query: %s", query.data);
 
 	ret = ndb_spi_execute(eval_spi_session, query.data, true, 0);
 	if (ret != SPI_OK_SELECT)
@@ -775,7 +773,7 @@ train_knn_model_id(PG_FUNCTION_ARGS)
 	bytea *model_data = NULL;
 	MLCatalogModelSpec spec;
 	Jsonb *metrics = NULL;
-	StringInfoData metrics_json;
+	Jsonb *params_jsonb = NULL;
 	int32		model_id;
 	StringInfoData model_buf;
 	MemoryContext oldcontext;
@@ -1011,18 +1009,124 @@ train_knn_model_id(PG_FUNCTION_ARGS)
 		nfree(model_buf.data);
 	}
 
-	initStringInfo(&metrics_json);
-	appendStringInfo(&metrics_json, "{\"storage\": \"cpu\", \"k\": %d, \"n_samples\": %d, \"n_features\": %d}",
-					 k_value, nvec, dim);
-	metrics = ndb_jsonb_in_cstring(metrics_json.data);
+	/* Build parameters JSON using JSONB API */
+	{
+		JsonbParseState *state = NULL;
+		JsonbValue	jkey;
+		JsonbValue	jval;
+
+		JsonbValue *final_value = NULL;
+		Numeric		k_num;
+
+		PG_TRY();
+		{
+			(void) pushJsonbValue(&state, WJB_BEGIN_OBJECT, NULL);
+
+			/* Add k */
+			jkey.type = jbvString;
+			jkey.val.string.val = "k";
+			jkey.val.string.len = strlen("k");
+			(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+			k_num = DatumGetNumeric(DirectFunctionCall1(int4_numeric, Int32GetDatum(k_value)));
+			jval.type = jbvNumeric;
+			jval.val.numeric = k_num;
+			(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+
+			final_value = pushJsonbValue(&state, WJB_END_OBJECT, NULL);
+
+			if (final_value == NULL)
+			{
+				elog(ERROR, "neurondb: train_knn_model_id: pushJsonbValue(WJB_END_OBJECT) returned NULL for parameters");
+			}
+
+			params_jsonb = JsonbValueToJsonb(final_value);
+		}
+		PG_CATCH();
+		{
+			ErrorData  *edata = CopyErrorData();
+
+			elog(ERROR, "neurondb: train_knn_model_id: parameters JSONB construction failed: %s", edata->message);
+			FlushErrorState();
+			params_jsonb = NULL;
+		}
+		PG_END_TRY();
+	}
+
+	/* Build metrics JSON using JSONB API */
+	{
+		JsonbParseState *state = NULL;
+		JsonbValue	jkey;
+		JsonbValue	jval;
+
+		JsonbValue *final_value = NULL;
+		Numeric		k_num,
+					n_samples_num,
+					n_features_num;
+
+		PG_TRY();
+		{
+			(void) pushJsonbValue(&state, WJB_BEGIN_OBJECT, NULL);
+
+			/* Add storage */
+			jkey.type = jbvString;
+			jkey.val.string.val = "storage";
+			jkey.val.string.len = strlen("storage");
+			(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+			jval.type = jbvString;
+			jval.val.string.val = "cpu";
+			jval.val.string.len = strlen("cpu");
+			(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+
+			/* Add k */
+			jkey.val.string.val = "k";
+			jkey.val.string.len = strlen("k");
+			(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+			k_num = DatumGetNumeric(DirectFunctionCall1(int4_numeric, Int32GetDatum(k_value)));
+			jval.type = jbvNumeric;
+			jval.val.numeric = k_num;
+			(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+
+			/* Add n_samples */
+			jkey.val.string.val = "n_samples";
+			jkey.val.string.len = strlen("n_samples");
+			(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+			n_samples_num = DatumGetNumeric(DirectFunctionCall1(int4_numeric, Int32GetDatum(nvec)));
+			jval.type = jbvNumeric;
+			jval.val.numeric = n_samples_num;
+			(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+
+			/* Add n_features */
+			jkey.val.string.val = "n_features";
+			jkey.val.string.len = strlen("n_features");
+			(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+			n_features_num = DatumGetNumeric(DirectFunctionCall1(int4_numeric, Int32GetDatum(dim)));
+			jval.type = jbvNumeric;
+			jval.val.numeric = n_features_num;
+			(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+
+			final_value = pushJsonbValue(&state, WJB_END_OBJECT, NULL);
+
+			if (final_value == NULL)
+			{
+				elog(ERROR, "neurondb: train_knn_model_id: pushJsonbValue(WJB_END_OBJECT) returned NULL for metrics");
+			}
+
+			metrics = JsonbValueToJsonb(final_value);
+		}
+		PG_CATCH();
+		{
+			ErrorData  *edata = CopyErrorData();
+
+			elog(ERROR, "neurondb: train_knn_model_id: metrics JSONB construction failed: %s", edata->message);
+			FlushErrorState();
+			metrics = NULL;
+		}
+		PG_END_TRY();
+	}
+
 	if (metrics == NULL)
 	{
-		nfree(metrics_json.data);
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
-				 errmsg("neurondb: train_knn_model_id: failed to parse metrics JSON")));
 	}
-	nfree(metrics_json.data);
 
 	memset(&spec, 0, sizeof(MLCatalogModelSpec));
 	spec.project_name = NULL;
@@ -1030,6 +1134,7 @@ train_knn_model_id(PG_FUNCTION_ARGS)
 	spec.training_table = tbl_str;
 	spec.training_column = label_str;
 	spec.model_data = model_data;
+	spec.parameters = params_jsonb;
 	spec.metrics = metrics;
 	spec.num_samples = nvec;
 	spec.num_features = dim;
@@ -1107,7 +1212,6 @@ predict_knn_model_id(PG_FUNCTION_ARGS)
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("predict_knn_model_id: features array cannot be empty")));
 
-	elog(DEBUG1, "predict_knn_model_id: creating memory context");
 	callcontext = AllocSetContextCreate(CurrentMemoryContext,
 										"predict_knn_model_id context",
 										ALLOCSET_DEFAULT_SIZES);
@@ -1414,9 +1518,6 @@ predict_knn_model_id(PG_FUNCTION_ARGS)
 			}
 			else
 			{
-				elog(DEBUG1,
-					 "neurondb: predict_knn_model_id: GPU prediction failed: %s, falling back to CPU",
-					 gpu_errstr ? gpu_errstr : "unknown error");
 				if (gpu_errstr)
 					nfree(gpu_errstr);
 			}
@@ -1673,9 +1774,6 @@ knn_predict_batch(int32 model_id,
 
 				char *gpu_errstr = NULL;
 
-				elog(DEBUG1,
-					 "neurondb: knn_predict_batch: attempting GPU batch prediction for %d samples (model_id=%d, n_features=%d, k=%d)",
-					 n_samples, model_id, feature_dim, k_value);
 
 				nalloc(predictions, int, (size_t) n_samples);
 				if (predictions != NULL)
@@ -1691,9 +1789,6 @@ knn_predict_batch(int32 model_id,
 
 						if (rc == 0)
 						{
-							elog(DEBUG1,
-								 "neurondb: knn_predict_batch: GPU batch prediction succeeded for %d samples",
-								 n_samples);
 							for (i = 0; i < n_samples; i++)
 							{
 								double		y_true = labels[i];
@@ -2384,33 +2479,22 @@ evaluate_knn_by_model_id(PG_FUNCTION_ARGS)
 		payload_size = VARSIZE(gpu_payload) - VARHDRSZ;
 		if (payload_size < sizeof(NdbCudaKnnModelHeader))
 		{
-			elog(DEBUG1,
-				 "neurondb: evaluate_knn_by_model_id: GPU payload too small (%zu bytes), falling back to CPU",
-				 payload_size);
 			goto cpu_evaluation_path;
 		}
 
 		gpu_hdr = (const NdbCudaKnnModelHeader *) VARDATA(gpu_payload);
 		if (gpu_hdr == NULL)
 		{
-			elog(DEBUG1,
-				 "neurondb: evaluate_knn_by_model_id: NULL GPU header, falling back to CPU");
 			goto cpu_evaluation_path;
 		}
 
 		if (gpu_hdr->n_features != feat_dim)
 		{
-			elog(DEBUG1,
-				 "neurondb: evaluate_knn_by_model_id: feature dimension mismatch (model has %d, expected %d), falling back to CPU",
-				 gpu_hdr->n_features, feat_dim);
 			goto cpu_evaluation_path;
 		}
 
 		if (gpu_hdr->n_features <= 0 || gpu_hdr->n_features > 100000)
 		{
-			elog(DEBUG1,
-				 "evaluate_knn_by_model_id: invalid feature_dim (%d), falling back to CPU",
-				 gpu_hdr->n_features);
 			goto cpu_evaluation_path;
 		}
 
@@ -2420,9 +2504,6 @@ evaluate_knn_by_model_id(PG_FUNCTION_ARGS)
 
 			if (features_size > MaxAllocSize || labels_size > MaxAllocSize)
 			{
-				elog(DEBUG1,
-					 "neurondb: evaluate_knn_by_model_id: allocation size too large (features=%zu, labels=%zu), falling back to CPU",
-					 features_size, labels_size);
 				goto cpu_evaluation_path;
 			}
 
@@ -2436,8 +2517,6 @@ evaluate_knn_by_model_id(PG_FUNCTION_ARGS)
 
 			if (h_features == NULL || h_labels == NULL)
 			{
-				elog(DEBUG1,
-					 "neurondb: evaluate_knn_by_model_id: memory allocation failed, falling back to CPU");
 				if (h_features)
 					nfree(h_features);
 				if (h_labels)
@@ -2451,8 +2530,6 @@ evaluate_knn_by_model_id(PG_FUNCTION_ARGS)
 
 			if (tupdesc == NULL)
 			{
-				elog(DEBUG1,
-					 "neurondb: evaluate_knn_by_model_id: NULL TupleDesc, falling back to CPU");
 				nfree(h_features);
 				nfree(h_labels);
 				goto cpu_evaluation_path;
@@ -2484,16 +2561,12 @@ evaluate_knn_by_model_id(PG_FUNCTION_ARGS)
 
 				if (valid_rows >= nvec)
 				{
-					elog(DEBUG1,
-						 "neurondb: evaluate_knn_by_model_id: valid_rows overflow, breaking");
 					break;
 				}
 
 				feat_row = h_features + (valid_rows * feat_dim);
 				if (feat_row == NULL || feat_row < h_features || feat_row >= h_features + (nvec * feat_dim))
 				{
-					elog(DEBUG1,
-						 "neurondb: evaluate_knn_by_model_id: feat_row out of bounds, skipping row");
 					continue;
 				}
 
@@ -2564,9 +2637,6 @@ evaluate_knn_by_model_id(PG_FUNCTION_ARGS)
 
 			if (h_features == NULL || h_labels == NULL || valid_rows <= 0 || feat_dim <= 0)
 			{
-				elog(DEBUG1,
-					 "neurondb: evaluate_knn_by_model_id: invalid inputs for GPU evaluation (features=%p, labels=%p, rows=%d, dim=%d), falling back to CPU",
-					 (void *) h_features, (void *) h_labels, valid_rows, feat_dim);
 				nfree(h_features);
 				nfree(h_labels);
 				goto cpu_evaluation_path;
@@ -2629,9 +2699,6 @@ evaluate_knn_by_model_id(PG_FUNCTION_ARGS)
 				}
 				else
 				{
-					elog(DEBUG1,
-						 "neurondb: evaluate_knn_by_model_id: GPU batch evaluation failed: %s, falling back to CPU",
-						 gpu_errstr ? gpu_errstr : "unknown error");
 					if (gpu_errstr)
 						nfree(gpu_errstr);
 					nfree(h_features);
@@ -2641,8 +2708,6 @@ evaluate_knn_by_model_id(PG_FUNCTION_ARGS)
 			}
 			PG_CATCH();
 			{
-				elog(DEBUG1,
-					 "neurondb: evaluate_knn_by_model_id: exception during GPU evaluation, falling back to CPU");
 				if (h_features)
 					nfree(h_features);
 				if (h_labels)
@@ -2833,9 +2898,6 @@ cpu_evaluation_path:
 
 			if (total_predictions == 0)
 			{
-				elog(DEBUG1,
-					 "neurondb: evaluate_knn_by_model_id: no valid predictions made for %d valid rows (model_id=%d, feature_dim=%d)",
-					 valid_rows, model_id, feat_dim);
 				accuracy = 0.0;
 				precision = 0.0;
 				recall = 0.0;
@@ -2847,9 +2909,6 @@ cpu_evaluation_path:
 
 				if (total_predictions < valid_rows)
 				{
-					elog(DEBUG1,
-						 "neurondb: evaluate_knn_by_model_id: %d rows skipped during prediction (labels out of range?)",
-						 valid_rows - total_predictions);
 				}
 
 				if ((tp + fp) > 0)

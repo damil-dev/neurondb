@@ -58,19 +58,10 @@ consistent_index_create(PG_FUNCTION_ARGS)
 	char *index_tbl = NULL;
 	Oid			relid;
 
-	elog(DEBUG1,
-		 "Creating consistent HNSW on %s.%s (seed=%u)",
-		 tbl_str,
-		 col_str,
-		 random_seed);
 
 	/* Check if the index already exists */
 	if (index_exists(tbl_str, col_str))
 	{
-		elog(DEBUG1,
-			 "Index already exists for %s.%s",
-			 tbl_str,
-			 col_str);
 		PG_RETURN_BOOL(true);
 	}
 
@@ -117,6 +108,8 @@ consistent_knn_search(PG_FUNCTION_ARGS)
 	char		sql[2048];
 	int			ret;
 
+	(void) snapshot_xmin;		/* Reserved for future use */
+
 	NDB_CHECK_VECTOR_VALID(query);
 
 	if (SRF_IS_FIRSTCALL())
@@ -130,11 +123,6 @@ consistent_knn_search(PG_FUNCTION_ARGS)
 		oldcontext =
 			MemoryContextSwitchTo(funcctx->multi_call_memory_ctx);
 
-		elog(DEBUG1,
-			 "Consistent kNN search for %d neighbors with snapshot "
-			 "xmin " NDB_INT64_FMT,
-			 k,
-			 NDB_INT64_CAST(snapshot_xmin));
 
 		/* Convert query vector to string for SQL embedding */
 		vector_str = vector_to_sql_literal(query);
@@ -206,11 +194,6 @@ consistent_knn_search(PG_FUNCTION_ARGS)
 
 		MemoryContextSwitchTo(oldcontext);
 
-		elog(DEBUG1,
-			 "Consistent query: snapshot " NDB_INT64_FMT
-			 " returned %lu results",
-			 NDB_INT64_CAST(snapshot_xmin),
-			 (unsigned long) SPI_processed);
 	}
 
 	funcctx = SRF_PERCALL_SETUP();
@@ -292,11 +275,6 @@ build_hnsw_index(const char *table, const char *col, uint32 seed)
 
 	NdbSpiSession *session = NULL;
 
-	elog(DEBUG1,
-		 "Building deterministic HNSW index: %s.%s (seed=%u)",
-		 table,
-		 col,
-		 seed);
 
 	/* Compute deterministic index table name */
 	index_table = get_index_table(table, col, seed);

@@ -28,6 +28,7 @@
 #include "neurondb_validation.h"
 #include "neurondb_safe_memory.h"
 #include "neurondb_macros.h"
+#include "neurondb_json.h"
 
 /*
  * rf_gini_impurity
@@ -212,13 +213,10 @@ rf_build_metrics_json(const RFMetricsSpec *spec)
 	StringInfoData buf;
 	bool		first = true;
 	Jsonb *result = NULL;
-	Datum		jsonb_datum;
 
-	elog(DEBUG1, "neurondb: rf_build_metrics_json: function entry");
 
 	if (spec == NULL)
 	{
-		elog(DEBUG1, "neurondb: rf_build_metrics_json: spec is NULL, returning NULL");
 		return NULL;
 	}
 
@@ -326,7 +324,6 @@ rf_build_metrics_json(const RFMetricsSpec *spec)
 
 	if (buf.data == NULL)
 	{
-		elog(DEBUG1, "neurondb: rf_build_metrics_json: buf.data is NULL, returning NULL");
 		return NULL;
 	}
 
@@ -335,25 +332,37 @@ rf_build_metrics_json(const RFMetricsSpec *spec)
 			 errdetail("buf.data=%s, buf.len=%d, CurrentMemoryContext=%p",
 					   buf.data ? buf.data : "NULL", buf.len, (void *) CurrentMemoryContext)));
 
-	ereport(DEBUG2,
-			(errmsg("rf_build_metrics_json: about to call CStringGetTextDatum"),
-			 errdetail("buf.data=%p", (void *) buf.data)));
+	/* Create JSON in TopMemoryContext to ensure it persists across context switches */
+	{
+		MemoryContext oldcontext;
 
-	jsonb_datum = CStringGetTextDatum(buf.data);
+		oldcontext = MemoryContextSwitchTo(TopMemoryContext);
 
-	ereport(DEBUG2,
-			(errmsg("rf_build_metrics_json: CStringGetTextDatum returned"),
-			 errdetail("jsonb_datum=%lu", (unsigned long) jsonb_datum)));
+		PG_TRY();
+		{
+			result = ndb_jsonb_in_cstring(buf.data);
+		}
+		PG_CATCH();
+		{
+			MemoryContextSwitchTo(oldcontext);
+			FlushErrorState();
+			elog(WARNING, "rf_build_metrics_json: Failed to create metrics JSONB in TopMemoryContext");
+			nfree(buf.data);
+			return NULL;
+		}
+		PG_END_TRY();
 
-	ereport(DEBUG2,
-			(errmsg("rf_build_metrics_json: about to call DirectFunctionCall1"),
-			 errdetail("jsonb_datum=%lu", (unsigned long) jsonb_datum)));
+		/* Switch back to original context */
+		MemoryContextSwitchTo(oldcontext);
 
-	result = DatumGetJsonbP(DirectFunctionCall1(jsonb_in, jsonb_datum));
-
-	ereport(DEBUG2,
-			(errmsg("rf_build_metrics_json: DirectFunctionCall1 returned"),
-			 errdetail("result=%p", (void *) result)));
+		if (result == NULL)
+		{
+			elog(WARNING, "rf_build_metrics_json: ndb_jsonb_in_cstring returned NULL for JSON (len=%d): %s", 
+				 buf.len, buf.data ? buf.data : "NULL");
+			nfree(buf.data);
+			return NULL;
+		}
+	}
 
 	if (buf.data != NULL)
 	{
@@ -364,7 +373,6 @@ rf_build_metrics_json(const RFMetricsSpec *spec)
 				(errmsg("rf_build_metrics_json: buf.data freed")));
 	}
 
-	elog(DEBUG1, "neurondb: rf_build_metrics_json: about to return result");
 
 	return result;
 }

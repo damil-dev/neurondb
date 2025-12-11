@@ -55,9 +55,6 @@ neurondb_gpu_batch_l2_distance(const float *queries,
 
 	/* Try to use backend batch operation if available */
 	/* For now, use CPU fallback until backend batch functions are added */
-	elog(DEBUG1,
-		 "neurondb: GPU batch L2 distance using CPU fallback (backend: %s)",
-		 backend->name ? backend->name : "unknown");
 	goto cpu_fallback;
 
 cpu_fallback:
@@ -116,9 +113,6 @@ neurondb_gpu_batch_cosine_distance(const float *queries,
 
 	/* Try to use backend batch operation if available */
 	/* For now, use CPU fallback until backend batch functions are added */
-	elog(DEBUG1,
-		 "neurondb: GPU batch cosine distance using CPU fallback (backend: %s)",
-		 backend->name ? backend->name : "unknown");
 	goto cpu_fallback;
 
 cpu_fallback:

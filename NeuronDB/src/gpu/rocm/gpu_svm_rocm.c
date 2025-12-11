@@ -303,11 +303,12 @@ ndb_rocm_svm_train(const float *features,
 				*errstr = pstrdup("HIP SVM train: non-finite value in labels array");
 			return -1;
 		}
-		/* SVM requires labels to be exactly -1 or 1 */
-		if (labels[i] != -1.0 && labels[i] != 1.0)
+		/* SVM requires labels to be exactly -1 or 1 (with small tolerance for floating point) */
+		if (fabs(labels[i] + 1.0) > 1e-6 && fabs(labels[i] - 1.0) > 1e-6)
 		{
 			if (errstr)
-				*errstr = pstrdup("HIP SVM train: labels must be exactly -1.0 or 1.0");
+				*errstr = psprintf("HIP SVM train: labels must be exactly -1.0 or 1.0 (found label[%d]=%.15f, |label+1|=%.15f, |label-1|=%.15f)",
+									i, labels[i], fabs(labels[i] + 1.0), fabs(labels[i] - 1.0));
 			return -1;
 		}
 		for (j = 0; j < feature_dim; j++)

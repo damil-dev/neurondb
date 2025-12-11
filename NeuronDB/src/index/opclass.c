@@ -898,10 +898,6 @@ neurondb_has_opclass(PG_FUNCTION_ARGS)
 
 	ndb_spi_session_end(&session);
 
-	elog(DEBUG1,
-		 "neurondb: Checking for operator class '%s': %s",
-		 name,
-		 exists ? "found" : "not found");
 
 	nfree(name);
 

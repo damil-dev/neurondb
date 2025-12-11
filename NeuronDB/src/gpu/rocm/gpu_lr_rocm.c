@@ -265,20 +265,7 @@ ndb_rocm_lr_train(const float *features,
 		}
 	}
 
-	elog(DEBUG1,
-		 "ndb_rocm_lr_train: entry: model_data=%p, features=%p, "
-		 "labels=%p, n_samples=%d, feature_dim=%d",
-		 model_data,
-		 features,
-		 labels,
-		 n_samples,
-		 feature_dim);
 
-	elog(DEBUG1,
-		 "ndb_rocm_lr_train: starting training: n_samples=%d, "
-		 "feature_dim=%d",
-		 n_samples,
-		 feature_dim);
 
 	/* Extract and validate hyperparameters from JSONB */
 	if (hyperparams != NULL)
@@ -431,12 +418,6 @@ ndb_rocm_lr_train(const float *features,
 	z_bytes = sizeof(double) * (size_t) n_samples;
 	weight_bytes_gpu = sizeof(float) * (size_t) feature_dim;
 
-	elog(DEBUG1,
-		 "ndb_rocm_lr_train: allocating GPU memory: feature_bytes=%zu "
-		 "(%.2f MB), label_bytes=%zu",
-		 feature_bytes,
-		 feature_bytes / (1024.0 * 1024.0),
-		 label_bytes);
 
 	/* Defensive: Check HIP context before proceeding */
 	status = hipGetLastError();
@@ -464,10 +445,6 @@ ndb_rocm_lr_train(const float *features,
 		return -1;
 	}
 
-	elog(DEBUG1,
-		 "ndb_rocm_lr_train: GPU memory: free=%.2f MB, total=%.2f MB",
-		 free_mem / (1024.0 * 1024.0),
-		 total_mem / (1024.0 * 1024.0));
 
 	/* Defensive: Check if we have enough GPU memory (with safety margin) */
 	{
@@ -542,8 +519,6 @@ ndb_rocm_lr_train(const float *features,
 		goto gpu_fail;
 	}
 
-	elog(DEBUG1,
-		 "ndb_rocm_lr_train: all GPU memory allocated successfully");
 
 	/*
 	 * Convert features from row-major to column-major for rocBLAS
@@ -755,7 +730,6 @@ ndb_rocm_lr_train(const float *features,
 		goto gpu_fail;
 	}
 
-	elog(DEBUG1, "ndb_rocm_lr_train: all fixed device buffers allocated successfully");
 
 	/* Gradient descent */
 	for (iter = 0; iter < max_iters; iter++)
@@ -895,9 +869,6 @@ ndb_rocm_lr_train(const float *features,
 
 				if ((iter % 100) == 0)
 				{
-					elog(DEBUG1,
-						 "neurondb: logistic_regression: rocBLAS SGEMV forward pass succeeded at iter %d",
-						 iter);
 				}
 			}
 		}
@@ -1072,9 +1043,6 @@ ndb_rocm_lr_train(const float *features,
 							grad_bias = grad_bias_device;
 							if ((iter % 100) == 0)
 							{
-								elog(DEBUG1,
-									 "neurondb: logistic_regression: rocBLAS SGEMV gradient computation succeeded at iter %d",
-									 iter);
 							}
 							goto gradient_done;
 						}
@@ -1418,9 +1386,6 @@ ndb_rocm_lr_train(const float *features,
 				elog(ERROR,
 					 "ndb_rocm_lr_train: failed to create metrics_json from JSON string");
 			}
-			elog(DEBUG1,
-				 "ndb_rocm_lr_train: created metrics_json: %p",
-				 (void *) metrics_json);
 		}
 
 		if (host_preds != NULL)
@@ -1434,8 +1399,6 @@ ndb_rocm_lr_train(const float *features,
 	{
 		if (metrics_json == NULL)
 		{
-			elog(DEBUG1,
-				 "ndb_rocm_lr_train: metrics_json is NULL, building default metrics");
 			/* Build default metrics JSON */
 			{
 				StringInfoData buf;
@@ -1475,10 +1438,6 @@ ndb_rocm_lr_train(const float *features,
 			}
 		}
 		*metrics = metrics_json;
-		elog(DEBUG1,
-			 "ndb_rocm_lr_train: setting *metrics = %p (metrics_json=%p)",
-			 (void *) *metrics,
-			 (void *) metrics_json);
 	}
 	else
 	{
@@ -1560,11 +1519,6 @@ ndb_rocm_lr_predict(const bytea * model_data,
 			sizeof(float) * (size_t) feature_dim;
 		size_t		actual_size = VARSIZE(detoasted) - VARHDRSZ;
 
-		elog(DEBUG1,
-			 "ndb_rocm_lr_predict: payload size check: expected=%zu, actual=%zu, feature_dim=%d",
-			 expected_size,
-			 actual_size,
-			 feature_dim);
 
 		if (actual_size < expected_size)
 		{
@@ -1576,10 +1530,6 @@ ndb_rocm_lr_predict(const bytea * model_data,
 	}
 
 	hdr = (const NdbCudaLrModelHeader *) VARDATA(detoasted);
-	elog(DEBUG1,
-		 "ndb_rocm_lr_predict: header feature_dim=%d, input feature_dim=%d",
-		 hdr->feature_dim,
-		 feature_dim);
 	if (hdr->feature_dim != feature_dim)
 	{
 		if (errstr)

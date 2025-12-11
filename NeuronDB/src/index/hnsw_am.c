@@ -356,7 +356,6 @@ hnswbuild(Relation heap, Relation index, IndexInfo * indexInfo)
 				ef_construction,
 				ef_search;
 
-	elog(INFO, "neurondb: Building HNSW index on %s", RelationGetRelationName(index));
 
 	buildstate.heap = heap;
 	buildstate.index = index;
@@ -405,8 +404,6 @@ hnswbuild(Relation heap, Relation index, IndexInfo * indexInfo)
 		result->index_tuples = buildstate.indtuples;
 
 		MemoryContextDelete(buildstate.tmpCtx);
-		elog(INFO, "neurondb: HNSW index build complete, indexed %.0f tuples",
-			 buildstate.indtuples);
 
 		return result;
 	}
@@ -2530,8 +2527,6 @@ hnswInsertNode(Relation index,
 		/* Skip neighbor linking if this is the first node in the index */
 		if (metaPage->entryPoint != InvalidBlockNumber && entryLevel >= 0)
 		{
-			BlockNumber **selectedNeighborsPerLevel = NULL;
-			int *selectedCountPerLevel = NULL;
 			int			currentLevel;
 			int			maxLevel = Min(level, entryLevel);
 			Buffer		newNodeBuf = InvalidBuffer;
@@ -2547,9 +2542,6 @@ hnswInsertNode(Relation index,
 						(errcode(ERRCODE_INTERNAL_ERROR),
 						 errmsg("hnsw: invalid block number %u after insert", blkno)));
 			}
-
-			nalloc(selectedNeighborsPerLevel, BlockNumber *, maxLevel + 1);
-			nalloc(selectedCountPerLevel, int, maxLevel + 1);
 
 			/* Step 5a: Search for neighbors at each level */
 			for (currentLevel = maxLevel; currentLevel >= 0; currentLevel--)
@@ -3353,9 +3345,6 @@ hnswupdate(Relation index,
 		 * If delete failed (e.g., old node not found), still try to insert
 		 * new value
 		 */
-		elog(DEBUG1,
-			 "neurondb: HNSW update: delete of old value failed (may not exist), "
-			 "proceeding with insert");
 	}
 
 	/* Insert the new value */

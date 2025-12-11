@@ -66,10 +66,6 @@ neurondb_gpu_matmul(const float *A,
 				backend->memcpy_h2d(d_A, A, A_size);
 				backend->memcpy_h2d(d_B, B, B_size);
 
-				elog(DEBUG1,
-					 "neurondb: GPU matmul framework ready (backend %s), "
-					 "using CPU fallback until kernel implemented",
-					 backend->name ? backend->name : "unknown");
 
 				backend->memcpy_d2h(C, d_C, C_size);
 			}
@@ -142,10 +138,6 @@ neurondb_gpu_vector_add(const float *a,
 				backend->memcpy_h2d(d_b, b, vec_size);
 
 				/* GPU vector_add kernel would be called here */
-				elog(DEBUG1,
-					 "neurondb: GPU vector_add framework ready (backend %s), "
-					 "using CPU fallback until kernel implemented",
-					 backend->name ? backend->name : "unknown");
 
 				backend->memcpy_d2h(result, d_result, vec_size);
 			}
@@ -203,10 +195,6 @@ neurondb_gpu_activation_relu(const float *input,
 				backend->memcpy_h2d(d_input, input, vec_size);
 
 				/* GPU ReLU kernel would be called here */
-				elog(DEBUG1,
-					 "neurondb: GPU ReLU framework ready (backend %s), "
-					 "using CPU fallback until kernel implemented",
-					 backend->name ? backend->name : "unknown");
 
 				backend->memcpy_d2h(output, d_output, vec_size);
 			}
@@ -268,17 +256,10 @@ neurondb_gpu_kmeans_update(const float *data,
 
 			if (rc == 0)
 			{
-				elog(DEBUG1,
-					 "neurondb: GPU k-means update completed via backend %s",
-					 backend->name ? backend->name : "unknown");
 				return;
 			}
 		}
 
-		elog(DEBUG1,
-			 "neurondb: GPU k-means update not available for backend %s; "
-			 "using CPU fallback",
-			 backend && backend->name ? backend->name : "unknown");
 	}
 
 	counts = (int *) palloc0(k * sizeof(int));
@@ -381,10 +362,6 @@ neurondb_gpu_compute_gradient(const float *weights,
 				backend->memcpy_h2d(d_y, y, y_size);
 
 				/* GPU gradient kernel would be called here */
-				elog(DEBUG1,
-					 "neurondb: GPU gradient framework ready (backend %s), "
-					 "using CPU fallback until kernel implemented",
-					 backend->name ? backend->name : "unknown");
 
 				backend->memcpy_d2h(gradient, d_gradient, grad_size);
 			}
@@ -456,10 +433,6 @@ neurondb_gpu_softmax(const float *input, float *output, int n, bool use_gpu)
 				backend->memcpy_h2d(d_input, input, vec_size);
 
 				/* GPU softmax kernel would be called here */
-				elog(DEBUG1,
-					 "neurondb: GPU softmax framework ready (backend %s), "
-					 "using CPU fallback until kernel implemented",
-					 backend->name ? backend->name : "unknown");
 
 				backend->memcpy_d2h(output, d_output, vec_size);
 			}

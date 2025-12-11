@@ -121,7 +121,6 @@ neurandefrag_run(PG_FUNCTION_ARGS)
 
 	NdbSpiSession *session = NULL;
 
-	elog(DEBUG1, "neurondb: neurandefrag_run invoked");
 
 	session = ndb_spi_session_begin(CurrentMemoryContext, false);
 	if (session == NULL)
@@ -149,9 +148,6 @@ neurandefrag_run(PG_FUNCTION_ARGS)
 		TupleDesc	tupdesc = SPI_tuptable->tupdesc;
 
 		n_indexes = SPI_processed;
-		elog(DEBUG1,
-			 "neurondb: neurandefrag_run: found %d HNSW indexes to check",
-			 n_indexes);
 
 		for (i = 0; i < n_indexes; i++)
 		{
@@ -179,10 +175,6 @@ neurandefrag_run(PG_FUNCTION_ARGS)
 				 * pages 2. Reorganizing nodes for better locality 3.
 				 * Rewriting pages in optimal order 4. Updating index metadata
 				 */
-				elog(DEBUG1,
-					 "neurondb: neurandefrag_run: index %u has %u blocks",
-					 index_oid,
-					 nblocks);
 
 				success = true;
 			}
@@ -195,9 +187,6 @@ neurandefrag_run(PG_FUNCTION_ARGS)
 
 	if (success)
 	{
-		elog(INFO,
-			 "neurondb: neurandefrag_run: completed defragmentation check on %d indexes",
-			 n_indexes);
 		PG_RETURN_BOOL(true);
 	}
 	else
@@ -492,10 +481,6 @@ neurandefrag_main(Datum main_arg)
 							if (dead_count > 0)
 							{
 								tombstones_found += dead_count;
-								elog(DEBUG1,
-									 "neurondb: Found %d potential tombstones in index %s",
-									 dead_count,
-									 relname);
 							}
 
 							index_close(indexRel, AccessShareLock);
@@ -548,10 +533,6 @@ neurandefrag_main(Datum main_arg)
 			}
 			else
 			{
-				ereport(DEBUG1,
-						(errmsg("neurondb: neurandefrag worker heartbeat (PID "
-								"%d) - no maintenance needed",
-								MyProcPid)));
 			}
 
 			/* Commit transaction */

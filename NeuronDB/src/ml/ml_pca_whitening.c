@@ -201,11 +201,6 @@ whiten_embeddings(PG_FUNCTION_ARGS)
 	tbl_str = text_to_cstring(table_name);
 	vec_col_str = text_to_cstring(vector_column);
 
-	elog(DEBUG1,
-		 "neurondb: PCA whitening on %s.%s (epsilon=%.2e)",
-		 tbl_str,
-		 vec_col_str,
-		 epsilon);
 
 	/* Fetch vectors */
 	vectors = neurondb_fetch_vectors_from_table(
@@ -240,10 +235,6 @@ whiten_embeddings(PG_FUNCTION_ARGS)
 
 	if (nvec < dim)
 	{
-		elog(DEBUG1,
-			 "Need at least d=%d vectors for %d-dimensional whitening",
-			 dim,
-			 dim);
 		ereport(ERROR,
 				(errcode(ERRCODE_DATA_EXCEPTION),
 				 errmsg("Need at least d=%d vectors for %d-dimensional whitening",
@@ -308,10 +299,6 @@ whiten_embeddings(PG_FUNCTION_ARGS)
 						   eigenvectors[c],
 						   eigenvalues[c]);
 
-		elog(DEBUG1,
-			 "neurondb: Eigenvalue %d = %.6f",
-			 c + 1,
-			 eigenvalues[c]);
 	}
 
 	/* Step 4: Compute whitening matrix W = UΛ^(-1/2)Uᵀ */

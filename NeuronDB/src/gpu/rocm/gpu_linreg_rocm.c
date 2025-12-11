@@ -260,11 +260,6 @@ ndb_rocm_linreg_train(const float *features,
 			float	   *d_X_with_intercept = NULL;
 			size_t		X_bytes = sizeof(float) * (size_t) n_samples * (size_t) dim_with_intercept;
 
-			elog(DEBUG1,
-				 "neurondb: linear_regression: attempting rocBLAS path (handle=%p, n_samples=%d, dim=%d)",
-				 (void *) handle,
-				 n_samples,
-				 dim_with_intercept);
 
 			/* Allocate and build X matrix with intercept column */
 			err = hipMalloc((void **) &d_X_with_intercept, X_bytes);
@@ -296,8 +291,6 @@ ndb_rocm_linreg_train(const float *features,
 			 * Use optimized custom kernel for X'X and X'y - it's correct and
 			 * fast
 			 */
-			elog(DEBUG1,
-				 "neurondb: linear_regression: using optimized custom kernel for X'X/X'y");
 			goto kernel_fallback;
 
 	kernel_fallback:
@@ -336,7 +329,7 @@ ndb_rocm_linreg_train(const float *features,
 
 #ifdef NDB_GPU_HIP
 		/* Wait for operations to complete */
-		err = cudaDeviceSynchronize();
+		err = hipDeviceSynchronize();
 		if (err != hipSuccess)
 			goto gpu_cleanup;
 

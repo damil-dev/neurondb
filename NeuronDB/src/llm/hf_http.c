@@ -183,7 +183,6 @@ ndb_hf_vision_complete(const NdbLLMConfig *cfg,
 	/* Handle all HTTP response types */
 	if (!handle_http_response(code, &resp, out))
 	{
-		elog(DEBUG1, "neurondb: ndb_hf_vision_complete: HTTP error status %d", code);
 		if (resp)
 			nfree(resp);
 		return -1;
@@ -231,7 +230,6 @@ ndb_hf_vision_complete(const NdbLLMConfig *cfg,
 	
 	if (!ok)
 	{
-		elog(DEBUG1, "neurondb: ndb_hf_vision_complete: could not extract generated_text from response");
 	}
 	
 	out->json = resp;
@@ -443,7 +441,6 @@ extract_hf_text(const char *json)
 
 	if (!json || json[0] == '\0')
 	{
-		elog(DEBUG1, "neurondb: extract_hf_text: NULL or empty JSON input");
 		return NULL;
 	}
 	
@@ -455,13 +452,11 @@ extract_hf_text(const char *json)
 	/* Validate JSON starts with valid character */
 	if (*json_trimmed != '{' && *json_trimmed != '[')
 	{
-		elog(DEBUG1, "neurondb: extract_hf_text: invalid JSON format (does not start with { or [)");
 		return NULL;
 	}
 	
 	if (strncmp(json_trimmed, "{\"error\"", 8) == 0)
 	{
-		elog(DEBUG1, "neurondb: extract_hf_text: response contains error");
 		return NULL;
 	}
 
@@ -474,20 +469,17 @@ extract_hf_text(const char *json)
 		p = strchr(p + strlen(key), '"');
 		if (!p)
 		{
-			elog(DEBUG1, "neurondb: extract_hf_text: could not find opening quote after content key");
 			return NULL;
 		}
 		p++;
 		q = strchr(p, '"');
 		if (!q)
 		{
-			elog(DEBUG1, "neurondb: extract_hf_text: could not find closing quote for content");
 			return NULL;
 		}
 		len = q - p;
 		if (len == 0)
 		{
-			elog(DEBUG1, "neurondb: extract_hf_text: empty content field");
 			return NULL;
 		}
 		nalloc(out, char, len + 1);
@@ -506,27 +498,23 @@ extract_hf_text(const char *json)
 	p = strstr(json_trimmed, key);
 	if (!p)
 	{
-		elog(DEBUG1, "neurondb: extract_hf_text: could not find generated_text or content key");
 		return NULL;
 	}
 	/* Find the first quote after the key */
 	p = strchr(p + strlen(key), '"');
 	if (!p)
 	{
-		elog(DEBUG1, "neurondb: extract_hf_text: could not find opening quote after generated_text key");
 		return NULL;
 	}
 	p++;
 	q = strchr(p, '"');
 	if (!q)
 	{
-		elog(DEBUG1, "neurondb: extract_hf_text: could not find closing quote for generated_text");
 		return NULL;
 	}
 	len = q - p;
 	if (len == 0)
 	{
-		elog(DEBUG1, "neurondb: extract_hf_text: empty generated_text field");
 		return NULL;
 	}
 	nalloc(out, char, len + 1);
@@ -999,7 +987,6 @@ build_url:
 	/* Use handle_http_response to process response consistently with other functions */
 	if (!handle_http_response(code, &resp, &temp_resp))
 	{
-		elog(DEBUG1, "neurondb: ndb_hf_complete: HTTP error status %d", code);
 		if (resp)
 			nfree(resp);
 		nfree(url.data);
@@ -1090,7 +1077,6 @@ parse_hf_emb_vector(const char *json, float **vec_out, int *dim_out)
 
 	if (!json)
 	{
-		elog(DEBUG1, "neurondb: parse_hf_emb_vector: NULL JSON input");
 		return false;
 	}
 
@@ -1125,7 +1111,6 @@ parse_hf_emb_vector(const char *json, float **vec_out, int *dim_out)
 
 					memcpy(err_msg, err_start, err_len);
 					err_msg[err_len] = '\0';
-					elog(DEBUG1, "neurondb: HF API error: %s", err_msg);
 					nfree(err_msg);
 				}
 			}
@@ -1138,7 +1123,6 @@ parse_hf_emb_vector(const char *json, float **vec_out, int *dim_out)
 		p++;
 	if (!*p)
 	{
-		elog(DEBUG1, "neurondb: parse_hf_emb_vector: could not find array start '['");
 		return false;
 	}
 	p++;
@@ -1162,7 +1146,6 @@ parse_hf_emb_vector(const char *json, float **vec_out, int *dim_out)
 	}
 	else
 	{
-		elog(DEBUG1, "neurondb: parse_hf_emb_vector: invalid array format, expected '[' or number");
 		return false;
 	}
 
@@ -1184,7 +1167,6 @@ parse_hf_emb_vector(const char *json, float **vec_out, int *dim_out)
 		if (endptr == p)
 		{
 			/* Could not parse number, stop parsing */
-			elog(DEBUG1, "neurondb: parse_hf_emb_vector: could not parse number at position %zu", (size_t)(p - json));
 			break;
 		}
 		if (n == cap)
@@ -1208,7 +1190,6 @@ parse_hf_emb_vector(const char *json, float **vec_out, int *dim_out)
 	}
 	else
 	{
-		elog(DEBUG1, "neurondb: parse_hf_emb_vector: no valid numbers found in array");
 		nfree(vec);
 		return false;
 	}
@@ -1325,7 +1306,6 @@ ndb_hf_embed(const NdbLLMConfig *cfg,
 	/* Handle all HTTP response types */
 	if (!handle_http_response(code, &resp, &temp_resp))
 	{
-		elog(DEBUG1, "neurondb: ndb_hf_embed: HTTP error status %d", code);
 		if (resp)
 			nfree(resp);
 		nfree(url.data);
@@ -1354,7 +1334,6 @@ ndb_hf_embed(const NdbLLMConfig *cfg,
 	ok = parse_hf_emb_vector(resp, vec_out, dim_out);
 	if (!ok)
 	{
-		elog(DEBUG1, "neurondb: ndb_hf_embed: failed to parse embedding vector from response");
 		nfree(resp);
 		nfree(url.data);
 		nfree(body.data);
@@ -1386,7 +1365,6 @@ parse_hf_emb_batch(const char *json,
 
 	if (!json)
 	{
-		elog(DEBUG1, "neurondb: parse_hf_emb_batch: NULL JSON input");
 		return false;
 	}
 
@@ -1403,7 +1381,6 @@ parse_hf_emb_batch(const char *json,
 		p++;
 	if (!*p)
 	{
-		elog(DEBUG1, "neurondb: parse_hf_emb_batch: could not find array start '['");
 		return false;
 	}
 	p++;
@@ -1458,7 +1435,6 @@ parse_hf_emb_batch(const char *json,
 			if (endptr == p)
 			{
 				/* Could not parse number, stop parsing this vector */
-				elog(DEBUG1, "neurondb: parse_hf_emb_batch: could not parse number");
 				break;
 			}
 			if (vec_dim == vec_cap)
@@ -1574,11 +1550,9 @@ ndb_hf_embed_batch(const NdbLLMConfig *cfg,
 	{
 		if (texts[i] == NULL)
 		{
-			elog(DEBUG1, "neurondb: ndb_hf_embed_batch: NULL text at index %d, will use null in JSON", i);
 		}
 		else if (strlen(texts[i]) == 0)
 		{
-			elog(DEBUG1, "neurondb: ndb_hf_embed_batch: empty text at index %d, will use null in JSON", i);
 		}
 	}
 
@@ -1657,7 +1631,6 @@ ndb_hf_embed_batch(const NdbLLMConfig *cfg,
 	/* Handle all HTTP response types */
 	if (!handle_http_response(code, &resp, &temp_resp))
 	{
-		elog(DEBUG1, "neurondb: ndb_hf_embed_batch: HTTP error status %d", code);
 		if (resp)
 			nfree(resp);
 		return -1;
@@ -1675,7 +1648,6 @@ ndb_hf_embed_batch(const NdbLLMConfig *cfg,
 
 	if (!ok)
 	{
-		elog(DEBUG1, "neurondb: ndb_hf_embed_batch: failed to parse batch embedding response");
 		if (vecs)
 		{
 			for (i = 0; i < num_vecs; i++)
@@ -1821,7 +1793,6 @@ ndb_hf_image_embed(const NdbLLMConfig *cfg,
 	/* Handle all HTTP response types */
 	if (!handle_http_response(code, &resp, &temp_resp))
 	{
-		elog(DEBUG1, "neurondb: ndb_hf_image_embed: HTTP error status %d", code);
 		if (resp)
 			nfree(resp);
 		return -1;
@@ -1839,7 +1810,6 @@ ndb_hf_image_embed(const NdbLLMConfig *cfg,
 
 	if (!ok)
 	{
-		elog(DEBUG1, "neurondb: ndb_hf_image_embed: failed to parse embedding vector");
 		return -1;
 	}
 	return 0;
@@ -1982,7 +1952,6 @@ ndb_hf_multimodal_embed(const NdbLLMConfig *cfg,
 	/* Handle all HTTP response types */
 	if (!handle_http_response(code, &resp, &temp_resp))
 	{
-		elog(DEBUG1, "neurondb: ndb_hf_multimodal_embed: HTTP error status %d", code);
 		if (resp)
 			nfree(resp);
 		return -1;
@@ -2000,7 +1969,6 @@ ndb_hf_multimodal_embed(const NdbLLMConfig *cfg,
 
 	if (!ok)
 	{
-		elog(DEBUG1, "neurondb: ndb_hf_multimodal_embed: failed to parse embedding vector");
 		return -1;
 	}
 	return 0;
@@ -2022,7 +1990,6 @@ parse_hf_scores(const char *json, float **scores_out, int ndocs)
 
 	if (!json)
 	{
-		elog(DEBUG1, "neurondb: parse_hf_scores: NULL JSON input");
 		return false;
 	}
 
@@ -2043,13 +2010,11 @@ parse_hf_scores(const char *json, float **scores_out, int ndocs)
 	ps = strstr(json, scores_key);
 	if (!ps)
 	{
-		elog(DEBUG1, "neurondb: parse_hf_scores: could not find scores key");
 		return false;
 	}
 	ps = strchr(ps, '[');
 	if (!ps)
 	{
-		elog(DEBUG1, "neurondb: parse_hf_scores: could not find array start after scores key");
 		return false;
 	}
 	ps++;
@@ -2070,7 +2035,6 @@ parse_hf_scores(const char *json, float **scores_out, int ndocs)
 		if (endptr == ps)
 		{
 			/* Could not parse number, stop parsing */
-			elog(DEBUG1, "neurondb: parse_hf_scores: could not parse number at position %zu", (size_t)(ps - json));
 			break;
 		}
 		scores[n++] = (float) v;
@@ -2081,7 +2045,6 @@ parse_hf_scores(const char *json, float **scores_out, int ndocs)
 		*scores_out = scores;
 		return true;
 	}
-	elog(DEBUG1, "neurondb: parse_hf_scores: parsed %d scores, expected %d", n, ndocs);
 	nfree(scores);
 	return false;
 }
@@ -2138,11 +2101,9 @@ ndb_hf_rerank(const NdbLLMConfig *cfg,
 	{
 		if (docs[i] == NULL)
 		{
-			elog(DEBUG1, "neurondb: ndb_hf_rerank: NULL doc at index %d, will use null in JSON", i);
 		}
 		else if (strlen(docs[i]) == 0)
 		{
-			elog(DEBUG1, "neurondb: ndb_hf_rerank: empty doc at index %d, will use null in JSON", i);
 		}
 	}
 
@@ -2223,7 +2184,6 @@ ndb_hf_rerank(const NdbLLMConfig *cfg,
 	/* Handle all HTTP response types */
 	if (!handle_http_response(code, &resp, &temp_resp))
 	{
-		elog(DEBUG1, "neurondb: ndb_hf_rerank: HTTP error status %d", code);
 		if (resp)
 			nfree(resp);
 		nfree(url.data);
@@ -2249,7 +2209,6 @@ ndb_hf_rerank(const NdbLLMConfig *cfg,
 	nfree(docs_json.data);
 	if (!ok)
 	{
-		elog(DEBUG1, "neurondb: ndb_hf_rerank: failed to parse scores from response");
 		return -1;
 	}
 	return 0;

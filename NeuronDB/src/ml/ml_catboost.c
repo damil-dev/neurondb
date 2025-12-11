@@ -983,7 +983,7 @@ typedef struct CatBoostGpuModelState
 }			CatBoostGpuModelState;
 
 static bytea *
-catboost_model_serialize_to_bytea(int iterations, int depth, float learning_rate, int n_features, const char *loss_function)
+catboost_model_serialize_to_bytea(int iterations, int depth, float learning_rate, int n_features, const char *loss_function, uint8 training_backend)
 {
 	StringInfoData buf;
 	int			total_size;
@@ -991,7 +991,18 @@ catboost_model_serialize_to_bytea(int iterations, int depth, float learning_rate
 	char *result_raw = NULL;
 	int			loss_len;
 
+	/* Validate training_backend */
+	if (training_backend > 1)
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_INTERNAL_ERROR),
+				 errmsg("neurondb: catboost_model_serialize_to_bytea: invalid training_backend %d (must be 0 or 1)",
+						training_backend)));
+	}
+
 	initStringInfo(&buf);
+	/* Write training_backend first (0=CPU, 1=GPU) - unified storage format */
+	appendBinaryStringInfo(&buf, (char *) &training_backend, sizeof(uint8));
 	appendBinaryStringInfo(&buf, (char *) &iterations, sizeof(int));
 	appendBinaryStringInfo(&buf, (char *) &depth, sizeof(int));
 	appendBinaryStringInfo(&buf, (char *) &learning_rate, sizeof(float));
@@ -1011,16 +1022,22 @@ catboost_model_serialize_to_bytea(int iterations, int depth, float learning_rate
 }
 
 static int
-catboost_model_deserialize_from_bytea(const bytea * data, int *iterations_out, int *depth_out, float *learning_rate_out, int *n_features_out, char *loss_function_out, int loss_max)
+catboost_model_deserialize_from_bytea(const bytea * data, int *iterations_out, int *depth_out, float *learning_rate_out, int *n_features_out, char *loss_function_out, int loss_max, uint8 * training_backend_out)
 {
 	const char *buf;
 	int			offset = 0;
 	int			loss_len;
+	uint8		training_backend = 0;
 
-	if (data == NULL || VARSIZE(data) < VARHDRSZ + sizeof(int) * 3 + sizeof(float) + sizeof(int))
+	if (data == NULL || VARSIZE(data) < VARHDRSZ + sizeof(uint8) + sizeof(int) * 3 + sizeof(float) + sizeof(int))
 		return -1;
 
 	buf = VARDATA(data);
+	/* Read training_backend first (unified storage format) */
+	training_backend = (uint8) buf[offset];
+	offset += sizeof(uint8);
+	if (training_backend_out != NULL)
+		*training_backend_out = training_backend;
 	memcpy(iterations_out, buf + offset, sizeof(int));
 	offset += sizeof(int);
 	memcpy(depth_out, buf + offset, sizeof(int));
@@ -1114,12 +1131,12 @@ catboost_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 	dim = spec->feature_dim;
 
 	/* Serialize model */
-	model_data = catboost_model_serialize_to_bytea(iterations, depth, learning_rate, dim, loss_function);
+	model_data = catboost_model_serialize_to_bytea(iterations, depth, learning_rate, dim, loss_function, 0); /* training_backend=0 for CPU */
 
 	/* Build metrics */
 	initStringInfo(&metrics_json);
 	appendStringInfo(&metrics_json,
-					 "{\"storage\":\"cpu\",\"iterations\":%d,\"depth\":%d,\"learning_rate\":%.6f,\"n_features\":%d,\"loss_function\":\"%s\",\"n_samples\":%d}",
+					 "{\"storage\":\"cpu\",\"training_backend\":0,\"iterations\":%d,\"depth\":%d,\"learning_rate\":%.6f,\"n_features\":%d,\"loss_function\":\"%s\",\"n_samples\":%d}",
 					 iterations, depth, learning_rate, dim, loss_function, nvec);
 	metrics = DatumGetJsonbP(DirectFunctionCall1(jsonb_in,
 												 CStringGetTextDatum(metrics_json.data)));
@@ -1314,12 +1331,16 @@ catboost_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 	payload_copy = (bytea *) payload_copy_raw;
 	memcpy(payload_copy, payload, payload_size);
 
-	if (catboost_model_deserialize_from_bytea(payload_copy, &iterations, &depth, &learning_rate, &n_features, loss_function, sizeof(loss_function)) != 0)
 	{
-		nfree(payload_copy);
-		if (errstr != NULL)
-			*errstr = pstrdup("catboost_gpu_deserialize: failed to deserialize");
-		return false;
+		uint8		training_backend = 0;
+
+		if (catboost_model_deserialize_from_bytea(payload_copy, &iterations, &depth, &learning_rate, &n_features, loss_function, sizeof(loss_function), &training_backend) != 0)
+		{
+			nfree(payload_copy);
+			if (errstr != NULL)
+				*errstr = pstrdup("catboost_gpu_deserialize: failed to deserialize");
+			return false;
+		}
 	}
 
 	state = (CatBoostGpuModelState *) palloc0(sizeof(CatBoostGpuModelState));

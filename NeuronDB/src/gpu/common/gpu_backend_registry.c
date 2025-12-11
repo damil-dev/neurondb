@@ -25,6 +25,8 @@
 #include <signal.h>
 
 #include "neurondb_gpu_backend.h"
+#include "ml_gpu_naive_bayes.h"
+#include "ml_gpu_knn.h"
 #include "neurondb_constants.h"
 #include "ml_gpu_random_forest.h"
 #include "ml_random_forest_internal.h"
@@ -95,16 +97,11 @@ ndb_gpu_register_backend(const ndb_gpu_backend *backend)
 
 	if (backend == NULL)
 	{
-		elog(DEBUG1,
-			 "neurondb: attempted to register NULL GPU backend");
 		return -1;
 	}
 
 	if (registry.count >= NDB_GPU_MAX_BACKENDS)
 	{
-		elog(DEBUG1,
-			 "neurondb: GPU backend registry full; ignoring '%s'",
-			 backend->name ? backend->name : "unknown");
 		return -1;
 	}
 
@@ -112,20 +109,12 @@ ndb_gpu_register_backend(const ndb_gpu_backend *backend)
 	{
 		if (registry.backends[i]->kind == backend->kind)
 		{
-			elog(DEBUG1,
-				 "neurondb: GPU backend kind %d already "
-				 "registered; keeping existing entry",
-				 backend->kind);
 			return 0;
 		}
 	}
 
 	registry.backends[registry.count++] = backend;
 
-	elog(DEBUG1,
-		 "neurondb: GPU backend registered: %s (%s)",
-		 backend->name ? backend->name : "unnamed",
-		 backend->provider ? backend->provider : "unknown");
 
 	return 0;
 }
@@ -256,23 +245,13 @@ ndb_gpu_rf_train(const float *features,
 		return -1;
 	}
 
-	ereport(DEBUG1,
-			(errmsg("ndb_gpu_rf_train: function entry"),
-			 errdetail("n_samples=%d, feature_dim=%d, class_count=%d",
-					   n_samples, feature_dim, class_count)));
 
 	if (errstr)
 		*errstr = NULL;
 
-	ereport(DEBUG1,
-			(errmsg("ndb_gpu_rf_train: checking backend"),
-			 errdetail("active_backend=%p, rf_train=%p",
-					   (void *) active_backend,
-					   active_backend ? (void *) active_backend->rf_train : NULL)));
 
 	if (!active_backend || active_backend->rf_train == NULL)
 	{
-		elog(DEBUG1, "neurondb: ndb_gpu_rf_train: no active backend or rf_train is NULL");
 		return -1;
 	}
 
@@ -280,15 +259,41 @@ ndb_gpu_rf_train(const float *features,
 			(errmsg("ndb_gpu_rf_train: about to call active_backend->rf_train"),
 			 errdetail("backend_name=%s", active_backend->name ? active_backend->name : "NULL")));
 
-	rc = active_backend->rf_train(features,
-								  labels,
-								  n_samples,
-								  feature_dim,
-								  class_count,
-								  hyperparams,
-								  model_data,
-								  metrics,
-								  errstr);
+	/* Log hyperparameters value before calling backend */
+	if (hyperparams != NULL)
+	{
+		PG_TRY();
+		{
+			char	   *hyperparams_text = DatumGetCString(
+											DirectFunctionCall1(jsonb_out,
+																JsonbPGetDatum(hyperparams)));
+			if (hyperparams_text)
+				pfree(hyperparams_text);
+		}
+		PG_CATCH();
+		{
+			FlushErrorState();
+		}
+		PG_END_TRY();
+	}
+
+	PG_TRY();
+	{
+		rc = active_backend->rf_train(features,
+									  labels,
+									  n_samples,
+									  feature_dim,
+									  class_count,
+									  hyperparams,
+									  model_data,
+									  metrics,
+									  errstr);
+	}
+	PG_CATCH();
+	{
+		PG_RE_THROW();
+	}
+	PG_END_TRY();
 
 	ereport(DEBUG2,
 			(errmsg("ndb_gpu_rf_train: active_backend->rf_train returned"),
@@ -307,6 +312,14 @@ ndb_gpu_rf_predict(const bytea * model_data,
 				   int *class_out,
 				   char **errstr)
 {
+	/* CPU mode: never run GPU code */
+	if (NDB_COMPUTE_MODE_IS_CPU())
+	{
+		if (errstr)
+			*errstr = NULL;
+		return -1;
+	}
+
 	if (errstr)
 		*errstr = NULL;
 	if (!active_backend || active_backend->rf_predict == NULL)
@@ -363,9 +376,6 @@ ndb_gpu_lr_train(const float *features,
 		return -1;
 	}
 
-	elog(DEBUG1,
-		 "ndb_gpu_lr_train: calling backend->lr_train, metrics=%p",
-		 (void *) metrics);
 	rc = active_backend->lr_train(features,
 								  labels,
 								  n_samples,
@@ -374,10 +384,6 @@ ndb_gpu_lr_train(const float *features,
 								  model_data,
 								  metrics,
 								  errstr);
-	elog(DEBUG1,
-		 "ndb_gpu_lr_train: backend->lr_train returned %d, *metrics=%p",
-		 rc,
-		 metrics ? (void *) *metrics : NULL);
 	return rc;
 }
 
@@ -444,9 +450,6 @@ ndb_gpu_linreg_train(const float *features,
 		return -1;
 	}
 
-	elog(DEBUG1,
-		 "ndb_gpu_linreg_train: calling backend->linreg_train, metrics=%p",
-		 (void *) metrics);
 	rc = active_backend->linreg_train(features,
 									  targets,
 									  n_samples,
@@ -455,10 +458,6 @@ ndb_gpu_linreg_train(const float *features,
 									  model_data,
 									  metrics,
 									  errstr);
-	elog(DEBUG1,
-		 "ndb_gpu_linreg_train: backend->linreg_train returned %d, *metrics=%p",
-		 rc,
-		 metrics ? (void *) *metrics : NULL);
 	return rc;
 }
 
@@ -771,6 +770,162 @@ ndb_gpu_lasso_pack_model(const struct LassoModel *model,
 	return active_backend->lasso_pack(model, model_data, metrics, errstr);
 }
 
+int
+ndb_gpu_nb_train(const float *features,
+				 const double *labels,
+				 int n_samples,
+				 int feature_dim,
+				 int class_count,
+				 const Jsonb * hyperparams,
+				 bytea * *model_data,
+				 Jsonb * *metrics,
+				 char **errstr)
+{
+	/* CPU mode: never run GPU code */
+	if (NDB_COMPUTE_MODE_IS_CPU())
+	{
+		if (errstr)
+			*errstr = NULL;
+		return -1;
+	}
+
+	if (errstr)
+		*errstr = NULL;
+	if (!active_backend)
+	{
+		if (errstr)
+			*errstr = pstrdup("GPU backend not available");
+		return -1;
+	}
+	if (active_backend->nb_train == NULL)
+	{
+		if (errstr)
+			*errstr = psprintf("GPU backend '%s' does not support nb_train",
+							   active_backend->name ? active_backend->name : "unknown");
+		return -1;
+	}
+	return active_backend->nb_train(features,
+									 labels,
+									 n_samples,
+									 feature_dim,
+									 class_count,
+									 hyperparams,
+									 model_data,
+									 metrics,
+									 errstr);
+}
+
+int
+ndb_gpu_nb_predict(const bytea * model_data,
+				   const float *input,
+				   int feature_dim,
+				   int *class_out,
+				   double *probability_out,
+				   char **errstr)
+{
+	if (errstr)
+		*errstr = NULL;
+	if (!active_backend || active_backend->nb_predict == NULL)
+		return -1;
+	return active_backend->nb_predict(model_data,
+									   input,
+									   feature_dim,
+									   class_out,
+									   probability_out,
+									   errstr);
+}
+
+int
+ndb_gpu_nb_pack_model(const struct GaussianNBModel *model,
+					  bytea * *model_data,
+					  Jsonb * *metrics,
+					  char **errstr)
+{
+	if (errstr)
+		*errstr = NULL;
+	if (!active_backend || active_backend->nb_pack == NULL)
+		return -1;
+	return active_backend->nb_pack(model, model_data, metrics, errstr);
+}
+
+int
+ndb_gpu_knn_train(const float *features,
+				  const double *labels,
+				  int n_samples,
+				  int feature_dim,
+				  int k,
+				  int task_type,
+				  const Jsonb * hyperparams,
+				  bytea * *model_data,
+				  Jsonb * *metrics,
+				  char **errstr)
+{
+	/* CPU mode: never run GPU code */
+	if (NDB_COMPUTE_MODE_IS_CPU())
+	{
+		if (errstr)
+			*errstr = NULL;
+		return -1;
+	}
+
+	if (errstr)
+		*errstr = NULL;
+	if (!active_backend)
+	{
+		if (errstr)
+			*errstr = pstrdup("GPU backend not available");
+		return -1;
+	}
+	if (active_backend->knn_train == NULL)
+	{
+		if (errstr)
+			*errstr = psprintf("GPU backend '%s' does not support knn_train",
+							   active_backend->name ? active_backend->name : "unknown");
+		return -1;
+	}
+	return active_backend->knn_train(features,
+									  labels,
+									  n_samples,
+									  feature_dim,
+									  k,
+									  task_type,
+									  hyperparams,
+									  model_data,
+									  metrics,
+									  errstr);
+}
+
+int
+ndb_gpu_knn_predict(const bytea * model_data,
+					const float *input,
+					int feature_dim,
+					double *prediction_out,
+					char **errstr)
+{
+	if (errstr)
+		*errstr = NULL;
+	if (!active_backend || active_backend->knn_predict == NULL)
+		return -1;
+	return active_backend->knn_predict(model_data,
+										input,
+										feature_dim,
+										prediction_out,
+										errstr);
+}
+
+int
+ndb_gpu_knn_pack(const struct KNNModel *model,
+				 bytea * *model_data,
+				 Jsonb * *metrics,
+				 char **errstr)
+{
+	if (errstr)
+		*errstr = NULL;
+	if (!active_backend || active_backend->knn_pack == NULL)
+		return -1;
+	return active_backend->knn_pack(model, model_data, metrics, errstr);
+}
+
 const ndb_gpu_backend *
 ndb_gpu_select_backend(const char *name)
 {
@@ -787,8 +942,6 @@ ndb_gpu_select_backend(const char *name)
 		chosen = ndb_gpu_select_best_internal();
 		if (!chosen)
 		{
-			elog(DEBUG1,
-				 "neurondb: no suitable GPU backend available");
 			return NULL;
 		}
 	}
@@ -803,10 +956,6 @@ ndb_gpu_select_backend(const char *name)
 
 			if (!ndb_backend_is_available(candidate))
 			{
-				elog(DEBUG1,
-					 "neurondb: GPU backend '%s' not "
-					 "available",
-					 name);
 				return NULL;
 			}
 
@@ -816,9 +965,6 @@ ndb_gpu_select_backend(const char *name)
 
 		if (chosen == NULL)
 		{
-			elog(DEBUG1,
-				 "neurondb: GPU backend '%s' not found",
-				 name);
 			return NULL;
 		}
 	}

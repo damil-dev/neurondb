@@ -122,13 +122,26 @@ typedef struct LightGBMGpuModelState
 }			LightGBMGpuModelState;
 
 static bytea *
-lightgbm_model_serialize_to_bytea(int n_estimators, int max_depth, float learning_rate, int n_features, const char *boosting_type)
+lightgbm_model_serialize_to_bytea(int n_estimators, int max_depth, float learning_rate, int n_features, const char *boosting_type, uint8 training_backend)
 {
 	StringInfoData buf;
 	int			total_size;
-		bytea *result = NULL;	int			type_len;
+	bytea	   *result = NULL;
+	int			type_len;
+	char	   *tmp = NULL;
+
+	/* Validate training_backend */
+	if (training_backend > 1)
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_INTERNAL_ERROR),
+				 errmsg("neurondb: lightgbm_model_serialize_to_bytea: invalid training_backend %d (must be 0 or 1)",
+						training_backend)));
+	}
 
 	initStringInfo(&buf);
+	/* Write training_backend first (0=CPU, 1=GPU) - unified storage format */
+	appendBinaryStringInfo(&buf, (char *) &training_backend, sizeof(uint8));
 	appendBinaryStringInfo(&buf, (char *) &n_estimators, sizeof(int));
 	appendBinaryStringInfo(&buf, (char *) &max_depth, sizeof(int));
 	appendBinaryStringInfo(&buf, (char *) &learning_rate, sizeof(float));
@@ -138,7 +151,6 @@ lightgbm_model_serialize_to_bytea(int n_estimators, int max_depth, float learnin
 	appendBinaryStringInfo(&buf, boosting_type, type_len);
 
 	total_size = VARHDRSZ + buf.len;
-	char *tmp = NULL;
 	nalloc(tmp, char, total_size);
 	result = (bytea *) tmp;
 	SET_VARSIZE(result, total_size);
@@ -149,16 +161,22 @@ lightgbm_model_serialize_to_bytea(int n_estimators, int max_depth, float learnin
 }
 
 static int
-lightgbm_model_deserialize_from_bytea(const bytea * data, int *n_estimators_out, int *max_depth_out, float *learning_rate_out, int *n_features_out, char *boosting_type_out, int type_max)
+lightgbm_model_deserialize_from_bytea(const bytea * data, int *n_estimators_out, int *max_depth_out, float *learning_rate_out, int *n_features_out, char *boosting_type_out, int type_max, uint8 * training_backend_out)
 {
 	const char *buf;
 	int			offset = 0;
 	int			type_len;
+	uint8		training_backend = 0;
 
-	if (data == NULL || VARSIZE(data) < VARHDRSZ + sizeof(int) * 3 + sizeof(float) + sizeof(int))
+	if (data == NULL || VARSIZE(data) < VARHDRSZ + sizeof(uint8) + sizeof(int) * 3 + sizeof(float) + sizeof(int))
 		return -1;
 
 	buf = VARDATA(data);
+	/* Read training_backend first (unified storage format) */
+	training_backend = (uint8) buf[offset];
+	offset += sizeof(uint8);
+	if (training_backend_out != NULL)
+		*training_backend_out = training_backend;
 	memcpy(n_estimators_out, buf + offset, sizeof(int));
 	offset += sizeof(int);
 	memcpy(max_depth_out, buf + offset, sizeof(int));
@@ -252,12 +270,12 @@ lightgbm_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 	dim = spec->feature_dim;
 
 	/* Serialize model */
-	model_data = lightgbm_model_serialize_to_bytea(n_estimators, max_depth, learning_rate, dim, boosting_type);
+	model_data = lightgbm_model_serialize_to_bytea(n_estimators, max_depth, learning_rate, dim, boosting_type, 0); /* training_backend=0 for CPU */
 
 	/* Build metrics */
 	initStringInfo(&metrics_json);
 	appendStringInfo(&metrics_json,
-					 "{\"storage\":\"cpu\",\"n_estimators\":%d,\"max_depth\":%d,\"learning_rate\":%.6f,\"n_features\":%d,\"boosting_type\":\"%s\",\"n_samples\":%d}",
+					 "{\"storage\":\"cpu\",\"training_backend\":0,\"n_estimators\":%d,\"max_depth\":%d,\"learning_rate\":%.6f,\"n_features\":%d,\"boosting_type\":\"%s\",\"n_samples\":%d}",
 					 n_estimators, max_depth, learning_rate, dim, boosting_type, nvec);
 	metrics = DatumGetJsonbP(DirectFunctionCall1(jsonb_in,
 												 CStringGetDatum(metrics_json.data)));
@@ -382,6 +400,7 @@ lightgbm_gpu_serialize(const MLGpuModel *model, bytea * *payload_out,
 	const		LightGBMGpuModelState *state;
 	bytea	   *payload_copy = NULL;
 	int			payload_size;
+	char	   *tmp = NULL;
 
 	if (errstr != NULL)
 		*errstr = NULL;
@@ -405,7 +424,6 @@ lightgbm_gpu_serialize(const MLGpuModel *model, bytea * *payload_out,
 	}
 
 	payload_size = VARSIZE(state->model_blob);
-	char *tmp = NULL;
 	nalloc(tmp, char, payload_size);
 	payload_copy = (bytea *) tmp;
 	memcpy(payload_copy, state->model_blob, payload_size);
@@ -437,6 +455,7 @@ lightgbm_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 	JsonbIterator *it = NULL;
 	JsonbValue	v;
 	int			r;
+	char	   *tmp = NULL;
 
 	if (errstr != NULL)
 		*errstr = NULL;
@@ -448,17 +467,20 @@ lightgbm_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 	}
 
 	payload_size = VARSIZE(payload);
-	char *tmp = NULL;
 	nalloc(tmp, char, payload_size);
 	payload_copy = (bytea *) tmp;
 	memcpy(payload_copy, payload, payload_size);
 
-	if (lightgbm_model_deserialize_from_bytea(payload_copy, &n_estimators, &max_depth, &learning_rate, &n_features, boosting_type, sizeof(boosting_type)) != 0)
 	{
-		nfree(payload_copy);
-		if (errstr != NULL)
-			*errstr = pstrdup("lightgbm_gpu_deserialize: failed to deserialize");
-		return false;
+		uint8		training_backend = 0;
+
+		if (lightgbm_model_deserialize_from_bytea(payload_copy, &n_estimators, &max_depth, &learning_rate, &n_features, boosting_type, sizeof(boosting_type), &training_backend) != 0)
+		{
+			nfree(payload_copy);
+			if (errstr != NULL)
+				*errstr = pstrdup("lightgbm_gpu_deserialize: failed to deserialize");
+			return false;
+		}
 	}
 
 		nalloc(state, LightGBMGpuModelState, 1);
@@ -473,10 +495,13 @@ lightgbm_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 
 	if (metadata != NULL)
 	{
-		int			metadata_size = VARSIZE(metadata);
-		char *tmp = NULL;
-		nalloc(tmp, char, metadata_size);
-		Jsonb *metadata_copy = (Jsonb *) tmp;
+		int			metadata_size;
+		char	   *tmp2 = NULL;
+		Jsonb	   *metadata_copy;
+		
+		metadata_size = VARSIZE(metadata);
+		nalloc(tmp2, char, metadata_size);
+		metadata_copy = (Jsonb *) tmp2;
 
 		memcpy(metadata_copy, metadata, metadata_size);
 		state->metrics = metadata_copy;

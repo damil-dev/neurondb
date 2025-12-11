@@ -177,10 +177,6 @@ rerank_ensemble_weighted(PG_FUNCTION_ARGS)
 		weight_sum = 1.0;
 	}
 
-	elog(DEBUG1,
-		 "neurondb: Ensemble reranking: %d systems, %d docs",
-		 num_systems,
-		 num_docs);
 
 	/* Normalize scores if requested */
 	nalloc(normalized_scores, double, num_systems * num_docs);
@@ -318,10 +314,6 @@ rerank_ensemble_borda(PG_FUNCTION_ARGS)
 	max_docs = dims[1];
 	ranked_lists = (int32 *) ARR_DATA_PTR(ranked_lists_array);
 
-	elog(DEBUG1,
-		 "neurondb: Borda count ensemble: %d systems, max %d docs",
-		 num_systems,
-		 max_docs);
 
 	/* Collect unique doc IDs */
 	nalloc(doc_id_map, int, num_systems * max_docs);

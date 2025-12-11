@@ -79,11 +79,6 @@ fallback_complete(const NdbLLMConfig *cfg,
 		NdbLLMConfig fallback = *cfg;
 
 		fallback.provider = "huggingface";
-		elog(DEBUG1,
-			 "neurondb: LLM provider \"%s\" unavailable "
-			 "locally (%s); falling back to remote Hugging Face",
-			 cfg->provider ? cfg->provider : "huggingface-local",
-			 reason ? reason : "not supported");
 		return ndb_hf_complete(&fallback, prompt, params_json, out);
 	}
 
@@ -125,11 +120,6 @@ fallback_embed(const NdbLLMConfig *cfg,
 		NdbLLMConfig fallback = *cfg;
 
 		fallback.provider = "huggingface";
-		elog(DEBUG1,
-			 "neurondb: LLM provider \"%s\" unavailable "
-			 "locally (%s); falling back to remote Hugging Face",
-			 cfg->provider ? cfg->provider : "huggingface-local",
-			 reason ? reason : "not supported");
 		return ndb_hf_embed(&fallback, text, vec_out, dim_out);
 	}
 
@@ -172,11 +162,6 @@ fallback_rerank(const NdbLLMConfig *cfg,
 		NdbLLMConfig fallback = *cfg;
 
 		fallback.provider = "huggingface";
-		elog(DEBUG1,
-			 "neurondb: LLM provider \"%s\" unavailable "
-			 "locally (%s); falling back to remote Hugging Face",
-			 cfg->provider ? cfg->provider : "huggingface-local",
-			 reason ? reason : "not supported");
 		return ndb_hf_rerank(&fallback, query, docs, ndocs, scores_out);
 	}
 
@@ -419,7 +404,6 @@ ndb_llm_route_complete(const NdbLLMConfig *cfg,
 			/* GPU not required, log warning and continue */
 			if (gpu_err)
 			{
-				elog(DEBUG1, "neurondb: GPU HF completion failed (non-fatal): %s", gpu_err);
 				nfree(gpu_err);
 			}
 			if (gpu_text)
@@ -639,7 +623,6 @@ ndb_llm_route_complete(const NdbLLMConfig *cfg,
 
 				if (onnx_err)
 				{
-					elog(DEBUG1, "neurondb: ONNX HF completion failed (non-fatal): %s", onnx_err);
 					fallback_reason = onnx_err;
 				}
 				if (onnx_text)
@@ -693,7 +676,6 @@ ndb_llm_route_vision_complete(const NdbLLMConfig *cfg,
 	/* Validate prompt if provided (it's optional for vision) */
 	if (prompt != NULL && strlen(prompt) == 0)
 	{
-		elog(DEBUG1, "neurondb: ndb_llm_route_vision_complete called with empty prompt, using default");
 		prompt = NULL; /* Will use default in backend */
 	}
 
@@ -790,7 +772,6 @@ ndb_llm_route_embed(const NdbLLMConfig *cfg,
 			char	   *gpu_err = NULL;
 			int			rc;
 
-			elog(DEBUG1, "neurondb: Attempting GPU embedding with model: %s", cfg->model);
 			rc = neurondb_gpu_hf_embed(
 									   cfg->model, text, &gpu_vec, &gpu_dim, &gpu_err);
 			if (rc == 0 && gpu_vec != NULL && gpu_dim > 0)
@@ -1130,7 +1111,6 @@ ndb_llm_route_rerank(const NdbLLMConfig *cfg,
 		}
 		if (strlen(docs[i]) == 0)
 		{
-			elog(DEBUG1, "neurondb: ndb_llm_route_rerank called with empty doc at index %d", i);
 		}
 	}
 
@@ -1300,7 +1280,6 @@ ndb_llm_route_complete_batch(const NdbLLMConfig *cfg,
 		}
 		if (strlen(prompts[i]) == 0)
 		{
-			elog(DEBUG1, "neurondb: ndb_llm_route_complete_batch called with empty prompt at index %d", i);
 		}
 	}
 
@@ -1439,7 +1418,6 @@ ndb_llm_route_complete_batch(const NdbLLMConfig *cfg,
 			/* Validate prompt before processing */
 			if (prompts[i] == NULL || strlen(prompts[i]) == 0)
 			{
-				elog(DEBUG1, "neurondb: batch completion: skipping invalid prompt at index %d", i);
 				out->texts[i] = NULL;
 				out->tokens_in[i] = 0;
 				out->tokens_out[i] = 0;
@@ -1480,7 +1458,6 @@ ndb_llm_route_complete_batch(const NdbLLMConfig *cfg,
 		/* Validate prompt before processing */
 		if (prompts[i] == NULL || strlen(prompts[i]) == 0)
 		{
-			elog(DEBUG1, "neurondb: batch completion: skipping invalid prompt at index %d", i);
 			out->texts[i] = NULL;
 			out->tokens_in[i] = 0;
 			out->tokens_out[i] = 0;
@@ -1623,11 +1600,9 @@ ndb_llm_route_embed_batch(const NdbLLMConfig *cfg,
 	{
 		if (texts[i] == NULL)
 		{
-			elog(DEBUG1, "neurondb: ndb_llm_route_embed_batch: NULL text at index %d, will skip", i);
 		}
 		else if (strlen(texts[i]) == 0)
 		{
-			elog(DEBUG1, "neurondb: ndb_llm_route_embed_batch: empty text at index %d, will skip", i);
 		}
 	}
 

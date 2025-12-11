@@ -77,7 +77,7 @@ ndb_gpu_strdup_or_null(const char *src)
 {
 	if (src == NULL)
 		return NULL;
-	return pstrdup(src);
+	return MemoryContextStrdup(TopMemoryContext, src);
 }
 
 bool
@@ -105,6 +105,8 @@ ndb_gpu_try_train_model(const char *algorithm,
 	Jsonb	   *metadata = NULL;
 	bool		trained = false;
 	volatile bool retval = false;
+	volatile bool ops_failed_with_exception = false;
+	bool		ops_trained = false;
 
 	/* Initialize all local variables to safe defaults */
 	memset(&model, 0, sizeof(MLGpuModel));
@@ -160,12 +162,6 @@ ndb_gpu_try_train_model(const char *algorithm,
 		return false;
 	}
 
-	ereport(DEBUG1,
-			(errmsg("ndb_gpu_try_train_model: active backend obtained"),
-			 errdetail("backend_name=%s", ctx.backend->name ? ctx.backend->name : "NULL")));
-	ereport(DEBUG1,
-			(errmsg("ndb_gpu_try_train_model: setting up context"),
-			 errdetail("backend_name=%s, device_id=%d", ctx.backend->name ? ctx.backend->name : "NULL", neurondb_gpu_device)));
 
 	ctx.backend_name = (ctx.backend->name) ? ctx.backend->name : "unknown";
 	ctx.device_id = neurondb_gpu_device;
@@ -173,8 +169,6 @@ ndb_gpu_try_train_model(const char *algorithm,
 	ctx.scratch_pool = NULL;
 	ctx.memory_ctx = CurrentMemoryContext;
 
-	ereport(DEBUG1,
-			(errmsg("ndb_gpu_try_train_model: initializing model structure")));
 
 	memset(&model, 0, sizeof(MLGpuModel));
 	model.ops = ops;
@@ -190,8 +184,6 @@ ndb_gpu_try_train_model(const char *algorithm,
 	model.is_gpu_resident = true;
 	model.gpu_ready = false;
 
-	ereport(DEBUG1,
-			(errmsg("ndb_gpu_try_train_model: initializing training spec")));
 
 	memset(&spec, 0, sizeof(MLGpuTrainSpec));
 	spec.algorithm = algorithm;
@@ -239,15 +231,11 @@ ndb_gpu_try_train_model(const char *algorithm,
 	{
 		TimestampTz train_start;
 		TimestampTz train_end;
-		bool		ops_trained;
 		bool		ops_serialized;
 		long		secs;
 		int			usecs = 0;
 		double		elapsed_ms;
 
-		ereport(DEBUG1,
-				(errmsg("ndb_gpu_try_train_model: using ops->train path"),
-				 errdetail("algorithm=%s", algorithm ? algorithm : "NULL")));
 
 		train_start = GetCurrentTimestamp();
 		ops_trained = false;
@@ -266,14 +254,10 @@ ndb_gpu_try_train_model(const char *algorithm,
 
 			if (ops->train(&model, &spec, errstr))
 			{
-				ereport(DEBUG1,
-						(errmsg("ndb_gpu_try_train_model: ops->train returned true")));
 
 				model.gpu_ready = true;
 				ops_trained = true;
 
-				ereport(DEBUG1,
-						(errmsg("ndb_gpu_try_train_model: about to call ops->serialize")));
 
 				if (ops->serialize(&model, &payload, &metadata, errstr))
 				{
@@ -282,31 +266,28 @@ ndb_gpu_try_train_model(const char *algorithm,
 				}
 				else
 				{
-					ereport(DEBUG1,
-							(errmsg("%s: GPU serialize failed: %s",
-									algorithm ? algorithm : "unknown",
-									(errstr && *errstr) ? *errstr : "no error message")));
 				}
 			}
 			else
 			{
-				ereport(DEBUG1,
-						(errmsg("%s: GPU train failed: %s",
-								algorithm ? algorithm : "unknown",
-								(errstr && *errstr) ? *errstr : "no error message")));
 			}
 		}
 		PG_CATCH();
 		{
 			/* Catch any PostgreSQL-level errors from ops->train */
 			elog(WARNING,
-				 "%s: exception caught during ops->train, falling back to direct path or CPU",
+				 "%s: exception caught during ops->train, falling back to direct path",
 				 algorithm ? algorithm : "unknown");
+			FlushErrorState();
 			ops_trained = false;
 			trained = false;
+			ops_failed_with_exception = true;
 			if (errstr && *errstr == NULL)
 				*errstr = pstrdup("Exception during ops->train");
-			PG_RE_THROW();
+			/* Don't call ops->destroy here - memory contexts may have been reset during exception */
+			/* Just NULL out the pointer - memory context cleanup will handle freeing */
+			model.backend_state = NULL;
+			/* Don't re-throw - just mark as failed and continue to direct path */
 		}
 		PG_END_TRY();
 
@@ -317,16 +298,6 @@ ndb_gpu_try_train_model(const char *algorithm,
 		if (trained)
 		{
 			ndb_gpu_stats_record(true, elapsed_ms, 0.0, false);
-			ereport(DEBUG1,
-					(errmsg("%s: GPU training succeeded",
-							algorithm ? algorithm : "unknown"),
-					 errdetail(
-							   "Elapsed %.3f ms on backend %s",
-							   elapsed_ms,
-							   ctx.backend_name
-							   ? ctx.backend_name
-							   : "unknown"),
-					 errhidestmt(true)));
 		}
 		else if (ops_trained || ops_serialized)
 		{
@@ -344,17 +315,10 @@ ndb_gpu_try_train_model(const char *algorithm,
 			}
 			/* AUTO mode: fall back to CPU */
 			ndb_gpu_stats_record(false, 0.0, elapsed_ms, true);
-			ereport(DEBUG1,
-					(errmsg("%s: GPU training fell back to CPU",
-							algorithm ? algorithm : "unknown"),
-					 errdetail("GPU stage elapsed %.3f ms "
-							   "before fallback",
-							   elapsed_ms),
-					 errhidestmt(true)));
 		}
 	}
 
-	if (!trained && algorithm != NULL
+	if (!trained && !ops_failed_with_exception && algorithm != NULL
 		&& strcmp(algorithm, "random_forest") == 0
 		&& feature_matrix != NULL && label_vector != NULL
 		&& sample_count > 0 && feature_dim > 0)
@@ -382,16 +346,6 @@ ndb_gpu_try_train_model(const char *algorithm,
 		{
 			trained = true;
 			ndb_gpu_stats_record(true, elapsed_ms, 0.0, false);
-			ereport(DEBUG1,
-					(errmsg("random_forest: GPU training succeeded "
-							"(direct)"),
-					 errdetail(
-							   "Elapsed %.3f ms on backend %s",
-							   elapsed_ms,
-							   ctx.backend_name
-							   ? ctx.backend_name
-							   : "unknown"),
-					 errhidestmt(true)));
 		}
 		else
 		{
@@ -409,16 +363,6 @@ ndb_gpu_try_train_model(const char *algorithm,
 			}
 			/* AUTO mode: fall back to CPU */
 			ndb_gpu_stats_record(false, 0.0, elapsed_ms, true);
-			ereport(INFO,
-					(errmsg("random_forest: GPU training "
-							"unavailable, using CPU"),
-					 errdetail("GPU attempt elapsed %.3f ms "
-							   "(%s)",
-							   elapsed_ms,
-							   (errstr && *errstr)
-							   ? *errstr
-							   : "no error"),
-					 errhidestmt(true)));
 		}
 	}
 
@@ -435,14 +379,6 @@ ndb_gpu_try_train_model(const char *algorithm,
 		int			usecs = 0;
 		double		elapsed_ms;
 
-		elog(DEBUG1,
-			 "logistic_regression: attempting direct GPU training: "
-			 "backend=%s, lr_train=%p, samples=%d, dim=%d",
-			 backend ? (backend->name ? backend->name : "unknown")
-			 : "NULL",
-			 backend ? (void *) backend->lr_train : NULL,
-			 sample_count,
-			 feature_dim);
 		
 		/* Set errstr if backend is NULL so we have a specific error message */
 		if (backend == NULL)
@@ -470,9 +406,6 @@ ndb_gpu_try_train_model(const char *algorithm,
 
 		if (backend == NULL || backend->lr_train == NULL)
 		{
-			elog(DEBUG1,
-				 "logistic_regression: backend or lr_train is "
-				 "NULL, skipping GPU");
 			/* Ensure errstr is set before returning */
 			if (errstr && *errstr == NULL)
 			{
@@ -554,9 +487,6 @@ ndb_gpu_try_train_model(const char *algorithm,
 		/* Defensive: Wrap CUDA call in error handling */
 		PG_TRY();
 		{
-			elog(DEBUG1,
-				 "logistic_regression: calling ndb_gpu_lr_train: samples=%d, dim=%d, errstr=%p",
-				 sample_count, feature_dim, (void *) errstr);
 			gpu_rc = ndb_gpu_lr_train(feature_matrix,
 									  label_vector,
 									  sample_count,
@@ -565,10 +495,6 @@ ndb_gpu_try_train_model(const char *algorithm,
 									  &payload,
 									  &metadata,
 									  errstr);
-			elog(DEBUG1,
-				 "logistic_regression: ndb_gpu_lr_train returned %d, errstr=%s",
-				 gpu_rc,
-				 (errstr && *errstr) ? *errstr : "NULL");
 		}
 		PG_CATCH();
 		{
@@ -658,10 +584,6 @@ ndb_gpu_try_train_model(const char *algorithm,
 													   DirectFunctionCall1(jsonb_out,
 																		   JsonbPGetDatum(metadata)));
 
-				elog(DEBUG1,
-					 "gpu_model_bridge: LR direct path "
-					 "metadata: %s",
-					 meta_txt);
 				nfree(meta_txt);
 			}
 			else
@@ -706,21 +628,11 @@ ndb_gpu_try_train_model(const char *algorithm,
 			}
 			/* AUTO mode: fall back to CPU */
 			ndb_gpu_stats_record(false, 0.0, elapsed_ms, true);
-			ereport(INFO,
-					(errmsg("logistic_regression: GPU training "
-							"unavailable, using CPU"),
-					 errdetail("GPU attempt elapsed %.3f ms "
-							   "(%s)",
-							   elapsed_ms,
-							   (errstr && *errstr)
-							   ? *errstr
-							   : "no error"),
-					 errhidestmt(true)));
 		}
 lr_fallback:;
 	}
 
-	if (!trained && algorithm != NULL
+	if (!trained && !ops_failed_with_exception && algorithm != NULL
 		&& strcmp(algorithm, "linear_regression") == 0
 		&& feature_matrix != NULL && label_vector != NULL
 		&& sample_count > 0 && feature_dim > 0)
@@ -758,9 +670,6 @@ lr_fallback:;
 
 		if (backend == NULL || backend->linreg_train == NULL)
 		{
-			elog(DEBUG1,
-				 "linear_regression: backend or linreg_train is "
-				 "NULL, skipping GPU");
 			goto linreg_fallback;
 		}
 
@@ -946,10 +855,6 @@ lr_fallback:;
 											   DirectFunctionCall1(jsonb_out,
 																   JsonbPGetDatum(metadata)));
 
-					elog(DEBUG1,
-						 "gpu_model_bridge: linear_regression direct path "
-						 "metadata: %s",
-						 meta_txt);
 					nfree(meta_txt);
 				}
 				else
@@ -978,16 +883,6 @@ lr_fallback:;
 				}
 			}
 
-			ereport(INFO,
-					(errmsg("linear_regression: GPU training "
-							"succeeded (direct)"),
-					 errdetail(
-							   "Elapsed %.3f ms on backend %s",
-							   elapsed_ms,
-							   backend && backend->name
-							   ? backend->name
-							   : "unknown"),
-					 errhidestmt(true)));
 		}
 		else
 		{
@@ -1018,21 +913,11 @@ lr_fallback:;
 			}
 			/* AUTO mode: fall back to CPU */
 			ndb_gpu_stats_record(false, 0.0, elapsed_ms, true);
-			ereport(INFO,
-					(errmsg("linear_regression: GPU training "
-							"unavailable, using CPU"),
-					 errdetail("GPU attempt elapsed %.3f ms "
-							   "(%s)",
-							   elapsed_ms,
-							   (errstr && *errstr)
-							   ? *errstr
-							   : "no error"),
-					 errhidestmt(true)));
 		}
 linreg_fallback:;
 	}
 
-	if (!trained && algorithm != NULL
+	if (!trained && !ops_trained && algorithm != NULL
 		&& strcmp(algorithm, "decision_tree") == 0
 		&& feature_matrix != NULL && label_vector != NULL
 		&& sample_count > 0 && feature_dim > 0)
@@ -1059,16 +944,6 @@ linreg_fallback:;
 		{
 			trained = true;
 			ndb_gpu_stats_record(true, elapsed_ms, 0.0, false);
-			ereport(DEBUG1,
-					(errmsg("decision_tree: GPU training succeeded "
-							"(direct)"),
-					 errdetail(
-							   "Elapsed %.3f ms on backend %s",
-							   elapsed_ms,
-							   ctx.backend_name
-							   ? ctx.backend_name
-							   : "unknown"),
-					 errhidestmt(true)));
 		}
 		else
 		{
@@ -1086,20 +961,10 @@ linreg_fallback:;
 			}
 			/* AUTO mode: fall back to CPU */
 			ndb_gpu_stats_record(false, 0.0, elapsed_ms, true);
-			ereport(INFO,
-					(errmsg("decision_tree: GPU training "
-							"unavailable, using CPU"),
-					 errdetail("GPU attempt elapsed %.3f ms "
-							   "(%s)",
-							   elapsed_ms,
-							   (errstr && *errstr)
-							   ? *errstr
-							   : "no error"),
-					 errhidestmt(true)));
 		}
 	}
 
-	if (!trained && algorithm != NULL && strcmp(algorithm, "ridge") == 0
+	if (!trained && !ops_trained && algorithm != NULL && strcmp(algorithm, "ridge") == 0
 		&& feature_matrix != NULL && label_vector != NULL
 		&& sample_count > 0 && feature_dim > 0)
 	{
@@ -1125,16 +990,6 @@ linreg_fallback:;
 		{
 			trained = true;
 			ndb_gpu_stats_record(true, elapsed_ms, 0.0, false);
-			ereport(DEBUG1,
-					(errmsg("ridge: GPU training succeeded "
-							"(direct)"),
-					 errdetail(
-							   "Elapsed %.3f ms on backend %s",
-							   elapsed_ms,
-							   ctx.backend_name
-							   ? ctx.backend_name
-							   : "unknown"),
-					 errhidestmt(true)));
 		}
 		else
 		{
@@ -1152,20 +1007,10 @@ linreg_fallback:;
 			}
 			/* AUTO mode: fall back to CPU */
 			ndb_gpu_stats_record(false, 0.0, elapsed_ms, true);
-			ereport(INFO,
-					(errmsg("ridge: GPU training unavailable, "
-							"using CPU"),
-					 errdetail("GPU attempt elapsed %.3f ms "
-							   "(%s)",
-							   elapsed_ms,
-							   (errstr && *errstr)
-							   ? *errstr
-							   : "no error"),
-					 errhidestmt(true)));
 		}
 	}
 
-	if (!trained && algorithm != NULL && strcmp(algorithm, "lasso") == 0
+	if (!trained && !ops_trained && algorithm != NULL && strcmp(algorithm, "lasso") == 0
 		&& feature_matrix != NULL && label_vector != NULL
 		&& sample_count > 0 && feature_dim > 0)
 	{
@@ -1191,16 +1036,6 @@ linreg_fallback:;
 		{
 			trained = true;
 			ndb_gpu_stats_record(true, elapsed_ms, 0.0, false);
-			ereport(DEBUG1,
-					(errmsg("lasso: GPU training succeeded "
-							"(direct)"),
-					 errdetail(
-							   "Elapsed %.3f ms on backend %s",
-							   elapsed_ms,
-							   ctx.backend_name
-							   ? ctx.backend_name
-							   : "unknown"),
-					 errhidestmt(true)));
 		}
 		else
 		{
@@ -1218,16 +1053,6 @@ linreg_fallback:;
 			}
 			/* AUTO mode: fall back to CPU */
 			ndb_gpu_stats_record(false, 0.0, elapsed_ms, true);
-			ereport(INFO,
-					(errmsg("lasso: GPU training unavailable, "
-							"using CPU"),
-					 errdetail("GPU attempt elapsed %.3f ms "
-							   "(%s)",
-							   elapsed_ms,
-							   (errstr && *errstr)
-							   ? *errstr
-							   : "no error"),
-					 errhidestmt(true)));
 		}
 	}
 
@@ -1257,10 +1082,6 @@ linreg_fallback:;
 			result->spec.metrics = metrics_copy;
 			result->metadata = metrics_copy;
 			result->metrics = metrics_copy;
-			elog(DEBUG1,
-				 "gpu_model_bridge: copied metrics to "
-				 "result->spec.metrics: %p",
-				 (void *) result->spec.metrics);
 		}
 		else
 		{
@@ -1299,7 +1120,7 @@ linreg_fallback:;
 	}
 
 	ereport(DEBUG2, (errmsg("gpu_model_bridge: about to check ops->destroy, ops=%p", (void *) ops)));
-	if (ops != NULL && ops->destroy != NULL)
+	if (ops != NULL && ops->destroy != NULL && model.backend_state != NULL)
 	{
 		ereport(DEBUG2, (errmsg("gpu_model_bridge: calling ops->destroy")));
 		ops->destroy(&model);
@@ -1313,9 +1134,6 @@ linreg_fallback:;
 	ereport(DEBUG2, (errmsg("gpu_model_bridge: about to check if (!trained), trained=%d", trained)));
 	if (!trained)
 	{
-		ereport(DEBUG1, (errmsg("gpu_model_bridge: trained is false, cleaning up. algorithm=%s, errstr=%s",
-								algorithm ? algorithm : "NULL",
-								(errstr && *errstr) ? *errstr : "NULL")));
 		/* If errstr is not set and we have an algorithm, set a default error message */
 		/* This ensures the caller always gets a meaningful error message */
 		if (errstr && *errstr == NULL)
@@ -1329,15 +1147,10 @@ linreg_fallback:;
 				*errstr = pstrdup("ndb_gpu_try_train_model: GPU training failed - no specific error available. Check GPU availability and backend registration.");
 			}
 		}
-		nfree(payload);
-		nfree(metadata);
-		if (result != NULL)
-		{
-			ereport(DEBUG2, (errmsg("gpu_model_bridge: calling ndb_gpu_free_train_result")));
-			ndb_gpu_free_train_result(result);
-			ereport(DEBUG2, (errmsg("gpu_model_bridge: ndb_gpu_free_train_result completed")));
-		}
-		ereport(DEBUG1, (errmsg("gpu_model_bridge: cleanup completed")));
+		/* Do not free payload/metadata here - they are either NULL or owned by GPU backend */
+		/* The GPU backend is responsible for cleaning up its own allocations */
+		/* Do not call ndb_gpu_free_train_result since training never completed successfully */
+		/* The result structure was never populated, so nothing to free */
 	}
 	else
 	{

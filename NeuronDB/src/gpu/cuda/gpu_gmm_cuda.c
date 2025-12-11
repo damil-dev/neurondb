@@ -313,6 +313,12 @@ ndb_cuda_gmm_train(const float *features,
 				d;
 	int			rc = -1;
 
+	/* Initialize output pointers to NULL */
+	if (model_data)
+		*model_data = NULL;
+	if (metrics)
+		*metrics = NULL;
+
 	if (errstr)
 		*errstr = NULL;
 
@@ -374,8 +380,6 @@ ndb_cuda_gmm_train(const float *features,
 		return -1;
 	}
 
-	elog(DEBUG1, "ndb_cuda_gmm_train: entry: n_samples=%d, feature_dim=%d, n_components=%d",
-		 n_samples, feature_dim, n_components);
 
 	/* Validate input data for NaN/Inf before processing */
 	for (i = 0; i < n_samples; i++)

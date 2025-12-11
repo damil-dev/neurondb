@@ -121,10 +121,6 @@ distributed_knn_search(PG_FUNCTION_ARGS)
 		oldcontext =
 			MemoryContextSwitchTo(funcctx->multi_call_memory_ctx);
 
-		elog(DEBUG1,
-			 "neurondb: distributed kNN search across %d shards (k=%d)",
-			 nshards,
-			 k);
 
 		total_candidates = nshards * k;
 		nalloc(candidate_ids, Datum, total_candidates);
@@ -493,7 +489,6 @@ Datum
 select_optimal_replica(PG_FUNCTION_ARGS)
 {
 	text	   *query_type = PG_GETARG_TEXT_PP(0);
-	int32		k = PG_GETARG_INT32(1);
 
 #define NREPLICAS 3
 	static const char *replicas[NREPLICAS] = {
@@ -505,22 +500,13 @@ select_optimal_replica(PG_FUNCTION_ARGS)
 	int			i;
 	int			best = 0;
 	text *selected_replica = NULL;
-	char	   *type_str = text_to_cstring(query_type);
 
-	elog(DEBUG1,
-		 "neurondb: starting replica selection for query_type=%s (k=%d)",
-		 type_str,
-		 k);
+	(void) query_type;
+
 
 	for (i = 0; i < NREPLICAS; i++)
 	{
 		scores[i] = latencies[i] * (1.0f - recalls[i]);
-		elog(DEBUG1,
-			 "neurondb: replica %s latency=%.2f recall=%.2f score=%.5f",
-			 replicas[i],
-			 latencies[i],
-			 recalls[i],
-			 scores[i]);
 		if (i == 0 || scores[i] < scores[best]
 			|| (scores[i] == scores[best]
 				&& strcmp(replicas[i], replicas[best]) < 0))
@@ -528,10 +514,6 @@ select_optimal_replica(PG_FUNCTION_ARGS)
 	}
 
 	selected_replica = cstring_to_text(replicas[best]);
-	elog(DEBUG1,
-		 "neurondb: selected replica: %s (score=%.5f)",
-		 replicas[best],
-		 scores[best]);
 
 	PG_RETURN_TEXT_P(selected_replica);
 }
@@ -559,10 +541,6 @@ sync_index_async(PG_FUNCTION_ARGS)
 
 	NdbSpiSession *session = NULL;
 
-	elog(DEBUG1,
-		 "neurondb: initiating async WAL streaming (index \"%s\" -> replica \"%s\")",
-		 idx_str,
-		 replica_str);
 	session = ndb_spi_session_begin(CurrentMemoryContext, false);
 	if (session == NULL)
 		ereport(ERROR,
@@ -621,9 +599,6 @@ sync_index_async(PG_FUNCTION_ARGS)
 
 	if (!slot_exists)
 	{
-		elog(DEBUG1,
-			 "neurondb: creating logical replication slot \"%s\"",
-			 slot_name.data);
 		resetStringInfo(&sql);
 		appendStringInfo(&sql,
 						 "SELECT "
@@ -642,15 +617,9 @@ sync_index_async(PG_FUNCTION_ARGS)
 							"replication slot \"%s\"",
 							slot_name.data)));
 		}
-		elog(DEBUG1,
-			 "neurondb: replication slot \"%s\" created successfully",
-			 slot_name.data);
 	}
 	else
 	{
-		elog(DEBUG1,
-			 "neurondb: replication slot \"%s\" already exists",
-			 slot_name.data);
 	}
 
 	resetStringInfo(&sql);
@@ -662,10 +631,6 @@ sync_index_async(PG_FUNCTION_ARGS)
 
 	if (!publication_exists)
 	{
-		elog(DEBUG1,
-			 "neurondb: creating publication \"%s\" for table %s",
-			 pub_name.data,
-			 idx_str);
 		resetStringInfo(&sql);
 		appendStringInfo(&sql,
 						 "CREATE PUBLICATION %s FOR TABLE %s",
@@ -676,16 +641,9 @@ sync_index_async(PG_FUNCTION_ARGS)
 			elog(WARNING,
 				 "neurondb: failed to create publication \"%s\" (may require manual intervention)",
 				 pub_name.data);
-		else
-			elog(DEBUG1,
-				 "neurondb: publication \"%s\" created successfully",
-				 pub_name.data);
 	}
 	else
 	{
-		elog(DEBUG1,
-			 "neurondb: publication \"%s\" already exists",
-			 pub_name.data);
 	}
 
 	resetStringInfo(&sql);
@@ -723,22 +681,6 @@ sync_index_async(PG_FUNCTION_ARGS)
 	}
 
 
-	elog(DEBUG1,
-		 "neurondb: async sync setup complete for index \"%s\"",
-		 idx_str);
-	elog(DEBUG1,
-		 "neurondb: slot=\"%s\", publication=\"%s\"",
-		 slot_name.data,
-		 pub_name.data);
-	elog(INFO,
-		 "neurondb: On replica, create subscription with:\n"
-		 "  CREATE SUBSCRIPTION neurondb_sub_%s\n"
-		 "  CONNECTION 'host=%s dbname=postgres'\n"
-		 "  PUBLICATION %s WITH (slot_name='%s')",
-		 idx_str,
-		 replica_str,
-		 pub_name.data,
-		 slot_name.data);
 
 	resetStringInfo(&sql);
 	appendStringInfo(&sql, "SELECT pg_current_wal_lsn()");

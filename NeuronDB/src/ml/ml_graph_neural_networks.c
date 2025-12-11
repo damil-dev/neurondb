@@ -742,9 +742,6 @@ gcn_train(PG_FUNCTION_ARGS)
 
 		if (l % 10 == 0 || l == epochs - 1)
 		{
-			elog(DEBUG1,
-				 "GCN epoch %d: loss = %.6f",
-				 l, loss / (float) n_nodes);
 		}
 	}
 

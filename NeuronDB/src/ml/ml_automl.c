@@ -184,8 +184,6 @@ auto_train(PG_FUNCTION_ARGS)
 	automl_context = AllocSetContextCreate(CurrentMemoryContext,
 										   "automl memory context",
 										   ALLOCSET_DEFAULT_SIZES);
-	elog(DEBUG1,
-		 "Created AutoML memory context");
 	oldcontext = MemoryContextSwitchTo(automl_context);
 
 	/* Select algorithms based on task */
@@ -249,9 +247,6 @@ auto_train(PG_FUNCTION_ARGS)
 			Jsonb *hyperparams_jsonb = NULL;
 			StringInfoData json_str;
 
-			elog(DEBUG1,
-				 "Training algorithm %s with table %s, label %s, features %s",
-				 algorithms[i], table_name_str, label_col_str, feature_col_str);
 
 			/* Build arguments for neurondb.train() */
 			project_name_text = cstring_to_text("default");
@@ -357,7 +352,7 @@ auto_train(PG_FUNCTION_ARGS)
 
 			/* Suppress shadow warnings from nested PG_TRY blocks */
 #pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wshadow"
+#pragma GCC diagnostic ignored "-Wshadow=compatible-local"
 			PG_TRY();
 			{
 				edata = CopyErrorData();
@@ -380,7 +375,7 @@ auto_train(PG_FUNCTION_ARGS)
 			{
 				/* Suppress shadow warnings from nested PG_TRY blocks */
 #pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wshadow"
+#pragma GCC diagnostic ignored "-Wshadow=compatible-local"
 				PG_TRY();
 				{
 					FreeErrorData(edata);
@@ -473,7 +468,7 @@ auto_train(PG_FUNCTION_ARGS)
 				 */
 				/* Suppress shadow warnings from nested PG_TRY blocks */
 #pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wshadow"
+#pragma GCC diagnostic ignored "-Wshadow=compatible-local"
 				PG_TRY();
 				{
 					eval_result_datum = FunctionCall4(&eval_flinfo,
@@ -515,9 +510,6 @@ auto_train(PG_FUNCTION_ARGS)
 				PG_CATCH();
 				{
 					/* Evaluation failed - use default score */
-					elog(DEBUG1,
-						 "auto_train: Evaluation of model %d failed, using default score",
-						 model_id);
 					FlushErrorState();
 					extracted_score = 0.5f;
 				}
@@ -529,8 +521,6 @@ auto_train(PG_FUNCTION_ARGS)
 			else
 			{
 				/* Function not found - use default score */
-				elog(DEBUG1,
-					 "auto_train: neurondb.evaluate function not found, using default score");
 				scores[i].score = 0.5f;
 			}
 		}
@@ -550,177 +540,6 @@ auto_train(PG_FUNCTION_ARGS)
 			best_model_id = scores[i].model_id;
 		}
 
-#if 0
-		/* Original evaluation code - disabled */
-		initStringInfo(&sql);
-		appendStringInfo(&sql,
-						 "SELECT neurondb.evaluate("
-						 "%d, "
-						 "'%s', "
-						 "'%s', "
-						 "'%s')",
-						 model_id,
-						 table_name_str,
-						 feature_col_str,
-						 label_col_str);
-		elog(DEBUG1,
-			 "Evaluating model %d with table %s, features %s, label %s",
-			 model_id, table_name_str, feature_col_str, label_col_str);
-
-		ret = ndb_spi_execute_safe(sql.data, true, 1);
-		NDB_CHECK_SPI_TUPTABLE();
-		if (ret != SPI_OK_SELECT || SPI_processed == 0)
-		{
-			nfree(sql.data);
-			scores[i].score = -1.0f;
-			continue;
-		}
-
-		/* Safe access for JSONB - validate before access */
-		if (SPI_tuptable == NULL || SPI_tuptable->vals == NULL ||
-			SPI_processed == 0 || SPI_tuptable->vals[0] == NULL || SPI_tuptable->tupdesc == NULL)
-		{
-			nfree(sql.data);
-			scores[i].score = -1.0f;
-			continue;
-		}
-		/* Use safe function to get JSONB */
-		metrics_jsonb = ndb_spi_get_jsonb(spi_session, 0, 1, oldcontext);
-		nfree(sql.data);
-
-		if (metrics_jsonb == NULL)
-		{
-			metrics_isnull = true;
-			scores[i].score = -1.0f;
-			continue;
-		}
-		metrics_isnull = false;
-		metrics_datum = JsonbPGetDatum(metrics_jsonb);
-
-		/* Extract metric value from JSONB */
-		/* Wrap in PG_TRY to handle corrupted JSONB gracefully */
-		PG_TRY();
-		{
-			it = JsonbIteratorInit((JsonbContainer *) & metrics_jsonb->root);
-
-			while ((r = JsonbIteratorNext(&it, &v, false)) != WJB_DONE)
-			{
-				if (r == WJB_KEY)
-				{
-					char	   *key = pnstrdup(v.val.string.val, v.val.string.len);
-
-					r = JsonbIteratorNext(&it, &v, false);
-
-					/* Handle metric name variations */
-					if ((strcmp(key, metric) == 0 ||
-						 (strcmp(metric, "f1_score") == 0 && strcmp(key, "f1") == 0) ||
-						 (strcmp(metric, "f1") == 0 && strcmp(key, "f1_score") == 0) ||
-						 (strcmp(metric, "r2") == 0 && strcmp(key, "r_squared") == 0) ||
-						 (strcmp(metric, "r_squared") == 0 && strcmp(key, "r2") == 0)) &&
-						v.type == jbvNumeric)
-					{
-						score = (float) DatumGetFloat8(
-													   DirectFunctionCall1(numeric_float8,
-																		   NumericGetDatum(v.val.numeric)));
-						found_metric = true;
-						nfree(key);
-						break;
-					}
-					nfree(key);
-				}
-			}
-		}
-		PG_CATCH();
-		{
-			FlushErrorState();
-			elog(WARNING,
-				 "auto_train: Failed to parse metrics JSONB (possibly corrupted), using default score");
-			found_metric = false;
-			score = 0.5f;		/* Default score */
-		}
-		PG_END_TRY();
-
-		if (!found_metric)
-		{
-			/*
-			 * Try to find alternative names for the requested metric, then
-			 * common metrics
-			 */
-			/* Wrap in PG_TRY to handle corrupted JSONB gracefully */
-			bool		matches_metric;
-			bool		matches_common;
-
-			PG_TRY();
-			{
-				it = JsonbIteratorInit((JsonbContainer *) & metrics_jsonb->root);
-				while ((r = JsonbIteratorNext(&it, &v, false)) != WJB_DONE)
-				{
-					if (r == WJB_KEY)
-					{
-						char	   *key = pnstrdup(v.val.string.val, v.val.string.len);
-
-						r = JsonbIteratorNext(&it, &v, false);
-
-						/* Check for alternative names of requested metric */
-						matches_metric = false;
-						if (strcmp(metric, "r2") == 0 && strcmp(key, "r_squared") == 0)
-							matches_metric = true;
-						else if (strcmp(metric, "r_squared") == 0 && strcmp(key, "r2") == 0)
-							matches_metric = true;
-						else if (strcmp(metric, "f1_score") == 0 && strcmp(key, "f1") == 0)
-							matches_metric = true;
-						else if (strcmp(metric, "f1") == 0 && strcmp(key, "f1_score") == 0)
-							matches_metric = true;
-						else if (strcmp(key, metric) == 0)
-							matches_metric = true;
-
-						/* Also check common metric names */
-						matches_common = false;
-						if (strcmp(task_str, "classification") == 0 &&
-							(strcmp(key, "accuracy") == 0 ||
-							 strcmp(key, "f1") == 0 ||
-							 strcmp(key, "precision") == 0 ||
-							 strcmp(key, "recall") == 0))
-							matches_common = true;
-						else if (strcmp(task_str, "regression") == 0 &&
-								 (strcmp(key, "r2") == 0 ||
-								  strcmp(key, "r_squared") == 0 ||
-								  strcmp(key, "mse") == 0 ||
-								  strcmp(key, "mae") == 0))
-							matches_common = true;
-
-						if ((matches_metric || matches_common) && v.type == jbvNumeric)
-						{
-							score = (float) DatumGetFloat8(
-														   DirectFunctionCall1(numeric_float8,
-																			   NumericGetDatum(v.val.numeric)));
-							found_metric = true;
-							nfree(key);
-							break;
-						}
-						nfree(key);
-					}
-				}
-			}
-			PG_CATCH();
-			{
-				FlushErrorState();
-				elog(WARNING,
-					 "auto_train: Failed to parse metrics JSONB (possibly corrupted), using default score");
-				found_metric = false;
-				score = 0.5f;	/* Default score */
-			}
-			PG_END_TRY();
-
-			if (!found_metric)
-			{
-				elog(DEBUG1,
-					 "neurondb: auto_train: Could not find metric '%s' for %s, using default score",
-					 metric, algorithms[i]);
-				score = 0.5f;	/* Default score */
-			}
-		}
-#endif
 
 		/* Track best model - using default score of 0.5f */
 		if (scores[i].score > best_score)
@@ -738,24 +557,14 @@ auto_train(PG_FUNCTION_ARGS)
 						 "AutoML completed. Best algorithm: %s, %s: %.4f, model_id: %d\n"
 						 "Trained %d algorithms:\n",
 						 best_algorithm, metric, best_score, best_model_id, n_algorithms);
-		elog(DEBUG1,
-			 "AutoML completed. Best algorithm: %s, %s: %.4f, model_id: %d, trained %d algorithms",
-			 best_algorithm, metric, best_score, best_model_id, n_algorithms);
 
 		for (i = 0; i < n_algorithms; i++)
 		{
 			if (scores[i].model_id > 0)
 			{
-				elog(DEBUG1,
-					 "  %d. %s: %.4f (model_id: %d)\n",
-					 i + 1, scores[i].algorithm,
-					 scores[i].score, scores[i].model_id);
 			}
 			else
 			{
-				elog(DEBUG1,
-					 "  %d. %s: failed\n",
-					 i + 1, scores[i].algorithm);
 			}
 		}
 	}
@@ -769,8 +578,6 @@ auto_train(PG_FUNCTION_ARGS)
 	MemoryContextSwitchTo(oldcontext);
 	MemoryContextDelete(automl_context);
 
-	elog(INFO, "AutoML completed. Best model_id: %d (algorithm: %s, score: %.4f)",
-		 best_model_id, best_algorithm ? best_algorithm : "none", best_score);
 
 	PG_RETURN_INT32(best_model_id);
 }
@@ -1009,13 +816,13 @@ optimize_hyperparameters(PG_FUNCTION_ARGS)
 									 * JSONB gracefully
 									 */
 
-									/*
-									 * Suppress shadow warnings from nested
-									 * PG_TRY blocks
-									 */
+				/*
+				 * Suppress shadow warnings from nested
+				 * PG_TRY blocks
+				 */
 #pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wshadow"
-									PG_TRY();
+#pragma GCC diagnostic ignored "-Wshadow=compatible-local"
+				PG_TRY();
 									{
 										metrics_it = JsonbIteratorInit((JsonbContainer *) & metrics_jsonb->root);
 
@@ -2108,10 +1915,8 @@ model_leaderboard(PG_FUNCTION_ARGS)
 		{
 			bool		isnull[3];
 			Datum		values[3];
-			int32		model_id;
 			char *algorithm = NULL;
 			char *score_str = NULL;
-			float		score = 0.0f;
 
 			values[0] = SPI_getbinval(SPI_tuptable->vals[row],
 									  SPI_tuptable->tupdesc,
@@ -2128,16 +1933,12 @@ model_leaderboard(PG_FUNCTION_ARGS)
 
 			if (!isnull[0] && !isnull[1] && !isnull[2])
 			{
-				model_id = DatumGetInt32(values[0]);
+				(void) DatumGetInt32(values[0]);
 				algorithm = TextDatumGetCString(values[1]);
 				score_str = TextDatumGetCString(values[2]);
 
-				if (score_str != NULL)
-					score = (float) atof(score_str);
+				(void) score_str;
 
-				elog(DEBUG1,
-					 "%d. %s (model_id: %d): %.4f\n",
-					 rank, algorithm, model_id, score);
 
 				nfree(algorithm);
 				if (score_str != NULL)
@@ -2668,14 +2469,6 @@ cleanup:
 		if (error_occurred)
 			return false;
 
-		elog(DEBUG1,
-			 "automl_gpu_train: Selected algorithm '%s' with evaluation score %.4f "
-			 "(nvec=%d, dim=%d, trained %d candidates)",
-			 selected_algorithm,
-			 best_score_val,
-			 nvec,
-			 dim,
-			 n_candidates);
 	}
 
 	/* Serialize model */

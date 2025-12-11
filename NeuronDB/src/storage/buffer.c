@@ -36,6 +36,9 @@ rebuild_hnsw_safe(PG_FUNCTION_ARGS)
 {
 	text	   *index_name;
 	bool		resume;
+	int64		vectors_processed = 0;
+	NdbSpiSession *session = NULL;
+	NdbSpiSession *session2 = NULL;
 
 	/* Validate argument count */
 	if (PG_NARGS() < 2)
@@ -45,19 +48,9 @@ rebuild_hnsw_safe(PG_FUNCTION_ARGS)
 
 	index_name = PG_GETARG_TEXT_PP(0);
 	resume = PG_GETARG_BOOL(1);
-	char *idx_str = NULL;
-	int64		vectors_processed = 0;
-	int64		checkpoint_id = 0;
 
-	NdbSpiSession *session = NULL;
-	NdbSpiSession *session2 = NULL;
+	(void) index_name;
 
-	idx_str = text_to_cstring(index_name);
-
-	elog(DEBUG1,
-		 "neurondb: %s HNSW rebuild for '%s'",
-		 resume ? "resuming" : "starting",
-		 idx_str);
 	session = ndb_spi_session_begin(CurrentMemoryContext, false);
 	if (session == NULL)
 		ereport(ERROR,
@@ -86,23 +79,11 @@ rebuild_hnsw_safe(PG_FUNCTION_ARGS)
 
 				if (!isnull)
 				{
-					checkpoint_id =
-						DatumGetInt64(ckpt_datum);
-				}
-				else
-				{
-					checkpoint_id = 0;
+					(void) DatumGetInt64(ckpt_datum);
 				}
 			}
 			ndb_spi_session_end(&session2);
 		}
-		else
-		{
-			checkpoint_id = 0;
-		}
-		elog(DEBUG1,
-			 "neurondb: resuming from checkpoint " NDB_INT64_FMT,
-			 NDB_INT64_CAST(checkpoint_id));
 	}
 
 	/* Build index incrementally */
@@ -143,9 +124,6 @@ rebuild_hnsw_safe(PG_FUNCTION_ARGS)
 
 	ndb_spi_session_end(&session);
 
-	elog(DEBUG1,
-		 "neurondb: processed " NDB_INT64_FMT " vectors",
-		 NDB_INT64_CAST(vectors_processed));
 
 	PG_RETURN_INT64(vectors_processed);
 }
@@ -155,8 +133,8 @@ Datum
 parallel_knn_search(PG_FUNCTION_ARGS)
 {
 	Vector	   *query_vector;
-	int32		k;
 	int32		num_workers;
+	int			i;
 
 	/* Validate argument count */
 	if (PG_NARGS() < 3)
@@ -165,24 +143,15 @@ parallel_knn_search(PG_FUNCTION_ARGS)
 				 errmsg("neurondb: parallel_knn_search requires at least 3 arguments")));
 
 	query_vector = (Vector *) PG_GETARG_POINTER(0);
-	k = PG_GETARG_INT32(1);
+	(void) PG_GETARG_INT32(1);
 	num_workers = PG_GETARG_INT32(2);
-	int			i;
 
 	(void) query_vector;
 	(void) i;
 
-	elog(DEBUG1,
-		 "neurondb: parallel kNN search with %d workers for top-%d",
-		 num_workers,
-		 k);
 
 	for (i = 0; i < num_workers; i++)
 	{
-		elog(DEBUG1,
-			 "neurondb: worker %d searching partition %d",
-			 i,
-			 i);
 	}
 
 
@@ -197,8 +166,9 @@ Datum
 save_rebuild_checkpoint(PG_FUNCTION_ARGS)
 {
 	text	   *index_name;
-	int64		vector_offset;
 	text	   *state_json;
+	char *state_str = NULL;
+	NdbSpiSession *session2 = NULL;
 
 	/* Validate argument count */
 	if (PG_NARGS() < 3)
@@ -207,21 +177,13 @@ save_rebuild_checkpoint(PG_FUNCTION_ARGS)
 				 errmsg("neurondb: save_rebuild_checkpoint requires at least 3 arguments")));
 
 	index_name = PG_GETARG_TEXT_PP(0);
-	vector_offset = PG_GETARG_INT64(1);
+	(void) PG_GETARG_INT64(1);
 	state_json = PG_GETARG_TEXT_PP(2);
-	char *idx_str = NULL;
-	char *state_str = NULL;
 
-	NdbSpiSession *session2 = NULL;
-
-	idx_str = text_to_cstring(index_name);
+	(void) index_name;
 	state_str = text_to_cstring(state_json);
 	(void) state_str;
 
-	elog(DEBUG1,
-		 "neurondb: saving checkpoint for '%s' at offset " NDB_INT64_FMT,
-		 idx_str,
-		 NDB_INT64_CAST(vector_offset));
 	session2 = ndb_spi_session_begin(CurrentMemoryContext, false);
 	if (session2 == NULL)
 		ereport(ERROR,
@@ -243,6 +205,8 @@ load_rebuild_checkpoint(PG_FUNCTION_ARGS)
 {
 	text	   *index_name;
 	text *checkpoint_data = NULL;
+	char *idx_str = NULL;
+	NdbSpiSession *session3 = NULL;
 
 	/* Validate argument count */
 	if (PG_NARGS() < 1)
@@ -251,9 +215,6 @@ load_rebuild_checkpoint(PG_FUNCTION_ARGS)
 				 errmsg("neurondb: load_rebuild_checkpoint requires at least 1 argument")));
 
 	index_name = PG_GETARG_TEXT_PP(0);
-	char *idx_str = NULL;
-
-	NdbSpiSession *session3 = NULL;
 
 	idx_str = text_to_cstring(index_name);
 
