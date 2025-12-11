@@ -69,7 +69,7 @@ func (e *Executor) Execute(ctx context.Context, tool *db.Tool, args map[string]i
 
 /* ExecuteByName executes a tool by name */
 func (e *Executor) ExecuteByName(ctx context.Context, toolName string, args map[string]interface{}) (string, error) {
-	tool, err := e.registry.Get(toolName)
+	tool, err := e.registry.Get(ctx, toolName)
 	if err != nil {
 		argKeys := make([]string, 0, len(args))
 		for k := range args {
