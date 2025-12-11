@@ -12,13 +12,99 @@
 # Git / build system
 .git
 .gitignore
+.gitattributes
+.gitmodules
 .github
 build/
 cmake-build*/
 
+# Docker files (don't include docker directory in build context)
+docker/
+.dockerignore
+
+# CI/CD files
+.gitlab-ci.yml
+.travis.yml
+.circleci/
+
+# Example and test configuration files
+*.example
+*.example.*
+.env.example
+*_example.json
+*_example.yaml
+*_example.yml
+
+# Test files and directories
+t/
+tests/
+*.t
+*.pm
+*.test
+*.out
+coverage.out
+coverage.html
+
+# Documentation (keep only essential)
+*.md
+!README.md
+docs/
+
+# Makefiles and build scripts (not needed in container)
+Makefile*
+*.sh
+!docker-entrypoint-initdb.d/*.sh
+
 # Editor metadata
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
 *.swp
+*.swo
+*~
 .vscode
 .idea
+.project
+.classpath
+.settings/
+
+# Development files
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+pg.log
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+*.backup
+*.orig
+*.rej
+*.patch
+
+# Python cache (if any Python tools are used)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# Node modules (if any)
+node_modules/
+package-lock.json
+yarn.lock
 

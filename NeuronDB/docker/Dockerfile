@@ -12,9 +12,15 @@
 # Build args:
 #   PG_MAJOR: PostgreSQL major version (16, 17, or 18, default: 17)
 #   ONNX_VERSION: ONNX Runtime version (default: 1.17.0)
+#   VERSION: Application version (used in labels)
+#   BUILD_DATE: Build date (ISO 8601 format)
+#   VCS_REF: Git commit hash or version control reference
 
 ARG PG_MAJOR=17
 ARG ONNX_VERSION=1.17.0
+ARG VERSION=latest
+ARG BUILD_DATE
+ARG VCS_REF
 
 FROM postgres:${PG_MAJOR}-bookworm AS builder
 
@@ -76,6 +82,23 @@ FROM postgres:${PG_MAJOR}-bookworm
 
 ARG PG_MAJOR
 ARG ONNX_VERSION
+ARG VERSION=latest
+ARG BUILD_DATE
+ARG VCS_REF
+
+# Add metadata labels
+LABEL org.opencontainers.image.title="NeuronDB" \
+      org.opencontainers.image.description="PostgreSQL extension for vector search, ML algorithms, and RAG capabilities" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.created="${BUILD_DATE}" \
+      org.opencontainers.image.revision="${VCS_REF}" \
+      org.opencontainers.image.vendor="neurondb" \
+      org.opencontainers.image.licenses="AGPL-3.0" \
+      org.opencontainers.image.source="https://github.com/neurondb/NeurondB" \
+      org.opencontainers.image.documentation="https://neurondb.ai/docs" \
+      maintainer="neurondb <admin@neurondb.com>" \
+      neurondb.postgresql.version="${PG_MAJOR}" \
+      neurondb.onnx.version="${ONNX_VERSION}"
 
 ENV ONNX_PATH=/usr/local/onnxruntime \
     NEURONDB_HOME=/usr/local/share/neurondb \

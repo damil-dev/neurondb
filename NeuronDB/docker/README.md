@@ -107,6 +107,9 @@ docker buildx build --platform linux/arm64 \
 |----------|---------|-------------|
 | `PG_MAJOR` | `17` | PostgreSQL major version: `16`, `17`, or `18` |
 | `ONNX_VERSION` | `1.17.0` | ONNX Runtime version to embed |
+| `VERSION` | `latest` | Application version (used in labels) |
+| `BUILD_DATE` | - | Build date (ISO 8601 format) |
+| `VCS_REF` | - | Git commit hash or version control reference |
 
 ### CUDA-Specific Arguments
 
@@ -120,6 +123,25 @@ docker buildx build --platform linux/arm64 \
 | Argument | Default | Description |
 |----------|---------|-------------|
 | `ROCM_VERSION` | `5.7` | ROCm version |
+
+### Production Build Example
+
+For production builds with versioning:
+
+```bash
+VERSION=1.0.0
+BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+VCS_REF=$(git rev-parse --short HEAD)
+
+docker build -f docker/Dockerfile \
+  --build-arg PG_MAJOR=17 \
+  --build-arg ONNX_VERSION=1.17.0 \
+  --build-arg VERSION=${VERSION} \
+  --build-arg BUILD_DATE=${BUILD_DATE} \
+  --build-arg VCS_REF=${VCS_REF} \
+  -t neurondb:${VERSION}-cpu \
+  -t neurondb:latest-cpu ..
+```
 
 ## Architecture Support
 
@@ -228,9 +250,10 @@ docker exec -it neurondb-cuda pg_ctl reload
 
 Standard PostgreSQL environment variables are supported:
 
-- `POSTGRES_USER` (default: `postgres`)
-- `POSTGRES_PASSWORD` (default: `postgres`)
-- `POSTGRES_DB` (default: `postgres`)
+- `POSTGRES_USER` (default: `neurondb`)
+- `POSTGRES_PASSWORD` (default: `neurondb`)
+- `POSTGRES_DB` (default: `neurondb`)
+- `POSTGRES_HOST_AUTH_METHOD` (default: `md5`, use `scram-sha-256` for production)
 - `POSTGRES_INITDB_ARGS`
 
 GPU-specific variables:
@@ -238,6 +261,17 @@ GPU-specific variables:
 - `NVIDIA_VISIBLE_DEVICES` (CUDA): GPU device selection
 - `NVIDIA_DRIVER_CAPABILITIES` (CUDA): Driver capabilities
 - `NEURONDB_GPU_ENABLED`: Enable GPU features
+
+### Environment File
+
+Create `.env` file from template:
+
+```bash
+cp .env.example .env
+# Edit .env with your configuration
+```
+
+The `.env.example` file includes all configurable environment variables with documentation.
 
 ## Advanced Usage
 
@@ -494,26 +528,428 @@ By default, containers use the `default` bridge network. To enable service disco
 
 3. **Use container name as hostname** when connecting from other services
 
-### Security Considerations
+## Production Deployment
 
-For production deployments:
-- Change default passwords via environment variables
-- Use Docker secrets for sensitive credentials
-- Restrict network access using Docker networks
-- Enable SSL/TLS connections if required
-- Consider using connection pooling in applications
+### Using Production Compose File
 
-### Environment Variables for External Access
+The `docker-compose.prod.yml` file extends the base configuration with production-focused settings:
 
-Ensure these are set appropriately:
+- Enhanced resource limits
+- Structured JSON logging
+- Production restart policies
+- Extended health checks
+- Security enhancements
+
+Start with production configuration:
 
 ```bash
-# Allow external connections (default: enabled)
-POSTGRES_HOST_AUTH_METHOD=md5  # or scram-sha-256 for better security
-
-# Optional: configure listen addresses
-# Add to postgresql.conf or via environment
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 ```
+
+### Production Environment Variables
+
+Create `.env.prod` for production:
+
+```env
+POSTGRES_USER=neurondb
+POSTGRES_PASSWORD=<secure-password>
+POSTGRES_DB=neurondb
+POSTGRES_HOST_AUTH_METHOD=scram-sha-256
+PG_MAJOR=17
+ONNX_VERSION=1.17.0
+```
+
+Load production environment:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.prod up -d
+```
+
+## SSL/TLS Configuration
+
+### Secure Database Connections
+
+NeuronDB (PostgreSQL) supports SSL/TLS for secure connections. Configure SSL in PostgreSQL:
+
+### Generate SSL Certificates
+
+```bash
+# Create certificates directory
+mkdir -p ssl
+
+# Generate CA key and certificate
+openssl req -new -x509 -days 3650 -nodes \
+  -out ssl/ca.crt -keyout ssl/ca.key \
+  -subj "/CN=NeuronDB-CA"
+
+# Generate server key
+openssl genrsa -out ssl/server.key 2048
+
+# Generate server certificate request
+openssl req -new -key ssl/server.key -out ssl/server.csr \
+  -subj "/CN=neurondb-cpu"
+
+# Sign server certificate with CA
+openssl x509 -req -in ssl/server.csr -CA ssl/ca.crt \
+  -CAkey ssl/ca.key -CAcreateserial \
+  -out ssl/server.crt -days 3650
+```
+
+### Mount SSL Certificates
+
+In `docker-compose.yml`:
+
+```yaml
+services:
+  neurondb:
+    volumes:
+      - neurondb-data:/var/lib/postgresql/data
+      - ./ssl:/var/lib/postgresql/ssl:ro
+    environment:
+      POSTGRES_SSL_CERT: /var/lib/postgresql/ssl/server.crt
+      POSTGRES_SSL_KEY: /var/lib/postgresql/ssl/server.key
+      POSTGRES_SSL_CA: /var/lib/postgresql/ssl/ca.crt
+```
+
+### Configure PostgreSQL for SSL
+
+Add to `postgresql.conf` (via init script or runtime):
+
+```conf
+ssl = on
+ssl_cert_file = '/var/lib/postgresql/ssl/server.crt'
+ssl_key_file = '/var/lib/postgresql/ssl/server.key'
+ssl_ca_file = '/var/lib/postgresql/ssl/ca.crt'
+```
+
+### Client SSL Configuration
+
+Connect with SSL:
+
+```bash
+psql "postgresql://neurondb:password@localhost:5433/neurondb?sslmode=require"
+```
+
+## Security
+
+### Container Security Best Practices
+
+The NeuronDB Docker images implement multiple security best practices:
+
+#### Base Image Security
+- Uses official PostgreSQL base images
+- Regular security updates via base image updates
+- Minimal attack surface
+
+#### Authentication Methods
+
+For production, use `scram-sha-256` authentication:
+
+```env
+POSTGRES_HOST_AUTH_METHOD=scram-sha-256
+```
+
+This provides better security than `md5` authentication.
+
+#### Credential Management
+
+#### Docker Secrets (Recommended for Production)
+
+```yaml
+version: "3.9"
+
+secrets:
+  postgres_password:
+    file: ./secrets/postgres_password.txt
+  postgres_user:
+    file: ./secrets/postgres_user.txt
+
+services:
+  neurondb:
+    secrets:
+      - postgres_password
+      - postgres_user
+    environment:
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      POSTGRES_USER_FILE: /run/secrets/postgres_user
+```
+
+Create secrets directory:
+
+```bash
+mkdir -p secrets
+chmod 700 secrets
+echo "your-secure-password" > secrets/postgres_password.txt
+chmod 600 secrets/postgres_password.txt
+```
+
+#### Environment Variables
+
+For development, use `.env` file with restricted permissions:
+
+```bash
+chmod 600 .env
+```
+
+Never commit `.env` files to version control. Use `.env.example` as a template.
+
+#### External Secrets Management
+
+Integrate with external secrets management systems:
+
+**HashiCorp Vault:**
+```bash
+export POSTGRES_PASSWORD=$(vault kv get -field=password secret/neurondb)
+```
+
+**AWS Secrets Manager:**
+```bash
+export POSTGRES_PASSWORD=$(aws secretsmanager get-secret-value \
+  --secret-id neurondb/password --query SecretString --output text)
+```
+
+### Network Security
+
+- **Isolated Networks**: Use Docker networks to isolate services
+- **Firewall Rules**: Restrict external access to PostgreSQL port
+- **TLS/SSL**: Enable TLS/SSL for all connections in production
+- **Network Policies**: Implement network policies in orchestrated environments
+
+### Security Checklist
+
+Before deploying to production:
+
+- [ ] Use Docker secrets or external secrets management
+- [ ] Change default passwords
+- [ ] Use `scram-sha-256` authentication method
+- [ ] Enable SSL/TLS for database connections
+- [ ] Restrict network access
+- [ ] Enable structured logging for audit trails
+- [ ] Set appropriate resource limits
+- [ ] Configure health checks
+- [ ] Use production restart policies
+- [ ] Regularly update base images
+- [ ] Scan images for vulnerabilities
+
+## Logging Integration
+
+### Structured JSON Logging
+
+For production, configure PostgreSQL logging:
+
+```yaml
+services:
+  neurondb:
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
+```
+
+### Docker Logging Drivers
+
+#### Syslog Driver
+
+Send logs to syslog:
+
+```yaml
+services:
+  neurondb:
+    logging:
+      driver: "syslog"
+      options:
+        syslog-address: "tcp://localhost:514"
+        syslog-facility: "daemon"
+        tag: "neurondb"
+```
+
+#### Fluentd Driver
+
+Send logs to Fluentd:
+
+```yaml
+services:
+  neurondb:
+    logging:
+      driver: "fluentd"
+      options:
+        fluentd-address: "localhost:24224"
+        tag: "neurondb.postgresql"
+```
+
+#### Loki Driver
+
+Send logs to Grafana Loki:
+
+```yaml
+services:
+  neurondb:
+    logging:
+      driver: "loki"
+      options:
+        loki-url: "http://localhost:3100/loki/api/v1/push"
+        loki-batch-size: "400"
+```
+
+#### CloudWatch Logs (AWS)
+
+```yaml
+services:
+  neurondb:
+    logging:
+      driver: "awslogs"
+      options:
+        awslogs-group: "/docker/neurondb"
+        awslogs-region: "us-east-1"
+        awslogs-stream-prefix: "postgresql"
+```
+
+### PostgreSQL Log Configuration
+
+Configure PostgreSQL logging in `postgresql.conf`:
+
+```conf
+logging_collector = on
+log_directory = 'log'
+log_filename = 'postgresql-%Y-%m-%d_%H%M%S.log'
+log_rotation_age = 1d
+log_rotation_size = 100MB
+log_line_prefix = '%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h '
+log_timezone = 'UTC'
+```
+
+## Monitoring
+
+### Container Metrics
+
+#### Docker Stats
+
+Monitor real-time container metrics:
+
+```bash
+docker stats neurondb-cpu
+```
+
+#### cAdvisor
+
+Use cAdvisor for detailed container metrics:
+
+```yaml
+services:
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+```
+
+#### Prometheus
+
+Export PostgreSQL metrics to Prometheus using `postgres_exporter`:
+
+```yaml
+services:
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    environment:
+      DATA_SOURCE_NAME: "postgresql://neurondb:password@neurondb-cpu:5432/neurondb?sslmode=disable"
+    ports:
+      - "9187:9187"
+```
+
+### Database Metrics
+
+#### PostgreSQL Statistics
+
+Query PostgreSQL statistics:
+
+```sql
+-- Connection statistics
+SELECT * FROM pg_stat_activity;
+
+-- Database statistics
+SELECT * FROM pg_stat_database WHERE datname = 'neurondb';
+
+-- Table statistics
+SELECT * FROM pg_stat_user_tables;
+```
+
+#### NeuronDB Metrics
+
+Query NeuronDB-specific metrics:
+
+```sql
+-- GPU device info (if GPU enabled)
+SELECT neurondb.gpu_device_info();
+
+-- Extension version
+SELECT neurondb.version();
+```
+
+### Health Monitoring
+
+#### Health Check Status
+
+Check container health:
+
+```bash
+docker inspect --format='{{.State.Health.Status}}' neurondb-cpu
+```
+
+#### Database Health
+
+Test database connectivity:
+
+```bash
+docker exec neurondb-cpu pg_isready -U neurondb
+```
+
+### Alerting
+
+#### Prometheus Alertmanager
+
+Set up alerts for:
+
+- Container down
+- High CPU usage (>80%)
+- High memory usage (>90%)
+- Health check failures
+- Database connection errors
+- Slow queries
+
+Example alert rule:
+
+```yaml
+groups:
+  - name: neurondb
+    rules:
+      - alert: NeuronDBDown
+        expr: up{job="neurondb"} == 0
+        for: 1m
+        annotations:
+          summary: "NeuronDB container is down"
+      - alert: HighConnectionCount
+        expr: pg_stat_database_numbackends{datname="neurondb"} > 80
+        for: 5m
+        annotations:
+          summary: "High connection count detected"
+```
+
+### Monitoring Best Practices
+
+1. **Set Up Alerts**: Configure alerts for critical metrics
+2. **Log Aggregation**: Centralize logs for analysis
+3. **Metrics Retention**: Configure appropriate retention periods
+4. **Dashboard Creation**: Create dashboards for key metrics
+5. **Regular Reviews**: Review metrics and logs regularly
+6. **Capacity Planning**: Monitor trends for capacity planning
+7. **Performance Baselines**: Establish performance baselines
 
 ## Support
 

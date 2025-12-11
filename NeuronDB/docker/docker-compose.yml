@@ -16,23 +16,38 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
       args:
-        PG_MAJOR: 17
-        ONNX_VERSION: 1.17.0
+        PG_MAJOR: ${PG_MAJOR:-17}
+        ONNX_VERSION: ${ONNX_VERSION:-1.17.0}
+        VERSION: ${VERSION:-latest}
+        BUILD_DATE: ${BUILD_DATE:-}
+        VCS_REF: ${VCS_REF:-}
     image: neurondb:cpu-pg17
     container_name: neurondb-cpu
     environment:
-      POSTGRES_USER: neurondb
-      POSTGRES_PASSWORD: neurondb
-      POSTGRES_DB: neurondb
+      POSTGRES_USER: ${POSTGRES_USER:-neurondb}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-neurondb}
+      POSTGRES_DB: ${POSTGRES_DB:-neurondb}
+      POSTGRES_HOST_AUTH_METHOD: ${POSTGRES_HOST_AUTH_METHOD:-md5}
     ports:
-      - "5433:5432"
+      - "${POSTGRES_PORT:-5433}:5432"
     volumes:
       - neurondb-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U neurondb"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-neurondb}"]
       interval: 30s
       timeout: 5s
       retries: 5
+      start_period: 40s
+    # Resource limits (adjust based on your requirements)
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 4G
+        reservations:
+          cpus: '1'
+          memory: 1G
+    restart: unless-stopped
     networks:
       - neurondb-network
 
@@ -43,24 +58,33 @@ services:
       context: ..
       dockerfile: docker/Dockerfile.gpu.cuda
       args:
-        PG_MAJOR: 17
-        CUDA_VERSION: 12.4.1
-        ONNX_VERSION: 1.17.0
-        ENABLE_RAPIDS: 0
+        PG_MAJOR: ${PG_MAJOR:-17}
+        CUDA_VERSION: ${CUDA_VERSION:-12.4.1}
+        ONNX_VERSION: ${ONNX_VERSION:-1.17.0}
+        ENABLE_RAPIDS: ${ENABLE_RAPIDS:-0}
+        VERSION: ${VERSION:-latest}
+        BUILD_DATE: ${BUILD_DATE:-}
+        VCS_REF: ${VCS_REF:-}
     image: neurondb:cuda-pg17
     container_name: neurondb-cuda
     environment:
-      POSTGRES_USER: neurondb
-      POSTGRES_PASSWORD: neurondb
-      POSTGRES_DB: neurondb
-      NVIDIA_VISIBLE_DEVICES: all
-      NVIDIA_DRIVER_CAPABILITIES: compute,utility
-      NEURONDB_GPU_ENABLED: "on"
+      POSTGRES_USER: ${POSTGRES_USER:-neurondb}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-neurondb}
+      POSTGRES_DB: ${POSTGRES_DB:-neurondb}
+      POSTGRES_HOST_AUTH_METHOD: ${POSTGRES_HOST_AUTH_METHOD:-md5}
+      NVIDIA_VISIBLE_DEVICES: ${NVIDIA_VISIBLE_DEVICES:-all}
+      NVIDIA_DRIVER_CAPABILITIES: ${NVIDIA_DRIVER_CAPABILITIES:-compute,utility}
+      NEURONDB_GPU_ENABLED: ${NEURONDB_GPU_ENABLED:-on}
     ports:
-      - "5434:5432"
+      - "${POSTGRES_CUDA_PORT:-5434}:5432"
     deploy:
       resources:
+        limits:
+          cpus: '8'
+          memory: 8G
         reservations:
+          cpus: '2'
+          memory: 2G
           devices:
             - driver: nvidia
               count: 1
@@ -69,10 +93,12 @@ services:
     volumes:
       - neurondb-cuda-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U neurondb"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-neurondb}"]
       interval: 30s
       timeout: 5s
       retries: 5
+      start_period: 40s
+    restart: unless-stopped
     networks:
       - neurondb-network
 
@@ -83,29 +109,43 @@ services:
       context: ..
       dockerfile: docker/Dockerfile.gpu.rocm
       args:
-        PG_MAJOR: 17
-        ROCM_VERSION: 5.7
-        ONNX_VERSION: 1.17.0
+        PG_MAJOR: ${PG_MAJOR:-17}
+        ROCM_VERSION: ${ROCM_VERSION:-5.7}
+        ONNX_VERSION: ${ONNX_VERSION:-1.17.0}
+        VERSION: ${VERSION:-latest}
+        BUILD_DATE: ${BUILD_DATE:-}
+        VCS_REF: ${VCS_REF:-}
     image: neurondb:rocm-pg17
     container_name: neurondb-rocm
     environment:
-      POSTGRES_USER: neurondb
-      POSTGRES_PASSWORD: neurondb
-      POSTGRES_DB: neurondb
-      NEURONDB_GPU_ENABLED: "on"
+      POSTGRES_USER: ${POSTGRES_USER:-neurondb}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-neurondb}
+      POSTGRES_DB: ${POSTGRES_DB:-neurondb}
+      POSTGRES_HOST_AUTH_METHOD: ${POSTGRES_HOST_AUTH_METHOD:-md5}
+      NEURONDB_GPU_ENABLED: ${NEURONDB_GPU_ENABLED:-on}
     ports:
-      - "5435:5432"
+      - "${POSTGRES_ROCM_PORT:-5435}:5432"
     volumes:
       - neurondb-rocm-data:/var/lib/postgresql/data
     # ROCm requires device access - adjust based on your setup
     devices:
       - /dev/kfd:/dev/kfd
       - /dev/dri:/dev/dri
+    deploy:
+      resources:
+        limits:
+          cpus: '8'
+          memory: 8G
+        reservations:
+          cpus: '2'
+          memory: 2G
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U neurondb"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-neurondb}"]
       interval: 30s
       timeout: 5s
       retries: 5
+      start_period: 40s
+    restart: unless-stopped
     networks:
       - neurondb-network
 
@@ -116,25 +156,39 @@ services:
       context: ..
       dockerfile: docker/Dockerfile.gpu.metal
       args:
-        PG_MAJOR: 17
-        ONNX_VERSION: 1.17.0
+        PG_MAJOR: ${PG_MAJOR:-17}
+        ONNX_VERSION: ${ONNX_VERSION:-1.17.0}
+        VERSION: ${VERSION:-latest}
+        BUILD_DATE: ${BUILD_DATE:-}
+        VCS_REF: ${VCS_REF:-}
     image: neurondb:metal-pg17
     container_name: neurondb-metal
     environment:
-      POSTGRES_USER: neurondb
-      POSTGRES_PASSWORD: neurondb
-      POSTGRES_DB: neurondb
-      NEURONDB_GPU_ENABLED: "on"
+      POSTGRES_USER: ${POSTGRES_USER:-neurondb}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-neurondb}
+      POSTGRES_DB: ${POSTGRES_DB:-neurondb}
+      POSTGRES_HOST_AUTH_METHOD: ${POSTGRES_HOST_AUTH_METHOD:-md5}
+      NEURONDB_GPU_ENABLED: ${NEURONDB_GPU_ENABLED:-on}
     ports:
-      - "5436:5432"
+      - "${POSTGRES_METAL_PORT:-5436}:5432"
     volumes:
       - neurondb-metal-data:/var/lib/postgresql/data
     platform: linux/arm64
+    deploy:
+      resources:
+        limits:
+          cpus: '8'
+          memory: 8G
+        reservations:
+          cpus: '2'
+          memory: 2G
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U neurondb"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-neurondb}"]
       interval: 30s
       timeout: 5s
       retries: 5
+      start_period: 40s
+    restart: unless-stopped
     networks:
       - neurondb-network
 
