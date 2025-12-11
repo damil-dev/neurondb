@@ -26,7 +26,7 @@ BEGIN
 	SELECT setting_value INTO gpu_mode FROM test_settings WHERE setting_key = 'gpu_mode';
 	SELECT current_setting('neurondb.compute_mode', true) INTO current_gpu_enabled;
 	IF gpu_mode = 'gpu' THEN
-		SELECT neurondb_gpu_enable();
+		PERFORM neurondb_gpu_enable();
 	END IF;
 END $$;
 
@@ -514,9 +514,12 @@ SELECT
 	ROUND(tm.precision::numeric, 6) AS precision,
 	ROUND(tm.recall::numeric, 6) AS recall,
 	ROUND(tm.f1_score::numeric, 6) AS f1_score,
-	CASE 
+	CASE
+		WHEN m.metrics IS NULL THEN 'CPU Training (default)'
+		CASE 
 		WHEN m.metrics::jsonb->>'storage' = 'gpu' THEN 'GPU Training ✓'
 		WHEN m.metrics::jsonb->>'storage' = 'cpu' THEN 'CPU Training'
+		WHEN m.metrics::jsonb->>'storage' IS NULL OR m.metrics::jsonb->>'storage' = '' THEN 'CPU Training (default)'
 		ELSE 'Unknown'
 	END AS training_status,
 	tm.updated_at AS test_completed_at

@@ -26,7 +26,7 @@ BEGIN
 	SELECT setting_value INTO gpu_mode FROM test_settings WHERE setting_key = 'gpu_mode';
 	SELECT current_setting('neurondb.compute_mode', true) INTO current_gpu_enabled;
 	IF gpu_mode = 'gpu' THEN
-		SELECT neurondb_gpu_enable();
+		PERFORM neurondb_gpu_enable();
 	END IF;
 END $$;
 
@@ -173,7 +173,14 @@ BEGIN
 				RAISE WARNING 'Evaluation returned NULL';
 				INSERT INTO gpu_metrics_temp VALUES ('{"error": "Evaluation returned NULL"}'::jsonb);
 			ELSE
-				INSERT INTO gpu_metrics_temp VALUES (metrics_result);
+				-- Ensure result is valid JSONB before storing
+				BEGIN
+					INSERT INTO gpu_metrics_temp VALUES (metrics_result);
+				EXCEPTION WHEN invalid_text_representation THEN
+					-- If metrics_result is not valid JSONB, store error
+					RAISE WARNING 'Evaluation returned invalid JSONB';
+					INSERT INTO gpu_metrics_temp VALUES (jsonb_build_object('error', 'Invalid JSONB result from evaluation'));
+				END;
 			END IF;
 		EXCEPTION WHEN OTHERS THEN
 			eval_error := SQLERRM;
@@ -254,9 +261,9 @@ SELECT
 	format('%-15s', 'Accuracy') AS metric,
 	CASE 
 		WHEN m.metrics IS NULL THEN 'N/A'
-		WHEN (m.metrics::jsonb ? 'error') THEN (m.metrics::jsonb->>'error')
-		WHEN (m.metrics::jsonb ? 'accuracy')
-			THEN ROUND((m.metrics::jsonb ->> 'accuracy')::numeric, 6)::text
+		WHEN (m.metrics ? 'error') THEN (m.metrics->>'error')
+		WHEN (m.metrics ? 'accuracy')
+			THEN ROUND((m.metrics->>'accuracy')::numeric, 6)::text
 		ELSE 'N/A' 
 	END AS value
 FROM gpu_metrics_temp m
@@ -265,9 +272,9 @@ SELECT
 	format('%-15s', 'Precision'),
 	CASE 
 		WHEN m.metrics IS NULL THEN NULL
-		WHEN (m.metrics::jsonb ? 'error') THEN NULL
-		WHEN (m.metrics::jsonb ? 'precision')
-			THEN ROUND((m.metrics::jsonb ->> 'precision')::numeric, 6)::text
+		WHEN (m.metrics ? 'error') THEN NULL
+		WHEN (m.metrics ? 'precision')
+			THEN ROUND((m.metrics->>'precision')::numeric, 6)::text
 		ELSE NULL 
 	END
 FROM gpu_metrics_temp m
@@ -276,9 +283,9 @@ SELECT
 	format('%-15s', 'Recall'),
 	CASE 
 		WHEN m.metrics IS NULL THEN NULL
-		WHEN (m.metrics::jsonb ? 'error') THEN NULL
-		WHEN (m.metrics::jsonb ? 'recall')
-			THEN ROUND((m.metrics::jsonb ->> 'recall')::numeric, 6)::text
+		WHEN (m.metrics ? 'error') THEN NULL
+		WHEN (m.metrics ? 'recall')
+			THEN ROUND((m.metrics->>'recall')::numeric, 6)::text
 		ELSE NULL 
 	END
 FROM gpu_metrics_temp m
@@ -287,9 +294,9 @@ SELECT
 	format('%-15s', 'F1 Score'),
 	CASE 
 		WHEN m.metrics IS NULL THEN NULL
-		WHEN (m.metrics::jsonb ? 'error') THEN NULL
-		WHEN (m.metrics::jsonb ? 'f1_score')
-			THEN ROUND((m.metrics::jsonb ->> 'f1_score')::numeric, 6)::text
+		WHEN (m.metrics ? 'error') THEN NULL
+		WHEN (m.metrics ? 'f1_score')
+			THEN ROUND((m.metrics->>'f1_score')::numeric, 6)::text
 		ELSE NULL 
 	END
 FROM gpu_metrics_temp m
@@ -459,9 +466,12 @@ SELECT
 	ROUND(tm.precision::numeric, 6) AS precision,
 	ROUND(tm.recall::numeric, 6) AS recall,
 	ROUND(tm.f1_score::numeric, 6) AS f1_score,
-	CASE 
+	CASE
+		WHEN m.metrics IS NULL THEN 'CPU Training (default)'
+		CASE 
 		WHEN m.metrics::jsonb->>'storage' = 'gpu' THEN 'GPU Training ✓'
 		WHEN m.metrics::jsonb->>'storage' = 'cpu' THEN 'CPU Training'
+		WHEN m.metrics::jsonb->>'storage' IS NULL OR m.metrics::jsonb->>'storage' = '' THEN 'CPU Training (default)'
 		ELSE 'Unknown'
 	END AS training_status,
 	tm.updated_at AS test_completed_at

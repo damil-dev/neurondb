@@ -26,7 +26,7 @@ BEGIN
 	SELECT setting_value INTO gpu_mode FROM test_settings WHERE setting_key = 'gpu_mode';
 	SELECT current_setting('neurondb.compute_mode', true) INTO current_gpu_enabled;
 	IF gpu_mode = 'gpu' THEN
-		SELECT neurondb_gpu_enable();
+		PERFORM neurondb_gpu_enable();
 	END IF;
 END $$;
 

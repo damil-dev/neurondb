@@ -99,9 +99,10 @@ def signal_handler(signum, frame):
 	_shutdown_requested = True
 
 
-def list_sql_files(category: str) -> List[str]:
+def list_sql_files(category: str, module: Optional[str] = None) -> List[str]:
 	"""
 	List SQL files by category from tests/sql (recursively).
+	Optionally filter by module (e.g., 'ml', 'vector', 'embedding').
 	"""
 	if not os.path.isdir(TESTS_SQL_DIR):
 		raise FileNotFoundError(f"SQL directory not found: {TESTS_SQL_DIR}")
@@ -115,6 +116,7 @@ def list_sql_files(category: str) -> List[str]:
 				all_files.append(rel_path)
 	all_files.sort()
 
+	# Filter by category
 	if category == "basic":
 		# Include files from basic/ subdirectory or files without _advance/_negative
 		result = []
@@ -123,23 +125,69 @@ def list_sql_files(category: str) -> List[str]:
 				result.append(os.path.join(TESTS_SQL_DIR, f))
 			elif "/" not in f and "_advance.sql" not in f and "_negative.sql" not in f and "_perf.sql" not in f:
 				result.append(os.path.join(TESTS_SQL_DIR, f))
-		return result
+		files = result
 	elif category == "advance":
-		return [
+		files = [
 			os.path.join(TESTS_SQL_DIR, f)
 			for f in all_files
 			if "_advance.sql" in f or "/advance/" in f
 		]
 	elif category == "negative":
-		return [
+		files = [
 			os.path.join(TESTS_SQL_DIR, f)
 			for f in all_files
 			if "_negative.sql" in f or "/negative/" in f
 		]
 	elif category == "all":
-		return [os.path.join(TESTS_SQL_DIR, f) for f in all_files]
+		files = [os.path.join(TESTS_SQL_DIR, f) for f in all_files]
 	else:
 		raise ValueError("category must be one of: basic, advance, negative, all")
+	
+	# Filter by module if specified
+	if module:
+		module_lower = module.lower()
+		filtered_files = []
+		
+		# Module mapping: module name -> keywords to match in filename
+		module_keywords = {
+			"ml": ["linreg", "logreg", "rf", "svm", "dt", "ridge", "lasso", "nb", "knn", 
+			       "xgboost", "catboost", "lightgbm", "neural_network", "gmm", "kmeans", 
+			       "minibatch_kmeans", "hierarchical", "dbscan", "pca", "timeseries", 
+			       "automl", "recommender", "arima"],
+			"vector": ["vector", "vecmap", "sparse_vectors"],
+			"embedding": ["embedding", "embeddings"],
+			"rag": ["rag"],
+			"hybrid": ["hybrid_search"],
+			"reranking": ["reranking"],
+			"index": ["index", "ivf_index", "hnsw"],
+			"quantization": ["quantization", "fp8", "opq", "pq"],
+			"core": ["core"],
+			"worker": ["worker"],
+			"storage": ["storage"],
+			"scan": ["scan"],
+			"util": ["util"],
+			"planner": ["planner"],
+			"tenant": ["tenant"],
+			"types": ["types"],
+			"metrics": ["metrics"],
+			"gpu": ["gpu_info", "gpu_search"],
+			"onnx": ["onnx"],
+			"crash": ["crash_prevention"],
+			"multimodal": ["multimodal"],
+			"llm": ["llm"],
+		}
+		
+		keywords = module_keywords.get(module_lower, [module_lower])
+		
+		for file_path in files:
+			basename = os.path.basename(file_path).lower()
+			# Check if any keyword matches in the filename
+			if any(keyword in basename for keyword in keywords):
+				filtered_files.append(file_path)
+		
+		return filtered_files
+	
+	return files
 
 
 def verify_gpu_usage(dbname: str, psql_path: str, compute_mode: str, test_name: str = "", host: Optional[str] = None, port: Optional[int] = None) -> Tuple[bool, str]:
@@ -1956,6 +2004,11 @@ def parse_args() -> argparse.Namespace:
 		default="all",
 		help="Test name to run (default: all). If specified, only runs tests matching this name. Use 'all' to run all tests in the category.",
 	)
+	parser.add_argument(
+		"--module",
+		default=None,
+		help="Module to run tests for (default: all). Examples: ml, vector, embedding, rag, hybrid, reranking, index, quantization, core, worker, storage, scan, util, planner, tenant, types, metrics, gpu, onnx, crash, multimodal, llm. By default, all modules are tested.",
+	)
 	return parser.parse_args()
 
 
@@ -2049,6 +2102,8 @@ def main() -> int:
 	
 	# Print header information
 	print_header_info(SCRIPT_NAME, SCRIPT_VERSION, args.db, args.psql, args.host, args.port, args.compute)
+	if args.module:
+		print(f"Module filter: {args.module}")
 	
 	# Load dataset if requested
 	if args.dataset == "higgs":
@@ -2268,9 +2323,10 @@ def main() -> int:
 	if not settings_ok:
 		print(f"Warning: Failed to set test settings: {settings_err}", file=sys.stderr)
 	
-	sql_files = list_sql_files(args.category)
+	sql_files = list_sql_files(args.category, args.module)
 	if not sql_files:
-		print(f"No SQL files found for category '{args.category}' in {TESTS_SQL_DIR}")
+		module_msg = f" for module '{args.module}'" if args.module else ""
+		print(f"No SQL files found for category '{args.category}'{module_msg} in {TESTS_SQL_DIR}")
 		return 2
 
 	# Filter by test name if specified (and not "all")

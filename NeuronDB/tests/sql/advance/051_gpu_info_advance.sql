@@ -33,7 +33,7 @@ BEGIN
 	ELSE
 		-- Verify GPU is disabled (should be set by test runner)
 		IF current_gpu_enabled != 'off' THEN
-			RAISE WARNING 'CPU mode expected but neurondb.compute_mode = % (expected: off)', current_gpu_enabled;
+			RAISE WARNING 'CPU mode expected but neurondb.compute_mode = % (expected: 0)', current_gpu_enabled;
 		END IF;
 	END IF;
 END $$;
@@ -174,7 +174,7 @@ FROM neurondb_gpu_info()
 WHERE is_available = true;
 
 \echo 'Test 8: GPU Enable/Disable'
-SET neurondb.compute_mode = off;
+SET neurondb.compute_mode = 0;
 SELECT 
 	'GPU Disabled' AS status,
 	neurondb_gpu_enable() AS enable_result;
@@ -194,7 +194,7 @@ DO $$
 DECLARE
 	result double precision;
 BEGIN
-	SET neurondb.compute_mode = off;
+	SET neurondb.compute_mode = 0;
 	BEGIN
 		result := vector_l2_distance_gpu('[1,2,3]'::vector, '[4,5,6]'::vector);
 	EXCEPTION WHEN OTHERS THEN 

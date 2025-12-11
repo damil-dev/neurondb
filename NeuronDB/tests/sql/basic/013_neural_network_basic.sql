@@ -83,7 +83,7 @@ BEGIN
 	ELSE
 		-- Verify GPU is disabled (should be set by test runner)
 		IF current_gpu_enabled != 'off' THEN
-			RAISE WARNING 'CPU mode expected but neurondb.compute_mode = % (expected: off)', current_gpu_enabled;
+			RAISE WARNING 'CPU mode expected but neurondb.compute_mode = % (expected: 0)', current_gpu_enabled;
 		END IF;
 	END IF;
 END $$;
