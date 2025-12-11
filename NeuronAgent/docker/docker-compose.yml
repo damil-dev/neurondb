@@ -49,6 +49,17 @@ services:
       timeout: 10s
       start_period: 40s
       retries: 3
+    
+    # Resource limits (adjust based on your requirements)
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    
     restart: unless-stopped
     networks:
       - default
