@@ -71,6 +71,16 @@ extern int	ndb_cuda_rf_evaluate(const bytea * model_data,
 								 double *recall_out,
 								 double *f1_out,
 								 char **errstr);
+extern int	ndb_cuda_rf_evaluate_batch(const bytea * model_data,
+									   const float *features,
+									   const int *labels,
+									   int n_samples,
+									   int feature_dim,
+									   double *accuracy_out,
+									   double *precision_out,
+									   double *recall_out,
+									   double *f1_out,
+									   char **errstr);
 #endif
 
 #define RF_BOOTSTRAP_FRACTION 0.8
@@ -4784,7 +4794,153 @@ evaluate_random_forest_by_model_id(PG_FUNCTION_ARGS)
 							feat_dim)));
 		}
 
+		/* For GPU models in GPU mode, use batch evaluation for better performance and correct metrics */
+#ifdef NDB_GPU_CUDA
+		if (use_gpu_predict && is_gpu_model && gpu_payload != NULL && nvec > 0)
+		{
+			float	   *features_array = NULL;
+			int		   *labels_array = NULL;
+			char	   *gpu_err = NULL;
+			int			batch_rc;
+			int			valid_samples = 0;
+			int			j;
+
+			/* Allocate arrays for batch evaluation */
+			nalloc(features_array, float, (size_t) nvec * (size_t) feat_dim);
+			nalloc(labels_array, int, nvec);
+
+			/* Load features and labels from SPI results */
+			for (i = 0; i < nvec; i++)
+			{
+				HeapTuple	tuple;
+				TupleDesc	tupdesc;
+				Datum		feat_datum;
+				Datum		targ_datum;
+				bool		feat_null;
+				bool		targ_null;
+				int			actual_dim;
+
+				if (SPI_tuptable == NULL || SPI_tuptable->vals == NULL ||
+					i >= SPI_processed || SPI_tuptable->vals[i] == NULL)
+					continue;
+
+				tuple = SPI_tuptable->vals[i];
+				tupdesc = SPI_tuptable->tupdesc;
+				if (tupdesc == NULL)
+					continue;
+
+				feat_datum = SPI_getbinval(tuple, tupdesc, 1, &feat_null);
+				if (tupdesc->natts < 2)
+					continue;
+				targ_datum = SPI_getbinval(tuple, tupdesc, 2, &targ_null);
+
+				if (feat_null || targ_null)
+					continue;
+
+				/* Extract features and determine dimension */
+				if (feat_is_array)
+				{
+					ArrayType *arr = DatumGetArrayTypeP(feat_datum);
+					if (arr == NULL || ARR_NDIM(arr) != 1)
+						continue;
+					actual_dim = ARR_DIMS(arr)[0];
+				}
+				else
+				{
+					Vector *vec = DatumGetVector(feat_datum);
+					if (vec == NULL)
+						continue;
+					actual_dim = vec->dim;
+				}
+
+				/* Validate feature dimension matches model */
+				if (actual_dim != feat_dim)
+					continue;
+
+				/* Extract features to float array */
+				if (feat_is_array)
+				{
+					ArrayType *arr = DatumGetArrayTypeP(feat_datum);
+					if (feat_type_oid == FLOAT8ARRAYOID)
+					{
+						float8	   *data = (float8 *) ARR_DATA_PTR(arr);
+						for (j = 0; j < feat_dim; j++)
+							features_array[valid_samples * feat_dim + j] = (float) data[j];
+					}
+					else
+					{
+						float4	   *data = (float4 *) ARR_DATA_PTR(arr);
+						memcpy(&features_array[valid_samples * feat_dim], data, sizeof(float) * feat_dim);
+					}
+				}
+				else
+				{
+					Vector *vec = DatumGetVector(feat_datum);
+					memcpy(&features_array[valid_samples * feat_dim], vec->data, sizeof(float) * feat_dim);
+				}
+
+				/* Extract label */
+				labels_array[valid_samples] = (int) rint(DatumGetFloat8(targ_datum));
+				valid_samples++;
+			}
+
+			/* Call GPU batch evaluation if we have valid samples */
+			if (valid_samples > 0)
+			{
+				batch_rc = ndb_cuda_rf_evaluate_batch(gpu_payload,
+													  features_array,
+													  labels_array,
+													  valid_samples,
+													  feat_dim,
+													  &accuracy,
+													  &precision,
+													  &recall,
+													  &f1_score,
+													  &gpu_err);
+
+				if (batch_rc == 0)
+				{
+					/* Batch evaluation succeeded - metrics are already set */
+					processed_count = valid_samples;
+					nfree(features_array);
+					nfree(labels_array);
+					if (gpu_err)
+						nfree(gpu_err);
+					/* Skip the row-by-row loop */
+					goto metrics_calculated;
+				}
+				else
+				{
+					/* Batch evaluation failed - fall back to row-by-row */
+					elog(WARNING, "evaluate_random_forest_by_model_id: GPU batch evaluation failed, falling back to row-by-row: %s",
+						 gpu_err ? gpu_err : "unknown error");
+					if (gpu_err)
+						nfree(gpu_err);
+					nfree(features_array);
+					nfree(labels_array);
+					/* Reset metrics for row-by-row calculation */
+					accuracy = 0.0;
+					precision = 0.0;
+					recall = 0.0;
+					f1_score = 0.0;
+					tp = 0;
+					tn = 0;
+					fp = 0;
+					fn = 0;
+					processed_count = 0;
+				}
+			}
+			else
+			{
+				/* No valid samples - free arrays and fall back to row-by-row */
+				nfree(features_array);
+				nfree(labels_array);
+			}
+		}
+#endif
+
 		/* Unified evaluation loop - prediction based on compute mode */
+		elog(WARNING, "evaluate_random_forest_by_model_id: starting evaluation loop, nvec=%d", nvec);
 		for (i = 0; i < nvec; i++)
 		{
 			HeapTuple	tuple;
@@ -4816,7 +4972,19 @@ evaluate_random_forest_by_model_id(PG_FUNCTION_ARGS)
 			if (feat_null || targ_null)
 				continue;
 
-			y_true = (int) rint(DatumGetFloat8(targ_datum));
+			/* Handle both integer and float label types */
+			{
+				Oid			label_type = SPI_gettypeid(tupdesc, 2);
+				
+				if (label_type == INT4OID || label_type == INT2OID || label_type == INT8OID)
+					y_true = DatumGetInt32(targ_datum);
+				else
+					y_true = (int) rint(DatumGetFloat8(targ_datum));
+			}
+
+			/* Debug: Log first few y_true values */
+			if (processed_count < 5)
+				elog(WARNING, "evaluate_random_forest_by_model_id: row %d: y_true=%d (from datum %f)", i, y_true, DatumGetFloat8(targ_datum));
 
 			/* Extract features and determine dimension */
 			if (feat_is_array)
@@ -5059,6 +5227,16 @@ evaluate_random_forest_by_model_id(PG_FUNCTION_ARGS)
 				y_pred = (int) rint(prediction);
 			}
 
+			/* Clamp y_pred to valid binary classification range [0, 1] */
+			if (y_pred < 0)
+				y_pred = 0;
+			else if (y_pred > 1)
+				y_pred = 1;
+
+			/* Debug: Log first few predictions */
+			if (processed_count < 5)
+				elog(WARNING, "evaluate_random_forest_by_model_id: row %d: y_true=%d, y_pred=%d", i, y_true, y_pred);
+
 			/* Compute confusion matrix (same for both CPU and GPU) */
 			if (y_true == 1)
 			{
@@ -5079,15 +5257,45 @@ evaluate_random_forest_by_model_id(PG_FUNCTION_ARGS)
 			nfree(feat_row);
 		}
 
+		elog(WARNING, "evaluate_random_forest_by_model_id: evaluation loop completed, processed_count=%d, tp=%d, tn=%d, fp=%d, fn=%d", 
+			 processed_count, tp, tn, fp, fn);
+
+metrics_calculated:
 		/* Calculate metrics from confusion matrix (same for both CPU and GPU) */
-		if (processed_count > 0)
+		/* Note: If GPU batch evaluation succeeded, metrics are already set and we skip this */
+		if (processed_count > 0 && (tp + tn + fp + fn) == 0)
 		{
-			accuracy = (double) (tp + tn) / (tp + tn + fp + fn);
-			precision = (tp + fp > 0) ? (double) tp / (tp + fp) : 0.0;
-			recall = (tp + fn > 0) ? (double) tp / (tp + fn) : 0.0;
-			f1_score = (precision + recall > 0)
-				? 2.0 * precision * recall / (precision + recall)
-				: 0.0;
+			/* Metrics were set by batch evaluation - no need to recalculate */
+		}
+		else if (processed_count > 0)
+		{
+			int			total = tp + tn + fp + fn;
+			
+			/* Debug: Log confusion matrix before calculation */
+			elog(WARNING, "evaluate_random_forest_by_model_id: calculating metrics: tp=%d, tn=%d, fp=%d, fn=%d, total=%d, processed=%d",
+				 tp, tn, fp, fn, total, processed_count);
+			
+			accuracy = total > 0 ? (double) (tp + tn) / total : 0.0;
+			
+			/* Precision: tp / (tp + fp) - undefined if no positive predictions */
+			/* For binary classification, if no positive predictions, precision is undefined (0.0) */
+			if (tp + fp > 0)
+				precision = (double) tp / (tp + fp);
+			else
+				precision = 0.0;  /* No positive predictions - precision undefined */
+			
+			/* Recall: tp / (tp + fn) - undefined if no positive labels */
+			/* For binary classification, if no positive labels, recall is undefined (0.0) */
+			if (tp + fn > 0)
+				recall = (double) tp / (tp + fn);
+			else
+				recall = 0.0;  /* No positive labels - recall undefined */
+			
+			/* F1 score: harmonic mean of precision and recall */
+			if (precision + recall > 0.0)
+				f1_score = 2.0 * precision * recall / (precision + recall);
+			else
+				f1_score = 0.0;
 		}
 		else
 		{
