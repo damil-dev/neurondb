@@ -100,3 +100,4 @@ type QualityScore struct {
 	Issues      []string `json:"issues"`
 }
 
+
