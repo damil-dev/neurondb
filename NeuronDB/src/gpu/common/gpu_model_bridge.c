@@ -106,6 +106,7 @@ ndb_gpu_try_train_model(const char *algorithm,
 	bool		trained = false;
 	volatile bool retval = false;
 	volatile bool ops_failed_with_exception = false;
+	volatile bool exception_caught = false;
 	bool		ops_trained = false;
 
 	/* Initialize all local variables to safe defaults */
@@ -275,19 +276,60 @@ ndb_gpu_try_train_model(const char *algorithm,
 		PG_CATCH();
 		{
 			/* Catch any PostgreSQL-level errors from ops->train */
+			
+			/* In GPU mode, re-throw the error immediately - no fallback allowed */
+			/* Don't try to capture error data here as it may be corrupted */
+			if (!NDB_COMPUTE_MODE_IS_CPU() && NDB_REQUIRE_GPU())
+			{
+				/* Don't call ops->destroy here - memory contexts may have been reset during exception */
+				model.backend_state = NULL;
+				/* Re-throw the error for GPU mode - let it propagate with original details */
+				PG_RE_THROW();
+			}
+			
+			/* AUTO mode: capture error details for logging and fall back */
+			ErrorData *edata = NULL;
+			char *error_msg = NULL;
+			
+			/* AUTO mode: log warning and fall back */
 			elog(WARNING,
 				 "%s: exception caught during ops->train, falling back to direct path",
 				 algorithm ? algorithm : "unknown");
+			
+			/* Try to capture error details for logging */
+			if (CurrentMemoryContext != ErrorContext)
+			{
+				edata = CopyErrorData();
+				if (edata)
+				{
+					if (edata->detail && strlen(edata->detail) > 0)
+						error_msg = pstrdup(edata->detail);
+					else if (edata->message && strlen(edata->message) > 0)
+						error_msg = pstrdup(edata->message);
+				}
+			}
+			
 			FlushErrorState();
 			ops_trained = false;
 			trained = false;
 			ops_failed_with_exception = true;
+			exception_caught = true;
 			if (errstr && *errstr == NULL)
-				*errstr = pstrdup("Exception during ops->train");
+			{
+				if (error_msg)
+					*errstr = pstrdup(error_msg);
+				else
+					*errstr = pstrdup("Exception during ops->train");
+			}
 			/* Don't call ops->destroy here - memory contexts may have been reset during exception */
 			/* Just NULL out the pointer - memory context cleanup will handle freeing */
 			model.backend_state = NULL;
-			/* Don't re-throw - just mark as failed and continue to direct path */
+			
+			if (edata)
+				FreeErrorData(edata);
+			if (error_msg)
+				pfree(error_msg);
+			/* Continue to direct path fallback in AUTO mode */
 		}
 		PG_END_TRY();
 
@@ -499,7 +541,8 @@ ndb_gpu_try_train_model(const char *algorithm,
 		PG_CATCH();
 		{
 			/* Catch any PostgreSQL-level errors from CUDA code */
-			/* Capture error message from error state before re-throwing */
+			/* CRITICAL: After exception, DO NOT free payload/metadata - memory context may be corrupted */
+			exception_caught = true;
 			ErrorData *edata = NULL;
 			char *error_msg = NULL;
 			
@@ -526,16 +569,9 @@ ndb_gpu_try_train_model(const char *algorithm,
 			/* GPU mode: re-raise error, no fallback */
 			if (NDB_REQUIRE_GPU())
 			{
-				if (payload != NULL)
-				{
-					nfree(payload);
-					payload = NULL;
-				}
-				if (metadata != NULL)
-				{
-					nfree(metadata);
-					metadata = NULL;
-				}
+				/* Skip payload/metadata cleanup - memory context may be corrupted */
+				payload = NULL;
+				metadata = NULL;
 				if (edata)
 					FreeErrorData(edata);
 				if (error_msg)
@@ -553,16 +589,9 @@ ndb_gpu_try_train_model(const char *algorithm,
 				else
 					*errstr = pstrdup("Exception during GPU training");
 			}
-			if (payload != NULL)
-			{
-				nfree(payload);
-				payload = NULL;
-			}
-			if (metadata != NULL)
-			{
-				nfree(metadata);
-				metadata = NULL;
-			}
+			/* Skip payload/metadata cleanup - memory context may be corrupted */
+			payload = NULL;
+			metadata = NULL;
 			if (edata)
 				FreeErrorData(edata);
 			if (error_msg)
@@ -773,7 +802,8 @@ lr_fallback:;
 		PG_CATCH();
 		{
 			/* Catch any PostgreSQL-level errors from GPU code */
-			/* CPU mode: never error, just fall back to CPU */
+			/* CRITICAL: After exception, DO NOT free payload/metadata - memory context may be corrupted */
+			exception_caught = true;
 			if (NDB_COMPUTE_MODE_IS_CPU())
 			{
 				elog(WARNING,
@@ -782,30 +812,16 @@ lr_fallback:;
 				gpu_rc = -1;
 				if (errstr && *errstr == NULL)
 					*errstr = pstrdup("Exception during GPU training (CPU mode)");
-				if (payload != NULL)
-				{
-					nfree(payload);
-					payload = NULL;
-				}
-				if (metadata != NULL)
-				{
-					nfree(metadata);
-					metadata = NULL;
-				}
+				/* Skip payload/metadata cleanup - memory context may be corrupted */
+				payload = NULL;
+				metadata = NULL;
 			}
 			/* GPU mode: re-raise error, no fallback */
 			else if (!NDB_COMPUTE_MODE_IS_CPU() && NDB_REQUIRE_GPU())
 			{
-				if (payload != NULL)
-				{
-					nfree(payload);
-					payload = NULL;
-				}
-				if (metadata != NULL)
-				{
-					nfree(metadata);
-					metadata = NULL;
-				}
+				/* Skip payload/metadata cleanup - memory context may be corrupted */
+				payload = NULL;
+				metadata = NULL;
 				PG_RE_THROW();
 			}
 			/* AUTO mode: fall back to CPU */
@@ -814,16 +830,9 @@ lr_fallback:;
 			gpu_rc = -1;
 			if (errstr && *errstr == NULL)
 				*errstr = pstrdup("Exception during GPU training");
-			if (payload != NULL)
-			{
-				nfree(payload);
-				payload = NULL;
-			}
-			if (metadata != NULL)
-			{
-				nfree(metadata);
-				metadata = NULL;
-			}
+			/* Skip payload/metadata cleanup - memory context may be corrupted */
+			payload = NULL;
+			metadata = NULL;
 			FlushErrorState();
 		}
 		PG_END_TRY();
