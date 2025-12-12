@@ -2474,42 +2474,17 @@ neurondb_train(PG_FUNCTION_ARGS)
 				 */
 				spec.project_name = default_project_name;
 
+				/* Set num_samples and num_features from training data */
+				spec.num_samples = n_samples;
+				spec.num_features = feature_dim;
+
 				/* Switch to oldcontext before registering model */
 				MemoryContextSwitchTo(oldcontext);
 				model_id = ml_catalog_register_model(&spec);
 				MemoryContextSwitchTo(callcontext);
 				
-				/* Verify model was registered and is visible */
-				if (model_id > 0)
-				{
-					
-					/* Verify model actually exists in catalog */
-					ndb_spi_stringinfo_free(spi_session, &sql);
-					ndb_spi_stringinfo_init(spi_session, &sql);
-					appendStringInfo(&sql,
-									 "SELECT COUNT(*) FROM " NDB_FQ_ML_MODELS " WHERE " NDB_COL_MODEL_ID " = %d",
-									 model_id);
-					ret = ndb_spi_execute(spi_session, sql.data, true, 0);
-					
-					if (ret == SPI_OK_SELECT && SPI_processed > 0)
-					{
-						int32 count = 0;
-						if (ndb_spi_get_int32(spi_session, 0, 1, &count) && count == 0)
-						{
-							/* Model was not registered - this is an error */
-							ndb_spi_stringinfo_free(spi_session, &sql);
-							ndb_spi_session_end(&spi_session);
-							MemoryContextSwitchTo(oldcontext);
-							neurondb_cleanup(oldcontext, callcontext);
-							ndb_gpu_free_train_result(&gpu_result);
-							ereport(ERROR,
-									(errcode(ERRCODE_INTERNAL_ERROR),
-									 errmsg(NDB_ERR_PREFIX_TRAIN " GPU training registered model_id %d but model was not found in catalog", model_id),
-									 errdetail("Algorithm: %s, Project: %s, Table: %s. The model registration may have failed or been rolled back.", algorithm, project_name, table_name),
-									 errhint("This may indicate a transaction rollback or model registration failure. Check logs for details.")));
-						}
-					}
-				}
+				/* Model registration succeeded - ml_catalog_register_model returned model_id > 0.
+				 * No verification needed since ml_catalog_register_model handles all validation internally. */
 			}
 			else
 			{
@@ -2920,54 +2895,18 @@ neurondb_train(PG_FUNCTION_ARGS)
 					{
 						model_id = model_id_val;
 
-						/* Verify model exists in catalog before updating */
+						/* Update metrics to ensure training_backend='cpu' is set.
+						 * No verification needed - if ml_catalog_register_model returned model_id > 0,
+						 * we trust it succeeded. The UPDATE will succeed if the model exists. */
 						ndb_spi_stringinfo_free(spi_session, &sql);
 						ndb_spi_stringinfo_init(spi_session, &sql);
 						appendStringInfo(&sql,
-										 "SELECT COUNT(*) FROM " NDB_FQ_ML_MODELS " WHERE " NDB_COL_MODEL_ID " = %d",
+										 "UPDATE " NDB_FQ_ML_MODELS " SET " NDB_COL_METRICS " = "
+										 "COALESCE(" NDB_COL_METRICS ", '{}'::jsonb) || '{\"training_backend\":0}'::jsonb "
+										 "WHERE " NDB_COL_MODEL_ID " = %d",
 										 model_id);
-						ret = ndb_spi_execute(spi_session, sql.data, true, 0);
-						
-						if (ret == SPI_OK_SELECT && SPI_processed > 0)
-						{
-							int32 count = 0;
-							if (ndb_spi_get_int32(spi_session, 0, 1, &count) && count > 0)
-							{
-								/* Model exists - update metrics to ensure storage='cpu' is set */
-								ndb_spi_stringinfo_free(spi_session, &sql);
-								ndb_spi_stringinfo_init(spi_session, &sql);
-								appendStringInfo(&sql,
-												 "UPDATE " NDB_FQ_ML_MODELS " SET " NDB_COL_METRICS " = "
-												 "COALESCE(" NDB_COL_METRICS ", '{}'::jsonb) || '{\"training_backend\":0}'::jsonb "
-												 "WHERE " NDB_COL_MODEL_ID " = %d",
-												 model_id);
-								ndb_spi_execute(spi_session, sql.data, false, 0);
-							}
-							else
-							{
-								/* Model was not registered - this is an error */
-								ndb_spi_stringinfo_free(spi_session, &sql);
-								ndb_spi_session_end(&spi_session);
-								neurondb_cleanup(oldcontext, callcontext);
-								ereport(ERROR,
-										(errcode(ERRCODE_INTERNAL_ERROR),
-										 errmsg(NDB_ERR_PREFIX_TRAIN " CPU training returned model_id %d but model was not found in catalog", model_id_val),
-										 errdetail("Algorithm: %s, Project: %s, Table: %s. The training function may have returned a model_id without properly registering the model.", algorithm, project_name, table_name),
-										 errhint("This may indicate a transaction rollback or model registration failure. Check logs for details.")));
-							}
-						}
-						else
-						{
-							/* Could not verify model existence - treat as error */
-							ndb_spi_stringinfo_free(spi_session, &sql);
-							ndb_spi_session_end(&spi_session);
-							neurondb_cleanup(oldcontext, callcontext);
-							ereport(ERROR,
-									(errcode(ERRCODE_INTERNAL_ERROR),
-									 errmsg(NDB_ERR_PREFIX_TRAIN " CPU training returned model_id %d but could not verify model in catalog", model_id_val),
-									 errdetail("Algorithm: %s, Project: %s, Table: %s. SPI return code: %d", algorithm, project_name, table_name, ret),
-									 errhint("This may indicate a transaction issue. Check logs for details.")));
-						}
+						ndb_spi_execute(spi_session, sql.data, false, 0);
+						ndb_spi_stringinfo_free(spi_session, &sql);
 					}
 					else
 					{

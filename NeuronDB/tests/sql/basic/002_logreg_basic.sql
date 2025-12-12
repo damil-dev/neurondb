@@ -19,24 +19,7 @@ SET client_min_messages TO WARNING;
 \echo 'GPU Configuration'
 \echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
 
-DO $$
-DECLARE
-	compute_mode TEXT;
-BEGIN
-	-- Get compute_mode from test_settings (set by run_test.py)
-	SELECT setting_value INTO compute_mode FROM test_settings WHERE setting_key = 'compute_mode';
-	-- Note: compute_mode is set by run_test.py via switch_gpu_mode()
-	-- This block is kept for backward compatibility but compute_mode
-	-- should be set before running tests via run_test.py
-	-- IMPORTANT: Do NOT call neurondb_gpu_enable() in auto mode as it would override to strict GPU mode
-	IF compute_mode = 'gpu' THEN
-		PERFORM neurondb_gpu_enable();
-	-- For auto mode, compute_mode is already set correctly by test runner
-	-- No need to call any GPU functions here
-	END IF;
-END $$;
-
--- Create test_settings table if it doesn't exist
+-- Create test_settings table if it doesn't exist (must be created before DO block)
 CREATE TABLE IF NOT EXISTS test_settings (
 	setting_key TEXT PRIMARY KEY,
 	setting_value TEXT,
@@ -73,6 +56,23 @@ CREATE TABLE IF NOT EXISTS test_metrics (
 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+DO $$
+DECLARE
+	compute_mode TEXT;
+BEGIN
+	-- Get compute_mode from test_settings (set by run_test.py)
+	SELECT setting_value INTO compute_mode FROM test_settings WHERE setting_key = 'compute_mode';
+	-- Note: compute_mode is set by run_test.py via switch_gpu_mode()
+	-- This block is kept for backward compatibility but compute_mode
+	-- should be set before running tests via run_test.py
+	-- IMPORTANT: Do NOT call neurondb_gpu_enable() in auto mode as it would override to strict GPU mode
+	IF compute_mode = 'gpu' THEN
+		PERFORM neurondb_gpu_enable();
+	-- For auto mode, compute_mode is already set correctly by test runner
+	-- No need to call any GPU functions here
+	END IF;
+END $$;
 
 -- DATASET
 \echo ''

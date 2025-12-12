@@ -104,7 +104,7 @@ if [ ${#FILES[@]} -eq 0 ]; then
     # Find all .c and .h files, excluding object files and other generated files
     while IFS= read -r -d '' file; do
         FILES+=("$file")
-    done < <(find src include -type f \( -name "*.c" -o -name "*.h" \) ! -name "*.o" ! -name "*.gcov" ! -name "*.gcda" -print0 2>/dev/null)
+    done < <(find src include -type f \( -name "*.c" -o -name "*.h" \) ! -name "*.o" ! -name "*.gcov" ! -name "*.gcda" ! -name "*.cu" -print0 2>/dev/null)
 fi
 
 if [ ${#FILES[@]} -eq 0 ]; then

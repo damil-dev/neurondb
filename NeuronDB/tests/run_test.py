@@ -930,6 +930,28 @@ def create_test_views(dbname: str, psql_path: str, num_rows: int, host: Optional
 		train_proc = subprocess.Popen(check_train_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
 		train_out, train_err = train_proc.communicate()
 		
+		# If no source tables exist, load synthetic dataset first
+		if not (train_proc.returncode == 0 and train_out.strip()):
+			# No source tables found, try to load synthetic dataset
+			# Use num_rows if provided, otherwise use default
+			effective_num_rows = num_rows if num_rows > 0 else DEFAULT_NUM_ROWS
+			# Calculate total rows needed (num_rows is train_rows, so we need more for 80/20 split)
+			total_rows = int(effective_num_rows / 0.8) if effective_num_rows > 0 else 1000
+			print(f"INFO: No source tables found. Loading synthetic dataset with {total_rows} rows...", file=sys.stderr)
+			load_ok = load_synthetic_dataset(
+				dbname,
+				num_rows=total_rows,
+				seed=None,
+				host=host,
+				port=port
+			)
+			if not load_ok:
+				print(f"ERROR: Failed to load synthetic dataset.", file=sys.stderr)
+				return False, 0
+			# Re-check for tables after loading
+			train_proc = subprocess.Popen(check_train_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
+			train_out, train_err = train_proc.communicate()
+		
 		if train_proc.returncode == 0 and train_out.strip():
 			train_table_full = train_out.strip()
 			

@@ -43,3 +43,4 @@ extern int	ndb_gpu_nb_pack_model(const struct GaussianNBModel *model,
 
 #endif							/* NEURONDB_ML_GPU_NAIVE_BAYES_H */
 
+

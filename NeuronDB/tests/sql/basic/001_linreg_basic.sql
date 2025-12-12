@@ -19,23 +19,7 @@ SET client_min_messages TO WARNING;
 \echo 'GPU Configuration'
 \echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
 
-DO $$
-DECLARE
-	compute_mode TEXT;
-BEGIN
-	-- Get compute_mode from test_settings (set by run_test.py)
-	SELECT setting_value INTO compute_mode FROM test_settings WHERE setting_key = 'compute_mode';
-	-- Note: compute_mode is set by run_test.py via switch_gpu_mode()
-	-- This block is kept for backward compatibility but compute_mode
-	-- should be set before running tests via run_test.py
-	IF compute_mode = 'gpu' THEN
-		PERFORM neurondb_gpu_enable();
-	ELSIF compute_mode = 'auto' THEN
-		PERFORM neurondb_gpu_enable();
-	END IF;
-END $$;
-
--- Create test_settings table if it doesn't exist
+-- Create test_settings table if it doesn't exist (must be created before DO block)
 CREATE TABLE IF NOT EXISTS test_settings (
 	setting_key TEXT PRIMARY KEY,
 	setting_value TEXT,
@@ -72,6 +56,23 @@ CREATE TABLE IF NOT EXISTS test_metrics (
 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+DO $$
+DECLARE
+	compute_mode TEXT;
+BEGIN
+	-- Get compute_mode from test_settings (set by run_test.py)
+	-- Handle case where table exists but has no rows
+	SELECT setting_value INTO compute_mode FROM test_settings WHERE setting_key = 'compute_mode';
+	-- Note: compute_mode is set by run_test.py via switch_gpu_mode()
+	-- This block is kept for backward compatibility but compute_mode
+	-- should be set before running tests via run_test.py
+	IF compute_mode = 'gpu' THEN
+		PERFORM neurondb_gpu_enable();
+	ELSIF compute_mode = 'auto' THEN
+		PERFORM neurondb_gpu_enable();
+	END IF;
+END $$;
 
 -- DATASET
 \echo ''
@@ -278,12 +279,11 @@ SELECT metrics FROM gpu_metrics_temp;
 -- Show error if evaluation failed
 SELECT 
 	CASE 
- 		WHEN m.metrics IS NULL THEN 'CPU Training (default)'
-		WHEN metrics IS NULL THEN 'ERROR: Metrics is NULL - evaluation did not run'
-		WHEN (metrics::jsonb ? 'error') THEN 'ERROR: ' || (metrics::jsonb->>'error')
+		WHEN m.metrics IS NULL THEN 'CPU Training (default)'
+		WHEN (m.metrics::jsonb ? 'error') THEN 'ERROR: ' || (m.metrics::jsonb->>'error')
 		ELSE 'Evaluation completed successfully'
 	END AS evaluation_status
-FROM gpu_metrics_temp;
+FROM gpu_metrics_temp m;
 
 SELECT
 	format('%-15s', 'MSE') AS metric,

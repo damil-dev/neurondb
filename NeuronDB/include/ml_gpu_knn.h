@@ -43,3 +43,4 @@ extern int	ndb_gpu_knn_pack(const struct KNNModel *model,
 
 #endif							/* NEURONDB_ML_GPU_KNN_H */
 
+
