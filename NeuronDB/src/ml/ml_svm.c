@@ -2938,21 +2938,6 @@ evaluate_svm_by_model_id(PG_FUNCTION_ARGS)
 			nfree(gpu_metrics);
 	}
 
-	nfree(query.data);
-	NDB_SPI_SESSION_END(eval_spi_session);
-	nfree(tbl_str);
-	nfree(feat_str);
-	nfree(targ_str);
-	/* Build jsonb result */
-	initStringInfo(&jsonbuf);
-	appendStringInfo(&jsonbuf,
-					 "{\"accuracy\":%.6f,\"precision\":%.6f,\"recall\":%.6f,\"f1_score\":%.6f,\"n_samples\":%d}",
-					 accuracy,
-					 precision,
-					 recall,
-					 f1_score,
-					 valid_rows);
-
 	/* End SPI session BEFORE creating JSONB to avoid context conflicts */
 	ndb_spi_stringinfo_free(eval_spi_session, &query);
 	NDB_SPI_SESSION_END(eval_spi_session);
