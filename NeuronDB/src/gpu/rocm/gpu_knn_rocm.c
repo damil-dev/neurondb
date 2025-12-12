@@ -389,25 +389,38 @@ ndb_rocm_knn_train(const float *features,
 			*errstr = pstrdup("HIP KNN train: feature array size exceeds MaxAllocSize");
 		return -1;
 	}
-	nalloc(features_copy, float, (size_t) n_samples * (size_t) feature_dim);
-	if (features_copy == NULL)
-	{
-		if (errstr)
-			*errstr = pstrdup("HIP KNN train: failed to allocate features_copy array");
-		return -1;
-	}
 
-	nalloc(labels_copy, double, (size_t) n_samples);
-	if (labels_copy == NULL)
+	/* Allocate and copy in TopMemoryContext to avoid memory context issues */
+	/* Copy immediately to ensure source data is valid */
 	{
-		if (errstr)
-			*errstr = pstrdup("HIP KNN train: failed to allocate labels_copy array");
-		nfree(features_copy);
-		return -1;
-	}
+		MemoryContext oldcontext = CurrentMemoryContext;
+		MemoryContextSwitchTo(TopMemoryContext);
+		
+		features_copy = (float *) palloc(sizeof(float) * (size_t) n_samples * (size_t) feature_dim);
+		if (features_copy == NULL)
+		{
+			MemoryContextSwitchTo(oldcontext);
+			if (errstr)
+				*errstr = pstrdup("HIP KNN train: failed to allocate features_copy array");
+			return -1;
+		}
 
-	memcpy(features_copy, features, sizeof(float) * (size_t) n_samples * (size_t) feature_dim);
-	memcpy(labels_copy, labels, sizeof(double) * (size_t) n_samples);
+		labels_copy = (double *) palloc(sizeof(double) * (size_t) n_samples);
+		if (labels_copy == NULL)
+		{
+			/* Don't free features_copy here - let it persist in TopMemoryContext to avoid corruption */
+			MemoryContextSwitchTo(oldcontext);
+			if (errstr)
+				*errstr = pstrdup("HIP KNN train: failed to allocate labels_copy array");
+			return -1;
+		}
+		
+		/* Copy data while still in TopMemoryContext to ensure consistency */
+		memcpy(features_copy, features, sizeof(float) * (size_t) n_samples * (size_t) feature_dim);
+		memcpy(labels_copy, labels, sizeof(double) * (size_t) n_samples);
+		
+		MemoryContextSwitchTo(oldcontext);
+	}
 
 	/* Build model structure */
 	model.n_samples = n_samples;
@@ -417,15 +430,13 @@ ndb_rocm_knn_train(const float *features,
 	model.features = features_copy;
 	model.labels = labels_copy;
 
-	/*
-	 * Pack model - pass NULL for metrics if caller doesn't want them to avoid
-	 * DirectFunctionCall issues
-	 */
+	/* Pack model - pass NULL for metrics if caller doesn't want them to avoid
+	 * DirectFunctionCall issues. No PG_TRY needed - pack handles its own errors. */
 	if (ndb_rocm_knn_pack(&model, &blob, metrics ? &metrics_json : NULL, errstr) != 0)
 	{
 		if (errstr && *errstr == NULL)
 			*errstr = pstrdup("HIP KNN model packing failed");
-		goto cleanup;
+		return -1;
 	}
 
 	*model_data = blob;
@@ -433,12 +444,6 @@ ndb_rocm_knn_train(const float *features,
 		*metrics = metrics_json;
 
 	rc = 0;
-
-cleanup:
-	if (features_copy)
-		nfree(features_copy);
-	if (labels_copy)
-		nfree(labels_copy);
 
 	return rc;
 }
@@ -481,7 +486,8 @@ ndb_rocm_knn_predict(const bytea * model_data,
 		return -1;
 	}
 
-	/* Validate model_data bytea */
+	/* Use VARDATA_ANY which handles toasted data safely without creating copies */
+	/* The caller (ml_knn.c) already copies model_data, so this should be safe */
 	if (VARSIZE_ANY_EXHDR(model_data) < sizeof(NdbCudaKnnModelHeader))
 	{
 		if (errstr)
@@ -653,7 +659,8 @@ ndb_rocm_knn_predict_batch(const bytea * model_data,
 		return -1;
 	}
 
-	/* Validate model_data bytea */
+	/* Use VARDATA_ANY which handles toasted data safely without creating copies */
+	/* The caller already handles copying if needed */
 	if (VARSIZE_ANY_EXHDR(model_data) < sizeof(NdbCudaKnnModelHeader))
 	{
 		if (errstr)
