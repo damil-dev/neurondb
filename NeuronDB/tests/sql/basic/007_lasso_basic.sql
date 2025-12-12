@@ -465,7 +465,6 @@ SELECT
 	ROUND(tm.r_squared::numeric, 6) AS r_squared,
 	CASE
 		WHEN m.metrics IS NULL THEN 'CPU Training (default)'
-		CASE 
 		WHEN m.metrics::jsonb->>'storage' = 'gpu' THEN 'GPU Training ✓'
 		WHEN m.metrics::jsonb->>'storage' = 'cpu' THEN 'CPU Training'
 		WHEN m.metrics::jsonb->>'storage' IS NULL OR m.metrics::jsonb->>'storage' = '' THEN 'CPU Training (default)'
