@@ -2181,7 +2181,15 @@ evaluate_decision_tree_by_model_id(PG_FUNCTION_ARGS)
 			if (feat_null || targ_null)
 				continue;
 
-			y_true = (int) rint(DatumGetFloat8(targ_datum));
+			/* Handle both integer and float label types */
+			{
+				Oid			label_type = SPI_gettypeid(tupdesc, 2);
+				
+				if (label_type == INT4OID || label_type == INT2OID || label_type == INT8OID)
+					y_true = DatumGetInt32(targ_datum);
+				else
+					y_true = (int) rint(DatumGetFloat8(targ_datum));
+			}
 
 			/* Extract features and determine dimension */
 			if (feat_is_array)
@@ -2310,6 +2318,12 @@ evaluate_decision_tree_by_model_id(PG_FUNCTION_ARGS)
 
 				y_pred = (int) rint(prediction);
 			}
+
+			/* Clamp y_pred to valid binary classification range [0, 1] */
+			if (y_pred < 0)
+				y_pred = 0;
+			else if (y_pred > 1)
+				y_pred = 1;
 
 			/* Compute confusion matrix (same for both CPU and GPU) */
 			if (y_true == 1)
