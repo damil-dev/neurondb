@@ -279,12 +279,11 @@ SELECT metrics FROM gpu_metrics_temp;
 -- Show error if evaluation failed
 SELECT 
 	CASE 
- 		WHEN m.metrics IS NULL THEN 'CPU Training (default)'
-		WHEN metrics IS NULL THEN 'ERROR: Metrics is NULL - evaluation did not run'
-		WHEN (metrics::jsonb ? 'error') THEN 'ERROR: ' || (metrics::jsonb->>'error')
+		WHEN m.metrics IS NULL THEN 'CPU Training (default)'
+		WHEN (m.metrics::jsonb ? 'error') THEN 'ERROR: ' || (m.metrics::jsonb->>'error')
 		ELSE 'Evaluation completed successfully'
 	END AS evaluation_status
-FROM gpu_metrics_temp;
+FROM gpu_metrics_temp m;
 
 SELECT
 	format('%-15s', 'Accuracy') AS metric,
@@ -507,7 +506,6 @@ SELECT
 	ROUND(tm.f1_score::numeric, 6) AS f1_score,
 	CASE
 		WHEN m.metrics IS NULL THEN 'CPU Training (default)'
-		CASE 
 		WHEN m.metrics::jsonb->>'storage' = 'gpu' THEN 'GPU Training ✓'
 		WHEN m.metrics::jsonb->>'storage' = 'cpu' THEN 'CPU Training'
 		WHEN m.metrics::jsonb->>'storage' IS NULL OR m.metrics::jsonb->>'storage' = '' THEN 'CPU Training (default)'

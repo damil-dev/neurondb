@@ -72,9 +72,10 @@ COPY . .
 
 # Build and install NeuronDB into the builder image
 # Note: Architecture is automatically detected and handled by the build system
-RUN make clean && \
-    make && \
-    make install
+# Disable GPU backends for CPU-only build
+RUN GPU_BACKENDS=none make clean && \
+    GPU_BACKENDS=none make && \
+    GPU_BACKENDS=none make install
 
 # -----------------------------------------------------------------------------
 

@@ -23,7 +23,8 @@ if ! grep -q "shared_preload_libraries" "${postgresql_conf}"; then
 shared_preload_libraries = 'neurondb'
 neurondb.compute_mode = ${compute_mode}
 neurondb.gpu_backend_type = ${gpu_backend_type}
-neurondb.automl.use_gpu = ${automl_gpu}
+# neurondb.automl.use_gpu is only valid when GPU is enabled
+# neurondb.automl.use_gpu = ${automl_gpu}
 CONF
 else
     sed -i "s/^shared_preload_libraries.*/shared_preload_libraries = 'neurondb'/g" "${postgresql_conf}"
@@ -42,10 +43,9 @@ else
         echo "neurondb.gpu_backend_type = ${gpu_backend_type}" >> "${postgresql_conf}"
     fi
     
+    # Comment out automl.use_gpu for CPU-only builds to avoid config errors
     if grep -q "^neurondb.automl.use_gpu" "${postgresql_conf}"; then
-        sed -i "s/^neurondb.automl.use_gpu.*/neurondb.automl.use_gpu = ${automl_gpu}/g" "${postgresql_conf}"
-    else
-        echo "neurondb.automl.use_gpu = ${automl_gpu}" >> "${postgresql_conf}"
+        sed -i "s/^neurondb.automl.use_gpu.*/# neurondb.automl.use_gpu = ${automl_gpu}/g" "${postgresql_conf}"
     fi
 fi
 
