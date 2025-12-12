@@ -281,7 +281,7 @@ services:
     ports:
     - ${SERVER_PORT:-8080}:8080
     environment:
-      DB_HOST: ${DB_HOST:-neurondb-cpu}
+      DB_HOST: ${DB_HOST:-neurondb}
       DB_PORT: ${DB_PORT:-5432}
       DB_NAME: ${DB_NAME:-neurondb}
       DB_USER: ${DB_USER:-neurondb}
@@ -535,7 +535,7 @@ services:
       neurondb:
         condition: service_healthy
     environment:
-      NEURONDB_HOST: ${NEURONDB_HOST:-neurondb-cpu}
+      NEURONDB_HOST: ${NEURONDB_HOST:-neurondb}
       NEURONDB_PORT: ${NEURONDB_PORT:-5432}
       NEURONDB_DATABASE: ${NEURONDB_DATABASE:-neurondb}
       NEURONDB_USER: ${NEURONDB_USER:-neurondb}
