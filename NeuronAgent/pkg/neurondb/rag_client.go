@@ -125,3 +125,4 @@ type RerankResult struct {
 	Rank      int     `json:"rank"`
 }
 
+
