@@ -1172,12 +1172,20 @@ neurondb_build_training_sql(MLAlgorithm algo, StringInfo sql, const char *table_
 		case ML_ALGO_KNN_CLASSIFIER:
 			{
 				int			k_value = 5;
+				const char *feature_col_knn;
 
 				neurondb_parse_hyperparams_int(hyperparams, "k", &k_value, 5);
+				
+				/* Use first feature name if available, otherwise use feature_list */
+				if (feature_name_count > 0 && feature_names != NULL && feature_names[0] != NULL)
+					feature_col_knn = feature_names[0];
+				else
+					feature_col_knn = feature_list;
+				
 				appendStringInfo(sql,
 								 "SELECT train_knn_model_id(%s, %s, %s, %d)",
 								 neurondb_quote_literal_cstr(table_name),
-								 neurondb_quote_literal_cstr(feature_list),
+								 neurondb_quote_literal_cstr(feature_col_knn),
 								 neurondb_quote_literal_or_null(target_column),
 								 k_value);
 				return true;
@@ -2474,17 +2482,42 @@ neurondb_train(PG_FUNCTION_ARGS)
 				 */
 				spec.project_name = default_project_name;
 
-				/* Set num_samples and num_features from training data */
-				spec.num_samples = n_samples;
-				spec.num_features = feature_dim;
-
 				/* Switch to oldcontext before registering model */
 				MemoryContextSwitchTo(oldcontext);
 				model_id = ml_catalog_register_model(&spec);
 				MemoryContextSwitchTo(callcontext);
 				
-				/* Model registration succeeded - ml_catalog_register_model returned model_id > 0.
-				 * No verification needed since ml_catalog_register_model handles all validation internally. */
+				/* Verify model was registered and is visible */
+				if (model_id > 0)
+				{
+					
+					/* Verify model actually exists in catalog */
+					ndb_spi_stringinfo_free(spi_session, &sql);
+					ndb_spi_stringinfo_init(spi_session, &sql);
+					appendStringInfo(&sql,
+									 "SELECT COUNT(*) FROM " NDB_FQ_ML_MODELS " WHERE " NDB_COL_MODEL_ID " = %d",
+									 model_id);
+					ret = ndb_spi_execute(spi_session, sql.data, true, 0);
+					
+					if (ret == SPI_OK_SELECT && SPI_processed > 0)
+					{
+						int32 count = 0;
+						if (ndb_spi_get_int32(spi_session, 0, 1, &count) && count == 0)
+						{
+							/* Model was not registered - this is an error */
+							ndb_spi_stringinfo_free(spi_session, &sql);
+							ndb_spi_session_end(&spi_session);
+							MemoryContextSwitchTo(oldcontext);
+							neurondb_cleanup(oldcontext, callcontext);
+							ndb_gpu_free_train_result(&gpu_result);
+							ereport(ERROR,
+									(errcode(ERRCODE_INTERNAL_ERROR),
+									 errmsg(NDB_ERR_PREFIX_TRAIN " GPU training registered model_id %d but model was not found in catalog", model_id),
+									 errdetail("Algorithm: %s, Project: %s, Table: %s. The model registration may have failed or been rolled back.", algorithm, project_name, table_name),
+									 errhint("This may indicate a transaction rollback or model registration failure. Check logs for details.")));
+						}
+					}
+				}
 			}
 			else
 			{
@@ -2679,15 +2712,129 @@ neurondb_train(PG_FUNCTION_ARGS)
 			data_loaded = false;
 		}
 
-		/* GPU training failed - fall back to CPU training (AUTO mode) */
-		/* Explicitly reset model_id to 0 to ensure we don't return garbage from GPU result */
-		model_id = 0;
-		algo_enum = neurondb_algorithm_from_string(algorithm);
+		/* GPU training failed - only fall back to CPU training in AUTO mode */
+		/* In GPU mode, error out. In AUTO mode, continue to CPU. In CPU mode, we shouldn't reach here. */
+		if (NDB_COMPUTE_MODE_IS_AUTO())
+		{
+			/* AUTO mode - fall back to CPU training */
+			/* Explicitly reset model_id to 0 to ensure we don't return garbage from GPU result */
+			model_id = 0;
+			algo_enum = neurondb_algorithm_from_string(algorithm);
 
-		/* Build SQL for CPU training */
-		ndb_spi_stringinfo_free(spi_session, &sql);
-		ndb_spi_stringinfo_init(spi_session, &sql);
+			/* Build SQL for CPU training */
+			ndb_spi_stringinfo_free(spi_session, &sql);
+			ndb_spi_stringinfo_init(spi_session, &sql);
+		}
+		else if (NDB_COMPUTE_MODE_IS_GPU())
+		{
+			/* GPU mode - error out if GPU training failed */
+			char *gpu_error_msg = NULL;
+			if (gpu_errmsg_ptr && strlen(gpu_errmsg_ptr) > 0)
+			{
+				gpu_error_msg = pstrdup(gpu_errmsg_ptr);
+			}
+			else
+			{
+				gpu_error_msg = psprintf("GPU training failed for algorithm '%s' - check GPU availability and error logs",
+										 algorithm ? algorithm : "unknown");
+			}
+			
+			/* Clean up before error */
+			if (gpu_errmsg_ptr)
+				nfree(gpu_errmsg_ptr);
+			nfree(feature_list_str);
+			if (feature_names)
+			{
+				int			i;
+				for (i = 0; i < feature_name_count; i++)
+				{
+					if (feature_names[i])
+					{
+						char	   *ptr = (char *) feature_names[i];
+						nfree(ptr);
+					}
+				}
+				nfree(feature_names);
+			}
+			if (model_name)
+				nfree(model_name);
+			if (data_loaded)
+			{
+				if (feature_matrix)
+					nfree(feature_matrix);
+				if (label_vector)
+					nfree(label_vector);
+			}
+			MemoryContextSwitchTo(oldcontext);
+			neurondb_cleanup(oldcontext, callcontext);
+			ndb_spi_session_end(&spi_session);
+			nfree(project_name);
+			nfree(algorithm);
+			nfree(table_name);
+			if (target_column)
+				nfree(target_column);
+			
+			ereport(ERROR,
+					(errcode(ERRCODE_INTERNAL_ERROR),
+					 errmsg(NDB_ERR_PREFIX_TRAIN " GPU training failed - GPU mode does not allow CPU fallback"),
+					 errdetail("Algorithm: %s, Project: %s, Table: %s. GPU Error: %s",
+							   algorithm ? algorithm : "unknown",
+							   project_name ? project_name : "unknown",
+							   table_name ? table_name : "unknown",
+							   gpu_error_msg),
+					 errhint("Check GPU hardware, drivers, and configuration. "
+							 "Set compute_mode='auto' for automatic CPU fallback, or 'cpu' for CPU-only training.")));
+			if (gpu_error_msg)
+				pfree(gpu_error_msg);
+		}
+		else
+		{
+			/* CPU mode - should not reach GPU training failure path */
+			if (gpu_errmsg_ptr)
+				nfree(gpu_errmsg_ptr);
+			nfree(feature_list_str);
+			if (feature_names)
+			{
+				int			i;
+				for (i = 0; i < feature_name_count; i++)
+				{
+					if (feature_names[i])
+					{
+						char	   *ptr = (char *) feature_names[i];
+						nfree(ptr);
+					}
+				}
+				nfree(feature_names);
+			}
+			if (model_name)
+				nfree(model_name);
+			if (data_loaded)
+			{
+				if (feature_matrix)
+					nfree(feature_matrix);
+				if (label_vector)
+					nfree(label_vector);
+			}
+			MemoryContextSwitchTo(oldcontext);
+			neurondb_cleanup(oldcontext, callcontext);
+			ndb_spi_session_end(&spi_session);
+			nfree(project_name);
+			nfree(algorithm);
+			nfree(table_name);
+			if (target_column)
+				nfree(target_column);
+			
+			ereport(ERROR,
+					(errcode(ERRCODE_INTERNAL_ERROR),
+					 errmsg(NDB_ERR_PREFIX_TRAIN " Internal error: GPU training path reached in CPU mode"),
+					 errdetail("Algorithm: %s, Project: %s, Table: %s",
+							   algorithm ? algorithm : "unknown",
+							   project_name ? project_name : "unknown",
+							   table_name ? table_name : "unknown"),
+					 errhint("This is an internal error. Please report this issue.")));
+		}
 
+		/* AUTO mode - execute CPU fallback code block */
 		/*
 		 * For random_forest, call C function directly to avoid PL/pgSQL
 		 * wrapper recursion
@@ -2858,6 +3005,10 @@ neurondb_train(PG_FUNCTION_ARGS)
 						}
 					}
 				}
+				else
+				{
+					/* SQL execution failed or returned no rows - allow fallback to next attempt */
+				}
 			}
 		}
 		else if (neurondb_build_training_sql(algo_enum, &sql, table_name, feature_list_str,
@@ -2895,18 +3046,54 @@ neurondb_train(PG_FUNCTION_ARGS)
 					{
 						model_id = model_id_val;
 
-						/* Update metrics to ensure training_backend='cpu' is set.
-						 * No verification needed - if ml_catalog_register_model returned model_id > 0,
-						 * we trust it succeeded. The UPDATE will succeed if the model exists. */
+						/* Verify model exists in catalog before updating */
 						ndb_spi_stringinfo_free(spi_session, &sql);
 						ndb_spi_stringinfo_init(spi_session, &sql);
 						appendStringInfo(&sql,
-										 "UPDATE " NDB_FQ_ML_MODELS " SET " NDB_COL_METRICS " = "
-										 "COALESCE(" NDB_COL_METRICS ", '{}'::jsonb) || '{\"training_backend\":0}'::jsonb "
-										 "WHERE " NDB_COL_MODEL_ID " = %d",
+										 "SELECT COUNT(*) FROM " NDB_FQ_ML_MODELS " WHERE " NDB_COL_MODEL_ID " = %d",
 										 model_id);
-						ndb_spi_execute(spi_session, sql.data, false, 0);
-						ndb_spi_stringinfo_free(spi_session, &sql);
+						ret = ndb_spi_execute(spi_session, sql.data, true, 0);
+						
+						if (ret == SPI_OK_SELECT && SPI_processed > 0)
+						{
+							int32 count = 0;
+							if (ndb_spi_get_int32(spi_session, 0, 1, &count) && count > 0)
+							{
+								/* Model exists - update metrics to ensure storage='cpu' is set */
+								ndb_spi_stringinfo_free(spi_session, &sql);
+								ndb_spi_stringinfo_init(spi_session, &sql);
+								appendStringInfo(&sql,
+												 "UPDATE " NDB_FQ_ML_MODELS " SET " NDB_COL_METRICS " = "
+												 "COALESCE(" NDB_COL_METRICS ", '{}'::jsonb) || '{\"training_backend\":0}'::jsonb "
+												 "WHERE " NDB_COL_MODEL_ID " = %d",
+												 model_id);
+								ndb_spi_execute(spi_session, sql.data, false, 0);
+							}
+							else
+							{
+								/* Model was not registered - this is an error */
+								ndb_spi_stringinfo_free(spi_session, &sql);
+								ndb_spi_session_end(&spi_session);
+								neurondb_cleanup(oldcontext, callcontext);
+								ereport(ERROR,
+										(errcode(ERRCODE_INTERNAL_ERROR),
+										 errmsg(NDB_ERR_PREFIX_TRAIN " CPU training returned model_id %d but model was not found in catalog", model_id_val),
+										 errdetail("Algorithm: %s, Project: %s, Table: %s. The training function may have returned a model_id without properly registering the model.", algorithm, project_name, table_name),
+										 errhint("This may indicate a transaction rollback or model registration failure. Check logs for details.")));
+							}
+						}
+						else
+						{
+							/* Could not verify model existence - treat as error */
+							ndb_spi_stringinfo_free(spi_session, &sql);
+							ndb_spi_session_end(&spi_session);
+							neurondb_cleanup(oldcontext, callcontext);
+							ereport(ERROR,
+									(errcode(ERRCODE_INTERNAL_ERROR),
+									 errmsg(NDB_ERR_PREFIX_TRAIN " CPU training returned model_id %d but could not verify model in catalog", model_id_val),
+									 errdetail("Algorithm: %s, Project: %s, Table: %s. SPI return code: %d", algorithm, project_name, table_name, ret),
+									 errhint("This may indicate a transaction issue. Check logs for details.")));
+						}
 					}
 					else
 					{
@@ -2975,6 +3162,7 @@ neurondb_train(PG_FUNCTION_ARGS)
 					 errdetail("Algorithm: %s, Project: %s, Table: %s, model_id: %d", algorithm, project_name, table_name, model_id),
 					 errhint("CPU training may have failed. Check logs for details.")));
 		}
+		/* End of AUTO mode CPU fallback block */
 	}
 
 
@@ -3966,6 +4154,20 @@ neurondb_evaluate(PG_FUNCTION_ARGS)
 	Assert(table_name != NULL);
 	Assert(feature_col != NULL);
 	Assert(callcontext != NULL);
+	
+	/* Validate strings are not empty */
+	if (table_name == NULL || strlen(table_name) == 0)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg(NDB_ERR_PREFIX_EVALUATE " table_name cannot be empty or NULL")));
+	if (feature_col == NULL || strlen(feature_col) == 0)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg(NDB_ERR_PREFIX_EVALUATE " feature_col cannot be empty or NULL")));
+	if (label_col != NULL && strlen(label_col) == 0)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg(NDB_ERR_PREFIX_EVALUATE " label_col cannot be empty")));
 
 	/* Validate label_col for supervised algorithms */
 	if (strcmp(algorithm, NDB_ALGO_LINEAR_REGRESSION) == 0 ||
