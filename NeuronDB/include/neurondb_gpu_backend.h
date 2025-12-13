@@ -14,6 +14,8 @@ struct LassoModel;
 struct GaussianNBModel;
 struct GMMModel;
 struct KNNModel;
+struct XGBoostModel;
+struct CatBoostModel;
 
 #define NDB_GPU_MAX_BACKENDS 8
 
@@ -308,6 +310,44 @@ typedef struct ndb_gpu_backend
 							 bytea * *model_data,
 							 Jsonb * *metrics,
 							 char **errstr);
+
+	/* XGBoost */
+	int			(*xgboost_train) (const float *features,
+								  const double *labels,
+								  int n_samples,
+								  int feature_dim,
+								  const Jsonb * hyperparams,
+								  bytea * *model_data,
+								  Jsonb * *metrics,
+								  char **errstr);
+	int			(*xgboost_predict) (const bytea * model_data,
+									const float *input,
+									int feature_dim,
+									double *prediction_out,
+									char **errstr);
+	int			(*xgboost_pack) (const struct XGBoostModel *model,
+								 bytea * *model_data,
+								 Jsonb * *metrics,
+								 char **errstr);
+
+	/* CatBoost */
+	int			(*catboost_train) (const float *features,
+								   const double *labels,
+								   int n_samples,
+								   int feature_dim,
+								   const Jsonb * hyperparams,
+								   bytea * *model_data,
+								   Jsonb * *metrics,
+								   char **errstr);
+	int			(*catboost_predict) (const bytea * model_data,
+									 const float *input,
+									 int feature_dim,
+									 double *prediction_out,
+									 char **errstr);
+	int			(*catboost_pack) (const struct CatBoostModel *model,
+								  bytea * *model_data,
+								  Jsonb * *metrics,
+								  char **errstr);
 
 	/* Hugging Face / LLM */
 	int			(*hf_embed) (const char *model_name,

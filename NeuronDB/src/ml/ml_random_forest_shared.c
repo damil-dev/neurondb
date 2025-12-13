@@ -312,6 +312,24 @@ rf_build_metrics_json(const RFMetricsSpec *spec)
 		first = false;
 	}
 
+	if (spec->n_samples > 0)
+	{
+		appendStringInfo(&buf,
+						 "%s\"n_samples\":%d",
+						 first ? "" : ",",
+						 spec->n_samples);
+		first = false;
+	}
+
+	if (spec->n_features > 0)
+	{
+		appendStringInfo(&buf,
+						 "%s\"n_features\":%d",
+						 first ? "" : ",",
+						 spec->n_features);
+		first = false;
+	}
+
 	ereport(DEBUG2,
 			(errmsg("rf_build_metrics_json: about to append closing brace"),
 			 errdetail("buf.data=%p, buf.len=%d", (void *) buf.data, buf.len)));

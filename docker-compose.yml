@@ -48,6 +48,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-neurondb}
       POSTGRES_DB: ${POSTGRES_DB:-neurondb}
       POSTGRES_HOST_AUTH_METHOD: ${POSTGRES_HOST_AUTH_METHOD:-md5}
+      NEURONDB_GPU_BACKEND_TYPE: ${NEURONDB_GPU_BACKEND_TYPE:-0}
+      NEURONDB_COMPUTE_MODE: ${NEURONDB_COMPUTE_MODE:-0}
     ports:
     - ${POSTGRES_PORT:-5433}:5432
     volumes:
@@ -94,6 +96,11 @@ services:
         VCS_REF: ${VCS_REF:-}
     image: neurondb:cuda-pg17
     container_name: neurondb-cuda
+    init: true
+    labels:
+    - com.neurondb.service=neurondb
+    - com.neurondb.variant=cuda
+    - com.neurondb.version=${VERSION:-latest}
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-neurondb}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-neurondb}
@@ -102,8 +109,26 @@ services:
       NVIDIA_VISIBLE_DEVICES: ${NVIDIA_VISIBLE_DEVICES:-all}
       NVIDIA_DRIVER_CAPABILITIES: ${NVIDIA_DRIVER_CAPABILITIES:-compute,utility}
       NEURONDB_GPU_ENABLED: ${NEURONDB_GPU_ENABLED:-on}
+      NEURONDB_GPU_BACKEND_TYPE: ${NEURONDB_GPU_BACKEND_TYPE:-1}
+      NEURONDB_COMPUTE_MODE: ${NEURONDB_COMPUTE_MODE:-1}
     ports:
     - ${POSTGRES_CUDA_PORT:-5434}:5432
+    volumes:
+    - neurondb-cuda-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U ${POSTGRES_USER:-neurondb} -d ${POSTGRES_DB:-neurondb}
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+        compress: 'true'
     deploy:
       resources:
         limits:
@@ -117,31 +142,9 @@ services:
             count: 1
             capabilities:
             - gpu
-    runtime: nvidia
-    volumes:
-    - neurondb-cuda-data:/var/lib/postgresql/data
-    healthcheck:
-      test:
-      - CMD-SHELL
-      - pg_isready -U ${POSTGRES_USER:-neurondb}
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 40s
     restart: unless-stopped
     networks:
     - neurondb-network
-    init: true
-    labels:
-    - com.neurondb.service=neurondb
-    - com.neurondb.variant=cuda
-    - com.neurondb.version=${VERSION:-latest}
-    logging:
-      driver: json-file
-      options:
-        max-size: 10m
-        max-file: '3'
-        compress: 'true'
   neurondb-rocm:
     profiles:
     - rocm
@@ -158,12 +161,19 @@ services:
         VCS_REF: ${VCS_REF:-}
     image: neurondb:rocm-pg17
     container_name: neurondb-rocm
+    init: true
+    labels:
+    - com.neurondb.service=neurondb
+    - com.neurondb.variant=rocm
+    - com.neurondb.version=${VERSION:-latest}
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-neurondb}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-neurondb}
       POSTGRES_DB: ${POSTGRES_DB:-neurondb}
       POSTGRES_HOST_AUTH_METHOD: ${POSTGRES_HOST_AUTH_METHOD:-md5}
       NEURONDB_GPU_ENABLED: ${NEURONDB_GPU_ENABLED:-on}
+      NEURONDB_GPU_BACKEND_TYPE: ${NEURONDB_GPU_BACKEND_TYPE:-2}
+      NEURONDB_COMPUTE_MODE: ${NEURONDB_COMPUTE_MODE:-1}
     ports:
     - ${POSTGRES_ROCM_PORT:-5435}:5432
     volumes:
@@ -171,6 +181,20 @@ services:
     devices:
     - /dev/kfd:/dev/kfd
     - /dev/dri:/dev/dri
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U ${POSTGRES_USER:-neurondb} -d ${POSTGRES_DB:-neurondb}
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+        compress: 'true'
     deploy:
       resources:
         limits:
@@ -179,28 +203,9 @@ services:
         reservations:
           cpus: '2'
           memory: 2G
-    healthcheck:
-      test:
-      - CMD-SHELL
-      - pg_isready -U ${POSTGRES_USER:-neurondb}
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 40s
     restart: unless-stopped
     networks:
     - neurondb-network
-    init: true
-    labels:
-    - com.neurondb.service=neurondb
-    - com.neurondb.variant=rocm
-    - com.neurondb.version=${VERSION:-latest}
-    logging:
-      driver: json-file
-      options:
-        max-size: 10m
-        max-file: '3'
-        compress: 'true'
   neurondb-metal:
     profiles:
     - metal
@@ -216,17 +221,38 @@ services:
         VCS_REF: ${VCS_REF:-}
     image: neurondb:metal-pg17
     container_name: neurondb-metal
+    init: true
+    labels:
+    - com.neurondb.service=neurondb
+    - com.neurondb.variant=metal
+    - com.neurondb.version=${VERSION:-latest}
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-neurondb}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-neurondb}
       POSTGRES_DB: ${POSTGRES_DB:-neurondb}
       POSTGRES_HOST_AUTH_METHOD: ${POSTGRES_HOST_AUTH_METHOD:-md5}
       NEURONDB_GPU_ENABLED: ${NEURONDB_GPU_ENABLED:-on}
+      NEURONDB_GPU_BACKEND_TYPE: ${NEURONDB_GPU_BACKEND_TYPE:-3}
+      NEURONDB_COMPUTE_MODE: ${NEURONDB_COMPUTE_MODE:-1}
     ports:
     - ${POSTGRES_METAL_PORT:-5436}:5432
     volumes:
     - neurondb-metal-data:/var/lib/postgresql/data
     platform: linux/arm64
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U ${POSTGRES_USER:-neurondb} -d ${POSTGRES_DB:-neurondb}
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+        compress: 'true'
     deploy:
       resources:
         limits:
@@ -235,28 +261,9 @@ services:
         reservations:
           cpus: '2'
           memory: 2G
-    healthcheck:
-      test:
-      - CMD-SHELL
-      - pg_isready -U ${POSTGRES_USER:-neurondb}
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 40s
     restart: unless-stopped
     networks:
     - neurondb-network
-    init: true
-    labels:
-    - com.neurondb.service=neurondb
-    - com.neurondb.variant=metal
-    - com.neurondb.version=${VERSION:-latest}
-    logging:
-      driver: json-file
-      options:
-        max-size: 10m
-        max-file: '3'
-        compress: 'true'
   neuronagent:
     profiles:
     - default

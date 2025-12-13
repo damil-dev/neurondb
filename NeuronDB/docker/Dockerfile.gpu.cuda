@@ -119,7 +119,7 @@ COPY . .
 # Architecture is automatically detected and handled by the build system
 RUN if [ -f /tmp/gpu_paths.env ]; then . /tmp/gpu_paths.env; fi && \
     make clean && \
-    make CUDA_PATH=${CUDA_PATH} ONNX_PATH=${ONNX_PATH} \
+    make GPU_BACKENDS=cuda CUDA_PATH=${CUDA_PATH} ONNX_PATH=${ONNX_PATH} \
          $(if [ -f /tmp/gpu_paths.env ]; then . /tmp/gpu_paths.env; echo "WITH_CUML=1 WITH_XGBOOST_GPU=1 CUML_INCLUDE_PATH=${CUML_INCLUDE_PATH} CUML_LIBRARY_PATH=${CUML_LIBRARY_PATH} XGBOOST_INCLUDE_PATH=${XGBOOST_INCLUDE_PATH} XGBOOST_LIBRARY_PATH=${XGBOOST_LIBRARY_PATH}"; fi) && \
     make install
 

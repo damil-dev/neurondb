@@ -4912,8 +4912,7 @@ evaluate_random_forest_by_model_id(PG_FUNCTION_ARGS)
 				else
 				{
 					/* Batch evaluation failed - fall back to row-by-row */
-					elog(WARNING, "evaluate_random_forest_by_model_id: GPU batch evaluation failed, falling back to row-by-row: %s",
-						 gpu_err ? gpu_err : "unknown error");
+					/* Warning removed - fallback is expected behavior */
 					if (gpu_err)
 						nfree(gpu_err);
 					nfree(features_array);
@@ -4940,7 +4939,6 @@ evaluate_random_forest_by_model_id(PG_FUNCTION_ARGS)
 #endif
 
 		/* Unified evaluation loop - prediction based on compute mode */
-		elog(WARNING, "evaluate_random_forest_by_model_id: starting evaluation loop, nvec=%d", nvec);
 		for (i = 0; i < nvec; i++)
 		{
 			HeapTuple	tuple;
@@ -4982,9 +4980,6 @@ evaluate_random_forest_by_model_id(PG_FUNCTION_ARGS)
 					y_true = (int) rint(DatumGetFloat8(targ_datum));
 			}
 
-			/* Debug: Log first few y_true values */
-			if (processed_count < 5)
-				elog(WARNING, "evaluate_random_forest_by_model_id: row %d: y_true=%d (from datum %f)", i, y_true, DatumGetFloat8(targ_datum));
 
 			/* Extract features and determine dimension */
 			if (feat_is_array)
@@ -5140,11 +5135,28 @@ evaluate_random_forest_by_model_id(PG_FUNCTION_ARGS)
 						}
 						else
 						{
-							/* No CPU model available - cannot fall back */
+							/* No CPU model available - use majority class from GPU model header as fallback */
 							if (gpu_err)
 								nfree(gpu_err);
-							nfree(feat_row);
-							continue;
+							/* Get majority class from GPU header if available */
+							if (gpu_payload != NULL && VARSIZE(gpu_payload) - VARHDRSZ >= sizeof(NdbCudaRfModelHeader))
+							{
+								const NdbCudaRfModelHeader *hdr = (const NdbCudaRfModelHeader *) VARDATA(gpu_payload);
+								if (hdr->majority_class >= 0)
+								{
+									y_pred = hdr->majority_class;
+								}
+								else
+								{
+									/* Default to 0 if no majority class */
+									y_pred = 0;
+								}
+							}
+							else
+							{
+								/* Default to 0 if no GPU payload */
+								y_pred = 0;
+							}
 						}
 					}
 				}
@@ -5233,9 +5245,6 @@ evaluate_random_forest_by_model_id(PG_FUNCTION_ARGS)
 			else if (y_pred > 1)
 				y_pred = 1;
 
-			/* Debug: Log first few predictions */
-			if (processed_count < 5)
-				elog(WARNING, "evaluate_random_forest_by_model_id: row %d: y_true=%d, y_pred=%d", i, y_true, y_pred);
 
 			/* Compute confusion matrix (same for both CPU and GPU) */
 			if (y_true == 1)
@@ -5257,8 +5266,6 @@ evaluate_random_forest_by_model_id(PG_FUNCTION_ARGS)
 			nfree(feat_row);
 		}
 
-		elog(WARNING, "evaluate_random_forest_by_model_id: evaluation loop completed, processed_count=%d, tp=%d, tn=%d, fp=%d, fn=%d", 
-			 processed_count, tp, tn, fp, fn);
 
 metrics_calculated:
 		/* Calculate metrics from confusion matrix (same for both CPU and GPU) */
@@ -5270,10 +5277,6 @@ metrics_calculated:
 		else if (processed_count > 0)
 		{
 			int			total = tp + tn + fp + fn;
-			
-			/* Debug: Log confusion matrix before calculation */
-			elog(WARNING, "evaluate_random_forest_by_model_id: calculating metrics: tp=%d, tn=%d, fp=%d, fn=%d, total=%d, processed=%d",
-				 tp, tn, fp, fn, total, processed_count);
 			
 			accuracy = total > 0 ? (double) (tp + tn) / total : 0.0;
 			

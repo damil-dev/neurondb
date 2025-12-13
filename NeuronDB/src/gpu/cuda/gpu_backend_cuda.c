@@ -34,6 +34,8 @@
 #include "neurondb_cuda_gmm.h"
 #include "neurondb_cuda_knn.h"
 #include "neurondb_cuda_hf.h"
+#include "neurondb_cuda_xgboost.h"
+#include "neurondb_cuda_catboost.h"
 #ifdef HAVE_ONNX_RUNTIME
 #include "neurondb_onnx.h"
 #endif
@@ -796,6 +798,14 @@ static const ndb_gpu_backend ndb_cuda_backend = {
 	.knn_train = ndb_cuda_knn_train,
 	.knn_predict = ndb_cuda_knn_predict,
 	.knn_pack = ndb_cuda_knn_pack,
+
+	.xgboost_train = ndb_cuda_xgboost_train,
+	.xgboost_predict = ndb_cuda_xgboost_predict,
+	.xgboost_pack = ndb_cuda_xgboost_pack_model,
+
+	.catboost_train = ndb_cuda_catboost_train,
+	.catboost_predict = ndb_cuda_catboost_predict,
+	.catboost_pack = ndb_cuda_catboost_pack_model,
 
 	.hf_embed = ndb_cuda_hf_embed,
 #ifdef HAVE_ONNX_RUNTIME

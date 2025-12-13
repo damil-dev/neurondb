@@ -83,7 +83,7 @@ COPY . .
 # Build NeuronDB with ROCm support
 # Architecture is automatically detected and handled by the build system
 RUN make clean && \
-    make ROCM_PATH=${ROCM_PATH} ONNX_PATH=${ONNX_PATH} && \
+    make GPU_BACKENDS=rocm ROCM_PATH=${ROCM_PATH} ONNX_PATH=${ONNX_PATH} && \
     make install
 
 # -----------------------------------------------------------------------------

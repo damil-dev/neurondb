@@ -93,7 +93,7 @@ COPY . .
 # Note: Metal framework is available on macOS host, but for Docker builds
 # we compile with Metal support flags. Actual Metal runtime requires macOS.
 RUN make clean && \
-    make ONNX_PATH=${ONNX_PATH} && \
+    make GPU_BACKENDS=metal ONNX_PATH=${ONNX_PATH} && \
     make install
 
 # -----------------------------------------------------------------------------

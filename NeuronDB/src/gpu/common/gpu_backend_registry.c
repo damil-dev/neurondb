@@ -42,6 +42,8 @@
 #include "ml_ridge_regression_internal.h"
 #include "ml_gpu_lasso_regression.h"
 #include "ml_lasso_regression_internal.h"
+#include "ml_gpu_xgboost.h"
+#include "ml_gpu_catboost.h"
 
 #include <string.h>
 
@@ -661,14 +663,25 @@ ndb_gpu_ridge_train(const float *features,
 							   active_backend->name ? active_backend->name : "unknown");
 		return -1;
 	}
-	return active_backend->ridge_train(features,
-									   targets,
-									   n_samples,
-									   feature_dim,
-									   hyperparams,
-									   model_data,
-									   metrics,
-									   errstr);
+	{
+		int rc = active_backend->ridge_train(features,
+											  targets,
+											  n_samples,
+											  feature_dim,
+											  hyperparams,
+											  model_data,
+											  metrics,
+											  errstr);
+		/* Copy error string to current memory context if it exists */
+		if (rc != 0 && errstr && *errstr != NULL)
+		{
+			char *old_err = *errstr;
+			*errstr = pstrdup(old_err);
+			if (old_err)
+				pfree(old_err);
+		}
+		return rc;
+	}
 }
 
 int
@@ -924,6 +937,132 @@ ndb_gpu_knn_pack(const struct KNNModel *model,
 	if (!active_backend || active_backend->knn_pack == NULL)
 		return -1;
 	return active_backend->knn_pack(model, model_data, metrics, errstr);
+}
+
+int
+ndb_gpu_xgboost_train(const float *features,
+					  const double *labels,
+					  int n_samples,
+					  int feature_dim,
+					  const Jsonb * hyperparams,
+					  bytea * *model_data,
+					  Jsonb * *metrics,
+					  char **errstr)
+{
+	/* CPU mode: never run GPU code */
+	if (NDB_COMPUTE_MODE_IS_CPU())
+	{
+		if (errstr)
+			*errstr = NULL;
+		return -1;
+	}
+
+	if (errstr)
+		*errstr = NULL;
+	if (!active_backend || active_backend->xgboost_train == NULL)
+		return -1;
+	return active_backend->xgboost_train(features,
+										  labels,
+										  n_samples,
+										  feature_dim,
+										  hyperparams,
+										  model_data,
+										  metrics,
+										  errstr);
+}
+
+int
+ndb_gpu_xgboost_predict(const bytea * model_data,
+						 const float *input,
+						 int feature_dim,
+						 double *prediction_out,
+						 char **errstr)
+{
+	if (errstr)
+		*errstr = NULL;
+	if (!active_backend || active_backend->xgboost_predict == NULL)
+		return -1;
+	return active_backend->xgboost_predict(model_data,
+											input,
+											feature_dim,
+											prediction_out,
+											errstr);
+}
+
+int
+ndb_gpu_xgboost_pack_model(const struct XGBoostModel *model,
+							 bytea * *model_data,
+							 Jsonb * *metrics,
+							 char **errstr)
+{
+	if (errstr)
+		*errstr = NULL;
+	if (!active_backend || active_backend->xgboost_pack == NULL)
+		return -1;
+	return active_backend->xgboost_pack(model, model_data, metrics, errstr);
+}
+
+int
+ndb_gpu_catboost_train(const float *features,
+					   const double *labels,
+					   int n_samples,
+					   int feature_dim,
+					   const Jsonb * hyperparams,
+					   bytea * *model_data,
+					   Jsonb * *metrics,
+					   char **errstr)
+{
+	/* CPU mode: never run GPU code */
+	if (NDB_COMPUTE_MODE_IS_CPU())
+	{
+		if (errstr)
+			*errstr = NULL;
+		return -1;
+	}
+
+	if (errstr)
+		*errstr = NULL;
+	if (!active_backend || active_backend->catboost_train == NULL)
+		return -1;
+	return active_backend->catboost_train(features,
+										  labels,
+										  n_samples,
+										  feature_dim,
+										  hyperparams,
+										  model_data,
+										  metrics,
+										  errstr);
+}
+
+int
+ndb_gpu_catboost_predict(const bytea * model_data,
+						  const float *input,
+						  int feature_dim,
+						  double *prediction_out,
+						  char **errstr)
+{
+	if (errstr)
+		*errstr = NULL;
+	if (!active_backend || active_backend->catboost_predict == NULL)
+		return -1;
+	return active_backend->catboost_predict(model_data,
+											input,
+											feature_dim,
+											prediction_out,
+											errstr);
+}
+
+int
+ndb_gpu_catboost_pack_model(const struct CatBoostModel *model,
+							 bytea * *model_data,
+							 Jsonb * *metrics,
+							 char **errstr)
+{
+	if (errstr)
+		*errstr = NULL;
+	if (!active_backend || active_backend->catboost_pack == NULL)
+		return -1;
+	return active_backend->catboost_pack(model, model_data, metrics, errstr);
 }
 
 const ndb_gpu_backend *

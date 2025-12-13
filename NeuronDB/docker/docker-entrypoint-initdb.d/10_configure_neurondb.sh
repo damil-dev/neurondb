@@ -6,9 +6,22 @@ echo "[init] Applying NeuronDB defaults"
 postgresql_conf="${PGDATA}/postgresql.conf"
 
 # Compute mode parameter (0=cpu, 1=gpu, 2=auto, default=2)
+# GPU backend type (0=cpu, 1=cuda, 2=rocm, 3=metal, default=0)
 compute_mode="${NEURONDB_COMPUTE_MODE:-2}"
 gpu_backend_type="${NEURONDB_GPU_BACKEND_TYPE:-0}"
 automl_gpu="${NEURONDB_AUTOML_USE_GPU:-off}"
+
+# Validate compute_mode (0=cpu, 1=gpu, 2=auto)
+if [[ ! "${compute_mode}" =~ ^[0-2]$ ]]; then
+    echo "[WARN] Invalid NEURONDB_COMPUTE_MODE=${compute_mode}, using default 2 (auto)"
+    compute_mode=2
+fi
+
+# Validate gpu_backend_type (0=cpu, 1=cuda, 2=rocm, 3=metal)
+if [[ ! "${gpu_backend_type}" =~ ^[0-3]$ ]]; then
+    echo "[WARN] Invalid NEURONDB_GPU_BACKEND_TYPE=${gpu_backend_type}, using default 0 (cpu)"
+    gpu_backend_type=0
+fi
 
 # Normalize accepted values
 case "${automl_gpu,,}" in
