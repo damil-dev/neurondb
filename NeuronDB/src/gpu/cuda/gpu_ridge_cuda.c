@@ -30,6 +30,7 @@
 
 #include "ml_ridge_regression_internal.h"
 #include "neurondb_cuda_ridge.h"
+#include "neurondb_json.h"
 
 #ifdef NDB_GPU_CUDA
 #include <cublas_v2.h>
@@ -129,8 +130,15 @@ ndb_cuda_ridge_pack_model(const RidgeModel *model,
 						 model->mse,
 						 model->mae);
 
-		metrics_json = DatumGetJsonbP(DirectFunctionCall1(
-														  jsonb_in, CStringGetTextDatum(buf.data)));
+		/* Use ndb_jsonb_in_cstring which handles errors properly */
+		metrics_json = ndb_jsonb_in_cstring(buf.data);
+		if (metrics_json == NULL)
+		{
+			elog(WARNING,
+				 "ndb_cuda_ridge_pack_model: failed to create metrics JSONB from: %s",
+				 buf.data ? buf.data : "(unknown)");
+		}
+
 		nfree(buf.data);
 		*metrics = metrics_json;
 	}
@@ -149,7 +157,7 @@ ndb_cuda_ridge_train(const float *features,
 					 Jsonb * *metrics,
 					 char **errstr)
 {
-	const double default_lambda = 0.01;
+	const double default_lambda = 1.0;	/* Increased default for better numerical stability */
 	double		lambda;
 	float	   *d_features = NULL;
 	double	   *d_targets = NULL;
@@ -246,7 +254,7 @@ ndb_cuda_ridge_train(const float *features,
 	}
 
 
-	/* Extract and validate lambda from hyperparameters */
+	/* Extract and validate lambda from hyperparameters - use same pattern as KNN */
 	if (hyperparams != NULL)
 	{
 		Datum		lambda_datum;
@@ -254,31 +262,48 @@ ndb_cuda_ridge_train(const float *features,
 		Numeric		num;
 		double		parsed_lambda;
 
-		lambda_datum = DirectFunctionCall2(jsonb_object_field,
-										   JsonbPGetDatum(hyperparams),
-										   CStringGetTextDatum("lambda"));
-		if (DatumGetPointer(lambda_datum) != NULL)
+		/* Wrap DirectFunctionCall calls in PG_TRY to catch any errors */
+		PG_TRY();
 		{
-			numeric_datum = DirectFunctionCall1(jsonb_numeric, lambda_datum);
-			if (DatumGetPointer(numeric_datum) != NULL)
+			lambda_datum = DirectFunctionCall2(
+										  jsonb_object_field,
+										  JsonbPGetDatum(hyperparams),
+										  CStringGetTextDatum("lambda"));
+			if (DatumGetPointer(lambda_datum) != NULL)
 			{
-				num = DatumGetNumeric(numeric_datum);
-				parsed_lambda = DatumGetFloat8(
-											   DirectFunctionCall1(numeric_float8, NumericGetDatum(num)));
-				/* Defensive: Validate lambda range and check for NaN/Inf */
-				if (isfinite(parsed_lambda) && parsed_lambda >= 0.0 && parsed_lambda <= 1000.0)
+				numeric_datum = DirectFunctionCall1(
+													jsonb_numeric, lambda_datum);
+				if (DatumGetPointer(numeric_datum) != NULL)
 				{
-					lambda = parsed_lambda;
-				}
-				else
-				{
-					elog(WARNING,
-						 "ndb_cuda_ridge_train: invalid lambda %f (must be finite, >= 0, <= 1000.0), using default %f",
-						 parsed_lambda, default_lambda);
-					lambda = default_lambda;
+					num = DatumGetNumeric(numeric_datum);
+					parsed_lambda = DatumGetFloat8(
+												   DirectFunctionCall1(numeric_float8,
+																	   NumericGetDatum(num)));
+					/* Defensive: Validate lambda range and check for NaN/Inf */
+					if (isfinite(parsed_lambda) && parsed_lambda >= 0.0 && parsed_lambda <= 1000.0)
+					{
+						lambda = parsed_lambda;
+					}
+					else
+					{
+						elog(WARNING,
+							 "ndb_cuda_ridge_train: invalid lambda %f (must be finite, >= 0, <= 1000.0), using default %f",
+							 parsed_lambda, default_lambda);
+						lambda = default_lambda;
+					}
 				}
 			}
 		}
+		PG_CATCH();
+		{
+			/* If hyperparameter extraction fails, use default lambda */
+			elog(WARNING,
+				 "ndb_cuda_ridge_train: failed to extract lambda from hyperparameters, using default %f",
+				 default_lambda);
+			FlushErrorState();
+			lambda = default_lambda;
+		}
+		PG_END_TRY();
 	}
 
 	/* Defensive: Final validation of lambda */
@@ -288,6 +313,16 @@ ndb_cuda_ridge_train(const float *features,
 			 "ndb_cuda_ridge_train: lambda %f invalid, using default %f",
 			 lambda, default_lambda);
 		lambda = default_lambda;
+	}
+
+	/* Ensure minimum lambda for numerical stability with ridge regression */
+	/* Ridge regression requires lambda > 0 to ensure matrix is invertible */
+	if (lambda < 0.1)
+	{
+		elog(DEBUG2,
+			 "ndb_cuda_ridge_train: lambda %f too small for numerical stability, using minimum %f",
+			 lambda, 0.1);
+		lambda = 0.1;
 	}
 
 	dim_with_intercept = feature_dim + 1;
@@ -301,6 +336,22 @@ ndb_cuda_ridge_train(const float *features,
 	nalloc(h_Xty, double, dim_with_intercept);
 	nalloc(h_XtX_inv, double, dim_with_intercept * dim_with_intercept);
 	nalloc(h_beta, double, dim_with_intercept);
+	
+	/* Check if allocations succeeded */
+	if (h_XtX == NULL || h_Xty == NULL || h_XtX_inv == NULL || h_beta == NULL)
+	{
+		if (errstr)
+			*errstr = psprintf("ndb_cuda_ridge_train: failed to allocate host memory (dim_with_intercept=%d)", dim_with_intercept);
+		if (h_XtX)
+			nfree(h_XtX);
+		if (h_Xty)
+			nfree(h_Xty);
+		if (h_XtX_inv)
+			nfree(h_XtX_inv);
+		if (h_beta)
+			nfree(h_beta);
+		return -1;
+	}
 
 	/* Compute X'X and X'y on GPU */
 	{
@@ -325,6 +376,8 @@ ndb_cuda_ridge_train(const float *features,
 		status = cudaMalloc((void **) &d_features, feature_bytes);
 		if (status != cudaSuccess)
 		{
+			if (errstr)
+				*errstr = psprintf("ndb_cuda_ridge_train: cudaMalloc d_features failed: %s", cudaGetErrorString(status));
 			elog(WARNING,
 				 "ndb_cuda_ridge_train: cudaMalloc d_features failed: %s",
 				 cudaGetErrorString(status));
@@ -335,6 +388,8 @@ ndb_cuda_ridge_train(const float *features,
 		if (status != cudaSuccess)
 		{
 			cudaFree(d_features);
+			if (errstr)
+				*errstr = psprintf("ndb_cuda_ridge_train: cudaMalloc d_targets failed: %s", cudaGetErrorString(status));
 			elog(WARNING,
 				 "ndb_cuda_ridge_train: cudaMalloc d_targets failed: %s",
 				 cudaGetErrorString(status));
@@ -346,6 +401,8 @@ ndb_cuda_ridge_train(const float *features,
 		{
 			cudaFree(d_features);
 			cudaFree(d_targets);
+			if (errstr)
+				*errstr = psprintf("ndb_cuda_ridge_train: cudaMalloc d_XtX failed: %s", cudaGetErrorString(status));
 			elog(WARNING,
 				 "ndb_cuda_ridge_train: cudaMalloc d_XtX failed: %s",
 				 cudaGetErrorString(status));
@@ -358,6 +415,8 @@ ndb_cuda_ridge_train(const float *features,
 			cudaFree(d_features);
 			cudaFree(d_targets);
 			cudaFree(d_XtX);
+			if (errstr)
+				*errstr = psprintf("ndb_cuda_ridge_train: cudaMalloc d_Xty failed: %s", cudaGetErrorString(status));
 			elog(WARNING,
 				 "ndb_cuda_ridge_train: cudaMalloc d_Xty failed: %s",
 				 cudaGetErrorString(status));
@@ -367,15 +426,25 @@ ndb_cuda_ridge_train(const float *features,
 		/* Initialize XtX and Xty to zero */
 		status = cudaMemset(d_XtX, 0, XtX_bytes);
 		if (status != cudaSuccess)
+		{
+			if (errstr)
+				*errstr = psprintf("ndb_cuda_ridge_train: cudaMemset d_XtX failed: %s", cudaGetErrorString(status));
 			goto gpu_cleanup;
+		}
 		status = cudaMemset(d_Xty, 0, Xty_bytes);
 		if (status != cudaSuccess)
+		{
+			if (errstr)
+				*errstr = psprintf("ndb_cuda_ridge_train: cudaMemset d_Xty failed: %s", cudaGetErrorString(status));
 			goto gpu_cleanup;
+		}
 
 		/* Copy data to device */
 		status = cudaMemcpy(d_features, features, feature_bytes, cudaMemcpyHostToDevice);
 		if (status != cudaSuccess)
 		{
+			if (errstr)
+				*errstr = psprintf("ndb_cuda_ridge_train: cudaMemcpy d_features failed: %s", cudaGetErrorString(status));
 			elog(WARNING,
 				 "ndb_cuda_ridge_train: cudaMemcpy d_features failed: %s",
 				 cudaGetErrorString(status));
@@ -384,6 +453,8 @@ ndb_cuda_ridge_train(const float *features,
 		status = cudaMemcpy(d_targets, targets, target_bytes, cudaMemcpyHostToDevice);
 		if (status != cudaSuccess)
 		{
+			if (errstr)
+				*errstr = psprintf("ndb_cuda_ridge_train: cudaMemcpy d_targets failed: %s", cudaGetErrorString(status));
 			elog(WARNING,
 				 "ndb_cuda_ridge_train: cudaMemcpy d_targets failed: %s",
 				 cudaGetErrorString(status));
@@ -416,6 +487,16 @@ ndb_cuda_ridge_train(const float *features,
 			goto gpu_cleanup;
 		}
 
+		/* Copy XtX from GPU to host AFTER lambda is added (for matrix inversion) */
+		status = cudaMemcpy(h_XtX, d_XtX, XtX_bytes, cudaMemcpyDeviceToHost);
+		if (status != cudaSuccess)
+		{
+			elog(WARNING,
+				 "ndb_cuda_ridge_train: cudaMemcpy h_XtX failed: %s",
+				 cudaGetErrorString(status));
+			goto gpu_cleanup;
+		}
+
 		/* Copy Xty to host for CPU fallback */
 		status = cudaMemcpy(h_Xty, d_Xty, Xty_bytes, cudaMemcpyDeviceToHost);
 		if (status != cudaSuccess)
@@ -426,20 +507,13 @@ ndb_cuda_ridge_train(const float *features,
 			goto gpu_cleanup;
 		}
 
-		/* Copy back to GPU for matrix inversion and cuBLAS operations */
-		status = cudaMemcpy(d_XtX, h_XtX, XtX_bytes, cudaMemcpyHostToDevice);
-		if (status != cudaSuccess)
-		{
-			elog(WARNING,
-				 "ndb_cuda_ridge_train: cudaMemcpy d_XtX failed: %s",
-				 cudaGetErrorString(status));
-			goto gpu_cleanup;
-		}
-
 		/* Allocate device memory for XtX_inv and beta */
 		status = cudaMalloc((void **) &d_XtX_inv, XtX_bytes);
 		if (status != cudaSuccess)
 		{
+			if (errstr)
+				*errstr = psprintf("ndb_cuda_ridge_train: cudaMalloc d_XtX_inv failed: %s",
+								   cudaGetErrorString(status));
 			elog(WARNING,
 				 "ndb_cuda_ridge_train: cudaMalloc d_XtX_inv failed: %s",
 				 cudaGetErrorString(status));
@@ -450,6 +524,9 @@ ndb_cuda_ridge_train(const float *features,
 		if (status != cudaSuccess)
 		{
 			cudaFree(d_XtX_inv);
+			if (errstr)
+				*errstr = psprintf("ndb_cuda_ridge_train: cudaMalloc d_beta failed: %s",
+								   cudaGetErrorString(status));
 			elog(WARNING,
 				 "ndb_cuda_ridge_train: cudaMalloc d_beta failed: %s",
 				 cudaGetErrorString(status));
@@ -482,6 +559,14 @@ gpu_cleanup:
 		cudaFree(d_beta);
 
 cpu_fallback:
+		/* If there was no explicit errstr, set a generic one using the CUDA error status (if available) */
+		if (errstr && (*errstr == NULL))
+		{
+			if (status != cudaSuccess)
+				*errstr = psprintf("ndb_cuda_ridge_train: CUDA error: %s", cudaGetErrorString(status));
+			else
+				*errstr = pstrdup("ndb_cuda_ridge_train: GPU fallback triggered due to internal GPU kernel or memory error");
+		}
 	/* Fallback to CPU computation */
 	for (i = 0; i < n_samples; i++)
 	{
@@ -535,32 +620,43 @@ matrix_inversion:
 			}
 		}
 
-		/* Gauss-Jordan elimination */
+		/* Gauss-Jordan elimination with improved numerical stability and partial pivoting */
 		for (row = 0; row < dim_with_intercept; row++)
 		{
-			pivot = augmented[row][row];
-			if (fabs(pivot) < 1e-10)
+			/* Partial pivoting: find the row with the largest absolute value in current column */
+			int			max_row = row;
+			double		max_val = fabs(augmented[row][row]);
+
+			for (k_local = row + 1; k_local < dim_with_intercept; k_local++)
 			{
-				bool		found = false;
-
-				for (k_local = row + 1; k_local < dim_with_intercept; k_local++)
+				if (fabs(augmented[k_local][row]) > max_val)
 				{
-					if (fabs(augmented[k_local][row]) > 1e-10)
-					{
-						double	   *temp = augmented[row];
+					max_val = fabs(augmented[k_local][row]);
+					max_row = k_local;
+				}
+			}
 
-						augmented[row] = augmented[k_local];
-						augmented[k_local] = temp;
-						pivot = augmented[row][row];
-						found = true;
-						break;
-					}
-				}
-				if (!found)
-				{
-					invert_success = false;
-					break;
-				}
+			/* Swap rows if needed */
+			if (max_row != row)
+			{
+				double	   *temp = augmented[row];
+
+				augmented[row] = augmented[max_row];
+				augmented[max_row] = temp;
+			}
+
+			pivot = augmented[row][row];
+			/* Use adaptive tolerance based on matrix size and lambda */
+			/* With lambda >= 0.1, the matrix should be well-conditioned */
+			/* Use a tolerance that scales with matrix dimension and lambda */
+			double		tolerance = fmax(1e-12, lambda * 1e-10 * dim_with_intercept);
+			if (fabs(pivot) < tolerance)
+			{
+				/* Even after partial pivoting, pivot is too small - matrix is singular */
+				/* This should not happen with proper ridge regularization (lambda > 0) */
+				/* But if it does, the matrix is truly singular or near-singular */
+				invert_success = false;
+				break;
 			}
 
 			for (col = 0; col < 2 * dim_with_intercept; col++)
@@ -604,7 +700,8 @@ matrix_inversion:
 			if (d_beta)
 				cudaFree(d_beta);
 			if (errstr)
-				*errstr = pstrdup("Matrix is singular, cannot compute Ridge regression");
+				*errstr = psprintf("Matrix is singular, cannot compute Ridge regression (lambda=%.6f, dim=%d). Try increasing lambda or removing correlated features.",
+								  lambda, dim_with_intercept);
 			return -1;
 		}
 
@@ -694,43 +791,58 @@ build_model:
 		model.intercept = h_beta[0];
 		model.lambda = lambda;
 		nalloc(model_coefficients, double, feature_dim);
-		model.coefficients = model_coefficients;
-		for (i = 0; i < feature_dim; i++)
-			model.coefficients[i] = h_beta[i + 1];
-
-		/* Compute metrics */
-		for (i = 0; i < n_samples; i++)
-			y_mean += targets[i];
-		y_mean /= n_samples;
-
-		for (i = 0; i < n_samples; i++)
+		if (model_coefficients == NULL)
 		{
-			const float *row = features + (i * feature_dim);
-			double		y_pred = model.intercept;
-			double		error;
-			int			j_local;
-
-			for (j_local = 0; j_local < feature_dim; j_local++)
-				y_pred += model.coefficients[j_local] * row[j_local];
-
-			error = targets[i] - y_pred;
-			mse += error * error;
-			mae += fabs(error);
-			ss_res += error * error;
-			ss_tot += (targets[i] - y_mean) * (targets[i] - y_mean);
+			if (errstr)
+				*errstr = psprintf("ndb_cuda_ridge_train: failed to allocate memory for model coefficients (feature_dim=%d)", feature_dim);
+			rc = -1;
+			/* Skip model building and go to cleanup */
 		}
+		else
+		{
+			model.coefficients = model_coefficients;
+			for (i = 0; i < feature_dim; i++)
+				model.coefficients[i] = h_beta[i + 1];
 
-		mse /= n_samples;
-		mae /= n_samples;
-		model.r_squared = (ss_tot > 0.0) ? (1.0 - (ss_res / ss_tot)) : 0.0;
-		model.mse = mse;
-		model.mae = mae;
+			/* Compute metrics */
+			for (i = 0; i < n_samples; i++)
+				y_mean += targets[i];
+			y_mean /= n_samples;
 
-		/* Pack model */
-		rc = ndb_cuda_ridge_pack_model(
-									   &model, &payload, &metrics_json, errstr);
+			for (i = 0; i < n_samples; i++)
+			{
+				const float *row = features + (i * feature_dim);
+				double		y_pred = model.intercept;
+				double		error;
+				int			j_local;
 
-		nfree(model.coefficients);
+				for (j_local = 0; j_local < feature_dim; j_local++)
+					y_pred += model.coefficients[j_local] * row[j_local];
+
+				error = targets[i] - y_pred;
+				mse += error * error;
+				mae += fabs(error);
+				ss_res += error * error;
+				ss_tot += (targets[i] - y_mean) * (targets[i] - y_mean);
+			}
+
+			mse /= n_samples;
+			mae /= n_samples;
+			model.r_squared = (ss_tot > 0.0) ? (1.0 - (ss_res / ss_tot)) : 0.0;
+			model.mse = mse;
+			model.mae = mae;
+
+			/* Pack model */
+			rc = ndb_cuda_ridge_pack_model(
+										   &model, &payload, &metrics_json, errstr);
+			if (rc != 0)
+			{
+				/* Pack model failed - error should be set by pack_model */
+				if (errstr && *errstr == NULL)
+					*errstr = pstrdup("ndb_cuda_ridge_train: model packing failed");
+			}
+			nfree(model.coefficients);
+		}
 	}
 
 	nfree(h_XtX);
@@ -754,10 +866,31 @@ build_model:
 		return 0;
 	}
 
+	/* Cleanup and return error */
 	if (payload != NULL)
 		nfree(payload);
 	if (metrics_json != NULL)
 		nfree(metrics_json);
+
+	/* Always set error string if returning -1 - this ensures caller gets error details */
+	/* Force set error string even if it was set before (may have been corrupted) */
+	if (errstr)
+	{
+		/* Free existing error string if it exists */
+		if (*errstr != NULL)
+		{
+			pfree(*errstr);
+			*errstr = NULL;
+		}
+		
+		/* Set a descriptive error based on the failure reason */
+		if (rc == 0 && payload == NULL)
+			*errstr = psprintf("ndb_cuda_ridge_train: training succeeded but payload is NULL (rc=%d)", rc);
+		else if (rc != 0)
+			*errstr = psprintf("ndb_cuda_ridge_train: training failed (rc=%d, payload=%p, feature_dim=%d, n_samples=%d, lambda=%.6f)", rc, (void*)payload, feature_dim, n_samples, lambda);
+		else
+			*errstr = psprintf("ndb_cuda_ridge_train: training failed (rc=%d, payload=%p, unknown error)", rc, (void*)payload);
+	}
 
 	return -1;
 }

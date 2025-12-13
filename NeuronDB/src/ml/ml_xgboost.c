@@ -956,6 +956,8 @@ evaluate_xgboost_by_model_id(PG_FUNCTION_ARGS)
 
 #include "neurondb_gpu_model.h"
 #include "ml_gpu_registry.h"
+#include "ml_gpu_xgboost.h"
+#include "neurondb_gpu.h"
 #include "neurondb_validation.h"
 #include "neurondb_safe_memory.h"
 #include "neurondb_macros.h"
@@ -965,13 +967,21 @@ typedef struct XGBoostGpuModelState
 {
 	bytea *model_blob;
 	Jsonb *metrics;
-	int n_estimators;
-	int max_depth;
-	float learning_rate;
-	int n_features;
+	int feature_dim;
 	int n_samples;
-	char objective[32];
 } XGBoostGpuModelState;
+
+static void
+xgboost_gpu_release_state(XGBoostGpuModelState *state)
+{
+	if (state == NULL)
+		return;
+	if (state->model_blob != NULL)
+		nfree(state->model_blob);
+	if (state->metrics != NULL)
+		nfree(state->metrics);
+	nfree(state);
+}
 
 static bytea *
 xgboost_model_serialize_to_bytea(int n_estimators, int max_depth, float learning_rate, int n_features, const char *objective, uint8 training_backend)
@@ -1052,101 +1062,64 @@ static bool
 xgboost_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 {
 	XGBoostGpuModelState *state = NULL;
-	int n_estimators = 100;
-	int max_depth = 6;
-	float learning_rate = 0.1f;
-	char objective[32] = "reg:squarederror";
-	int nvec = 0;
-	int dim = 0;
-	bytea *model_data = NULL;
+	bytea *payload = NULL;
 	Jsonb *metrics = NULL;
-	StringInfoData metrics_json;
-	JsonbIterator *it = NULL;
-	JsonbValue v;
-	int r;
+	int rc;
 
 	if (errstr != NULL)
 		*errstr = NULL;
 	if (model == NULL || spec == NULL)
+		return false;
+	if (!neurondb_gpu_is_available())
+		return false;
+	if (spec->feature_matrix == NULL || spec->label_vector == NULL)
+		return false;
+	if (spec->sample_count <= 0 || spec->feature_dim <= 0)
+		return false;
+
+	payload = NULL;
+	metrics = NULL;
+
+	PG_TRY();
 	{
-		if (errstr != NULL)
-			*errstr = pstrdup("xgboost_gpu_train: invalid parameters");
+		rc = ndb_gpu_xgboost_train(spec->feature_matrix,
+								   spec->label_vector,
+								   spec->sample_count,
+								   spec->feature_dim,
+								   spec->hyperparameters,
+								   &payload,
+								   &metrics,
+								   errstr);
+	}
+	PG_CATCH();
+	{
+		FlushErrorState();
+		rc = -1;
+		if (errstr && *errstr == NULL)
+			*errstr = pstrdup("XGBoost GPU training failed with exception");
+	}
+	PG_END_TRY();
+
+	if (rc != 0 || payload == NULL)
+	{
 		return false;
 	}
-
-	/* Extract hyperparameters */
-	if (spec->hyperparameters != NULL)
-	{
-		it = JsonbIteratorInit((JsonbContainer *)&spec->hyperparameters->root);
-		while ((r = JsonbIteratorNext(&it, &v, false)) != WJB_DONE)
-		{
-			if (r == WJB_KEY)
-			{
-				char *key = pnstrdup(v.val.string.val, v.val.string.len);
-				r = JsonbIteratorNext(&it, &v, false);
-				if (strcmp(key, "n_estimators") == 0 && v.type == jbvNumeric)
-					n_estimators = DatumGetInt32(DirectFunctionCall1(numeric_int4,
-						NumericGetDatum(v.val.numeric)));
-				else if (strcmp(key, "max_depth") == 0 && v.type == jbvNumeric)
-					max_depth = DatumGetInt32(DirectFunctionCall1(numeric_int4,
-						NumericGetDatum(v.val.numeric)));
-				else if (strcmp(key, "learning_rate") == 0 && v.type == jbvNumeric)
-					learning_rate = (float)DatumGetFloat8(DirectFunctionCall1(numeric_float8,
-						NumericGetDatum(v.val.numeric)));
-				else if (strcmp(key, "objective") == 0 && v.type == jbvString)
-					strncpy(objective, v.val.string.val, sizeof(objective) - 1);
-				nfree(key);
-			}
-		}
-	}
-
-	if (n_estimators < 1)
-		n_estimators = 100;
-	if (max_depth < 1)
-		max_depth = 6;
-	if (learning_rate <= 0.0f)
-		learning_rate = 0.1f;
-
-	/* Convert feature matrix */
-	if (spec->feature_matrix == NULL || spec->sample_count <= 0
-		|| spec->feature_dim <= 0)
-	{
-		if (errstr != NULL)
-			*errstr = pstrdup("xgboost_gpu_train: invalid feature matrix");
-		return false;
-	}
-
-	nvec = spec->sample_count;
-	dim = spec->feature_dim;
-
-	/* Serialize model */
-	model_data = xgboost_model_serialize_to_bytea(n_estimators, max_depth, learning_rate, dim, objective, 0); /* training_backend=0 for CPU */
-
-	/* Build metrics */
-	initStringInfo(&metrics_json);
-	appendStringInfo(&metrics_json,
-		"{\"storage\":\"cpu\",\"training_backend\":0,\"n_estimators\":%d,\"max_depth\":%d,\"learning_rate\":%.6f,\"n_features\":%d,\"objective\":\"%s\",\"n_samples\":%d}",
-		n_estimators, max_depth, learning_rate, dim, objective, nvec);
-	metrics = DatumGetJsonbP(DirectFunctionCall1(jsonb_in,
-		CStringGetTextDatum(metrics_json.data)));
-	nfree(metrics_json.data);
-
-	nalloc(state, XGBoostGpuModelState, 1);
-	state->model_blob = model_data;
-	state->metrics = metrics;
-	state->n_estimators = n_estimators;
-	state->max_depth = max_depth;
-	state->learning_rate = learning_rate;
-	state->n_features = dim;
-	state->n_samples = nvec;
-	strncpy(state->objective, objective, sizeof(state->objective) - 1);
 
 	if (model->backend_state != NULL)
-		nfree(model->backend_state);
+	{
+		xgboost_gpu_release_state((XGBoostGpuModelState *) model->backend_state);
+		model->backend_state = NULL;
+	}
+
+	state = (XGBoostGpuModelState *) palloc0(sizeof(XGBoostGpuModelState));
+	state->model_blob = payload;
+	state->feature_dim = spec->feature_dim;
+	state->n_samples = spec->sample_count;
+	state->metrics = metrics;
 
 	model->backend_state = state;
 	model->gpu_ready = true;
-	model->is_gpu_resident = false;
+	model->is_gpu_resident = true;
 
 	return true;
 }
@@ -1156,46 +1129,41 @@ xgboost_gpu_predict(const MLGpuModel *model, const float *input, int input_dim,
 	float *output, int output_dim, char **errstr)
 {
 	const XGBoostGpuModelState *state;
-	float prediction = 0.0f;
-	int i;
+	double prediction;
+	int rc;
 
 	if (errstr != NULL)
 		*errstr = NULL;
 	if (output != NULL && output_dim > 0)
 		output[0] = 0.0f;
 	if (model == NULL || input == NULL || output == NULL)
-	{
-		if (errstr != NULL)
-			*errstr = pstrdup("xgboost_gpu_predict: invalid parameters");
 		return false;
-	}
 	if (output_dim <= 0)
-	{
-		if (errstr != NULL)
-			*errstr = pstrdup("xgboost_gpu_predict: invalid output dimension");
 		return false;
-	}
 	if (!model->gpu_ready || model->backend_state == NULL)
+		return false;
+
+	state = (const XGBoostGpuModelState *) model->backend_state;
+	if (state->model_blob == NULL)
+		return false;
+
+	/* Validate input dimension matches model */
+	if (input_dim != state->feature_dim)
 	{
 		if (errstr != NULL)
-			*errstr = pstrdup("xgboost_gpu_predict: model not ready");
+			*errstr = pstrdup("neurondb: xgboost: feature dimension mismatch");
 		return false;
 	}
 
-	state = (const XGBoostGpuModelState *)model->backend_state;
-
-	if (input_dim != state->n_features)
-	{
-		if (errstr != NULL)
-			*errstr = pstrdup("xgboost_gpu_predict: dimension mismatch");
+	rc = ndb_gpu_xgboost_predict(state->model_blob,
+								 input,
+								 input_dim,
+								 &prediction,
+								 errstr);
+	if (rc != 0)
 		return false;
-	}
 
-	/* Simple ensemble prediction: weighted sum of features */
-	for (i = 0; i < input_dim; i++)
-		prediction += input[i] * state->learning_rate;
-
-	output[0] = prediction;
+	output[0] = (float) prediction;
 
 	return true;
 }
@@ -1206,7 +1174,6 @@ xgboost_gpu_evaluate(const MLGpuModel *model, const MLGpuEvalSpec *spec,
 {
 	const XGBoostGpuModelState *state;
 	Jsonb *metrics_json = NULL;
-	StringInfoData buf;
 
 	if (errstr != NULL)
 		*errstr = NULL;
@@ -1221,20 +1188,25 @@ xgboost_gpu_evaluate(const MLGpuModel *model, const MLGpuEvalSpec *spec,
 
 	state = (const XGBoostGpuModelState *)model->backend_state;
 
-	initStringInfo(&buf);
-	appendStringInfo(&buf,
-		"{\"algorithm\":\"xgboost\",\"storage\":\"cpu\","
-		"\"n_estimators\":%d,\"max_depth\":%d,\"learning_rate\":%.6f,\"n_features\":%d,\"objective\":\"%s\",\"n_samples\":%d}",
-		state->n_estimators > 0 ? state->n_estimators : 100,
-		state->max_depth > 0 ? state->max_depth : 6,
-		state->learning_rate > 0.0f ? state->learning_rate : 0.1f,
-		state->n_features > 0 ? state->n_features : 0,
-		state->objective[0] ? state->objective : "reg:squarederror",
-		state->n_samples > 0 ? state->n_samples : 0);
-
-	metrics_json = DatumGetJsonbP(DirectFunctionCall1(jsonb_in,
-		CStringGetTextDatum(buf.data)));
-	nfree(buf.data);
+	/* Return metrics from state if available, otherwise return a basic metrics object */
+	if (state->metrics != NULL)
+	{
+		metrics_json = (Jsonb *) PG_DETOAST_DATUM_COPY(PointerGetDatum(state->metrics));
+	}
+	else
+	{
+		/* Create basic metrics from model blob if available */
+		StringInfoData buf;
+		initStringInfo(&buf);
+		appendStringInfo(&buf,
+			"{\"algorithm\":\"xgboost\",\"storage\":\"gpu\","
+			"\"n_features\":%d,\"n_samples\":%d}",
+			state->feature_dim > 0 ? state->feature_dim : 0,
+			state->n_samples > 0 ? state->n_samples : 0);
+		metrics_json = DatumGetJsonbP(DirectFunctionCall1(jsonb_in,
+			CStringGetTextDatum(buf.data)));
+		nfree(buf.data);
+	}
 
 	if (out != NULL)
 		out->payload = metrics_json;
@@ -1332,12 +1304,8 @@ xgboost_gpu_deserialize(MLGpuModel *model, const bytea *payload,
 
 	nalloc(state, XGBoostGpuModelState, 1);
 	state->model_blob = payload_copy;
-	state->n_estimators = n_estimators;
-	state->max_depth = max_depth;
-	state->learning_rate = learning_rate;
-	state->n_features = n_features;
+	state->feature_dim = n_features;
 	state->n_samples = 0;
-	strncpy(state->objective, objective, sizeof(state->objective) - 1);
 
 	if (metadata != NULL)
 	{

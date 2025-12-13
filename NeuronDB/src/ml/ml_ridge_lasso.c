@@ -1258,54 +1258,57 @@ ridge_try_gpu_predict_catalog(int32 model_id,
 	if (payload == NULL)
 		goto cleanup;
 
-	/* Check if this is a GPU model - either by metrics or by payload format */
+	/* Check if this is a GPU model - must have both GPU metrics AND GPU payload format */
 	{
 		bool		is_gpu_model = false;
+		bool		has_gpu_metrics = false;
 		uint32		payload_size;
 
 		/* First check metrics for training_backend */
-		if (ridge_metadata_is_gpu(metrics))
+		has_gpu_metrics = ridge_metadata_is_gpu(metrics);
+
+		/* Check payload format - GPU models must have raw GPU format (NdbCudaRidgeModelHeader) */
+		/* Unified format starts with uint8 training_backend, GPU format starts with int32 feature_dim */
+		payload_size = VARSIZE(payload) - VARHDRSZ;
+		
+		/* Check if payload is in raw GPU format (starts with int32 feature_dim) */
+		if (payload_size >= sizeof(int32))
 		{
-			is_gpu_model = true;
-		}
-		else
-		{
-			/* If metrics check didn't find GPU indicator, check payload format */
-			/* GPU models start with NdbCudaRidgeModelHeader, CPU models start with uint8 training_backend */
-			payload_size = VARSIZE(payload) - VARHDRSZ;
+			const int32 *first_int = (const int32 *) VARDATA(payload);
+			int32		first_value = *first_int;
 			
-			/* CPU format: first byte is training_backend (uint8), then model_id (int32) */
-			/* GPU format: first field is feature_dim (int32) */
-			/* Check if payload looks like GPU format (starts with int32, not uint8) */
-			if (payload_size >= sizeof(int32))
+			/* If first 4 bytes look like a reasonable feature_dim, check for GPU format */
+			if (first_value > 0 && first_value <= 100000)
 			{
-				const int32 *first_int = (const int32 *) VARDATA(payload);
-				int32		first_value = *first_int;
-				
-				/* If first 4 bytes look like a reasonable feature_dim, check for GPU format */
-				if (first_value > 0 && first_value <= 100000)
+				/* Check if payload size matches GPU format */
+				if (payload_size >= sizeof(NdbCudaRidgeModelHeader))
 				{
-					/* Check if payload size matches GPU format */
-					if (payload_size >= sizeof(NdbCudaRidgeModelHeader))
+					const NdbCudaRidgeModelHeader *hdr = (const NdbCudaRidgeModelHeader *) VARDATA(payload);
+					
+					/* Validate header fields match the first int32 */
+					if (hdr->feature_dim == first_value &&
+						hdr->n_samples >= 0 && hdr->n_samples <= 1000000000)
 					{
-						const NdbCudaRidgeModelHeader *hdr = (const NdbCudaRidgeModelHeader *) VARDATA(payload);
+						size_t		expected_gpu_size = sizeof(NdbCudaRidgeModelHeader) +
+							sizeof(float) * (size_t) hdr->feature_dim;
 						
-						/* Validate header fields match the first int32 */
-						if (hdr->feature_dim == first_value &&
-							hdr->n_samples >= 0 && hdr->n_samples <= 1000000000)
+						/* Size matches GPU format - likely a GPU model */
+						if (payload_size >= expected_gpu_size && payload_size < expected_gpu_size + 1000)
 						{
-							size_t		expected_gpu_size = sizeof(NdbCudaRidgeModelHeader) +
-								sizeof(float) * (size_t) hdr->feature_dim;
-							
-							/* Size matches GPU format - likely a GPU model */
-							if (payload_size >= expected_gpu_size && payload_size < expected_gpu_size + 1000)
-							{
-								is_gpu_model = true;
-							}
+							/* Has GPU payload format - treat as GPU model */
+							is_gpu_model = true;
 						}
 					}
 				}
 			}
+		}
+
+		/* If metrics says GPU but payload is unified format, fall back to CPU */
+		/* Unified format starts with uint8 (training_backend), which is < 256, so first int32 would be small */
+		if (has_gpu_metrics && !is_gpu_model)
+		{
+			/* Metrics says GPU but payload is unified format - use CPU path */
+			goto cleanup;
 		}
 
 		if (!is_gpu_model)
@@ -1362,59 +1365,68 @@ ridge_load_model_from_catalog(int32 model_id, RidgeModel **out)
 		return false;
 	}
 
-	/* Skip GPU models - they should be handled by GPU prediction */
-	/* Check both metrics and payload format to determine if this is a GPU model */
+	/* Skip GPU models with raw GPU payload format - they should be handled by GPU prediction */
+	/* Unified format models (training_backend=1 but payload is unified) should be loaded as CPU */
 	{
-		bool		is_gpu_model = false;
+		bool		has_gpu_metrics = false;
+		bool		has_gpu_payload = false;
 		uint32		payload_size;
 
-		/* First check metrics for training_backend */
-		if (ridge_metadata_is_gpu(metrics))
+		/* Check metrics for training_backend */
+		has_gpu_metrics = ridge_metadata_is_gpu(metrics);
+
+		/* Check payload format - GPU models must have raw GPU format (NdbCudaRidgeModelHeader) */
+		/* Unified format starts with uint8 training_backend (0 or 1), GPU format starts with int32 feature_dim */
+		payload_size = VARSIZE(payload) - VARHDRSZ;
+		
+		/* Check if payload is in raw GPU format (starts with int32 feature_dim, not uint8 training_backend) */
+		if (payload_size >= sizeof(uint8))
 		{
-			is_gpu_model = true;
-		}
-		else
-		{
-			/* If metrics check didn't find GPU indicator, check payload format */
-			/* GPU models start with NdbCudaRidgeModelHeader, CPU models start with uint8 training_backend */
-			payload_size = VARSIZE(payload) - VARHDRSZ;
+			const uint8 *first_byte = (const uint8 *) VARDATA(payload);
 			
-			/* CPU format: first byte is training_backend (uint8), then model_id (int32) */
-			/* GPU format: first field is feature_dim (int32) */
-			/* Check if payload looks like GPU format (starts with int32, not uint8) */
-			if (payload_size >= sizeof(int32))
+			/* Unified format: first byte is training_backend (0 or 1) */
+			/* GPU format: first 4 bytes are int32 feature_dim (typically > 1) */
+			if (*first_byte > 1)
 			{
-				const int32 *first_int = (const int32 *) VARDATA(payload);
-				int32		first_value = *first_int;
-				
-				/* If first 4 bytes look like a reasonable feature_dim, check for GPU format */
-				if (first_value > 0 && first_value <= 100000)
+				/* First byte > 1, likely GPU format - check further */
+				if (payload_size >= sizeof(int32))
 				{
-					/* Check if payload size matches GPU format */
-					if (payload_size >= sizeof(NdbCudaRidgeModelHeader))
+					const int32 *first_int = (const int32 *) VARDATA(payload);
+					int32		first_value = *first_int;
+					
+					/* If first 4 bytes look like a reasonable feature_dim, check for GPU format */
+					if (first_value > 0 && first_value <= 100000)
 					{
-						const NdbCudaRidgeModelHeader *hdr = (const NdbCudaRidgeModelHeader *) VARDATA(payload);
-						
-						/* Validate header fields match the first int32 */
-						if (hdr->feature_dim == first_value &&
-							hdr->n_samples >= 0 && hdr->n_samples <= 1000000000)
+						/* Check if payload size matches GPU format */
+						if (payload_size >= sizeof(NdbCudaRidgeModelHeader))
 						{
-							size_t		expected_gpu_size = sizeof(NdbCudaRidgeModelHeader) +
-								sizeof(float) * (size_t) hdr->feature_dim;
+							const NdbCudaRidgeModelHeader *hdr = (const NdbCudaRidgeModelHeader *) VARDATA(payload);
 							
-							/* Size matches GPU format - likely a GPU model */
-							if (payload_size >= expected_gpu_size && payload_size < expected_gpu_size + 1000)
+							/* Validate header fields match the first int32 */
+							if (hdr->feature_dim == first_value &&
+								hdr->n_samples >= 0 && hdr->n_samples <= 1000000000)
 							{
-								is_gpu_model = true;
+								size_t		expected_gpu_size = sizeof(NdbCudaRidgeModelHeader) +
+									sizeof(float) * (size_t) hdr->feature_dim;
+								
+								/* Size matches GPU format - has raw GPU payload */
+								if (payload_size >= expected_gpu_size && payload_size < expected_gpu_size + 1000)
+								{
+									has_gpu_payload = true;
+								}
 							}
 						}
 					}
 				}
 			}
+			/* If first_byte is 0 or 1, it's unified format - not raw GPU */
 		}
 
-		if (is_gpu_model)
+		/* Only skip if BOTH metrics say GPU AND payload is raw GPU format */
+		/* Unified format models (GPU metrics but unified payload) should be loaded as CPU */
+		if (has_gpu_metrics && has_gpu_payload)
 		{
+			/* Has both GPU metrics and raw GPU payload - skip, let GPU prediction handle it */
 			nfree(payload);
 			payload = NULL;
 			if (metrics != NULL)
@@ -1424,6 +1436,7 @@ ridge_load_model_from_catalog(int32 model_id, RidgeModel **out)
 			}
 			return false;
 		}
+		/* Otherwise (unified format or CPU format), load as CPU model */
 	}
 
 	*out = ridge_model_deserialize(payload, NULL);
@@ -1674,54 +1687,68 @@ lasso_try_gpu_predict_catalog(int32 model_id,
 	if (payload == NULL)
 		goto cleanup;
 
-	/* Check if this is a GPU model - either by metrics or by payload format */
+	/* Check if this is a GPU model - must have both GPU metrics AND GPU payload format */
 	{
 		bool		is_gpu_model = false;
+		bool		has_gpu_metrics = false;
 		uint32		payload_size;
 
 		/* First check metrics for training_backend */
-		if (lasso_metadata_is_gpu(metrics))
+		has_gpu_metrics = lasso_metadata_is_gpu(metrics);
+
+		/* Check payload format - GPU models must have raw GPU format (NdbCudaLassoModelHeader) */
+		/* Unified format starts with uint8 training_backend (0 or 1), GPU format starts with int32 feature_dim */
+		payload_size = VARSIZE(payload) - VARHDRSZ;
+		
+		/* Check if payload is in raw GPU format (starts with int32 feature_dim, not uint8 training_backend) */
+		if (payload_size >= sizeof(uint8))
 		{
-			is_gpu_model = true;
-		}
-		else
-		{
-			/* If metrics check didn't find GPU indicator, check payload format */
-			/* GPU models start with NdbCudaLassoModelHeader, CPU models start with uint8 training_backend */
-			payload_size = VARSIZE(payload) - VARHDRSZ;
+			const uint8 *first_byte = (const uint8 *) VARDATA(payload);
 			
-			/* CPU format: first byte is training_backend (uint8), then model_id (int32) */
-			/* GPU format: first field is feature_dim (int32) */
-			/* Check if payload looks like GPU format (starts with int32, not uint8) */
-			if (payload_size >= sizeof(int32))
+			/* Unified format: first byte is training_backend (0 or 1) */
+			/* GPU format: first 4 bytes are int32 feature_dim (typically > 1) */
+			if (*first_byte > 1)
 			{
-				const int32 *first_int = (const int32 *) VARDATA(payload);
-				int32		first_value = *first_int;
-				
-				/* If first 4 bytes look like a reasonable feature_dim, check for GPU format */
-				if (first_value > 0 && first_value <= 100000)
+				/* First byte > 1, likely GPU format - check further */
+				if (payload_size >= sizeof(int32))
 				{
-					/* Check if payload size matches GPU format */
-					if (payload_size >= sizeof(NdbCudaLassoModelHeader))
+					const int32 *first_int = (const int32 *) VARDATA(payload);
+					int32		first_value = *first_int;
+					
+					/* If first 4 bytes look like a reasonable feature_dim, check for GPU format */
+					if (first_value > 0 && first_value <= 100000)
 					{
-						const NdbCudaLassoModelHeader *hdr = (const NdbCudaLassoModelHeader *) VARDATA(payload);
-						
-						/* Validate header fields match the first int32 */
-						if (hdr->feature_dim == first_value &&
-							hdr->n_samples >= 0 && hdr->n_samples <= 1000000000)
+						/* Check if payload size matches GPU format */
+						if (payload_size >= sizeof(NdbCudaLassoModelHeader))
 						{
-							size_t		expected_gpu_size = sizeof(NdbCudaLassoModelHeader) +
-								sizeof(float) * (size_t) hdr->feature_dim;
+							const NdbCudaLassoModelHeader *hdr = (const NdbCudaLassoModelHeader *) VARDATA(payload);
 							
-							/* Size matches GPU format - likely a GPU model */
-							if (payload_size >= expected_gpu_size && payload_size < expected_gpu_size + 1000)
+							/* Validate header fields match the first int32 */
+							if (hdr->feature_dim == first_value &&
+								hdr->n_samples >= 0 && hdr->n_samples <= 1000000000)
 							{
-								is_gpu_model = true;
+								size_t		expected_gpu_size = sizeof(NdbCudaLassoModelHeader) +
+									sizeof(float) * (size_t) hdr->feature_dim;
+								
+								/* Size matches GPU format - has raw GPU payload */
+								if (payload_size >= expected_gpu_size && payload_size < expected_gpu_size + 1000)
+								{
+									is_gpu_model = true;
+								}
 							}
 						}
 					}
 				}
 			}
+			/* If first_byte is 0 or 1, it's unified format - not raw GPU */
+		}
+
+		/* If metrics says GPU but payload is unified format, fall back to CPU */
+		/* Unified format starts with uint8 (training_backend), which is < 256, so first int32 would be small */
+		if (has_gpu_metrics && !is_gpu_model)
+		{
+			/* Metrics says GPU but payload is unified format - use CPU path */
+			goto cleanup;
 		}
 
 		if (!is_gpu_model)
@@ -1775,64 +1802,78 @@ lasso_load_model_from_catalog(int32 model_id, LassoModel **out)
 		return false;
 	}
 
-	/* Skip GPU models - they should be handled by GPU prediction */
-	/* Check both metrics and payload format to determine if this is a GPU model */
+	/* Skip GPU models with raw GPU payload format - they should be handled by GPU prediction */
+	/* Unified format models (training_backend=1 but payload is unified) should be loaded as CPU */
 	{
-		bool		is_gpu_model = false;
+		bool		has_gpu_metrics = false;
+		bool		has_gpu_payload = false;
 		uint32		payload_size;
 
-		/* First check metrics for training_backend */
-		if (lasso_metadata_is_gpu(metrics))
+		/* Check metrics for training_backend */
+		has_gpu_metrics = lasso_metadata_is_gpu(metrics);
+
+		/* Check payload format - GPU models must have raw GPU format (NdbCudaLassoModelHeader) */
+		/* Unified format starts with uint8 training_backend (0 or 1), GPU format starts with int32 feature_dim */
+		payload_size = VARSIZE(payload) - VARHDRSZ;
+		
+		/* Check if payload is in raw GPU format (starts with int32 feature_dim, not uint8 training_backend) */
+		if (payload_size >= sizeof(uint8))
 		{
-			is_gpu_model = true;
-		}
-		else
-		{
-			/* If metrics check didn't find GPU indicator, check payload format */
-			/* GPU models start with NdbCudaLassoModelHeader, CPU models start with uint8 training_backend */
-			payload_size = VARSIZE(payload) - VARHDRSZ;
+			const uint8 *first_byte = (const uint8 *) VARDATA(payload);
 			
-			/* CPU format: first byte is training_backend (uint8), then model_id (int32) */
-			/* GPU format: first field is feature_dim (int32) */
-			/* Check if payload looks like GPU format (starts with int32, not uint8) */
-			if (payload_size >= sizeof(int32))
+			/* Unified format: first byte is training_backend (0 or 1) */
+			/* GPU format: first 4 bytes are int32 feature_dim (typically > 1) */
+			if (*first_byte > 1)
 			{
-				const int32 *first_int = (const int32 *) VARDATA(payload);
-				int32		first_value = *first_int;
-				
-				/* If first 4 bytes look like a reasonable feature_dim, check for GPU format */
-				if (first_value > 0 && first_value <= 100000)
+				/* First byte > 1, likely GPU format - check further */
+				if (payload_size >= sizeof(int32))
 				{
-					/* Check if payload size matches GPU format */
-					if (payload_size >= sizeof(NdbCudaLassoModelHeader))
+					const int32 *first_int = (const int32 *) VARDATA(payload);
+					int32		first_value = *first_int;
+					
+					/* If first 4 bytes look like a reasonable feature_dim, check for GPU format */
+					if (first_value > 0 && first_value <= 100000)
 					{
-						const NdbCudaLassoModelHeader *hdr = (const NdbCudaLassoModelHeader *) VARDATA(payload);
-						
-						/* Validate header fields match the first int32 */
-						if (hdr->feature_dim == first_value &&
-							hdr->n_samples >= 0 && hdr->n_samples <= 1000000000)
+						/* Check if payload size matches GPU format */
+						if (payload_size >= sizeof(NdbCudaLassoModelHeader))
 						{
-							size_t		expected_gpu_size = sizeof(NdbCudaLassoModelHeader) +
-								sizeof(float) * (size_t) hdr->feature_dim;
+							const NdbCudaLassoModelHeader *hdr = (const NdbCudaLassoModelHeader *) VARDATA(payload);
 							
-							/* Size matches GPU format - likely a GPU model */
-							if (payload_size >= expected_gpu_size && payload_size < expected_gpu_size + 1000)
+							/* Validate header fields match the first int32 */
+							if (hdr->feature_dim == first_value &&
+								hdr->n_samples >= 0 && hdr->n_samples <= 1000000000)
 							{
-								is_gpu_model = true;
+								size_t		expected_gpu_size = sizeof(NdbCudaLassoModelHeader) +
+									sizeof(float) * (size_t) hdr->feature_dim;
+								
+								/* Size matches GPU format - has raw GPU payload */
+								if (payload_size >= expected_gpu_size && payload_size < expected_gpu_size + 1000)
+								{
+									has_gpu_payload = true;
+								}
 							}
 						}
 					}
 				}
 			}
+			/* If first_byte is 0 or 1, it's unified format - not raw GPU */
 		}
 
-		if (is_gpu_model)
+		/* Only skip if BOTH metrics say GPU AND payload is raw GPU format */
+		/* Unified format models (GPU metrics but unified payload) should be loaded as CPU */
+		if (has_gpu_metrics && has_gpu_payload)
 		{
+			/* Has both GPU metrics and raw GPU payload - skip, let GPU prediction handle it */
 			nfree(payload);
+			payload = NULL;
 			if (metrics != NULL)
+			{
 				nfree(metrics);
+				metrics = NULL;
+			}
 			return false;
 		}
+		/* Otherwise (unified format or CPU format), load as CPU model */
 	}
 
 	*out = lasso_model_deserialize(payload, NULL);
@@ -2084,11 +2125,10 @@ train_ridge_regression(PG_FUNCTION_ARGS)
 			ndb_gpu_init_if_needed();
 		}
 
-		if (false)				/* neurondb_gpu_is_available() && nvec > 0 &&
-								 * dim > 0 &&
-								 * ndb_gpu_kernel_enabled("ridge_train") */
+		if (neurondb_gpu_is_available() && nvec > 0 && dim > 0)
 		{
 			int			gpu_sample_limit = nvec;
+			bool		gpu_train_result = false;
 			/* Load limited dataset for GPU training */
 			ridge_dataset_init(&dataset);
 			ridge_dataset_load_limited(quoted_tbl,
@@ -2097,32 +2137,67 @@ train_ridge_regression(PG_FUNCTION_ARGS)
 									   &dataset,
 									   gpu_sample_limit);
 
+			/* Create hyperparameters JSONB with lambda, same pattern as linear regression */
 			initStringInfo(&hyperbuf);
 			appendStringInfo(&hyperbuf, "{\"lambda\":%.6f}", lambda);
+			/* Use ndb_jsonb_in_cstring like linear regression */
 			gpu_hyperparams = ndb_jsonb_in_cstring(hyperbuf.data);
 			if (gpu_hyperparams == NULL)
 			{
+				nfree(hyperbuf.data);
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
 						 errmsg("neurondb: train_ridge_regression: failed to parse GPU hyperparameters JSON")));
 			}
+			nfree(hyperbuf.data);
+			hyperbuf.data = NULL;
 
-			if (ndb_gpu_try_train_model("ridge",
-										NULL,
-										NULL,
-										tbl_str,
-										targ_str,
-										NULL,
-										0,
-										gpu_hyperparams,
-										dataset.features,
-										dataset.targets,
-										dataset.n_samples,
-										dataset.feature_dim,
-										0,
-										&gpu_result,
-										&gpu_err)
-				&& gpu_result.spec.model_data != NULL)
+			PG_TRY();
+			{
+				gpu_train_result = ndb_gpu_try_train_model("ridge",
+														  NULL,
+														  NULL,
+														  tbl_str,
+														  targ_str,
+														  NULL,
+														  0,
+														  gpu_hyperparams,
+														  dataset.features,
+														  dataset.targets,
+														  dataset.n_samples,
+														  dataset.feature_dim,
+														  0,
+														  &gpu_result,
+														  &gpu_err);
+			}
+			PG_CATCH();
+			{
+				/* GPU mode: re-throw error - don't catch it, let it propagate */
+				if (NDB_REQUIRE_GPU())
+				{
+					PG_RE_THROW();
+				}
+				/* AUTO/CPU mode: capture error and fall back to CPU */
+				/* Capture error message before flushing */
+				if (gpu_err == NULL)
+				{
+					/* Set a simple error message - don't try to capture from ErrorData as it may be corrupted */
+					gpu_err = pstrdup("Exception during GPU training - check GPU availability and backend registration");
+				}
+				FlushErrorState();
+				gpu_train_result = false;
+			}
+			PG_END_TRY();
+
+			/* AUTO/CPU mode: error if GPU training failed - will fall back to CPU */
+			if (!gpu_train_result && !NDB_REQUIRE_GPU())
+			{
+				/* In AUTO mode, this is expected - will fall back to CPU below */
+			}
+			/* AUTO mode: GPU training failed - will fall back to CPU (handled below) */
+
+			/* Only proceed with GPU model if training succeeded AND model_data exists */
+			if (gpu_train_result && gpu_result.spec.model_data != NULL)
 			{
 #ifdef NDB_GPU_CUDA
 				MLCatalogModelSpec spec;
@@ -2180,6 +2255,7 @@ train_ridge_regression(PG_FUNCTION_ARGS)
 					initStringInfo(&metrics_buf);
 					appendStringInfo(&metrics_buf,
 									 "{\"algorithm\":\"ridge\","
+									 "\"storage\":\"gpu\","
 									 "\"training_backend\":1,"
 									 "\"n_features\":%d,"
 									 "\"n_samples\":%d,"
@@ -2210,18 +2286,48 @@ train_ridge_regression(PG_FUNCTION_ARGS)
 				spec.model_data = unified_model_data;
 				spec.metrics = updated_metrics;
 
-				if (spec.training_table == NULL)
-					spec.training_table = tbl_str;
-				if (spec.training_column == NULL)
-					spec.training_column = targ_str;
+				/*
+				 * ALWAYS copy all string pointers to current memory context
+				 * before switching contexts. This ensures the pointers remain
+				 * valid after memory context switch.
+				 */
+
+				/* Copy algorithm */
+				spec.algorithm = pstrdup("ridge");
+
+				/* Copy training_table */
+				if (spec.training_table != NULL)
+				{
+					spec.training_table = pstrdup(spec.training_table);
+				}
+				else if (tbl_str != NULL)
+				{
+					spec.training_table = pstrdup(tbl_str);
+				}
+
+				/* Copy training_column */
+				if (spec.training_column != NULL)
+				{
+					spec.training_column = pstrdup(spec.training_column);
+				}
+				else if (targ_str != NULL)
+				{
+					spec.training_column = pstrdup(targ_str);
+				}
+
 				if (spec.parameters == NULL)
 				{
 					spec.parameters = gpu_hyperparams;
 					gpu_hyperparams = NULL;
 				}
 
-				spec.algorithm = "ridge";
-				spec.model_type = "regression";
+				spec.model_type = pstrdup("regression");
+
+				/*
+				 * Ensure we're in a valid memory context before calling
+				 * ml_catalog_register_model
+				 */
+				MemoryContextSwitchTo(oldcontext);
 
 				model_id = ml_catalog_register_model(&spec);
 #else
@@ -2895,7 +3001,11 @@ train_lasso_regression(PG_FUNCTION_ARGS)
 	char *gpu_err = NULL;
 	Jsonb *gpu_hyperparams = NULL;
 	StringInfoData hyperbuf;
+	MemoryContext oldcontext;
 	int32		model_id = 0;
+
+	oldcontext = CurrentMemoryContext;
+	Assert(oldcontext != NULL);
 
 	table_name = PG_GETARG_TEXT_PP(0);
 	feature_col = PG_GETARG_TEXT_PP(1);
@@ -2930,7 +3040,6 @@ train_lasso_regression(PG_FUNCTION_ARGS)
 	 */
 	{
 		NdbSpiSession *spi_session = NULL;
-		MemoryContext oldcontext = CurrentMemoryContext;
 		StringInfoData count_query;
 		int			ret;
 		Oid			feat_type_oid = InvalidOid;
@@ -3071,11 +3180,10 @@ train_lasso_regression(PG_FUNCTION_ARGS)
 			ndb_gpu_init_if_needed();
 		}
 
-		if (false)				/* neurondb_gpu_is_available() && nvec > 0 &&
-								 * dim > 0 &&
-								 * ndb_gpu_kernel_enabled("lasso_train") */
+		if (neurondb_gpu_is_available() && nvec > 0 && dim > 0)
 		{
 			int			gpu_sample_limit = nvec;
+			bool		gpu_train_result = false;
 			/* Load limited dataset for GPU training */
 			lasso_dataset_init(&dataset);
 			lasso_dataset_load_limited(quoted_tbl,
@@ -3097,22 +3205,46 @@ train_lasso_regression(PG_FUNCTION_ARGS)
 						 errmsg("neurondb: train_lasso_regression: failed to parse GPU hyperparameters JSON")));
 			}
 
-			if (ndb_gpu_try_train_model("lasso",
-										NULL,
-										NULL,
-										tbl_str,
-										targ_str,
-										NULL,
-										0,
-										gpu_hyperparams,
-										dataset.features,
-										dataset.targets,
-										dataset.n_samples,
-										dataset.feature_dim,
-										0,
-										&gpu_result,
-										&gpu_err)
-				&& gpu_result.spec.model_data != NULL)
+			PG_TRY();
+			{
+				gpu_train_result = ndb_gpu_try_train_model("lasso",
+														  NULL,
+														  NULL,
+														  tbl_str,
+														  targ_str,
+														  NULL,
+														  0,
+														  gpu_hyperparams,
+														  dataset.features,
+														  dataset.targets,
+														  dataset.n_samples,
+														  dataset.feature_dim,
+														  0,
+														  &gpu_result,
+														  &gpu_err);
+			}
+			PG_CATCH();
+			{
+				/* GPU mode: re-throw error - don't catch it, let it propagate */
+				if (NDB_REQUIRE_GPU())
+				{
+					PG_RE_THROW();
+				}
+				/* AUTO/CPU mode: capture error and fall back to CPU */
+				FlushErrorState();
+				gpu_train_result = false;
+			}
+			PG_END_TRY();
+
+			/* AUTO/CPU mode: error if GPU training failed - will fall back to CPU */
+			if (!gpu_train_result && !NDB_REQUIRE_GPU())
+			{
+				/* In AUTO mode, this is expected - will fall back to CPU below */
+			}
+			/* AUTO mode: GPU training failed - will fall back to CPU (handled below) */
+
+			/* Only proceed with GPU model if training succeeded AND model_data exists */
+			if (gpu_train_result && gpu_result.spec.model_data != NULL)
 			{
 #ifdef NDB_GPU_CUDA
 				MLCatalogModelSpec spec;
@@ -3189,6 +3321,14 @@ train_lasso_regression(PG_FUNCTION_ARGS)
 						jval.type = jbvString;
 						jval.val.string.len = 5;
 						jval.val.string.val = "lasso";
+						(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+
+						jkey.val.string.val = "storage";
+						jkey.val.string.len = 7;
+						(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+						jval.type = jbvString;
+						jval.val.string.len = 3;
+						jval.val.string.val = "gpu";
 						(void) pushJsonbValue(&state, WJB_VALUE, &jval);
 
 						jkey.val.string.val = "training_backend";
@@ -3278,18 +3418,48 @@ train_lasso_regression(PG_FUNCTION_ARGS)
 				spec.model_data = unified_model_data;
 				spec.metrics = updated_metrics;
 
-				if (spec.training_table == NULL)
-					spec.training_table = tbl_str;
-				if (spec.training_column == NULL)
-					spec.training_column = targ_str;
+				/*
+				 * ALWAYS copy all string pointers to current memory context
+				 * before switching contexts. This ensures the pointers remain
+				 * valid after memory context switch.
+				 */
+
+				/* Copy algorithm */
+				spec.algorithm = pstrdup("lasso");
+
+				/* Copy training_table */
+				if (spec.training_table != NULL)
+				{
+					spec.training_table = pstrdup(spec.training_table);
+				}
+				else if (tbl_str != NULL)
+				{
+					spec.training_table = pstrdup(tbl_str);
+				}
+
+				/* Copy training_column */
+				if (spec.training_column != NULL)
+				{
+					spec.training_column = pstrdup(spec.training_column);
+				}
+				else if (targ_str != NULL)
+				{
+					spec.training_column = pstrdup(targ_str);
+				}
+
 				if (spec.parameters == NULL)
 				{
 					spec.parameters = gpu_hyperparams;
 					gpu_hyperparams = NULL;
 				}
 
-				spec.algorithm = "lasso";
-				spec.model_type = "regression";
+				spec.model_type = pstrdup("regression");
+
+				/*
+				 * Ensure we're in a valid memory context before calling
+				 * ml_catalog_register_model
+				 */
+				MemoryContextSwitchTo(oldcontext);
 
 				model_id = ml_catalog_register_model(&spec);
 #else

@@ -266,6 +266,8 @@ ndb_cuda_rf_pack_model(const RFModel *model,
 		spec.majority_fraction = model_hdr->majority_fraction;
 		spec.gini = model->gini_impurity;
 		spec.oob_accuracy = model->oob_accuracy;
+		spec.n_samples = model_hdr->sample_count;
+		spec.n_features = model_hdr->feature_dim;
 		*metrics = rf_build_metrics_json(&spec);
 	}
 
@@ -747,6 +749,8 @@ ndb_cuda_rf_train(const float *features,
 				? (gini_accumulator / (double) n_trees)
 				: 0.0;
 			spec.oob_accuracy = 0.0;
+			spec.n_samples = n_samples;
+			spec.n_features = feature_dim;
 			/* Wrap metrics JSON building in error handling to catch JSONB parsing errors */
 			PG_TRY();
 			{

@@ -1249,6 +1249,12 @@ CREATE FUNCTION train_xgboost_regressor(text, text, text, integer DEFAULT 100, i
     LANGUAGE C STABLE;
 COMMENT ON FUNCTION train_xgboost_regressor IS 'Train XGBoost regressor: (table, feature_col, label_col, n_estimators, max_depth, learning_rate) returns model_id';
 
+CREATE FUNCTION predict_xgboost(integer, real[])
+    RETURNS float8
+    AS 'MODULE_PATHNAME', 'predict_xgboost'
+    LANGUAGE C STABLE STRICT;
+COMMENT ON FUNCTION predict_xgboost(integer, real[]) IS 'Predict using XGBoost model by model_id';
+
 -- ============================================================================
 -- CATBOOST FUNCTIONS
 -- ============================================================================
@@ -1264,6 +1270,12 @@ CREATE FUNCTION train_catboost_regressor(text, text, text, integer DEFAULT 1000,
     AS 'MODULE_PATHNAME', 'train_catboost_regressor'
     LANGUAGE C STABLE;
 COMMENT ON FUNCTION train_catboost_regressor IS 'Train CatBoost regressor: (table, feature_col, label_col, iterations, learning_rate, depth) returns model_id';
+
+CREATE FUNCTION predict_catboost(integer, real[])
+    RETURNS float8
+    AS 'MODULE_PATHNAME', 'predict_catboost'
+    LANGUAGE C STABLE STRICT;
+COMMENT ON FUNCTION predict_catboost(integer, real[]) IS 'Predict using CatBoost model by model_id';
 
 -- ============================================================================
 -- LIGHTGBM FUNCTIONS
@@ -4980,6 +4992,8 @@ BEGIN
 			RETURN predict_svm_model_id(model_id, features);
 		WHEN 'xgboost' THEN
 			RETURN predict_xgboost(model_id, vector_to_array(features));
+		WHEN 'catboost' THEN
+			RETURN predict_catboost(model_id, vector_to_array(features));
 		WHEN 'lightgbm' THEN
 			RETURN predict_lightgbm(model_id, vector_to_array(features));
 		WHEN 'neural_network' THEN

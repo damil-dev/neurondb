@@ -31,6 +31,8 @@ typedef struct RFMetricsSpec
 	double		majority_fraction;
 	double		gini;
 	double		oob_accuracy;
+	int			n_samples;
+	int			n_features;
 } RFMetricsSpec;
 
 /* Gini impurity computation */
