@@ -131,7 +131,8 @@ extern int ndb_cuda_rf_model_upload(const NdbCudaRfNode *nodes,
 extern int ndb_cuda_rf_infer_model(const NdbCudaRfGpuModel *model,
 	const float *input,
 	int feature_dim,
-	int *votes);
+	int *votes,
+	char **errstr);
 
 extern void ndb_cuda_rf_model_free(NdbCudaRfGpuModel *model);
 

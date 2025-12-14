@@ -626,6 +626,8 @@ matrix_inversion:
 			/* Partial pivoting: find the row with the largest absolute value in current column */
 			int			max_row = row;
 			double		max_val = fabs(augmented[row][row]);
+			double		tolerance;
+			double	   *temp;
 
 			for (k_local = row + 1; k_local < dim_with_intercept; k_local++)
 			{
@@ -639,7 +641,7 @@ matrix_inversion:
 			/* Swap rows if needed */
 			if (max_row != row)
 			{
-				double	   *temp = augmented[row];
+				temp = augmented[row];
 
 				augmented[row] = augmented[max_row];
 				augmented[max_row] = temp;
@@ -649,7 +651,7 @@ matrix_inversion:
 			/* Use adaptive tolerance based on matrix size and lambda */
 			/* With lambda >= 0.1, the matrix should be well-conditioned */
 			/* Use a tolerance that scales with matrix dimension and lambda */
-			double		tolerance = fmax(1e-12, lambda * 1e-10 * dim_with_intercept);
+			tolerance = fmax(1e-12, lambda * 1e-10 * dim_with_intercept);
 			if (fabs(pivot) < tolerance)
 			{
 				/* Even after partial pivoting, pivot is too small - matrix is singular */

@@ -801,11 +801,11 @@ static const ndb_gpu_backend ndb_cuda_backend = {
 
 	.xgboost_train = ndb_cuda_xgboost_train,
 	.xgboost_predict = ndb_cuda_xgboost_predict,
-	.xgboost_pack = ndb_cuda_xgboost_pack_model,
+	.xgboost_pack = (int (*)(const struct XGBoostModel *, bytea **, Jsonb **, char **)) ndb_cuda_xgboost_pack_model,
 
 	.catboost_train = ndb_cuda_catboost_train,
 	.catboost_predict = ndb_cuda_catboost_predict,
-	.catboost_pack = ndb_cuda_catboost_pack_model,
+	.catboost_pack = (int (*)(const struct CatBoostModel *, bytea **, Jsonb **, char **)) ndb_cuda_catboost_pack_model,
 
 	.hf_embed = ndb_cuda_hf_embed,
 #ifdef HAVE_ONNX_RUNTIME
