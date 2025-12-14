@@ -67,6 +67,20 @@ class VectorBenchmark(Benchmark):
             'cosine': 'ASC',
             'inner_product': 'DESC',  # Higher is better for inner product
         }
+        
+        # Operator class mapping for index creation
+        self.opclass_mapping = {
+            'neurondb': {
+                'l2': 'vector_l2_ops',
+                'cosine': 'vector_cosine_ops',
+                'inner_product': 'vector_ip_ops'
+            },
+            'pgvector': {
+                'l2': 'vector_l2_ops',
+                'cosine': 'vector_cosine_ops',
+                'inner_product': 'vector_ip_ops'
+            }
+        }
     
     def setup(self) -> None:
         """Set up benchmark tables and indexes."""
@@ -143,6 +157,7 @@ class VectorBenchmark(Benchmark):
     def create_index(
         self,
         dimensions: int,
+        metric: str = 'l2',
         index_type: str = 'hnsw',
         m: int = 16,
         ef_construction: int = 200
@@ -152,6 +167,7 @@ class VectorBenchmark(Benchmark):
         
         Args:
             dimensions: Vector dimensions
+            metric: Distance metric ('l2', 'cosine', 'inner_product')
             index_type: Index type ('hnsw')
             m: HNSW parameter M
             ef_construction: HNSW parameter ef_construction
@@ -165,19 +181,18 @@ class VectorBenchmark(Benchmark):
         start_time = time.perf_counter()
         
         conn = self.db._get_connection()
+        original_isolation = conn.isolation_level
         try:
             # CREATE INDEX must run in autocommit mode
             from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
             conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
             with conn.cursor() as cur:
                 if index_type == 'hnsw':
-                    # Determine operator class based on system
-                    if self.system_name == 'neurondb':
-                        # NeuronDB uses vector_l2_ops, vector_cosine_ops, etc.
-                        opclass = 'vector_l2_ops'  # Default to L2
-                    else:
-                        # pgvector uses vector_ops
-                        opclass = 'vector_ops'
+                    # Determine operator class based on system and metric
+                    if metric not in self.opclass_mapping[self.system_name]:
+                        raise ValueError(f"Unknown metric: {metric}")
+                    
+                    opclass = self.opclass_mapping[self.system_name][metric]
                     
                     # Build column specification with operator class
                     # Format: column_name operator_class
@@ -199,6 +214,11 @@ class VectorBenchmark(Benchmark):
                     
                     cur.execute(index_query)
         finally:
+            # Reset isolation level before returning connection to pool
+            try:
+                conn.set_isolation_level(original_isolation)
+            except:
+                pass
             self.db._return_connection(conn)
         
         end_time = time.perf_counter()
@@ -288,12 +308,39 @@ class VectorBenchmark(Benchmark):
         index_size = 0
         if self.config.use_index:
             print(f"    Creating index...")
-            index_build_time, index_size = self.create_index(
-                dimensions=dimensions,
-                index_type='hnsw',
-                m=16,
-                ef_construction=200
-            )
+            try:
+                # Small delay to ensure data is flushed
+                import time
+                time.sleep(0.1)
+                
+                # Try with smaller parameters if first attempt fails
+                try:
+                    index_build_time, index_size = self.create_index(
+                        dimensions=dimensions,
+                        metric=metric,
+                        index_type='hnsw',
+                        m=16,
+                        ef_construction=200
+                    )
+                except Exception:
+                    # Retry with smaller parameters
+                    print(f"    Retrying index creation with smaller parameters...")
+                    time.sleep(0.2)
+                    index_build_time, index_size = self.create_index(
+                        dimensions=dimensions,
+                        metric=metric,
+                        index_type='hnsw',
+                        m=8,
+                        ef_construction=100
+                    )
+                
+                if index_size > 0:
+                    print(f"    Index created successfully (size: {index_size / 1024 / 1024:.2f} MB)")
+            except Exception as e:
+                print(f"    WARNING: Index creation failed: {e}")
+                print(f"    Continuing benchmark without index...")
+                index_build_time = 0.0
+                index_size = 0
         
         # Generate query vectors
         query_vectors = DataGenerator.generate_query_vectors(

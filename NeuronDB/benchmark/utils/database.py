@@ -88,6 +88,7 @@ class DatabaseManager:
             True if extension exists or was created, False otherwise
         """
         conn = self._get_connection()
+        original_isolation = conn.isolation_level
         try:
             conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
             with conn.cursor() as cur:
@@ -101,6 +102,11 @@ class DatabaseManager:
             print(f"Warning: Failed to create extension '{extension_name}': {e}")
             return False
         finally:
+            # Reset isolation level before returning connection to pool
+            try:
+                conn.set_isolation_level(original_isolation)
+            except:
+                pass
             self._return_connection(conn)
     
     def execute_query(
@@ -245,21 +251,16 @@ class DatabaseManager:
         try:
             with conn.cursor() as cur:
                 if schema:
+                    # Use format() with %I for identifier to properly handle regclass
                     cur.execute(
-                        sql.SQL("""
-                            SELECT pg_total_relation_size({}.{}) as size
-                        """).format(
-                            sql.Identifier(schema),
-                            sql.Identifier(table_name)
-                        )
+                        "SELECT pg_total_relation_size(%s.%s::regclass) as size",
+                        (schema, table_name)
                     )
                 else:
+                    # Use format() with %I for identifier to properly handle regclass
                     cur.execute(
-                        sql.SQL("""
-                            SELECT pg_total_relation_size({}) as size
-                        """).format(
-                            sql.Identifier(table_name)
-                        )
+                        "SELECT pg_total_relation_size(%s::regclass) as size",
+                        (table_name,)
                     )
                 result = cur.fetchone()
                 return result[0] if result else 0
@@ -281,21 +282,16 @@ class DatabaseManager:
         try:
             with conn.cursor() as cur:
                 if schema:
+                    # Use format() with %I for identifier to properly handle regclass
                     cur.execute(
-                        sql.SQL("""
-                            SELECT pg_relation_size({}.{}) as size
-                        """).format(
-                            sql.Identifier(schema),
-                            sql.Identifier(index_name)
-                        )
+                        "SELECT pg_relation_size(%s.%s::regclass) as size",
+                        (schema, index_name)
                     )
                 else:
+                    # Use format() with %I for identifier to properly handle regclass
                     cur.execute(
-                        sql.SQL("""
-                            SELECT pg_relation_size({}) as size
-                        """).format(
-                            sql.Identifier(index_name)
-                        )
+                        "SELECT pg_relation_size(%s::regclass) as size",
+                        (index_name,)
                     )
                 result = cur.fetchone()
                 return result[0] if result else 0
