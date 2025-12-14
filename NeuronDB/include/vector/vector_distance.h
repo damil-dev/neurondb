@@ -25,6 +25,10 @@ extern Datum vector_l1_distance(PG_FUNCTION_ARGS);
 extern Datum vector_hamming_distance(PG_FUNCTION_ARGS);
 extern Datum vector_chebyshev_distance(PG_FUNCTION_ARGS);
 extern Datum vector_minkowski_distance(PG_FUNCTION_ARGS);
+extern Datum vector_spherical_distance(PG_FUNCTION_ARGS);
+
+/* Internal distance functions for index optimization */
+extern float4 spherical_distance(Vector *a, Vector *b);
 
 /* GPU-accelerated distance functions */
 extern Datum vector_l2_distance_gpu(PG_FUNCTION_ARGS);

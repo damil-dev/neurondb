@@ -20,6 +20,7 @@
 #include "fmgr.h"
 #include "utils/array.h"
 #include "utils/builtins.h"
+#include "utils/numeric.h"
 #include "catalog/pg_type.h"
 #include "neurondb_safe_memory.h"
 #include "neurondb_macros.h"
@@ -222,6 +223,77 @@ array_to_vector_integer(PG_FUNCTION_ARGS)
 				 errmsg("out of memory")));
 	for (i = 0; i < dim; i++)
 		result->data[i] = (float4) data[i];
+
+	PG_RETURN_VECTOR_P(result);
+}
+
+PG_FUNCTION_INFO_V1(array_to_vector_numeric);
+Datum
+array_to_vector_numeric(PG_FUNCTION_ARGS)
+{
+	ArrayType *arr = NULL;
+	Vector *result = NULL;
+	Datum *elems = NULL;
+	bool *nulls = NULL;
+	int			dim;
+	int			i;
+	Numeric		num;
+
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("array_to_vector_numeric requires 1 argument, got %d",
+						PG_NARGS())));
+
+	arr = PG_GETARG_ARRAYTYPE_P(0);
+
+	if (arr == NULL)
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("array must not be NULL")));
+
+	if (ARR_NDIM(arr) != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_ARRAY_SUBSCRIPT_ERROR),
+				 errmsg("array must be one-dimensional")));
+
+	dim = ARR_DIMS(arr)[0];
+	if (dim <= 0 || dim > VECTOR_MAX_DIM)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("invalid array dimension: %d (max: %d)",
+						dim,
+						VECTOR_MAX_DIM)));
+
+	deconstruct_array(arr, NUMERICOID, -1, false, 'i', &elems, &nulls, &dim);
+
+	if (ARR_HASNULL(arr) || nulls != NULL)
+	{
+		for (i = 0; i < dim; i++)
+		{
+			if (nulls != NULL && nulls[i])
+				ereport(ERROR,
+						(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+						 errmsg("array must not contain NULL values")));
+		}
+	}
+
+	result = new_vector(dim);
+	if (result == NULL)
+		ereport(ERROR,
+				(errcode(ERRCODE_OUT_OF_MEMORY),
+				 errmsg("out of memory")));
+
+	for (i = 0; i < dim; i++)
+	{
+		num = DatumGetNumeric(elems[i]);
+		result->data[i] = (float4) DatumGetFloat8(DirectFunctionCall1(numeric_float8, NumericGetDatum(num)));
+	}
+
+	if (elems)
+		pfree(elems);
+	if (nulls)
+		pfree(nulls);
 
 	PG_RETURN_VECTOR_P(result);
 }
