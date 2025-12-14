@@ -522,12 +522,11 @@ neurondb_rank_documents(PG_FUNCTION_ARGS)
 	/* NOTICE: Starting JSON construction using JsonbParseState - MARKER 1 */
 	elog(NOTICE, "neurondb_rank_documents: MARKER 1 - Starting JSON construction using JsonbParseState, nelems=%d, limit=%d", nelems, limit);
 	
-	Jsonb *jsonb_result = NULL;
 	{
+		Jsonb *jsonb_result = NULL;
 		volatile JsonbParseState *parse_state = NULL;
 		volatile JsonbValue *result = NULL;
 		JsonbValue jkey;
-		JsonbValue jval;
 		JsonbValue jdoc;
 		JsonbValue jscore;
 		JsonbValue jrank;
@@ -585,7 +584,7 @@ neurondb_rank_documents(PG_FUNCTION_ARGS)
 				
 				/* Add score value as numeric */
 				jscore.type = jbvNumeric;
-				jscore.val.numeric = DirectFunctionCall1(float4_numeric, Float4GetDatum(ranklist[i].score));
+				jscore.val.numeric = (Numeric) DatumGetPointer(DirectFunctionCall1(float4_numeric, Float4GetDatum(ranklist[i].score)));
 				(void) pushJsonbValue((JsonbParseState **) &parse_state, WJB_VALUE, &jscore);
 				
 				/* Add "rank" key */
@@ -596,7 +595,7 @@ neurondb_rank_documents(PG_FUNCTION_ARGS)
 				
 				/* Add rank value as numeric */
 				jrank.type = jbvNumeric;
-				jrank.val.numeric = DirectFunctionCall1(int4_numeric, Int32GetDatum(count + 1));
+				jrank.val.numeric = (Numeric) DatumGetPointer(DirectFunctionCall1(int4_numeric, Int32GetDatum(count + 1)));
 				(void) pushJsonbValue((JsonbParseState **) &parse_state, WJB_VALUE, &jrank);
 				
 				/* End document object */
@@ -627,7 +626,7 @@ neurondb_rank_documents(PG_FUNCTION_ARGS)
 			}
 			
 			elog(NOTICE, "neurondb_rank_documents: MARKER 4.1 - About to call JsonbValueToJsonb");
-			jsonb_result = JsonbValueToJsonb(result);
+			jsonb_result = JsonbValueToJsonb((JsonbValue *) result);
 			elog(NOTICE, "neurondb_rank_documents: MARKER 4.2 - JsonbValueToJsonb returned, jsonb_result=%p", (void *)jsonb_result);
 			
 			/* Ensure jsonb_result is set before exiting PG_TRY */
@@ -652,11 +651,14 @@ neurondb_rank_documents(PG_FUNCTION_ARGS)
 		PG_CATCH();
 		{
 			ErrorData  *edata = CopyErrorData();
+			const char *error_msg = (edata && edata->message) ? edata->message : "unknown error";
 			
-			elog(ERROR,
+			ereport(ERROR,
 				 (errcode(ERRCODE_INTERNAL_ERROR),
-				  errmsg("neurondb_rank_documents: JSON construction failed: %s", edata->message),
+				  errmsg("neurondb_rank_documents: JSON construction failed: %s", error_msg),
 				  errdetail("Error occurred during JSONB construction with %d documents", nelems)));
+			if (edata)
+				FreeErrorData(edata);
 			FlushErrorState();
 		}
 		PG_END_TRY();

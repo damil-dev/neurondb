@@ -3893,8 +3893,8 @@ neurondb_predict(PG_FUNCTION_ARGS)
 					{
 						char	   *error_msg = NULL;
 
-						if (errstr && *errstr)
-							error_msg = pstrdup(*errstr);
+						if (errstr && errstr[0] != '\0')
+							error_msg = pstrdup(errstr);
 						else
 							error_msg = pstrdup("GPU prediction failed with unknown error");
 
@@ -3904,7 +3904,7 @@ neurondb_predict(PG_FUNCTION_ARGS)
 						if (metrics)
 							nfree(metrics);
 						if (errstr)
-							nfree(*errstr);
+							nfree(errstr);
 						ndb_spi_session_end(&spi_session);
 						neurondb_cleanup(oldcontext, callcontext);
 						ereport(ERROR,

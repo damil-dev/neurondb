@@ -576,14 +576,16 @@ vector_min_2arg(PG_FUNCTION_ARGS)
 						a->dim,
 						b->dim)));
 
-	Vector *result = NULL;
-	int			i;
+	{
+		Vector *result = NULL;
+		int			i;
 
-	result = new_vector(a->dim);
-	for (i = 0; i < a->dim; i++)
-		result->data[i] = (a->data[i] < b->data[i]) ? a->data[i] : b->data[i];
+		result = new_vector(a->dim);
+		for (i = 0; i < a->dim; i++)
+			result->data[i] = (a->data[i] < b->data[i]) ? a->data[i] : b->data[i];
 
-	PG_RETURN_VECTOR_P(result);
+		PG_RETURN_VECTOR_P(result);
+	}
 }
 
 /*
@@ -614,14 +616,16 @@ vector_max_2arg(PG_FUNCTION_ARGS)
 						a->dim,
 						b->dim)));
 
-	Vector *result = NULL;
-	int			i;
+	{
+		Vector *result = NULL;
+		int			i;
 
-	result = new_vector(a->dim);
-	for (i = 0; i < a->dim; i++)
-		result->data[i] = (a->data[i] > b->data[i]) ? a->data[i] : b->data[i];
+		result = new_vector(a->dim);
+		for (i = 0; i < a->dim; i++)
+			result->data[i] = (a->data[i] > b->data[i]) ? a->data[i] : b->data[i];
 
-	PG_RETURN_VECTOR_P(result);
+		PG_RETURN_VECTOR_P(result);
+	}
 }
 
 PG_FUNCTION_INFO_V1(vector_sum);
