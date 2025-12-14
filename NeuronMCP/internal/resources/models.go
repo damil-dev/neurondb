@@ -54,10 +54,9 @@ func (r *ModelsResource) GetContent(ctx context.Context) (interface{}, error) {
 	query := `
 		SELECT 
 			model_id,
-			algorithm,
+			algorithm::text AS algorithm,
 			training_table,
-			created_at,
-			updated_at
+			created_at
 		FROM neurondb.ml_models
 		ORDER BY model_id DESC
 	`

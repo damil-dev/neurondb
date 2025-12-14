@@ -15,6 +15,7 @@ package resources
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/neurondb/NeuronMCP/internal/database"
 )
@@ -51,6 +52,23 @@ func (r *WorkersResource) MimeType() string {
 
 /* GetContent returns the workers content */
 func (r *WorkersResource) GetContent(ctx context.Context) (interface{}, error) {
+	/* Check if table exists first */
+	checkQuery := `
+		SELECT EXISTS (
+			SELECT FROM information_schema.tables 
+			WHERE table_schema = 'neurondb' 
+			AND table_name = 'neurondb_workers'
+		) AS table_exists
+	`
+	exists, err := r.executeQueryOne(ctx, checkQuery, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check if workers table exists: %w", err)
+	}
+	
+	if tableExists, ok := exists["table_exists"].(bool); !ok || !tableExists {
+		return []map[string]interface{}{}, nil
+	}
+	
 	query := `SELECT * FROM neurondb.neurondb_workers`
 	return r.executeQuery(ctx, query, nil)
 }

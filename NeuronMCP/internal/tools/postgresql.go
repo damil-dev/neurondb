@@ -51,7 +51,6 @@ func (t *PostgreSQLVersionTool) Execute(ctx context.Context, params map[string]i
 	versionQuery := `
 		SELECT 
 			version() AS version,
-			pg_version() AS pg_version,
 			current_setting('server_version') AS server_version,
 			current_setting('server_version_num')::bigint AS server_version_num,
 			current_setting('server_version_num')::bigint / 10000 AS major_version,
@@ -329,29 +328,29 @@ func (t *PostgreSQLDatabaseListTool) Execute(ctx context.Context, params map[str
 	if includeSystem {
 		query = `
 			SELECT 
-				datname AS name,
-				pg_database_size(datname) AS size_bytes,
-				pg_size_pretty(pg_database_size(datname)) AS size_pretty,
-				numbackends AS connections,
-				datcollate AS collation,
-				datctype AS ctype
+				d.datname AS name,
+				pg_database_size(d.datname) AS size_bytes,
+				pg_size_pretty(pg_database_size(d.datname)) AS size_pretty,
+				COALESCE(s.numbackends, 0) AS connections,
+				d.datcollate AS collation,
+				d.datctype AS ctype
 			FROM pg_database d
 			LEFT JOIN pg_stat_database s ON d.oid = s.datid
-			ORDER BY pg_database_size(datname) DESC
+			ORDER BY pg_database_size(d.datname) DESC
 		`
 	} else {
 		query = `
 			SELECT 
-				datname AS name,
-				pg_database_size(datname) AS size_bytes,
-				pg_size_pretty(pg_database_size(datname)) AS size_pretty,
-				numbackends AS connections,
-				datcollate AS collation,
-				datctype AS ctype
+				d.datname AS name,
+				pg_database_size(d.datname) AS size_bytes,
+				pg_size_pretty(pg_database_size(d.datname)) AS size_pretty,
+				COALESCE(s.numbackends, 0) AS connections,
+				d.datcollate AS collation,
+				d.datctype AS ctype
 			FROM pg_database d
 			LEFT JOIN pg_stat_database s ON d.oid = s.datid
-			WHERE datname NOT IN ('template0', 'template1', 'postgres')
-			ORDER BY pg_database_size(datname) DESC
+			WHERE d.datname NOT IN ('template0', 'template1', 'postgres')
+			ORDER BY pg_database_size(d.datname) DESC
 		`
 	}
 

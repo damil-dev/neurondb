@@ -411,7 +411,7 @@ func NewListModelsTool(db *database.Database, logger *logging.Logger) *ListModel
 
 /* Execute executes the list models query */
 func (t *ListModelsTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
-	query := `SELECT model_id, algorithm, training_table, created_at, updated_at FROM neurondb.ml_models WHERE 1=1`
+	query := `SELECT model_id, algorithm::text AS algorithm, training_table, created_at FROM neurondb.ml_models WHERE 1=1`
 	queryParams := []interface{}{}
 	paramIndex := 1
 

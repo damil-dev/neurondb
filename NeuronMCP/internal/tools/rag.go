@@ -77,13 +77,20 @@ func (t *ProcessDocumentTool) Execute(ctx context.Context, params map[string]int
 		}), nil
 	}
 
+	/* Accept both "text" and "document" parameters */
 	text, _ := params["text"].(string)
+	if text == "" {
+		text, _ = params["document"].(string)
+	}
 	chunkSize := 500
 	if c, ok := params["chunk_size"].(float64); ok {
 		chunkSize = int(c)
 	}
 	overlap := 50
+	/* Accept both "overlap" and "chunk_overlap" parameters */
 	if o, ok := params["overlap"].(float64); ok {
+		overlap = int(o)
+	} else if o, ok := params["chunk_overlap"].(float64); ok {
 		overlap = int(o)
 	}
 	generateEmbeddings := true
@@ -471,18 +478,25 @@ func (t *ChunkDocumentTool) Execute(ctx context.Context, params map[string]inter
 		}), nil
 	}
 
+	/* Accept both "text" and "document" parameters */
 	text, _ := params["text"].(string)
+	if text == "" {
+		text, _ = params["document"].(string)
+	}
 	chunkSize := 500
 	if c, ok := params["chunk_size"].(float64); ok {
 		chunkSize = int(c)
 	}
 	overlap := 50
+	/* Accept both "overlap" and "chunk_overlap" parameters */
 	if o, ok := params["overlap"].(float64); ok {
+		overlap = int(o)
+	} else if o, ok := params["chunk_overlap"].(float64); ok {
 		overlap = int(o)
 	}
 
 	if text == "" {
-		return Error("text parameter is required and cannot be empty for chunk_document tool", "VALIDATION_ERROR", map[string]interface{}{
+		return Error("text or document parameter is required and cannot be empty for chunk_document tool", "VALIDATION_ERROR", map[string]interface{}{
 			"parameter":   "text",
 			"text_length": 0,
 			"params":      params,

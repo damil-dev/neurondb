@@ -16,6 +16,7 @@ package resources
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/neurondb/NeuronMCP/internal/database"
@@ -49,6 +50,26 @@ func (r *BaseResource) executeQuery(ctx context.Context, query string, params []
 	defer rows.Close()
 
 	return scanRowsToMaps(rows)
+}
+
+/* executeQueryOne executes a query and returns a single row */
+func (r *BaseResource) executeQueryOne(ctx context.Context, query string, params []interface{}) (map[string]interface{}, error) {
+	rows, err := r.db.Query(ctx, query, params...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	if !rows.Next() {
+		return nil, fmt.Errorf("no rows returned")
+	}
+
+	result, err := scanRowToMap(rows)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, rows.Err()
 }
 
 /* scanRowsToMaps scans all rows into maps */
