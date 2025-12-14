@@ -20,6 +20,7 @@
 #include "utils/builtins.h"
 #include "utils/array.h"
 #include "utils/jsonb.h"
+#include "common/jsonapi.h"
 #include "utils/lsyscache.h"
 #include "catalog/pg_type.h"
 #include "executor/spi.h"
@@ -37,6 +38,7 @@
 #include "neurondb_macros.h"
 #include "neurondb_llm.h"
 #include "neurondb_gpu.h"
+#include "neurondb_json.h"
 
 PG_FUNCTION_INFO_V1(neurondb_chunk_text);
 PG_FUNCTION_INFO_V1(neurondb_embed_text);
@@ -446,7 +448,8 @@ neurondb_rank_documents(PG_FUNCTION_ARGS)
 	int			i,
 				limit = 10,
 				count = 0;
-	StringInfoData json_result;
+
+	elog(NOTICE, "neurondb_rank_documents: ENTRY - Function called with %d arguments", PG_NARGS());
 
 	if (PG_NARGS() < 2 || PG_NARGS() > 3)
 		ereport(ERROR,
@@ -454,17 +457,23 @@ neurondb_rank_documents(PG_FUNCTION_ARGS)
 				 errmsg("neurondb_rank_documents: expected 2-3 arguments, got %d",
 						PG_NARGS())));
 
+	elog(NOTICE, "neurondb_rank_documents: ENTRY 2 - Getting arguments");
 	query_text = PG_GETARG_TEXT_PP(0);
 	documents_array = PG_GETARG_ARRAYTYPE_P(1);
 	algorithm_text = PG_ARGISNULL(2) ? NULL : PG_GETARG_TEXT_PP(2);
+	elog(NOTICE, "neurondb_rank_documents: ENTRY 3 - Arguments retrieved");
 
 	query = text_to_cstring(query_text);
 	algorithm = algorithm_text ? text_to_cstring(algorithm_text)
 		: pstrdup("bm25");
 
+	elog(NOTICE, "neurondb_rank_documents: DEBUG 1 - Query='%s', Algorithm='%s'", query, algorithm);
+
 	ndims = ARR_NDIM(documents_array);
 	dims = ARR_DIMS(documents_array);
 	nelems = ArrayGetNItems(ndims, dims);
+
+	elog(NOTICE, "neurondb_rank_documents: DEBUG 2 - Array dimensions: %d, elements: %d", ndims, nelems);
 
 	deconstruct_array(documents_array,
 					  TEXTOID,
@@ -482,9 +491,20 @@ neurondb_rank_documents(PG_FUNCTION_ARGS)
 			ranklist[i].doc = NULL;
 			ranklist[i].score = -FLT_MAX;
 			ranklist[i].rawidx = i;
+			elog(NOTICE, "neurondb_rank_documents: DEBUG 3 - Element %d is NULL", i);
 			continue;
 		}
 		ranklist[i].doc = TextDatumGetCString(elem_values[i]);
+		/* Validate document string is not NULL and has valid content */
+		if (ranklist[i].doc == NULL)
+		{
+			ranklist[i].doc = pstrdup("");
+			elog(NOTICE, "neurondb_rank_documents: DEBUG 4 - NULL document at index %d, using empty string", i);
+		}
+		else
+		{
+			elog(NOTICE, "neurondb_rank_documents: DEBUG 5 - Element %d: doc='%.50s' (len=%zu)", i, ranklist[i].doc, strlen(ranklist[i].doc));
+		}
 		if (strcmp(algorithm, "bm25") == 0)
 			ranklist[i].score = simple_bm25(query, ranklist[i].doc);
 		else if (strcmp(algorithm, "cosine") == 0)
@@ -499,39 +519,168 @@ neurondb_rank_documents(PG_FUNCTION_ARGS)
 	}
 	qsort(ranklist, nelems, sizeof(doc_with_score), doc_with_score_cmp);
 
-	initStringInfo(&json_result);
-	appendStringInfoString(&json_result, "{\"ranked\": [");
-
-	count = 0;
-	for (i = 0; i < nelems && count < limit; i++)
+	/* NOTICE: Starting JSON construction using JsonbParseState - MARKER 1 */
+	elog(NOTICE, "neurondb_rank_documents: MARKER 1 - Starting JSON construction using JsonbParseState, nelems=%d, limit=%d", nelems, limit);
+	
+	Jsonb *jsonb_result = NULL;
 	{
-		if (ranklist[i].doc)
+		volatile JsonbParseState *parse_state = NULL;
+		volatile JsonbValue *result = NULL;
+		JsonbValue jkey;
+		JsonbValue jval;
+		JsonbValue jdoc;
+		JsonbValue jscore;
+		JsonbValue jrank;
+		
+		PG_TRY();
 		{
-			if (count != 0)
-				appendStringInfoString(&json_result, ", ");
-			appendStringInfo(&json_result,
-							 "{\"document\": %s, \"score\": %.4f, \"rank\": %d}",
-							 quote_literal_cstr(ranklist[i].doc),
-							 ranklist[i].score,
-							 count + 1);
-			count++;
+			elog(NOTICE, "neurondb_rank_documents: MARKER 1.1 - About to start JSON object");
+			/* Start building JSON object */
+			(void) pushJsonbValue((JsonbParseState **) &parse_state, WJB_BEGIN_OBJECT, NULL);
+			elog(NOTICE, "neurondb_rank_documents: MARKER 1.2 - JSON object started");
+		
+			elog(NOTICE, "neurondb_rank_documents: MARKER 1.3 - Adding 'ranked' key");
+			/* Add "ranked" key */
+			jkey.type = jbvString;
+			jkey.val.string.val = "ranked";
+			jkey.val.string.len = strlen("ranked");
+			(void) pushJsonbValue((JsonbParseState **) &parse_state, WJB_KEY, &jkey);
+			
+			elog(NOTICE, "neurondb_rank_documents: MARKER 1.4 - Starting 'ranked' array");
+			/* Start "ranked" array */
+			(void) pushJsonbValue((JsonbParseState **) &parse_state, WJB_BEGIN_ARRAY, NULL);
+		
+		count = 0;
+		for (i = 0; i < nelems && count < limit; i++)
+		{
+			if (ranklist[i].doc)
+			{
+				/* NOTICE: Adding document to JSON - MARKER 2 */
+				elog(NOTICE, "neurondb_rank_documents: MARKER 2.1 - Adding document %d: '%.50s'", count, ranklist[i].doc);
+				
+				elog(NOTICE, "neurondb_rank_documents: MARKER 2.2 - Starting document object");
+				/* Start document object */
+				(void) pushJsonbValue((JsonbParseState **) &parse_state, WJB_BEGIN_OBJECT, NULL);
+				
+				elog(NOTICE, "neurondb_rank_documents: MARKER 2.3 - Adding 'document' key");
+				/* Add "document" key */
+				jkey.type = jbvString;
+				jkey.val.string.val = "document";
+				jkey.val.string.len = strlen("document");
+				(void) pushJsonbValue((JsonbParseState **) &parse_state, WJB_KEY, &jkey);
+				
+				elog(NOTICE, "neurondb_rank_documents: MARKER 2.4 - Adding document value, doc='%.50s', len=%zu", ranklist[i].doc, strlen(ranklist[i].doc));
+				/* Add document value - ensure string is properly null-terminated */
+				jdoc.type = jbvString;
+				jdoc.val.string.val = ranklist[i].doc;
+				jdoc.val.string.len = strlen(ranklist[i].doc);
+				(void) pushJsonbValue((JsonbParseState **) &parse_state, WJB_VALUE, &jdoc);
+				elog(NOTICE, "neurondb_rank_documents: MARKER 2.5 - Document value added");
+				
+				/* Add "score" key */
+				jkey.type = jbvString;
+				jkey.val.string.val = "score";
+				jkey.val.string.len = strlen("score");
+				(void) pushJsonbValue((JsonbParseState **) &parse_state, WJB_KEY, &jkey);
+				
+				/* Add score value as numeric */
+				jscore.type = jbvNumeric;
+				jscore.val.numeric = DirectFunctionCall1(float4_numeric, Float4GetDatum(ranklist[i].score));
+				(void) pushJsonbValue((JsonbParseState **) &parse_state, WJB_VALUE, &jscore);
+				
+				/* Add "rank" key */
+				jkey.type = jbvString;
+				jkey.val.string.val = "rank";
+				jkey.val.string.len = strlen("rank");
+				(void) pushJsonbValue((JsonbParseState **) &parse_state, WJB_KEY, &jkey);
+				
+				/* Add rank value as numeric */
+				jrank.type = jbvNumeric;
+				jrank.val.numeric = DirectFunctionCall1(int4_numeric, Int32GetDatum(count + 1));
+				(void) pushJsonbValue((JsonbParseState **) &parse_state, WJB_VALUE, &jrank);
+				
+				/* End document object */
+				(void) pushJsonbValue((JsonbParseState **) &parse_state, WJB_END_OBJECT, NULL);
+				
+				count++;
+			}
 		}
+		
+			elog(NOTICE, "neurondb_rank_documents: MARKER 3.1 - Ending 'ranked' array");
+			/* End "ranked" array */
+			(void) pushJsonbValue((JsonbParseState **) &parse_state, WJB_END_ARRAY, NULL);
+			
+			elog(NOTICE, "neurondb_rank_documents: MARKER 3.2 - Ending root object");
+			/* End root object */
+			result = pushJsonbValue((JsonbParseState **) &parse_state, WJB_END_OBJECT, NULL);
+			
+			/* NOTICE: JSON construction complete - MARKER 3 */
+			elog(NOTICE, "neurondb_rank_documents: MARKER 3.3 - JSON construction complete, count=%d, result=%p", count, (void *)result);
+			
+			/* Convert to Jsonb */
+			if (result == NULL)
+			{
+				elog(NOTICE, "neurondb_rank_documents: ERROR - result is NULL");
+				ereport(ERROR,
+						(errcode(ERRCODE_INTERNAL_ERROR),
+						 errmsg("neurondb_rank_documents: failed to build JSON result")));
+			}
+			
+			elog(NOTICE, "neurondb_rank_documents: MARKER 4.1 - About to call JsonbValueToJsonb");
+			jsonb_result = JsonbValueToJsonb(result);
+			elog(NOTICE, "neurondb_rank_documents: MARKER 4.2 - JsonbValueToJsonb returned, jsonb_result=%p", (void *)jsonb_result);
+			
+			/* Ensure jsonb_result is set before exiting PG_TRY */
+			if (jsonb_result == NULL)
+			{
+				elog(NOTICE, "neurondb_rank_documents: ERROR - jsonb_result is NULL after JsonbValueToJsonb");
+				ereport(ERROR,
+						(errcode(ERRCODE_INTERNAL_ERROR),
+						 errmsg("neurondb_rank_documents: failed to convert JSON result to Jsonb")));
+			}
+			
+			if (jsonb_result == NULL)
+			{
+				elog(NOTICE, "neurondb_rank_documents: ERROR - jsonb_result is NULL");
+				ereport(ERROR,
+						(errcode(ERRCODE_INTERNAL_ERROR),
+						 errmsg("neurondb_rank_documents: failed to convert JSON result to Jsonb")));
+			}
+			
+			elog(NOTICE, "neurondb_rank_documents: MARKER 4.3 - Successfully built JSONB");
+		}
+		PG_CATCH();
+		{
+			ErrorData  *edata = CopyErrorData();
+			
+			elog(ERROR,
+				 (errcode(ERRCODE_INTERNAL_ERROR),
+				  errmsg("neurondb_rank_documents: JSON construction failed: %s", edata->message),
+				  errdetail("Error occurred during JSONB construction with %d documents", nelems)));
+			FlushErrorState();
+		}
+		PG_END_TRY();
+		
+		/* cleanup */
+		for (i = 0; i < nelems; i++)
+		{
+			if (ranklist[i].doc)
+				nfree(ranklist[i].doc);
+		}
+		nfree(ranklist);
+		if (algorithm_text)
+			nfree(algorithm);
+		nfree(query);
+		
+		elog(NOTICE, "neurondb_rank_documents: FINAL - About to return JSONB, jsonb_result=%p", (void *)jsonb_result);
+		if (jsonb_result == NULL)
+		{
+			ereport(ERROR,
+					(errcode(ERRCODE_INTERNAL_ERROR),
+					 errmsg("neurondb_rank_documents: jsonb_result is NULL before return")));
+		}
+		PG_RETURN_JSONB_P(jsonb_result);
 	}
-	appendStringInfoString(&json_result, "]}");
-
-	/* cleanup */
-	for (i = 0; i < nelems; i++)
-	{
-		if (ranklist[i].doc)
-			nfree(ranklist[i].doc);
-	}
-	nfree(ranklist);
-	if (algorithm_text)
-		nfree(algorithm);
-	nfree(query);
-
-	PG_RETURN_JSONB_P(DatumGetJsonbP(DirectFunctionCall1(
-														 jsonb_in, CStringGetTextDatum(json_result.data))));
 }
 
 /*

@@ -992,7 +992,7 @@ catboost_gpu_release_state(CatBoostGpuModelState *state)
 	nfree(state);
 }
 
-static bytea *
+static bytea * __attribute__((unused))
 catboost_model_serialize_to_bytea(int iterations, int depth, float learning_rate, int n_features, const char *loss_function, uint8 training_backend)
 {
 	StringInfoData buf;
