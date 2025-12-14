@@ -412,6 +412,17 @@ vector_norm(PG_FUNCTION_ARGS)
 	PG_RETURN_FLOAT8(sqrt(sum));
 }
 
+/*
+ * l2_norm - Alias for vector_norm for compatibility
+ * Computes L2 (Euclidean) norm of a vector
+ */
+PG_FUNCTION_INFO_V1(l2_norm);
+Datum
+l2_norm(PG_FUNCTION_ARGS)
+{
+	return vector_norm(fcinfo);
+}
+
 void
 normalize_vector(Vector *v)
 {
@@ -660,6 +671,35 @@ vector_mul(PG_FUNCTION_ARGS)
 					 errmsg("vector multiplication resulted in infinity at index %d", i)));
 		result->data[i] = (float4) product;
 	}
+
+	PG_RETURN_VECTOR_P(result);
+}
+
+PG_FUNCTION_INFO_V1(vector_neg);
+Datum
+vector_neg(PG_FUNCTION_ARGS)
+{
+	Vector	   *v = NULL;
+	Vector *result = NULL;
+	int			i;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_neg requires 1 argument")));
+
+	v = PG_GETARG_VECTOR_P(0);
+	NDB_CHECK_VECTOR_VALID(v);
+
+	if (v == NULL)
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("cannot negate NULL vector")));
+
+	result = new_vector(v->dim);
+	for (i = 0; i < v->dim; i++)
+		result->data[i] = -v->data[i];
 
 	PG_RETURN_VECTOR_P(result);
 }
