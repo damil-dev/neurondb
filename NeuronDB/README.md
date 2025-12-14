@@ -83,7 +83,33 @@ NeuronDB extends PostgreSQL with vector search, ML model inference, hybrid retri
 - **[Configuration](docs/configuration.md)** - Essential configuration options
 - **[Troubleshooting](docs/troubleshooting.md)** - Common issues and solutions
 
-For detailed documentation, API references, best practices, and guides, visit [www.neurondb.ai](https://neurondb.ai/docs)
+## Official Documentation
+
+**For comprehensive documentation, detailed tutorials, complete API references, best practices, and production guides, visit:**
+
+🌐 **[https://www.neurondb.ai/docs](https://www.neurondb.ai/docs)**
+
+The official documentation site provides:
+- **Complete API Reference**: All 473 SQL functions with examples
+- **Detailed Tutorials**: Step-by-step guides for all features
+- **Performance Guides**: Optimization strategies and benchmarks
+- **Production Best Practices**: Deployment, scaling, and monitoring
+- **Troubleshooting**: Common issues and solutions
+- **Latest Updates**: Release notes and what's new
+
+### Quick Links to Official Documentation
+
+| Topic | Link |
+|-------|------|
+| Getting Started | [Quick Start Guide](https://www.neurondb.ai/docs/getting-started) |
+| Vector Search | [Vector Search Documentation](https://www.neurondb.ai/docs/vector-search) |
+| ML Algorithms | [ML Algorithms Guide](https://www.neurondb.ai/docs/ml-algorithms) |
+| RAG Pipeline | [RAG Documentation](https://www.neurondb.ai/docs/rag) |
+| GPU Acceleration | [GPU Support Guide](https://www.neurondb.ai/docs/gpu) |
+| Hybrid Search | [Hybrid Search Guide](https://www.neurondb.ai/docs/hybrid-search) |
+| Performance | [Performance Optimization](https://www.neurondb.ai/docs/performance) |
+| Security | [Security Features](https://www.neurondb.ai/docs/security) |
+| API Reference | [Complete API Reference](https://www.neurondb.ai/docs/api) |
 
 ## Architecture
 
