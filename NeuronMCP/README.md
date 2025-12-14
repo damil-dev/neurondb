@@ -11,6 +11,20 @@ Model Context Protocol server for NeuronDB PostgreSQL extension, implemented in 
 
 NeuronMCP implements the Model Context Protocol using JSON-RPC 2.0 over stdio. It provides tools and resources for MCP clients to interact with NeuronDB, including vector operations, ML model training, and database schema management.
 
+## Official Documentation
+
+**For comprehensive documentation, detailed tutorials, complete tool references, and integration guides, visit:**
+
+🌐 **[https://www.neurondb.ai/docs/neuronmcp](https://www.neurondb.ai/docs/neuronmcp)**
+
+The official documentation provides:
+- Complete MCP protocol implementation details
+- All available tools and resources reference
+- Claude Desktop integration guide
+- Custom tool development
+- Configuration and deployment guides
+- Troubleshooting and best practices
+
 ## Features
 
 | Feature | Description |
@@ -113,8 +127,8 @@ Using Docker:
 
 ```bash
 cd docker
-cp .env.example .env
-# Edit .env with your configuration
+# Optionally create .env file with your configuration
+# Or use environment variables directly (docker-compose.yml has defaults)
 docker compose up -d
 ```
 
@@ -220,7 +234,7 @@ Create Claude Desktop configuration file:
 
 **Linux:** `~/.config/Claude/claude_desktop_config.json`
 
-See [Setup Guide](SETUP_GUIDE.md) for platform-specific configuration examples.
+See the example configuration files in this directory (`claude_desktop_config.*.json`) for platform-specific examples.
 
 Example configuration:
 
@@ -328,11 +342,9 @@ docker run -i --rm \
 
 | Document | Description |
 |----------|-------------|
-| [Tools Reference](TOOLS_REFERENCE.md) | Complete tool reference with parameters and examples |
-| [Setup Guide](SETUP_GUIDE.md) | Installation and configuration guide for all platforms |
-| [PostgreSQL Tools](POSTGRESQL_TOOLS.md) | PostgreSQL monitoring tools documentation |
 | [Docker Guide](docker/README.md) | Container deployment guide |
 | [MCP Specification](https://modelcontextprotocol.io/) | Model Context Protocol documentation |
+| [Claude Desktop Config Examples](claude_desktop_config.json) | Example configurations for macOS, Linux, and Windows |
 
 ## System Requirements
 

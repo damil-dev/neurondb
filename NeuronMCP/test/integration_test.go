@@ -15,12 +15,10 @@ package test
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 	"time"
 
 	"github.com/neurondb/NeuronMCP/internal/server"
-	"github.com/neurondb/NeuronMCP/pkg/mcp"
 )
 
 /* IntegrationTestSuite provides integration tests for NeuronMCP */
@@ -111,6 +109,7 @@ func TestToolExecution(t *testing.T) {
 		if srv == nil {
 			t.Fatal("NewServer() returned nil")
 		}
+		_ = ctx /* Context reserved for future MCP protocol testing */
 	}()
 }
 
