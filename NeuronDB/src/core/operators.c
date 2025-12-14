@@ -308,6 +308,55 @@ vector_div(PG_FUNCTION_ARGS)
 	PG_RETURN_VECTOR_P(res);
 }
 
+PG_FUNCTION_INFO_V1(vector_div_scalar);
+Datum
+vector_div_scalar(PG_FUNCTION_ARGS)
+{
+	Vector	   *v = NULL;
+	float8		scalar;
+	Vector *result = NULL;
+	int			i;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_div_scalar requires 2 arguments")));
+
+	v = PG_GETARG_VECTOR_P(0);
+	NDB_CHECK_VECTOR_VALID(v);
+	scalar = PG_GETARG_FLOAT8(1);
+
+	if (v == NULL)
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("cannot divide NULL vector")));
+
+	if (scalar == 0.0)
+		ereport(ERROR,
+				(errcode(ERRCODE_DIVISION_BY_ZERO),
+				 errmsg("division by zero")));
+
+	if (isnan(scalar) || isinf(scalar))
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("scalar divisor cannot be NaN or Infinity")));
+
+	result = new_vector(v->dim);
+	for (i = 0; i < v->dim; i++)
+	{
+		double		quotient = (double) v->data[i] / scalar;
+
+		if (isinf(quotient))
+			ereport(ERROR,
+					(errcode(ERRCODE_DATA_EXCEPTION),
+					 errmsg("vector division resulted in infinity at index %d", i)));
+		result->data[i] = (float4) quotient;
+	}
+
+	PG_RETURN_VECTOR_P(result);
+}
+
 PG_FUNCTION_INFO_V1(vector_avg);
 Datum
 vector_avg(PG_FUNCTION_ARGS)
