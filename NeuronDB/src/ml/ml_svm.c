@@ -2378,7 +2378,6 @@ evaluate_svm_by_model_id(PG_FUNCTION_ARGS)
 	StringInfoData query;
 
 	SVMModel *model = NULL;
-	StringInfoData jsonbuf;
 
 	Jsonb *result_jsonb = NULL;
 	bytea *gpu_payload = NULL;

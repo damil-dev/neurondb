@@ -4912,7 +4912,10 @@ evaluate_random_forest_by_model_id(PG_FUNCTION_ARGS)
 				else
 				{
 					/* Batch evaluation failed - fall back to row-by-row */
-					/* Warning removed - fallback is expected behavior */
+					/* Log error for debugging */
+					ereport(DEBUG2,
+							(errmsg("evaluate_random_forest_by_model_id: GPU batch evaluation failed: %s",
+									gpu_err ? gpu_err : "unknown error")));
 					if (gpu_err)
 						nfree(gpu_err);
 					nfree(features_array);
@@ -5040,6 +5043,10 @@ evaluate_random_forest_by_model_id(PG_FUNCTION_ARGS)
 				if (predict_rc != 0)
 				{
 					/* GPU predict failed - check compute mode */
+					/* Log error for debugging */
+					ereport(DEBUG2,
+							(errmsg("evaluate_random_forest_by_model_id: GPU prediction failed for row %d: %s",
+									i, gpu_err ? gpu_err : "unknown error")));
 					if (NDB_REQUIRE_GPU())
 					{
 						/* Strict GPU mode: error out */

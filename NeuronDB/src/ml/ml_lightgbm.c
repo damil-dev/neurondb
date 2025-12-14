@@ -224,30 +224,42 @@ lightgbm_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 	}
 
 	/* Extract hyperparameters */
+	/* Wrap JSONB iteration in PG_TRY to handle corrupted JSONB gracefully, similar to automl code */
 	if (spec->hyperparameters != NULL)
 	{
-		it = JsonbIteratorInit((JsonbContainer *) & spec->hyperparameters->root);
-		while ((r = JsonbIteratorNext(&it, &v, false)) != WJB_DONE)
+		PG_TRY();
 		{
-			if (r == WJB_KEY)
+			it = JsonbIteratorInit((JsonbContainer *) & spec->hyperparameters->root);
+			while ((r = JsonbIteratorNext(&it, &v, false)) != WJB_DONE)
 			{
-				char	   *key = pnstrdup(v.val.string.val, v.val.string.len);
+				if (r == WJB_KEY)
+				{
+					char	   *key = pnstrdup(v.val.string.val, v.val.string.len);
 
-				r = JsonbIteratorNext(&it, &v, false);
-				if (strcmp(key, "n_estimators") == 0 && v.type == jbvNumeric)
-					n_estimators = DatumGetInt32(DirectFunctionCall1(numeric_int4,
-																	 NumericGetDatum(v.val.numeric)));
-				else if (strcmp(key, "max_depth") == 0 && v.type == jbvNumeric)
-					max_depth = DatumGetInt32(DirectFunctionCall1(numeric_int4,
-																  NumericGetDatum(v.val.numeric)));
-				else if (strcmp(key, "learning_rate") == 0 && v.type == jbvNumeric)
-					learning_rate = (float) DatumGetFloat8(DirectFunctionCall1(numeric_float8,
-																			   NumericGetDatum(v.val.numeric)));
-				else if (strcmp(key, "boosting_type") == 0 && v.type == jbvString)
-					strncpy(boosting_type, v.val.string.val, sizeof(boosting_type) - 1);
-				nfree(key);
+					r = JsonbIteratorNext(&it, &v, false);
+					if (strcmp(key, "n_estimators") == 0 && v.type == jbvNumeric)
+						n_estimators = DatumGetInt32(DirectFunctionCall1(numeric_int4,
+																		 NumericGetDatum(v.val.numeric)));
+					else if (strcmp(key, "max_depth") == 0 && v.type == jbvNumeric)
+						max_depth = DatumGetInt32(DirectFunctionCall1(numeric_int4,
+																	  NumericGetDatum(v.val.numeric)));
+					else if (strcmp(key, "learning_rate") == 0 && v.type == jbvNumeric)
+						learning_rate = (float) DatumGetFloat8(DirectFunctionCall1(numeric_float8,
+																				   NumericGetDatum(v.val.numeric)));
+					else if (strcmp(key, "boosting_type") == 0 && v.type == jbvString)
+						strncpy(boosting_type, v.val.string.val, sizeof(boosting_type) - 1);
+					nfree(key);
+				}
 			}
 		}
+		PG_CATCH();
+		{
+			FlushErrorState();
+			elog(WARNING,
+				 "lightgbm_gpu_train: Failed to parse hyperparameters JSONB (possibly corrupted), using defaults");
+			/* Use default values already set above */
+		}
+		PG_END_TRY();
 	}
 
 	if (n_estimators < 1)
