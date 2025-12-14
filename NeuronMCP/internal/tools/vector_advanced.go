@@ -104,10 +104,10 @@ func (t *VectorArithmeticTool) Execute(ctx context.Context, params map[string]in
 		if operation == "subtract" {
 			op = "-"
 		} else if operation == "concat" {
-			query = fmt.Sprintf("SELECT vector_concat($1::vector, $2::vector) AS result")
+			query = fmt.Sprintf("SELECT vector_concat($1::vector, $2::vector)::text AS result")
 			queryParams = []interface{}{vec1Str, vec2Str}
 		} else {
-			query = fmt.Sprintf("SELECT ($1::vector %s $2::vector) AS result", op)
+			query = fmt.Sprintf("SELECT (($1::vector %s $2::vector)::text) AS result", op)
 			queryParams = []interface{}{vec1Str, vec2Str}
 		}
 	case "multiply":
@@ -118,10 +118,10 @@ func (t *VectorArithmeticTool) Execute(ctx context.Context, params map[string]in
 				"params":    params,
 			}), nil
 		}
-		query = fmt.Sprintf("SELECT ($1::vector * $2::float8) AS result")
+		query = fmt.Sprintf("SELECT (($1::vector * $2::float8)::text) AS result")
 		queryParams = []interface{}{vec1Str, scalar}
 	case "normalize":
-		query = fmt.Sprintf("SELECT vector_normalize($1::vector) AS result")
+		query = fmt.Sprintf("SELECT vector_normalize($1::vector)::text AS result")
 		queryParams = []interface{}{vec1Str}
 	case "norm":
 		query = fmt.Sprintf("SELECT vector_norm($1::vector) AS result")

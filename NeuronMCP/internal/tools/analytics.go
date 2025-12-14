@@ -391,7 +391,7 @@ func (t *ReduceDimensionalityTool) Execute(ctx context.Context, params map[strin
   /* Use neurondb.train with 'pca' algorithm or use dimensionality reduction functions */
   /* For now, we'll use a direct approach - PCA might need to be implemented differently */
   /* Check if there's a compute_pca function or use train with pca algorithm */
-	query := `SELECT neurondb.train('default', 'pca', $1, NULL, ARRAY[$2], jsonb_build_object('n_components', $3)) AS pca_model_id`
+	query := `SELECT neurondb.train('default', 'pca', $1, NULL, ARRAY[$2], jsonb_build_object('n_components', $3::integer)) AS pca_model_id`
 	result, err := t.executor.ExecuteQueryOne(ctx, query, []interface{}{table, vectorColumn, nComponents})
 	if err != nil {
 		t.logger.Error("Dimensionality reduction failed", err, params)

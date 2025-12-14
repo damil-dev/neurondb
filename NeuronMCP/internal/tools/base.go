@@ -71,11 +71,30 @@ func (b *BaseTool) InputSchema() map[string]interface{} {
 func (b *BaseTool) ValidateParams(params map[string]interface{}, schema map[string]interface{}) (bool, []string) {
 	var errors []string
 
+	/* Parameter aliases - map common aliases to canonical names */
+	aliases := map[string]string{
+		"document": "text", /* document is alias for text in RAG tools */
+	}
+
 	if required, ok := schema["required"].([]interface{}); ok {
 		for _, req := range required {
 			if reqStr, ok := req.(string); ok {
 				if _, exists := params[reqStr]; !exists {
-					errors = append(errors, fmt.Sprintf("Missing required parameter: %s", reqStr))
+					/* Check if alias exists */
+					aliasFound := false
+					for alias, canonical := range aliases {
+						if canonical == reqStr {
+							if _, aliasExists := params[alias]; aliasExists {
+								/* Copy alias value to canonical name */
+								params[reqStr] = params[alias]
+								aliasFound = true
+								break
+							}
+						}
+					}
+					if !aliasFound {
+						errors = append(errors, fmt.Sprintf("Missing required parameter: %s", reqStr))
+					}
 				}
 			}
 		}

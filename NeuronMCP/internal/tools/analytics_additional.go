@@ -15,6 +15,7 @@ package tools
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/neurondb/NeuronMCP/internal/database"
@@ -77,6 +78,18 @@ func (t *AnalyzeDataTool) Execute(ctx context.Context, params map[string]interfa
 
 	table, _ := params["table"].(string)
 	columns, _ := params["columns"].([]interface{})
+	
+	/* Handle string array format from command parser */
+	if columns == nil {
+		if colsStr, ok := params["columns"].(string); ok && colsStr != "" {
+			/* Try to parse as JSON array */
+			var colsArray []interface{}
+			if err := json.Unmarshal([]byte(colsStr), &colsArray); err == nil {
+				columns = colsArray
+			}
+		}
+	}
+	
 	includeStats, _ := params["include_stats"].(bool)
 	includeDistribution, _ := params["include_distribution"].(bool)
 
