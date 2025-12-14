@@ -132,8 +132,10 @@ ndb_cuda_knn_pack(const struct KNNModel *model,
 	}
 
 	/* Allocate blob in TopMemoryContext */
-	char *tmp = (char *) palloc0(VARHDRSZ + payload_bytes);
-	blob = (bytea *) tmp;
+	{
+		char *tmp = (char *) palloc0(VARHDRSZ + payload_bytes);
+		blob = (bytea *) tmp;
+		
 	
 	if (blob == NULL)
 	{
@@ -143,6 +145,7 @@ ndb_cuda_knn_pack(const struct KNNModel *model,
 		return -1;
 	}
 
+	}
 	SET_VARSIZE(blob, VARHDRSZ + payload_bytes);
 	base = VARDATA(blob);
 
@@ -231,6 +234,9 @@ ndb_cuda_knn_train(const float *features,
 	Jsonb	   *metrics_json = NULL;
 	int			i,
 				j;
+	float	   *features_copy = NULL;
+	double	   *labels_copy = NULL;
+	MemoryContext oldcontext;
 	int			extracted_task;
 	int			rc = -1;
 
@@ -380,6 +386,9 @@ ndb_cuda_knn_train(const float *features,
 		PG_END_TRY();
 	}
 
+	/* Copy input data into TopMemoryContext to ensure it persists during pack call.
+	 * This prevents issues if the input pointers point to memory that might be freed. */
+
 	/* Check for integer overflow in memory allocation before copying */
 	if (feature_dim > 0 && (size_t) n_samples > MaxAllocSize / sizeof(float) / (size_t) feature_dim)
 	{
@@ -387,13 +396,11 @@ ndb_cuda_knn_train(const float *features,
 			*errstr = pstrdup("CUDA KNN train: feature array size exceeds MaxAllocSize");
 		return -1;
 	}
-	
-	/* Copy input data into TopMemoryContext to ensure it persists during pack call.
-	 * This prevents issues if the input pointers point to memory that might be freed. */
-	float *features_copy = NULL;
-	double *labels_copy = NULL;
+
+	features_copy = NULL;
+	labels_copy = NULL;
 	{
-		MemoryContext oldcontext = CurrentMemoryContext;
+		oldcontext = CurrentMemoryContext;
 		MemoryContextSwitchTo(TopMemoryContext);
 		
 		features_copy = (float *) palloc(sizeof(float) * (size_t) n_samples * (size_t) feature_dim);

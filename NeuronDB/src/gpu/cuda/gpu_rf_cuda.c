@@ -961,7 +961,8 @@ ndb_cuda_rf_predict(const bytea * model_data,
 		rc = ndb_cuda_rf_infer_model(gpu_model,
 									 input,
 									 effective_dim,
-									 votes);
+									 votes,
+									 errstr);
 	}
 	else
 	{
@@ -981,26 +982,35 @@ ndb_cuda_rf_predict(const bytea * model_data,
 							   votes);
 	}
 
-	if (rc == 0)
+	if (rc != 0)
 	{
-		best_class = model_hdr->majority_class;
-		best_votes = -1;
-		for (i = 0; i < model_hdr->class_count; i++)
-		{
-			if (votes[i] > best_votes)
-			{
-				best_votes = votes[i];
-				best_class = i;
-			}
-		}
-		*class_out = best_class;
-	}
-	else
-	{
+		/* Error details should already be set in errstr by ndb_cuda_rf_infer_model */
+		if (votes)
+			nfree(votes);
 		if (errstr != NULL && *errstr == NULL)
-			*errstr = pstrdup("CUDA RF inference failed");
-		*class_out = model_hdr->majority_class;
+		{
+			/* Fallback error message if ndb_cuda_rf_infer_model didn't set one */
+			cudaError_t cuda_err = cudaGetLastError();
+			if (cuda_err != cudaSuccess)
+				*errstr = psprintf("CUDA RF inference failed: %s", cudaGetErrorString(cuda_err));
+			else
+				*errstr = pstrdup("CUDA RF inference failed: unknown error");
+		}
+		return -1;
 	}
+
+	/* Inference succeeded - find best class from votes */
+	best_class = model_hdr->majority_class;
+	best_votes = -1;
+	for (i = 0; i < model_hdr->class_count; i++)
+	{
+		if (votes[i] > best_votes)
+		{
+			best_votes = votes[i];
+			best_class = i;
+		}
+	}
+	*class_out = best_class;
 
 	if (votes)
 		nfree(votes);
@@ -1177,7 +1187,8 @@ int
 ndb_cuda_rf_infer_model(const NdbCudaRfGpuModel *model,
 						const float *input,
 						int feature_dim,
-						int *votes)
+						int *votes,
+						char **errstr)
 {
 	float	   *d_input = NULL;
 	int		   *d_votes = NULL;
@@ -1188,18 +1199,31 @@ ndb_cuda_rf_infer_model(const NdbCudaRfGpuModel *model,
 		return -1;
 
 	if (model->feature_dim != feature_dim)
+	{
+		if (errstr && *errstr == NULL)
+			*errstr = psprintf("CUDA RF infer_model: feature dimension mismatch (model expects %d, got %d)",
+							   model->feature_dim, feature_dim);
 		return -1;
+	}
 
 	/* Allocate temporary device buffers for input and votes */
 	status = cudaMalloc((void **) &d_input, sizeof(float) * (size_t) feature_dim);
 	if (status != cudaSuccess)
+	{
+		if (errstr && *errstr == NULL)
+			*errstr = psprintf("CUDA RF infer_model: failed to allocate input buffer: %s",
+							   cudaGetErrorString(status));
 		return -1;
+	}
 
 	status = cudaMalloc((void **) &d_votes,
 						sizeof(int) * (size_t) model->class_count);
 	if (status != cudaSuccess)
 	{
 		cudaFree(d_input);
+		if (errstr && *errstr == NULL)
+			*errstr = psprintf("CUDA RF infer_model: failed to allocate votes buffer: %s",
+							   cudaGetErrorString(status));
 		return -1;
 	}
 
@@ -1209,14 +1233,25 @@ ndb_cuda_rf_infer_model(const NdbCudaRfGpuModel *model,
 						sizeof(float) * (size_t) feature_dim,
 						cudaMemcpyHostToDevice);
 	if (status != cudaSuccess)
+	{
+		if (errstr && *errstr == NULL)
+			*errstr = psprintf("CUDA RF infer_model: failed to copy input to device: %s",
+							   cudaGetErrorString(status));
 		goto cleanup;
+	}
 
 	/* Clear votes */
 	status = cudaMemset(d_votes, 0, sizeof(int) * (size_t) model->class_count);
 	if (status != cudaSuccess)
+	{
+		if (errstr && *errstr == NULL)
+			*errstr = psprintf("CUDA RF infer_model: failed to clear votes buffer: %s",
+							   cudaGetErrorString(status));
 		goto cleanup;
+	}
 
 	/* Launch kernel using batch kernel with n_samples=1 */
+	/* Note: launch_rf_predict_batch_kernel already synchronizes, so we don't need to sync again */
 	rc = launch_rf_predict_batch_kernel(model->d_nodes,
 										model->d_trees,
 										model->tree_count,
@@ -1228,11 +1263,19 @@ ndb_cuda_rf_infer_model(const NdbCudaRfGpuModel *model,
 										d_votes);
 
 	if (rc != 0)
+	{
+		if (errstr && *errstr == NULL)
+		{
+			/* Check for CUDA error after kernel launch failure */
+			cudaError_t cuda_err = cudaGetLastError();
+			if (cuda_err != cudaSuccess)
+				*errstr = psprintf("CUDA RF infer_model: kernel launch/sync failed (rc=%d): %s",
+								   rc, cudaGetErrorString(cuda_err));
+			else
+				*errstr = psprintf("CUDA RF infer_model: kernel launch failed (rc=%d) - check kernel parameters", rc);
+		}
 		goto cleanup;
-
-	status = cudaDeviceSynchronize();
-	if (status != cudaSuccess)
-		goto cleanup;
+	}
 
 	/* Copy votes back */
 	status = cudaMemcpy(votes,
@@ -1240,13 +1283,26 @@ ndb_cuda_rf_infer_model(const NdbCudaRfGpuModel *model,
 						sizeof(int) * (size_t) model->class_count,
 						cudaMemcpyDeviceToHost);
 	if (status != cudaSuccess)
+	{
+		if (errstr && *errstr == NULL)
+			*errstr = psprintf("CUDA RF infer_model: failed to copy votes from device: %s",
+							   cudaGetErrorString(status));
 		goto cleanup;
+	}
 
 	cudaFree(d_input);
 	cudaFree(d_votes);
 	return 0;
 
 cleanup:
+	if (errstr && *errstr == NULL)
+	{
+		cudaError_t cuda_err = cudaGetLastError();
+		if (cuda_err != cudaSuccess)
+			*errstr = psprintf("CUDA RF infer_model failed: %s", cudaGetErrorString(cuda_err));
+		else
+			*errstr = pstrdup("CUDA RF infer_model failed: unknown error");
+	}
 	if (d_input)
 		cudaFree(d_input);
 	if (d_votes)
