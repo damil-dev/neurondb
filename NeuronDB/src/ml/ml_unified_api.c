@@ -1459,6 +1459,13 @@ neurondb_train(PG_FUNCTION_ARGS)
 
 	/* Pre-allocate "default" string early in callcontext */
 	default_project_name = pstrdup("default");
+	
+	/* Copy hyperparams into callcontext to ensure it's valid throughout the function */
+	if (hyperparams != NULL)
+	{
+		hyperparams = (Jsonb *) PG_DETOAST_DATUM_COPY(PointerGetDatum(hyperparams));
+	}
+	
 	MemoryContextSwitchTo(oldcontext);
 	MemoryContextSwitchTo(callcontext);
 
@@ -1807,8 +1814,17 @@ neurondb_train(PG_FUNCTION_ARGS)
 			 * prevent JSON parsing errors in GPU code. This matches the
 			 * behavior in CPU training code (ml_linear_regression.c).
 			 */
-			Jsonb *gpu_hyperparams = hyperparams;
-			if (gpu_hyperparams == NULL)
+			/* Ensure hyperparams is copied into callcontext before GPU training */
+			/* This matches the pattern used by linear regression and other algorithms */
+			Jsonb *gpu_hyperparams = NULL;
+			MemoryContext prev_gpu_context = MemoryContextSwitchTo(callcontext);
+			
+			if (hyperparams != NULL)
+			{
+				/* Copy hyperparams into callcontext to ensure it's valid */
+				gpu_hyperparams = (Jsonb *) PG_DETOAST_DATUM_COPY(PointerGetDatum(hyperparams));
+			}
+			else
 			{
 				/* Create empty JSONB object like CPU training does */
 				PG_TRY();
@@ -1816,6 +1832,7 @@ neurondb_train(PG_FUNCTION_ARGS)
 					gpu_hyperparams = ndb_jsonb_in_cstring("{}");
 					if (gpu_hyperparams == NULL)
 					{
+						MemoryContextSwitchTo(prev_gpu_context);
 						ereport(ERROR,
 								(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
 								 errmsg(NDB_ERR_PREFIX_TRAIN " failed to create empty hyperparams JSONB")));
@@ -1824,12 +1841,15 @@ neurondb_train(PG_FUNCTION_ARGS)
 				PG_CATCH();
 				{
 					FlushErrorState();
+					MemoryContextSwitchTo(prev_gpu_context);
 					ereport(ERROR,
 							(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
 							 errmsg(NDB_ERR_PREFIX_TRAIN " failed to parse empty hyperparams JSON: %m")));
 				}
 				PG_END_TRY();
 			}
+			
+			MemoryContextSwitchTo(prev_gpu_context);
 
 			/*
 			 * Wrap GPU training call in PG_TRY to catch exceptions and
@@ -3730,7 +3750,211 @@ neurondb_predict(PG_FUNCTION_ARGS)
 	else if (strcmp(algorithm, "hierarchical") == 0)
 		appendStringInfo(&sql, "SELECT predict_hierarchical_cluster(%d, %s)", model_id, features_str.data);
 	else if (strcmp(algorithm, "xgboost") == 0)
+	{
+		bytea *model_data = NULL;
+		Jsonb *metrics = NULL;
+		bool		is_gpu = false;
+		double		xgboost_prediction = 0.0;
+
+		float *features_float = NULL;
+		int			feature_dim = nelems;
+
+		char *errstr = NULL;
+		int			rc;
+
+		if (!ml_catalog_fetch_model_payload(model_id, &model_data, NULL, &metrics))
+		{
+			ndb_spi_session_end(&spi_session);
+			neurondb_cleanup(oldcontext, callcontext);
+			ereport(ERROR, (errcode(ERRCODE_INVALID_PARAMETER_VALUE), errmsg("XGBoost model %d not found", model_id)));
+		}
+
+		if (model_data == NULL)
+		{
+			if (metrics)
+				nfree(metrics);
+
+			ndb_spi_session_end(&spi_session);
+			neurondb_cleanup(oldcontext, callcontext);
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					 errmsg("XGBoost model %d has no model data (model not trained)", model_id),
+					 errhint("XGBoost training must be completed before prediction. The model may have been created without actual training.")));
+		}
+
+		if (metrics != NULL)
+		{
+			JsonbIterator *it = NULL;
+			JsonbValue	v;
+			int			r;
+
+			PG_TRY();
+			{
+				it = JsonbIteratorInit(&metrics->root);
+				while ((r = JsonbIteratorNext(&it, &v, false)) != WJB_DONE)
+				{
+					if (r == WJB_KEY && v.type == jbvString)
+					{
+						char	   *key = pnstrdup(v.val.string.val, v.val.string.len);
+
+						r = JsonbIteratorNext(&it, &v, false);
+						/* Check for training_backend integer (new format) */
+						if (strcmp(key, "training_backend") == 0 && v.type == jbvNumeric)
+						{
+							int			backend = DatumGetInt32(DirectFunctionCall1(numeric_int4, NumericGetDatum(v.val.numeric)));
+
+							if (backend == 1)
+								is_gpu = true;
+						}
+						/* Also check storage field as fallback for XGBoost */
+						else if (strcmp(key, "storage") == 0 && v.type == jbvString)
+						{
+							char	   *storage_val = pnstrdup(v.val.string.val, v.val.string.len);
+
+							if (strcmp(storage_val, "gpu") == 0)
+								is_gpu = true;
+							nfree(storage_val);
+						}
+						nfree(key);
+					}
+				}
+			}
+			PG_CATCH();
+			{
+				/* If metrics parsing fails, assume CPU model */
+				is_gpu = false;
+			}
+			PG_END_TRY();
+		}
+		nalloc(features_float, float, feature_dim);
+
+		for (i = 0; i < feature_dim; i++)
+			features_float[i] = (float) features[i];
+
+		/*
+		 * Use model's training backend (from catalog) regardless of current
+		 * GPU state
+		 */
+		{
+			const ndb_gpu_backend *backend;
+			bool		gpu_currently_enabled;
+
+			/* Initialize GPU if needed (lazy initialization) before checking availability */
+			if (NDB_SHOULD_TRY_GPU())
+			{
+				ndb_gpu_init_if_needed();
+			}
+
+			backend = ndb_gpu_get_active_backend();
+			gpu_currently_enabled = (backend != NULL && neurondb_gpu_is_available());
+
+
+			if (is_gpu)
+			{
+				/* Model was trained on GPU - must use GPU prediction */
+				if (!gpu_currently_enabled)
+				{
+					nfree(features_float);
+
+					if (model_data)
+						nfree(model_data);
+
+					if (metrics)
+						nfree(metrics);
+
+					ndb_spi_session_end(&spi_session);
+					neurondb_cleanup(oldcontext, callcontext);
+					ereport(ERROR,
+							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+							 errmsg("XGBoost: model %d was trained on GPU but GPU is not currently available", model_id),
+							 errhint("Enable GPU with: SET neurondb.compute_mode = 1; or SET neurondb.compute_mode = 2; for auto mode")));
+				}
+
+				/* Use GPU prediction */
+				if (backend && backend->xgboost_predict && model_data != NULL)
+				{
+					rc = backend->xgboost_predict(model_data, features_float, feature_dim, &xgboost_prediction, &errstr);
+					if (rc == 0)
+					{
+						prediction = xgboost_prediction;
+						nfree(features_float);
+
+						if (model_data)
+							nfree(model_data);
+
+						if (metrics)
+							nfree(metrics);
+
+						ndb_spi_session_end(&spi_session);
+						neurondb_cleanup(oldcontext, callcontext);
+						PG_RETURN_FLOAT8(prediction);
+					}
+					/* GPU prediction failed - error out since model was GPU-trained */
+					{
+						char	   *error_msg = NULL;
+
+						if (errstr && *errstr)
+							error_msg = pstrdup(*errstr);
+						else
+							error_msg = pstrdup("GPU prediction failed with unknown error");
+
+						nfree(features_float);
+						if (model_data)
+							nfree(model_data);
+						if (metrics)
+							nfree(metrics);
+						if (errstr)
+							nfree(*errstr);
+						ndb_spi_session_end(&spi_session);
+						neurondb_cleanup(oldcontext, callcontext);
+						ereport(ERROR,
+								(errcode(ERRCODE_INTERNAL_ERROR),
+								 errmsg("XGBoost: GPU prediction failed for GPU-trained model %d", model_id),
+								 errdetail("Error: %s", error_msg),
+								 errhint("GPU backend may not be properly initialized or model data may be corrupted.")));
+						if (error_msg)
+							pfree(error_msg);
+					}
+				}
+				else
+				{
+					/* GPU backend or predict function not available */
+					nfree(features_float);
+					if (model_data)
+						nfree(model_data);
+					if (metrics)
+						nfree(metrics);
+					ndb_spi_session_end(&spi_session);
+					neurondb_cleanup(oldcontext, callcontext);
+					ereport(ERROR,
+							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+							 errmsg("XGBoost: GPU prediction not available for GPU-trained model %d", model_id),
+							 errdetail("Backend: %p, predict function: %p, model_data: %p", 
+									   (void *) backend, 
+									   backend ? (void *) backend->xgboost_predict : NULL,
+									   (void *) model_data),
+							 errhint("GPU backend may not be properly initialized.")));
+				}
+			}
+			else
+			{
+				/*
+				 * Model was trained on CPU - use CPU prediction (ignore
+				 * current GPU state)
+				 */
+				/* Fall through to CPU prediction path below */
+			}
+		}
+		/* Fall through to CPU prediction */
 		appendStringInfo(&sql, "SELECT predict_xgboost(%d, %s)", model_id, features_str.data);
+		nfree(features_float);
+
+		if (model_data)
+			nfree(model_data);
+
+		if (metrics)
+			nfree(metrics);
+	}
 	else if (strcmp(algorithm, "catboost") == 0)
 		appendStringInfo(&sql, "SELECT predict_catboost(%d, %s)", model_id, features_str.data);
 	else if (strcmp(algorithm, "lightgbm") == 0)

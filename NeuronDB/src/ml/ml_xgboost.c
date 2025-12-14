@@ -983,7 +983,7 @@ xgboost_gpu_release_state(XGBoostGpuModelState *state)
 	nfree(state);
 }
 
-static bytea *
+static bytea * __attribute__((unused))
 xgboost_model_serialize_to_bytea(int n_estimators, int max_depth, float learning_rate, int n_features, const char *objective, uint8 training_backend)
 {
 	StringInfoData buf;
