@@ -335,13 +335,17 @@ vector_to_binary(PG_FUNCTION_ARGS)
 }
 
 /*
- * binary_quantize: Alias for vector_to_binary (pgvector compatibility)
+ * binary_quantize: Convert vector to bit type (pgvector compatibility)
+ * Returns bit type instead of bytea for compatibility
  */
+/* Forward declaration */
+Datum vector_to_bit(PG_FUNCTION_ARGS);
+
 PG_FUNCTION_INFO_V1(binary_quantize);
 Datum
 binary_quantize(PG_FUNCTION_ARGS)
 {
-	return vector_to_binary(fcinfo);
+	return vector_to_bit(fcinfo);
 }
 
 /*
@@ -1974,6 +1978,99 @@ halfvec_hash(PG_FUNCTION_ARGS)
 }
 
 /*
+ * halfvec_subvector: Extract subvector from halfvec
+ * Returns a new halfvec containing elements from start to end index
+ */
+PG_FUNCTION_INFO_V1(halfvec_subvector);
+Datum
+halfvec_subvector(PG_FUNCTION_ARGS)
+{
+	VectorF16  *v = NULL;
+	VectorF16  *result = NULL;
+	int32		start;
+	int32		end;
+	int			new_dim;
+	int			size;
+	int			i;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 3)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: halfvec_subvector requires 3 arguments")));
+
+	v = (VectorF16 *) PG_GETARG_POINTER(0);
+	start = PG_GETARG_INT32(1);
+	end = PG_GETARG_INT32(2);
+
+	if (v == NULL)
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("cannot extract subvector from NULL halfvec")));
+
+	if (start < 0 || start >= v->dim || end < start || end > v->dim)
+		ereport(ERROR,
+				(errcode(ERRCODE_ARRAY_SUBSCRIPT_ERROR),
+				 errmsg("invalid slice bounds for halfvec: start=%d, end=%d, dim=%d",
+						start, end, v->dim)));
+
+	new_dim = end - start;
+	size = offsetof(VectorF16, data) + sizeof(uint16) * new_dim;
+	result = (VectorF16 *) palloc0(size);
+	SET_VARSIZE(result, size);
+	result->dim = new_dim;
+
+	for (i = 0; i < new_dim; i++)
+		result->data[i] = v->data[start + i];
+
+	PG_RETURN_POINTER(result);
+}
+
+/*
+ * halfvec_l2_norm: Compute L2 norm of halfvec
+ */
+PG_FUNCTION_INFO_V1(halfvec_l2_norm);
+Datum
+halfvec_l2_norm(PG_FUNCTION_ARGS)
+{
+	VectorF16  *v = NULL;
+	double		sum = 0.0;
+	int			i;
+	float4		val;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: halfvec_l2_norm requires 1 argument")));
+
+	v = (VectorF16 *) PG_GETARG_POINTER(0);
+
+	if (v == NULL)
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("cannot compute norm of NULL halfvec")));
+
+	if (v->dim <= 0)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("cannot compute norm of halfvec with dimension %d",
+						v->dim)));
+
+	for (i = 0; i < v->dim; i++)
+	{
+		val = fp16_to_float(v->data[i]);
+		if (isnan(val) || isinf(val))
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					 errmsg("cannot compute norm of halfvec containing NaN or Infinity")));
+		sum += (double) val * (double) val;
+	}
+
+	PG_RETURN_FLOAT8(sqrt(sum));
+}
+
+/*
  * halfvec_l2_distance: L2 distance between two halfvec vectors
  */
 PG_FUNCTION_INFO_V1(halfvec_l2_distance);
@@ -2268,4 +2365,73 @@ bit_hamming_distance(PG_FUNCTION_ARGS)
 	}
 
 	PG_RETURN_INT32(count);
+}
+
+/*
+ * bit_jaccard_distance: Jaccard distance between two bit vectors
+ * Formula: 1 - (intersection / union)
+ * where intersection = count of bits where both are 1
+ * and union = count of bits where either is 1
+ */
+PG_FUNCTION_INFO_V1(bit_jaccard_distance);
+Datum
+bit_jaccard_distance(PG_FUNCTION_ARGS)
+{
+	VarBit	   *a = NULL;
+	VarBit	   *b = NULL;
+	int			intersection = 0;
+	int			union_count = 0;
+	int			nbits;
+	int			i;
+	int			byte_idx;
+	int			bit_idx;
+	bits8	   *a_bits = NULL;
+	bits8	   *b_bits = NULL;
+	int			bit1;
+	int			bit2;
+	double		jaccard_sim;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: bit_jaccard_distance requires 2 arguments")));
+
+	a = PG_GETARG_VARBIT_P(0);
+	b = PG_GETARG_VARBIT_P(1);
+
+	if (a == NULL || b == NULL)
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("cannot compute Jaccard distance with NULL bit vectors")));
+
+	nbits = VARBITLEN(a);
+	if (VARBITLEN(b) != nbits)
+		ereport(ERROR,
+				(errcode(ERRCODE_DATA_EXCEPTION),
+				 errmsg("bit vector lengths must match: %d vs %d",
+						nbits, VARBITLEN(b))));
+
+	a_bits = VARBITS(a);
+	b_bits = VARBITS(b);
+
+	/* Count intersection (both 1) and union (either 1) */
+	for (i = 0; i < nbits; i++)
+	{
+		byte_idx = i / BITS_PER_BYTE;
+		bit_idx = i % BITS_PER_BYTE;
+		bit1 = (a_bits[byte_idx] >> (BITS_PER_BYTE - 1 - bit_idx)) & 1;
+		bit2 = (b_bits[byte_idx] >> (BITS_PER_BYTE - 1 - bit_idx)) & 1;
+
+		if (bit1 && bit2)
+			intersection++;
+		if (bit1 || bit2)
+			union_count++;
+	}
+
+	if (union_count == 0)
+		PG_RETURN_FLOAT8(0.0);
+
+	jaccard_sim = (double) intersection / (double) union_count;
+	PG_RETURN_FLOAT8(1.0 - jaccard_sim);
 }
