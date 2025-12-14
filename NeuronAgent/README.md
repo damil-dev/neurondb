@@ -10,6 +10,20 @@ AI agent runtime system providing REST API and WebSocket endpoints for building 
 
 NeuronAgent integrates with NeuronDB PostgreSQL extension to provide agent runtime capabilities. Use it to build autonomous agent systems with persistent memory, tool execution, and streaming responses.
 
+## Official Documentation
+
+**For comprehensive documentation, detailed tutorials, complete API references, and best practices, visit:**
+
+🌐 **[https://www.neurondb.ai/docs/neuronagent](https://www.neurondb.ai/docs/neuronagent)**
+
+The official documentation provides:
+- Complete REST API reference with examples
+- WebSocket integration guides
+- Agent configuration and profiles
+- Tool development and registration
+- Production deployment guides
+- Performance optimization tips
+
 ## Features
 
 | Feature | Description |
@@ -92,8 +106,8 @@ Using Docker:
 
 ```bash
 cd docker
-cp .env.example .env
-# Edit .env with your configuration
+# Optionally create .env file with your configuration
+# Or use environment variables directly (docker-compose.yml has defaults)
 docker compose up -d
 ```
 
