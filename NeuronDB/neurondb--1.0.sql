@@ -344,6 +344,11 @@ CREATE FUNCTION vector_norm(vector) RETURNS double precision
     LANGUAGE C IMMUTABLE STRICT;
 COMMENT ON FUNCTION vector_norm IS 'Compute L2 norm of vector';
 
+CREATE FUNCTION l2_norm(vector) RETURNS double precision
+    AS 'MODULE_PATHNAME', 'l2_norm'
+    LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
+COMMENT ON FUNCTION l2_norm IS 'Compute L2 norm of vector (alias for vector_norm)';
+
 CREATE FUNCTION vector_normalize(vector) RETURNS vector
     AS 'MODULE_PATHNAME', 'vector_normalize'
     LANGUAGE C IMMUTABLE STRICT;
@@ -390,6 +395,25 @@ CREATE OPERATOR * (
     COMMUTATOR = *
 );
 
+CREATE FUNCTION vector_div(vector, double precision) RETURNS vector
+    AS 'MODULE_PATHNAME', 'vector_div_scalar'
+    LANGUAGE C IMMUTABLE STRICT;
+
+CREATE OPERATOR / (
+    LEFTARG = vector,
+    RIGHTARG = double precision,
+    PROCEDURE = vector_div
+);
+
+CREATE FUNCTION vector_neg(vector) RETURNS vector
+    AS 'MODULE_PATHNAME', 'vector_neg'
+    LANGUAGE C IMMUTABLE STRICT;
+
+CREATE OPERATOR - (
+    RIGHTARG = vector,
+    PROCEDURE = vector_neg
+);
+
 -- ============================================================================
 -- DISTANCE FUNCTIONS & OPERATORS
 -- ============================================================================
@@ -413,6 +437,11 @@ CREATE FUNCTION vector_cosine_distance(vector, vector) RETURNS real
     AS 'MODULE_PATHNAME', 'vector_cosine_distance'
     LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
 COMMENT ON FUNCTION vector_cosine_distance IS 'Cosine distance (1 - cosine similarity)';
+
+CREATE FUNCTION vector_spherical_distance(vector, vector) RETURNS real
+    AS 'MODULE_PATHNAME', 'vector_spherical_distance'
+    LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
+COMMENT ON FUNCTION vector_spherical_distance IS 'Spherical distance for index optimization (internal use)';
 
 -- Note: Operator <=> is created after vector_cosine_distance_op function definition (see line ~2472)
 
@@ -494,10 +523,10 @@ CREATE FUNCTION vector_to_binary(vector) RETURNS bytea
     LANGUAGE C IMMUTABLE STRICT;
 COMMENT ON FUNCTION vector_to_binary IS 'Convert vector to binary (32x compression)';
 
-CREATE FUNCTION binary_quantize(vector) RETURNS bytea
+CREATE FUNCTION binary_quantize(vector) RETURNS bit
     AS 'MODULE_PATHNAME', 'binary_quantize'
-    LANGUAGE C IMMUTABLE STRICT;
-COMMENT ON FUNCTION binary_quantize IS 'Alias for vector_to_binary (pgvector compatibility)';
+    LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
+COMMENT ON FUNCTION binary_quantize IS 'Convert vector to bit type via binary quantization (pgvector compatibility)';
 
 -- Bit type support for binary vectors (pgvector compatibility)
 CREATE FUNCTION vector_to_bit(vector) RETURNS bit
@@ -1976,6 +2005,11 @@ CREATE FUNCTION array_to_vector_integer(integer[]) RETURNS vector
     LANGUAGE C IMMUTABLE STRICT;
 COMMENT ON FUNCTION array_to_vector_integer IS 'Convert integer array to vector';
 
+CREATE FUNCTION array_to_vector_numeric(numeric[]) RETURNS vector
+    AS 'MODULE_PATHNAME', 'array_to_vector_numeric'
+    LANGUAGE C IMMUTABLE STRICT;
+COMMENT ON FUNCTION array_to_vector_numeric IS 'Convert numeric array to vector';
+
 CREATE FUNCTION vector_to_array_float4(vector) RETURNS real[]
     AS 'MODULE_PATHNAME', 'vector_to_array_float4'
     LANGUAGE C IMMUTABLE STRICT;
@@ -2132,6 +2166,12 @@ CREATE FUNCTION vector_slice(vector, integer, integer) RETURNS vector
     LANGUAGE C IMMUTABLE STRICT;
 COMMENT ON FUNCTION vector_slice IS 'Extract subvector from start to end index';
 
+-- CREATE FUNCTION subvector(vector, integer, integer) RETURNS vector
+--     AS 'MODULE_PATHNAME', 'subvector'
+--     LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
+-- COMMENT ON FUNCTION subvector IS 'Extract subvector from start to end index (alias for vector_slice)';
+-- NOTE: Temporarily disabled - function symbol not exported. Use vector_slice instead.
+
 CREATE FUNCTION vector_append(vector, real) RETURNS vector
     AS 'MODULE_PATHNAME', 'vector_append'
     LANGUAGE C IMMUTABLE STRICT;
@@ -2198,6 +2238,16 @@ CREATE FUNCTION vector_max(vector) RETURNS real
     AS 'MODULE_PATHNAME', 'vector_max'
     LANGUAGE C IMMUTABLE STRICT;
 COMMENT ON FUNCTION vector_max IS 'Maximum element in vector';
+
+CREATE FUNCTION vector_min(vector, vector) RETURNS vector
+    AS 'MODULE_PATHNAME', 'vector_min_2arg'
+    LANGUAGE C IMMUTABLE STRICT;
+COMMENT ON FUNCTION vector_min(vector, vector) IS 'Element-wise minimum of two vectors';
+
+CREATE FUNCTION vector_max(vector, vector) RETURNS vector
+    AS 'MODULE_PATHNAME', 'vector_max_2arg'
+    LANGUAGE C IMMUTABLE STRICT;
+COMMENT ON FUNCTION vector_max(vector, vector) IS 'Element-wise maximum of two vectors';
 
 CREATE FUNCTION vector_element_sum(vector) RETURNS double precision
     AS 'MODULE_PATHNAME', 'vector_sum'
@@ -2417,6 +2467,16 @@ CREATE FUNCTION halfvec_inner_product(halfvec, halfvec) RETURNS real
     LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
 COMMENT ON FUNCTION halfvec_inner_product IS 'Inner product (negative for distance ordering) between halfvec vectors';
 
+CREATE FUNCTION l2_norm(halfvec) RETURNS double precision
+    AS 'MODULE_PATHNAME', 'halfvec_l2_norm'
+    LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
+COMMENT ON FUNCTION l2_norm(halfvec) IS 'Compute L2 norm of halfvec';
+
+CREATE FUNCTION subvector(halfvec, integer, integer) RETURNS halfvec
+    AS 'MODULE_PATHNAME', 'halfvec_subvector'
+    LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
+COMMENT ON FUNCTION subvector(halfvec, integer, integer) IS 'Extract subvector from halfvec';
+
 -- Distance operators for halfvec type (defined after functions)
 CREATE OPERATOR <-> (
     LEFTARG = halfvec,
@@ -2494,6 +2554,11 @@ CREATE FUNCTION bit_hamming_distance(bit, bit) RETURNS integer
     LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
 COMMENT ON FUNCTION bit_hamming_distance IS 'Hamming distance between bit vectors';
 
+CREATE FUNCTION bit_jaccard_distance(bit, bit) RETURNS double precision
+    AS 'MODULE_PATHNAME', 'bit_jaccard_distance'
+    LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
+COMMENT ON FUNCTION bit_jaccard_distance IS 'Jaccard distance between bit vectors (1 - Jaccard similarity)';
+
 -- Distance operator for bit type (defined after function)
 CREATE OPERATOR <-> (
     LEFTARG = bit,
@@ -2501,6 +2566,22 @@ CREATE OPERATOR <-> (
     PROCEDURE = bit_hamming_distance,
     COMMUTATOR = '<->'
 );
+
+CREATE OPERATOR <~> (
+    LEFTARG = bit,
+    RIGHTARG = bit,
+    PROCEDURE = bit_hamming_distance,
+    COMMUTATOR = '<~>'
+);
+COMMENT ON OPERATOR <~>(bit, bit) IS 'Hamming distance operator for bit vectors (pgvector compatibility)';
+
+CREATE OPERATOR <%> (
+    LEFTARG = bit,
+    RIGHTARG = bit,
+    PROCEDURE = bit_jaccard_distance,
+    COMMUTATOR = '<%>'
+);
+COMMENT ON OPERATOR <%>(bit, bit) IS 'Jaccard distance operator for bit vectors';
 
 -- Vector preprocessing
 CREATE FUNCTION vector_clip(vector, double precision, double precision) RETURNS vector
@@ -2525,6 +2606,18 @@ CREATE CAST (real[] AS vector)
 
 CREATE CAST (vector AS real[])
     WITH FUNCTION vector_to_array(vector)
+    AS ASSIGNMENT;
+
+CREATE CAST (integer[] AS vector)
+    WITH FUNCTION array_to_vector_integer(integer[])
+    AS ASSIGNMENT;
+
+CREATE CAST (double precision[] AS vector)
+    WITH FUNCTION array_to_vector_float8(double precision[])
+    AS ASSIGNMENT;
+
+CREATE CAST (numeric[] AS vector)
+    WITH FUNCTION array_to_vector_numeric(numeric[])
     AS ASSIGNMENT;
 
 -- ============================================================================
@@ -2911,6 +3004,11 @@ CREATE OPERATOR CLASS halfvec_cosine_ops
     OPERATOR 1 <=> (halfvec, halfvec) FOR ORDER BY float_ops,
     FUNCTION 1 halfvec_cosine_distance(halfvec, halfvec);
 
+CREATE OPERATOR CLASS halfvec_ip_ops
+    FOR TYPE halfvec USING ivf AS
+    OPERATOR 1 <#> (halfvec, halfvec) FOR ORDER BY float_ops,
+    FUNCTION 1 halfvec_inner_product(halfvec, halfvec);
+
 -- Operator classes for sparsevec type with HNSW
 CREATE OPERATOR CLASS sparsevec_l2_ops
     DEFAULT FOR TYPE sparsevec USING hnsw AS
@@ -2949,6 +3047,12 @@ CREATE OPERATOR CLASS bit_hamming_ops
     DEFAULT FOR TYPE bit USING ivf AS
     OPERATOR 1 <-> (bit, bit) FOR ORDER BY integer_ops,
     FUNCTION 1 bit_hamming_distance(bit, bit);
+
+-- Operator class for bit type with HNSW (Jaccard distance)
+CREATE OPERATOR CLASS bit_jaccard_ops
+    FOR TYPE bit USING hnsw AS
+    OPERATOR 1 <%> (bit, bit) FOR ORDER BY float_ops,
+    FUNCTION 1 bit_jaccard_distance(bit, bit);
 
 -- Operator classes for binaryvec type with HNSW
 CREATE OPERATOR CLASS binaryvec_hamming_ops
@@ -3870,6 +3974,667 @@ CREATE FUNCTION ndb_llm_rerank_batch(
 COMMENT ON FUNCTION ndb_llm_rerank_batch IS 'Batch LLM reranking with GPU acceleration support: ndb_llm_rerank_batch(queries, documents_array, model, top_k) processes multiple query-document pairs in parallel using GPU when available. Uses CUDA-accelerated inference when available, falls back to ONNX Runtime or remote API. Configure via neurondb.llm_provider and neurondb.compute_mode.';
 
 -- ============================================================================
+-- LLM WRAPPER FUNCTIONS FOR NEURONAGENT COMPATIBILITY
+-- ============================================================================
+-- Wrapper functions that match NeuronAgent expectations
+-- These functions provide a compatible interface for the Go client
+-- ============================================================================
+
+-- Wrapper that matches NeuronAgent expectations
+CREATE FUNCTION neurondb_llm_generate(
+    model text,
+    prompt text, 
+    params jsonb DEFAULT '{}'::jsonb
+) RETURNS text
+LANGUAGE plpgsql STABLE AS $$
+DECLARE
+    params_with_model jsonb;
+    params_text text;
+BEGIN
+    -- Merge model into params JSON
+    params_with_model := params || jsonb_build_object('model', model);
+    params_text := params_with_model::text;
+    
+    -- Call underlying C function
+    RETURN ndb_llm_complete(prompt, params_text);
+END;
+$$;
+COMMENT ON FUNCTION neurondb_llm_generate IS 'LLM text generation wrapper for NeuronAgent compatibility: neurondb_llm_generate(model, prompt, params). Accepts model as first parameter and JSONB params, converts to format expected by ndb_llm_complete().';
+
+-- Alias for compatibility
+CREATE FUNCTION neurondb_llm_complete(
+    model text,
+    prompt text,
+    params jsonb DEFAULT '{}'::jsonb
+) RETURNS text
+LANGUAGE sql STABLE AS $$
+    SELECT neurondb_llm_generate(model, prompt, params);
+$$;
+COMMENT ON FUNCTION neurondb_llm_complete IS 'Alias for neurondb_llm_generate() for backward compatibility';
+
+-- Streaming version (returns chunks)
+CREATE FUNCTION neurondb_llm_generate_stream(
+    model text,
+    prompt text,
+    params jsonb DEFAULT '{}'::jsonb
+) RETURNS SETOF text
+LANGUAGE plpgsql STABLE AS $$
+DECLARE
+    result text;
+    chunk_size int := 50;
+    i int;
+BEGIN
+    -- Generate full response first
+    result := neurondb_llm_generate(model, prompt, params);
+    
+    -- Split into chunks for streaming simulation
+    FOR i IN 1..length(result) BY chunk_size LOOP
+        RETURN NEXT substring(result, i, chunk_size);
+    END LOOP;
+    
+    RETURN;
+END;
+$$;
+COMMENT ON FUNCTION neurondb_llm_generate_stream IS 'Streaming LLM generation wrapper: neurondb_llm_generate_stream(model, prompt, params). Returns text in chunks. Currently simulates streaming by chunking full response.';
+
+-- ============================================================================
+-- RAG C FUNCTIONS (CORE IMPLEMENTATIONS)
+-- ============================================================================
+-- Core RAG functions implemented in C
+-- ============================================================================
+
+-- Text chunking function (C implementation)
+CREATE FUNCTION neurondb_chunk_text(
+    text text,
+    chunk_size integer DEFAULT 512,
+    overlap integer DEFAULT 128,
+    separator text DEFAULT NULL
+) RETURNS text[]
+    AS 'MODULE_PATHNAME', 'neurondb_chunk_text'
+    LANGUAGE C STABLE;
+COMMENT ON FUNCTION neurondb_chunk_text(text, integer, integer, text) IS 'Chunk text for RAG with configurable size, overlap, and separator. Returns array of text chunks.';
+
+-- Document ranking function (C implementation)
+CREATE FUNCTION neurondb_rank_documents(
+    query text,
+    documents text[],
+    algorithm text DEFAULT 'bm25'
+) RETURNS jsonb
+    AS 'MODULE_PATHNAME', 'neurondb_rank_documents'
+    LANGUAGE C STABLE;
+COMMENT ON FUNCTION neurondb_rank_documents(text, text[], text) IS 'Rank documents based on query using bm25, cosine, or edit_distance algorithm. Returns JSONB with ranked results.';
+
+-- Data transformation function (C implementation)
+CREATE FUNCTION neurondb_transform_data(
+    pipeline text,
+    input_data double precision[]
+) RETURNS double precision[]
+    AS 'MODULE_PATHNAME', 'neurondb_transform_data'
+    LANGUAGE C STABLE;
+COMMENT ON FUNCTION neurondb_transform_data(text, double precision[]) IS 'Apply transformation (normalize, standardize, min_max) to float8 array. Returns transformed array.';
+
+-- ============================================================================
+-- RAG WRAPPER FUNCTIONS FOR NEURONAGENT COMPATIBILITY
+-- ============================================================================
+-- Wrapper functions for RAG operations that match NeuronAgent expectations
+-- ============================================================================
+
+-- Chunk text wrapper for NeuronAgent (PL/pgSQL wrapper over C function)
+CREATE FUNCTION neurondb_chunk_text(
+    text text,
+    chunk_size integer,
+    overlap integer
+) RETURNS text
+LANGUAGE plpgsql STABLE AS $$
+DECLARE
+    chunks_json jsonb;
+BEGIN
+    -- Call neurondb.chunk() with 'fixed' method and convert to JSON array
+    SELECT json_agg(json_build_object(
+        'chunk_id', chunk_id,
+        'chunk_text', chunk_text,
+        'start_pos', start_pos,
+        'end_pos', end_pos
+    )) INTO chunks_json
+    FROM neurondb.chunk(text, chunk_size, overlap, 'fixed');
+    
+    RETURN chunks_json::text;
+END;
+$$;
+COMMENT ON FUNCTION neurondb_chunk_text(text, integer, integer) IS 'Text chunking wrapper for NeuronAgent: neurondb_chunk_text(text, chunk_size, overlap). Returns JSON array of chunks.';
+
+-- Rerank results wrapper for NeuronAgent
+CREATE FUNCTION neurondb_rerank_results(
+    query text,
+    documents text[],
+    model text DEFAULT 'ms-marco-MiniLM-L-6-v2',
+    top_k integer DEFAULT 10
+) RETURNS text
+LANGUAGE plpgsql STABLE AS $$
+DECLARE
+    results_json jsonb;
+BEGIN
+    -- Call rerank_cross_encoder and convert TABLE to JSON array
+    SELECT json_agg(json_build_object(
+        'document', documents[idx],
+        'score', score,
+        'rank', row_number() OVER (ORDER BY score DESC)
+    )) INTO results_json
+    FROM rerank_cross_encoder(query, documents, model, top_k);
+    
+    RETURN results_json::text;
+END;
+$$;
+COMMENT ON FUNCTION neurondb_rerank_results IS 'Reranking wrapper for NeuronAgent: neurondb_rerank_results(query, documents, model, top_k). Returns JSON array of reranked results.';
+
+-- Generate answer wrapper for NeuronAgent RAG
+CREATE FUNCTION neurondb_generate_answer(
+    query text,
+    context text[],
+    model text DEFAULT NULL,
+    params jsonb DEFAULT '{}'::jsonb
+) RETURNS text
+LANGUAGE plpgsql STABLE AS $$
+DECLARE
+    context_str text;
+    prompt text;
+    model_name text;
+    answer text;
+BEGIN
+    -- Combine context into single string
+    context_str := array_to_string(context, '\n\n');
+    
+    -- Build RAG prompt
+    prompt := format('Context:\n%s\n\nQuestion: %s\n\nAnswer:', context_str, query);
+    
+    -- Use model from params or default
+    model_name := COALESCE(model, COALESCE(params->>'model', current_setting('neurondb.llm_model', true)));
+    IF model_name IS NULL OR model_name = '' THEN
+        model_name := 'gpt-3.5-turbo';
+    END IF;
+    
+    -- Call LLM generation
+    answer := neurondb_llm_generate(model_name, prompt, params);
+    
+    RETURN answer;
+END;
+$$;
+COMMENT ON FUNCTION neurondb_generate_answer IS 'RAG answer generation wrapper for NeuronAgent: neurondb_generate_answer(query, context, model, params). Formats context and query, calls LLM, returns answer.';
+
+-- Retrieve context wrapper for NeuronMCP
+CREATE FUNCTION neurondb_retrieve_context_c(
+    query_text text,
+    table_name text,
+    vector_column text,
+    limit_count integer
+) RETURNS text
+LANGUAGE plpgsql STABLE AS $$
+DECLARE
+    query_embedding vector;
+    context_json jsonb;
+    sql_query text;
+BEGIN
+    -- Generate embedding for query
+    query_embedding := neurondb_embed(query_text, 'all-MiniLM-L6-v2');
+    
+    -- Build and execute vector search query
+    sql_query := format(
+        'SELECT json_agg(json_build_object(
+            ''id'', id,
+            ''content'', content,
+            ''metadata'', metadata,
+            ''similarity'', 1.0 - (%I <=> $1::vector)
+        )) FROM (
+            SELECT id, content, metadata, %I
+            FROM %I
+            ORDER BY %I <=> $1::vector
+            LIMIT $2
+        ) subq',
+        vector_column, vector_column, table_name, vector_column
+    );
+    
+    EXECUTE sql_query INTO context_json USING query_embedding, limit_count;
+    
+    RETURN COALESCE(context_json::text, '[]');
+END;
+$$;
+COMMENT ON FUNCTION neurondb_retrieve_context_c IS 'Context retrieval wrapper for NeuronMCP: neurondb_retrieve_context_c(query_text, table_name, vector_column, limit). Performs vector search and returns JSON context.';
+
+-- ============================================================================
+-- SEARCH AND RERANKING WRAPPER FUNCTIONS FOR NEURONAGENT COMPATIBILITY
+-- ============================================================================
+
+-- Hybrid search wrapper for NeuronAgent
+CREATE FUNCTION neurondb_hybrid_search(
+    query text,
+    query_vec vector,
+    table_name text,
+    vector_col text,
+    text_col text,
+    limit_count integer,
+    params jsonb DEFAULT '{}'::jsonb
+) RETURNS text
+LANGUAGE plpgsql STABLE AS $$
+DECLARE
+    vector_weight double precision;
+    filters text;
+    results_json jsonb;
+BEGIN
+    -- Extract vector_weight from params or use default
+    vector_weight := COALESCE((params->>'vector_weight')::double precision, 0.7);
+    
+    -- Extract filters from params or use empty JSON
+    filters := COALESCE((params->>'filters')::text, '{}');
+    
+    -- Call hybrid_search with correct parameter order
+    SELECT json_agg(json_build_object(
+        'id', id,
+        'score', score
+    )) INTO results_json
+    FROM hybrid_search(table_name, query_vec, query, filters, vector_weight, limit_count);
+    
+    RETURN COALESCE(results_json::text, '[]');
+END;
+$$;
+COMMENT ON FUNCTION neurondb_hybrid_search IS 'Hybrid search wrapper for NeuronAgent: neurondb_hybrid_search(query, query_vec, table, vector_col, text_col, limit, params). Returns JSON array of results.';
+
+-- Reciprocal rank fusion wrapper for NeuronAgent
+CREATE FUNCTION neurondb_reciprocal_rank_fusion(
+    result_sets jsonb,
+    k integer DEFAULT 60
+) RETURNS text
+LANGUAGE plpgsql STABLE AS $$
+DECLARE
+    result_array anyarray;
+    fused_result anyarray;
+BEGIN
+    -- Convert JSONB to array format expected by reciprocal_rank_fusion
+    -- This is a simplified version - may need adjustment based on actual data format
+    SELECT array_agg(id::integer) INTO result_array
+    FROM jsonb_array_elements(result_sets->0) AS elem(id);
+    
+    -- Call reciprocal_rank_fusion
+    fused_result := reciprocal_rank_fusion(ARRAY[result_array], k::double precision);
+    
+    -- Convert back to JSON
+    RETURN json_agg(fused_result)::text;
+END;
+$$;
+COMMENT ON FUNCTION neurondb_reciprocal_rank_fusion IS 'Reciprocal rank fusion wrapper for NeuronAgent: neurondb_reciprocal_rank_fusion(result_sets, k). Returns fused results as JSON.';
+
+-- Semantic keyword search wrapper for NeuronAgent
+CREATE FUNCTION neurondb_semantic_keyword_search(
+    query text,
+    query_vec vector,
+    table_name text,
+    vector_col text,
+    text_col text,
+    limit_count integer
+) RETURNS text
+LANGUAGE plpgsql STABLE AS $$
+DECLARE
+    results_json jsonb;
+BEGIN
+    -- Call semantic_keyword_search with correct parameter order
+    SELECT json_agg(json_build_object(
+        'id', id,
+        'score', score
+    )) INTO results_json
+    FROM semantic_keyword_search(table_name, query_vec, query, limit_count);
+    
+    RETURN COALESCE(results_json::text, '[]');
+END;
+$$;
+COMMENT ON FUNCTION neurondb_semantic_keyword_search IS 'Semantic keyword search wrapper for NeuronAgent: neurondb_semantic_keyword_search(query, query_vec, table, vector_col, text_col, limit). Returns JSON array of results.';
+
+-- Multi-vector search wrapper for NeuronAgent
+CREATE FUNCTION neurondb_multi_vector_search(
+    query_vecs vector[],
+    table_name text,
+    vector_col text,
+    limit_count integer,
+    params jsonb DEFAULT '{}'::jsonb
+) RETURNS text
+LANGUAGE plpgsql STABLE AS $$
+DECLARE
+    agg_method text;
+    results_json jsonb;
+BEGIN
+    -- Extract aggregation method from params or use default
+    agg_method := COALESCE((params->>'agg_method')::text, 'max');
+    
+    -- Call multi_vector_search with correct parameter order
+    SELECT json_agg(json_build_object(
+        'id', id,
+        'score', score
+    )) INTO results_json
+    FROM multi_vector_search(table_name, query_vecs, agg_method, limit_count);
+    
+    RETURN COALESCE(results_json::text, '[]');
+END;
+$$;
+COMMENT ON FUNCTION neurondb_multi_vector_search IS 'Multi-vector search wrapper for NeuronAgent: neurondb_multi_vector_search(query_vecs, table, vector_col, limit, params). Returns JSON array of results.';
+
+-- Rerank cross-encoder wrapper for NeuronAgent
+CREATE FUNCTION neurondb_rerank_cross_encoder(
+    query text,
+    documents text[],
+    model text DEFAULT 'ms-marco-MiniLM-L-6-v2',
+    top_k integer DEFAULT 10
+) RETURNS text
+LANGUAGE plpgsql STABLE AS $$
+DECLARE
+    results_json jsonb;
+BEGIN
+    -- Call rerank_cross_encoder and convert TABLE to JSON
+    SELECT json_agg(json_build_object(
+        'document', documents[idx],
+        'score', score,
+        'rank', row_number() OVER (ORDER BY score DESC)
+    )) INTO results_json
+    FROM rerank_cross_encoder(query, documents, model, top_k);
+    
+    RETURN COALESCE(results_json::text, '[]');
+END;
+$$;
+COMMENT ON FUNCTION neurondb_rerank_cross_encoder IS 'Cross-encoder reranking wrapper for NeuronAgent: neurondb_rerank_cross_encoder(query, documents, model, top_k). Returns JSON array of reranked results.';
+
+-- Rerank LLM wrapper for NeuronAgent
+CREATE FUNCTION neurondb_rerank_llm(
+    query text,
+    documents text[],
+    model text DEFAULT 'gpt-3.5-turbo',
+    top_k integer DEFAULT 10,
+    params jsonb DEFAULT '{}'::jsonb
+) RETURNS text
+LANGUAGE plpgsql STABLE AS $$
+DECLARE
+    results_json jsonb;
+    model_name text;
+BEGIN
+    -- Use model from params if provided
+    model_name := COALESCE((params->>'model')::text, model);
+    
+    -- Call rerank_llm and convert TABLE to JSON
+    SELECT json_agg(json_build_object(
+        'document', documents[idx],
+        'score', score,
+        'rank', row_number() OVER (ORDER BY score DESC)
+    )) INTO results_json
+    FROM rerank_llm(query, documents, model_name, top_k);
+    
+    RETURN COALESCE(results_json::text, '[]');
+END;
+$$;
+COMMENT ON FUNCTION neurondb_rerank_llm IS 'LLM reranking wrapper for NeuronAgent: neurondb_rerank_llm(query, documents, model, top_k, params). Returns JSON array of reranked results.';
+
+-- Rerank ColBERT wrapper for NeuronAgent
+CREATE FUNCTION neurondb_rerank_colbert(
+    query text,
+    documents text[],
+    model text DEFAULT 'colbert-v2',
+    top_k integer DEFAULT 10
+) RETURNS text
+LANGUAGE plpgsql STABLE AS $$
+DECLARE
+    results_json jsonb;
+    reranked_results TABLE(idx integer, score real);
+BEGIN
+    -- Call rerank_colbert (note: doesn't have top_k parameter, so we'll limit after)
+    SELECT json_agg(json_build_object(
+        'document', documents[idx],
+        'score', score,
+        'rank', row_number() OVER (ORDER BY score DESC)
+    )) INTO results_json
+    FROM (
+        SELECT idx, score
+        FROM rerank_colbert(query, documents, model)
+        ORDER BY score DESC
+        LIMIT top_k
+    ) subq;
+    
+    RETURN COALESCE(results_json::text, '[]');
+END;
+$$;
+COMMENT ON FUNCTION neurondb_rerank_colbert IS 'ColBERT reranking wrapper for NeuronAgent: neurondb_rerank_colbert(query, documents, model, top_k). Returns JSON array of reranked results.';
+
+-- Rerank ensemble wrapper for NeuronAgent
+CREATE FUNCTION neurondb_rerank_ensemble(
+    query text,
+    documents text[],
+    methods jsonb,
+    weights jsonb,
+    top_k integer DEFAULT 10
+) RETURNS text
+LANGUAGE plpgsql STABLE AS $$
+DECLARE
+    methods_array text[];
+    weights_array double precision[];
+    results_json jsonb;
+BEGIN
+    -- Convert JSONB arrays to PostgreSQL arrays
+    SELECT array_agg(value::text) INTO methods_array
+    FROM jsonb_array_elements(methods);
+    
+    SELECT array_agg(value::double precision) INTO weights_array
+    FROM jsonb_array_elements(weights);
+    
+    -- Call rerank_ensemble and convert TABLE to JSON
+    SELECT json_agg(json_build_object(
+        'document', documents[idx],
+        'score', score,
+        'rank', row_number() OVER (ORDER BY score DESC)
+    )) INTO results_json
+    FROM rerank_ensemble(query, documents, methods_array, weights_array);
+    
+    RETURN COALESCE(results_json::text, '[]');
+END;
+$$;
+COMMENT ON FUNCTION neurondb_rerank_ensemble IS 'Ensemble reranking wrapper for NeuronAgent: neurondb_rerank_ensemble(query, documents, methods, weights, top_k). Returns JSON array of reranked results.';
+
+-- ============================================================================
+-- ANALYTICS WRAPPER FUNCTIONS FOR NEURONAGENT COMPATIBILITY
+-- ============================================================================
+
+-- Cluster wrapper for NeuronAgent
+CREATE FUNCTION neurondb_cluster(
+    table_name text,
+    feature_col text,
+    algorithm text,
+    params jsonb DEFAULT '{}'::jsonb
+) RETURNS text
+LANGUAGE plpgsql STABLE AS $$
+DECLARE
+    k integer;
+    max_iters integer;
+    results_json jsonb;
+    cluster_assignments integer[];
+    gmm_results float8[][];
+    dbscan_results TABLE(id integer, cluster_id integer, distance float8);
+    i integer;
+BEGIN
+    -- Extract parameters
+    k := COALESCE((params->>'k')::integer, (params->>'num_clusters')::integer, 3);
+    max_iters := COALESCE((params->>'max_iters')::integer, 100);
+    
+    -- Route to algorithm-specific function
+    CASE lower(algorithm)
+        WHEN 'kmeans' THEN
+            cluster_assignments := cluster_kmeans(table_name, feature_col, k, max_iters);
+            -- Convert array to JSON with row numbers
+            SELECT json_agg(json_build_object(
+                'id', i,
+                'cluster_id', cluster_assignments[i],
+                'distance', 0.0  -- K-means doesn't return distances
+            )) INTO results_json
+            FROM generate_series(1, array_length(cluster_assignments, 1)) AS i;
+        WHEN 'gmm' THEN
+            gmm_results := cluster_gmm(table_name, feature_col, k, max_iters);
+            -- GMM returns soft assignments, convert to JSON
+            SELECT json_agg(json_build_object(
+                'id', i,
+                'cluster_id', NULL,  -- GMM has soft assignments
+                'distance', 0.0,
+                'probabilities', gmm_results[i]
+            )) INTO results_json
+            FROM generate_series(1, array_length(gmm_results, 1)) AS i;
+        WHEN 'dbscan' THEN
+            SELECT json_agg(json_build_object(
+                'id', id,
+                'cluster_id', cluster_id,
+                'distance', distance
+            )) INTO results_json
+            FROM cluster_dbscan(table_name, feature_col, 
+                COALESCE((params->>'eps')::float8, 0.5),
+                COALESCE((params->>'min_samples')::integer, 5));
+        ELSE
+            RAISE EXCEPTION 'Unsupported clustering algorithm: %. Supported: kmeans, gmm, dbscan', algorithm;
+    END CASE;
+    
+    RETURN COALESCE(results_json::text, '[]');
+END;
+$$;
+COMMENT ON FUNCTION neurondb_cluster IS 'Clustering wrapper for NeuronAgent: neurondb_cluster(table, feature_col, algorithm, params). Routes to algorithm-specific clustering functions.';
+
+-- Detect outliers wrapper for NeuronAgent
+CREATE FUNCTION neurondb_detect_outliers(
+    table_name text,
+    feature_col text,
+    method text DEFAULT 'zscore',
+    params jsonb DEFAULT '{}'::jsonb
+) RETURNS text
+LANGUAGE plpgsql STABLE AS $$
+DECLARE
+    threshold double precision;
+    results_json jsonb;
+    outlier_flags boolean[];
+    scores double precision[];
+BEGIN
+    -- Extract threshold from params
+    threshold := COALESCE((params->>'threshold')::double precision, 3.0);
+    
+    -- Route to method-specific function
+    CASE lower(method)
+        WHEN 'zscore', 'modified_zscore', 'iqr' THEN
+            outlier_flags := detect_outliers_zscore(table_name, feature_col, threshold, method);
+            scores := compute_outlier_scores(table_name, feature_col, method);
+        ELSE
+            RAISE EXCEPTION 'Unsupported outlier detection method: %. Supported: zscore, modified_zscore, iqr', method;
+    END CASE;
+    
+    -- Build results JSON
+    SELECT json_agg(json_build_object(
+        'id', i,
+        'is_outlier', outlier_flags[i],
+        'score', scores[i]
+    )) INTO results_json
+    FROM generate_series(1, array_length(outlier_flags, 1)) AS i;
+    
+    RETURN COALESCE(results_json::text, '[]');
+END;
+$$;
+COMMENT ON FUNCTION neurondb_detect_outliers IS 'Outlier detection wrapper for NeuronAgent: neurondb_detect_outliers(table, feature_col, method, params). Routes to method-specific outlier detection functions.';
+
+-- Reduce dimensionality wrapper for NeuronAgent
+CREATE FUNCTION neurondb_reduce_dimensionality(
+    table_name text,
+    feature_col text,
+    method text,
+    target_dim integer,
+    params jsonb DEFAULT '{}'::jsonb
+) RETURNS text
+LANGUAGE plpgsql STABLE AS $$
+DECLARE
+    results_json jsonb;
+    reduced_vectors real[][];
+    epsilon double precision;
+BEGIN
+    -- Route to method-specific function
+    CASE lower(method)
+        WHEN 'pca' THEN
+            reduced_vectors := reduce_pca(table_name, feature_col, target_dim);
+        WHEN 'whiten', 'whitening' THEN
+            epsilon := COALESCE((params->>'epsilon')::double precision, 1e-5);
+            reduced_vectors := whiten_embeddings(table_name, feature_col, epsilon);
+        ELSE
+            RAISE EXCEPTION 'Unsupported dimensionality reduction method: %. Supported: pca, whiten', method;
+    END CASE;
+    
+    -- Build results JSON
+    SELECT json_agg(json_build_object(
+        'id', i,
+        'reduced', reduced_vectors[i]
+    )) INTO results_json
+    FROM generate_series(1, array_length(reduced_vectors, 1)) AS i;
+    
+    RETURN COALESCE(results_json::text, '[]');
+END;
+$$;
+COMMENT ON FUNCTION neurondb_reduce_dimensionality IS 'Dimensionality reduction wrapper for NeuronAgent: neurondb_reduce_dimensionality(table, feature_col, method, target_dim, params). Routes to method-specific reduction functions.';
+
+-- Analyze data wrapper for NeuronAgent
+CREATE FUNCTION neurondb_analyze_data(
+    table_name text,
+    columns text[]
+) RETURNS text
+LANGUAGE plpgsql STABLE AS $$
+DECLARE
+    analysis_json jsonb;
+    col text;
+    col_analysis jsonb;
+BEGIN
+    analysis_json := '{}'::jsonb;
+    
+    -- Analyze each column
+    FOREACH col IN ARRAY columns
+    LOOP
+        -- Basic statistics for each column
+        EXECUTE format(
+            'SELECT json_build_object(
+                ''column'', %L,
+                ''count'', COUNT(*),
+                ''null_count'', COUNT(*) FILTER (WHERE %I IS NULL),
+                ''distinct_count'', COUNT(DISTINCT %I)
+            ) FROM %I',
+            col, col, col, table_name
+        ) INTO col_analysis;
+        
+        analysis_json := analysis_json || jsonb_build_object(col, col_analysis);
+    END LOOP;
+    
+    RETURN analysis_json::text;
+END;
+$$;
+COMMENT ON FUNCTION neurondb_analyze_data IS 'Data analysis wrapper for NeuronAgent: neurondb_analyze_data(table, columns). Returns basic statistics for specified columns.';
+
+-- Quantize vector wrapper for NeuronAgent
+CREATE FUNCTION neurondb_quantize_vector(
+    vector_val vector,
+    method text
+) RETURNS text
+LANGUAGE plpgsql STABLE AS $$
+DECLARE
+    quantized_result text;
+BEGIN
+    -- Route to method-specific quantization function
+    CASE lower(method)
+        WHEN 'fp16', 'float16' THEN
+            SELECT encode(vector_quantize_fp16(vector_val), 'base64') INTO quantized_result;
+        WHEN 'int8' THEN
+            -- Note: int8 quantization requires min/max vectors, using defaults
+            SELECT encode(vector_quantize_int8(vector_val, vector_val, vector_val), 'base64') INTO quantized_result;
+        WHEN 'binary' THEN
+            SELECT vector_quantize_binary(vector_val)::text INTO quantized_result;
+        ELSE
+            RAISE EXCEPTION 'Unsupported quantization method: %. Supported: fp16, int8, binary', method;
+    END CASE;
+    
+    RETURN quantized_result;
+END;
+$$;
+COMMENT ON FUNCTION neurondb_quantize_vector IS 'Vector quantization wrapper for NeuronAgent: neurondb_quantize_vector(vector, method). Routes to method-specific quantization functions.';
+
+-- ============================================================================
 -- DISTRIBUTED QUERY FUNCTIONS
 -- ============================================================================
 
@@ -4617,10 +5382,10 @@ CREATE FUNCTION audit_log_query(
     LANGUAGE C VOLATILE;
 COMMENT ON FUNCTION audit_log_query IS 'Log query for audit trail';
 
-CREATE FUNCTION ndb_llm_cache_test() RETURNS boolean
+CREATE FUNCTION ndb_llm_cache_test(text, text, integer) RETURNS text
     AS 'MODULE_PATHNAME', 'ndb_llm_cache_test'
     LANGUAGE C VOLATILE;
-COMMENT ON FUNCTION ndb_llm_cache_test IS 'Test LLM cache functionality';
+COMMENT ON FUNCTION ndb_llm_cache_test(text, text, integer) IS 'Test LLM cache functionality: store and retrieve a value. Returns retrieved value or NULL.';
 
 /* Advanced cache management functions */
 CREATE FUNCTION ndb_llm_cache_stats() RETURNS jsonb
@@ -4991,7 +5756,8 @@ BEGIN
 		WHEN 'svm' THEN
 			RETURN predict_svm_model_id(model_id, features);
 		WHEN 'xgboost' THEN
-			RETURN predict_xgboost(model_id, vector_to_array(features));
+			-- Delegate to unified C function for GPU/CPU routing
+			RETURN neurondb_predict(model_id, vector_to_array(features));
 		WHEN 'catboost' THEN
 			RETURN predict_catboost(model_id, vector_to_array(features));
 		WHEN 'lightgbm' THEN
