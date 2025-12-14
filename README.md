@@ -2,7 +2,10 @@
 
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16%2C17%2C18-blue.svg)](https://www.postgresql.org/)
 [![License](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
-[![Documentation](https://img.shields.io/badge/docs-latest-brightgreen.svg)](https://neurondb.ai/docs)
+[![Documentation](https://img.shields.io/badge/docs-latest-brightgreen.svg)](https://www.neurondb.ai/docs)
+[![Website](https://img.shields.io/badge/website-www.neurondb.ai-blue.svg)](https://www.neurondb.ai/)
+
+> **📚 For comprehensive documentation, tutorials, API references, and best practices, visit [https://www.neurondb.ai/docs](https://www.neurondb.ai/docs)**
 
 PostgreSQL extension with vector search, machine learning algorithms, and agent runtime capabilities. Three components operate independently while sharing the same database instance.
 
@@ -190,14 +193,14 @@ psql "postgresql://neurondb:neurondb@localhost:5433/neurondb" \
 
 #### Step 2: Start NeuronAgent
 
-Configure environment:
+Configure environment (optional - docker-compose.yml has defaults):
 
 ```bash
 cd ../../NeuronAgent/docker
-cp .env.example .env
+# Optionally create .env file, or use environment variables directly
 ```
 
-Edit `.env` file:
+Example `.env` file (if creating one):
 
 ```env
 DB_HOST=localhost
@@ -224,14 +227,14 @@ curl http://localhost:8080/health
 
 #### Step 3: Start NeuronMCP
 
-Configure environment:
+Configure environment (optional - docker-compose.yml has defaults):
 
 ```bash
 cd ../../NeuronMCP/docker
-cp .env.example .env
+# Optionally create .env file, or use environment variables directly
 ```
 
-Edit `.env` file:
+Example `.env` file (if creating one):
 
 ```env
 NEURONDB_HOST=localhost
@@ -356,7 +359,7 @@ docker network create neurondb-network
 
 # Connect containers
 docker network connect neurondb-network neurondb-cpu
-docker network connect neurondb-network agent-server
+docker network connect neurondb-network neuronagent
 docker network connect neurondb-network neurondb-mcp
 ```
 
@@ -554,45 +557,61 @@ docker compose restart neurondb-mcp
 
 ## Documentation
 
+### Official Documentation
+
+**For comprehensive documentation, tutorials, API references, and best practices, visit:**
+
+🌐 **[https://www.neurondb.ai/docs](https://www.neurondb.ai/docs)**
+
+The official documentation site provides:
+- Complete API reference for all 473 SQL functions
+- Detailed tutorials and guides
+- Performance optimization guides
+- Production deployment best practices
+- Troubleshooting and FAQ
+- Latest updates and release notes
+
+**📖 See [DOCUMENTATION.md](DOCUMENTATION.md) for a complete documentation index with quick links to all topics.**
+
 ### Component Documentation
 
 #### NeuronDB
 
-| Document | Purpose |
-|----------|---------|
-| [Main Documentation](NeuronDB/README.md) | Complete feature reference |
-| [Installation Guide](NeuronDB/INSTALL.md) | Build and install instructions |
-| [Docker Guide](NeuronDB/docker/README.md) | Container deployment |
-| [SQL API Reference](NeuronDB/docs/sql-api.md) | Function documentation |
-| [Vector Search](NeuronDB/docs/vector-search/) | Indexing and search guide |
-| [ML Algorithms](NeuronDB/docs/ml-algorithms/) | Machine learning features |
-| [RAG Pipeline](NeuronDB/docs/rag/) | Retrieval-augmented generation |
+| Document | Purpose | Detailed Docs |
+|----------|---------|---------------|
+| [Main Documentation](NeuronDB/README.md) | Complete feature reference | [Vector Search](https://www.neurondb.ai/docs/vector-search) |
+| [Installation Guide](NeuronDB/INSTALL.md) | Build and install instructions | [Installation Guide](https://www.neurondb.ai/docs/installation) |
+| [Docker Guide](NeuronDB/docker/README.md) | Container deployment | [Docker Deployment](https://www.neurondb.ai/docs/docker) |
+| [SQL API Reference](NeuronDB/docs/sql-api.md) | Function documentation | [Complete API Reference](https://www.neurondb.ai/docs/api) |
+| [Vector Search](NeuronDB/docs/vector-search/) | Indexing and search guide | [Vector Search Guide](https://www.neurondb.ai/docs/vector-search) |
+| [ML Algorithms](NeuronDB/docs/ml-algorithms/) | Machine learning features | [ML Algorithms](https://www.neurondb.ai/docs/ml-algorithms) |
+| [RAG Pipeline](NeuronDB/docs/rag/) | Retrieval-augmented generation | [RAG Pipeline](https://www.neurondb.ai/docs/rag) |
 
 #### NeuronAgent
 
-| Document | Purpose |
-|----------|---------|
-| [Main Documentation](NeuronAgent/README.md) | Overview and features |
-| [API Reference](NeuronAgent/docs/API.md) | Complete REST API docs |
-| [Architecture](NeuronAgent/docs/ARCHITECTURE.md) | System design |
-| [Deployment Guide](NeuronAgent/docs/DEPLOYMENT.md) | Production setup |
-| [Docker Guide](NeuronAgent/docker/README.md) | Container deployment |
+| Document | Purpose | Detailed Docs |
+|----------|---------|---------------|
+| [Main Documentation](NeuronAgent/README.md) | Overview and features | [NeuronAgent Guide](https://www.neurondb.ai/docs/neuronagent) |
+| [API Reference](NeuronAgent/docs/API.md) | Complete REST API docs | [API Reference](https://www.neurondb.ai/docs/neuronagent/api) |
+| [Architecture](NeuronAgent/docs/ARCHITECTURE.md) | System design | [Architecture Guide](https://www.neurondb.ai/docs/neuronagent/architecture) |
+| [Deployment Guide](NeuronAgent/docs/DEPLOYMENT.md) | Production setup | [Deployment Guide](https://www.neurondb.ai/docs/neuronagent/deployment) |
+| [Docker Guide](NeuronAgent/docker/README.md) | Container deployment | [Docker Guide](https://www.neurondb.ai/docs/neuronagent/docker) |
 
 #### NeuronMCP
 
-| Document | Purpose |
-|----------|---------|
-| [Main Documentation](NeuronMCP/README.md) | Overview and usage |
-| [Docker Guide](NeuronMCP/docker/README.md) | Container deployment |
+| Document | Purpose | Detailed Docs |
+|----------|---------|---------------|
+| [Main Documentation](NeuronMCP/README.md) | Overview and usage | [NeuronMCP Guide](https://www.neurondb.ai/docs/neuronmcp) |
+| [Docker Guide](NeuronMCP/docker/README.md) | Container deployment | [Docker Guide](https://www.neurondb.ai/docs/neuronmcp/docker) |
 
 ### Ecosystem Documentation
 
-| Document | Purpose |
-|----------|---------|
-| [Ecosystem Docker Guide](NeuronDB/docker/ECOSYSTEM.md) | Running all services together |
-| [Configuration Reference](NeuronDB/docker/ECOSYSTEM.md#configuration) | Service configuration |
-| [Network Setup](NeuronDB/docker/ECOSYSTEM.md#network-configuration) | Networking options |
-| [Troubleshooting](NeuronDB/docker/ECOSYSTEM.md#troubleshooting) | Common issues |
+| Document | Purpose | Detailed Docs |
+|----------|---------|---------------|
+| [Ecosystem Docker Guide](NeuronDB/docker/ECOSYSTEM.md) | Running all services together | [Ecosystem Guide](https://www.neurondb.ai/docs/ecosystem) |
+| [Configuration Reference](NeuronDB/docker/ECOSYSTEM.md#configuration) | Service configuration | [Configuration](https://www.neurondb.ai/docs/configuration) |
+| [Network Setup](NeuronDB/docker/ECOSYSTEM.md#network-configuration) | Networking options | [Network Setup](https://www.neurondb.ai/docs/network) |
+| [Troubleshooting](NeuronDB/docker/ECOSYSTEM.md#troubleshooting) | Common issues | [Troubleshooting](https://www.neurondb.ai/docs/troubleshooting) |
 
 ## System Requirements
 
@@ -637,9 +656,9 @@ See [installation guide](NeuronDB/INSTALL.md) for platform-specific requirements
 Each component includes Docker configurations:
 
 - `Dockerfile` - Multi-stage build for optimized images
-- `docker-compose.yml` - Service definition and networking
+- `docker-compose.yml` - Service definition and networking with default environment variables
 - `.dockerignore` - Exclude unnecessary files from builds
-- `.env.example` - Environment variable templates
+- Optional `.env` file - Override environment variables (create manually if needed)
 
 ### Deployment Options
 
@@ -676,7 +695,7 @@ See component-specific Docker guides:
 
 3. Test network connectivity:
    ```bash
-   docker exec agent-server ping neurondb-cpu
+   docker exec neuronagent ping neurondb-cpu
    ```
 
 4. Verify firewall rules:
@@ -837,8 +856,9 @@ See component-specific deployment documentation:
 
 | Resource | Purpose |
 |----------|---------|
+| [Official Documentation](https://www.neurondb.ai/docs) | Complete documentation, tutorials, and guides |
 | [GitHub Issues](https://github.com/neurondb/NeurondB/issues) | Report bugs and request features |
-| [Documentation](https://neurondb.ai/docs) | Complete documentation site |
+| [Website](https://www.neurondb.ai/) | Product information and resources |
 | Email Support | support@neurondb.ai |
 
 ### Reporting Issues
@@ -884,9 +904,12 @@ See [LICENSE](LICENSE) file for license information.
 
 ### Feature Links
 
-| Feature | Documentation |
-|---------|---------------|
-| [Vector Search](NeuronDB/docs/vector-search/) | Vector indexing and search |
-| [ML Algorithms](NeuronDB/docs/ml-algorithms/) | Machine learning features |
-| [RAG Pipeline](NeuronDB/docs/rag/) | Retrieval-augmented generation |
-| [GPU Acceleration](NeuronDB/docs/gpu/) | GPU support and configuration |
+| Feature | Local Documentation | Official Documentation |
+|---------|-------------------|----------------------|
+| [Vector Search](NeuronDB/docs/vector-search/) | Vector indexing and search | [Vector Search Guide](https://www.neurondb.ai/docs/vector-search) |
+| [ML Algorithms](NeuronDB/docs/ml-algorithms/) | Machine learning features | [ML Algorithms Guide](https://www.neurondb.ai/docs/ml-algorithms) |
+| [RAG Pipeline](NeuronDB/docs/rag/) | Retrieval-augmented generation | [RAG Pipeline Guide](https://www.neurondb.ai/docs/rag) |
+| [GPU Acceleration](NeuronDB/docs/gpu/) | GPU support and configuration | [GPU Acceleration Guide](https://www.neurondb.ai/docs/gpu) |
+| Hybrid Search | - | [Hybrid Search Guide](https://www.neurondb.ai/docs/hybrid-search) |
+| Performance Optimization | - | [Performance Guide](https://www.neurondb.ai/docs/performance) |
+| Security Features | - | [Security Guide](https://www.neurondb.ai/docs/security) |
