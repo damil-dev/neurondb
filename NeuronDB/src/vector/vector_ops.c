@@ -548,6 +548,82 @@ vector_max(PG_FUNCTION_ARGS)
 	PG_RETURN_FLOAT4(max_val);
 }
 
+/*
+ * Element-wise minimum of two vectors (overloaded version)
+ */
+PG_FUNCTION_INFO_V1(vector_min_2arg);
+Datum
+vector_min_2arg(PG_FUNCTION_ARGS)
+{
+	Vector	   *a = NULL;
+	Vector	   *b = NULL;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_min_2arg requires 2 arguments")));
+
+	a = PG_GETARG_VECTOR_P(0);
+	NDB_CHECK_VECTOR_VALID(a);
+	b = PG_GETARG_VECTOR_P(1);
+	NDB_CHECK_VECTOR_VALID(b);
+
+	if (a->dim != b->dim)
+		ereport(ERROR,
+				(errcode(ERRCODE_DATA_EXCEPTION),
+				 errmsg("vector dimensions must match: %d vs %d",
+						a->dim,
+						b->dim)));
+
+	Vector *result = NULL;
+	int			i;
+
+	result = new_vector(a->dim);
+	for (i = 0; i < a->dim; i++)
+		result->data[i] = (a->data[i] < b->data[i]) ? a->data[i] : b->data[i];
+
+	PG_RETURN_VECTOR_P(result);
+}
+
+/*
+ * Element-wise maximum of two vectors (overloaded version)
+ */
+PG_FUNCTION_INFO_V1(vector_max_2arg);
+Datum
+vector_max_2arg(PG_FUNCTION_ARGS)
+{
+	Vector	   *a = NULL;
+	Vector	   *b = NULL;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_max_2arg requires 2 arguments")));
+
+	a = PG_GETARG_VECTOR_P(0);
+	NDB_CHECK_VECTOR_VALID(a);
+	b = PG_GETARG_VECTOR_P(1);
+	NDB_CHECK_VECTOR_VALID(b);
+
+	if (a->dim != b->dim)
+		ereport(ERROR,
+				(errcode(ERRCODE_DATA_EXCEPTION),
+				 errmsg("vector dimensions must match: %d vs %d",
+						a->dim,
+						b->dim)));
+
+	Vector *result = NULL;
+	int			i;
+
+	result = new_vector(a->dim);
+	for (i = 0; i < a->dim; i++)
+		result->data[i] = (a->data[i] > b->data[i]) ? a->data[i] : b->data[i];
+
+	PG_RETURN_VECTOR_P(result);
+}
+
 PG_FUNCTION_INFO_V1(vector_sum);
 Datum
 vector_sum(PG_FUNCTION_ARGS)

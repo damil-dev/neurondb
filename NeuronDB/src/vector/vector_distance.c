@@ -31,6 +31,9 @@ extern float4 inner_product_simd(Vector *a, Vector *b);
 extern float4 cosine_distance_simd(Vector *a, Vector *b);
 extern float4 l1_distance_simd(Vector *a, Vector *b);
 
+/* Forward declaration */
+float4 spherical_distance(Vector *a, Vector *b);
+
 static inline void
 check_dimensions(const Vector *a, const Vector *b)
 {
@@ -210,6 +213,68 @@ cosine_distance(Vector *a, Vector *b)
 				 errmsg("cosine distance calculation resulted in NaN or Infinity")));
 
 	return result;
+}
+
+/*
+ * spherical_distance - Internal function for index optimization
+ * Computes spherical distance: 1 - (dot / (norm_a * norm_b))
+ * This is similar to cosine distance but used internally by indexes
+ * for optimization purposes.
+ */
+float4
+spherical_distance(Vector *a, Vector *b)
+{
+	double		dot = 0.0,
+				norm_a = 0.0,
+				norm_b = 0.0;
+	int			i;
+	float4		result;
+
+	check_dimensions(a, b);
+
+	for (i = 0; i < a->dim; i++)
+	{
+		double		va = (double) a->data[i];
+		double		vb = (double) b->data[i];
+
+		dot += va * vb;
+		norm_a += va * va;
+		norm_b += vb * vb;
+	}
+
+	if (norm_a == 0.0 || norm_b == 0.0)
+		return 1.0;
+
+	result = (float4) (1.0 - (dot / (sqrt(norm_a) * sqrt(norm_b))));
+
+	/* Validate result */
+	if (isnan(result) || isinf(result))
+		ereport(ERROR,
+				(errcode(ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE),
+				 errmsg("spherical distance calculation resulted in NaN or Infinity")));
+
+	return result;
+}
+
+PG_FUNCTION_INFO_V1(vector_spherical_distance);
+Datum
+vector_spherical_distance(PG_FUNCTION_ARGS)
+{
+	Vector	   *a = NULL;
+	Vector	   *b = NULL;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_spherical_distance requires 2 arguments")));
+
+	a = PG_GETARG_VECTOR_P(0);
+	NDB_CHECK_VECTOR_VALID(a);
+	b = PG_GETARG_VECTOR_P(1);
+	NDB_CHECK_VECTOR_VALID(b);
+
+	PG_RETURN_FLOAT4(spherical_distance(a, b));
 }
 
 PG_FUNCTION_INFO_V1(vector_cosine_distance);
