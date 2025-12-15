@@ -30,6 +30,7 @@
 #include "ml_catalog.h"
 #include "lib/stringinfo.h"
 #include "utils/jsonb.h"
+#include "utils/memutils.h"
 #include "common/jsonapi.h"
 #include "vector/vector_types.h"
 #include "neurondb_cuda_gmm.h"
@@ -395,12 +396,12 @@ nalloc(result_datums, Datum, nvec * num_components);
 static bytea *
 gmm_model_serialize_to_bytea(const GMMModel * model, uint8 training_backend)
 {
-	bytea	   *result = NULL;
-	char	   *result_bytes = NULL;
+	StringInfoData buf = {0};
 	int			i = 0;
 	int			j = 0;
+	char	   *result_raw = NULL;
 	int			total_size = 0;
-	StringInfoData buf = {0};
+	bytea	   *result = NULL;
 
 	/* Validate training_backend */
 	if (training_backend > 1)
@@ -408,7 +409,7 @@ gmm_model_serialize_to_bytea(const GMMModel * model, uint8 training_backend)
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
 				 errmsg("neurondb: gmm_model_serialize_to_bytea: invalid training_backend %d (must be 0 or 1)",
-						training_backend)));
+					training_backend)));
 	}
 
 	initStringInfo(&buf);
@@ -430,12 +431,18 @@ gmm_model_serialize_to_bytea(const GMMModel * model, uint8 training_backend)
 		for (j = 0; j < model->dim; j++)
 			appendBinaryStringInfo(&buf, (char *) &model->variances[i][j], sizeof(double));
 
-	total_size = VARHDRSZ + buf.len;
-	nalloc(result_bytes, char, total_size);
-	result = (bytea *) result_bytes;
-	SET_VARSIZE(result, total_size);
-	memcpy(VARDATA(result), buf.data, buf.len);
-	nfree(buf.data);
+	/* Convert to bytea - match naive_bayes pattern exactly */
+	{
+		char *result_raw = NULL;
+		total_size = VARHDRSZ + buf.len;
+		nalloc(result_raw, char, total_size);
+		result = (bytea *) result_raw;
+		SET_VARSIZE(result, total_size);
+		memcpy(VARDATA(result), buf.data, buf.len);
+		/* Don't free buf.data - StringInfo manages its own memory and will
+		 * be cleaned up when the memory context is reset. Freeing it manually
+		 * can cause "invalid pointer" errors if the buffer was reallocated. */
+	}
 
 	return result;
 }
@@ -1378,7 +1385,7 @@ evaluate_gmm_by_model_id(PG_FUNCTION_ARGS)
 	 * jsonb_in
 	 */
 	{
-		StringInfoData jsonbuf;
+		StringInfoData jsonbuf = {0};
 		double		safe_inertia = inertia;
 		double		safe_silhouette = silhouette;
 
@@ -1404,8 +1411,7 @@ evaluate_gmm_by_model_id(PG_FUNCTION_ARGS)
 
 		/* Create JSONB in oldcontext using ndb_jsonb_in_cstring */
 		result_jsonb = ndb_jsonb_in_cstring(jsonbuf.data);
-		nfree(jsonbuf.data);
-		jsonbuf.data = NULL;
+		/* Don't free jsonbuf.data - let PostgreSQL's memory context handle it */
 
 		if (result_jsonb == NULL)
 		{
@@ -1642,7 +1648,7 @@ gmm_gpu_evaluate(const MLGpuModel *model,
 	state = (const GmmGpuModelState *) model->backend_state;
 
 	{
-		StringInfoData buf;
+		StringInfoData buf = {0};
 
 		initStringInfo(&buf);
 		appendStringInfo(&buf,
@@ -1656,7 +1662,7 @@ gmm_gpu_evaluate(const MLGpuModel *model,
 						 state->n_components);
 
 		metrics_json = ndb_jsonb_in_cstring(buf.data);
-		nfree(buf.data);
+		/* Don't free buf.data - let PostgreSQL's memory context handle it */
 	}
 
 	if (out != NULL)
