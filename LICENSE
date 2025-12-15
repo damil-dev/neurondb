@@ -2,6 +2,20 @@ NeurondB — Advanced AI Database Extension for PostgreSQL
 
 Copyright (C) 2024-2025 neurondb, Inc. All rights reserved.
 
+IMPORTANT NOTICE - RETROACTIVE LICENSE APPLICATION
+
+This license applies RETROACTIVELY and EFFECTIVELY to ALL versions of
+this software from the FIRST COMMIT in the repository history, regardless
+of when this license file was created or updated. The restrictions and
+prohibitions contained herein apply to ALL code, ALL commits, ALL versions,
+and ALL distributions of this software from its inception, including but
+not limited to commit d6bcea1 (Initial commit, 2025-12-01) and ALL
+subsequent and prior versions.
+
+By using ANY version of this software, whether obtained before or after
+the date of this license update, you agree that these license terms have
+ALWAYS applied to this software from the first line of code written.
+
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
@@ -42,8 +56,12 @@ THIS SOFTWARE IS STRICTLY PROHIBITED FOR ANY AND ALL COMMERCIAL USE.
 
 In addition to the Commons Clause restriction above, the following
 STRICT AND ABSOLUTE restrictions apply to ALL versions of this software
-from the first commit in 2024 onwards. These restrictions are
-NON-NEGOTIABLE and apply RETROACTIVELY to all historical versions.
+FROM THE FIRST COMMIT IN THE REPOSITORY HISTORY (commit d6bcea1, dated
+2025-12-01, and ALL code from that commit onwards). These restrictions
+are NON-NEGOTIABLE and apply RETROACTIVELY to ALL historical versions,
+including ALL code that existed before this license file was created or
+updated. These restrictions have ALWAYS applied to this software from
+the first line of code written.
 
 1. ABSOLUTE PROHIBITION ON COMMERCIAL USE
 
@@ -132,19 +150,35 @@ NON-NEGOTIABLE and apply RETROACTIVELY to all historical versions.
    f) Using the source code in any way that could lead to commercial
       exploitation, directly or indirectly.
 
-4. RETROACTIVE APPLICATION TO ALL VERSIONS
+4. RETROACTIVE APPLICATION TO ALL VERSIONS FROM FIRST COMMIT
 
    These license terms apply STRICTLY and RETROACTIVELY to ALL versions
-   of this software, including but not limited to:
+   of this software FROM THE FIRST COMMIT IN THE REPOSITORY HISTORY,
+   including but not limited to:
    
-   - All historical versions from the first commit in 2024 onwards
+   - The initial commit (d6bcea1, dated 2025-12-01) and ALL code therein
+   - ALL historical versions, commits, and code from the first commit
+   - ALL versions that existed before this license was updated
+   - ALL versions that were distributed under any previous license
    - All current versions
    - All future versions
    - All branches, forks, and variants
    - All releases, tags, and distributions
+   - ALL source code, binary code, and any form of this software
 
-   NO VERSION OF THIS SOFTWARE, REGARDLESS OF WHEN IT WAS CREATED OR
-   DISTRIBUTED, IS EXEMPT FROM THESE RESTRICTIONS.
+   THIS LICENSE APPLIES RETROACTIVELY TO ALL CODE FROM THE FIRST COMMIT,
+   REGARDLESS OF:
+   - When this license file was created or last modified
+   - What license was stated in previous versions of this file
+   - When you obtained or downloaded the software
+   - What version or commit you are using
+
+   NO VERSION OF THIS SOFTWARE, NO COMMIT, NO CODE, REGARDLESS OF WHEN IT
+   WAS CREATED, DISTRIBUTED, OR OBTAINED, IS EXEMPT FROM THESE RESTRICTIONS.
+
+   The fact that this license file may have been updated on a specific
+   date does NOT mean these restrictions only apply from that date. These
+   restrictions have ALWAYS applied to ALL code from the first commit.
 
 5. NO EXCEPTIONS OR WAIVERS
 
@@ -236,6 +270,9 @@ NON-NEGOTIABLE and apply RETROACTIVELY to all historical versions.
 
 ---
 
-This license is effective immediately and applies to all versions of
-this software from the first commit in 2024 onwards. These terms are
-non-negotiable and strictly enforced.
+This license is effective immediately and applies RETROACTIVELY to ALL
+versions of this software FROM THE FIRST COMMIT IN THE REPOSITORY HISTORY
+(commit d6bcea1, dated 2025-12-01). These terms apply to ALL code from
+that first commit, regardless of when this license file was created or
+updated. These restrictions have ALWAYS been in effect for this software
+from its inception. These terms are non-negotiable and strictly enforced.
