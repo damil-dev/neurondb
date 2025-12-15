@@ -20,6 +20,7 @@
 #include "utils/builtins.h"
 #include "utils/array.h"
 #include "utils/jsonb.h"
+#include "neurondb_json.h"
 #include "executor/spi.h"
 #include "catalog/pg_type.h"
 #include "access/htup_details.h"
@@ -865,23 +866,33 @@ neural_network_deserialize(const bytea * data, uint8 * training_backend_out)
 		for (j = 0; j < layer->n_outputs; j++)
 		{
 			float *weight_row = NULL;
-			nalloc(weight_row, float, layer->n_inputs + 1);
-			layer->weights[j] = weight_row;
+			
+			PG_TRY();
 			{
+				nalloc(weight_row, float, layer->n_inputs + 1);
+				layer->weights[j] = weight_row;
+			}
+			PG_CATCH();
+			{
+				/* Cleanup on allocation failure */
 				for (k = 0; k < j; k++)
-					nfree(layer->weights[k]);
-				nfree(layer->weights);
-				nfree(layer->activations);
-				nfree(layer->deltas);
-				for (j = 0; j < i; j++)
+					if (layer->weights[k] != NULL)
+						nfree(layer->weights[k]);
+				if (layer->weights != NULL)
+					nfree(layer->weights);
+				if (layer->activations != NULL)
+					nfree(layer->activations);
+				if (layer->deltas != NULL)
+					nfree(layer->deltas);
+				for (k = 0; k < i; k++)
 				{
-					NeuralLayer *prev_layer = &net->layers[j];
+					NeuralLayer *prev_layer = &net->layers[k];
 
 					if (prev_layer->weights != NULL)
 					{
-						for (k = 0; k < prev_layer->n_outputs; k++)
-							if (prev_layer->weights[k] != NULL)
-								nfree(prev_layer->weights[k]);
+						for (int m = 0; m < prev_layer->n_outputs; m++)
+							if (prev_layer->weights[m] != NULL)
+								nfree(prev_layer->weights[m]);
 						nfree(prev_layer->weights);
 					}
 					if (prev_layer->activations != NULL)
@@ -897,6 +908,7 @@ neural_network_deserialize(const bytea * data, uint8 * training_backend_out)
 						 errmsg("neurondb: neural_network_deserialize: failed to allocate weights for layer %d, output %d",
 								i, j)));
 			}
+			PG_END_TRY();
 			for (k = 0; k <= layer->n_inputs; k++)
 			{
 				float		weight_val = (float) pq_getmsgfloat8(&buf);
@@ -1566,7 +1578,6 @@ predict_neural_network(PG_FUNCTION_ARGS)
 	Jsonb *parameters = NULL;
 	Jsonb *metrics = NULL;
 	MemoryContext oldcontext;
-	MemoryContext pred_context;
 	NeuralNetwork *net = NULL;
 
 	float *input_features = NULL;
@@ -1574,9 +1585,9 @@ predict_neural_network(PG_FUNCTION_ARGS)
 	int			i;
 
 	/* Defensive: validate inputs */
-	features = PG_GETARG_VECTOR_P(0);
+	model_id = PG_GETARG_INT32(0);
+	features = PG_GETARG_VECTOR_P(1);
 	NDB_CHECK_VECTOR_VALID(features);
-	model_id = PG_GETARG_INT32(1);
 
 	if (features == NULL)
 		ereport(ERROR,
@@ -1594,18 +1605,13 @@ predict_neural_network(PG_FUNCTION_ARGS)
 				 errmsg("predict_neural_network: invalid feature dimension %d",
 						features->dim)));
 
-	/* Create memory context */
-	pred_context = AllocSetContextCreate(CurrentMemoryContext,
-										 "neural network prediction context",
-										 ALLOCSET_DEFAULT_SIZES);
-	oldcontext = MemoryContextSwitchTo(pred_context);
+	/* Save current memory context */
+	oldcontext = CurrentMemoryContext;
 
-	/* Load model from catalog */
+	/* Load model from catalog - ml_catalog_fetch_model_payload allocates in caller's context */
 	if (!ml_catalog_fetch_model_payload(model_id, &model_data,
 										&parameters, &metrics))
 	{
-		MemoryContextSwitchTo(oldcontext);
-		MemoryContextDelete(pred_context);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("predict_neural_network: model %d not found", model_id)));
@@ -1614,8 +1620,6 @@ predict_neural_network(PG_FUNCTION_ARGS)
 	/* Defensive: validate model_data */
 	if (model_data == NULL)
 	{
-		MemoryContextSwitchTo(oldcontext);
-		MemoryContextDelete(pred_context);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("predict_neural_network: model %d has no model data",
@@ -1635,8 +1639,6 @@ predict_neural_network(PG_FUNCTION_ARGS)
 		}
 		if (net == NULL)
 		{
-			MemoryContextSwitchTo(oldcontext);
-			MemoryContextDelete(pred_context);
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("predict_neural_network: failed to deserialize model %d",
@@ -1648,8 +1650,6 @@ predict_neural_network(PG_FUNCTION_ARGS)
 		/* Cleanup on deserialization error */
 		if (net != NULL)
 			neural_network_free(net);
-		MemoryContextSwitchTo(oldcontext);
-		MemoryContextDelete(pred_context);
 		PG_RE_THROW();
 	}
 	PG_END_TRY();
@@ -1658,8 +1658,6 @@ predict_neural_network(PG_FUNCTION_ARGS)
 	if (features->dim != net->n_inputs)
 	{
 		neural_network_free(net);
-		MemoryContextSwitchTo(oldcontext);
-		MemoryContextDelete(pred_context);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("predict_neural_network: feature dimension %d does not match model input dimension %d",
@@ -1673,8 +1671,6 @@ predict_neural_network(PG_FUNCTION_ARGS)
 		if (features_size > MaxAllocSize)
 		{
 			neural_network_free(net);
-			MemoryContextSwitchTo(oldcontext);
-			MemoryContextDelete(pred_context);
 			ereport(ERROR,
 					(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
 					 errmsg("predict_neural_network: feature array allocation exceeds maximum size")));
@@ -1683,8 +1679,6 @@ predict_neural_network(PG_FUNCTION_ARGS)
 		if (input_features == NULL)
 		{
 			neural_network_free(net);
-			MemoryContextSwitchTo(oldcontext);
-			MemoryContextDelete(pred_context);
 			ereport(ERROR,
 					(errcode(ERRCODE_OUT_OF_MEMORY),
 					 errmsg("predict_neural_network: failed to allocate input features array")));
@@ -1696,8 +1690,6 @@ predict_neural_network(PG_FUNCTION_ARGS)
 		{
 			nfree(input_features);
 			neural_network_free(net);
-			MemoryContextSwitchTo(oldcontext);
-			MemoryContextDelete(pred_context);
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("predict_neural_network: non-finite feature value at index %d",
@@ -1716,8 +1708,6 @@ predict_neural_network(PG_FUNCTION_ARGS)
 		{
 			neural_network_free(net);
 			nfree(input_features);
-			MemoryContextSwitchTo(oldcontext);
-			MemoryContextDelete(pred_context);
 			ereport(ERROR,
 					(errcode(ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE),
 					 errmsg("predict_neural_network: non-finite prediction result")));
@@ -1730,17 +1720,12 @@ predict_neural_network(PG_FUNCTION_ARGS)
 			neural_network_free(net);
 		if (input_features != NULL)
 			nfree(input_features);
-		MemoryContextSwitchTo(oldcontext);
-		MemoryContextDelete(pred_context);
 		PG_RE_THROW();
 	}
 	PG_END_TRY();
 
 	neural_network_free(net);
 	nfree(input_features);
-
-	MemoryContextSwitchTo(oldcontext);
-	MemoryContextDelete(pred_context);
 
 	PG_RETURN_FLOAT8(result[0]);
 }
@@ -2020,11 +2005,11 @@ neural_network_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **e
 
 	bytea *model_data = NULL;
 	Jsonb *metrics = NULL;
-	StringInfoData metrics_json;
 	JsonbIterator *it = NULL;
 	JsonbValue	v;
 	int			r;
 	int			i;
+	MemoryContext oldcontext = CurrentMemoryContext;
 
 	if (errstr != NULL)
 		*errstr = NULL;
@@ -2034,6 +2019,9 @@ neural_network_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **e
 			*errstr = pstrdup("neural_network_gpu_train: invalid parameters");
 		return false;
 	}
+
+	/* Ensure we're in TopMemoryContext for allocations in GPU context */
+	MemoryContextSwitchTo(TopMemoryContext);
 
 	/* Extract hyperparameters */
 	if (spec->hyperparameters != NULL)
@@ -2120,6 +2108,9 @@ neural_network_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **e
 	nvec = spec->sample_count;
 	dim = spec->feature_dim;
 
+	/* Ensure we're in TopMemoryContext for allocations */
+	MemoryContextSwitchTo(TopMemoryContext);
+
 	/* Allocate training data */
 	nalloc(X, float *, nvec);
 	nalloc(y, float, nvec);
@@ -2179,14 +2170,135 @@ neural_network_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **e
 	/* Serialize model */
 	model_data = neural_network_serialize(net, 0); /* training_backend=0 for CPU */
 
-	/* Build metrics */
-	initStringInfo(&metrics_json);
-	appendStringInfo(&metrics_json,
-					 "{\"storage\":\"cpu\",\"training_backend\":0,\"n_inputs\":%d,\"n_outputs\":%d,\"n_hidden_layers\":%d,\"activation\":\"%s\",\"learning_rate\":%.6f,\"epochs\":%d,\"final_loss\":%.6f,\"n_samples\":%d}",
-					 dim, n_outputs, n_hidden, activation, learning_rate, epochs, loss, nvec);
-	metrics = DatumGetJsonbP(DirectFunctionCall1(jsonb_in,
-												 CStringGetTextDatum(metrics_json.data)));
-	nfree(metrics_json.data);
+	/* Build metrics using JSONB API directly to avoid DirectFunctionCall in GPU context */
+	{
+		JsonbParseState *state = NULL;
+		JsonbValue	jkey;
+		JsonbValue	jval;
+		JsonbValue *final_value = NULL;
+		MemoryContext oldcontext = CurrentMemoryContext;
+		Numeric		n_inputs_num, n_outputs_num, n_hidden_num, learning_rate_num, epochs_num, final_loss_num, n_samples_num;
+		
+		/* Switch to TopMemoryContext for JSONB construction */
+		MemoryContextSwitchTo(TopMemoryContext);
+		
+		PG_TRY();
+		{
+			(void) pushJsonbValue(&state, WJB_BEGIN_OBJECT, NULL);
+			
+			/* Add storage */
+			jkey.type = jbvString;
+			jkey.val.string.val = "storage";
+			jkey.val.string.len = strlen("storage");
+			(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+			jval.type = jbvString;
+			jval.val.string.val = "cpu";
+			jval.val.string.len = strlen("cpu");
+			(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+			
+			/* Add training_backend */
+			jkey.val.string.val = "training_backend";
+			jkey.val.string.len = strlen("training_backend");
+			(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+			jval.type = jbvNumeric;
+			jval.val.numeric = DatumGetNumeric(DirectFunctionCall1(int4_numeric, Int32GetDatum(0)));
+			(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+			
+			/* Add n_inputs */
+			jkey.val.string.val = "n_inputs";
+			jkey.val.string.len = strlen("n_inputs");
+			(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+			n_inputs_num = DatumGetNumeric(DirectFunctionCall1(int4_numeric, Int32GetDatum(dim)));
+			jval.type = jbvNumeric;
+			jval.val.numeric = n_inputs_num;
+			(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+			
+			/* Add n_outputs */
+			jkey.val.string.val = "n_outputs";
+			jkey.val.string.len = strlen("n_outputs");
+			(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+			n_outputs_num = DatumGetNumeric(DirectFunctionCall1(int4_numeric, Int32GetDatum(n_outputs)));
+			jval.type = jbvNumeric;
+			jval.val.numeric = n_outputs_num;
+			(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+			
+			/* Add n_hidden_layers */
+			jkey.val.string.val = "n_hidden_layers";
+			jkey.val.string.len = strlen("n_hidden_layers");
+			(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+			n_hidden_num = DatumGetNumeric(DirectFunctionCall1(int4_numeric, Int32GetDatum(n_hidden)));
+			jval.type = jbvNumeric;
+			jval.val.numeric = n_hidden_num;
+			(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+			
+			/* Add activation */
+			jkey.val.string.val = "activation";
+			jkey.val.string.len = strlen("activation");
+			(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+			jval.type = jbvString;
+			jval.val.string.val = activation;
+			jval.val.string.len = strlen(activation);
+			(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+			
+			/* Add learning_rate */
+			jkey.val.string.val = "learning_rate";
+			jkey.val.string.len = strlen("learning_rate");
+			(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+			learning_rate_num = DatumGetNumeric(DirectFunctionCall1(float8_numeric, Float8GetDatum((double) learning_rate)));
+			jval.type = jbvNumeric;
+			jval.val.numeric = learning_rate_num;
+			(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+			
+			/* Add epochs */
+			jkey.val.string.val = "epochs";
+			jkey.val.string.len = strlen("epochs");
+			(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+			epochs_num = DatumGetNumeric(DirectFunctionCall1(int4_numeric, Int32GetDatum(epochs)));
+			jval.type = jbvNumeric;
+			jval.val.numeric = epochs_num;
+			(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+			
+			/* Add final_loss */
+			jkey.val.string.val = "final_loss";
+			jkey.val.string.len = strlen("final_loss");
+			(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+			final_loss_num = DatumGetNumeric(DirectFunctionCall1(float8_numeric, Float8GetDatum((double) loss)));
+			jval.type = jbvNumeric;
+			jval.val.numeric = final_loss_num;
+			(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+			
+			/* Add n_samples */
+			jkey.val.string.val = "n_samples";
+			jkey.val.string.len = strlen("n_samples");
+			(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+			n_samples_num = DatumGetNumeric(DirectFunctionCall1(int4_numeric, Int32GetDatum(nvec)));
+			jval.type = jbvNumeric;
+			jval.val.numeric = n_samples_num;
+			(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+			
+			final_value = pushJsonbValue(&state, WJB_END_OBJECT, NULL);
+			if (final_value == NULL)
+			{
+				MemoryContextSwitchTo(oldcontext);
+				ereport(ERROR,
+						(errcode(ERRCODE_INTERNAL_ERROR),
+						 errmsg("neurondb: neural_network_gpu_train: pushJsonbValue(WJB_END_OBJECT) returned NULL")));
+			}
+			
+			metrics = JsonbValueToJsonb(final_value);
+		}
+		PG_CATCH();
+		{
+			MemoryContextSwitchTo(oldcontext);
+			PG_RE_THROW();
+		}
+		PG_END_TRY();
+		
+		MemoryContextSwitchTo(oldcontext);
+	}
+
+	/* Switch back to original context after JSONB construction */
+	MemoryContextSwitchTo(oldcontext);
 
 	nalloc(state, NeuralNetworkGpuModelState, 1);
 	state->model_blob = model_data;
