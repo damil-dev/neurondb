@@ -41,3 +41,4 @@ extern int	ndb_gpu_xgboost_pack_model(const struct XGBoostModel *model,
 
 #endif							/* NEURONDB_ML_GPU_XGBOOST_H */
 
+

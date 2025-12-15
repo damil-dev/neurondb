@@ -41,3 +41,4 @@ extern int	ndb_gpu_catboost_pack_model(const struct CatBoostModel *model,
 
 #endif							/* NEURONDB_ML_GPU_CATBOOST_H */
 
+
