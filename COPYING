@@ -1,16 +1,29 @@
 NeurondB — Advanced AI Database Extension for PostgreSQL
 
-Copyright (C) 2024-2025 neurondb, Inc.
+Copyright (C) 2024-2025 neurondb, Inc. All rights reserved.
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+STRICT LICENSE TERMS - READ CAREFULLY
 
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
+This software is licensed under the Apache License, Version 2.0, with
+Commons Clause restrictions and STRICT additional commercial use
+prohibitions.
 
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ABSOLUTE RESTRICTIONS:
+
+✓ Personal use of binaries ONLY is permitted
+✗ Commercial use is STRICTLY PROHIBITED
+✗ Creating companies based on this code is STRICTLY PROHIBITED
+✗ Using source code for commercial purposes is STRICTLY PROHIBITED
+✗ Redistributing source code is STRICTLY PROHIBITED
+✗ Creating derivative works is STRICTLY PROHIBITED
+
+These terms apply RETROACTIVELY to ALL versions from 2024 onwards.
+
+ANY violation will result in immediate termination of rights and
+may result in legal action.
+
+For full license terms, see the LICENSE file.
+
+For commercial licensing inquiries, contact: support@neurondb.ai
+
+By using this software, you agree to be bound by these strict terms.

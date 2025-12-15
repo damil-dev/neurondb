@@ -1,7 +1,7 @@
 # NeuronDB Ecosystem
 
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16%2C17%2C18-blue.svg)](https://www.postgresql.org/)
-[![License](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-Apache%202.0%20%2B%20Commons%20Clause-red.svg)](LICENSE)
 [![Documentation](https://img.shields.io/badge/docs-latest-brightgreen.svg)](https://www.neurondb.ai/docs)
 [![Website](https://img.shields.io/badge/website-www.neurondb.ai-blue.svg)](https://www.neurondb.ai/)
 
@@ -874,7 +874,18 @@ Include this information when reporting issues:
 
 ## License
 
-See [LICENSE](LICENSE) file for license information.
+This software is licensed under the Apache License 2.0 with Commons Clause
+restrictions and strict commercial use prohibitions.
+
+**Key Terms:**
+- ✓ Personal use of binaries ONLY is permitted
+- ✗ Commercial use is STRICTLY PROHIBITED
+- ✗ Creating companies based on this code is STRICTLY PROHIBITED
+- ✗ Using source code for commercial purposes is STRICTLY PROHIBITED
+
+These terms apply RETROACTIVELY to ALL versions from 2024 onwards.
+
+See [LICENSE](LICENSE) file for complete license terms.
 
 ## Quick Reference
 
