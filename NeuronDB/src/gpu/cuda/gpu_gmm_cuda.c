@@ -31,6 +31,7 @@
 #include "neurondb_validation.h"
 #include "neurondb_safe_memory.h"
 #include "neurondb_macros.h"
+#include "neurondb_json.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -188,10 +189,10 @@ ndb_cuda_gmm_pack_model(const struct GMMModel *model,
 					/* Validate mean: must be finite */
 					if (!isfinite(mean_val))
 					{
-						if (errstr)
-							*errstr = pstrdup("invalid GMM model: means contains non-finite value");
-						nfree(blob);
-						return -1;
+					if (errstr)
+						*errstr = pstrdup("invalid GMM model: means contains non-finite value");
+					nfree(blob);
+					return -1;
 					}
 					means_dest[i * model->dim + j] = mean_val;
 				}
@@ -223,10 +224,10 @@ ndb_cuda_gmm_pack_model(const struct GMMModel *model,
 					/* Validate variance: must be finite and positive */
 					if (!isfinite(var_val) || var_val < 0.0)
 					{
-						if (errstr)
-							*errstr = pstrdup("invalid GMM model: variances contains invalid value");
-						nfree(blob);
-						return -1;
+					if (errstr)
+						*errstr = pstrdup("invalid GMM model: variances contains invalid value");
+					nfree(blob);
+					return -1;
 					}
 					/* Regularize to avoid division by zero */
 					if (var_val < GMM_EPSILON)
@@ -251,7 +252,7 @@ ndb_cuda_gmm_pack_model(const struct GMMModel *model,
 
 	if (metrics != NULL)
 	{
-		StringInfoData buf;
+		StringInfoData buf = {0};
 		Jsonb	   *metrics_json = NULL;
 
 		initStringInfo(&buf);
@@ -263,24 +264,16 @@ ndb_cuda_gmm_pack_model(const struct GMMModel *model,
 						 model->k,
 						 model->dim);
 
-		PG_TRY();
-		{
-			metrics_json = DatumGetJsonbP(
-										  DirectFunctionCall1(jsonb_in, CStringGetTextDatum(buf.data)));
-		}
-		PG_CATCH();
-		{
-			/* If JSONB creation fails, set metrics to NULL */
-			FlushErrorState();
-			metrics_json = NULL;
-		}
-		PG_END_TRY();
-
-		nfree(buf.data);
+		/* Use ndb_jsonb_in_cstring which handles errors properly */
+		metrics_json = ndb_jsonb_in_cstring(buf.data);
+		/* Don't free buf.data - StringInfo manages its own memory and will
+		 * be cleaned up when the memory context is reset. Freeing it manually
+		 * can cause "invalid pointer" errors if the buffer was reallocated. */
 		*metrics = metrics_json;
 	}
 
 	*model_data = blob;
+
 	return 0;
 }
 
