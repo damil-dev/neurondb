@@ -269,13 +269,8 @@ auto_train(PG_FUNCTION_ARGS)
 				nfree(nulls_arr);
 			}
 
-			/* Build empty JSONB for hyperparams - use text type for jsonb_in */
-			{
-				text *json_text = cstring_to_text("{}");
-				Datum jsonb_datum = DirectFunctionCall1(jsonb_in, PointerGetDatum(json_text));
-				hyperparams_jsonb = DatumGetJsonbP(jsonb_datum);
-				/* json_text is managed by memory context, don't free */
-			}
+			/* Build empty JSONB for hyperparams - use ndb_jsonb_in_cstring helper */
+			hyperparams_jsonb = ndb_jsonb_in_cstring("{}");
 
 			/* Lookup neurondb.train function */
 			funcname = list_make2(makeString("neurondb"), makeString("train"));
