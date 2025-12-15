@@ -334,7 +334,8 @@ knn_classify(PG_FUNCTION_ARGS)
 				class_votes[label_class] += 1.0;
 		}
 
-		predicted_class = (class_votes[1] > class_votes[0]) ? 1 : 0;
+		/* Break ties by preferring class 1 if votes are equal */
+		predicted_class = (class_votes[1] >= class_votes[0]) ? 1 : 0;
 
 		for (i = 0; i < nsamples; i++)
 		{
@@ -1598,7 +1599,8 @@ predict_knn_model_id(PG_FUNCTION_ARGS)
 				if (label >= 0 && label < 2)
 					class_votes[label] += 1.0;
 			}
-			prediction = (class_votes[1] > class_votes[0]) ? 1.0 : 0.0;
+			/* Break ties by preferring class 1 if votes are equal */
+			prediction = (class_votes[1] >= class_votes[0]) ? 1.0 : 0.0;
 		}
 		else
 		{
@@ -1995,7 +1997,8 @@ knn_predict_batch(int32 model_id,
 							if (label >= 0 && label < 2)
 								class_votes[label] += 1.0;
 						}
-						prediction = (class_votes[1] > class_votes[0]) ? 1.0 : 0.0;
+						/* Break ties by preferring class 1 if votes are equal */
+						prediction = (class_votes[1] >= class_votes[0]) ? 1.0 : 0.0;
 					}
 
 					pred_class = (int) rint(prediction);
@@ -2208,7 +2211,8 @@ knn_predict_batch(int32 model_id,
 						if (label >= 0 && label < 2)
 							class_votes[label] += 1.0;
 					}
-					prediction = (class_votes[1] > class_votes[0]) ? 1.0 : 0.0;
+					/* Break ties by preferring class 1 if votes are equal */
+					prediction = (class_votes[1] >= class_votes[0]) ? 1.0 : 0.0;
 				}
 
 				pred_class = (int) rint(prediction);
@@ -3012,6 +3016,11 @@ cpu_evaluation_path:
 		{
 			int			total_predictions = tp + tn + fp + fn;
 
+			/* Always log confusion matrix for debugging */
+			elog(DEBUG1,
+				 "knn evaluation: tp=%d, tn=%d, fp=%d, fn=%d, total=%d, valid_rows=%d",
+				 tp, tn, fp, fn, total_predictions, valid_rows);
+
 			if (total_predictions == 0)
 			{
 				accuracy = 0.0;
@@ -3021,22 +3030,26 @@ cpu_evaluation_path:
 			}
 			else
 			{
+				/* Calculate accuracy: correct predictions / total predictions */
+				/* Use valid_rows as denominator to match expected behavior */
 				accuracy = (double) (tp + tn) / (double) valid_rows;
 
-				if (total_predictions < valid_rows)
-				{
-				}
-
+				/* Precision: tp / (tp + fp) - undefined if no positive predictions */
+				/* If no positive predictions were made, precision is undefined (set to 0) */
 				if ((tp + fp) > 0)
 					precision = (double) tp / (double) (tp + fp);
 				else
 					precision = 0.0;
 
+				/* Recall: tp / (tp + fn) - undefined if no positive labels */
+				/* If no positive labels exist in test set, recall is undefined (set to 0) */
 				if ((tp + fn) > 0)
 					recall = (double) tp / (double) (tp + fn);
 				else
 					recall = 0.0;
 
+				/* F1 score: harmonic mean of precision and recall */
+				/* Only calculate if both precision and recall are defined */
 				if ((precision + recall) > 0.0)
 					f1_score = 2.0 * (precision * recall) / (precision + recall);
 				else
