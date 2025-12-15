@@ -24,6 +24,7 @@
 #include "access/htup_details.h"
 #include "utils/memutils.h"
 #include "utils/jsonb.h"
+#include "common/jsonapi.h"
 #include "utils/guc.h"
 #include "utils/lsyscache.h"
 #include "parser/parse_func.h"
@@ -245,7 +246,7 @@ auto_train(PG_FUNCTION_ARGS)
 			text *target_column_text = NULL;
 			ArrayType *feature_array = NULL;
 			Jsonb *hyperparams_jsonb = NULL;
-			StringInfoData json_str;
+			StringInfoData json_str = {0};
 
 
 			/* Build arguments for neurondb.train() */
@@ -268,12 +269,13 @@ auto_train(PG_FUNCTION_ARGS)
 				nfree(nulls_arr);
 			}
 
-			/* Build empty JSONB for hyperparams */
-			initStringInfo(&json_str);
-			appendStringInfoString(&json_str, "{}");
-			hyperparams_jsonb = DatumGetJsonbP(DirectFunctionCall1(jsonb_in,
-																   CStringGetTextDatum(json_str.data)));
-			/* Don't free json_str.data - it's managed by memory context */
+			/* Build empty JSONB for hyperparams - use text type for jsonb_in */
+			{
+				text *json_text = cstring_to_text("{}");
+				Datum jsonb_datum = DirectFunctionCall1(jsonb_in, PointerGetDatum(json_text));
+				hyperparams_jsonb = DatumGetJsonbP(jsonb_datum);
+				/* json_text is managed by memory context, don't free */
+			}
 
 			/* Lookup neurondb.train function */
 			funcname = list_make2(makeString("neurondb"), makeString("train"));
@@ -306,6 +308,8 @@ auto_train(PG_FUNCTION_ARGS)
 			values[2] = PointerGetDatum(table_name_text);
 			values[3] = PointerGetDatum(target_column_text);
 			values[4] = PointerGetDatum(feature_array);
+			/* For JSONB, ensure it's properly passed - use PointerGetDatum */
+			/* For JSONB, use PointerGetDatum - PG_GETARG_JSONB_P will handle it */
 			values[5] = PointerGetDatum(hyperparams_jsonb);
 
 			/* Call neurondb.train() directly - avoids nested SPI */
@@ -339,10 +343,7 @@ auto_train(PG_FUNCTION_ARGS)
 			char *error_message = NULL;
 			MemoryContext safe_context;
 
-			/* Flush error state first */
-			FlushErrorState();
-
-			/* Switch out of ErrorContext before CopyErrorData() */
+			/* Copy error data BEFORE flushing error state */
 			safe_context = oldcontext;
 			if (safe_context == NULL || safe_context == ErrorContext)
 			{
@@ -369,6 +370,9 @@ auto_train(PG_FUNCTION_ARGS)
 			}
 			PG_END_TRY();
 #pragma GCC diagnostic pop
+
+			/* Now flush error state after copying */
+			FlushErrorState();
 
 			/* Free error data before using the copied message */
 			if (edata != NULL)
