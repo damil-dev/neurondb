@@ -22,10 +22,18 @@
 #include "utils/array.h"
 #include "access/htup_details.h"
 #include "utils/memutils.h"
+#include "utils/jsonb.h"
+#include "lib/stringinfo.h"
+#include <math.h>
+#include "neurondb.h"
+#include "neurondb_ml.h"
+#include "neurondb_spi_safe.h"
+#include "neurondb_spi.h"
 
 PG_FUNCTION_INFO_V1(train_lightgbm_classifier);
 PG_FUNCTION_INFO_V1(train_lightgbm_regressor);
 PG_FUNCTION_INFO_V1(predict_lightgbm);
+PG_FUNCTION_INFO_V1(evaluate_lightgbm_by_model_id);
 
 Datum
 train_lightgbm_classifier(PG_FUNCTION_ARGS)
@@ -103,11 +111,373 @@ predict_lightgbm(PG_FUNCTION_ARGS)
 	PG_RETURN_FLOAT8(0.0);
 }
 
+/*
+ * evaluate_lightgbm_by_model_id
+ *
+ * Evaluates a LightGBM model on a dataset and returns performance metrics.
+ * Arguments: int4 model_id, text table_name, text feature_col, text label_col
+ * Returns: jsonb with metrics
+ * 
+ * Note: This function works even when LightGBM library is not available,
+ * but will return an error if prediction fails (which requires the library).
+ */
+Datum
+evaluate_lightgbm_by_model_id(PG_FUNCTION_ARGS)
+{
+	int32		model_id;
+	text *table_name = NULL;
+	text *feature_col = NULL;
+	text *label_col = NULL;
+	char *tbl_str = NULL;
+	char *feat_str = NULL;
+	char *targ_str = NULL;
+	StringInfoData query;
+	int			ret;
+	int			nvec = 0;
+	double		mse = 0.0;
+	double		mae = 0.0;
+	double		ss_tot = 0.0;
+	double		ss_res = 0.0;
+	double		y_mean = 0.0;
+	double		r_squared;
+	double		rmse;
+	int			i;
+	StringInfoData jsonbuf;
+	Jsonb *result = NULL;
+	MemoryContext oldcontext;
+	bool		is_classification = false;
+	Oid			label_type_oid = InvalidOid;
+	/* Classification metrics */
+	int			tp = 0, tn = 0, fp = 0, fn = 0;
+	double		accuracy = 0.0;
+	double		precision = 0.0;
+	double		recall = 0.0;
+	double		f1_score = 0.0;
+
+	/* Validate arguments */
+	if (PG_NARGS() != 4)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: evaluate_lightgbm_by_model_id: 4 arguments are required")));
+
+	if (PG_ARGISNULL(0))
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: evaluate_lightgbm_by_model_id: model_id is required")));
+
+	model_id = PG_GETARG_INT32(0);
+
+	if (PG_ARGISNULL(1) || PG_ARGISNULL(2) || PG_ARGISNULL(3))
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: evaluate_lightgbm_by_model_id: table_name, feature_col, and label_col are required")));
+
+	table_name = PG_GETARG_TEXT_PP(1);
+	feature_col = PG_GETARG_TEXT_PP(2);
+	label_col = PG_GETARG_TEXT_PP(3);
+
+	tbl_str = text_to_cstring(table_name);
+	feat_str = text_to_cstring(feature_col);
+	targ_str = text_to_cstring(label_col);
+
+	oldcontext = CurrentMemoryContext;
+
+	/* Connect to SPI */
+	NdbSpiSession *spi_session = NULL;
+
+	NDB_SPI_SESSION_BEGIN(spi_session, oldcontext);
+
+	/* Build query */
+	ndb_spi_stringinfo_init(spi_session, &query);
+	appendStringInfo(&query,
+					 "SELECT %s, %s FROM %s WHERE %s IS NOT NULL AND %s IS NOT NULL",
+					 feat_str, targ_str, tbl_str, feat_str, targ_str);
+
+		ret = ndb_spi_execute(spi_session, query.data, true, 0);
+	if (ret != SPI_OK_SELECT)
+	{
+		ndb_spi_stringinfo_free(spi_session, &query);
+		NDB_SPI_SESSION_END(spi_session);
+		pfree(tbl_str);
+		pfree(feat_str);
+		pfree(targ_str);
+		ereport(ERROR,
+				(errcode(ERRCODE_INTERNAL_ERROR),
+				 errmsg("neurondb: evaluate_lightgbm_by_model_id: query failed")));
+	}
+
+	nvec = SPI_processed;
+	if (nvec < 2)
+	{
+		ndb_spi_stringinfo_free(spi_session, &query);
+		NDB_SPI_SESSION_END(spi_session);
+		pfree(tbl_str);
+		pfree(feat_str);
+		pfree(targ_str);
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: evaluate_lightgbm_by_model_id: need at least 2 samples, got %d",
+						nvec)));
+	}
+
+	/* First pass: determine label type and compute mean of y (for regression) */
+	if (SPI_tuptable != NULL && SPI_tuptable->tupdesc != NULL && SPI_tuptable->tupdesc->natts >= 2)
+	{
+		label_type_oid = SPI_gettypeid(SPI_tuptable->tupdesc, 2);
+		/* Check if label is integer type (classification) or float type (regression) */
+		if (label_type_oid == INT4OID || label_type_oid == INT2OID || label_type_oid == INT8OID)
+		{
+			is_classification = true;
+		}
+	}
+
+	for (i = 0; i < nvec; i++)
+	{
+		/* Safe access to SPI_tuptable - validate before access */
+		if (SPI_tuptable == NULL || SPI_tuptable->vals == NULL ||
+			i >= SPI_processed || SPI_tuptable->vals[i] == NULL)
+		{
+			continue;
+		}
+		HeapTuple	tuple = SPI_tuptable->vals[i];
+		TupleDesc	tupdesc = SPI_tuptable->tupdesc;
+
+		if (tupdesc == NULL)
+		{
+			continue;
+		}
+		Datum		targ_datum;
+		bool		targ_null;
+
+		/* Safe access for target - validate tupdesc has at least 2 columns */
+		if (tupdesc->natts < 2)
+		{
+			continue;
+		}
+		targ_datum = SPI_getbinval(tuple, tupdesc, 2, &targ_null);
+		if (!targ_null && !is_classification)
+			y_mean += DatumGetFloat8(targ_datum);
+	}
+	if (!is_classification && nvec > 0)
+		y_mean /= nvec;
+
+	/* Determine feature type from first row */
+	Oid			feat_type_oid = InvalidOid;
+	bool		feat_is_array = false;
+
+	if (SPI_tuptable != NULL && SPI_tuptable->tupdesc != NULL)
+	{
+		feat_type_oid = SPI_gettypeid(SPI_tuptable->tupdesc, 1);
+		if (feat_type_oid == FLOAT8ARRAYOID || feat_type_oid == FLOAT4ARRAYOID)
+			feat_is_array = true;
+	}
+
+	/* Second pass: compute predictions and metrics */
+	for (i = 0; i < nvec; i++)
+	{
+		HeapTuple	tuple = SPI_tuptable->vals[i];
+		TupleDesc	tupdesc = SPI_tuptable->tupdesc;
+		Datum		feat_datum;
+		Datum		targ_datum;
+		bool		feat_null;
+		bool		targ_null;
+		ArrayType *arr = NULL;
+		Vector *vec = NULL;
+		double		y_pred;
+		int			actual_dim;
+		int			j;
+
+		feat_datum = SPI_getbinval(tuple, tupdesc, 1, &feat_null);
+		targ_datum = SPI_getbinval(tuple, tupdesc, 2, &targ_null);
+
+		if (feat_null || targ_null)
+			continue;
+
+		/* Handle both integer and float label types */
+		int			y_true_int = 0;
+		double		y_true_float = 0.0;
+		
+		if (is_classification)
+		{
+			if (label_type_oid == INT4OID || label_type_oid == INT2OID || label_type_oid == INT8OID)
+				y_true_int = DatumGetInt32(targ_datum);
+			else
+				y_true_int = (int) rint(DatumGetFloat8(targ_datum));
+		}
+		else
+		{
+			y_true_float = DatumGetFloat8(targ_datum);
+		}
+
+		/* Extract features and determine dimension */
+		if (feat_is_array)
+		{
+			arr = DatumGetArrayTypeP(feat_datum);
+			if (ARR_NDIM(arr) != 1)
+			{
+			ndb_spi_stringinfo_free(spi_session, &query);
+			NDB_SPI_SESSION_END(spi_session);
+			pfree(tbl_str);
+			pfree(feat_str);
+			pfree(targ_str);
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					 errmsg("lightgbm: features array must be 1-D")));
+			}
+			actual_dim = ARR_DIMS(arr)[0];
+		}
+		else
+		{
+			vec = DatumGetVector(feat_datum);
+			actual_dim = vec->dim;
+		}
+
+		/* Make prediction using LightGBM model - this will fail if library not available */
+		PG_TRY();
+		{
+			if (feat_is_array)
+			{
+				/* Create a temporary array for prediction */
+				Datum		features_datum = feat_datum;
+
+				y_pred = DatumGetFloat8(DirectFunctionCall2(predict_lightgbm,
+															Int32GetDatum(model_id),
+															features_datum));
+			}
+			else
+			{
+				/* Convert vector to array for prediction */
+				int			ndims = 1;
+				int			dims[1] = {actual_dim};
+				int			lbs[1] = {1};
+				Datum	   *elems = NULL;
+				ArrayType  *feature_array = NULL;
+				Datum		features_datum;
+
+				elems = (Datum *) palloc(sizeof(Datum) * actual_dim);
+
+				for (j = 0; j < actual_dim; j++)
+					elems[j] = Float8GetDatum(vec->data[j]);
+
+				feature_array = construct_md_array(elems, NULL, ndims, dims, lbs,
+												   FLOAT8OID, sizeof(float8), true, 'd');
+				features_datum = PointerGetDatum(feature_array);
+
+				y_pred = DatumGetFloat8(DirectFunctionCall2(predict_lightgbm,
+															Int32GetDatum(model_id),
+															features_datum));
+
+				/* elems is allocated with palloc, so use pfree */
+				pfree(elems);
+			}
+		}
+		PG_CATCH();
+		{
+			ndb_spi_stringinfo_free(spi_session, &query);
+			NDB_SPI_SESSION_END(spi_session);
+			pfree(tbl_str);
+			pfree(feat_str);
+			pfree(targ_str);
+			ereport(ERROR,
+					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+					 errmsg("LightGBM library not available for evaluation"),
+					 errhint("LightGBM library is required for prediction and evaluation. "
+							 "Install LightGBM and recompile NeuronDB to enable evaluation.")));
+		}
+		PG_END_TRY();
+
+		/* Compute metrics based on task type */
+		if (is_classification)
+		{
+			int			y_pred_int = (int) rint(y_pred);
+			
+			/* Classification: compute confusion matrix */
+			if (y_true_int == 1 && y_pred_int == 1)
+				tp++;
+			else if (y_true_int == 0 && y_pred_int == 0)
+				tn++;
+			else if (y_true_int == 0 && y_pred_int == 1)
+				fp++;
+			else if (y_true_int == 1 && y_pred_int == 0)
+				fn++;
+		}
+		else
+		{
+			/* Regression: compute errors */
+			double		error = y_true_float - y_pred;
+			mse += error * error;
+			mae += fabs(error);
+			ss_res += error * error;
+			ss_tot += (y_true_float - y_mean) * (y_true_float - y_mean);
+		}
+	}
+
+	ndb_spi_stringinfo_free(spi_session, &query);
+	NDB_SPI_SESSION_END(spi_session);
+
+	/* Build result JSON based on task type */
+	MemoryContextSwitchTo(oldcontext);
+	initStringInfo(&jsonbuf);
+	
+	if (is_classification)
+	{
+		/* Calculate classification metrics */
+		int			total = tp + tn + fp + fn;
+		
+		if (total > 0)
+		{
+			accuracy = (double) (tp + tn) / (double) total;
+			precision = (tp + fp > 0) ? (double) tp / (double) (tp + fp) : 0.0;
+			recall = (tp + fn > 0) ? (double) tp / (double) (tp + fn) : 0.0;
+			f1_score = (precision + recall > 0.0)
+				? 2.0 * precision * recall / (precision + recall)
+				: 0.0;
+		}
+		
+		appendStringInfo(&jsonbuf,
+						 "{\"accuracy\":%.6f,\"precision\":%.6f,\"recall\":%.6f,\"f1_score\":%.6f,\"n_samples\":%d}",
+						 accuracy, precision, recall, f1_score, nvec);
+	}
+	else
+	{
+		/* Calculate regression metrics */
+		mse /= nvec;
+		mae /= nvec;
+		rmse = sqrt(mse);
+
+		/*
+		 * Handle R² calculation - if ss_tot is zero (no variance in y), R² is
+		 * undefined
+		 */
+		if (ss_tot == 0.0)
+			r_squared = 0.0;		/* Convention: set to 0 when there's no
+									 * variance to explain */
+		else
+			r_squared = 1.0 - (ss_res / ss_tot);
+		
+		appendStringInfo(&jsonbuf,
+						 "{\"mse\":%.6f,\"mae\":%.6f,\"rmse\":%.6f,\"r_squared\":%.6f,\"n_samples\":%d}",
+						 mse, mae, rmse, r_squared, nvec);
+	}
+
+	result = DatumGetJsonbP(DirectFunctionCall1(jsonb_in, CStringGetTextDatum(jsonbuf.data)));
+	pfree(jsonbuf.data);
+
+	pfree(tbl_str);
+	pfree(feat_str);
+	pfree(targ_str);
+
+	PG_RETURN_JSONB_P(result);
+}
+
 #include "neurondb_gpu_model.h"
 #include "ml_gpu_registry.h"
 #include "neurondb_validation.h"
 #include "neurondb_safe_memory.h"
+#include "neurondb_spi_safe.h"
 #include "neurondb_macros.h"
+#include "neurondb_spi.h"
+#include "lib/stringinfo.h"
 
 typedef struct LightGBMGpuModelState
 {
@@ -209,7 +579,6 @@ lightgbm_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 
 	bytea *model_data = NULL;
 	Jsonb *metrics = NULL;
-	StringInfoData metrics_json;
 	JsonbIterator *it = NULL;
 	JsonbValue	v;
 	int			r;
@@ -284,14 +653,107 @@ lightgbm_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 	/* Serialize model */
 	model_data = lightgbm_model_serialize_to_bytea(n_estimators, max_depth, learning_rate, dim, boosting_type, 0); /* training_backend=0 for CPU */
 
-	/* Build metrics */
-	initStringInfo(&metrics_json);
-	appendStringInfo(&metrics_json,
-					 "{\"storage\":\"cpu\",\"training_backend\":0,\"n_estimators\":%d,\"max_depth\":%d,\"learning_rate\":%.6f,\"n_features\":%d,\"boosting_type\":\"%s\",\"n_samples\":%d}",
-					 n_estimators, max_depth, learning_rate, dim, boosting_type, nvec);
-	metrics = DatumGetJsonbP(DirectFunctionCall1(jsonb_in,
-												 CStringGetDatum(metrics_json.data)));
-	nfree(metrics_json.data);
+	/* Build metrics using JSONB API directly to avoid DirectFunctionCall in GPU context */
+	{
+		JsonbParseState *state = NULL;
+		JsonbValue	jkey;
+		JsonbValue	jval;
+		JsonbValue *final_value = NULL;
+		MemoryContext oldcontext = CurrentMemoryContext;
+		
+		/* Switch to TopMemoryContext for JSONB construction */
+		MemoryContextSwitchTo(TopMemoryContext);
+		
+		PG_TRY();
+		{
+			(void) pushJsonbValue(&state, WJB_BEGIN_OBJECT, NULL);
+			
+			/* Add storage */
+			jkey.type = jbvString;
+			jkey.val.string.val = "storage";
+			jkey.val.string.len = strlen("storage");
+			(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+			jval.type = jbvString;
+			jval.val.string.val = "cpu";
+			jval.val.string.len = strlen("cpu");
+			(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+			
+			/* Add training_backend */
+			jkey.val.string.val = "training_backend";
+			jkey.val.string.len = strlen("training_backend");
+			(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+			jval.type = jbvNumeric;
+			jval.val.numeric = DatumGetNumeric(DirectFunctionCall1(int4_numeric, Int32GetDatum(0)));
+			(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+			
+			/* Add n_estimators */
+			jkey.val.string.val = "n_estimators";
+			jkey.val.string.len = strlen("n_estimators");
+			(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+			jval.type = jbvNumeric;
+			jval.val.numeric = DatumGetNumeric(DirectFunctionCall1(int4_numeric, Int32GetDatum(n_estimators)));
+			(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+			
+			/* Add max_depth */
+			jkey.val.string.val = "max_depth";
+			jkey.val.string.len = strlen("max_depth");
+			(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+			jval.type = jbvNumeric;
+			jval.val.numeric = DatumGetNumeric(DirectFunctionCall1(int4_numeric, Int32GetDatum(max_depth)));
+			(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+			
+			/* Add learning_rate */
+			jkey.val.string.val = "learning_rate";
+			jkey.val.string.len = strlen("learning_rate");
+			(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+			jval.type = jbvNumeric;
+			jval.val.numeric = DatumGetNumeric(DirectFunctionCall1(float8_numeric, Float8GetDatum((double)learning_rate)));
+			(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+			
+			/* Add n_features */
+			jkey.val.string.val = "n_features";
+			jkey.val.string.len = strlen("n_features");
+			(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+			jval.type = jbvNumeric;
+			jval.val.numeric = DatumGetNumeric(DirectFunctionCall1(int4_numeric, Int32GetDatum(dim)));
+			(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+			
+			/* Add boosting_type */
+			jkey.val.string.val = "boosting_type";
+			jkey.val.string.len = strlen("boosting_type");
+			(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+			jval.type = jbvString;
+			jval.val.string.val = boosting_type;
+			jval.val.string.len = strlen(boosting_type);
+			(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+			
+			/* Add n_samples */
+			jkey.val.string.val = "n_samples";
+			jkey.val.string.len = strlen("n_samples");
+			(void) pushJsonbValue(&state, WJB_KEY, &jkey);
+			jval.type = jbvNumeric;
+			jval.val.numeric = DatumGetNumeric(DirectFunctionCall1(int4_numeric, Int32GetDatum(nvec)));
+			(void) pushJsonbValue(&state, WJB_VALUE, &jval);
+			
+			final_value = pushJsonbValue(&state, WJB_END_OBJECT, NULL);
+			
+			if (final_value == NULL)
+			{
+				MemoryContextSwitchTo(oldcontext);
+				elog(ERROR, "lightgbm_gpu_train: pushJsonbValue(WJB_END_OBJECT) returned NULL for metrics");
+			}
+			
+			metrics = JsonbValueToJsonb(final_value);
+			MemoryContextSwitchTo(oldcontext);
+		}
+		PG_CATCH();
+		{
+			MemoryContextSwitchTo(oldcontext);
+			FlushErrorState();
+			elog(ERROR, "lightgbm_gpu_train: Failed to construct metrics JSONB");
+		}
+		PG_END_TRY();
+	}
 
 		nalloc(state, LightGBMGpuModelState, 1);
 		MemSet(state, 0, sizeof(LightGBMGpuModelState));
