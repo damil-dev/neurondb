@@ -181,7 +181,7 @@ CREATE TYPE rtext (
 
 COMMENT ON TYPE rtext IS 'Retrievable text type with token metadata for RAG pipelines';
 
--- Half-precision vector type (halfvec): FP16 quantized vectors (pgvector compatibility)
+-- Half-precision vector type (halfvec): FP16 quantized vectors (compatibility)
 CREATE TYPE halfvec;
 
 CREATE FUNCTION halfvec_in(cstring) RETURNS halfvec
@@ -209,7 +209,7 @@ CREATE TYPE halfvec (
     CATEGORY = 'U'
 );
 
-COMMENT ON TYPE halfvec IS 'Half-precision vector type (FP16) for 2x compression, supports up to 4000 dimensions (pgvector compatible)';
+COMMENT ON TYPE halfvec IS 'Half-precision vector type (FP16) for 2x compression, supports up to 4000 dimensions (compatible)';
 
 -- Binary vector type (binaryvec): Packed binary vectors for quantization
 CREATE TYPE binaryvec;
@@ -246,7 +246,7 @@ CREATE OPERATOR <-> (
 );
 COMMENT ON OPERATOR <->(binaryvec, binaryvec) IS 'Hamming distance operator for binary vectors';
 
--- Sparse vector type (sparsevec): pgvector-compatible sparse vector format
+-- Sparse vector type (sparsevec): compatible sparse vector format
 CREATE TYPE sparsevec;
 
 CREATE FUNCTION sparsevec_in(cstring) RETURNS sparsevec
@@ -274,7 +274,7 @@ CREATE TYPE sparsevec (
     CATEGORY = 'U'
 );
 
-COMMENT ON TYPE sparsevec IS 'Sparse vector type (pgvector compatible), supports up to 1000 nonzero entries and 1M dimensions';
+COMMENT ON TYPE sparsevec IS 'Sparse vector type (compatible), supports up to 1000 nonzero entries and 1M dimensions';
 
 -- ============================================================================
 -- CORE CONFIGURATION TABLES (neurondb schema)
@@ -526,39 +526,39 @@ COMMENT ON FUNCTION vector_to_binary IS 'Convert vector to binary (32x compressi
 CREATE FUNCTION binary_quantize(vector) RETURNS bit
     AS 'MODULE_PATHNAME', 'binary_quantize'
     LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
-COMMENT ON FUNCTION binary_quantize IS 'Convert vector to bit type via binary quantization (pgvector compatibility)';
+COMMENT ON FUNCTION binary_quantize IS 'Convert vector to bit type via binary quantization (compatibility)';
 
--- Bit type support for binary vectors (pgvector compatibility)
+-- Bit type support for binary vectors (compatibility)
 CREATE FUNCTION vector_to_bit(vector) RETURNS bit
     AS 'MODULE_PATHNAME', 'vector_to_bit'
     LANGUAGE C IMMUTABLE STRICT;
-COMMENT ON FUNCTION vector_to_bit IS 'Convert vector to PostgreSQL bit type (pgvector compatibility)';
+COMMENT ON FUNCTION vector_to_bit IS 'Convert vector to PostgreSQL bit type (compatibility)';
 
 CREATE FUNCTION bit_to_vector(bit) RETURNS vector
     AS 'MODULE_PATHNAME', 'bit_to_vector'
     LANGUAGE C IMMUTABLE STRICT;
 COMMENT ON FUNCTION bit_to_vector IS 'Convert PostgreSQL bit type to vector';
 
--- Type conversion functions (pgvector compatibility)
+-- Type conversion functions (compatibility)
 CREATE FUNCTION vector_to_halfvec(vector) RETURNS halfvec
     AS 'MODULE_PATHNAME', 'vector_to_halfvec'
     LANGUAGE C IMMUTABLE STRICT;
-COMMENT ON FUNCTION vector_to_halfvec IS 'Convert vector to halfvec (pgvector compatible)';
+COMMENT ON FUNCTION vector_to_halfvec IS 'Convert vector to halfvec (compatible)';
 
 CREATE FUNCTION halfvec_to_vector(halfvec) RETURNS vector
     AS 'MODULE_PATHNAME', 'halfvec_to_vector'
     LANGUAGE C IMMUTABLE STRICT;
-COMMENT ON FUNCTION halfvec_to_vector IS 'Convert halfvec to vector (pgvector compatible)';
+COMMENT ON FUNCTION halfvec_to_vector IS 'Convert halfvec to vector (compatible)';
 
 CREATE FUNCTION vector_to_sparsevec(vector) RETURNS sparsevec
     AS 'MODULE_PATHNAME', 'vector_to_sparsevec'
     LANGUAGE C IMMUTABLE STRICT;
-COMMENT ON FUNCTION vector_to_sparsevec IS 'Convert vector to sparsevec, storing only non-zero values (pgvector compatible)';
+COMMENT ON FUNCTION vector_to_sparsevec IS 'Convert vector to sparsevec, storing only non-zero values (compatible)';
 
 CREATE FUNCTION sparsevec_to_vector(sparsevec) RETURNS vector
     AS 'MODULE_PATHNAME', 'sparsevec_to_vector'
     LANGUAGE C IMMUTABLE STRICT;
-COMMENT ON FUNCTION sparsevec_to_vector IS 'Convert sparsevec to vector (pgvector compatible)';
+COMMENT ON FUNCTION sparsevec_to_vector IS 'Convert sparsevec to vector (compatible)';
 
 CREATE FUNCTION binary_hamming_distance(bytea, bytea) RETURNS integer
     AS 'MODULE_PATHNAME', 'binary_hamming_distance'
@@ -2175,7 +2175,7 @@ CREATE FUNCTION vector_where(vector, vector, real) RETURNS vector
 COMMENT ON FUNCTION vector_where IS 'Conditional vector assignment: where(condition, value_if_true, value_if_false)';
 
 -- =============================================================================
--- Advanced Vector Operations (Superior to pgvector)
+-- Advanced Vector Operations
 -- =============================================================================
 
 -- Element access and manipulation
@@ -2338,7 +2338,7 @@ CREATE FUNCTION vector_hash(vector) RETURNS integer
     LANGUAGE C IMMUTABLE STRICT;
 COMMENT ON FUNCTION vector_hash IS 'Hash function for vector type (supports hash joins)';
 
--- Vector Comparison Operators (pgvector compatibility)
+-- Vector Comparison Operators (compatibility)
 CREATE OPERATOR = (
     LEFTARG = vector,
     RIGHTARG = vector,
@@ -2543,16 +2543,16 @@ CREATE FUNCTION sparsevec_inner_product(sparsevec, sparsevec) RETURNS real
     LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
 COMMENT ON FUNCTION sparsevec_inner_product IS 'Inner product (negative for distance ordering) between sparsevec vectors';
 
--- Norm functions for sparsevec type (pgvector compatibility)
+-- Norm functions for sparsevec type (compatibility)
 CREATE FUNCTION sparsevec_l2_norm(sparsevec) RETURNS double precision
     AS 'MODULE_PATHNAME', 'sparsevec_l2_norm'
     LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
-COMMENT ON FUNCTION sparsevec_l2_norm IS 'L2 (Euclidean) norm of sparsevec vector (pgvector compatible)';
+COMMENT ON FUNCTION sparsevec_l2_norm IS 'L2 (Euclidean) norm of sparsevec vector (compatible)';
 
 CREATE FUNCTION sparsevec_l2_normalize(sparsevec) RETURNS sparsevec
     AS 'MODULE_PATHNAME', 'sparsevec_l2_normalize'
     LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
-COMMENT ON FUNCTION sparsevec_l2_normalize IS 'Normalize sparsevec vector with L2 norm (pgvector compatible)';
+COMMENT ON FUNCTION sparsevec_l2_normalize IS 'Normalize sparsevec vector with L2 norm (compatible)';
 
 -- Distance operators for sparsevec type (defined after functions)
 CREATE OPERATOR <-> (
@@ -2601,7 +2601,7 @@ CREATE OPERATOR <~> (
     PROCEDURE = bit_hamming_distance,
     COMMUTATOR = '<~>'
 );
-COMMENT ON OPERATOR <~>(bit, bit) IS 'Hamming distance operator for bit vectors (pgvector compatibility)';
+COMMENT ON OPERATOR <~>(bit, bit) IS 'Hamming distance operator for bit vectors (compatibility)';
 
 CREATE OPERATOR <%> (
     LEFTARG = bit,
@@ -2912,32 +2912,32 @@ CREATE OPERATOR <=> (
 );
 COMMENT ON OPERATOR <=>(vector, vector) IS 'Cosine distance operator';
 
--- L1 (Manhattan/Taxicab) Distance Operator <+> (pgvector compatibility)
+-- L1 (Manhattan/Taxicab) Distance Operator <+> (compatibility)
 CREATE OPERATOR <+> (
     LEFTARG = vector,
     RIGHTARG = vector,
     PROCEDURE = vector_l1_distance,
     COMMUTATOR = '<+>'
 );
-COMMENT ON OPERATOR <+>(vector, vector) IS 'L1 (Manhattan/Taxicab) distance operator (pgvector compatible)';
+COMMENT ON OPERATOR <+>(vector, vector) IS 'L1 (Manhattan/Taxicab) distance operator (compatible)';
 
--- Hamming Distance Operator <~> (pgvector compatibility)
+-- Hamming Distance Operator <~> (compatibility)
 CREATE OPERATOR <~> (
     LEFTARG = vector,
     RIGHTARG = vector,
     PROCEDURE = vector_hamming_distance,
     COMMUTATOR = '<~>'
 );
-COMMENT ON OPERATOR <~>(vector, vector) IS 'Hamming distance operator (pgvector compatible)';
+COMMENT ON OPERATOR <~>(vector, vector) IS 'Hamming distance operator (compatible)';
 
--- Jaccard Distance Operator <*~*> (pgvector compatibility)
+-- Jaccard Distance Operator <*~*> (compatibility)
 CREATE OPERATOR <*~*> (
     LEFTARG = vector,
     RIGHTARG = vector,
     PROCEDURE = vector_jaccard_distance,
     COMMUTATOR = '<*~*>'
 );
-COMMENT ON OPERATOR <*~*>(vector, vector) IS 'Jaccard distance operator (pgvector compatible)';
+COMMENT ON OPERATOR <*~*>(vector, vector) IS 'Jaccard distance operator (compatible)';
 
 -- Operator class comparison functions
 CREATE FUNCTION vector_l2_less(vector, vector, vector) RETURNS boolean
@@ -3000,82 +3000,82 @@ CREATE FUNCTION neurondb_has_opclass(opclass_name text) RETURNS boolean
 COMMENT ON FUNCTION neurondb_has_opclass IS 'Check if NeurondB operator class exists';
 
 -- ============================================================================
--- PGVECTOR COMPATIBILITY FUNCTION ALIASES
+-- COMPATIBILITY FUNCTION ALIASES
 -- ============================================================================
--- These aliases provide pgvector-compatible function names for easier migration
+-- These aliases provide compatible function names for easier migration
 
--- Vector distance function aliases (pgvector compatibility)
+-- Vector distance function aliases (compatibility)
 CREATE OR REPLACE FUNCTION l2_distance(vector, vector) RETURNS real
     AS $$ SELECT vector_l2_distance($1, $2); $$
     LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
-COMMENT ON FUNCTION l2_distance(vector, vector) IS 'L2 (Euclidean) distance (pgvector compatibility alias)';
+COMMENT ON FUNCTION l2_distance(vector, vector) IS 'L2 (Euclidean) distance (compatibility alias)';
 
 CREATE OR REPLACE FUNCTION inner_product(vector, vector) RETURNS real
     AS $$ SELECT vector_inner_product($1, $2); $$
     LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
-COMMENT ON FUNCTION inner_product(vector, vector) IS 'Inner product distance (pgvector compatibility alias)';
+COMMENT ON FUNCTION inner_product(vector, vector) IS 'Inner product distance (compatibility alias)';
 
 CREATE OR REPLACE FUNCTION cosine_distance(vector, vector) RETURNS real
     AS $$ SELECT vector_cosine_distance($1, $2); $$
     LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
-COMMENT ON FUNCTION cosine_distance(vector, vector) IS 'Cosine distance (pgvector compatibility alias)';
+COMMENT ON FUNCTION cosine_distance(vector, vector) IS 'Cosine distance (compatibility alias)';
 
 CREATE OR REPLACE FUNCTION l1_distance(vector, vector) RETURNS real
     AS $$ SELECT vector_l1_distance($1, $2); $$
     LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
-COMMENT ON FUNCTION l1_distance(vector, vector) IS 'L1 (Manhattan) distance (pgvector compatibility alias)';
+COMMENT ON FUNCTION l1_distance(vector, vector) IS 'L1 (Manhattan) distance (compatibility alias)';
 
 CREATE OR REPLACE FUNCTION l2_normalize(vector) RETURNS vector
     AS $$ SELECT vector_normalize($1); $$
     LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
-COMMENT ON FUNCTION l2_normalize(vector) IS 'L2 normalize vector (pgvector compatibility alias)';
+COMMENT ON FUNCTION l2_normalize(vector) IS 'L2 normalize vector (compatibility alias)';
 
--- Halfvec distance function aliases (pgvector compatibility)
+-- Halfvec distance function aliases (compatibility)
 CREATE OR REPLACE FUNCTION l2_distance(halfvec, halfvec) RETURNS real
     AS $$ SELECT halfvec_l2_distance($1, $2); $$
     LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
-COMMENT ON FUNCTION l2_distance(halfvec, halfvec) IS 'L2 distance for halfvec (pgvector compatibility alias)';
+COMMENT ON FUNCTION l2_distance(halfvec, halfvec) IS 'L2 distance for halfvec (compatibility alias)';
 
 CREATE OR REPLACE FUNCTION inner_product(halfvec, halfvec) RETURNS real
     AS $$ SELECT halfvec_inner_product($1, $2); $$
     LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
-COMMENT ON FUNCTION inner_product(halfvec, halfvec) IS 'Inner product for halfvec (pgvector compatibility alias)';
+COMMENT ON FUNCTION inner_product(halfvec, halfvec) IS 'Inner product for halfvec (compatibility alias)';
 
 CREATE OR REPLACE FUNCTION cosine_distance(halfvec, halfvec) RETURNS real
     AS $$ SELECT halfvec_cosine_distance($1, $2); $$
     LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
-COMMENT ON FUNCTION cosine_distance(halfvec, halfvec) IS 'Cosine distance for halfvec (pgvector compatibility alias)';
+COMMENT ON FUNCTION cosine_distance(halfvec, halfvec) IS 'Cosine distance for halfvec (compatibility alias)';
 
--- Halfvec norm functions (pgvector compatibility)
+-- Halfvec norm functions (compatibility)
 -- Note: These convert to vector for norm calculation
 CREATE OR REPLACE FUNCTION l2_norm(halfvec) RETURNS double precision
     AS $$ SELECT vector_norm(halfvec_to_vector($1)); $$
     LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
-COMMENT ON FUNCTION l2_norm(halfvec) IS 'L2 norm of halfvec (pgvector compatibility alias)';
+COMMENT ON FUNCTION l2_norm(halfvec) IS 'L2 norm of halfvec (compatibility alias)';
 
 CREATE OR REPLACE FUNCTION l2_normalize(halfvec) RETURNS halfvec
     AS $$ SELECT vector_to_halfvec(vector_normalize(halfvec_to_vector($1))); $$
     LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
-COMMENT ON FUNCTION l2_normalize(halfvec) IS 'L2 normalize halfvec (pgvector compatibility alias)';
+COMMENT ON FUNCTION l2_normalize(halfvec) IS 'L2 normalize halfvec (compatibility alias)';
 
 -- Sparsevec norm function alias
 CREATE OR REPLACE FUNCTION l2_norm(sparsevec) RETURNS double precision
     AS $$ SELECT sparsevec_l2_norm($1); $$
     LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
-COMMENT ON FUNCTION l2_norm(sparsevec) IS 'L2 norm of sparsevec (pgvector compatibility alias)';
+COMMENT ON FUNCTION l2_norm(sparsevec) IS 'L2 norm of sparsevec (compatibility alias)';
 
--- Bit distance function aliases (pgvector compatibility)
+-- Bit distance function aliases (compatibility)
 CREATE OR REPLACE FUNCTION hamming_distance(bit, bit) RETURNS integer
     AS $$ SELECT bit_hamming_distance($1, $2); $$
     LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
-COMMENT ON FUNCTION hamming_distance(bit, bit) IS 'Hamming distance for bit (pgvector compatibility alias)';
+COMMENT ON FUNCTION hamming_distance(bit, bit) IS 'Hamming distance for bit (compatibility alias)';
 
 CREATE OR REPLACE FUNCTION jaccard_distance(bit, bit) RETURNS double precision
     AS $$ SELECT bit_jaccard_distance($1, $2); $$
     LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
-COMMENT ON FUNCTION jaccard_distance(bit, bit) IS 'Jaccard distance for bit (pgvector compatibility alias)';
+COMMENT ON FUNCTION jaccard_distance(bit, bit) IS 'Jaccard distance for bit (compatibility alias)';
 
--- Comparison functions for btree compatibility (pgvector compatibility)
+-- Comparison functions for btree compatibility (compatibility)
 -- These return -1, 0, or 1 for less than, equal, or greater than
 CREATE OR REPLACE FUNCTION vector_cmp(vector, vector) RETURNS integer
     AS $$
@@ -3086,7 +3086,7 @@ CREATE OR REPLACE FUNCTION vector_cmp(vector, vector) RETURNS integer
     END;
     $$
     LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
-COMMENT ON FUNCTION vector_cmp(vector, vector) IS 'Comparison function for vector (pgvector compatibility)';
+COMMENT ON FUNCTION vector_cmp(vector, vector) IS 'Comparison function for vector (compatibility)';
 
 -- Note: halfvec and sparsevec comparison functions require comparison operators
 -- For now, these use equality check only (full comparison requires <, > operators)
@@ -3100,7 +3100,7 @@ CREATE OR REPLACE FUNCTION halfvec_cmp(halfvec, halfvec) RETURNS integer
     END;
     $$
     LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
-COMMENT ON FUNCTION halfvec_cmp(halfvec, halfvec) IS 'Comparison function for halfvec (pgvector compatibility)';
+COMMENT ON FUNCTION halfvec_cmp(halfvec, halfvec) IS 'Comparison function for halfvec (compatibility)';
 
 CREATE OR REPLACE FUNCTION sparsevec_cmp(sparsevec, sparsevec) RETURNS integer
     AS $$
@@ -3112,20 +3112,20 @@ CREATE OR REPLACE FUNCTION sparsevec_cmp(sparsevec, sparsevec) RETURNS integer
     END;
     $$
     LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
-COMMENT ON FUNCTION sparsevec_cmp(sparsevec, sparsevec) IS 'Comparison function for sparsevec (pgvector compatibility)';
+COMMENT ON FUNCTION sparsevec_cmp(sparsevec, sparsevec) IS 'Comparison function for sparsevec (compatibility)';
 
--- Subvector alias for pgvector compatibility
--- pgvector uses 1-based indexing: subvector(vec, start, count) where start is 1-based
+-- Subvector alias for compatibility
+-- uses 1-based indexing: subvector(vec, start, count) where start is 1-based
 -- NeuronDB uses 0-based indexing: vector_slice(vec, start, end) where end is exclusive
--- Convert: pgvector subvector(vec, start, count) -> vector_slice(vec, start-1, start-1+count)
+-- Convert: subvector(vec, start, count) -> vector_slice(vec, start-1, start-1+count)
 CREATE OR REPLACE FUNCTION subvector(vector, integer, integer) RETURNS vector
     AS $$
     SELECT vector_slice($1, GREATEST(0, $2 - 1), LEAST(vector_dims($1), $2 - 1 + $3));
     $$
     LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
-COMMENT ON FUNCTION subvector(vector, integer, integer) IS 'Extract subvector (pgvector compatibility: 1-based start, count)';
+COMMENT ON FUNCTION subvector(vector, integer, integer) IS 'Extract subvector (compatibility: 1-based start, count)';
 
--- Note: pgvector uses avg(vector) and sum(vector) as aggregates
+-- Note: uses avg(vector) and sum(vector) as aggregates
 -- NeuronDB uses vector_avg(vector) and vector_sum(vector)
 -- Cannot create aggregate aliases with same name as built-in functions
 -- Users should use vector_avg and vector_sum directly
