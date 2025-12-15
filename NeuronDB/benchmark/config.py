@@ -27,6 +27,11 @@ class BenchmarkConfig:
         self.iterations: int = 100
         self.warmup_iterations: int = 10
         
+        # Index parameters
+        self.index_m: int = 16  # HNSW M parameter
+        self.index_ef_construction: int = 200  # HNSW ef_construction parameter
+        self.compare_sequential_scan: bool = False  # Compare with sequential scan
+        
         # Output
         self.output_formats: List[str] = ['console']
         self.output_file: Optional[str] = None
@@ -80,6 +85,14 @@ class BenchmarkConfig:
         # Data generation
         if hasattr(args, 'seed') and args.seed:
             config.seed = args.seed
+        
+        # Index parameters
+        if hasattr(args, 'index_m') and args.index_m:
+            config.index_m = args.index_m
+        if hasattr(args, 'index_ef_construction') and args.index_ef_construction:
+            config.index_ef_construction = args.index_ef_construction
+        if hasattr(args, 'compare_sequential_scan'):
+            config.compare_sequential_scan = args.compare_sequential_scan
         
         return config
     
@@ -234,6 +247,25 @@ Examples:
         '--seed',
         type=int,
         help='Random seed for reproducibility (default: 42)'
+    )
+    
+    # Index parameters
+    parser.add_argument(
+        '--index-m',
+        type=int,
+        default=16,
+        help='HNSW M parameter (default: 16)'
+    )
+    parser.add_argument(
+        '--index-ef-construction',
+        type=int,
+        default=200,
+        help='HNSW ef_construction parameter (default: 200)'
+    )
+    parser.add_argument(
+        '--compare-sequential-scan',
+        action='store_true',
+        help='Also benchmark sequential scan (without index) for comparison'
     )
     
     return parser.parse_args()

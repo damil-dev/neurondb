@@ -85,15 +85,30 @@ def run_vector_benchmark(config: BenchmarkConfig) -> None:
                     metrics = [
                         'latency_p50_ms',
                         'latency_p95_ms',
+                        'latency_p99_ms',
                         'latency_mean_ms',
                         'throughput_qps',
                         'recall',
+                        'index_build_time_seconds',
+                        'index_size_bytes',
                     ]
                     print(formatter.format_comparison_table(
                         ndb_result,
                         pgv_result,
                         metrics
                     ))
+            
+            # Summary statistics
+            summary_stats = formatter.compute_summary_statistics(neurondb_results, pgvector_results)
+            if summary_stats:
+                print("\n" + "=" * 80)
+                print(" Summary Statistics (Geometric Mean)")
+                print("=" * 80)
+                for key, value in sorted(summary_stats.items()):
+                    if 'speedup' in key:
+                        print(f"  {key}: {value:.2f}x")
+                    else:
+                        print(f"  {key}: {value:.2f}")
     
     # JSON output
     if 'json' in config.output_formats or 'all' in config.output_formats:
@@ -108,8 +123,12 @@ def run_vector_benchmark(config: BenchmarkConfig) -> None:
         }
         if pgvector_results:
             all_results['pgvector'] = pgvector_results
+            # Add summary statistics
+            summary_stats = formatter.compute_summary_statistics(neurondb_results, pgvector_results)
+            if summary_stats:
+                all_results['summary_statistics'] = summary_stats
         
-        formatter.export_json([all_results], json_file)
+        formatter.export_json(all_results, json_file)
         print(f"\nResults exported to: {json_file}")
     
     # CSV output

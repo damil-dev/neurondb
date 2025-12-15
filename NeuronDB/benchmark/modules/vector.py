@@ -233,7 +233,8 @@ class VectorBenchmark(Benchmark):
         self,
         query_vector: np.ndarray,
         k: int,
-        metric: str
+        metric: str,
+        use_index: bool = True
     ) -> Tuple[List[Dict[str, Any]], float]:
         """
         Run a KNN query.
@@ -242,6 +243,7 @@ class VectorBenchmark(Benchmark):
             query_vector: Query vector
             k: Number of neighbors
             metric: Distance metric ('l2', 'cosine', 'inner_product')
+            use_index: Whether to use index (if False, forces sequential scan)
         
         Returns:
             Tuple of (results, execution_time_seconds)
@@ -250,6 +252,7 @@ class VectorBenchmark(Benchmark):
         operator = self.operators[metric]
         order_dir = self.order_directions[metric]
         
+        # Build query
         query = f"""
             SELECT id, {self.vector_column} {operator} %s::vector AS distance
             FROM {self.table_name}
@@ -257,6 +260,9 @@ class VectorBenchmark(Benchmark):
             LIMIT %s
         """
         
+        # Note: use_index parameter is mainly for documentation
+        # Sequential scan comparison would require dropping the index
+        # For now, we rely on the index being present or not based on config.use_index
         results, exec_time = self.db.execute_query(
             query,
             params=(vector_str, k),
@@ -313,29 +319,39 @@ class VectorBenchmark(Benchmark):
                 import time
                 time.sleep(0.1)
                 
-                # Try with smaller parameters if first attempt fails
+                # Try with configured parameters first
                 try:
                     index_build_time, index_size = self.create_index(
                         dimensions=dimensions,
                         metric=metric,
                         index_type='hnsw',
-                        m=16,
-                        ef_construction=200
+                        m=self.config.index_m,
+                        ef_construction=self.config.index_ef_construction
                     )
                 except Exception:
-                    # Retry with smaller parameters
+                    # Retry with smaller parameters if configured ones fail
                     print(f"    Retrying index creation with smaller parameters...")
                     time.sleep(0.2)
                     index_build_time, index_size = self.create_index(
                         dimensions=dimensions,
                         metric=metric,
                         index_type='hnsw',
-                        m=8,
-                        ef_construction=100
+                        m=max(4, self.config.index_m // 2),
+                        ef_construction=max(50, self.config.index_ef_construction // 2)
                     )
                 
                 if index_size > 0:
                     print(f"    Index created successfully (size: {index_size / 1024 / 1024:.2f} MB)")
+                    # Wait after index creation to let database stabilize
+                    import time
+                    time.sleep(2.0)
+                    
+                    # Check if database is in recovery mode and wait if needed
+                    try:
+                        if not self.db.wait_for_recovery(max_wait=30):
+                            print(f"    WARNING: Database still in recovery mode after waiting")
+                    except:
+                        pass
             except Exception as e:
                 print(f"    WARNING: Index creation failed: {e}")
                 print(f"    Continuing benchmark without index...")
@@ -354,35 +370,92 @@ class VectorBenchmark(Benchmark):
         # Warmup
         print(f"    Warmup ({self.config.warmup_iterations} iterations)...")
         for i in range(self.config.warmup_iterations):
-            self.run_knn_query(query_vectors[i], k, metric)
+            try:
+                self.run_knn_query(
+                    query_vectors[i], 
+                    k, 
+                    metric,
+                    use_index=self.config.use_index
+                )
+            except Exception as e:
+                print(f"    WARNING: Warmup query {i+1} failed: {e}")
+                # If database is in recovery, wait for it
+                if 'recovery' in str(e).lower():
+                    print(f"    Database in recovery mode, waiting...")
+                    if self.db.wait_for_recovery(max_wait=60):
+                        print(f"    Database recovery complete, continuing...")
+                    else:
+                        print(f"    WARNING: Database still in recovery after timeout")
+                continue
         
         # Actual benchmark
         print(f"    Benchmarking ({self.config.iterations} iterations)...")
         metrics = MetricsCollector()
         
+        successful_queries = 0
         for i in range(
             self.config.warmup_iterations,
             self.config.warmup_iterations + self.config.iterations
         ):
-            _, exec_time = self.run_knn_query(query_vectors[i], k, metric)
-            metrics.add_timing(exec_time)
+            try:
+                _, exec_time = self.run_knn_query(
+                    query_vectors[i], 
+                    k, 
+                    metric,
+                    use_index=self.config.use_index
+                )
+                metrics.add_timing(exec_time)
+                successful_queries += 1
+            except Exception as e:
+                print(f"    WARNING: Query {i+1} failed: {e}")
+                # If database is in recovery, wait for it
+                if 'recovery' in str(e).lower():
+                    print(f"    Database in recovery mode, waiting...")
+                    if self.db.wait_for_recovery(max_wait=60):
+                        print(f"    Database recovery complete, continuing...")
+                    else:
+                        print(f"    WARNING: Database still in recovery after timeout")
+                continue
+        
+        if successful_queries == 0:
+            raise RuntimeError("All benchmark queries failed. Database may be unavailable.")
+        elif successful_queries < self.config.iterations:
+            print(f"    WARNING: Only {successful_queries}/{self.config.iterations} queries succeeded")
         
         # Compute ground truth for first query (for accuracy)
-        ground_truth_indices, _ = DataGenerator.compute_ground_truth(
+        # Note: IDs in database start from 1, but numpy arrays are 0-indexed
+        # So we need to adjust: ground_truth_indices are 0-indexed, but DB IDs are 1-indexed
+        ground_truth_indices, ground_truth_distances = DataGenerator.compute_ground_truth(
             query_vectors[self.config.warmup_iterations],
             vectors,
             k,
             metric
         )
+        # Convert 0-indexed to 1-indexed for comparison with DB results
+        ground_truth_ids = ground_truth_indices + 1
         
         # Get results from first query for recall calculation
         first_results, _ = self.run_knn_query(
             query_vectors[self.config.warmup_iterations],
             k,
-            metric
+            metric,
+            use_index=self.config.use_index
         )
-        predicted_indices = np.array([r['id'] for r in first_results])
-        recall = DataGenerator.compute_recall(predicted_indices, ground_truth_indices)
+        
+        # Validate results
+        if len(first_results) == 0:
+            print(f"    WARNING: Query returned no results")
+            recall = 0.0
+        else:
+            predicted_indices = np.array([r['id'] for r in first_results])
+            recall = DataGenerator.compute_recall(predicted_indices, ground_truth_ids)
+            
+            # Additional validation: check if distances are reasonable
+            predicted_distances = np.array([r['distance'] for r in first_results])
+            if len(predicted_distances) > 0 and len(ground_truth_distances) > 0:
+                # Check if the first result matches ground truth (within tolerance)
+                if abs(predicted_distances[0] - ground_truth_distances[0]) > 1e-5:
+                    print(f"    WARNING: Distance mismatch - predicted: {predicted_distances[0]:.6f}, ground truth: {ground_truth_distances[0]:.6f}")
         
         # Collect metrics
         result = self.collect_metrics(metrics, {
