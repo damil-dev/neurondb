@@ -45,12 +45,13 @@ BEGIN
 	
 	IF gpu_mode = 'gpu' THEN
 		-- Verify GPU is enabled (should be set by test runner)
-		IF current_gpu_enabled != 'on' THEN
-			RAISE WARNING 'GPU mode expected but neurondb.compute_mode = % (expected: on)', current_gpu_enabled;
+		-- compute_mode is an integer: 0=cpu, 1=gpu, 2=auto
+		IF current_gpu_enabled != '1' AND current_gpu_enabled != '2' THEN
+			RAISE WARNING 'GPU mode expected but neurondb.compute_mode = % (expected: 1 or 2)', current_gpu_enabled;
 		END IF;
 	ELSE
 		-- Verify GPU is disabled (should be set by test runner)
-		IF current_gpu_enabled != 'off' THEN
+		IF current_gpu_enabled != '0' THEN
 			RAISE WARNING 'CPU mode expected but neurondb.compute_mode = % (expected: 0)', current_gpu_enabled;
 		END IF;
 	END IF;

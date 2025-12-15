@@ -8,6 +8,18 @@
 
 \set ON_ERROR_STOP on
 
+-- Create test_train table and view
+DROP TABLE IF EXISTS test_train CASCADE;
+CREATE TABLE test_train (features vector(28), label integer);
+INSERT INTO test_train (features, label) SELECT array_to_vector(ARRAY(SELECT random()::real FROM generate_series(1, 28)))::vector(28), (random() * 2)::integer FROM generate_series(1, 1000);
+CREATE OR REPLACE VIEW test_train_view AS SELECT features, label FROM test_train;
+
+CREATE TABLE IF NOT EXISTS test_train (features vector(28), label integer);
+DELETE FROM test_train;
+INSERT INTO test_train (features, label) SELECT array_to_vector(ARRAY(SELECT random()::real FROM generate_series(1, 28)))::vector(28), (random() * 2)::integer FROM generate_series(1, 1000);
+CREATE OR REPLACE VIEW test_train_view AS SELECT features, label FROM test_train;
+
+
 \echo '=========================================================================='
 \echo 'Storage Module: Basic Functionality Tests'
 \echo '=========================================================================='

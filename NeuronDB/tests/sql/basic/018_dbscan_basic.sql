@@ -222,9 +222,15 @@ SELECT
 	tm.model_id,
 	tm.train_samples,
 	tm.test_samples,
-	'Unknown' AS training_status,
+	CASE
+		WHEN ts.setting_value = 'gpu' THEN 'GPU Training ✓'
+		WHEN ts.setting_value = 'cpu' OR ts.setting_value IS NULL THEN 'CPU Training'
+		WHEN current_setting('neurondb.compute_mode', true) = 'gpu' THEN 'GPU Training ✓'
+		ELSE 'CPU Training (default)'
+	END AS training_status,
 	tm.updated_at AS test_completed_at
 FROM test_metrics tm
+LEFT JOIN test_settings ts ON ts.setting_key = 'gpu_mode'
 WHERE tm.test_name = '018_dbscan_basic';
 
 \echo ''
