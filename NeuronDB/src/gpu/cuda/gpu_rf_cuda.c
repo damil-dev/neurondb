@@ -891,10 +891,20 @@ ndb_cuda_rf_predict(const bytea * model_data,
 														   HASH_FIND,
 														   &found);
 
-		if (found && cache_entry != NULL && cache_entry->gpu_model != NULL
-			&& cache_entry->gpu_model->is_valid)
+		if (found && cache_entry != NULL && cache_entry->gpu_model != NULL)
 		{
-			gpu_model = cache_entry->gpu_model;
+			/* Check if cached model is still valid */
+			if (cache_entry->gpu_model->is_valid)
+			{
+				gpu_model = cache_entry->gpu_model;
+			}
+			else
+			{
+				/* Cached model is invalid - free it and re-upload */
+				elog(WARNING, "CUDA RF predict: cached model is invalid, re-uploading");
+				ndb_cuda_rf_model_free(cache_entry->gpu_model);
+				cache_entry->gpu_model = NULL;
+			}
 		}
 	}
 
@@ -914,6 +924,39 @@ ndb_cuda_rf_predict(const bytea * model_data,
 									  model_hdr->class_count,
 									  model_hdr->majority_class,
 									  &gpu_model);
+
+		if (rc != 0)
+		{
+			if (errstr && *errstr == NULL)
+			{
+				cudaError_t cuda_err = cudaGetLastError();
+				if (cuda_err != cudaSuccess)
+					*errstr = psprintf("CUDA RF predict: model upload failed (rc=%d): %s", rc, cudaGetErrorString(cuda_err));
+				else
+					*errstr = psprintf("CUDA RF predict: model upload failed (rc=%d) - check CUDA memory allocation", rc);
+			}
+			if (votes)
+				nfree(votes);
+			return -1;
+		}
+
+		if (gpu_model == NULL)
+		{
+			if (errstr && *errstr == NULL)
+				*errstr = pstrdup("CUDA RF predict: model upload returned NULL");
+			if (votes)
+				nfree(votes);
+			return -1;
+		}
+
+		if (!gpu_model->is_valid)
+		{
+			if (errstr && *errstr == NULL)
+				*errstr = pstrdup("CUDA RF predict: uploaded model is not valid");
+			if (votes)
+				nfree(votes);
+			return -1;
+		}
 
 		if (rc == 0 && gpu_model != NULL && rf_gpu_model_cache != NULL)
 		{
@@ -1089,6 +1132,7 @@ ndb_cuda_rf_model_upload(const NdbCudaRfNode *nodes,
 	cudaError_t status;
 	int			total_nodes = 0;
 	int			i;
+	MemoryContext oldcontext;
 
 	if (nodes == NULL || trees == NULL || tree_count <= 0
 		|| feature_dim <= 0 || class_count <= 0 || out_model == NULL)
@@ -1102,7 +1146,11 @@ ndb_cuda_rf_model_upload(const NdbCudaRfNode *nodes,
 		return -1;
 	}
 
+	/* Allocate model in TopMemoryContext so it persists across calls */
+	oldcontext = MemoryContextSwitchTo(TopMemoryContext);
 	model = (NdbCudaRfGpuModel *) palloc0(sizeof(NdbCudaRfGpuModel));
+	MemoryContextSwitchTo(oldcontext);
+	
 	if (model == NULL)
 		return -1;
 
@@ -1168,6 +1216,8 @@ ndb_cuda_rf_model_upload(const NdbCudaRfNode *nodes,
 void
 ndb_cuda_rf_model_free(NdbCudaRfGpuModel *model)
 {
+	MemoryContext oldcontext;
+
 	if (model == NULL)
 		return;
 
@@ -1177,7 +1227,10 @@ ndb_cuda_rf_model_free(NdbCudaRfGpuModel *model)
 		cudaFree(model->d_trees);
 
 	model->is_valid = false;
-	nfree(model);
+	/* Model was allocated in TopMemoryContext, so switch to it before freeing */
+	oldcontext = MemoryContextSwitchTo(TopMemoryContext);
+	pfree(model);
+	MemoryContextSwitchTo(oldcontext);
 }
 
 /*
@@ -1195,8 +1248,30 @@ ndb_cuda_rf_infer_model(const NdbCudaRfGpuModel *model,
 	cudaError_t status;
 	int			rc;
 
-	if (model == NULL || !model->is_valid || input == NULL || votes == NULL)
+	if (model == NULL)
+	{
+		if (errstr && *errstr == NULL)
+			*errstr = pstrdup("CUDA RF infer_model: model is NULL");
 		return -1;
+	}
+	if (!model->is_valid)
+	{
+		if (errstr && *errstr == NULL)
+			*errstr = pstrdup("CUDA RF infer_model: model is not valid (may have been freed or corrupted)");
+		return -1;
+	}
+	if (input == NULL)
+	{
+		if (errstr && *errstr == NULL)
+			*errstr = pstrdup("CUDA RF infer_model: input is NULL");
+		return -1;
+	}
+	if (votes == NULL)
+	{
+		if (errstr && *errstr == NULL)
+			*errstr = pstrdup("CUDA RF infer_model: votes buffer is NULL");
+		return -1;
+	}
 
 	if (model->feature_dim != feature_dim)
 	{
