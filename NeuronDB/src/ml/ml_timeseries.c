@@ -21,6 +21,7 @@
 #include "utils/builtins.h"
 #include "utils/array.h"
 #include "utils/jsonb.h"
+#include "common/jsonapi.h"
 #include "access/htup_details.h"
 #include "executor/spi.h"
 #include "utils/memutils.h"
@@ -1282,8 +1283,8 @@ evaluate_arima_by_model_id(PG_FUNCTION_ARGS)
 					 "{\"mse\":%.6f,\"mae\":%.6f,\"rmse\":%.6f,\"n_predictions\":%d,\"forecast_horizon\":%d}",
 					 mse, mae, rmse, valid_predictions, forecast_horizon);
 
-	result = DatumGetJsonbP(DirectFunctionCall1(jsonb_in, CStringGetTextDatum(jsonbuf.data)));
-	nfree(jsonbuf.data);
+	result = ndb_jsonb_in_cstring(jsonbuf.data);
+	/* Don't free jsonbuf.data - let memory context handle it */
 
 	nfree(tbl_str);
 	nfree(time_str);
@@ -1927,14 +1928,18 @@ timeseries_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errst
 
 				r = JsonbIteratorNext(&it, &v, false);
 				if (strcmp(key, "p") == 0 && v.type == jbvNumeric)
-					p = DatumGetInt32(DirectFunctionCall1(numeric_int4,
-														  NumericGetDatum(v.val.numeric)));
+				{
+					/* Parse numeric directly without DirectFunctionCall */
+					p = DatumGetInt32(DirectFunctionCall1(numeric_int4, NumericGetDatum(v.val.numeric)));
+				}
 				else if (strcmp(key, "d") == 0 && v.type == jbvNumeric)
-					d = DatumGetInt32(DirectFunctionCall1(numeric_int4,
-														  NumericGetDatum(v.val.numeric)));
+				{
+					d = DatumGetInt32(DirectFunctionCall1(numeric_int4, NumericGetDatum(v.val.numeric)));
+				}
 				else if (strcmp(key, "q") == 0 && v.type == jbvNumeric)
-					q = DatumGetInt32(DirectFunctionCall1(numeric_int4,
-														  NumericGetDatum(v.val.numeric)));
+				{
+					q = DatumGetInt32(DirectFunctionCall1(numeric_int4, NumericGetDatum(v.val.numeric)));
+				}
 				else if (strcmp(key, "model_type") == 0 && v.type == jbvString)
 					strncpy(model_type, v.val.string.val, sizeof(model_type) - 1);
 				nfree(key);
@@ -1991,23 +1996,121 @@ timeseries_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errst
 	}
 
 	/* Serialize model */
-	model_data = timeseries_model_serialize_to_bytea(ar_coeffs, p, ma_coeffs, q, d, intercept, nvec, model_type, 0); /* training_backend=0 for CPU */
+	model_data = timeseries_model_serialize_to_bytea(ar_coeffs, p, ma_coeffs, q, d, intercept, nvec, model_type, 1); /* training_backend=1 for GPU */
 
-	/* Build metrics */
+	/* Build metrics using direct JSONB API (safe in GPU context) */
 	{
-		char	   *metrics_json_str = NULL;
-		int			metrics_json_len = 0;
+		JsonbParseState *state = NULL;
+		JsonbValue	k;
+		JsonbValue	v;
+		MemoryContext oldcontext = NULL;
+		char		p_str[32], d_str[32], q_str[32], intercept_str[32], nvec_str[32];
 
-		metrics_json_len = snprintf(NULL, 0,
-									"{\"storage\":\"cpu\",\"training_backend\":0,\"p\":%d,\"d\":%d,\"q\":%d,\"intercept\":%.6f,\"model_type\":\"%s\",\"n_samples\":%d}",
-									p, d, q, intercept, model_type, nvec) + 1;
-		nalloc(metrics_json_str, char, metrics_json_len);
-		snprintf(metrics_json_str, metrics_json_len,
-				 "{\"storage\":\"cpu\",\"training_backend\":0,\"p\":%d,\"d\":%d,\"q\":%d,\"intercept\":%.6f,\"model_type\":\"%s\",\"n_samples\":%d}",
-				 p, d, q, intercept, model_type, nvec);
-		metrics = DatumGetJsonbP(DirectFunctionCall1(jsonb_in,
-													 CStringGetTextDatum(metrics_json_str)));
-		nfree(metrics_json_str);
+		/* Switch to TopMemoryContext for JSONB allocations */
+		oldcontext = MemoryContextSwitchTo(TopMemoryContext);
+
+		(void) pushJsonbValue(&state, WJB_BEGIN_OBJECT, NULL);
+
+		/* Add "storage": "gpu" */
+		k.type = jbvString;
+		k.val.string.len = strlen("storage");
+		k.val.string.val = "storage";
+		(void) pushJsonbValue(&state, WJB_KEY, &k);
+		v.type = jbvString;
+		v.val.string.len = strlen("gpu");
+		v.val.string.val = "gpu";
+		(void) pushJsonbValue(&state, WJB_VALUE, &v);
+
+		/* Add "training_backend": "1" (as string to avoid DirectFunctionCall) */
+		k.type = jbvString;
+		k.val.string.len = strlen("training_backend");
+		k.val.string.val = "training_backend";
+		(void) pushJsonbValue(&state, WJB_KEY, &k);
+		v.type = jbvString;
+		v.val.string.len = 1;
+		v.val.string.val = "1";
+		(void) pushJsonbValue(&state, WJB_VALUE, &v);
+
+		/* Add "p": p (as string) */
+		k.type = jbvString;
+		k.val.string.len = 1;
+		k.val.string.val = "p";
+		(void) pushJsonbValue(&state, WJB_KEY, &k);
+		snprintf(p_str, sizeof(p_str), "%d", p);
+		v.type = jbvString;
+		v.val.string.len = strlen(p_str);
+		v.val.string.val = p_str;
+		(void) pushJsonbValue(&state, WJB_VALUE, &v);
+
+		/* Add "d": d (as string) */
+		k.type = jbvString;
+		k.val.string.len = 1;
+		k.val.string.val = "d";
+		(void) pushJsonbValue(&state, WJB_KEY, &k);
+		snprintf(d_str, sizeof(d_str), "%d", d);
+		v.type = jbvString;
+		v.val.string.len = strlen(d_str);
+		v.val.string.val = d_str;
+		(void) pushJsonbValue(&state, WJB_VALUE, &v);
+
+		/* Add "q": q (as string) */
+		k.type = jbvString;
+		k.val.string.len = 1;
+		k.val.string.val = "q";
+		(void) pushJsonbValue(&state, WJB_KEY, &k);
+		snprintf(q_str, sizeof(q_str), "%d", q);
+		v.type = jbvString;
+		v.val.string.len = strlen(q_str);
+		v.val.string.val = q_str;
+		(void) pushJsonbValue(&state, WJB_VALUE, &v);
+
+		/* Add "intercept": intercept (as string) */
+		k.type = jbvString;
+		k.val.string.len = strlen("intercept");
+		k.val.string.val = "intercept";
+		(void) pushJsonbValue(&state, WJB_KEY, &k);
+		snprintf(intercept_str, sizeof(intercept_str), "%.6f", intercept);
+		v.type = jbvString;
+		v.val.string.len = strlen(intercept_str);
+		v.val.string.val = intercept_str;
+		(void) pushJsonbValue(&state, WJB_VALUE, &v);
+
+		/* Add "model_type": model_type */
+		k.type = jbvString;
+		k.val.string.len = strlen("model_type");
+		k.val.string.val = "model_type";
+		(void) pushJsonbValue(&state, WJB_KEY, &k);
+		v.type = jbvString;
+		v.val.string.len = strlen(model_type);
+		v.val.string.val = model_type;
+		(void) pushJsonbValue(&state, WJB_VALUE, &v);
+
+		/* Add "n_samples": nvec (as string) */
+		k.type = jbvString;
+		k.val.string.len = strlen("n_samples");
+		k.val.string.val = "n_samples";
+		(void) pushJsonbValue(&state, WJB_KEY, &k);
+		snprintf(nvec_str, sizeof(nvec_str), "%d", nvec);
+		v.type = jbvString;
+		v.val.string.len = strlen(nvec_str);
+		v.val.string.val = nvec_str;
+		(void) pushJsonbValue(&state, WJB_VALUE, &v);
+
+		{
+			JsonbValue *final_value = pushJsonbValue(&state, WJB_END_OBJECT, NULL);
+			if (final_value == NULL)
+			{
+				MemoryContextSwitchTo(oldcontext);
+				metrics = NULL;
+			}
+			else
+			{
+				metrics = JsonbValueToJsonb(final_value);
+			}
+		}
+
+		/* Switch back to original memory context */
+		MemoryContextSwitchTo(oldcontext);
 	}
 
 	{
@@ -2176,8 +2279,7 @@ timeseries_gpu_evaluate(const MLGpuModel *model, const MLGpuEvalSpec *spec,
 				 state->model_type[0] ? state->model_type : "arima",
 				 state->n_samples > 0 ? state->n_samples : 0);
 
-		metrics_json = DatumGetJsonbP(DirectFunctionCall1(jsonb_in,
-														  CStringGetTextDatum(buf_str)));
+		metrics_json = ndb_jsonb_in_cstring(buf_str);
 		nfree(buf_str);
 	}
 
