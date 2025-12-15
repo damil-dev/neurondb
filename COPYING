@@ -2,36 +2,54 @@ NeurondB — Advanced AI Database Extension for PostgreSQL
 
 Copyright (C) 2024-2025 neurondb, Inc. All rights reserved.
 
-STRICT LICENSE TERMS - READ CAREFULLY
+IMPORTANT LEGAL NOTICE
 
-IMPORTANT: This license applies RETROACTIVELY to ALL versions from the
-FIRST COMMIT (d6bcea1, 2025-12-01) onwards, regardless of when this
-license was created or updated. These restrictions have ALWAYS applied
-to ALL code from the first commit.
+This software is subject to a Software License Agreement that contains
+strict prohibitions on commercial use. This notice is a summary only.
+You must read and agree to the complete Software License Agreement
+contained in the LICENSE file before using this software.
 
-This software is licensed under the Apache License, Version 2.0, with
-Commons Clause restrictions and STRICT additional commercial use
-prohibitions.
+RETROACTIVE APPLICATION: The license terms apply retroactively to ALL
+versions from the FIRST COMMIT (d6bcea1, dated December 1, 2025) onwards,
+regardless of when the license was created or updated. These restrictions
+have ALWAYS applied to ALL code from the first commit.
 
-ABSOLUTE RESTRICTIONS:
+ABSOLUTE PROHIBITIONS - NO EXCEPTIONS:
 
-✓ Personal use of binaries ONLY is permitted
-✗ Commercial use is STRICTLY PROHIBITED
+✓ Personal, non-commercial use of binary code ONLY is permitted
+✗ Commercial use is STRICTLY PROHIBITED - NO EXCEPTIONS
 ✗ Creating companies based on this code is STRICTLY PROHIBITED
-✗ Using source code for commercial purposes is STRICTLY PROHIBITED
+✗ Using source code for ANY commercial purpose is STRICTLY PROHIBITED
 ✗ Redistributing source code is STRICTLY PROHIBITED
 ✗ Creating derivative works is STRICTLY PROHIBITED
+✗ Reverse engineering or decompiling is STRICTLY PROHIBITED
+✗ Using in cloud services, SaaS, or hosted services is PROHIBITED
+✗ Circumventing restrictions through ANY means is PROHIBITED
+✗ Using even portions or excerpts commercially is PROHIBITED
+✗ Claiming "fair use" or other exceptions is NOT PERMITTED
 
-These terms apply RETROACTIVELY to ALL versions from the FIRST COMMIT
-(d6bcea1, 2025-12-01) onwards. These restrictions have ALWAYS applied
-to ALL code from the first line written, regardless of when this license
-file was created or updated.
+LEGAL CONSEQUENCES:
 
-ANY violation will result in immediate termination of rights and
-may result in legal action.
+ANY violation WILL result in IMMEDIATE termination of rights and
+AGGRESSIVE legal action. These restrictions are ABSOLUTE, NON-NEGOTIABLE,
+and will be enforced to the MAXIMUM extent permitted by law, including
+but not limited to:
 
-For full license terms, see the LICENSE file.
+- Immediate injunctive relief
+- Monetary damages (actual, lost profits, unjust enrichment, statutory,
+  punitive, treble damages where available)
+- Criminal prosecution where applicable
+- Attorney's fees and costs
+- Permanent injunctions
+- Public disclosure of violations
+
+BINDING AGREEMENT:
+
+By using this software in ANY way, you acknowledge that you have read,
+understood, and agree to be bound by the complete Software License
+Agreement. Your use creates a BINDING LEGAL AGREEMENT between you and
+neurondb, Inc.
+
+For the complete license terms, see the LICENSE file.
 
 For commercial licensing inquiries, contact: support@neurondb.ai
-
-By using this software, you agree to be bound by these strict terms.
