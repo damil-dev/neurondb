@@ -2669,13 +2669,9 @@ dt_gpu_serialize(const MLGpuModel *model, bytea * *payload_out,
 
 	if (metadata_out != NULL && state->metrics != NULL)
 	{
-		text   *metrics_text = DatumGetTextP(DirectFunctionCall1(jsonb_out,
-											 PointerGetDatum(state->metrics)));
-		char   *metrics_cstr = text_to_cstring(metrics_text);
-		Jsonb  *metrics_copy = ndb_jsonb_in_cstring(metrics_cstr);
-
-		pfree(metrics_text);
-		nfree(metrics_cstr);
+		/* Copy Jsonb directly without using DirectFunctionCall (unsafe in GPU context) */
+		/* Use PG_DETOAST_DATUM_COPY to create a copy in current memory context */
+		Jsonb  *metrics_copy = (Jsonb *) PG_DETOAST_DATUM_COPY(PointerGetDatum(state->metrics));
 		*metadata_out = metrics_copy;
 	}
 	else if (metadata_out != NULL)
