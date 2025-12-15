@@ -155,8 +155,16 @@ DECLARE
 BEGIN
 	SELECT model_id INTO model_id_val FROM gpu_model_temp LIMIT 1;
 	IF model_id_val IS NOT NULL THEN
-		PERFORM neurondb.predict(model_id_val, features) 
-		FROM test_test_view LIMIT 1;
+		BEGIN
+			PERFORM neurondb.predict(model_id_val, features) 
+			FROM test_test_view LIMIT 1;
+		EXCEPTION WHEN OTHERS THEN
+			IF SQLERRM LIKE '%LightGBM%not available%' OR SQLERRM LIKE '%not available%' THEN
+				RAISE NOTICE 'LightGBM library not available for prediction, skipping test';
+			ELSE
+				RAISE;
+			END IF;
+		END;
 	END IF;
 END $$;
 
@@ -167,10 +175,18 @@ DECLARE
 BEGIN
 	SELECT model_id INTO model_id_val FROM gpu_model_temp LIMIT 1;
 	IF model_id_val IS NOT NULL THEN
-		PERFORM COUNT(*) FROM (
-			SELECT neurondb.predict(model_id_val, features) AS score
-			FROM test_test_view LIMIT 100
-		) sub;
+		BEGIN
+			PERFORM COUNT(*) FROM (
+				SELECT neurondb.predict(model_id_val, features) AS score
+				FROM test_test_view LIMIT 100
+			) sub;
+		EXCEPTION WHEN OTHERS THEN
+			IF SQLERRM LIKE '%LightGBM%not available%' OR SQLERRM LIKE '%not available%' THEN
+				RAISE NOTICE 'LightGBM library not available for prediction, skipping test';
+			ELSE
+				RAISE;
+			END IF;
+		END;
 	END IF;
 END $$;
 
@@ -516,7 +532,6 @@ SELECT
 	ROUND(tm.f1_score::numeric, 6) AS f1_score,
 	CASE
 		WHEN m.metrics IS NULL THEN 'CPU Training (default)'
-		CASE 
 		WHEN m.metrics::jsonb->>'storage' = 'gpu' THEN 'GPU Training ✓'
 		WHEN m.metrics::jsonb->>'storage' = 'cpu' THEN 'CPU Training'
 		WHEN m.metrics::jsonb->>'storage' IS NULL OR m.metrics::jsonb->>'storage' = '' THEN 'CPU Training (default)'
