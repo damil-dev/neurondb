@@ -191,3 +191,4 @@ class DataGenerator:
         intersection = np.intersect1d(predicted_indices, ground_truth_indices)
         return len(intersection) / len(ground_truth_indices)
 
+

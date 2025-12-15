@@ -59,23 +59,88 @@ class DatabaseManager:
                 parts.append(f"password={password}")
             self.connection_string = " ".join(parts)
         
-        # Create connection pool
-        try:
-            self.pool = pool.ThreadedConnectionPool(
-                min_connections,
-                max_connections,
-                self.connection_string
-            )
-        except Exception as e:
-            raise ConnectionError(f"Failed to create connection pool: {e}")
+        # Create connection pool with retry logic
+        max_retries = 3
+        retry_delay = 1.0
+        for attempt in range(max_retries):
+            try:
+                self.pool = pool.ThreadedConnectionPool(
+                    min_connections,
+                    max_connections,
+                    self.connection_string
+                )
+                break
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    import time
+                    time.sleep(retry_delay * (attempt + 1))
+                    continue
+                raise ConnectionError(f"Failed to create connection pool after {max_retries} attempts: {e}")
     
-    def _get_connection(self):
-        """Get connection from pool."""
-        return self.pool.getconn()
+    def _get_connection(self, retries=3):
+        """Get connection from pool with retry logic."""
+        for attempt in range(retries):
+            try:
+                conn = self.pool.getconn()
+                # Test connection is alive
+                try:
+                    with conn.cursor() as cur:
+                        cur.execute("SELECT 1")
+                except Exception:
+                    # Connection is dead, close it and try again
+                    try:
+                        conn.close()
+                    except:
+                        pass
+                    if attempt < retries - 1:
+                        import time
+                        time.sleep(0.5 * (attempt + 1))
+                        continue
+                    raise
+                return conn
+            except Exception as e:
+                if attempt < retries - 1:
+                    import time
+                    time.sleep(0.5 * (attempt + 1))
+                    continue
+                raise ConnectionError(f"Failed to get connection after {retries} attempts: {e}")
     
     def _return_connection(self, conn):
         """Return connection to pool."""
         self.pool.putconn(conn)
+    
+    def wait_for_recovery(self, max_wait: int = 60) -> bool:
+        """
+        Wait for database to exit recovery mode.
+        
+        Args:
+            max_wait: Maximum seconds to wait
+        
+        Returns:
+            True if database is ready, False if timeout
+        """
+        import time
+        start_time = time.time()
+        
+        while time.time() - start_time < max_wait:
+            try:
+                conn = self._get_connection()
+                try:
+                    with conn.cursor() as cur:
+                        cur.execute("SELECT pg_is_in_recovery()")
+                        result = cur.fetchone()
+                        if result and not result[0]:
+                            # Database is ready
+                            self._return_connection(conn)
+                            return True
+                finally:
+                    self._return_connection(conn)
+            except Exception:
+                pass
+            
+            time.sleep(2)
+        
+        return False
     
     def ensure_extension(self, extension_name: str) -> bool:
         """
@@ -114,7 +179,8 @@ class DatabaseManager:
         query: str,
         params: Optional[Tuple] = None,
         fetch: bool = True,
-        timing: bool = False
+        timing: bool = False,
+        retries: int = 3
     ) -> Tuple[Optional[List[Dict[str, Any]]], float]:
         """
         Execute a query and return results with optional timing.
@@ -124,30 +190,67 @@ class DatabaseManager:
             params: Query parameters
             fetch: Whether to fetch results
             timing: Whether to measure execution time
+            retries: Number of retry attempts on failure
         
         Returns:
             Tuple of (results, execution_time_seconds)
         """
-        conn = self._get_connection()
-        try:
-            start_time = time.perf_counter()
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute(query, params)
-                if fetch:
-                    results = cur.fetchall()
-                    # Convert RealDictRow to dict
-                    results = [dict(row) for row in results]
+        last_error = None
+        for attempt in range(retries):
+            conn = None
+            try:
+                conn = self._get_connection()
+                start_time = time.perf_counter()
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    cur.execute(query, params)
+                    if fetch:
+                        results = cur.fetchall()
+                        # Convert RealDictRow to dict
+                        results = [dict(row) for row in results]
+                    else:
+                        results = None
+                    conn.commit()
+                end_time = time.perf_counter()
+                execution_time = end_time - start_time if timing else 0.0
+                self._return_connection(conn)
+                return results, execution_time
+            except Exception as e:
+                last_error = e
+                if conn:
+                    try:
+                        conn.rollback()
+                    except:
+                        pass
+                    try:
+                        self._return_connection(conn)
+                    except:
+                        # Connection is bad, close it
+                        try:
+                            conn.close()
+                        except:
+                            pass
+                
+                # Check if database is in recovery mode
+                error_str = str(e).lower()
+                if 'recovery mode' in error_str:
+                    if attempt < retries - 1:
+                        import time
+                        wait_time = 2.0 * (attempt + 1)
+                        print(f"    Database in recovery mode, waiting {wait_time:.1f}s before retry...")
+                        time.sleep(wait_time)
+                        continue
+                    else:
+                        raise RuntimeError(f"Database is in recovery mode. Please wait for recovery to complete: {e}")
+                
+                # For other errors, retry with backoff
+                if attempt < retries - 1:
+                    import time
+                    time.sleep(0.5 * (attempt + 1))
+                    continue
                 else:
-                    results = None
-                conn.commit()
-            end_time = time.perf_counter()
-            execution_time = end_time - start_time if timing else 0.0
-            return results, execution_time
-        except Exception as e:
-            conn.rollback()
-            raise RuntimeError(f"Query execution failed: {e}")
-        finally:
-            self._return_connection(conn)
+                    raise RuntimeError(f"Query execution failed after {retries} attempts: {e}")
+        
+        raise RuntimeError(f"Query execution failed: {last_error}")
     
     def execute_many(
         self,
