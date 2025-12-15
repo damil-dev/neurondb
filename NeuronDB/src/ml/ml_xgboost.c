@@ -735,6 +735,14 @@ evaluate_xgboost_by_model_id(PG_FUNCTION_ARGS)
     StringInfoData jsonbuf;
     Jsonb *result = NULL;
     MemoryContext oldcontext;
+    bool is_classification = false;
+    Oid label_type_oid = InvalidOid;
+    /* Classification metrics */
+    int tp = 0, tn = 0, fp = 0, fn = 0;
+    double accuracy = 0.0;
+    double precision = 0.0;
+    double recall = 0.0;
+    double f1_score = 0.0;
 
     /* Validate arguments */
     if (PG_NARGS() != 4)
@@ -803,7 +811,17 @@ evaluate_xgboost_by_model_id(PG_FUNCTION_ARGS)
                     nvec)));
     }
 
-    /* First pass: compute mean of y */
+    /* First pass: determine label type and compute mean of y (for regression) */
+    if (SPI_tuptable != NULL && SPI_tuptable->tupdesc != NULL && SPI_tuptable->tupdesc->natts >= 2)
+    {
+        label_type_oid = SPI_gettypeid(SPI_tuptable->tupdesc, 2);
+        /* Check if label is integer type (classification) or float type (regression) */
+        if (label_type_oid == INT4OID || label_type_oid == INT2OID || label_type_oid == INT8OID)
+        {
+            is_classification = true;
+        }
+    }
+
     for (i = 0; i < nvec; i++)
     {
         HeapTuple tuple = SPI_tuptable->vals[i];
@@ -812,10 +830,11 @@ evaluate_xgboost_by_model_id(PG_FUNCTION_ARGS)
         bool targ_null;
 
         targ_datum = SPI_getbinval(tuple, tupdesc, 2, &targ_null);
-        if (!targ_null)
+        if (!targ_null && !is_classification)
             y_mean += DatumGetFloat8(targ_datum);
     }
-    y_mean /= nvec;
+    if (!is_classification && nvec > 0)
+        y_mean /= nvec;
 
     /* Determine feature type from first row */
     Oid feat_type_oid = InvalidOid;
@@ -850,7 +869,21 @@ evaluate_xgboost_by_model_id(PG_FUNCTION_ARGS)
         if (feat_null || targ_null)
             continue;
 
-        y_true = DatumGetFloat8(targ_datum);
+        /* Handle both integer and float label types */
+        int y_true_int = 0;
+        double y_true_float = 0.0;
+        
+        if (is_classification)
+        {
+            if (label_type_oid == INT4OID || label_type_oid == INT2OID || label_type_oid == INT8OID)
+                y_true_int = DatumGetInt32(targ_datum);
+            else
+                y_true_int = (int) rint(DatumGetFloat8(targ_datum));
+        }
+        else
+        {
+            y_true_float = DatumGetFloat8(targ_datum);
+        }
 
         /* Extract features and determine dimension */
         if (feat_is_array)
@@ -908,33 +941,75 @@ evaluate_xgboost_by_model_id(PG_FUNCTION_ARGS)
             nfree(feature_array);
         }
 
-        /* Compute errors */
-        error = y_true - y_pred;
-        mse += error * error;
-        mae += fabs(error);
-        ss_res += error * error;
-        ss_tot += (y_true - y_mean) * (y_true - y_mean);
+        /* Compute metrics based on task type */
+        if (is_classification)
+        {
+            int y_pred_int = (int) rint(y_pred);
+            
+            /* Classification: compute confusion matrix */
+            if (y_true_int == 1 && y_pred_int == 1)
+                tp++;
+            else if (y_true_int == 0 && y_pred_int == 0)
+                tn++;
+            else if (y_true_int == 0 && y_pred_int == 1)
+                fp++;
+            else if (y_true_int == 1 && y_pred_int == 0)
+                fn++;
+        }
+        else
+        {
+            /* Regression: compute errors */
+            error = y_true_float - y_pred;
+            mse += error * error;
+            mae += fabs(error);
+            ss_res += error * error;
+            ss_tot += (y_true_float - y_mean) * (y_true_float - y_mean);
+        }
     }
 
     ndb_spi_stringinfo_free(spi_session, &query);
     NDB_SPI_SESSION_END(spi_session);
 
-    mse /= nvec;
-    mae /= nvec;
-    rmse = sqrt(mse);
-
-    /* Handle R² calculation - if ss_tot is zero (no variance in y), R² is undefined */
-    if (ss_tot == 0.0)
-        r_squared = 0.0; /* Convention: set to 0 when there's no variance to explain */
-    else
-        r_squared = 1.0 - (ss_res / ss_tot);
-
-    /* Build result JSON */
+    /* Build result JSON based on task type */
     MemoryContextSwitchTo(oldcontext);
     initStringInfo(&jsonbuf);
-    appendStringInfo(&jsonbuf,
-        "{\"mse\":%.6f,\"mae\":%.6f,\"rmse\":%.6f,\"r_squared\":%.6f,\"n_samples\":%d}",
-        mse, mae, rmse, r_squared, nvec);
+    
+    if (is_classification)
+    {
+        /* Calculate classification metrics */
+        int total = tp + tn + fp + fn;
+        
+        if (total > 0)
+        {
+            accuracy = (double) (tp + tn) / (double) total;
+            precision = (tp + fp > 0) ? (double) tp / (double) (tp + fp) : 0.0;
+            recall = (tp + fn > 0) ? (double) tp / (double) (tp + fn) : 0.0;
+            f1_score = (precision + recall > 0.0)
+                ? 2.0 * precision * recall / (precision + recall)
+                : 0.0;
+        }
+        
+        appendStringInfo(&jsonbuf,
+            "{\"accuracy\":%.6f,\"precision\":%.6f,\"recall\":%.6f,\"f1_score\":%.6f,\"n_samples\":%d}",
+            accuracy, precision, recall, f1_score, nvec);
+    }
+    else
+    {
+        /* Calculate regression metrics */
+        mse /= nvec;
+        mae /= nvec;
+        rmse = sqrt(mse);
+
+        /* Handle R² calculation - if ss_tot is zero (no variance in y), R² is undefined */
+        if (ss_tot == 0.0)
+            r_squared = 0.0; /* Convention: set to 0 when there's no variance to explain */
+        else
+            r_squared = 1.0 - (ss_res / ss_tot);
+        
+        appendStringInfo(&jsonbuf,
+            "{\"mse\":%.6f,\"mae\":%.6f,\"rmse\":%.6f,\"r_squared\":%.6f,\"n_samples\":%d}",
+            mse, mae, rmse, r_squared, nvec);
+    }
 
     result = DatumGetJsonbP(DirectFunctionCall1(jsonb_in, CStringGetTextDatum(jsonbuf.data)));
     nfree(jsonbuf.data);
