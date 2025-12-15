@@ -363,9 +363,16 @@ SELECT
 	tm.test_samples,
 	ROUND(tm.inertia::numeric, 6) AS inertia,
 	tm.n_clusters,
-	'Unknown' AS training_status,
+	CASE
+		WHEN m.metrics IS NULL THEN 'CPU Training (default)'
+		WHEN m.metrics::jsonb->>'storage' = 'gpu' THEN 'GPU Training ✓'
+		WHEN m.metrics::jsonb->>'storage' = 'cpu' THEN 'CPU Training'
+		WHEN m.metrics::jsonb->>'storage' IS NULL OR m.metrics::jsonb->>'storage' = '' THEN 'CPU Training (default)'
+		ELSE 'Unknown'
+	END AS training_status,
 	tm.updated_at AS test_completed_at
 FROM test_metrics tm
+LEFT JOIN neurondb.ml_models m ON m.model_id = tm.model_id
 WHERE tm.test_name = '015_kmeans_basic';
 
 \echo ''

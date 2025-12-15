@@ -39,7 +39,6 @@ SELECT
 	384 AS expected_dims,
 	vector_dims(embed_text('Test text', 'sentence-transformers/all-MiniLM-L6-v2')) AS actual_dims,
 	CASE 
- 		WHEN m.metrics IS NULL THEN 'CPU Training (default)'
 		WHEN vector_norm(embed_text('Test text', 'sentence-transformers/all-MiniLM-L6-v2')) > 0 THEN true
 		ELSE false
 	END AS non_zero,
