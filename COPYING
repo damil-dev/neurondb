@@ -4,6 +4,11 @@ Copyright (C) 2024-2025 neurondb, Inc. All rights reserved.
 
 STRICT LICENSE TERMS - READ CAREFULLY
 
+IMPORTANT: This license applies RETROACTIVELY to ALL versions from the
+FIRST COMMIT (d6bcea1, 2025-12-01) onwards, regardless of when this
+license was created or updated. These restrictions have ALWAYS applied
+to ALL code from the first commit.
+
 This software is licensed under the Apache License, Version 2.0, with
 Commons Clause restrictions and STRICT additional commercial use
 prohibitions.
@@ -17,7 +22,10 @@ ABSOLUTE RESTRICTIONS:
 ✗ Redistributing source code is STRICTLY PROHIBITED
 ✗ Creating derivative works is STRICTLY PROHIBITED
 
-These terms apply RETROACTIVELY to ALL versions from 2024 onwards.
+These terms apply RETROACTIVELY to ALL versions from the FIRST COMMIT
+(d6bcea1, 2025-12-01) onwards. These restrictions have ALWAYS applied
+to ALL code from the first line written, regardless of when this license
+file was created or updated.
 
 ANY violation will result in immediate termination of rights and
 may result in legal action.
