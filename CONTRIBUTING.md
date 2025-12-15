@@ -56,6 +56,11 @@ All submissions require review. We use GitHub pull requests for this purpose.
 ## License
 
 By contributing, you agree that your contributions will be licensed under
-the GNU Affero General Public License v3.0 (AGPL-3.0), the same license
-as the project.
+the Apache License 2.0 with Commons Clause restrictions and strict
+commercial use prohibitions, the same license as the project.
+
+This license strictly prohibits commercial use, creating companies based
+on the code, and restricts source code use to personal, non-commercial
+purposes only. Personal use of binaries is permitted. See the LICENSE
+file for full terms.
 
