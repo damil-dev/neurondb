@@ -1284,6 +1284,12 @@ CREATE FUNCTION predict_xgboost(integer, real[])
     LANGUAGE C STABLE STRICT;
 COMMENT ON FUNCTION predict_xgboost(integer, real[]) IS 'Predict using XGBoost model by model_id';
 
+CREATE FUNCTION evaluate_xgboost_by_model_id(integer, text, text, text)
+    RETURNS jsonb
+    AS 'MODULE_PATHNAME', 'evaluate_xgboost_by_model_id'
+    LANGUAGE C STABLE STRICT;
+COMMENT ON FUNCTION evaluate_xgboost_by_model_id IS 'Evaluate XGBoost model by model_id. Returns classification or regression metrics based on label type.';
+
 -- ============================================================================
 -- CATBOOST FUNCTIONS
 -- ============================================================================
@@ -1306,6 +1312,12 @@ CREATE FUNCTION predict_catboost(integer, real[])
     LANGUAGE C STABLE STRICT;
 COMMENT ON FUNCTION predict_catboost(integer, real[]) IS 'Predict using CatBoost model by model_id';
 
+CREATE FUNCTION evaluate_catboost_by_model_id(integer, text, text, text)
+    RETURNS jsonb
+    AS 'MODULE_PATHNAME', 'evaluate_catboost_by_model_id'
+    LANGUAGE C STABLE STRICT;
+COMMENT ON FUNCTION evaluate_catboost_by_model_id IS 'Evaluate CatBoost model by model_id. Returns classification or regression metrics based on label type.';
+
 -- ============================================================================
 -- LIGHTGBM FUNCTIONS
 -- ============================================================================
@@ -1326,7 +1338,23 @@ CREATE FUNCTION predict_lightgbm(integer, real[])
     RETURNS float8
     AS 'MODULE_PATHNAME', 'predict_lightgbm'
     LANGUAGE C STABLE STRICT;
+
+CREATE FUNCTION evaluate_lightgbm_by_model_id(integer, text, text, text)
+    RETURNS jsonb
+    AS 'MODULE_PATHNAME', 'evaluate_lightgbm_by_model_id'
+    LANGUAGE C STABLE STRICT;
+COMMENT ON FUNCTION evaluate_lightgbm_by_model_id IS 'Evaluate LightGBM model by model_id. Returns classification or regression metrics based on label type.';
 COMMENT ON FUNCTION predict_lightgbm(integer, real[]) IS 'Predict using LightGBM model by model_id';
+
+-- ============================================================================
+-- NEURAL NETWORK FUNCTIONS
+-- ============================================================================
+
+CREATE FUNCTION predict_neural_network(integer, vector)
+    RETURNS float8
+    AS 'MODULE_PATHNAME', 'predict_neural_network'
+    LANGUAGE C STABLE STRICT;
+COMMENT ON FUNCTION predict_neural_network IS 'Predict using neural network model by model_id';
 
 -- ============================================================================
 -- DIMENSIONALITY REDUCTION
@@ -5763,7 +5791,7 @@ BEGIN
 		WHEN 'lightgbm' THEN
 			RETURN predict_lightgbm(model_id, vector_to_array(features));
 		WHEN 'neural_network' THEN
-			RETURN predict_neural_network(model_id, vector_to_array(features));
+			RETURN predict_neural_network(model_id, features);
 		WHEN 'naive_bayes' THEN
 			-- Delegate to C function (convert vector to array)
 			RETURN neurondb_predict(model_id, vector_to_array(features));
