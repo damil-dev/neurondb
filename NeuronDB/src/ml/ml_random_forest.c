@@ -3752,8 +3752,82 @@ predict_random_forest(PG_FUNCTION_ARGS)
 
 	if (!rf_lookup_model(model_id, &model))
 	{
-		if (rf_try_gpu_predict_catalog(model_id, feature_vec, &result))
-			PG_RETURN_FLOAT8(result);
+		bool		gpu_prediction_failed = false;
+		
+		/* Try GPU prediction first if available */
+		if (NDB_SHOULD_TRY_GPU() && neurondb_gpu_is_available())
+		{
+			if (rf_try_gpu_predict_catalog(model_id, feature_vec, &result))
+			{
+				PG_RETURN_FLOAT8(result);
+			}
+			else
+			{
+				gpu_prediction_failed = true;
+			}
+		}
+		
+		/* If GPU prediction failed, check if model is GPU-only before trying CPU fallback */
+		if (gpu_prediction_failed)
+		{
+			bytea *payload = NULL;
+			Jsonb *metrics = NULL;
+			bool		is_gpu_only = false;
+			bool		fetch_succeeded = false;
+			
+			/* Check if model is GPU-only */
+			{
+				MemoryContext oldctx = MemoryContextSwitchTo(TopMemoryContext);
+				fetch_succeeded = ml_catalog_fetch_model_payload(model_id, &payload, NULL, &metrics);
+				MemoryContextSwitchTo(oldctx);
+				
+				if (fetch_succeeded)
+				{
+					if (metrics != NULL)
+					{
+						is_gpu_only = rf_metadata_is_gpu(metrics);
+					}
+					
+					/* If metadata check didn't determine it, check payload format */
+					if (!is_gpu_only && payload != NULL)
+					{
+						/* Check payload format - GPU models start with NdbCudaRfModelHeader */
+						int payload_size = VARSIZE(payload) - VARHDRSZ;
+						if (payload_size >= sizeof(int32))
+						{
+							const int32 *first_int = (const int32 *) VARDATA(payload);
+							int32 first_value = *first_int;
+							
+							/* If first 4 bytes look like a reasonable tree_count, it's likely GPU format */
+							if (first_value > 0 && first_value <= 10000)
+							{
+								if (payload_size >= sizeof(NdbCudaRfModelHeader))
+								{
+									const NdbCudaRfModelHeader *hdr = (const NdbCudaRfModelHeader *) VARDATA(payload);
+									if (hdr->tree_count == first_value &&
+										hdr->feature_dim > 0 && hdr->feature_dim <= 100000 &&
+										hdr->class_count > 0 && hdr->class_count <= 10000)
+									{
+										is_gpu_only = true;
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+			
+			/* If model is GPU-only and GPU prediction failed, give specific error */
+			if (fetch_succeeded && is_gpu_only)
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+						 errmsg("neurondb: predict_random_forest: model %d is GPU-only and GPU prediction failed", model_id),
+						 errdetail("Model %d was trained on GPU and requires GPU for prediction, but GPU prediction failed: %s", 
+								   model_id, "CUDA RF inference failed"),
+						 errhint("Check GPU availability and configuration, or train a new model with CPU backend.")));
+			}
+		}
 		
 		/* Switch to TopMemoryContext before calling rf_load_model_from_catalog
 		 * to ensure allocations happen in a stable context, not the PL/pgSQL context.
@@ -4901,13 +4975,39 @@ evaluate_random_forest_by_model_id(PG_FUNCTION_ARGS)
 				if (batch_rc == 0)
 				{
 					/* Batch evaluation succeeded - metrics are already set */
-					processed_count = valid_samples;
-					nfree(features_array);
-					nfree(labels_array);
-					if (gpu_err)
-						nfree(gpu_err);
-					/* Skip the row-by-row loop */
-					goto metrics_calculated;
+					/* Verify metrics were actually set (should be non-zero if evaluation succeeded) */
+					if (accuracy == 0.0 && precision == 0.0 && recall == 0.0 && f1_score == 0.0)
+					{
+						/* Metrics weren't set - batch evaluation may have failed silently */
+						ereport(WARNING,
+								(errmsg("evaluate_random_forest_by_model_id: batch evaluation reported success but metrics are zero - falling back to row-by-row")));
+						/* Fall through to row-by-row evaluation */
+						nfree(features_array);
+						nfree(labels_array);
+						if (gpu_err)
+							nfree(gpu_err);
+						/* Reset metrics for row-by-row calculation */
+						accuracy = 0.0;
+						precision = 0.0;
+						recall = 0.0;
+						f1_score = 0.0;
+						tp = 0;
+						tn = 0;
+						fp = 0;
+						fn = 0;
+						processed_count = 0;
+					}
+					else
+					{
+						/* Metrics were set correctly - use them */
+						processed_count = valid_samples;
+						nfree(features_array);
+						nfree(labels_array);
+						if (gpu_err)
+							nfree(gpu_err);
+						/* Skip the row-by-row loop */
+						goto metrics_calculated;
+					}
 				}
 				else
 				{
@@ -5276,10 +5376,44 @@ evaluate_random_forest_by_model_id(PG_FUNCTION_ARGS)
 
 metrics_calculated:
 		/* Calculate metrics from confusion matrix (same for both CPU and GPU) */
-		/* Note: If GPU batch evaluation succeeded, metrics are already set and we skip this */
-		if (processed_count > 0 && (tp + tn + fp + fn) == 0)
+		/* Note: If GPU batch evaluation succeeded, it jumps here with metrics already set */
+		/* Check if metrics need to be calculated from confusion matrix */
+		if (processed_count > 0 && (tp + tn + fp + fn) > 0)
 		{
-			/* Metrics were set by batch evaluation - no need to recalculate */
+			/* Row-by-row evaluation completed - calculate metrics from confusion matrix */
+			int			total = tp + tn + fp + fn;
+			
+			accuracy = total > 0 ? (double) (tp + tn) / total : 0.0;
+			
+			/* Precision: tp / (tp + fp) - undefined if no positive predictions */
+			if (tp + fp > 0)
+				precision = (double) tp / (tp + fp);
+			else
+				precision = 0.0;
+			
+			/* Recall: tp / (tp + fn) - undefined if no positive labels */
+			if (tp + fn > 0)
+				recall = (double) tp / (tp + fn);
+			else
+				recall = 0.0;
+			
+			/* F1 score: harmonic mean of precision and recall */
+			if (precision + recall > 0.0)
+				f1_score = 2.0 * precision * recall / (precision + recall);
+			else
+				f1_score = 0.0;
+		}
+		else if (processed_count > 0 && (tp + tn + fp + fn) == 0)
+		{
+			/* Batch evaluation succeeded - metrics are already set, no need to recalculate */
+			/* This case means GPU batch evaluation set the metrics directly */
+			/* Verify metrics were actually set (should be non-zero if evaluation succeeded) */
+			if (accuracy == 0.0 && precision == 0.0 && recall == 0.0 && f1_score == 0.0)
+			{
+				/* Metrics weren't set - this shouldn't happen, but handle gracefully */
+				ereport(WARNING,
+						(errmsg("evaluate_random_forest_by_model_id: batch evaluation reported success but metrics are zero")));
+			}
 		}
 		else if (processed_count > 0)
 		{
