@@ -1310,6 +1310,16 @@ CREATE FUNCTION predict_lightgbm(integer, real[])
 COMMENT ON FUNCTION predict_lightgbm(integer, real[]) IS 'Predict using LightGBM model by model_id';
 
 -- ============================================================================
+-- NEURAL NETWORK FUNCTIONS
+-- ============================================================================
+
+CREATE FUNCTION predict_neural_network(integer, vector)
+    RETURNS float8
+    AS 'MODULE_PATHNAME', 'predict_neural_network'
+    LANGUAGE C STABLE STRICT;
+COMMENT ON FUNCTION predict_neural_network IS 'Predict using neural network model by model_id';
+
+-- ============================================================================
 -- DIMENSIONALITY REDUCTION
 -- ============================================================================
 
@@ -5689,7 +5699,7 @@ BEGIN
 		WHEN 'lightgbm' THEN
 			RETURN predict_lightgbm(model_id, vector_to_array(features));
 		WHEN 'neural_network' THEN
-			RETURN predict_neural_network(model_id, vector_to_array(features));
+			RETURN predict_neural_network(model_id, features);
 		WHEN 'naive_bayes' THEN
 			-- Delegate to C function (convert vector to array)
 			RETURN neurondb_predict(model_id, vector_to_array(features));
