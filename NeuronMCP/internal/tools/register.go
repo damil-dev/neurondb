@@ -70,6 +70,7 @@ func RegisterAllTools(registry *ToolRegistry, db *database.Database, logger *log
 
   /* Hybrid search tools */
 	registry.Register(NewHybridSearchTool(db, logger))
+	registry.Register(NewTextSearchTool(db, logger))
 	registry.Register(NewReciprocalRankFusionTool(db, logger))
 	registry.Register(NewSemanticKeywordSearchTool(db, logger))
 	registry.Register(NewMultiVectorSearchTool(db, logger))

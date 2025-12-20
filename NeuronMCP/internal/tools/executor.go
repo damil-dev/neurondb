@@ -261,14 +261,29 @@ func scanRowToMap(rows pgx.Rows) (map[string]interface{}, error) {
 	values := make([]interface{}, len(fieldDescriptions))
 	valuePointers := make([]interface{}, len(fieldDescriptions))
 	fieldNames := make([]string, len(fieldDescriptions))
+	textScanners := make([]*string, len(fieldDescriptions))
 
 	for i, desc := range fieldDescriptions {
 		fieldNames[i] = string(desc.Name)
-		valuePointers[i] = &values[i]
+		// For vector types (OID 17648) or if column name suggests it's a vector,
+		// scan as text to avoid scanning issues with pgx vector type codec
+		if desc.DataTypeOID == 17648 || string(desc.Name) == "embedding" || string(desc.Name) == "vector" {
+			textScanners[i] = new(string)
+			valuePointers[i] = textScanners[i]
+		} else {
+			valuePointers[i] = &values[i]
+		}
 	}
 
 	if err := rows.Scan(valuePointers...); err != nil {
 		return nil, fmt.Errorf("failed to scan row values: columns=%v, error=%w", fieldNames, err)
+	}
+	
+	// Copy text-scanned values to values array
+	for i, textScanner := range textScanners {
+		if textScanner != nil {
+			values[i] = *textScanner
+		}
 	}
 
 	result := make(map[string]interface{})
@@ -282,7 +297,18 @@ func scanRowToMap(rows pgx.Rows) (map[string]interface{}, error) {
 				val = string(bytes)
 			}
 		}
-		result[string(desc.Name)] = val
+		// Handle vector type - convert to string representation
+		if val != nil {
+			if str, ok := val.(string); ok {
+				// Already a string, use as-is
+				result[string(desc.Name)] = str
+			} else {
+				// Try to convert to string for vector types and other types
+				result[string(desc.Name)] = fmt.Sprintf("%v", val)
+			}
+		} else {
+			result[string(desc.Name)] = nil
+		}
 	}
 
 	return result, nil

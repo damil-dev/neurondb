@@ -29,8 +29,9 @@ import (
 /* TrainModelTool trains an ML model using the unified neurondb.train function */
 type TrainModelTool struct {
 	*BaseTool
-	executor *QueryExecutor
-	logger   *logging.Logger
+	executor     *QueryExecutor
+	logger       *logging.Logger
+	configHelper *database.ConfigHelper
 }
 
 /* NewTrainModelTool creates a new train model tool */
@@ -125,9 +126,29 @@ func (t *TrainModelTool) Execute(ctx context.Context, params map[string]interfac
 		}), nil
 	}
 
-	paramsJSON := "{}"
+	// Get ML defaults from database
+	defaultParams := make(map[string]interface{})
+	if mlDefaults, err := t.configHelper.GetMLDefaults(ctx, algorithm); err == nil {
+		// Merge default hyperparameters
+		for k, v := range mlDefaults.Hyperparameters {
+			defaultParams[k] = v
+		}
+		t.logger.Info("Using ML defaults from database", map[string]interface{}{
+			"algorithm": algorithm,
+			"defaults": defaultParams,
+		})
+	}
+	
+	// Override with provided parameters
 	if p, ok := params["params"].(map[string]interface{}); ok && len(p) > 0 {
-		paramsBytes, err := json.Marshal(p)
+		for k, v := range p {
+			defaultParams[k] = v
+		}
+	}
+	
+	paramsJSON := "{}"
+	if len(defaultParams) > 0 {
+		paramsBytes, err := json.Marshal(defaultParams)
 		if err == nil {
 			paramsJSON = string(paramsBytes)
 		}

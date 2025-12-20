@@ -200,12 +200,6 @@ func (t *AnalyzeDataTool) Execute(ctx context.Context, params map[string]interfa
 				"table": table,
 			}), nil
 		}
-
-		if len(statsParts) == 0 {
-			return Error(fmt.Sprintf("No numeric columns found in table '%s' for analyze_data tool", table), "VALIDATION_ERROR", map[string]interface{}{
-				"table": table,
-			}), nil
-		}
 		unionQuery := statsParts[0]
 		for i := 1; i < len(statsParts); i++ {
 			unionQuery += " UNION ALL " + statsParts[i]

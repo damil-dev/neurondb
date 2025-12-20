@@ -16,6 +16,7 @@ package tools
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/neurondb/NeuronMCP/internal/database"
 	"github.com/neurondb/NeuronMCP/internal/logging"
@@ -24,8 +25,9 @@ import (
 /* CreateHNSWIndexTool creates an HNSW index */
 type CreateHNSWIndexTool struct {
 	*BaseTool
-	executor *QueryExecutor
-	logger   *logging.Logger
+	executor     *QueryExecutor
+	logger       *logging.Logger
+	configHelper *database.ConfigHelper
 }
 
 /* NewCreateHNSWIndexTool creates a new create HNSW index tool */
@@ -85,11 +87,29 @@ func (t *CreateHNSWIndexTool) Execute(ctx context.Context, params map[string]int
 	table, _ := params["table"].(string)
 	vectorColumn, _ := params["vector_column"].(string)
 	indexName, _ := params["index_name"].(string)
+	
+	// Get index config defaults from database
 	m := 16
+	efConstruction := 200
+	if indexConfig, err := t.configHelper.GetIndexConfig(ctx, table, vectorColumn); err == nil && indexConfig != nil {
+		if indexConfig.HNSWM != nil {
+			m = *indexConfig.HNSWM
+		}
+		if indexConfig.HNSWEFConstruction != nil {
+			efConstruction = *indexConfig.HNSWEFConstruction
+		}
+		t.logger.Info("Using index config from database", map[string]interface{}{
+			"table": table,
+			"vector_column": vectorColumn,
+			"m": m,
+			"ef_construction": efConstruction,
+		})
+	}
+	
+	// Override with provided parameters
 	if mVal, ok := params["m"].(float64); ok {
 		m = int(mVal)
 	}
-	efConstruction := 200
 	if ef, ok := params["ef_construction"].(float64); ok {
 		efConstruction = int(ef)
 	}
@@ -174,8 +194,9 @@ func (t *CreateHNSWIndexTool) Execute(ctx context.Context, params map[string]int
 /* CreateIVFIndexTool creates an IVF index */
 type CreateIVFIndexTool struct {
 	*BaseTool
-	executor *QueryExecutor
-	logger   *logging.Logger
+	executor     *QueryExecutor
+	logger       *logging.Logger
+	configHelper *database.ConfigHelper
 }
 
 /* NewCreateIVFIndexTool creates a new create IVF index tool */
@@ -227,7 +248,21 @@ func (t *CreateIVFIndexTool) Execute(ctx context.Context, params map[string]inte
 	table, _ := params["table"].(string)
 	vectorColumn, _ := params["vector_column"].(string)
 	indexName, _ := params["index_name"].(string)
+	
+	// Get index config defaults from database
 	numLists := 100
+	if indexConfig, err := t.configHelper.GetIndexConfig(ctx, table, vectorColumn); err == nil && indexConfig != nil {
+		if indexConfig.IVFLists != nil {
+			numLists = *indexConfig.IVFLists
+		}
+		t.logger.Info("Using index config from database", map[string]interface{}{
+			"table": table,
+			"vector_column": vectorColumn,
+			"num_lists": numLists,
+		})
+	}
+	
+	// Override with provided parameters
 	if n, ok := params["num_lists"].(float64); ok {
 		numLists = int(n)
 	}
@@ -352,6 +387,16 @@ func (t *IndexStatusTool) Execute(ctx context.Context, params map[string]interfa
 	`
 	result, err := t.executor.ExecuteQueryOne(ctx, query, []interface{}{indexName})
 	if err != nil {
+		// Check if error is "no rows returned" - index doesn't exist
+		if strings.Contains(err.Error(), "no rows returned") {
+			return Success(map[string]interface{}{
+				"index_name": indexName,
+				"exists":      false,
+				"message":     fmt.Sprintf("Index '%s' does not exist", indexName),
+			}, map[string]interface{}{
+				"tool": "index_status",
+			}), nil
+		}
 		t.logger.Error("Index status query failed", err, params)
 		return Error(fmt.Sprintf("Index status query execution failed: index_name='%s', query='SELECT ... FROM pg_indexes WHERE indexname = $1', error=%v", indexName, err), "QUERY_ERROR", map[string]interface{}{
 			"index_name": indexName,

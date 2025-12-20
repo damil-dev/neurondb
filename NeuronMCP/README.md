@@ -75,6 +75,36 @@ createdb neurondb
 psql -d neurondb -c "CREATE EXTENSION neurondb;"
 ```
 
+### NeuronMCP Configuration Schema Setup
+
+NeuronMCP requires a comprehensive database schema for managing LLM models, API keys, index configurations, worker settings, ML defaults, and tool configurations. This schema provides:
+
+- **50+ pre-populated LLM models** (OpenAI, Anthropic, HuggingFace, local) with encrypted API key storage
+- **Index templates** for HNSW and IVF vector indexes
+- **Worker configurations** for background workers
+- **ML algorithm defaults** for all supported algorithms
+- **Tool-specific defaults** for all NeuronMCP tools
+- **System-wide settings** and feature flags
+
+**Quick Setup:**
+
+```bash
+cd NeuronMCP
+./scripts/setup_neurondb_mcp.sh
+```
+
+**Set API Keys:**
+
+```sql
+-- Set API key for a model
+SELECT neurondb_set_model_key('text-embedding-3-small', 'sk-your-api-key');
+
+-- View configured models
+SELECT * FROM neurondb.v_llm_models_ready;
+```
+
+**For complete documentation**, see [NEURONDB_MCP_SETUP.md](docs/NEURONDB_MCP_SETUP.md)
+
 ### Configuration
 
 Create `mcp-config.json`:
@@ -204,10 +234,93 @@ NeuronMCP provides comprehensive tools covering all NeuronDB capabilities:
 | **Workers & GPU** | `worker_management`, `gpu_info` |
 | **Vector Graph** | `vector_graph` (BFS, DFS, PageRank, community detection) |
 | **Vecmap Operations** | `vecmap_operations` (distances, arithmetic, norm on sparse vectors) |
-| **Dataset Loading** | `load_dataset` (HuggingFace datasets) |
+| **Dataset Loading** | `load_dataset` (HuggingFace, URLs, GitHub, S3, local files with auto-embedding) |
 | **PostgreSQL** | `postgresql_version`, `postgresql_stats`, `postgresql_databases`, `postgresql_connections`, `postgresql_locks`, `postgresql_replication`, `postgresql_settings`, `postgresql_extensions` |
 
 See [TOOLS_REFERENCE.md](TOOLS_REFERENCE.md) for complete parameter lists and examples.
+
+### Dataset Loading Examples
+
+The `load_dataset` tool supports multiple data sources with automatic schema detection, embedding generation, and index creation:
+
+#### HuggingFace Datasets
+
+```json
+{
+  "name": "load_dataset",
+  "arguments": {
+    "source_type": "huggingface",
+    "source_path": "sentence-transformers/embedding-training-data",
+    "split": "train",
+    "limit": 10000,
+    "auto_embed": true,
+    "embedding_model": "default"
+  }
+}
+```
+
+#### URL Datasets (CSV, JSON, Parquet)
+
+```json
+{
+  "name": "load_dataset",
+  "arguments": {
+    "source_type": "url",
+    "source_path": "https://example.com/data.csv",
+    "format": "csv",
+    "auto_embed": true,
+    "create_indexes": true
+  }
+}
+```
+
+#### GitHub Repositories
+
+```json
+{
+  "name": "load_dataset",
+  "arguments": {
+    "source_type": "github",
+    "source_path": "owner/repo/path/to/data.json",
+    "auto_embed": true
+  }
+}
+```
+
+#### S3 Buckets
+
+```json
+{
+  "name": "load_dataset",
+  "arguments": {
+    "source_type": "s3",
+    "source_path": "s3://my-bucket/data.parquet",
+    "auto_embed": true
+  }
+}
+```
+
+#### Local Files
+
+```json
+{
+  "name": "load_dataset",
+  "arguments": {
+    "source_type": "local",
+    "source_path": "/path/to/local/file.jsonl",
+    "schema_name": "my_schema",
+    "table_name": "my_table",
+    "auto_embed": true
+  }
+}
+```
+
+**Key Features:**
+- **Automatic Schema Detection**: Analyzes data types and creates optimized PostgreSQL tables
+- **Auto-Embedding**: Automatically detects text columns and generates vector embeddings using NeuronDB
+- **Index Creation**: Creates HNSW indexes for vectors, GIN indexes for full-text search
+- **Batch Loading**: Efficient bulk loading with progress tracking
+- **Multiple Formats**: Supports CSV, JSON, JSONL, Parquet, and HuggingFace datasets
 
 ## Resources
 

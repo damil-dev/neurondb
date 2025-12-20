@@ -19,6 +19,8 @@ package tools
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/neurondb/NeuronMCP/internal/database"
 	"github.com/neurondb/NeuronMCP/internal/logging"
@@ -27,8 +29,9 @@ import (
 /* VectorSearchTool performs vector similarity search */
 type VectorSearchTool struct {
 	*BaseTool
-	executor *QueryExecutor
-	logger   *logging.Logger
+	executor     *QueryExecutor
+	logger       *logging.Logger
+	configHelper *database.ConfigHelper
 }
 
 /* NewVectorSearchTool creates a new vector search tool */
@@ -75,8 +78,9 @@ func NewVectorSearchTool(db *database.Database, logger *logging.Logger) *VectorS
 				"required": []interface{}{"table", "vector_column", "query_vector"},
 			},
 		),
-		executor: NewQueryExecutor(db),
-		logger:   logger,
+		executor:     NewQueryExecutor(db),
+		logger:       logger,
+		configHelper: database.NewConfigHelper(db),
 	}
 }
 
@@ -344,8 +348,9 @@ func (t *VectorSearchInnerProductTool) Execute(ctx context.Context, params map[s
 /* GenerateEmbeddingTool generates text embeddings */
 type GenerateEmbeddingTool struct {
 	*BaseTool
-	executor *QueryExecutor
-	logger   *logging.Logger
+	executor     *QueryExecutor
+	logger       *logging.Logger
+	configHelper *database.ConfigHelper
 }
 
 /* NewGenerateEmbeddingTool creates a new embedding generation tool */
@@ -369,8 +374,9 @@ func NewGenerateEmbeddingTool(db *database.Database, logger *logging.Logger) *Ge
 				"required": []interface{}{"text"},
 			},
 		),
-		executor: NewQueryExecutor(db),
-		logger:   logger,
+		executor:     NewQueryExecutor(db),
+		logger:       logger,
+		configHelper: database.NewConfigHelper(db),
 	}
 }
 
@@ -397,13 +403,31 @@ func (t *GenerateEmbeddingTool) Execute(ctx context.Context, params map[string]i
 		}), nil
 	}
 
+	// Resolve model name - try to get from database config, fallback to provided or default
 	modelName := model
 	if modelName == "" {
-		modelName = "default"
+		// Try to get default model for embedding operation
+		if defaultModel, err := t.configHelper.GetDefaultModel(ctx, "embedding"); err == nil {
+			modelName = defaultModel
+			t.logger.Info("Using default embedding model from database", map[string]interface{}{"model": modelName})
+		} else {
+			modelName = "default"
+			t.logger.Info("Using fallback default model", map[string]interface{}{"model": modelName, "error": err.Error()})
+		}
+	}
+
+	// Try to resolve API key from database (for future use with NeuronDB functions that accept keys)
+	// For now, NeuronDB uses GUC settings, but we log usage
+	// TODO: Use resolved API key when NeuronDB functions support it
+	if _, err := t.configHelper.ResolveModelKey(ctx, modelName); err == nil {
+		t.logger.Debug("Resolved API key from database", map[string]interface{}{"model": modelName, "has_key": true})
+	} else {
+		t.logger.Debug("No API key in database, will use GUC settings", map[string]interface{}{"model": modelName, "error": err.Error()})
 	}
 
 	var result interface{}
 	var err error
+	startTime := time.Now()
 	
 	query := "SELECT embed_text($1, $2)::text AS embedding"
 	queryParams := []interface{}{text, modelName}
@@ -417,16 +441,53 @@ func (t *GenerateEmbeddingTool) Execute(ctx context.Context, params map[string]i
 	
 	result, err = t.executor.ExecuteQueryOneWithTimeout(ctx, query, queryParams, EmbeddingQueryTimeout)
 	if err != nil {
+		// Check if error is about configuration (API key, etc.) - check first method's error
+		errStr := err.Error()
+		if strings.Contains(errStr, "llm_api_key") || strings.Contains(errStr, "llm_provider") || strings.Contains(errStr, "Configure neurondb") || strings.Contains(errStr, "embedding generation failed") {
+			t.logger.Error("Embedding generation failed - configuration issue", err, params)
+			return Error(fmt.Sprintf("Embedding generation failed: text_length=%d, model='%s'. The embedding function requires proper configuration. Error: %v. Note: Configuration is managed via PostgreSQL GUC settings (neurondb.llm_api_key and neurondb.llm_provider).", textLen, modelName, err), "CONFIGURATION_ERROR", map[string]interface{}{
+				"text_length": textLen,
+				"model":       modelName,
+				"error":       err.Error(),
+				"methods_tried": []string{"embed_text"},
+				"hint":        "Check PostgreSQL GUC settings: SHOW neurondb.llm_api_key; SHOW neurondb.llm_provider;",
+			}), nil
+		}
+		
 		t.logger.Warn("embed_text failed, trying neurondb.embed fallback", map[string]interface{}{
 			"error": err.Error(),
 			"model": modelName,
 		})
 		
-		query = "SELECT neurondb.embed($1, $2, 'embedding')::text AS embedding"
-		queryParams = []interface{}{modelName, text}
+		// neurondb.embed(model text, input_text text, task text) - function signature: model, input_text, task
+		query = "SELECT neurondb.embed($1, $2, $3)::text AS embedding"
+		queryParams = []interface{}{modelName, text, "embedding"}
 		
 		result, err = t.executor.ExecuteQueryOneWithTimeout(ctx, query, queryParams, EmbeddingQueryTimeout)
 		if err != nil {
+			// Check if error is "no rows returned" - function exists but requires configuration
+			errStr = err.Error()
+			if strings.Contains(errStr, "no rows returned") {
+				t.logger.Error("Embedding generation failed - function returned no rows (configuration required)", err, params)
+				return Error(fmt.Sprintf("Embedding generation requires configuration: text_length=%d, model='%s'. The embedding function exists but returned no results, which typically means embedding model configuration is required. Configuration is managed via PostgreSQL GUC settings.", textLen, modelName), "CONFIGURATION_ERROR", map[string]interface{}{
+					"text_length": textLen,
+					"model":       modelName,
+					"error":       err.Error(),
+					"methods_tried": []string{"embed_text", "neurondb.embed"},
+					"hint":        "Check PostgreSQL GUC settings: SHOW neurondb.llm_api_key; SHOW neurondb.llm_provider;",
+				}), nil
+			}
+			// Check if error is about configuration (API key, etc.)
+			if strings.Contains(errStr, "llm_api_key") || strings.Contains(errStr, "llm_provider") || strings.Contains(errStr, "Configure neurondb") || strings.Contains(errStr, "embedding generation failed") {
+				t.logger.Error("Embedding generation failed - configuration required", err, params)
+				return Error(fmt.Sprintf("Embedding generation requires configuration: text_length=%d, model='%s'. Error: %v. Configuration is managed via PostgreSQL GUC settings (neurondb.llm_api_key and neurondb.llm_provider).", textLen, modelName, err), "CONFIGURATION_ERROR", map[string]interface{}{
+					"text_length": textLen,
+					"model":       modelName,
+					"error":       err.Error(),
+					"methods_tried": []string{"embed_text", "neurondb.embed"},
+					"hint":        "Check PostgreSQL GUC settings: SHOW neurondb.llm_api_key; SHOW neurondb.llm_provider;",
+				}), nil
+			}
 			t.logger.Error("Embedding generation failed with both methods", err, params)
 			return Error(fmt.Sprintf("Embedding generation failed: text_length=%d, model='%s', error=%v", textLen, modelName, err), "EMBEDDING_ERROR", map[string]interface{}{
 				"text_length": textLen,
@@ -435,6 +496,22 @@ func (t *GenerateEmbeddingTool) Execute(ctx context.Context, params map[string]i
 				"methods_tried": []string{"embed_text", "neurondb.embed"},
 			}), nil
 		}
+	}
+
+	// Log usage metrics if successful
+	if result != nil {
+		// Estimate tokens (rough approximation: 1 token ≈ 4 characters)
+		tokensEstimate := textLen / 4
+		tokensInput := &tokensEstimate
+		latency := int(time.Since(startTime).Milliseconds())
+		latencyMS := &latency
+		
+		// Log asynchronously (don't fail if logging fails)
+		go func() {
+			if err := t.configHelper.LogModelUsage(ctx, modelName, "embedding", tokensInput, nil, latencyMS, true, nil); err != nil {
+				t.logger.Warn("Failed to log model usage", map[string]interface{}{"error": err.Error()})
+			}
+		}()
 	}
 
 	return Success(result, map[string]interface{}{"model": modelName}), nil

@@ -25,8 +25,9 @@ import (
 /* WorkerManagementTool manages background workers */
 type WorkerManagementTool struct {
 	*BaseTool
-	executor *QueryExecutor
-	logger   *logging.Logger
+	executor     *QueryExecutor
+	logger       *logging.Logger
+	configHelper *database.ConfigHelper
 }
 
 /* NewWorkerManagementTool creates a new worker management tool */
@@ -59,8 +60,9 @@ func NewWorkerManagementTool(db *database.Database, logger *logging.Logger) *Wor
 				"required": []interface{}{"operation"},
 			},
 		),
-		executor: NewQueryExecutor(db),
-		logger:   logger,
+		executor:     NewQueryExecutor(db),
+		logger:       logger,
+		configHelper: database.NewConfigHelper(db),
 	}
 }
 
@@ -81,11 +83,59 @@ func (t *WorkerManagementTool) Execute(ctx context.Context, params map[string]in
 
 	switch operation {
 	case "status":
+		// Try to get worker configs from database
+		workerConfigs := make(map[string]interface{})
+		workers := []string{"neuranq", "neuranmon", "neurandefrag"}
+		for _, workerName := range workers {
+			if config, err := t.configHelper.GetWorkerConfig(ctx, workerName); err == nil {
+				workerConfigs[workerName] = map[string]interface{}{
+					"enabled": config.Enabled,
+					"naptime_ms": config.NaptimeMS,
+				}
+			}
+		}
+		
+		// Try neurondb.worker_status() first, fallback to checking if function exists
 		query = "SELECT * FROM neurondb.worker_status()"
 		queryParams = []interface{}{}
+		result, err := t.executor.ExecuteQueryOne(ctx, query, queryParams)
+		if err != nil {
+			// Function might not exist, return configs from database instead
+			t.logger.Warn("worker_status() function not found, returning configs from database", map[string]interface{}{
+				"error": err.Error(),
+			})
+			return Success(map[string]interface{}{
+				"workers": workerConfigs,
+				"note":   "Worker status function not available, showing configuration from database",
+			}, map[string]interface{}{
+				"operation": operation,
+			}), nil
+		}
+		
+		// Merge database configs with status result
+		result["configs"] = workerConfigs
+		
+		return Success(result, map[string]interface{}{
+			"operation": operation,
+		}), nil
 	case "list_jobs":
 		query = "SELECT * FROM neurondb.list_worker_jobs()"
 		queryParams = []interface{}{}
+		result, err := t.executor.ExecuteQueryOne(ctx, query, queryParams)
+		if err != nil {
+			t.logger.Warn("list_worker_jobs() function not found", map[string]interface{}{
+				"error": err.Error(),
+			})
+			return Success(map[string]interface{}{
+				"jobs": []interface{}{},
+				"note": "list_worker_jobs() function not available in this NeuronDB installation",
+			}, map[string]interface{}{
+				"operation": operation,
+			}), nil
+		}
+		return Success(result, map[string]interface{}{
+			"operation": operation,
+		}), nil
 	case "queue_job":
 		jobType, _ := params["job_type"].(string)
 		jobParams, _ := params["job_params"].(map[string]interface{})
