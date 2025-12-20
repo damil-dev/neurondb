@@ -47,15 +47,31 @@ The following compatible function aliases have been added to `neurondb--1.0.sql`
 - `hamming_distance(bit, bit)` -> `bit_hamming_distance`
 - `jaccard_distance(bit, bit)` -> `bit_jaccard_distance`
 
+## Recent Fixes (December 2024)
+
+### 1. Arithmetic Operators ✅
+- **Halfvec operators implemented**: Added `halfvec_add`, `halfvec_sub`, `halfvec_mul`, `halfvec_div`, `halfvec_neg` functions
+- **SQL operators added**: `+`, `-`, `*`, `/`, and unary `-` for halfvec type
+- **Sparsevec operators implemented**: Added `sparsevec_add`, `sparsevec_sub`, `sparsevec_mul` functions
+- **SQL operators added**: `+`, `-`, `*` for sparsevec type
+
+### 2. Index Crash Fixes ✅
+- **HNSW bit type crash fixed**: Added null check for `bit_data` in `hnswExtractVectorData` function
+- This prevents server crashes when processing bit vectors in HNSW indexes
+
+### 3. Empty Sparsevec Support ✅
+- **Empty format support**: Modified `sparsevec_in` to support `{}/dim` format
+- Allows creation of empty sparse vectors with explicit dimension specification
+
+### 4. B-tree Operator Classes ✅
+- **Vector btree operator class**: Added `vector_btree_ops` for btree indexes on vector type
+- Note: Halfvec and sparsevec btree classes require `<`, `<=`, `>`, `>=` operators (not yet implemented)
+
 ## Known Issues and Limitations
 
-### 1. Missing Operators
-- Halfvec and sparsevec types don't have arithmetic operators (+, -, *, ||)
-- These need to be implemented or tests need to be updated to handle gracefully
-
-### 2. Index Issues
-- HNSW index tests may cause server crashes in some cases
-- Need to investigate index access method implementation
+### 1. Index Issues (Partially Fixed)
+- HNSW index crashes for bit type have been fixed with null check
+- Some index operations may still need testing and verification
 - IVFFlat index uses `ivf` access method name instead of `ivfflat` (intentional difference)
 
 ### 3. Function Name Differences

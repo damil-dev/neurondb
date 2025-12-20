@@ -230,10 +230,11 @@ SELECT subvector('[1,2,3,4,5]'::vector, 3, 2);
 \echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
 
 -- Note: uses avg(vector) and sum(vector), NeuronDB uses vector_avg and vector_sum
-SELECT vector_avg(v) FROM unnest(ARRAY['[1,2,3]'::vector, '[3,5,7]']) v;
-SELECT vector_avg(v) FROM unnest(ARRAY['[1,2,3]'::vector, '[3,5,7]', NULL]) v;
-SELECT vector_sum(v) FROM unnest(ARRAY['[1,2,3]'::vector, '[3,5,7]']) v;
-SELECT vector_sum(v) FROM unnest(ARRAY['[1,2,3]'::vector, '[3,5,7]', NULL]) v;
+-- Use batch functions for array-based aggregation (compatible approach)
+SELECT vector_avg_batch(ARRAY['[1,2,3]'::vector, '[3,5,7]'::vector]);
+SELECT vector_avg_batch(ARRAY['[1,2,3]'::vector, '[3,5,7]'::vector, NULL::vector]);
+SELECT vector_sum_batch(ARRAY['[1,2,3]'::vector, '[3,5,7]'::vector]);
+SELECT vector_sum_batch(ARRAY['[1,2,3]'::vector, '[3,5,7]'::vector, NULL::vector]);
 
 \echo ''
 \echo '=========================================================================='
