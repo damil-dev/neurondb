@@ -775,11 +775,11 @@ COMMENT ON FUNCTION delete_embedding_model_config IS 'Delete stored configuratio
 -- HYBRID SEARCH
 -- ============================================================================
 
-CREATE FUNCTION hybrid_search(text, vector, text, text DEFAULT '{}', double precision DEFAULT 0.7, integer DEFAULT 10)
+CREATE FUNCTION hybrid_search(text, vector, text, text DEFAULT '{}', double precision DEFAULT 0.7, integer DEFAULT 10, text DEFAULT 'plain')
     RETURNS TABLE(id bigint, score real)
     AS 'MODULE_PATHNAME', 'hybrid_search'
     LANGUAGE C STABLE;
-COMMENT ON FUNCTION hybrid_search IS 'Hybrid search: (table, query_vec, query_text, filters, vector_weight, limit)';
+COMMENT ON FUNCTION hybrid_search IS 'Hybrid search: (table, query_vec, query_text, filters, vector_weight, limit, query_type). query_type: plain (plainto_tsquery), to (to_tsquery), phrase (phraseto_tsquery)';
 
 CREATE FUNCTION reciprocal_rank_fusion(anyarray, double precision DEFAULT 60.0) RETURNS anyarray
     AS 'MODULE_PATHNAME', 'reciprocal_rank_fusion'
@@ -815,6 +815,12 @@ CREATE FUNCTION diverse_vector_search(text, vector, double precision DEFAULT 0.5
     AS 'MODULE_PATHNAME', 'diverse_vector_search'
     LANGUAGE C STABLE;
 COMMENT ON FUNCTION diverse_vector_search IS 'Diverse search (MMR): (table, query_vec, lambda, top_k)';
+
+CREATE FUNCTION full_text_search(text, text, text DEFAULT 'fts_vector', text DEFAULT 'plain', text DEFAULT '{}', integer DEFAULT 10)
+    RETURNS TABLE(id bigint, score real)
+    AS 'MODULE_PATHNAME', 'full_text_search'
+    LANGUAGE C STABLE;
+COMMENT ON FUNCTION full_text_search IS 'Full-text search (text-only, no vectors): (table, query_text, text_column, query_type, filters, limit). query_type: plain (plainto_tsquery), to (to_tsquery), phrase (phraseto_tsquery)';
 
 -- ============================================================================
 -- RERANKING
@@ -2533,6 +2539,20 @@ CREATE FUNCTION bit_hamming_distance(bit, bit) RETURNS integer
     AS 'MODULE_PATHNAME', 'bit_hamming_distance'
     LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
 COMMENT ON FUNCTION bit_hamming_distance IS 'Hamming distance between bit vectors';
+
+-- Bit distance function aliases (compatibility)
+-- Drop existing function if it exists (may have been created outside extension)
+DROP FUNCTION IF EXISTS public.hamming_distance(bit, bit) CASCADE;
+CREATE FUNCTION hamming_distance(bit, bit) RETURNS integer
+    AS $$ SELECT bit_hamming_distance($1, $2); $$
+    LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
+COMMENT ON FUNCTION hamming_distance(bit, bit) IS 'Hamming distance for bit (compatibility alias)';
+
+DROP FUNCTION IF EXISTS public.jaccard_distance(bit, bit) CASCADE;
+CREATE FUNCTION jaccard_distance(bit, bit) RETURNS double precision
+    AS $$ SELECT bit_jaccard_distance($1, $2); $$
+    LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
+COMMENT ON FUNCTION jaccard_distance(bit, bit) IS 'Jaccard distance for bit (compatibility alias)';
 
 CREATE FUNCTION bit_jaccard_distance(bit, bit) RETURNS double precision
     AS 'MODULE_PATHNAME', 'bit_jaccard_distance'
@@ -7371,6 +7391,9 @@ GRANT EXECUTE ON FUNCTION vector_to_bit(vector) TO PUBLIC;
 GRANT EXECUTE ON FUNCTION bit_to_vector(bit) TO PUBLIC;
 GRANT EXECUTE ON FUNCTION binary_quantize(vector) TO PUBLIC;
 GRANT EXECUTE ON FUNCTION bit_hamming_distance(bit, bit) TO PUBLIC;
+GRANT EXECUTE ON FUNCTION hamming_distance(bit, bit) TO PUBLIC;
+GRANT EXECUTE ON FUNCTION jaccard_distance(bit, bit) TO PUBLIC;
+GRANT EXECUTE ON FUNCTION hamming_distance(bit, bit) TO PUBLIC;
 
 -- Grant permissions for halfvec distance functions
 GRANT EXECUTE ON FUNCTION halfvec_l2_distance(halfvec, halfvec) TO PUBLIC;

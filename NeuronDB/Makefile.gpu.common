@@ -32,7 +32,14 @@ GPU_COMMON_SOURCES = \
 	src/gpu/common/ml_gpu_context.c \
 	src/gpu/common/ml_gpu_support.c
 
+# Always compile GPU backend stubs (even when GPU_BACKENDS=none)
+# This ensures stub functions are available for CPU-only builds
+GPU_STUB_SOURCES = \
+	src/gpu/cuda/gpu_backend_cuda.c \
+	src/gpu/rocm/gpu_backend_rocm.c
+
 GPU_COMMON_OBJS = $(GPU_COMMON_SOURCES:.c=.o)
+GPU_STUB_OBJS = $(GPU_STUB_SOURCES:.c=.o)
 
 # Add GPU common objects to main OBJS if any GPU backend is enabled (only once)
 ifneq ($(GPU_BACKENDS),none)
@@ -42,6 +49,13 @@ GPU_COMMON_ADDED := 1
 	PG_CPPFLAGS += $(GPU_CPPFLAGS)
 	SHLIB_LINK += $(GPU_LDFLAGS) $(GPU_LIBS)
 endif
+endif
+
+# Always add GPU stub objects (for CPU-only builds)
+# These provide stub implementations when GPU backends are disabled
+ifndef GPU_STUB_ADDED
+GPU_STUB_ADDED := 1
+	OBJS += $(GPU_STUB_OBJS)
 endif
 
 # GPU backend-specific targets (only define once)

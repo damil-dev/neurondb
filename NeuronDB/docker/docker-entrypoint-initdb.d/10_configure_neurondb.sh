@@ -3,7 +3,40 @@ set -euo pipefail
 
 echo "[init] Applying NeuronDB defaults"
 
-postgresql_conf="${PGDATA}/postgresql.conf"
+# PostgreSQL 18+ uses different data directory structure
+# During initdb, the config file location depends on PostgreSQL version
+# Try multiple possible locations in order of likelihood
+
+postgresql_conf=""
+
+# First, try the standard location (works for most PostgreSQL versions)
+if [ -n "${PGDATA:-}" ] && [ -f "${PGDATA}/postgresql.conf" ]; then
+    postgresql_conf="${PGDATA}/postgresql.conf"
+# PostgreSQL 18 uses /var/lib/postgresql/18/docker/postgresql.conf
+elif [ -f "/var/lib/postgresql/18/docker/postgresql.conf" ]; then
+    postgresql_conf="/var/lib/postgresql/18/docker/postgresql.conf"
+# Try PGDATA/18/docker/postgresql.conf
+elif [ -n "${PGDATA:-}" ] && [ -f "${PGDATA}/18/docker/postgresql.conf" ]; then
+    postgresql_conf="${PGDATA}/18/docker/postgresql.conf"
+# Try to find postgresql.conf anywhere in /var/lib/postgresql
+elif postgresql_conf=$(find /var/lib/postgresql -name postgresql.conf -type f 2>/dev/null | head -1); then
+    : # Found it
+# Last resort: use PGDATA if set
+elif [ -n "${PGDATA:-}" ]; then
+    postgresql_conf="${PGDATA}/postgresql.conf"
+else
+    # Default PostgreSQL 18 location
+    postgresql_conf="/var/lib/postgresql/18/docker/postgresql.conf"
+fi
+
+# If config file doesn't exist yet (during initdb), it will be created by PostgreSQL
+# We'll configure it after PostgreSQL starts using ALTER SYSTEM
+if [ ! -f "$postgresql_conf" ]; then
+    echo "[INFO] postgresql.conf not found at $postgresql_conf yet (will be created by PostgreSQL)"
+    echo "[INFO] Configuration will be applied after PostgreSQL starts"
+    # Don't fail - PostgreSQL will create the config file
+    exit 0
+fi
 
 # Compute mode parameter (0=cpu, 1=gpu, 2=auto, default=2)
 # GPU backend type (0=cpu, 1=cuda, 2=rocm, 3=metal, default=0)

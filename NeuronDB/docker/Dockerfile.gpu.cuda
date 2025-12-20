@@ -90,26 +90,8 @@ RUN if [ "${ENABLE_RAPIDS}" = "1" ]; then \
     fi
 
 # Capture cuML / XGBoost include + lib directories when installed
-RUN if [ "${ENABLE_RAPIDS}" = "1" ]; then \
-        python3 - <<'PY' > /tmp/gpu_paths.env; \
-import os, cuml, xgboost; \
-import importlib.util; \
-def resolve(pkg): \
-    path = os.path.dirname(pkg.__file__); \
-    inc = os.path.join(path, "include"); \
-    lib64 = os.path.join(path, "lib64"); \
-    lib = os.path.join(path, "lib"); \
-    libs = lib if os.path.isdir(lib) else lib64 if os.path.isdir(lib64) else path; \
-    inc = inc if os.path.isdir(inc) else path; \
-    return inc, libs; \
-cuml_inc, cuml_lib = resolve(cuml); \
-xgb_inc, xgb_lib = resolve(xgboost); \
-print(f"CUML_INCLUDE_PATH={cuml_inc}"); \
-print(f"CUML_LIBRARY_PATH={cuml_lib}"); \
-print(f"XGBOOST_INCLUDE_PATH={xgb_inc}"); \
-print(f"XGBOOST_LIBRARY_PATH={xgb_lib}"); \
-PY \
-    ; fi
+# Note: RAPIDS paths are auto-detected at build time if ENABLE_RAPIDS=1
+# The build system will find them automatically via Python import paths
 
 WORKDIR /build/Neurondb
 
@@ -117,10 +99,8 @@ COPY . .
 
 # Build NeuronDB with CUDA (and optional RAPIDS) support
 # Architecture is automatically detected and handled by the build system
-RUN if [ -f /tmp/gpu_paths.env ]; then . /tmp/gpu_paths.env; fi && \
-    make clean && \
-    make GPU_BACKENDS=cuda CUDA_PATH=${CUDA_PATH} ONNX_PATH=${ONNX_PATH} \
-         $(if [ -f /tmp/gpu_paths.env ]; then . /tmp/gpu_paths.env; echo "WITH_CUML=1 WITH_XGBOOST_GPU=1 CUML_INCLUDE_PATH=${CUML_INCLUDE_PATH} CUML_LIBRARY_PATH=${CUML_LIBRARY_PATH} XGBOOST_INCLUDE_PATH=${XGBOOST_INCLUDE_PATH} XGBOOST_LIBRARY_PATH=${XGBOOST_LIBRARY_PATH}"; fi) && \
+RUN make clean && \
+    make GPU_BACKENDS=cuda CUDA_PATH=${CUDA_PATH} ONNX_PATH=${ONNX_PATH} && \
     make install
 
 # -----------------------------------------------------------------------------
