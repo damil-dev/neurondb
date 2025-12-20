@@ -1705,6 +1705,14 @@ hnswExtractVectorData(Datum value, Oid typeOid, int *out_dim, MemoryContext ctx)
 						 errmsg("hnsw: invalid bit vector length %d", nbits)));
 			}
 			bit_data = VARBITS(bit_vec);
+			if (bit_data == NULL)
+			{
+				if (needsFree)
+					nfree(bit_vec);
+				ereport(ERROR,
+						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+						 errmsg("hnsw: bit vector data is NULL")));
+			}
 			*out_dim = nbits;
 			NDB_CHECK_ALLOC_SIZE((size_t) nbits * sizeof(float4), "bit vector data");
 			nalloc(result, float4, nbits);
