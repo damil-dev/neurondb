@@ -147,6 +147,11 @@ evaluate_lightgbm_by_model_id(PG_FUNCTION_ARGS)
 	MemoryContext oldcontext;
 	bool		is_classification = false;
 	Oid			label_type_oid = InvalidOid;
+	Oid			feat_type_oid = InvalidOid;
+	bool		feat_is_array = false;
+	NdbSpiSession *spi_session = NULL;
+	HeapTuple	tuple;
+	TupleDesc	tupdesc;
 	/* Classification metrics */
 	int			tp = 0, tn = 0, fp = 0, fn = 0;
 	double		accuracy = 0.0;
@@ -183,8 +188,6 @@ evaluate_lightgbm_by_model_id(PG_FUNCTION_ARGS)
 	oldcontext = CurrentMemoryContext;
 
 	/* Connect to SPI */
-	NdbSpiSession *spi_session = NULL;
-
 	NDB_SPI_SESSION_BEGIN(spi_session, oldcontext);
 
 	/* Build query */
@@ -193,7 +196,7 @@ evaluate_lightgbm_by_model_id(PG_FUNCTION_ARGS)
 					 "SELECT %s, %s FROM %s WHERE %s IS NOT NULL AND %s IS NOT NULL",
 					 feat_str, targ_str, tbl_str, feat_str, targ_str);
 
-		ret = ndb_spi_execute(spi_session, query.data, true, 0);
+	ret = ndb_spi_execute(spi_session, query.data, true, 0);
 	if (ret != SPI_OK_SELECT)
 	{
 		ndb_spi_stringinfo_free(spi_session, &query);
@@ -233,21 +236,22 @@ evaluate_lightgbm_by_model_id(PG_FUNCTION_ARGS)
 
 	for (i = 0; i < nvec; i++)
 	{
+		Datum		targ_datum;
+		bool		targ_null;
+
 		/* Safe access to SPI_tuptable - validate before access */
 		if (SPI_tuptable == NULL || SPI_tuptable->vals == NULL ||
 			i >= SPI_processed || SPI_tuptable->vals[i] == NULL)
 		{
 			continue;
 		}
-		HeapTuple	tuple = SPI_tuptable->vals[i];
-		TupleDesc	tupdesc = SPI_tuptable->tupdesc;
+		tuple = SPI_tuptable->vals[i];
+		tupdesc = SPI_tuptable->tupdesc;
 
 		if (tupdesc == NULL)
 		{
 			continue;
 		}
-		Datum		targ_datum;
-		bool		targ_null;
 
 		/* Safe access for target - validate tupdesc has at least 2 columns */
 		if (tupdesc->natts < 2)
@@ -262,9 +266,6 @@ evaluate_lightgbm_by_model_id(PG_FUNCTION_ARGS)
 		y_mean /= nvec;
 
 	/* Determine feature type from first row */
-	Oid			feat_type_oid = InvalidOid;
-	bool		feat_is_array = false;
-
 	if (SPI_tuptable != NULL && SPI_tuptable->tupdesc != NULL)
 	{
 		feat_type_oid = SPI_gettypeid(SPI_tuptable->tupdesc, 1);
@@ -275,8 +276,6 @@ evaluate_lightgbm_by_model_id(PG_FUNCTION_ARGS)
 	/* Second pass: compute predictions and metrics */
 	for (i = 0; i < nvec; i++)
 	{
-		HeapTuple	tuple = SPI_tuptable->vals[i];
-		TupleDesc	tupdesc = SPI_tuptable->tupdesc;
 		Datum		feat_datum;
 		Datum		targ_datum;
 		bool		feat_null;
@@ -286,6 +285,20 @@ evaluate_lightgbm_by_model_id(PG_FUNCTION_ARGS)
 		double		y_pred;
 		int			actual_dim;
 		int			j;
+		int			y_true_int = 0;
+		double		y_true_float = 0.0;
+
+		if (SPI_tuptable == NULL || SPI_tuptable->vals == NULL ||
+			i >= SPI_processed || SPI_tuptable->vals[i] == NULL)
+		{
+			continue;
+		}
+		tuple = SPI_tuptable->vals[i];
+		if (SPI_tuptable->tupdesc == NULL)
+		{
+			continue;
+		}
+		tupdesc = SPI_tuptable->tupdesc;
 
 		feat_datum = SPI_getbinval(tuple, tupdesc, 1, &feat_null);
 		targ_datum = SPI_getbinval(tuple, tupdesc, 2, &targ_null);
@@ -294,8 +307,6 @@ evaluate_lightgbm_by_model_id(PG_FUNCTION_ARGS)
 			continue;
 
 		/* Handle both integer and float label types */
-		int			y_true_int = 0;
-		double		y_true_float = 0.0;
 		
 		if (is_classification)
 		{

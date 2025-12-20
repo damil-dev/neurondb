@@ -1577,7 +1577,6 @@ predict_neural_network(PG_FUNCTION_ARGS)
 	bytea *model_data = NULL;
 	Jsonb *parameters = NULL;
 	Jsonb *metrics = NULL;
-	MemoryContext oldcontext;
 	NeuralNetwork *net = NULL;
 
 	float *input_features = NULL;
@@ -1604,9 +1603,6 @@ predict_neural_network(PG_FUNCTION_ARGS)
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("predict_neural_network: invalid feature dimension %d",
 						features->dim)));
-
-	/* Save current memory context */
-	oldcontext = CurrentMemoryContext;
 
 	/* Load model from catalog - ml_catalog_fetch_model_payload allocates in caller's context */
 	if (!ml_catalog_fetch_model_payload(model_id, &model_data,
@@ -2176,7 +2172,7 @@ neural_network_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **e
 		JsonbValue	jkey;
 		JsonbValue	jval;
 		JsonbValue *final_value = NULL;
-		MemoryContext oldcontext = CurrentMemoryContext;
+		MemoryContext oldcontext_jsonb = CurrentMemoryContext;
 		Numeric		n_inputs_num, n_outputs_num, n_hidden_num, learning_rate_num, epochs_num, final_loss_num, n_samples_num;
 		
 		/* Switch to TopMemoryContext for JSONB construction */
@@ -2279,7 +2275,7 @@ neural_network_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **e
 			final_value = pushJsonbValue(&state, WJB_END_OBJECT, NULL);
 			if (final_value == NULL)
 			{
-				MemoryContextSwitchTo(oldcontext);
+				MemoryContextSwitchTo(oldcontext_jsonb);
 				ereport(ERROR,
 						(errcode(ERRCODE_INTERNAL_ERROR),
 						 errmsg("neurondb: neural_network_gpu_train: pushJsonbValue(WJB_END_OBJECT) returned NULL")));
@@ -2289,16 +2285,13 @@ neural_network_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **e
 		}
 		PG_CATCH();
 		{
-			MemoryContextSwitchTo(oldcontext);
+			MemoryContextSwitchTo(oldcontext_jsonb);
 			PG_RE_THROW();
 		}
 		PG_END_TRY();
 		
-		MemoryContextSwitchTo(oldcontext);
+		MemoryContextSwitchTo(oldcontext_jsonb);
 	}
-
-	/* Switch back to original context after JSONB construction */
-	MemoryContextSwitchTo(oldcontext);
 
 	nalloc(state, NeuralNetworkGpuModelState, 1);
 	state->model_blob = model_data;

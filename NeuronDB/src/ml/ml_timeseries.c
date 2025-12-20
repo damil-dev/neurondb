@@ -2002,7 +2002,7 @@ timeseries_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errst
 	{
 		JsonbParseState *state = NULL;
 		JsonbValue	k;
-		JsonbValue	v;
+		JsonbValue	jval;
 		MemoryContext oldcontext = NULL;
 		char		p_str[32], d_str[32], q_str[32], intercept_str[32], nvec_str[32];
 
@@ -2016,20 +2016,20 @@ timeseries_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errst
 		k.val.string.len = strlen("storage");
 		k.val.string.val = "storage";
 		(void) pushJsonbValue(&state, WJB_KEY, &k);
-		v.type = jbvString;
-		v.val.string.len = strlen("gpu");
-		v.val.string.val = "gpu";
-		(void) pushJsonbValue(&state, WJB_VALUE, &v);
+		jval.type = jbvString;
+		jval.val.string.len = strlen("gpu");
+		jval.val.string.val = "gpu";
+		(void) pushJsonbValue(&state, WJB_VALUE, &jval);
 
 		/* Add "training_backend": "1" (as string to avoid DirectFunctionCall) */
 		k.type = jbvString;
 		k.val.string.len = strlen("training_backend");
 		k.val.string.val = "training_backend";
 		(void) pushJsonbValue(&state, WJB_KEY, &k);
-		v.type = jbvString;
-		v.val.string.len = 1;
-		v.val.string.val = "1";
-		(void) pushJsonbValue(&state, WJB_VALUE, &v);
+		jval.type = jbvString;
+		jval.val.string.len = 1;
+		jval.val.string.val = "1";
+		(void) pushJsonbValue(&state, WJB_VALUE, &jval);
 
 		/* Add "p": p (as string) */
 		k.type = jbvString;
@@ -2037,10 +2037,10 @@ timeseries_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errst
 		k.val.string.val = "p";
 		(void) pushJsonbValue(&state, WJB_KEY, &k);
 		snprintf(p_str, sizeof(p_str), "%d", p);
-		v.type = jbvString;
-		v.val.string.len = strlen(p_str);
-		v.val.string.val = p_str;
-		(void) pushJsonbValue(&state, WJB_VALUE, &v);
+		jval.type = jbvString;
+		jval.val.string.len = strlen(p_str);
+		jval.val.string.val = p_str;
+		(void) pushJsonbValue(&state, WJB_VALUE, &jval);
 
 		/* Add "d": d (as string) */
 		k.type = jbvString;
@@ -2048,10 +2048,10 @@ timeseries_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errst
 		k.val.string.val = "d";
 		(void) pushJsonbValue(&state, WJB_KEY, &k);
 		snprintf(d_str, sizeof(d_str), "%d", d);
-		v.type = jbvString;
-		v.val.string.len = strlen(d_str);
-		v.val.string.val = d_str;
-		(void) pushJsonbValue(&state, WJB_VALUE, &v);
+		jval.type = jbvString;
+		jval.val.string.len = strlen(d_str);
+		jval.val.string.val = d_str;
+		(void) pushJsonbValue(&state, WJB_VALUE, &jval);
 
 		/* Add "q": q (as string) */
 		k.type = jbvString;
@@ -2059,10 +2059,10 @@ timeseries_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errst
 		k.val.string.val = "q";
 		(void) pushJsonbValue(&state, WJB_KEY, &k);
 		snprintf(q_str, sizeof(q_str), "%d", q);
-		v.type = jbvString;
-		v.val.string.len = strlen(q_str);
-		v.val.string.val = q_str;
-		(void) pushJsonbValue(&state, WJB_VALUE, &v);
+		jval.type = jbvString;
+		jval.val.string.len = strlen(q_str);
+		jval.val.string.val = q_str;
+		(void) pushJsonbValue(&state, WJB_VALUE, &jval);
 
 		/* Add "intercept": intercept (as string) */
 		k.type = jbvString;
@@ -2070,20 +2070,20 @@ timeseries_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errst
 		k.val.string.val = "intercept";
 		(void) pushJsonbValue(&state, WJB_KEY, &k);
 		snprintf(intercept_str, sizeof(intercept_str), "%.6f", intercept);
-		v.type = jbvString;
-		v.val.string.len = strlen(intercept_str);
-		v.val.string.val = intercept_str;
-		(void) pushJsonbValue(&state, WJB_VALUE, &v);
+		jval.type = jbvString;
+		jval.val.string.len = strlen(intercept_str);
+		jval.val.string.val = intercept_str;
+		(void) pushJsonbValue(&state, WJB_VALUE, &jval);
 
 		/* Add "model_type": model_type */
 		k.type = jbvString;
 		k.val.string.len = strlen("model_type");
 		k.val.string.val = "model_type";
 		(void) pushJsonbValue(&state, WJB_KEY, &k);
-		v.type = jbvString;
-		v.val.string.len = strlen(model_type);
-		v.val.string.val = model_type;
-		(void) pushJsonbValue(&state, WJB_VALUE, &v);
+		jval.type = jbvString;
+		jval.val.string.len = strlen(model_type);
+		jval.val.string.val = model_type;
+		(void) pushJsonbValue(&state, WJB_VALUE, &jval);
 
 		/* Add "n_samples": nvec (as string) */
 		k.type = jbvString;
@@ -2091,10 +2091,10 @@ timeseries_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errst
 		k.val.string.val = "n_samples";
 		(void) pushJsonbValue(&state, WJB_KEY, &k);
 		snprintf(nvec_str, sizeof(nvec_str), "%d", nvec);
-		v.type = jbvString;
-		v.val.string.len = strlen(nvec_str);
-		v.val.string.val = nvec_str;
-		(void) pushJsonbValue(&state, WJB_VALUE, &v);
+		jval.type = jbvString;
+		jval.val.string.len = strlen(nvec_str);
+		jval.val.string.val = nvec_str;
+		(void) pushJsonbValue(&state, WJB_VALUE, &jval);
 
 		{
 			JsonbValue *final_value = pushJsonbValue(&state, WJB_END_OBJECT, NULL);
