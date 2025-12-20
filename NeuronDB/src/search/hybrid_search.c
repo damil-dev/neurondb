@@ -108,18 +108,32 @@ hybrid_search(PG_FUNCTION_ARGS)
 		int			i;
 		int			proc;
 		NdbSpiSession *session = NULL;
+		text *query_type = NULL;
+		char *qtype_str = NULL;
+		const char *query_func = NULL;
 
 		/* Validate argument count */
-		if (PG_NARGS() != 6)
+		if (PG_NARGS() < 6 || PG_NARGS() > 7)
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-					 errmsg("neurondb: hybrid_search requires 6 arguments")));
+					 errmsg("neurondb: hybrid_search requires 6-7 arguments")));
 
 		table_name = PG_GETARG_TEXT_PP(0);
 		query_text = PG_GETARG_TEXT_PP(2);
 		filters = PG_GETARG_TEXT_PP(3);
 		vector_weight = PG_GETARG_FLOAT8(4);
 		limit = PG_GETARG_INT32(5);
+		
+		/* Optional 7th parameter: query_type for FTS */
+		if (PG_NARGS() >= 7 && !PG_ARGISNULL(6))
+		{
+			query_type = PG_GETARG_TEXT_PP(6);
+			qtype_str = text_to_cstring(query_type);
+		}
+		else
+		{
+			qtype_str = pstrdup("plain");  /* Default to plainto_tsquery */
+		}
 
 		if (PG_ARGISNULL(1))
 			ereport(ERROR,
@@ -177,6 +191,7 @@ hybrid_search(PG_FUNCTION_ARGS)
 				nfree(tbl_str);
 				nfree(txt_str);
 				nfree(filter_str);
+				nfree(qtype_str);
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 						 errmsg("hybrid_search: non-finite value in vector at index %d", i)));
@@ -185,13 +200,21 @@ hybrid_search(PG_FUNCTION_ARGS)
 		}
 		appendStringInfoChar(&vec_lit, '}');
 
+		/* Determine query function based on query_type */
+		query_func = "plainto_tsquery";
+		if (strcmp(qtype_str, "to") == 0 || strcmp(qtype_str, "to_tsquery") == 0)
+			query_func = "to_tsquery";
+		else if (strcmp(qtype_str, "phrase") == 0 || strcmp(qtype_str, "phraseto_tsquery") == 0)
+			query_func = "phraseto_tsquery";
+		/* else default to plainto_tsquery */
+
 		initStringInfo(&sql);
 
 		appendStringInfo(&sql,
 						 "WITH _hybrid_scores AS ("
 						 " SELECT id,"
 						 "        (1 - (embedding <-> '%s'::vector)) AS vector_score,"
-						 "        ts_rank(fts_vector, plainto_tsquery(%s)) AS fts_score,"
+						 "        ts_rank(fts_vector, %s(%s)) AS fts_score,"
 						 "        metadata "
 						 "   FROM %s "
 						 "  WHERE metadata @> %s "
@@ -204,6 +227,7 @@ hybrid_search(PG_FUNCTION_ARGS)
 						 " ORDER BY hybrid_score DESC "
 						 " LIMIT %d;",
 						 vec_lit.data,
+						 query_func,
 						 to_sql_literal(txt_str),
 						 tbl_str,
 						 to_sql_literal(filter_str),
@@ -304,6 +328,7 @@ hybrid_search(PG_FUNCTION_ARGS)
 		nfree(tbl_str);
 		nfree(txt_str);
 		nfree(filter_str);
+		nfree(qtype_str);
 		ndb_spi_session_end(&session);
 		MemoryContextSwitchTo(oldcontext);
 	}
@@ -1309,4 +1334,222 @@ diverse_vector_search(PG_FUNCTION_ARGS)
 	nfree(tbl_str);
 	ndb_spi_session_end(&session);
 	PG_RETURN_ARRAYTYPE_P(ret_array);
+}
+
+typedef struct FullTextSearchState
+{
+	int			num_results;
+	int			current_idx;
+	int64	   *ids;
+	float4	   *scores;
+}			FullTextSearchState;
+
+PG_FUNCTION_INFO_V1(full_text_search);
+Datum
+full_text_search(PG_FUNCTION_ARGS)
+{
+	FuncCallContext *funcctx = NULL;
+	FullTextSearchState *state = NULL;
+
+	if (SRF_IS_FIRSTCALL())
+	{
+		MemoryContext oldcontext;
+		TupleDesc	tupdesc;
+		text	   *table_name = NULL;
+		text	   *query_text = NULL;
+		text	   *text_column = NULL;
+		text	   *query_type = NULL;
+		text	   *filters = NULL;
+		int32		limit;
+
+		char	   *tbl_str = NULL;
+		char	   *txt_str = NULL;
+		char	   *col_str = NULL;
+		char	   *qtype_str = NULL;
+		char	   *filter_str = NULL;
+		StringInfoData sql;
+		int			spi_ret;
+		int			proc;
+		NdbSpiSession *session = NULL;
+		const char *query_func = NULL;
+
+		/* Validate argument count */
+		if (PG_NARGS() < 3 || PG_NARGS() > 6)
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					 errmsg("neurondb: full_text_search requires 3-6 arguments")));
+
+		table_name = PG_GETARG_TEXT_PP(0);
+		query_text = PG_GETARG_TEXT_PP(1);
+		text_column = PG_ARGISNULL(2) ? NULL : PG_GETARG_TEXT_PP(2);
+		query_type = PG_ARGISNULL(3) ? NULL : PG_GETARG_TEXT_PP(3);
+		filters = PG_ARGISNULL(4) ? NULL : PG_GETARG_TEXT_PP(4);
+		limit = PG_ARGISNULL(5) ? 10 : PG_GETARG_INT32(5);
+
+		if (limit <= 0 || limit > 10000)
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					 errmsg("full_text_search: limit must be between 1 and 10000")));
+
+		tbl_str = text_to_cstring(table_name);
+		txt_str = text_to_cstring(query_text);
+		col_str = text_column ? text_to_cstring(text_column) : pstrdup("fts_vector");
+		qtype_str = query_type ? text_to_cstring(query_type) : pstrdup("plain");
+		filter_str = filters ? text_to_cstring(filters) : pstrdup("{}");
+
+		session = ndb_spi_session_begin(CurrentMemoryContext, false);
+		if (session == NULL)
+			ereport(ERROR, (errmsg("full_text_search: failed to begin SPI session")));
+
+		initStringInfo(&sql);
+
+		/* Determine query function based on query_type */
+		query_func = "plainto_tsquery";
+		if (strcmp(qtype_str, "to") == 0 || strcmp(qtype_str, "to_tsquery") == 0)
+			query_func = "to_tsquery";
+		else if (strcmp(qtype_str, "phrase") == 0 || strcmp(qtype_str, "phraseto_tsquery") == 0)
+			query_func = "phraseto_tsquery";
+		/* else default to plainto_tsquery */
+
+		appendStringInfo(&sql,
+						 "SELECT id, ts_rank(%s, %s(%s)) AS score "
+						 "  FROM %s "
+						 " WHERE %s @@ %s(%s) ",
+						 col_str,
+						 query_func,
+						 to_sql_literal(txt_str),
+						 tbl_str,
+						 col_str,
+						 query_func,
+						 to_sql_literal(txt_str));
+
+		/* Add metadata filters if provided */
+		if (strcmp(filter_str, "{}") != 0)
+		{
+			appendStringInfo(&sql, " AND metadata @> %s ", to_sql_literal(filter_str));
+		}
+
+		appendStringInfo(&sql,
+						 " ORDER BY score DESC "
+						 " LIMIT %d;",
+						 limit);
+
+		spi_ret = ndb_spi_execute(session, sql.data, true, limit);
+		if (spi_ret != SPI_OK_SELECT)
+		{
+			nfree(sql.data);
+			ndb_spi_session_end(&session);
+			nfree(tbl_str);
+			nfree(txt_str);
+			nfree(col_str);
+			nfree(qtype_str);
+			nfree(filter_str);
+			ereport(ERROR, (errmsg("Failed to execute full_text_search SQL")));
+		}
+
+		proc = SPI_processed;
+
+		/* Initialize SRF context */
+		funcctx = SRF_FIRSTCALL_INIT();
+		oldcontext = MemoryContextSwitchTo(funcctx->multi_call_memory_ctx);
+
+		/* Allocate state */
+		nalloc(state, FullTextSearchState, 1);
+		NDB_CHECK_ALLOC(state, "state");
+
+		if (get_call_result_type(fcinfo, NULL, &tupdesc) != TYPEFUNC_COMPOSITE)
+			ereport(ERROR,
+					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+					 errmsg("function returning record called in context that cannot accept type record")));
+		funcctx->tuple_desc = BlessTupleDesc(tupdesc);
+
+		if (proc == 0)
+		{
+			state->num_results = 0;
+			state->ids = NULL;
+			state->scores = NULL;
+		}
+		else
+		{
+			int64 *ids = NULL;
+			float4 *scores = NULL;
+
+			state->num_results = proc;
+			NBP_ALLOC(ids, int64, proc);
+			NDB_CHECK_ALLOC(ids, "state->ids");
+			NBP_ALLOC(scores, float4, proc);
+			NDB_CHECK_ALLOC(scores, "state->scores");
+			state->ids = ids;
+			state->scores = scores;
+
+			for (int i = 0; i < proc; i++)
+			{
+				bool		isnull_id,
+							isnull_score;
+				Datum		id_val,
+							score_val;
+
+				id_val = SPI_getbinval(SPI_tuptable->vals[i],
+									   SPI_tuptable->tupdesc,
+									   1,
+									   &isnull_id);
+
+				score_val = SPI_getbinval(SPI_tuptable->vals[i],
+										  SPI_tuptable->tupdesc,
+										  2,
+										  &isnull_score);
+
+				if (!isnull_id)
+				{
+					Oid			id_type = SPI_gettypeid(SPI_tuptable->tupdesc, 1);
+
+					if (id_type == INT8OID)
+						state->ids[i] = DatumGetInt64(id_val);
+					else if (id_type == INT4OID)
+						state->ids[i] = (int64) DatumGetInt32(id_val);
+					else
+						state->ids[i] = 0;
+				}
+				else
+					state->ids[i] = 0;
+
+				if (!isnull_score)
+					state->scores[i] = DatumGetFloat4(score_val);
+				else
+					state->scores[i] = 0.0f;
+			}
+		}
+
+		funcctx->user_fctx = state;
+		funcctx->max_calls = proc;
+
+		nfree(sql.data);
+		nfree(tbl_str);
+		nfree(txt_str);
+		nfree(col_str);
+		nfree(qtype_str);
+		nfree(filter_str);
+		ndb_spi_session_end(&session);
+		MemoryContextSwitchTo(oldcontext);
+	}
+
+	funcctx = SRF_PERCALL_SETUP();
+	state = (FullTextSearchState *) funcctx->user_fctx;
+
+	if (funcctx->call_cntr < funcctx->max_calls)
+	{
+		Datum		values[2];
+		bool		nulls[2] = {false, false};
+		HeapTuple	tuple;
+
+		values[0] = Int64GetDatum(state->ids[funcctx->call_cntr]);
+		values[1] = Float4GetDatum(state->scores[funcctx->call_cntr]);
+
+		tuple = heap_form_tuple(funcctx->tuple_desc, values, nulls);
+		SRF_RETURN_NEXT(funcctx, HeapTupleGetDatum(tuple));
+	}
+	else
+	{
+		SRF_RETURN_DONE(funcctx);
+	}
 }

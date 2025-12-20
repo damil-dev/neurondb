@@ -1,4 +1,5 @@
 #include "postgres.h"
+#include "neurondb_macros.h"
 
 #include "utils/builtins.h"
 #include <ctype.h>
@@ -234,6 +235,7 @@ ndb_llm_route_complete(const NdbLLMConfig *cfg,
 					return NDB_LLM_ROUTE_ERROR;
 				}
 
+#ifdef HAVE_ONNX_RUNTIME
 				token_ids = neurondb_tokenize_with_model(prompt,
 														 2048,
 														 &token_length,
@@ -245,6 +247,9 @@ ndb_llm_route_complete(const NdbLLMConfig *cfg,
 						0;
 				if (token_ids)
 					nfree(token_ids);
+#else
+				out->tokens_in = 0;
+#endif
 
 #ifdef HAVE_ONNX_RUNTIME
 				PG_TRY();

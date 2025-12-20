@@ -57,6 +57,7 @@
 void
 neurondb_gpu_register_cuda_backend(void)
 {
+	/* No-op for CPU-only builds */
 }
 
 #endif							/* NDB_GPU_CUDA */

@@ -28,6 +28,7 @@
 
 #include "neurondb_onnx.h"
 #include "neurondb_gpu_backend.h"
+
 #include "ml_gpu_registry.h"
 #include "neurondb_config.h"
 #include "neurondb_automl.h"
@@ -187,26 +188,8 @@ _PG_init(void)
 	neurondb_gpu_register_models();
 }
 
-#ifndef NDB_GPU_CUDA
-void
-neurondb_gpu_register_cuda_backend(void)
-{
-}
-#endif
-
-#ifndef NDB_GPU_ROCM
-void
-neurondb_gpu_register_rocm_backend(void)
-{
-}
-#endif
-
-#ifndef NDB_GPU_METAL
-void
-neurondb_gpu_register_metal_backend(void)
-{
-}
-#endif
+/* GPU backend registration stubs are now in src/gpu/gpu_stubs.c */
+/* This ensures they're always available, even in CPU-only builds */
 
 void
 neurondb_worker_fini(void)

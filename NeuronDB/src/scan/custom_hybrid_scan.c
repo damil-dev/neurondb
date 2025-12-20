@@ -29,6 +29,8 @@
 #include "access/heapam.h"
 #include "catalog/pg_am.h"
 #include "utils/syscache.h"
+#include "utils/snapshot.h"
+#include "storage/bufmgr.h"
 #include "commands/explain.h"
 #include "executor/executor.h"
 #include "executor/nodeCustom.h"
@@ -127,6 +129,8 @@ static void
 __attribute__((unused))
 hybrid_estimate_path_cost(PlannerInfo * root, RelOptInfo * rel, CustomPath * path)
 {
+	(void) root; /* unused */
+	(void) rel;  /* unused */
 	path->path.startup_cost = 100.0;
 	path->path.total_cost = 100.0 + (rel->tuples * 0.01);
 	path->path.rows = rel->tuples * 0.1;
@@ -173,6 +177,7 @@ create_hybrid_scan_path(PG_FUNCTION_ARGS)
 {
 	/* This function can be called to manually create hybrid scan paths */
 	/* The planner hook automatically adds paths during query planning */
+	(void) fcinfo; /* unused */
 
 	PG_RETURN_VOID();
 }
@@ -200,6 +205,8 @@ hybrid_create_scan_state(CustomScan * cscan)
 {
 	HybridScanState *state = NULL;
 
+	(void) cscan; /* unused */
+
 	state = (HybridScanState *) newNode(
 										sizeof(HybridScanState), T_CustomScanState);
 	state->css.methods = &hybrid_exec_methods;
@@ -225,6 +232,9 @@ hybrid_begin(CustomScanState * node, EState * estate, int eflags)
 	Oid			ftsIndexOid = InvalidOid;
 	int			nkeys = 0;
 	int			norderbys = 0;
+
+	(void) estate; /* unused */
+	(void) eflags; /* unused */
 
 	/* Get heap relation */
 	heapRel = node->ss.ss_currentRelation;
@@ -345,12 +355,22 @@ hybrid_begin(CustomScanState * node, EState * estate, int eflags)
 	{
 		/* Create scan keys for vector search */
 		/* For now, use empty scan keys - query vector would come from plan */
+#if PG_VERSION_NUM >= 180000
+		/* PostgreSQL 18+ includes IndexScanInstrumentation parameter */
 		state->vectorScan = index_beginscan(heapRel,
 											vectorIndexRel,
 											GetActiveSnapshot(),
-											NULL,
+											NULL, /* instrument */
 											nkeys,
 											norderbys);
+#else
+		/* PostgreSQL 16 and 17 */
+		state->vectorScan = index_beginscan(heapRel,
+											vectorIndexRel,
+											GetActiveSnapshot(),
+											nkeys,
+											norderbys);
+#endif
 		/* Set up order-by keys with query vector if available */
 		if (state->queryVector)
 		{
@@ -367,12 +387,22 @@ hybrid_begin(CustomScanState * node, EState * estate, int eflags)
 	if (OidIsValid(ftsIndexOid) && ftsIndexRel)
 	{
 		/* Create scan keys for FTS search */
+#if PG_VERSION_NUM >= 180000
+		/* PostgreSQL 18+ includes IndexScanInstrumentation parameter */
 		state->ftsScan = index_beginscan(heapRel,
 										 ftsIndexRel,
 										 GetActiveSnapshot(),
-										 NULL,
+										 NULL, /* instrument */
 										 nkeys,
 										 norderbys);
+#else
+		/* PostgreSQL 16 and 17 */
+		state->ftsScan = index_beginscan(heapRel,
+										 ftsIndexRel,
+										 GetActiveSnapshot(),
+										 nkeys,
+										 norderbys);
+#endif
 		/* Set up scan keys with FTS query if available */
 		if (state->ftsQuery)
 		{
@@ -738,6 +768,8 @@ hybrid_explain(CustomScanState * node, List * ancestors, ExplainState * es)
 {
 	HybridScanState *state = (HybridScanState *) node;
 
+	(void) ancestors; /* unused */
+
 #if PG_VERSION_NUM >= 180000
 	/* PG18 removed ExplainProperty* functions - use appendStringInfo instead */
 	if (es->format == EXPLAIN_FORMAT_TEXT)
@@ -791,6 +823,7 @@ compute_hybrid_score(float4 vectorDist, float4 ftsScore, float4 vectorWeight)
 __attribute__((unused)) static void
 merge_candidates(HybridScanState * state)
 {
+	(void) state; /* unused */
 	/* Merging is now done inline in hybrid_exec() for better performance */
 	/* This function is kept for potential future refactoring */
 }
