@@ -77,6 +77,12 @@ func NewHybridSearchTool(db *database.Database, logger *logging.Logger) *HybridS
 						"type":        "object",
 						"description": "Optional filters as JSON object",
 					},
+					"query_type": map[string]interface{}{
+						"type":        "string",
+						"enum":        []interface{}{"plain", "to", "phrase"},
+						"default":     "plain",
+						"description": "FTS query type: 'plain' (plainto_tsquery), 'to' (to_tsquery), 'phrase' (phraseto_tsquery)",
+					},
 				},
 				"required": []interface{}{"table", "query_vector", "query_text", "vector_column", "text_column"},
 			},
@@ -110,6 +116,10 @@ func (t *HybridSearchTool) Execute(ctx context.Context, params map[string]interf
 		limit = int(l)
 	}
 	filters, _ := params["filters"].(map[string]interface{})
+	queryType := "plain"
+	if qt, ok := params["query_type"].(string); ok && qt != "" {
+		queryType = qt
+	}
 
 	if table == "" {
 		return Error("table parameter is required and cannot be empty for hybrid_search tool", "VALIDATION_ERROR", map[string]interface{}{
@@ -177,11 +187,11 @@ func (t *HybridSearchTool) Execute(ctx context.Context, params map[string]interf
 		}
 	}
 
-  /* Use NeuronDB's hybrid_search function: hybrid_search(table, query_vec, query_text, filters, vector_weight, limit) */
-	query := `SELECT hybrid_search($1, $2::vector, $3, $4::text, $5, $6) AS results`
+  /* Use NeuronDB's hybrid_search function: hybrid_search(table, query_vec, query_text, filters, vector_weight, limit, query_type) */
+	query := `SELECT hybrid_search($1, $2::vector, $3, $4::text, $5, $6, $7) AS results`
 	executor := NewQueryExecutor(t.db)
 	result, err := executor.ExecuteQueryOne(ctx, query, []interface{}{
-		table, vectorStr, queryText, filtersJSON, vectorWeight, limit,
+		table, vectorStr, queryText, filtersJSON, vectorWeight, limit, queryType,
 	})
 	if err != nil {
 		t.logger.Error("Hybrid search failed", err, params)
@@ -200,6 +210,7 @@ func (t *HybridSearchTool) Execute(ctx context.Context, params map[string]interf
 	return Success(result, map[string]interface{}{
 		"table":         table,
 		"vector_weight": vectorWeight,
+		"query_type":    queryType,
 		"limit":         limit,
 	}), nil
 }

@@ -24,8 +24,9 @@ import (
 /* ClusterDataTool performs clustering on data */
 type ClusterDataTool struct {
 	*BaseTool
-	executor *QueryExecutor
-	logger   *logging.Logger
+	executor     *QueryExecutor
+	logger       *logging.Logger
+	configHelper *database.ConfigHelper
 }
 
 /* NewClusterDataTool creates a new cluster data tool */

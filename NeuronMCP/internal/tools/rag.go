@@ -24,8 +24,9 @@ import (
 /* ProcessDocumentTool processes a document for RAG */
 type ProcessDocumentTool struct {
 	*BaseTool
-	executor *QueryExecutor
-	logger   *logging.Logger
+	executor     *QueryExecutor
+	logger       *logging.Logger
+	configHelper *database.ConfigHelper
 }
 
 /* NewProcessDocumentTool creates a new process document tool */
@@ -62,8 +63,9 @@ func NewProcessDocumentTool(db *database.Database, logger *logging.Logger) *Proc
 				"required": []interface{}{"text"},
 			},
 		),
-		executor: NewQueryExecutor(db),
-		logger:   logger,
+		executor:     NewQueryExecutor(db),
+		logger:       logger,
+		configHelper: database.NewConfigHelper(db),
 	}
 }
 
@@ -165,8 +167,9 @@ func (t *ProcessDocumentTool) Execute(ctx context.Context, params map[string]int
 /* RetrieveContextTool retrieves context for RAG */
 type RetrieveContextTool struct {
 	*BaseTool
-	executor *QueryExecutor
-	logger   *logging.Logger
+	executor     *QueryExecutor
+	logger       *logging.Logger
+	configHelper *database.ConfigHelper
 }
 
 /* NewRetrieveContextTool creates a new retrieve context tool */
@@ -201,8 +204,9 @@ func NewRetrieveContextTool(db *database.Database, logger *logging.Logger) *Retr
 				"required": []interface{}{"query", "table", "vector_column"},
 			},
 		),
-		executor: NewQueryExecutor(db),
-		logger:   logger,
+		executor:     NewQueryExecutor(db),
+		logger:       logger,
+		configHelper: database.NewConfigHelper(db),
 	}
 }
 
@@ -312,8 +316,9 @@ func (t *RetrieveContextTool) Execute(ctx context.Context, params map[string]int
 /* GenerateResponseTool generates a response using RAG */
 type GenerateResponseTool struct {
 	*BaseTool
-	executor *QueryExecutor
-	logger   *logging.Logger
+	executor     *QueryExecutor
+	logger       *logging.Logger
+	configHelper *database.ConfigHelper
 }
 
 /* NewGenerateResponseTool creates a new generate response tool */
@@ -338,8 +343,9 @@ func NewGenerateResponseTool(db *database.Database, logger *logging.Logger) *Gen
 				"required": []interface{}{"query", "context"},
 			},
 		),
-		executor: NewQueryExecutor(db),
-		logger:   logger,
+		executor:     NewQueryExecutor(db),
+		logger:       logger,
+		configHelper: database.NewConfigHelper(db),
 	}
 }
 
@@ -430,8 +436,9 @@ func (t *GenerateResponseTool) Execute(ctx context.Context, params map[string]in
 /* ChunkDocumentTool chunks a document into smaller pieces */
 type ChunkDocumentTool struct {
 	*BaseTool
-	executor *QueryExecutor
-	logger   *logging.Logger
+	executor     *QueryExecutor
+	logger       *logging.Logger
+	configHelper *database.ConfigHelper
 }
 
 /* NewChunkDocumentTool creates a new chunk document tool */
@@ -463,8 +470,9 @@ func NewChunkDocumentTool(db *database.Database, logger *logging.Logger) *ChunkD
 				"required": []interface{}{"text"},
 			},
 		),
-		executor: NewQueryExecutor(db),
-		logger:   logger,
+		executor:     NewQueryExecutor(db),
+		logger:       logger,
+		configHelper: database.NewConfigHelper(db),
 	}
 }
 

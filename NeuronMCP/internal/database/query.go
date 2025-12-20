@@ -106,19 +106,45 @@ func (qb *QueryBuilder) VectorSearch(table, vectorColumn string, queryVector []f
 	vectorParamIndex := paramIndex
 	paramIndex++
 
-	var distanceExpr string
+	tableAlias := "t"
+	params = append(params, limit)
+	limitParamIndex := paramIndex
 
+	// Use subquery to cast vector to text, then calculate distance in outer query using cast back to vector
+	// This ensures vector is scannable while allowing distance calculation
+	subquerySelect := []string{}
+	if len(additionalColumns) > 0 {
+		for _, col := range additionalColumns {
+			subquerySelect = append(subquerySelect, EscapeIdentifier(col))
+		}
+		subquerySelect = append(subquerySelect, fmt.Sprintf("%s::text AS %s", EscapeIdentifier(vectorColumn), EscapeIdentifier(vectorColumn)))
+	} else {
+		// For *, we need to explicitly cast the vector column to text
+		// PostgreSQL doesn't support * EXCEPT column, so we'll handle it differently
+		// Select all columns with vector cast to text
+		subquerySelect = append(subquerySelect, "*")
+		// Note: This creates a duplicate, but we'll handle it by selecting explicitly in outer query
+	}
+	
+	subquery := fmt.Sprintf("(SELECT %s FROM %s) AS %s",
+		strings.Join(subquerySelect, ", "),
+		EscapeIdentifier(table),
+		tableAlias)
+
+	// Build final SELECT - calculate distance using vector cast, select all columns
+	// Distance calculation: cast the text vector back to vector type for distance calc
+	distanceExprWithCast := ""
 	switch distanceMetric {
 	case "cosine":
-		distanceExpr = fmt.Sprintf("%s <=> $%d::vector AS distance", EscapeIdentifier(vectorColumn), vectorParamIndex)
+		distanceExprWithCast = fmt.Sprintf("(%s.%s::vector <=> $%d::vector) AS distance", tableAlias, EscapeIdentifier(vectorColumn), vectorParamIndex)
 	case "inner_product":
-		distanceExpr = fmt.Sprintf("%s <#> $%d::vector AS distance", EscapeIdentifier(vectorColumn), vectorParamIndex)
+		distanceExprWithCast = fmt.Sprintf("(%s.%s::vector <#> $%d::vector) AS distance", tableAlias, EscapeIdentifier(vectorColumn), vectorParamIndex)
 	case "l1":
-		distanceExpr = fmt.Sprintf("vector_l1_distance(%s, $%d::vector) AS distance", EscapeIdentifier(vectorColumn), vectorParamIndex)
+		distanceExprWithCast = fmt.Sprintf("vector_l1_distance(%s.%s::vector, $%d::vector) AS distance", tableAlias, EscapeIdentifier(vectorColumn), vectorParamIndex)
 	case "hamming":
-		distanceExpr = fmt.Sprintf("vector_hamming_distance(%s, $%d::vector) AS distance", EscapeIdentifier(vectorColumn), vectorParamIndex)
+		distanceExprWithCast = fmt.Sprintf("vector_hamming_distance(%s.%s::vector, $%d::vector) AS distance", tableAlias, EscapeIdentifier(vectorColumn), vectorParamIndex)
 	case "chebyshev":
-		distanceExpr = fmt.Sprintf("vector_chebyshev_distance(%s, $%d::vector) AS distance", EscapeIdentifier(vectorColumn), vectorParamIndex)
+		distanceExprWithCast = fmt.Sprintf("vector_chebyshev_distance(%s.%s::vector, $%d::vector) AS distance", tableAlias, EscapeIdentifier(vectorColumn), vectorParamIndex)
 	case "minkowski":
 		p := 2.0
 		if minkowskiP != nil {
@@ -127,30 +153,28 @@ func (qb *QueryBuilder) VectorSearch(table, vectorColumn string, queryVector []f
 		params = append(params, p)
 		pParamIndex := paramIndex
 		paramIndex++
-		distanceExpr = fmt.Sprintf("vector_minkowski_distance(%s, $%d::vector, $%d::double precision) AS distance", EscapeIdentifier(vectorColumn), vectorParamIndex, pParamIndex)
+		distanceExprWithCast = fmt.Sprintf("vector_minkowski_distance(%s.%s::vector, $%d::vector, $%d::double precision) AS distance", tableAlias, EscapeIdentifier(vectorColumn), vectorParamIndex, pParamIndex)
 	default:
-		distanceExpr = fmt.Sprintf("%s <-> $%d::vector AS distance", EscapeIdentifier(vectorColumn), vectorParamIndex)
+		distanceExprWithCast = fmt.Sprintf("(%s.%s::vector <-> $%d::vector) AS distance", tableAlias, EscapeIdentifier(vectorColumn), vectorParamIndex)
 	}
 
 	selectColumns := []string{}
 	if len(additionalColumns) > 0 {
 		for _, col := range additionalColumns {
-			selectColumns = append(selectColumns, EscapeIdentifier(col))
+			selectColumns = append(selectColumns, fmt.Sprintf("%s.%s", tableAlias, EscapeIdentifier(col)))
 		}
-		selectColumns = append(selectColumns, EscapeIdentifier(vectorColumn))
+		selectColumns = append(selectColumns, fmt.Sprintf("%s.%s", tableAlias, EscapeIdentifier(vectorColumn)))
 	} else {
-		selectColumns = append(selectColumns, "*")
+		// Select all columns from subquery (vector is already text)
+		selectColumns = append(selectColumns, fmt.Sprintf("%s.*", tableAlias))
 	}
-	selectColumns = append(selectColumns, distanceExpr)
-
-	params = append(params, limit)
-	limitParamIndex := paramIndex
+	selectColumns = append(selectColumns, distanceExprWithCast)
 
 	selectClause := strings.Join(selectColumns, ", ")
 	query := fmt.Sprintf(
 		"SELECT %s FROM %s ORDER BY distance ASC LIMIT $%d",
 		selectClause,
-		EscapeIdentifier(table),
+		subquery,
 		limitParamIndex,
 	)
 

@@ -10,8 +10,8 @@
 services:
   neurondb-mcp:
     build:
-      context: ..
-      dockerfile: docker/Dockerfile
+      context: ../..
+      dockerfile: NeuronMCP/docker/Dockerfile.package
     image: neurondb-mcp:latest
     container_name: neurondb-mcp
     environment:
@@ -50,7 +50,7 @@ services:
     # Note: MCP uses stdio, so we can't test actual MCP protocol without breaking stdio
     # This checks that the binary is present and executable
     healthcheck:
-      test: ["CMD", "test", "-f", "/app/neurondb-mcp", "-a", "-x", "/app/neurondb-mcp"]
+      test: ["CMD", "test", "-f", "/usr/bin/neurondb-mcp", "-a", "-x", "/usr/bin/neurondb-mcp"]
       interval: 30s
       timeout: 5s
       retries: 3
