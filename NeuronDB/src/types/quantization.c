@@ -2213,6 +2213,267 @@ halfvec_inner_product(PG_FUNCTION_ARGS)
 }
 
 /*
+ * halfvec_add: Add two halfvec vectors element-wise
+ */
+PG_FUNCTION_INFO_V1(halfvec_add);
+Datum
+halfvec_add(PG_FUNCTION_ARGS)
+{
+	VectorF16  *a = NULL;
+	VectorF16  *b = NULL;
+	VectorF16  *result = NULL;
+	int			i;
+	int			size;
+	float4		val_a, val_b, sum;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: halfvec_add requires 2 arguments")));
+
+	a = (VectorF16 *) PG_GETARG_POINTER(0);
+	b = (VectorF16 *) PG_GETARG_POINTER(1);
+
+	if (a == NULL || b == NULL)
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("cannot add NULL halfvec")));
+
+	if (a->dim != b->dim)
+		ereport(ERROR,
+				(errcode(ERRCODE_DATA_EXCEPTION),
+				 errmsg("halfvec dimensions must match: %d vs %d",
+						a->dim, b->dim)));
+
+	size = offsetof(VectorF16, data) + sizeof(uint16) * a->dim;
+	result = (VectorF16 *) palloc0(size);
+	SET_VARSIZE(result, size);
+	result->dim = a->dim;
+
+	for (i = 0; i < a->dim; i++)
+	{
+		val_a = fp16_to_float(a->data[i]);
+		val_b = fp16_to_float(b->data[i]);
+		sum = val_a + val_b;
+
+		if (isinf(sum))
+			ereport(ERROR,
+					(errcode(ERRCODE_DATA_EXCEPTION),
+					 errmsg("halfvec addition resulted in infinity at index %d", i)));
+		result->data[i] = float4_to_fp16(sum);
+	}
+
+	PG_RETURN_POINTER(result);
+}
+
+/*
+ * halfvec_sub: Subtract two halfvec vectors element-wise
+ */
+PG_FUNCTION_INFO_V1(halfvec_sub);
+Datum
+halfvec_sub(PG_FUNCTION_ARGS)
+{
+	VectorF16  *a = NULL;
+	VectorF16  *b = NULL;
+	VectorF16  *result = NULL;
+	int			i;
+	int			size;
+	float4		val_a, val_b, diff;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: halfvec_sub requires 2 arguments")));
+
+	a = (VectorF16 *) PG_GETARG_POINTER(0);
+	b = (VectorF16 *) PG_GETARG_POINTER(1);
+
+	if (a == NULL || b == NULL)
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("cannot subtract NULL halfvec")));
+
+	if (a->dim != b->dim)
+		ereport(ERROR,
+				(errcode(ERRCODE_DATA_EXCEPTION),
+				 errmsg("halfvec dimensions must match: %d vs %d",
+						a->dim, b->dim)));
+
+	size = offsetof(VectorF16, data) + sizeof(uint16) * a->dim;
+	result = (VectorF16 *) palloc0(size);
+	SET_VARSIZE(result, size);
+	result->dim = a->dim;
+
+	for (i = 0; i < a->dim; i++)
+	{
+		val_a = fp16_to_float(a->data[i]);
+		val_b = fp16_to_float(b->data[i]);
+		diff = val_a - val_b;
+
+		if (isinf(diff))
+			ereport(ERROR,
+					(errcode(ERRCODE_DATA_EXCEPTION),
+					 errmsg("halfvec subtraction resulted in infinity at index %d", i)));
+		result->data[i] = float4_to_fp16(diff);
+	}
+
+	PG_RETURN_POINTER(result);
+}
+
+/*
+ * halfvec_mul: Multiply halfvec by scalar
+ */
+PG_FUNCTION_INFO_V1(halfvec_mul);
+Datum
+halfvec_mul(PG_FUNCTION_ARGS)
+{
+	VectorF16  *v = NULL;
+	float8		scalar;
+	VectorF16  *result = NULL;
+	int			i;
+	int			size;
+	float4		val, product;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: halfvec_mul requires 2 arguments")));
+
+	v = (VectorF16 *) PG_GETARG_POINTER(0);
+	scalar = PG_GETARG_FLOAT8(1);
+
+	if (v == NULL)
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("cannot multiply NULL halfvec")));
+
+	if (isnan(scalar) || isinf(scalar))
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("scalar multiplier cannot be NaN or Infinity")));
+
+	size = offsetof(VectorF16, data) + sizeof(uint16) * v->dim;
+	result = (VectorF16 *) palloc0(size);
+	SET_VARSIZE(result, size);
+	result->dim = v->dim;
+
+	for (i = 0; i < v->dim; i++)
+	{
+		val = fp16_to_float(v->data[i]);
+		product = val * scalar;
+
+		if (isinf(product))
+			ereport(ERROR,
+					(errcode(ERRCODE_DATA_EXCEPTION),
+					 errmsg("halfvec multiplication resulted in infinity at index %d", i)));
+		result->data[i] = float4_to_fp16(product);
+	}
+
+	PG_RETURN_POINTER(result);
+}
+
+/*
+ * halfvec_div: Divide halfvec by scalar
+ */
+PG_FUNCTION_INFO_V1(halfvec_div);
+Datum
+halfvec_div(PG_FUNCTION_ARGS)
+{
+	VectorF16  *v = NULL;
+	float8		scalar;
+	VectorF16  *result = NULL;
+	int			i;
+	int			size;
+	float4		val, quotient;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: halfvec_div requires 2 arguments")));
+
+	v = (VectorF16 *) PG_GETARG_POINTER(0);
+	scalar = PG_GETARG_FLOAT8(1);
+
+	if (v == NULL)
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("cannot divide NULL halfvec")));
+
+	if (scalar == 0.0)
+		ereport(ERROR,
+				(errcode(ERRCODE_DIVISION_BY_ZERO),
+				 errmsg("division by zero")));
+
+	if (isnan(scalar) || isinf(scalar))
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("scalar divisor cannot be NaN or Infinity")));
+
+	size = offsetof(VectorF16, data) + sizeof(uint16) * v->dim;
+	result = (VectorF16 *) palloc0(size);
+	SET_VARSIZE(result, size);
+	result->dim = v->dim;
+
+	for (i = 0; i < v->dim; i++)
+	{
+		val = fp16_to_float(v->data[i]);
+		quotient = val / scalar;
+
+		if (isinf(quotient))
+			ereport(ERROR,
+					(errcode(ERRCODE_DATA_EXCEPTION),
+					 errmsg("halfvec division resulted in infinity at index %d", i)));
+		result->data[i] = float4_to_fp16(quotient);
+	}
+
+	PG_RETURN_POINTER(result);
+}
+
+/*
+ * halfvec_neg: Negate halfvec
+ */
+PG_FUNCTION_INFO_V1(halfvec_neg);
+Datum
+halfvec_neg(PG_FUNCTION_ARGS)
+{
+	VectorF16  *v = NULL;
+	VectorF16  *result = NULL;
+	int			i;
+	int			size;
+	float4		val;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 1)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: halfvec_neg requires 1 argument")));
+
+	v = (VectorF16 *) PG_GETARG_POINTER(0);
+
+	if (v == NULL)
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("cannot negate NULL halfvec")));
+
+	size = offsetof(VectorF16, data) + sizeof(uint16) * v->dim;
+	result = (VectorF16 *) palloc0(size);
+	SET_VARSIZE(result, size);
+	result->dim = v->dim;
+
+	for (i = 0; i < v->dim; i++)
+	{
+		val = fp16_to_float(v->data[i]);
+		result->data[i] = float4_to_fp16(-val);
+	}
+
+	PG_RETURN_POINTER(result);
+}
+
+/*
  * vector_to_bit: Convert vector to PostgreSQL bit type (pgvector compatibility)
  * Returns bit type instead of bytea
  */
