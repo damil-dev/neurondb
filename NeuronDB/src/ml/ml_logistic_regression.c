@@ -46,8 +46,18 @@
 #include "utils/jsonb.h"
 #include "utils/elog.h"
 #include "neurondb_guc.h"
-#ifdef NDB_GPU_CUDA
+/* Include CUDA LR header for type definitions (needed even when GPU is disabled) */
+/* We need the NdbCudaLrModelHeader type definition */
+#ifndef __CUDACC__
+#include "postgres.h"
+#include "utils/jsonb.h"
+#include "ml_logistic_regression_internal.h"
+#endif
+
+/* Include the header that defines NdbCudaLrModelHeader */
 #include "neurondb_cuda_lr.h"
+
+#ifdef NDB_GPU_CUDA
 #include "neurondb_cuda_runtime.h"
 #include <cublas_v2.h>
 extern cublasHandle_t ndb_cuda_get_cublas_handle(void);

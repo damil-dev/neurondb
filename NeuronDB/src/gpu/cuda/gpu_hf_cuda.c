@@ -3915,4 +3915,17 @@ ndb_cuda_hf_tokenize(const char *text,
 	return -1;
 }
 
+int
+ndb_cuda_hf_generate_batch(const char *model_name,
+						   const char **prompts,
+						   int num_prompts,
+						   const char *params_json,
+						   NdbCudaHfBatchResult *results,
+						   char **errstr)
+{
+	if (errstr)
+		*errstr = pstrdup("CUDA support not compiled in");
+	return -1;
+}
+
 #endif							/* NDB_GPU_CUDA */

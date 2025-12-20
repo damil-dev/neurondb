@@ -2005,7 +2005,6 @@ neural_network_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **e
 	JsonbValue	v;
 	int			r;
 	int			i;
-	MemoryContext oldcontext = CurrentMemoryContext;
 
 	if (errstr != NULL)
 		*errstr = NULL;

@@ -246,8 +246,6 @@ auto_train(PG_FUNCTION_ARGS)
 			text *target_column_text = NULL;
 			ArrayType *feature_array = NULL;
 			Jsonb *hyperparams_jsonb = NULL;
-			StringInfoData json_str = {0};
-
 
 			/* Build arguments for neurondb.train() */
 			project_name_text = cstring_to_text("default");
