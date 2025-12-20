@@ -118,7 +118,8 @@ def list_sql_files(category: str, module: Optional[str] = None) -> List[str]:
 
 	# Filter by category
 	if category == "basic":
-		# Include files from basic/ subdirectory or files without _advance/_negative
+		# Include files from basic/ subdirectory and its subdirectories (ml/, vector/, rag/, core/, gpu/, other/)
+		# or files without _advance/_negative in the root sql/ directory
 		result = []
 		for f in all_files:
 			if "/basic/" in f or (f.startswith("basic/") or os.path.dirname(f) == "basic"):
@@ -148,13 +149,41 @@ def list_sql_files(category: str, module: Optional[str] = None) -> List[str]:
 		module_lower = module.lower()
 		filtered_files = []
 		
-		# Module mapping: module name -> keywords to match in filename
+		# Directory-based module mapping for new structure (basic/ml/, basic/vector/, etc.)
+		# Also includes filename keywords for backward compatibility
+		module_dirs = {
+			"ml": ["ml"],
+			"vector": ["vector"],
+			"embedding": ["vector"],  # embeddings are in vector/ directory
+			"rag": ["rag"],
+			"hybrid": ["rag"],  # hybrid_search is in rag/ directory
+			"reranking": ["rag"],  # reranking is in rag/ directory
+			"core": ["core"],
+			"index": ["core"],  # index tests are in core/ directory
+			"worker": ["core"],  # worker tests are in core/ directory
+			"storage": ["core"],  # storage tests are in core/ directory
+			"scan": ["core"],  # scan tests are in core/ directory
+			"util": ["core"],  # util tests are in core/ directory
+			"planner": ["core"],  # planner tests are in core/ directory
+			"tenant": ["core"],  # tenant tests are in core/ directory
+			"types": ["core"],  # types tests are in core/ directory
+			"metrics": ["core"],  # metrics tests are in core/ directory
+			"gpu": ["gpu"],
+			"onnx": ["gpu"],  # onnx tests are in gpu/ directory
+			"quantization": ["vector"],  # quantization tests are in vector/ directory
+			"crash": ["other"],  # crash_prevention is in other/ directory
+			"multimodal": ["other", "vector"],  # multimodal tests can be in other/ or vector/
+			"other": ["other"],  # other/ directory contains miscellaneous tests
+			"llm": [],  # LLM tests if they exist
+		}
+		
+		# Filename keyword mapping for backward compatibility and special cases
 		module_keywords = {
 			"ml": ["linreg", "logreg", "rf", "svm", "dt", "ridge", "lasso", "nb", "knn", 
 			       "xgboost", "catboost", "lightgbm", "neural_network", "gmm", "kmeans", 
 			       "minibatch_kmeans", "hierarchical", "dbscan", "pca", "timeseries", 
 			       "automl", "recommender", "arima"],
-			"vector": ["vector", "vecmap", "sparse_vectors"],
+			"vector": ["vector", "vecmap", "sparse_vectors", "pgvector"],
 			"embedding": ["embedding", "embeddings"],
 			"rag": ["rag"],
 			"hybrid": ["hybrid_search"],
@@ -175,15 +204,55 @@ def list_sql_files(category: str, module: Optional[str] = None) -> List[str]:
 			"crash": ["crash_prevention"],
 			"multimodal": ["multimodal"],
 			"llm": ["llm"],
+			"other": [],  # "other" module should only match via directory
 		}
 		
+		target_dirs = module_dirs.get(module_lower, [])
 		keywords = module_keywords.get(module_lower, [module_lower])
 		
 		for file_path in files:
-			basename = os.path.basename(file_path).lower()
-			# Check if any keyword matches in the filename
-			if any(keyword in basename for keyword in keywords):
-				filtered_files.append(file_path)
+			# Check directory path first (for new structure)
+			file_rel_path = os.path.relpath(file_path, TESTS_SQL_DIR)
+			path_parts = file_rel_path.split(os.sep)
+			
+			# Check if file is in one of the target directories
+			dir_match = False
+			if target_dirs:
+				# Check if any part of the path is in target directories
+				for part in path_parts:
+					if part in target_dirs:
+						dir_match = True
+						break
+			
+			# If we have directory mapping, prefer directory match over keyword match
+			# This avoids false positives (e.g., "rag" matching "storage")
+			if target_dirs:
+				if dir_match:
+					filtered_files.append(file_path)
+			else:
+				# No directory mapping, use keyword matching
+				basename = os.path.basename(file_path).lower()
+				# Use word boundary matching for more precise keyword matching
+				keyword_match = False
+				for keyword in keywords:
+					# Match whole words to avoid substring false positives
+					# For example, "rag" should not match "storage"
+					if keyword in basename:
+						# Additional check: make sure it's not just a substring in the middle of another word
+						# Simple heuristic: check if it's at word boundary or start/end
+						idx = basename.find(keyword)
+						if idx >= 0:
+							# Check if it's at start, end, or has non-alphanumeric before/after
+							before_char = basename[idx - 1] if idx > 0 else '_'
+							after_idx = idx + len(keyword)
+							after_char = basename[after_idx] if after_idx < len(basename) else '_'
+							# Allow match if at boundary or surrounded by non-alphanumeric
+							if (not before_char.isalnum() or idx == 0) and (not after_char.isalnum() or after_idx >= len(basename)):
+								keyword_match = True
+								break
+				
+				if keyword_match:
+					filtered_files.append(file_path)
 		
 		return filtered_files
 	
