@@ -22,6 +22,8 @@
 #include "neurondb_cuda_runtime.h"
 #endif
 #else
+#include <stdint.h>
+typedef int32_t int32;
 struct varlena;
 typedef struct varlena bytea;
 struct Jsonb;
@@ -114,6 +116,7 @@ extern int	ndb_cuda_lr_update_weights_gpu(float *d_weights,
 
 /* Kernel launcher from gpu_lr_kernels.cu */
 #ifndef __CUDACC__
+#ifdef NDB_GPU_CUDA
 extern cudaError_t launch_lr_eval_kernel(const float *features,
 										 const double *labels,
 										 const double *weights,
@@ -127,7 +130,8 @@ extern cudaError_t launch_lr_eval_kernel(const float *features,
 										 long long *fn_out,
 										 double *log_loss_out,
 										 long long *count_out);
-#endif
+#endif /* NDB_GPU_CUDA */
+#endif /* __CUDACC__ */
 
 extern int	ndb_cuda_lr_evaluate(const bytea * model_data,
 								 const float *features,

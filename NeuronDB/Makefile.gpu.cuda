@@ -26,7 +26,8 @@ ifeq ($(CUDA_AVAILABLE),yes)
 		CUDA_OBJS = $(CUDA_SOURCES:.cu=.o)
 		
 		# CUDA C source files (.c files compiled with gcc)
-		CUDA_C_SOURCES = $(wildcard src/gpu/cuda/*.c)
+		# Exclude gpu_backend_cuda.c as it's already added via GPU_STUB_OBJS in Makefile.gpu.common
+		CUDA_C_SOURCES = $(filter-out src/gpu/cuda/gpu_backend_cuda.c,$(wildcard src/gpu/cuda/*.c))
 		CUDA_C_OBJS = $(CUDA_C_SOURCES:.c=.o)
 		
 		# CUDA compilation flags

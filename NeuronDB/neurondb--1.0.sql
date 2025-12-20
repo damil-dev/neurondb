@@ -794,11 +794,11 @@ COMMENT ON FUNCTION delete_embedding_model_config IS 'Delete stored configuratio
 -- HYBRID SEARCH
 -- ============================================================================
 
-CREATE FUNCTION hybrid_search(text, vector, text, text DEFAULT '{}', double precision DEFAULT 0.7, integer DEFAULT 10)
+CREATE FUNCTION hybrid_search(text, vector, text, text DEFAULT '{}', double precision DEFAULT 0.7, integer DEFAULT 10, text DEFAULT 'plain')
     RETURNS TABLE(id bigint, score real)
     AS 'MODULE_PATHNAME', 'hybrid_search'
     LANGUAGE C STABLE;
-COMMENT ON FUNCTION hybrid_search IS 'Hybrid search: (table, query_vec, query_text, filters, vector_weight, limit)';
+COMMENT ON FUNCTION hybrid_search IS 'Hybrid search: (table, query_vec, query_text, filters, vector_weight, limit, query_type). query_type: plain (plainto_tsquery), to (to_tsquery), phrase (phraseto_tsquery)';
 
 CREATE FUNCTION reciprocal_rank_fusion(anyarray, double precision DEFAULT 60.0) RETURNS anyarray
     AS 'MODULE_PATHNAME', 'reciprocal_rank_fusion'
@@ -834,6 +834,12 @@ CREATE FUNCTION diverse_vector_search(text, vector, double precision DEFAULT 0.5
     AS 'MODULE_PATHNAME', 'diverse_vector_search'
     LANGUAGE C STABLE;
 COMMENT ON FUNCTION diverse_vector_search IS 'Diverse search (MMR): (table, query_vec, lambda, top_k)';
+
+CREATE FUNCTION full_text_search(text, text, text DEFAULT 'fts_vector', text DEFAULT 'plain', text DEFAULT '{}', integer DEFAULT 10)
+    RETURNS TABLE(id bigint, score real)
+    AS 'MODULE_PATHNAME', 'full_text_search'
+    LANGUAGE C STABLE;
+COMMENT ON FUNCTION full_text_search IS 'Full-text search (text-only, no vectors): (table, query_text, text_column, query_type, filters, limit). query_type: plain (plainto_tsquery), to (to_tsquery), phrase (phraseto_tsquery)';
 
 -- ============================================================================
 -- RERANKING
@@ -2006,7 +2012,9 @@ CREATE FUNCTION array_to_vector(real[]) RETURNS vector
 COMMENT ON FUNCTION array_to_vector IS 'Convert float array to vector';
 
 -- Overload to accept double precision[] by casting to real[]
-CREATE OR REPLACE FUNCTION array_to_vector(double precision[]) RETURNS vector
+-- Drop existing function if it exists (may have been created outside extension)
+DROP FUNCTION IF EXISTS public.array_to_vector(double precision[]) CASCADE;
+CREATE FUNCTION array_to_vector(double precision[]) RETURNS vector
 LANGUAGE sql IMMUTABLE STRICT AS $$
 	SELECT array_to_vector($1::real[]);
 $$;
@@ -2497,7 +2505,7 @@ CREATE OPERATOR - (
     RIGHTARG = halfvec,
     PROCEDURE = halfvec_neg
 );
-COMMENT ON OPERATOR -(halfvec) IS 'Halfvec negation operator';
+COMMENT ON OPERATOR -(NONE, halfvec) IS 'Halfvec negation operator';
 
 -- Comparison operators for sparsevec type
 CREATE FUNCTION sparsevec_eq(sparsevec, sparsevec) RETURNS boolean
@@ -3106,79 +3114,99 @@ COMMENT ON FUNCTION neurondb_has_opclass IS 'Check if NeurondB operator class ex
 -- These aliases provide compatible function names for easier migration
 
 -- Vector distance function aliases (compatibility)
-CREATE OR REPLACE FUNCTION l2_distance(vector, vector) RETURNS real
+-- Drop existing functions if they exist (may have been created outside extension)
+DROP FUNCTION IF EXISTS public.l2_distance(vector, vector) CASCADE;
+CREATE FUNCTION l2_distance(vector, vector) RETURNS real
     AS $$ SELECT vector_l2_distance($1, $2); $$
     LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
 COMMENT ON FUNCTION l2_distance(vector, vector) IS 'L2 (Euclidean) distance (compatibility alias)';
 
-CREATE OR REPLACE FUNCTION inner_product(vector, vector) RETURNS real
+DROP FUNCTION IF EXISTS public.inner_product(vector, vector) CASCADE;
+CREATE FUNCTION inner_product(vector, vector) RETURNS real
     AS $$ SELECT vector_inner_product($1, $2); $$
     LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
 COMMENT ON FUNCTION inner_product(vector, vector) IS 'Inner product distance (compatibility alias)';
 
-CREATE OR REPLACE FUNCTION cosine_distance(vector, vector) RETURNS real
+DROP FUNCTION IF EXISTS public.cosine_distance(vector, vector) CASCADE;
+CREATE FUNCTION cosine_distance(vector, vector) RETURNS real
     AS $$ SELECT vector_cosine_distance($1, $2); $$
     LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
 COMMENT ON FUNCTION cosine_distance(vector, vector) IS 'Cosine distance (compatibility alias)';
 
-CREATE OR REPLACE FUNCTION l1_distance(vector, vector) RETURNS real
+DROP FUNCTION IF EXISTS public.l1_distance(vector, vector) CASCADE;
+CREATE FUNCTION l1_distance(vector, vector) RETURNS real
     AS $$ SELECT vector_l1_distance($1, $2); $$
     LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
 COMMENT ON FUNCTION l1_distance(vector, vector) IS 'L1 (Manhattan) distance (compatibility alias)';
 
-CREATE OR REPLACE FUNCTION l2_normalize(vector) RETURNS vector
+DROP FUNCTION IF EXISTS public.l2_normalize(vector) CASCADE;
+CREATE FUNCTION l2_normalize(vector) RETURNS vector
     AS $$ SELECT vector_normalize($1); $$
     LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
 COMMENT ON FUNCTION l2_normalize(vector) IS 'L2 normalize vector (compatibility alias)';
 
 -- Halfvec distance function aliases (compatibility)
-CREATE OR REPLACE FUNCTION l2_distance(halfvec, halfvec) RETURNS real
+-- Drop existing functions if they exist (may have been created outside extension)
+DROP FUNCTION IF EXISTS public.l2_distance(halfvec, halfvec) CASCADE;
+CREATE FUNCTION l2_distance(halfvec, halfvec) RETURNS real
     AS $$ SELECT halfvec_l2_distance($1, $2); $$
     LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
 COMMENT ON FUNCTION l2_distance(halfvec, halfvec) IS 'L2 distance for halfvec (compatibility alias)';
 
-CREATE OR REPLACE FUNCTION inner_product(halfvec, halfvec) RETURNS real
+DROP FUNCTION IF EXISTS public.inner_product(halfvec, halfvec) CASCADE;
+CREATE FUNCTION inner_product(halfvec, halfvec) RETURNS real
     AS $$ SELECT halfvec_inner_product($1, $2); $$
     LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
 COMMENT ON FUNCTION inner_product(halfvec, halfvec) IS 'Inner product for halfvec (compatibility alias)';
 
-CREATE OR REPLACE FUNCTION cosine_distance(halfvec, halfvec) RETURNS real
+DROP FUNCTION IF EXISTS public.cosine_distance(halfvec, halfvec) CASCADE;
+CREATE FUNCTION cosine_distance(halfvec, halfvec) RETURNS real
     AS $$ SELECT halfvec_cosine_distance($1, $2); $$
     LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
 COMMENT ON FUNCTION cosine_distance(halfvec, halfvec) IS 'Cosine distance for halfvec (compatibility alias)';
 
 -- Halfvec norm functions (compatibility)
 -- Note: These convert to vector for norm calculation
-CREATE OR REPLACE FUNCTION l2_norm(halfvec) RETURNS double precision
+-- Drop existing functions if they exist (may have been created outside extension)
+DROP FUNCTION IF EXISTS public.l2_norm(halfvec) CASCADE;
+CREATE FUNCTION l2_norm(halfvec) RETURNS double precision
     AS $$ SELECT vector_norm(halfvec_to_vector($1)); $$
     LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
 COMMENT ON FUNCTION l2_norm(halfvec) IS 'L2 norm of halfvec (compatibility alias)';
 
-CREATE OR REPLACE FUNCTION l2_normalize(halfvec) RETURNS halfvec
+DROP FUNCTION IF EXISTS public.l2_normalize(halfvec) CASCADE;
+CREATE FUNCTION l2_normalize(halfvec) RETURNS halfvec
     AS $$ SELECT vector_to_halfvec(vector_normalize(halfvec_to_vector($1))); $$
     LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
 COMMENT ON FUNCTION l2_normalize(halfvec) IS 'L2 normalize halfvec (compatibility alias)';
 
 -- Sparsevec norm function alias
-CREATE OR REPLACE FUNCTION l2_norm(sparsevec) RETURNS double precision
+-- Drop existing function if it exists (may have been created outside extension)
+DROP FUNCTION IF EXISTS public.l2_norm(sparsevec) CASCADE;
+CREATE FUNCTION l2_norm(sparsevec) RETURNS double precision
     AS $$ SELECT sparsevec_l2_norm($1); $$
     LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
 COMMENT ON FUNCTION l2_norm(sparsevec) IS 'L2 norm of sparsevec (compatibility alias)';
 
 -- Bit distance function aliases (compatibility)
-CREATE OR REPLACE FUNCTION hamming_distance(bit, bit) RETURNS integer
+-- Drop existing functions if they exist (may have been created outside extension)
+DROP FUNCTION IF EXISTS public.hamming_distance(bit, bit) CASCADE;
+CREATE FUNCTION hamming_distance(bit, bit) RETURNS integer
     AS $$ SELECT bit_hamming_distance($1, $2); $$
     LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
 COMMENT ON FUNCTION hamming_distance(bit, bit) IS 'Hamming distance for bit (compatibility alias)';
 
-CREATE OR REPLACE FUNCTION jaccard_distance(bit, bit) RETURNS double precision
+DROP FUNCTION IF EXISTS public.jaccard_distance(bit, bit) CASCADE;
+CREATE FUNCTION jaccard_distance(bit, bit) RETURNS double precision
     AS $$ SELECT bit_jaccard_distance($1, $2); $$
     LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
 COMMENT ON FUNCTION jaccard_distance(bit, bit) IS 'Jaccard distance for bit (compatibility alias)';
 
 -- Comparison functions for btree compatibility (compatibility)
 -- These return -1, 0, or 1 for less than, equal, or greater than
-CREATE OR REPLACE FUNCTION vector_cmp(vector, vector) RETURNS integer
+-- Drop existing function if it exists (may have been created outside extension)
+DROP FUNCTION IF EXISTS public.vector_cmp(vector, vector) CASCADE;
+CREATE FUNCTION vector_cmp(vector, vector) RETURNS integer
     AS $$
     SELECT CASE
         WHEN $1 < $2 THEN -1
@@ -3191,7 +3219,9 @@ COMMENT ON FUNCTION vector_cmp(vector, vector) IS 'Comparison function for vecto
 
 -- Note: halfvec and sparsevec comparison functions require comparison operators
 -- For now, these use equality check only (full comparison requires <, > operators)
-CREATE OR REPLACE FUNCTION halfvec_cmp(halfvec, halfvec) RETURNS integer
+-- Drop existing functions if they exist (may have been created outside extension)
+DROP FUNCTION IF EXISTS public.halfvec_cmp(halfvec, halfvec) CASCADE;
+CREATE FUNCTION halfvec_cmp(halfvec, halfvec) RETURNS integer
     AS $$
     SELECT CASE
         WHEN $1 = $2 THEN 0
@@ -3203,7 +3233,8 @@ CREATE OR REPLACE FUNCTION halfvec_cmp(halfvec, halfvec) RETURNS integer
     LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
 COMMENT ON FUNCTION halfvec_cmp(halfvec, halfvec) IS 'Comparison function for halfvec (compatibility)';
 
-CREATE OR REPLACE FUNCTION sparsevec_cmp(sparsevec, sparsevec) RETURNS integer
+DROP FUNCTION IF EXISTS public.sparsevec_cmp(sparsevec, sparsevec) CASCADE;
+CREATE FUNCTION sparsevec_cmp(sparsevec, sparsevec) RETURNS integer
     AS $$
     SELECT CASE
         WHEN $1 = $2 THEN 0
@@ -3237,7 +3268,9 @@ COMMENT ON OPERATOR CLASS vector_btree_ops USING btree IS 'B-tree operator class
 -- NeuronDB uses 0-based indexing: vector_slice(vec, start, end) where end is exclusive
 -- Convert: subvector(vec, start, count) -> vector_slice(vec, start-1, start-1+count)
 -- Handle edge cases: count=0 returns empty, invalid bounds return error
-CREATE OR REPLACE FUNCTION subvector(vector, integer, integer) RETURNS vector
+-- Drop existing function if it exists (may have been created outside extension)
+DROP FUNCTION IF EXISTS public.subvector(vector, integer, integer) CASCADE;
+CREATE FUNCTION subvector(vector, integer, integer) RETURNS vector
     AS $$
     SELECT CASE
         WHEN $3 <= 0 THEN
@@ -7723,6 +7756,7 @@ GRANT EXECUTE ON FUNCTION vector_to_bit(vector) TO PUBLIC;
 GRANT EXECUTE ON FUNCTION bit_to_vector(bit) TO PUBLIC;
 GRANT EXECUTE ON FUNCTION binary_quantize(vector) TO PUBLIC;
 GRANT EXECUTE ON FUNCTION bit_hamming_distance(bit, bit) TO PUBLIC;
+GRANT EXECUTE ON FUNCTION hamming_distance(bit, bit) TO PUBLIC;
 
 -- Grant permissions for halfvec distance functions
 GRANT EXECUTE ON FUNCTION halfvec_l2_distance(halfvec, halfvec) TO PUBLIC;

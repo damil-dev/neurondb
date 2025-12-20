@@ -359,6 +359,10 @@ ifneq ($(GPU_BACKENDS),none)
 	endif
 endif
 
+# Always compile GPU stub file for CPU-only builds
+# This provides stub implementations when GPU backends are disabled
+OBJS += src/gpu/gpu_stubs.o
+
 # Old Metal system (disabled when using modular GPU system)
 ifneq ($(GPU_BACKENDS),none)
 # Modular GPU system is active - skip old Metal (don't clear METAL_OBJS set by modular system)
