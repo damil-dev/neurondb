@@ -70,3 +70,4 @@ RESET enable_seqscan;
 \echo 'Test completed successfully'
 \echo '=========================================================================='
 
+

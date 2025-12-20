@@ -29,19 +29,11 @@ SELECT ' [ 1,  2 ,    3  ] '::halfvec;
 \echo 'Test 2: Halfvec Arithmetic'
 \echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
 
--- Note: Halfvec arithmetic operators may not be available
--- Convert to vector for arithmetic operations if needed
-DO $$
-BEGIN
-    BEGIN
-        PERFORM '[1,2,3]'::halfvec + '[4,5,6]';
-        RAISE NOTICE 'Halfvec addition operator available';
-    EXCEPTION WHEN OTHERS THEN
-        RAISE NOTICE 'Halfvec addition operator not available: %', SQLERRM;
-        -- Use vector conversion as fallback
-        PERFORM (halfvec_to_vector('[1,2,3]'::halfvec) + halfvec_to_vector('[4,5,6]'::halfvec))::halfvec;
-    END;
-END $$;
+-- Note: Halfvec arithmetic operators are not available in NeuronDB
+-- Convert to vector for arithmetic operations, then back to halfvec
+SELECT vector_to_halfvec(halfvec_to_vector('[1,2,3]'::halfvec) + halfvec_to_vector('[4,5,6]'::halfvec));
+SELECT vector_to_halfvec(halfvec_to_vector('[1,2,3]'::halfvec) - halfvec_to_vector('[4,5,6]'::halfvec));
+SELECT vector_to_halfvec(halfvec_to_vector('[1,2,3]'::halfvec) || halfvec_to_vector('[4,5]'::halfvec));
 
 -- Test 3: Halfvec Comparison
 \echo ''

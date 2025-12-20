@@ -469,10 +469,18 @@ sparsevec_in(PG_FUNCTION_ARGS)
 		nnz++;
 	}
 
+	/* Handle empty sparsevec format: {}/dim */
 	if (nnz == 0)
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
-				 errmsg("sparsevec must have at least one entry")));
+	{
+		/* Check if dim was specified */
+		if (dim == 0)
+		{
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
+					 errmsg("sparsevec must have at least one entry or specify dim")));
+		}
+		/* Allow empty sparsevec if dim is specified */
+	}
 
 	if (nnz > 1000)
 		ereport(ERROR,

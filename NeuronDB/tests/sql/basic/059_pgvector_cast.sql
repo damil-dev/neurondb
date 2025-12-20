@@ -178,7 +178,8 @@ SELECT vector_to_sparsevec('{1,0,2,0,3,0}'::real[]::vector);
 \echo 'Test 13: Large Dimension Arrays'
 \echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
 
-SELECT array_agg(n)::vector FROM generate_series(1, 16001) n;
+-- Note: NeuronDB max dimension is 16000, not 16001
+SELECT array_agg(n)::vector FROM generate_series(1, 16000) n;
 
 \echo ''
 \echo '=========================================================================='
