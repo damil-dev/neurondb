@@ -169,6 +169,44 @@ Install these components before starting:
 
 See [NeuronDB installation guide](NeuronDB/INSTALL.md) for platform-specific requirements.
 
+### Unified Setup (Recommended)
+
+For a complete integrated setup of all three modules, use the unified setup script:
+
+```bash
+# Set database connection parameters (optional - defaults shown)
+export DB_HOST=localhost
+export DB_PORT=5432
+export DB_NAME=neurondb
+export DB_USER=postgres
+export DB_PASSWORD=your_password
+
+# Run unified setup script
+./scripts/setup_neurondb_ecosystem.sh
+```
+
+This script will:
+1. Create the database if it doesn't exist
+2. Install the NeuronDB extension
+3. Set up NeuronMCP schema and functions
+4. Run NeuronAgent migrations
+5. Verify the installation
+
+**Verify Integration:**
+
+After setup, verify all components are properly integrated:
+
+```bash
+./scripts/verify_neurondb_integration.sh
+```
+
+This will test:
+- NeuronDB extension functionality
+- NeuronMCP schema and functions
+- NeuronAgent schema and tables
+- Cross-module integration
+- Vector operations
+
 ### Installation Steps
 
 #### Step 1: Start NeuronDB
@@ -252,6 +290,74 @@ docker compose up -d neurondb-mcp
 ```
 
 ## Installation
+
+### Database Setup and Integration
+
+Before starting services, ensure the database is properly set up with all required schemas and extensions.
+
+#### Option 1: Unified Setup Script (Recommended)
+
+The unified setup script ensures proper execution order and handles all dependencies:
+
+```bash
+# Run from project root
+./scripts/setup_neurondb_ecosystem.sh
+```
+
+**What it does:**
+- Creates database if needed
+- Installs NeuronDB extension
+- Sets up NeuronMCP schema (13 tables, 30+ functions)
+- Runs NeuronAgent migrations (4 migration files)
+- Verifies installation
+
+**Environment Variables:**
+```bash
+export DB_HOST=localhost          # Default: localhost
+export DB_PORT=5432              # Default: 5432
+export DB_NAME=neurondb          # Default: neurondb
+export DB_USER=postgres          # Default: postgres
+export DB_PASSWORD=your_password # Optional
+```
+
+#### Option 2: Manual Setup
+
+If you prefer to set up components individually:
+
+1. **Create database and install NeuronDB extension:**
+   ```bash
+   createdb neurondb
+   psql -d neurondb -c "CREATE EXTENSION neurondb;"
+   ```
+
+2. **Setup NeuronMCP:**
+   ```bash
+   cd NeuronMCP
+   ./scripts/setup_neurondb_mcp.sh
+   ```
+
+3. **Setup NeuronAgent:**
+   ```bash
+   cd NeuronAgent
+   ./scripts/setup_neurondb_agent.sh
+   ./scripts/run_migrations.sh
+   ```
+
+#### Verification
+
+After setup, verify integration:
+
+```bash
+./scripts/verify_neurondb_integration.sh
+```
+
+This comprehensive test verifies:
+- ✓ NeuronDB extension installed and functional
+- ✓ NeuronMCP schema, tables, views, and functions
+- ✓ NeuronAgent schema, tables, and vector columns
+- ✓ HNSW indexes on vector columns
+- ✓ Cross-module queries and operations
+- ✓ Vector operations with different dimensions
 
 ### Installation Methods
 

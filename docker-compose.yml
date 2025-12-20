@@ -11,6 +11,12 @@
 # All services automatically connect via shared 'neurondb-network'
 # NeuronAgent and NeuronMCP connect to NeuronDB using container names
 #
+# Build Methods:
+#   - Source build (default): Uses Dockerfile - builds from source in container
+#   - Package build: Uses Dockerfile.package - builds DEB packages then installs
+#     To use package builds, set: USE_PACKAGE_BUILD=true
+#     Package builds are faster and more reproducible
+#
 # Modern Best Practices Implemented:
 #   - Docker Compose v2 (no version field)
 #   - init: true for proper signal handling
@@ -28,10 +34,11 @@ services:
     - default
     - cpu
     build:
-      context: ./NeuronDB
-      dockerfile: docker/Dockerfile
+      context: .
+      dockerfile: NeuronDB/docker/Dockerfile.package
       args:
         PG_MAJOR: ${PG_MAJOR:-17}
+        PACKAGE_VERSION: ${PACKAGE_VERSION:-1.0.0.beta}
         ONNX_VERSION: ${ONNX_VERSION:-1.17.0}
         VERSION: ${VERSION:-latest}
         BUILD_DATE: ${BUILD_DATE:-}
@@ -53,7 +60,7 @@ services:
     ports:
     - ${POSTGRES_PORT:-5433}:5432
     volumes:
-    - neurondb-data:/var/lib/postgresql/data
+    - neurondb-data:/var/lib/postgresql
     healthcheck:
       test:
       - CMD-SHELL
@@ -73,9 +80,6 @@ services:
         limits:
           cpus: '4'
           memory: 4G
-        reservations:
-          cpus: '1'
-          memory: 1G
     restart: unless-stopped
     networks:
     - neurondb-network
@@ -114,7 +118,7 @@ services:
     ports:
     - ${POSTGRES_CUDA_PORT:-5434}:5432
     volumes:
-    - neurondb-cuda-data:/var/lib/postgresql/data
+    - neurondb-cuda-data:/var/lib/postgresql
     healthcheck:
       test:
       - CMD-SHELL
@@ -134,17 +138,15 @@ services:
         limits:
           cpus: '8'
           memory: 8G
-        reservations:
-          cpus: '2'
-          memory: 2G
-          devices:
-          - driver: nvidia
-            count: 1
-            capabilities:
-            - gpu
     restart: unless-stopped
     networks:
     - neurondb-network
+    # GPU access via runtime (requires nvidia-container-toolkit)
+    # Use: docker run --gpus all or docker-compose with runtime
+    runtime: nvidia
+    environment:
+      NVIDIA_VISIBLE_DEVICES: ${NVIDIA_VISIBLE_DEVICES:-all}
+      NVIDIA_DRIVER_CAPABILITIES: ${NVIDIA_DRIVER_CAPABILITIES:-compute,utility}
   neurondb-rocm:
     profiles:
     - rocm
@@ -200,9 +202,6 @@ services:
         limits:
           cpus: '8'
           memory: 8G
-        reservations:
-          cpus: '2'
-          memory: 2G
     restart: unless-stopped
     networks:
     - neurondb-network
@@ -258,9 +257,6 @@ services:
         limits:
           cpus: '8'
           memory: 8G
-        reservations:
-          cpus: '2'
-          memory: 2G
     restart: unless-stopped
     networks:
     - neurondb-network
@@ -269,9 +265,10 @@ services:
     - default
     - cpu
     build:
-      context: ./NeuronAgent
-      dockerfile: docker/Dockerfile
+      context: .
+      dockerfile: NeuronAgent/docker/Dockerfile.package
       args:
+        PACKAGE_VERSION: ${PACKAGE_VERSION:-1.0.0.beta}
         VERSION: ${VERSION:-latest}
         BUILD_DATE: ${BUILD_DATE:-}
         VCS_REF: ${VCS_REF:-}
@@ -322,9 +319,6 @@ services:
         limits:
           cpus: '2'
           memory: 1G
-        reservations:
-          cpus: '0.5'
-          memory: 256M
     restart: unless-stopped
     networks:
     - neurondb-network
@@ -375,9 +369,6 @@ services:
         limits:
           cpus: '2'
           memory: 1G
-        reservations:
-          cpus: '0.5'
-          memory: 256M
     restart: unless-stopped
     networks:
     - neurondb-network
@@ -439,9 +430,6 @@ services:
         limits:
           cpus: '2'
           memory: 1G
-        reservations:
-          cpus: '0.5'
-          memory: 256M
     restart: unless-stopped
     networks:
     - neurondb-network
@@ -503,9 +491,6 @@ services:
         limits:
           cpus: '2'
           memory: 1G
-        reservations:
-          cpus: '0.5'
-          memory: 256M
     restart: unless-stopped
     networks:
     - neurondb-network
@@ -525,9 +510,10 @@ services:
     - default
     - cpu
     build:
-      context: ./NeuronMCP
-      dockerfile: docker/Dockerfile
+      context: .
+      dockerfile: NeuronMCP/docker/Dockerfile.package
       args:
+        PACKAGE_VERSION: ${PACKAGE_VERSION:-1.0.0.beta}
         VERSION: ${VERSION:-latest}
         BUILD_DATE: ${BUILD_DATE:-}
         VCS_REF: ${VCS_REF:-}
@@ -580,9 +566,6 @@ services:
         limits:
           cpus: '2'
           memory: 512M
-        reservations:
-          cpus: '0.5'
-          memory: 128M
     networks:
     - neurondb-network
   neuronmcp-cuda:
@@ -634,9 +617,6 @@ services:
         limits:
           cpus: '2'
           memory: 512M
-        reservations:
-          cpus: '0.5'
-          memory: 128M
     networks:
     - neurondb-network
     init: true
@@ -699,9 +679,6 @@ services:
         limits:
           cpus: '2'
           memory: 512M
-        reservations:
-          cpus: '0.5'
-          memory: 128M
     networks:
     - neurondb-network
     init: true
@@ -764,9 +741,6 @@ services:
         limits:
           cpus: '2'
           memory: 512M
-        reservations:
-          cpus: '0.5'
-          memory: 128M
     networks:
     - neurondb-network
     init: true
