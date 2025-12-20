@@ -433,7 +433,6 @@ gmm_model_serialize_to_bytea(const GMMModel * model, uint8 training_backend)
 
 	/* Convert to bytea - match naive_bayes pattern exactly */
 	{
-		char *result_raw = NULL;
 		total_size = VARHDRSZ + buf.len;
 		nalloc(result_raw, char, total_size);
 		result = (bytea *) result_raw;
