@@ -76,6 +76,15 @@ build_warnings.log
 *.swp
 *.swo
 
+# Merge conflict files
+*.BASE
+*.LOCAL
+*.REMOTE
+*_BACKUP_*
+*_BASE_*
+*_LOCAL_*
+*_REMOTE_*
+
 # PostgreSQL source backup files
 pgsrc*.BAK
 pgsrc*.bak
@@ -95,7 +104,6 @@ pgsrc*.bak
 # Configuration files with secrets
 config.yaml
 mcp-config.json
-!mcp-config.example.json
 !mcp-config.json.example
 
 # API keys and secrets
@@ -334,6 +342,8 @@ tmp/
 temp/
 .tmp/
 .temp/
+*.tmp/
+*.temp/
 
 # Archives (unless explicitly needed)
 *.zip
