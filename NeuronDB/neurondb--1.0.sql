@@ -2437,6 +2437,68 @@ CREATE OPERATOR <> (
 );
 COMMENT ON OPERATOR <>(halfvec, halfvec) IS 'Halfvec inequality operator';
 
+-- Arithmetic operators for halfvec type
+CREATE FUNCTION halfvec_add(halfvec, halfvec) RETURNS halfvec
+    AS 'MODULE_PATHNAME', 'halfvec_add'
+    LANGUAGE C IMMUTABLE STRICT;
+COMMENT ON FUNCTION halfvec_add IS 'Add two halfvec vectors element-wise';
+
+CREATE OPERATOR + (
+    LEFTARG = halfvec,
+    RIGHTARG = halfvec,
+    PROCEDURE = halfvec_add,
+    COMMUTATOR = +
+);
+COMMENT ON OPERATOR +(halfvec, halfvec) IS 'Halfvec addition operator';
+
+CREATE FUNCTION halfvec_sub(halfvec, halfvec) RETURNS halfvec
+    AS 'MODULE_PATHNAME', 'halfvec_sub'
+    LANGUAGE C IMMUTABLE STRICT;
+COMMENT ON FUNCTION halfvec_sub IS 'Subtract two halfvec vectors element-wise';
+
+CREATE OPERATOR - (
+    LEFTARG = halfvec,
+    RIGHTARG = halfvec,
+    PROCEDURE = halfvec_sub
+);
+COMMENT ON OPERATOR -(halfvec, halfvec) IS 'Halfvec subtraction operator';
+
+CREATE FUNCTION halfvec_mul(halfvec, double precision) RETURNS halfvec
+    AS 'MODULE_PATHNAME', 'halfvec_mul'
+    LANGUAGE C IMMUTABLE STRICT;
+COMMENT ON FUNCTION halfvec_mul IS 'Multiply halfvec by scalar';
+
+CREATE OPERATOR * (
+    LEFTARG = halfvec,
+    RIGHTARG = double precision,
+    PROCEDURE = halfvec_mul,
+    COMMUTATOR = *
+);
+COMMENT ON OPERATOR *(halfvec, double precision) IS 'Halfvec scalar multiplication operator';
+
+CREATE FUNCTION halfvec_div(halfvec, double precision) RETURNS halfvec
+    AS 'MODULE_PATHNAME', 'halfvec_div'
+    LANGUAGE C IMMUTABLE STRICT;
+COMMENT ON FUNCTION halfvec_div IS 'Divide halfvec by scalar';
+
+CREATE OPERATOR / (
+    LEFTARG = halfvec,
+    RIGHTARG = double precision,
+    PROCEDURE = halfvec_div
+);
+COMMENT ON OPERATOR /(halfvec, double precision) IS 'Halfvec scalar division operator';
+
+CREATE FUNCTION halfvec_neg(halfvec) RETURNS halfvec
+    AS 'MODULE_PATHNAME', 'halfvec_neg'
+    LANGUAGE C IMMUTABLE STRICT;
+COMMENT ON FUNCTION halfvec_neg IS 'Negate halfvec';
+
+CREATE OPERATOR - (
+    RIGHTARG = halfvec,
+    PROCEDURE = halfvec_neg
+);
+COMMENT ON OPERATOR -(halfvec) IS 'Halfvec negation operator';
+
 -- Comparison operators for sparsevec type
 CREATE FUNCTION sparsevec_eq(sparsevec, sparsevec) RETURNS boolean
     AS 'MODULE_PATHNAME', 'sparsevec_eq'
@@ -2472,6 +2534,45 @@ CREATE OPERATOR <> (
     NEGATOR = =
 );
 COMMENT ON OPERATOR <>(sparsevec, sparsevec) IS 'Sparsevec inequality operator';
+
+-- Arithmetic operators for sparsevec type
+CREATE FUNCTION sparsevec_add(sparsevec, sparsevec) RETURNS sparsevec
+    AS 'MODULE_PATHNAME', 'sparsevec_add'
+    LANGUAGE C IMMUTABLE STRICT;
+COMMENT ON FUNCTION sparsevec_add IS 'Add two sparsevec vectors element-wise';
+
+CREATE OPERATOR + (
+    LEFTARG = sparsevec,
+    RIGHTARG = sparsevec,
+    PROCEDURE = sparsevec_add,
+    COMMUTATOR = +
+);
+COMMENT ON OPERATOR +(sparsevec, sparsevec) IS 'Sparsevec addition operator';
+
+CREATE FUNCTION sparsevec_sub(sparsevec, sparsevec) RETURNS sparsevec
+    AS 'MODULE_PATHNAME', 'sparsevec_sub'
+    LANGUAGE C IMMUTABLE STRICT;
+COMMENT ON FUNCTION sparsevec_sub IS 'Subtract two sparsevec vectors element-wise';
+
+CREATE OPERATOR - (
+    LEFTARG = sparsevec,
+    RIGHTARG = sparsevec,
+    PROCEDURE = sparsevec_sub
+);
+COMMENT ON OPERATOR -(sparsevec, sparsevec) IS 'Sparsevec subtraction operator';
+
+CREATE FUNCTION sparsevec_mul(sparsevec, double precision) RETURNS sparsevec
+    AS 'MODULE_PATHNAME', 'sparsevec_mul'
+    LANGUAGE C IMMUTABLE STRICT;
+COMMENT ON FUNCTION sparsevec_mul IS 'Multiply sparsevec by scalar';
+
+CREATE OPERATOR * (
+    LEFTARG = sparsevec,
+    RIGHTARG = double precision,
+    PROCEDURE = sparsevec_mul,
+    COMMUTATOR = *
+);
+COMMENT ON OPERATOR *(sparsevec, double precision) IS 'Sparsevec scalar multiplication operator';
 
 -- Note: bit type already has native = and <> operators in PostgreSQL
 
@@ -3114,13 +3215,41 @@ CREATE OR REPLACE FUNCTION sparsevec_cmp(sparsevec, sparsevec) RETURNS integer
     LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
 COMMENT ON FUNCTION sparsevec_cmp(sparsevec, sparsevec) IS 'Comparison function for sparsevec (compatibility)';
 
+-- B-tree operator classes for vector types
+-- Note: vector type already has <, <=, >, >= operators defined above
+CREATE OPERATOR CLASS vector_btree_ops
+    DEFAULT FOR TYPE vector USING btree AS
+    OPERATOR 1 < (vector, vector),
+    OPERATOR 2 <= (vector, vector),
+    OPERATOR 3 = (vector, vector),
+    OPERATOR 4 >= (vector, vector),
+    OPERATOR 5 > (vector, vector),
+    FUNCTION 1 vector_cmp(vector, vector);
+
+COMMENT ON OPERATOR CLASS vector_btree_ops USING btree IS 'B-tree operator class for vector type';
+
+-- Note: halfvec and sparsevec btree operator classes require <, <=, >, >= operators
+-- These are not yet implemented, so btree indexes on halfvec/sparsevec are not supported
+-- For now, only equality-based operations are supported via hash indexes
+
 -- Subvector alias for compatibility
 -- uses 1-based indexing: subvector(vec, start, count) where start is 1-based
 -- NeuronDB uses 0-based indexing: vector_slice(vec, start, end) where end is exclusive
 -- Convert: subvector(vec, start, count) -> vector_slice(vec, start-1, start-1+count)
+-- Handle edge cases: count=0 returns empty, invalid bounds return error
 CREATE OR REPLACE FUNCTION subvector(vector, integer, integer) RETURNS vector
     AS $$
-    SELECT vector_slice($1, GREATEST(0, $2 - 1), LEAST(vector_dims($1), $2 - 1 + $3));
+    SELECT CASE
+        WHEN $3 <= 0 THEN
+            -- Return empty vector for count <= 0 (but vector must have at least 1 dim)
+            -- Use a single zero element as minimum
+            '[0]'::vector
+        WHEN $2 < 1 OR $2 > vector_dims($1) THEN
+            -- Invalid start position
+            (SELECT NULL)::vector
+        ELSE
+            vector_slice($1, GREATEST(0, $2 - 1), LEAST(vector_dims($1), $2 - 1 + $3))
+    END;
     $$
     LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE;
 COMMENT ON FUNCTION subvector(vector, integer, integer) IS 'Extract subvector (compatibility: 1-based start, count)';

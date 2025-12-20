@@ -599,3 +599,99 @@ vecmap_norm(PG_FUNCTION_ARGS)
 
 	PG_RETURN_FLOAT4((float4) sqrt(sum));
 }
+
+/*
+ * sparsevec_add: Add two sparsevec vectors
+ * Wrapper around vecmap_add for sparsevec type
+ */
+PG_FUNCTION_INFO_V1(sparsevec_add);
+Datum
+sparsevec_add(PG_FUNCTION_ARGS)
+{
+	return vecmap_add(fcinfo);
+}
+
+/*
+ * sparsevec_sub: Subtract two sparsevec vectors
+ * Wrapper around vecmap_sub for sparsevec type
+ */
+PG_FUNCTION_INFO_V1(sparsevec_sub);
+Datum
+sparsevec_sub(PG_FUNCTION_ARGS)
+{
+	return vecmap_sub(fcinfo);
+}
+
+/*
+ * sparsevec_mul: Multiply sparsevec by scalar
+ * Wrapper around vecmap_mul_scalar for sparsevec type
+ */
+PG_FUNCTION_INFO_V1(sparsevec_mul);
+Datum
+sparsevec_mul(PG_FUNCTION_ARGS)
+{
+	VectorMap  *a = (VectorMap *) PG_GETARG_POINTER(0);
+	float8		scalar = PG_GETARG_FLOAT8(1);
+	VectorMap  *result = NULL;
+	int32	   *a_indices = NULL;
+	float4	   *a_values = NULL;
+	int32	   *result_indices = NULL;
+	float4	   *result_values = NULL;
+	int32		result_nnz;
+	int			i;
+	int			size;
+
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: sparsevec_mul requires 2 arguments")));
+
+	if (a == NULL)
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("cannot multiply NULL sparsevec")));
+
+	if (isnan(scalar) || isinf(scalar))
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("scalar multiplier cannot be NaN or Infinity")));
+
+	a_indices = VECMAP_INDICES(a);
+	a_values = VECMAP_VALUES(a);
+
+	/* Count non-zero results */
+	result_nnz = 0;
+	for (i = 0; i < a->nnz; i++)
+	{
+		if (fabs(a_values[i] * scalar) > 1e-10f)
+			result_nnz++;
+	}
+
+	size = sizeof(VectorMap) + sizeof(int32) * result_nnz +
+		sizeof(float4) * result_nnz;
+	result = (VectorMap *) palloc0(size);
+	SET_VARSIZE(result, size);
+	result->total_dim = a->total_dim;
+	result->nnz = result_nnz;
+
+	result_indices = VECMAP_INDICES(result);
+	result_values = VECMAP_VALUES(result);
+
+	{
+		int			k = 0;
+
+		for (i = 0; i < a->nnz; i++)
+		{
+			float4		scaled = a_values[i] * scalar;
+
+			if (fabs(scaled) > 1e-10f)
+			{
+				result_indices[k] = a_indices[i];
+				result_values[k] = scaled;
+				k++;
+			}
+		}
+	}
+
+	PG_RETURN_POINTER(result);
+}
