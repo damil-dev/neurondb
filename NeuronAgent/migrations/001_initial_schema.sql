@@ -1,3 +1,14 @@
+-- ============================================================================
+-- NeuronAgent Initial Schema Migration
+-- ============================================================================
+-- This migration creates the core schema for NeuronAgent.
+-- Prerequisites: NeuronDB extension must be installed
+-- ============================================================================
+
+-- Ensure required extensions exist
+CREATE EXTENSION IF NOT EXISTS neurondb;
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 -- Schema: neurondb_agent
 CREATE SCHEMA IF NOT EXISTS neurondb_agent;
 
