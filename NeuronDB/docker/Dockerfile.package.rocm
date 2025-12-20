@@ -1,0 +1,184 @@
+# syntax=docker/dockerfile:1.6
+#
+# NeuronDB Docker image using pre-built DEB packages with ROCm support
+# Uses AMD's official ROCm packages from the ROCm Installation Guide
+# https://rocm.docs.amd.com/projects/install-on-linux/en/latest/install/install-methods/package-manager/package-manager-debian.html
+#
+# Supports:
+#   - PostgreSQL: 16, 17, 18 (via PG_MAJOR build arg)
+#   - OS: Debian Bookworm (via postgres base image)
+#   - ROCm: Configurable version via AMD official packages
+#
+# Build args:
+#   PG_MAJOR: PostgreSQL major version (16, 17, or 18, default: 17)
+#   PACKAGE_VERSION: NeuronDB package version (default: 1.0.0.beta)
+#   ROCM_VERSION: ROCm version (default: 7.1.1)
+#   ONNX_VERSION: ONNX Runtime version (default: 1.17.0)
+#   VERSION: Application version (used in labels)
+#
+# Usage:
+#   docker build -f docker/Dockerfile.package.rocm \
+#     --build-arg PG_MAJOR=18 \
+#     --build-arg ROCM_VERSION=7.1.1 \
+#     --build-arg PACKAGE_VERSION=1.0.0.beta \
+#     -t neurondb:rocm-package-pg18 \
+#     .
+
+ARG PG_MAJOR=17
+ARG PACKAGE_VERSION=1.0.0.beta
+ARG ROCM_VERSION=7.1.1
+ARG ONNX_VERSION=1.17.0
+ARG VERSION=latest
+ARG BUILD_DATE
+ARG VCS_REF
+
+FROM postgres:${PG_MAJOR}-bookworm
+
+ARG PG_MAJOR
+ARG PACKAGE_VERSION
+ARG ROCM_VERSION
+ARG ONNX_VERSION
+ARG VERSION
+ARG BUILD_DATE
+ARG VCS_REF
+
+# Add metadata labels
+LABEL org.opencontainers.image.title="NeuronDB (ROCm)" \
+      org.opencontainers.image.description="PostgreSQL extension for vector search, ML algorithms, and RAG capabilities with AMD ROCm GPU support" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.created="${BUILD_DATE}" \
+      org.opencontainers.image.revision="${VCS_REF}" \
+      org.opencontainers.image.vendor="neurondb" \
+      org.opencontainers.image.licenses="AGPL-3.0" \
+      org.opencontainers.image.source="https://github.com/neurondb/NeurondB" \
+      org.opencontainers.image.documentation="https://neurondb.ai/docs" \
+      maintainer="neurondb <admin@neurondb.com>" \
+      neurondb.postgresql.version="${PG_MAJOR}" \
+      neurondb.package.version="${PACKAGE_VERSION}" \
+      neurondb.rocm.version="${ROCM_VERSION}" \
+      neurondb.build.method="package"
+
+ENV LANG=C.UTF-8 \
+    ROCM_PATH=/opt/rocm \
+    HIP_PATH=/opt/rocm \
+    LD_LIBRARY_PATH=/opt/rocm/lib:/usr/local/onnxruntime/lib:${LD_LIBRARY_PATH} \
+    ONNX_PATH=/usr/local/onnxruntime
+
+# Install build and runtime dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        libcurl4 \
+        libssl3 \
+        ca-certificates \
+        dpkg-dev \
+        fakeroot \
+        build-essential \
+        clang \
+        cmake \
+        make \
+        git \
+        curl \
+        wget \
+        pkg-config \
+        libssl-dev \
+        libcurl4-openssl-dev \
+        zlib1g-dev \
+        python3 \
+        python3-pip \
+        postgresql-server-dev-${PG_MAJOR} \
+        gnupg \
+        software-properties-common \
+        lsb-release && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install ROCm using AMD's official packages (following ROCm Installation Guide)
+# Reference: https://rocm.docs.amd.com/projects/install-on-linux/en/latest/install/install-methods/package-manager/package-manager-debian.html
+RUN set -eux; \
+    # Make the directory for package signing key
+    mkdir -p --mode=0755 /etc/apt/keyrings; \
+    # Download and convert the package signing key
+    wget -q https://repo.radeon.com/rocm/rocm.gpg.key -O - | \
+        gpg --dearmor | tee /etc/apt/keyrings/rocm.gpg > /dev/null; \
+    # Determine distribution codename (Debian 12 = bookworm, maps to jammy for ROCm)
+    DISTRO_CODENAME=$(lsb_release -cs 2>/dev/null || echo "bookworm"); \
+    # For Debian 12 (bookworm), use jammy repository (as per ROCm guide)
+    if [ "$DISTRO_CODENAME" = "bookworm" ]; then \
+        DISTRO_CODENAME="jammy"; \
+    fi; \
+    # Register ROCm packages repository
+    tee /etc/apt/sources.list.d/rocm.list << EOF
+deb [arch=amd64 signed-by=/etc/apt/keyrings/rocm.gpg] https://repo.radeon.com/rocm/apt/${ROCM_VERSION} ${DISTRO_CODENAME} main
+deb [arch=amd64 signed-by=/etc/apt/keyrings/rocm.gpg] https://repo.radeon.com/graphics/${ROCM_VERSION}/ubuntu ${DISTRO_CODENAME} main
+EOF
+    # Set repository priority
+    tee /etc/apt/preferences.d/rocm-pin-600 << EOF
+Package: *
+Pin: release o=repo.radeon.com
+Pin-Priority: 600
+EOF
+    # Update package lists
+    apt-get update; \
+    # Install ROCm runtime and developer packages
+    apt-get install -y --no-install-recommends \
+        rocm-hip-runtime \
+        rocm-hip-runtime-devel \
+        rocm-hip-sdk \
+        rocm-ml-libraries \
+        rocm-ml-sdk || \
+    # Fallback: install rocm meta package if specific packages not found
+    apt-get install -y --no-install-recommends \
+        rocm; \
+    # Cleanup
+    rm -rf /var/lib/apt/lists/*
+
+# Install ONNX Runtime (CPU build for now, GPU support via ROCm can be added later)
+RUN set -eux; \
+    arch="$(dpkg --print-architecture)"; \
+    case "$arch" in \
+        amd64) onnx_pkg="onnxruntime-linux-x64-${ONNX_VERSION}.tgz" ;; \
+        arm64) onnx_pkg="onnxruntime-linux-aarch64-${ONNX_VERSION}.tgz" ;; \
+        *) echo "Unsupported architecture for ONNX Runtime: ${arch}" >&2; exit 1 ;; \
+    esac; \
+    curl -fsSL "https://github.com/microsoft/onnxruntime/releases/download/v${ONNX_VERSION}/${onnx_pkg}" -o /tmp/onnxruntime.tgz; \
+    mkdir -p /tmp/onnxruntime; \
+    tar -xzf /tmp/onnxruntime.tgz -C /tmp/onnxruntime --strip-components=1; \
+    mv /tmp/onnxruntime ${ONNX_PATH}; \
+    rm -f /tmp/onnxruntime.tgz
+
+# Copy packaging directory and NeuronDB source from repository root
+COPY packaging /tmp/packaging
+COPY NeuronDB /tmp/NeuronDB
+
+# Build and install the DEB package with ROCm support
+RUN set -eux; \
+    cd /tmp/packaging/deb/neurondb && \
+    # Set ROCm environment for package build
+    export ROCM_PATH=/opt/rocm && \
+    export HIP_PATH=/opt/rocm && \
+    export GPU_BACKENDS=rocm && \
+    VERSION="${PACKAGE_VERSION}" ./build.sh && \
+    DEB_FILE="neurondb_${PACKAGE_VERSION}_amd64.deb" && \
+    if [ -f "$DEB_FILE" ]; then \
+        dpkg -i "$DEB_FILE" || apt-get install -yf; \
+        rm -f "$DEB_FILE"; \
+    else \
+        echo "Error: DEB package not found after build" >&2; \
+        exit 1; \
+    fi && \
+    rm -rf /tmp/packaging
+
+# Copy helper init scripts
+COPY NeuronDB/docker/docker-entrypoint-initdb.d/ /docker-entrypoint-initdb.d/
+RUN chmod +x /docker-entrypoint-initdb.d/*.sh 2>/dev/null || true
+
+# PostgreSQL 18+ uses /var/lib/postgresql instead of /var/lib/postgresql/data
+VOLUME ["/var/lib/postgresql"]
+
+# Device access for ROCm (kfd and dri)
+# Note: These need to be mounted at runtime: /dev/kfd and /dev/dri
+
+HEALTHCHECK --interval=30s --timeout=5s --retries=5 \
+    CMD pg_isready -U "${POSTGRES_USER:-postgres}"
+
+# Default entrypoint inherited from postgres image
+

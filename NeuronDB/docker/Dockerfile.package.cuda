@@ -1,0 +1,197 @@
+# syntax=docker/dockerfile:1.6
+#
+# NeuronDB Docker image using pre-built DEB packages with CUDA support
+# Uses NVIDIA's official CUDA packages from the CUDA Installation Guide
+# https://docs.nvidia.com/cuda/cuda-installation-guide-linux/
+#
+# Supports:
+#   - PostgreSQL: 16, 17, 18 (via PG_MAJOR build arg)
+#   - OS: Debian Bookworm (via postgres base image)
+#   - CUDA: Configurable version via NVIDIA official packages
+#
+# Build args:
+#   PG_MAJOR: PostgreSQL major version (16, 17, or 18, default: 17)
+#   PACKAGE_VERSION: NeuronDB package version (default: 1.0.0.beta)
+#   CUDA_VERSION: CUDA version (default: 12.4.1)
+#   ONNX_VERSION: ONNX Runtime version (default: 1.17.0)
+#   VERSION: Application version (used in labels)
+#
+# Usage:
+#   docker build -f docker/Dockerfile.package.cuda \
+#     --build-arg PG_MAJOR=18 \
+#     --build-arg CUDA_VERSION=12.4.1 \
+#     --build-arg PACKAGE_VERSION=1.0.0.beta \
+#     -t neurondb:cuda-package-pg18 \
+#     .
+
+ARG PG_MAJOR=17
+ARG PACKAGE_VERSION=1.0.0.beta
+ARG CUDA_VERSION=12.4.1
+ARG ONNX_VERSION=1.17.0
+ARG VERSION=latest
+ARG BUILD_DATE
+ARG VCS_REF
+
+FROM postgres:${PG_MAJOR}-bookworm
+
+ARG PG_MAJOR
+ARG PACKAGE_VERSION
+ARG CUDA_VERSION
+ARG ONNX_VERSION
+ARG VERSION
+ARG BUILD_DATE
+ARG VCS_REF
+
+# Add metadata labels
+LABEL org.opencontainers.image.title="NeuronDB (CUDA)" \
+      org.opencontainers.image.description="PostgreSQL extension for vector search, ML algorithms, and RAG capabilities with CUDA GPU support" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.created="${BUILD_DATE}" \
+      org.opencontainers.image.revision="${VCS_REF}" \
+      org.opencontainers.image.vendor="neurondb" \
+      org.opencontainers.image.licenses="AGPL-3.0" \
+      org.opencontainers.image.source="https://github.com/neurondb/NeurondB" \
+      org.opencontainers.image.documentation="https://neurondb.ai/docs" \
+      maintainer="neurondb <admin@neurondb.com>" \
+      neurondb.postgresql.version="${PG_MAJOR}" \
+      neurondb.package.version="${PACKAGE_VERSION}" \
+      neurondb.cuda.version="${CUDA_VERSION}" \
+      neurondb.build.method="package" \
+      com.nvidia.volumes.needed="nvidia_driver"
+
+ENV LANG=C.UTF-8 \
+    CUDA_HOME=/usr/local/cuda \
+    CUDA_PATH=/usr/local/cuda \
+    LD_LIBRARY_PATH=/usr/local/cuda/lib64:/usr/local/onnxruntime/lib:${LD_LIBRARY_PATH} \
+    ONNX_PATH=/usr/local/onnxruntime
+
+# Install build and runtime dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        libcurl4 \
+        libssl3 \
+        ca-certificates \
+        dpkg-dev \
+        fakeroot \
+        build-essential \
+        clang \
+        cmake \
+        make \
+        git \
+        curl \
+        wget \
+        pkg-config \
+        libssl-dev \
+        libcurl4-openssl-dev \
+        zlib1g-dev \
+        python3 \
+        python3-pip \
+        postgresql-server-dev-${PG_MAJOR} \
+        gnupg \
+        software-properties-common && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install CUDA using NVIDIA's official packages (following CUDA Installation Guide)
+# Reference: https://docs.nvidia.com/cuda/cuda-installation-guide-linux/
+# For Debian 12 (bookworm), we use the network repository method
+RUN set -eux; \
+    # Install prerequisites
+    apt-get install -y --no-install-recommends wget gnupg ca-certificates; \
+    # Download and install CUDA repository package
+    # Try different package naming formats
+    CUDA_MAJOR=$(echo ${CUDA_VERSION} | cut -d. -f1); \
+    CUDA_MINOR=$(echo ${CUDA_VERSION} | cut -d. -f2); \
+    CUDA_PATCH=$(echo ${CUDA_VERSION} | cut -d. -f3); \
+    # Try format: cuda-repo-debian12_X.Y.Z-1_amd64.deb
+    CUDA_REPO_PKG="cuda-repo-debian12_${CUDA_VERSION}-1_amd64.deb"; \
+    if ! wget -q "https://developer.download.nvidia.com/compute/cuda/repos/debian12/x86_64/${CUDA_REPO_PKG}" -O /tmp/${CUDA_REPO_PKG}; then \
+        # Try alternative format: cuda-repo-debian12_X-Y_amd64.deb
+        CUDA_REPO_PKG="cuda-repo-debian12_${CUDA_MAJOR}-${CUDA_MINOR}_amd64.deb"; \
+        if ! wget -q "https://developer.download.nvidia.com/compute/cuda/repos/debian12/x86_64/${CUDA_REPO_PKG}" -O /tmp/${CUDA_REPO_PKG}; then \
+            echo "Warning: Could not download CUDA repo package, trying alternative method"; \
+            # Use nvidia/cuda base image approach instead
+            exit 1; \
+        fi; \
+    fi; \
+    dpkg -i /tmp/${CUDA_REPO_PKG} || apt-get install -yf; \
+    rm -f /tmp/${CUDA_REPO_PKG}; \
+    # Update package lists
+    apt-get update; \
+    # Install CUDA toolkit (development version for building)
+    # Try version-specific packages first, then fallback
+    if apt-cache show cuda-toolkit-${CUDA_MAJOR}-${CUDA_MINOR} > /dev/null 2>&1; then \
+        apt-get install -y --no-install-recommends \
+            cuda-toolkit-${CUDA_MAJOR}-${CUDA_MINOR} \
+            cuda-libraries-dev-${CUDA_MAJOR}-${CUDA_MINOR}; \
+    elif apt-cache show cuda-toolkit-${CUDA_MAJOR} > /dev/null 2>&1; then \
+        apt-get install -y --no-install-recommends \
+            cuda-toolkit-${CUDA_MAJOR} \
+            cuda-libraries-dev-${CUDA_MAJOR}; \
+    else \
+        apt-get install -y --no-install-recommends \
+            cuda-toolkit \
+            cuda-libraries-dev; \
+    fi; \
+    # Create symlink for CUDA (find the actual installed version)
+    if [ -d "/usr/local/cuda-${CUDA_VERSION}" ]; then \
+        ln -sf /usr/local/cuda-${CUDA_VERSION} /usr/local/cuda; \
+    elif [ -d "/usr/local/cuda-${CUDA_MAJOR}.${CUDA_MINOR}" ]; then \
+        ln -sf /usr/local/cuda-${CUDA_MAJOR}.${CUDA_MINOR} /usr/local/cuda; \
+    elif [ -d "/usr/local/cuda-${CUDA_MAJOR}" ]; then \
+        ln -sf /usr/local/cuda-${CUDA_MAJOR} /usr/local/cuda; \
+    else \
+        CUDA_DIR=$(ls -d /usr/local/cuda-* 2>/dev/null | head -1); \
+        if [ -n "$CUDA_DIR" ]; then \
+            ln -sf "$CUDA_DIR" /usr/local/cuda; \
+        fi; \
+    fi; \
+    # Cleanup
+    rm -rf /var/lib/apt/lists/*
+
+# Install ONNX Runtime with GPU providers (CUDA/TensorRT)
+RUN set -eux; \
+    arch="$(dpkg --print-architecture)"; \
+    case "$arch" in \
+        amd64) onnx_pkg="onnxruntime-linux-x64-gpu-${ONNX_VERSION}.tgz" ;; \
+        arm64) onnx_pkg="onnxruntime-linux-aarch64-gpu-${ONNX_VERSION}.tgz" ;; \
+        *) echo "Unsupported architecture for ONNX Runtime GPU: ${arch}" >&2; exit 1 ;; \
+    esac; \
+    curl -fsSL "https://github.com/microsoft/onnxruntime/releases/download/v${ONNX_VERSION}/${onnx_pkg}" -o /tmp/onnxruntime.tgz; \
+    mkdir -p /tmp/onnxruntime; \
+    tar -xzf /tmp/onnxruntime.tgz -C /tmp/onnxruntime --strip-components=1; \
+    mv /tmp/onnxruntime ${ONNX_PATH}; \
+    rm -f /tmp/onnxruntime.tgz
+
+# Copy packaging directory and NeuronDB source from repository root
+COPY packaging /tmp/packaging
+COPY NeuronDB /tmp/NeuronDB
+
+# Build and install the DEB package with CUDA support
+RUN set -eux; \
+    cd /tmp/packaging/deb/neurondb && \
+    # Set CUDA environment for package build
+    export CUDA_PATH=/usr/local/cuda && \
+    export GPU_BACKENDS=cuda && \
+    VERSION="${PACKAGE_VERSION}" ./build.sh && \
+    DEB_FILE="neurondb_${PACKAGE_VERSION}_amd64.deb" && \
+    if [ -f "$DEB_FILE" ]; then \
+        dpkg -i "$DEB_FILE" || apt-get install -yf; \
+        rm -f "$DEB_FILE"; \
+    else \
+        echo "Error: DEB package not found after build" >&2; \
+        exit 1; \
+    fi && \
+    rm -rf /tmp/packaging
+
+# Copy helper init scripts
+COPY NeuronDB/docker/docker-entrypoint-initdb.d/ /docker-entrypoint-initdb.d/
+RUN chmod +x /docker-entrypoint-initdb.d/*.sh 2>/dev/null || true
+
+# PostgreSQL 18+ uses /var/lib/postgresql instead of /var/lib/postgresql/data
+VOLUME ["/var/lib/postgresql"]
+
+HEALTHCHECK --interval=30s --timeout=5s --retries=5 \
+    CMD pg_isready -U "${POSTGRES_USER:-postgres}"
+
+# Default entrypoint inherited from postgres image
+

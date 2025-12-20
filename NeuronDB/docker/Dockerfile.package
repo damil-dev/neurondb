@@ -1,0 +1,142 @@
+# syntax=docker/dockerfile:1.6
+#
+# NeuronDB Docker image using pre-built DEB packages
+# This approach is faster and more reproducible than building from source
+#
+# Supports:
+#   - PostgreSQL: 16, 17, 18 (via PG_MAJOR build arg)
+#   - OS: Debian Bookworm (via postgres base image)
+#
+# Build args:
+#   PG_MAJOR: PostgreSQL major version (16, 17, or 18, default: 17)
+#   PACKAGE_VERSION: NeuronDB package version (default: 1.0.0.beta)
+#   VERSION: Application version (used in labels)
+#   BUILD_DATE: Build date (ISO 8601 format)
+#   VCS_REF: Git commit hash or version control reference
+#
+# Usage:
+#   docker build -f docker/Dockerfile.package \
+#     --build-arg PG_MAJOR=18 \
+#     --build-arg PACKAGE_VERSION=1.0.0.beta \
+#     -t neurondb:package-pg18 \
+#     --build-context packaging=../packaging \
+#     .
+
+ARG PG_MAJOR=17
+ARG PACKAGE_VERSION=1.0.0.beta
+ARG VERSION=latest
+ARG BUILD_DATE
+ARG VCS_REF
+
+FROM postgres:${PG_MAJOR}-bookworm
+
+ARG PG_MAJOR
+ARG PACKAGE_VERSION
+ARG VERSION
+ARG BUILD_DATE
+ARG VCS_REF
+
+# Add metadata labels
+LABEL org.opencontainers.image.title="NeuronDB" \
+      org.opencontainers.image.description="PostgreSQL extension for vector search, ML algorithms, and RAG capabilities" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.created="${BUILD_DATE}" \
+      org.opencontainers.image.revision="${VCS_REF}" \
+      org.opencontainers.image.vendor="neurondb" \
+      org.opencontainers.image.licenses="AGPL-3.0" \
+      org.opencontainers.image.source="https://github.com/neurondb/NeurondB" \
+      org.opencontainers.image.documentation="https://neurondb.ai/docs" \
+      maintainer="neurondb <admin@neurondb.com>" \
+      neurondb.postgresql.version="${PG_MAJOR}" \
+      neurondb.package.version="${PACKAGE_VERSION}" \
+      neurondb.build.method="package"
+
+ENV LANG=C.UTF-8
+
+# Install build and runtime dependencies
+ARG ONNX_VERSION=1.17.0
+ENV ONNX_PATH=/usr/local/onnxruntime
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        libcurl4 \
+        libssl3 \
+        ca-certificates \
+        dpkg-dev \
+        fakeroot \
+        build-essential \
+        clang \
+        cmake \
+        make \
+        git \
+        curl \
+        wget \
+        pkg-config \
+        libssl-dev \
+        libcurl4-openssl-dev \
+        zlib1g-dev \
+        python3 \
+        python3-pip \
+        postgresql-server-dev-${PG_MAJOR} && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install ONNX Runtime (CPU build) matching architecture
+RUN set -eux; \
+    arch="$(dpkg --print-architecture)"; \
+    case "$arch" in \
+        amd64) onnx_pkg="onnxruntime-linux-x64-${ONNX_VERSION}.tgz" ;; \
+        arm64) onnx_pkg="onnxruntime-linux-aarch64-${ONNX_VERSION}.tgz" ;; \
+        *) echo "Unsupported architecture for ONNX Runtime: ${arch}" >&2; exit 1 ;; \
+    esac; \
+    curl -fsSL "https://github.com/microsoft/onnxruntime/releases/download/v${ONNX_VERSION}/${onnx_pkg}" -o /tmp/onnxruntime.tgz; \
+    mkdir -p /tmp/onnxruntime; \
+    tar -xzf /tmp/onnxruntime.tgz -C /tmp/onnxruntime --strip-components=1; \
+    mv /tmp/onnxruntime ${ONNX_PATH}; \
+    rm -f /tmp/onnxruntime.tgz
+
+# Copy packaging directory and NeuronDB source from repository root
+# Build context should be set to repository root: docker build -f NeuronDB/docker/Dockerfile.package .
+COPY packaging /tmp/packaging
+COPY NeuronDB /tmp/NeuronDB
+
+# Build and install the DEB package
+# The package build script will detect PostgreSQL versions and build accordingly
+RUN set -eux; \
+    cd /tmp/packaging/deb/neurondb && \
+    VERSION="${PACKAGE_VERSION}" ./build.sh && \
+    DEB_FILE="neurondb_${PACKAGE_VERSION}_amd64.deb" && \
+    if [ -f "$DEB_FILE" ]; then \
+        dpkg -i "$DEB_FILE" || apt-get install -yf; \
+        rm -f "$DEB_FILE"; \
+    else \
+        echo "Error: DEB package not found after build" >&2; \
+        exit 1; \
+    fi && \
+    rm -rf /tmp/packaging
+
+# Copy helper init scripts
+COPY NeuronDB/docker/docker-entrypoint-initdb.d/ /docker-entrypoint-initdb.d/
+RUN chmod +x /docker-entrypoint-initdb.d/*.sh 2>/dev/null || true
+
+# Create a post-startup script that ensures shared_preload_libraries is configured
+# This runs after PostgreSQL is fully initialized
+RUN echo '#!/bin/bash' > /usr/local/bin/post-startup-neurondb.sh && \
+    echo 'set -e' >> /usr/local/bin/post-startup-neurondb.sh && \
+    echo 'CONF_FILE=$(find /var/lib/postgresql -name postgresql.conf -type f 2>/dev/null | head -1)' >> /usr/local/bin/post-startup-neurondb.sh && \
+    echo 'if [ -n "$CONF_FILE" ] && ! grep -q "shared_preload_libraries.*neurondb" "$CONF_FILE" 2>/dev/null; then' >> /usr/local/bin/post-startup-neurondb.sh && \
+    echo '  echo "shared_preload_libraries = '\''neurondb'\''" >> "$CONF_FILE"' >> /usr/local/bin/post-startup-neurondb.sh && \
+    echo '  echo "neurondb.compute_mode = 0" >> "$CONF_FILE"' >> /usr/local/bin/post-startup-neurondb.sh && \
+    echo '  echo "neurondb.gpu_backend_type = 0" >> "$CONF_FILE"' >> /usr/local/bin/post-startup-neurondb.sh && \
+    echo '  echo "[post-startup] Configured NeuronDB in $CONF_FILE"' >> /usr/local/bin/post-startup-neurondb.sh && \
+    echo 'fi' >> /usr/local/bin/post-startup-neurondb.sh && \
+    chmod +x /usr/local/bin/post-startup-neurondb.sh
+
+# PostgreSQL 18+ uses /var/lib/postgresql instead of /var/lib/postgresql/data
+# The base postgres image handles this automatically
+VOLUME ["/var/lib/postgresql"]
+
+HEALTHCHECK --interval=30s --timeout=5s --retries=5 \
+    CMD pg_isready -U "${POSTGRES_USER:-postgres}"
+
+# Default entrypoint inherited from postgres image
+
