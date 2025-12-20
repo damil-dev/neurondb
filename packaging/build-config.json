@@ -1,0 +1,42 @@
+{
+  "version": "1.0.0.beta",
+  "architecture": "amd64",
+  "neurondb": {
+    "postgresql_versions": ["16", "17", "18"],
+    "gpu_backends": "none",
+    "compute_mode": "cpu",
+    "build_args": {
+      "CXXFLAGS": "",
+      "CFLAGS": "",
+      "LDFLAGS": ""
+    },
+    "cuda": {
+      "enabled": false,
+      "path": "",
+      "version": ""
+    },
+    "rocm": {
+      "enabled": false,
+      "path": "",
+      "version": ""
+    },
+    "metal": {
+      "enabled": false
+    }
+  },
+  "neuronagent": {
+    "build_args": {
+      "CGO_ENABLED": "0",
+      "GOOS": "linux",
+      "ldflags": "-w -s"
+    }
+  },
+  "neuronmcp": {
+    "build_args": {
+      "CGO_ENABLED": "0",
+      "GOOS": "linux",
+      "ldflags": "-w -s"
+    }
+  }
+}
+

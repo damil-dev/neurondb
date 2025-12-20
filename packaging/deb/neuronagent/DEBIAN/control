@@ -1,0 +1,22 @@
+Package: neuronagent
+Version: 1.0.0.beta
+Section: database
+Priority: optional
+Architecture: amd64
+Depends: postgresql-client, ca-certificates, libc6 (>= 2.17)
+Maintainer: neurondb <admin@neurondb.com>
+Description: NeuronAgent - AI Agent Runtime System
+ NeuronAgent is a production-ready AI agent runtime system that provides
+ REST API and WebSocket endpoints for building applications with long-term
+ memory and tool execution.
+ .
+ Features:
+  - Agent state machine for autonomous task execution
+  - Long-term memory with HNSW vector search
+  - Tool registry (SQL, HTTP, code execution, shell commands)
+  - REST API for agent, session, and message management
+  - WebSocket support for streaming responses
+  - API key authentication with rate limiting
+  - Background job queue with worker pool
+  - Direct integration with NeuronDB embedding and LLM functions
+

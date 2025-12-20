@@ -1,0 +1,18 @@
+#!/bin/bash
+set -e
+
+# Pre-removal script for NeuronAgent
+
+# Stop service if running
+if systemctl is-active --quiet neuronagent.service 2>/dev/null; then
+    echo "Stopping NeuronAgent service..."
+    systemctl stop neuronagent.service
+fi
+
+# Disable service
+if systemctl is-enabled --quiet neuronagent.service 2>/dev/null; then
+    systemctl disable neuronagent.service
+fi
+
+exit 0
+
