@@ -55,3 +55,5 @@ cp "$RPMBUILD_DIR/RPMS"/*/neuronmcp-${VERSION}-*.rpm "$REPO_ROOT/packaging/rpm/n
 
 echo "RPM package built: $(ls -1 $REPO_ROOT/packaging/rpm/neuronmcp/neuronmcp-${VERSION}-*.rpm 2>/dev/null | head -1)"
 
+
+

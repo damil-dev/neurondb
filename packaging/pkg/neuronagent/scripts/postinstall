@@ -1,0 +1,13 @@
+#!/bin/bash
+
+# Post-install script for NeuronAgent macOS package
+
+echo "NeuronAgent installed successfully."
+echo ""
+echo "Configuration file: /etc/neuronagent/config.yaml.example"
+echo "Copy it to config.yaml and edit as needed:"
+echo "  sudo cp /etc/neuronagent/config.yaml.example /etc/neuronagent/config.yaml"
+echo ""
+echo "To run NeuronAgent:"
+echo "  /usr/local/bin/neuronagent"
+

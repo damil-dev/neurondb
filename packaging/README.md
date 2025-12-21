@@ -1,6 +1,6 @@
 # NeuronDB Ecosystem Packaging
 
-This directory contains scripts to build DEB (Debian/Ubuntu) and RPM (RHEL/CentOS/Rocky) packages for the NeuronDB ecosystem components.
+This directory contains scripts to build DEB (Debian/Ubuntu), RPM (RHEL/CentOS/Rocky), and macOS (.pkg) packages for the NeuronDB ecosystem components.
 
 ## Components
 
@@ -87,6 +87,7 @@ export PACKAGING_CONFIG=/path/to/custom-config.json
 - `build-config.example.json` - Template with all options documented
 - `build-config.cuda.json` - Example for CUDA builds
 - `build-config.rocm.json` - Example for ROCm builds
+- `build-config.metal.json` - Example for Metal builds (macOS)
 
 To use an example config:
 ```bash
@@ -122,6 +123,22 @@ sudo dnf install -y postgresql17-devel postgresql16-devel postgresql18-devel
 sudo dnf install -y golang  # Or install Go 1.23+ from golang.org
 ```
 
+### For macOS Packages (.pkg)
+
+```bash
+# macOS requires Xcode Command Line Tools
+xcode-select --install
+
+# Install Homebrew if not already installed
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# For NeuronDB - install PostgreSQL via Homebrew
+brew install postgresql@17  # or postgresql@16, postgresql@18
+
+# For Go services - install Go
+brew install go  # Or install Go 1.23+ from golang.org
+```
+
 ## Building Packages
 
 ### Build All Packages
@@ -136,6 +153,12 @@ cd packaging/deb
 ```bash
 cd packaging/rpm
 ./build-all-rpm.sh [VERSION]
+```
+
+**macOS packages (.pkg):**
+```bash
+cd packaging/pkg
+./build-all-pkg.sh [VERSION]
 ```
 
 Default version is `1.0.0.beta`. Override by passing version as argument or setting `VERSION` environment variable.
@@ -170,31 +193,37 @@ cd packaging/deb/neuronmcp
 # Or for RPM
 cd packaging/rpm/neuronmcp
 ./build.sh
+
+# Or for macOS
+cd packaging/pkg/neuronmcp
+./build.sh
 ```
 
 ## Package Contents
 
 ### NeuronDB Package
 
-- **Binary**: `neurondb.so` installed to PostgreSQL extension directory
+- **Binary**: `neurondb.so` (Linux) or `neurondb.dylib` (macOS) installed to PostgreSQL extension directory
 - **SQL files**: Extension SQL and control files
 - **Location**: Built for all installed PostgreSQL versions (16, 17, 18)
+  - Linux: `/usr/lib/postgresql/*/lib/` and `/usr/share/postgresql/*/extension/`
+  - macOS: `/opt/homebrew/opt/postgresql@*/lib/` and `/opt/homebrew/opt/postgresql@*/share/postgresql/extension/` (Apple Silicon)
 
 ### NeuronAgent Package
 
-- **Binary**: `/usr/bin/neuronagent`
+- **Binary**: `/usr/bin/neuronagent` (Linux) or `/usr/local/bin/neuronagent` (macOS)
 - **Configuration**: `/etc/neuronagent/config.yaml.example`
-- **Migrations**: `/usr/share/neuronagent/migrations/`
-- **Systemd service**: `/etc/systemd/system/neuronagent.service`
-- **User**: `neuronagent` (created automatically)
-- **Directories**: `/var/lib/neuronagent`, `/var/log/neuronagent`
+- **Migrations**: `/usr/share/neuronagent/migrations/` (Linux) or `/usr/local/share/neuronagent/migrations/` (macOS)
+- **Systemd service**: `/etc/systemd/system/neuronagent.service` (Linux only)
+- **User**: `neuronagent` (Linux only, created automatically)
+- **Directories**: `/var/lib/neuronagent`, `/var/log/neuronagent` (Linux only)
 
 ### NeuronMCP Package
 
-- **Binary**: `/usr/bin/neurondb-mcp`
+- **Binary**: `/usr/bin/neurondb-mcp` (Linux) or `/usr/local/bin/neurondb-mcp` (macOS)
 - **Configuration**: `/etc/neuronmcp/mcp-config.json.example`
-- **User**: `neuronmcp` (created automatically)
-- **Directories**: `/var/lib/neuronmcp`, `/var/log/neuronmcp`
+- **User**: `neuronmcp` (Linux only, created automatically)
+- **Directories**: `/var/lib/neuronmcp`, `/var/log/neuronmcp` (Linux only)
 
 ## Installation
 
@@ -217,6 +246,17 @@ sudo apt-get install -f
 sudo rpm -ivh neurondb-1.0.0.beta-1.el*.rpm
 sudo rpm -ivh neuronagent-1.0.0.beta-1.el*.rpm
 sudo rpm -ivh neuronmcp-1.0.0.beta-1.el*.rpm
+```
+
+### macOS Packages (.pkg)
+
+```bash
+# Install individual packages
+sudo installer -pkg neurondb-1.0.0.beta-arm64.pkg -target /
+sudo installer -pkg neuronagent-1.0.0.beta-arm64.pkg -target /
+sudo installer -pkg neuronmcp-1.0.0.beta-arm64.pkg -target /
+
+# Or use the installer GUI by double-clicking the .pkg file
 ```
 
 ## Post-Installation
@@ -242,18 +282,30 @@ sudo rpm -ivh neuronmcp-1.0.0.beta-1.el*.rpm
 
 1. Configure database connection:
    ```bash
+   # Linux
+   sudo nano /etc/neuronagent/config.yaml
+   
+   # macOS
    sudo nano /etc/neuronagent/config.yaml
    ```
 
 2. Start the service:
    ```bash
+   # Linux (systemd)
    sudo systemctl start neuronagent
    sudo systemctl enable neuronagent
+   
+   # macOS (run manually or use launchd)
+   /usr/local/bin/neuronagent
    ```
 
 3. Check status:
    ```bash
+   # Linux
    sudo systemctl status neuronagent
+   curl http://localhost:8080/health
+   
+   # macOS
    curl http://localhost:8080/health
    ```
 
@@ -305,6 +357,20 @@ packaging/
 │   │   ├── neuronmcp.spec
 │   │   └── build.sh
 │   └── build-all-rpm.sh     # Master build script
+├── pkg/
+│   ├── neurondb/
+│   │   ├── scripts/
+│   │   │   └── postinstall  # Post-install script
+│   │   └── build.sh         # macOS package build script
+│   ├── neuronagent/
+│   │   ├── scripts/
+│   │   │   └── postinstall
+│   │   └── build.sh
+│   ├── neuronmcp/
+│   │   ├── scripts/
+│   │   │   └── postinstall
+│   │   └── build.sh
+│   └── build-all-pkg.sh     # Master build script for macOS
 └── README.md                 # This file
 ```
 

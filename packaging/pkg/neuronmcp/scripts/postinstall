@@ -1,0 +1,13 @@
+#!/bin/bash
+
+# Post-install script for NeuronMCP macOS package
+
+echo "NeuronMCP installed successfully."
+echo ""
+echo "Configuration file: /etc/neuronmcp/mcp-config.json.example"
+echo "Copy it to mcp-config.json and edit as needed:"
+echo "  sudo cp /etc/neuronmcp/mcp-config.json.example /etc/neuronmcp/mcp-config.json"
+echo ""
+echo "To use with MCP clients (e.g., Claude Desktop), configure them to use:"
+echo "  /usr/local/bin/neurondb-mcp"
+

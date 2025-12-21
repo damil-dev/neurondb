@@ -18,3 +18,5 @@ echo "Installed for PostgreSQL versions: $(echo $PG_VERSIONS | tr '\n' ' ')"
 
 exit 0
 
+
+

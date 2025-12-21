@@ -7,6 +7,8 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PACKAGING_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+REPO_ROOT="$(cd "$PACKAGING_DIR/.." && pwd)"
+REPO_RPM_DIR="$REPO_ROOT/repo/rpm"
 
 # Load configuration
 if [ -f "$PACKAGING_DIR/config-loader.sh" ]; then
@@ -29,6 +31,33 @@ if ! command -v rpmbuild &> /dev/null; then
     exit 1
 fi
 
+# Function to place RPM package in repository structure
+place_rpm_in_repo() {
+    local package_file="$1"
+    
+    if [ ! -f "$package_file" ]; then
+        echo "Warning: Package file not found: $package_file"
+        return 1
+    fi
+    
+    # Extract EL version from package name (e.g., neurondb-1.0.0.beta-1.el9.x86_64.rpm -> el9)
+    local el_version=$(basename "$package_file" | grep -oE '\.el[0-9]+\.' | sed 's/\.el\([0-9]\+\)\./\1/' | head -1)
+    
+    if [ -z "$el_version" ]; then
+        echo "Warning: Could not extract EL version from package name: $package_file"
+        echo "Skipping repo placement"
+        return 1
+    fi
+    
+    # Create destination directory: repo/rpm/el<version>/x86_64/
+    local dest_dir="$REPO_RPM_DIR/el${el_version}/x86_64"
+    mkdir -p "$dest_dir"
+    
+    # Copy package to repo
+    cp "$package_file" "$dest_dir/"
+    echo "Placed package in repository: $dest_dir/$(basename "$package_file")"
+}
+
 # Build NeuronDB
 echo "Building NeuronDB RPM package..."
 cd "$SCRIPT_DIR/neurondb"
@@ -38,6 +67,12 @@ if [ $? -ne 0 ]; then
     echo "Error: NeuronDB RPM build failed"
     exit 1
 fi
+# Place package(s) in repo structure
+for RPM_FILE in "$SCRIPT_DIR/neurondb"/*.rpm; do
+    if [ -f "$RPM_FILE" ]; then
+        place_rpm_in_repo "$RPM_FILE"
+    fi
+done
 echo ""
 
 # Build NeuronAgent
@@ -49,6 +84,12 @@ if [ $? -ne 0 ]; then
     echo "Error: NeuronAgent RPM build failed"
     exit 1
 fi
+# Place package(s) in repo structure
+for RPM_FILE in "$SCRIPT_DIR/neuronagent"/*.rpm; do
+    if [ -f "$RPM_FILE" ]; then
+        place_rpm_in_repo "$RPM_FILE"
+    fi
+done
 echo ""
 
 # Build NeuronMCP
@@ -60,6 +101,12 @@ if [ $? -ne 0 ]; then
     echo "Error: NeuronMCP RPM build failed"
     exit 1
 fi
+# Place package(s) in repo structure
+for RPM_FILE in "$SCRIPT_DIR/neuronmcp"/*.rpm; do
+    if [ -f "$RPM_FILE" ]; then
+        place_rpm_in_repo "$RPM_FILE"
+    fi
+done
 echo ""
 
 echo "=========================================="

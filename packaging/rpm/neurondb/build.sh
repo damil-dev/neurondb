@@ -54,6 +54,17 @@ cp "$REPO_ROOT/packaging/rpm/neurondb/neurondb.spec" "$RPMBUILD_DIR/SPECS/"
 # Update version in spec file
 sed -i "s/Version: .*/Version: $VERSION/" "$RPMBUILD_DIR/SPECS/neurondb.spec"
 
+# Add GPU dependencies if GPU backend is enabled
+if [ -f "$PACKAGING_DIR/config-loader.sh" ]; then
+    GPU_DEPS=$(get_gpu_deps_rpm)
+    if [ -n "$GPU_DEPS" ]; then
+        # Add GPU dependencies to the Requires line
+        # This appends the GPU deps after the existing requirements
+        sed -i "s/^Requires: \(.*\)$/Requires: \1, $GPU_DEPS/" "$RPMBUILD_DIR/SPECS/neurondb.spec"
+        echo "Added GPU dependencies: $GPU_DEPS"
+    fi
+fi
+
 # Extract source for build
 cd "$RPMBUILD_DIR/BUILD"
 tar xzf "$RPMBUILD_DIR/SOURCES/$TARBALL_NAME"

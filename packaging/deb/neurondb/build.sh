@@ -160,6 +160,17 @@ chmod +x "$PACKAGE_DIR/DEBIAN/prerm"
 # Update version in control file
 sed -i "s/Version: .*/Version: $VERSION/" "$PACKAGE_DIR/DEBIAN/control"
 
+# Add GPU dependencies if GPU backend is enabled
+if [ -f "$PACKAGING_DIR/config-loader.sh" ]; then
+    GPU_DEPS=$(get_gpu_deps_deb)
+    if [ -n "$GPU_DEPS" ]; then
+        # Add GPU dependencies to the Depends line
+        # This appends the GPU deps after the existing dependencies
+        sed -i "s/^Depends: \(.*\)$/Depends: \1, $GPU_DEPS/" "$PACKAGE_DIR/DEBIAN/control"
+        echo "Added GPU dependencies: $GPU_DEPS"
+    fi
+fi
+
 # Build package
 echo "Building DEB package..."
 cd "$SCRIPT_DIR"
