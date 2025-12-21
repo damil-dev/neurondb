@@ -1,5 +1,9 @@
 # NeuronDB Ecosystem
 
+<div align="center">
+  <img src="NeuronDB/neurondb.png" alt="NeuronDB Logo" width="200">
+</div>
+
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16%2C17%2C18-blue.svg)](https://www.postgresql.org/)
 [![License](https://img.shields.io/badge/License-Proprietary-red.svg)](LICENSE)
 [![Documentation](https://img.shields.io/badge/docs-latest-brightgreen.svg)](https://www.neurondb.ai/docs)
