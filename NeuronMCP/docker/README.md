@@ -22,50 +22,79 @@ NeuronMCP Docker container runs the MCP server service. Connects to an external 
 
 ## Quick Start
 
-### Step 1: Copy Environment File
+**Prerequisites**: NeuronDB container must be running first. See [NeuronDB Docker README](../../NeuronDB/docker/README.md).
+
+### Step 1: Navigate to Directory
 
 ```bash
-cp .env.example .env
+cd /path/to/neurondb/NeuronMCP/docker
 ```
 
-### Step 2: Configure Database Connection
-
-Edit `.env` file:
-
-```env
-NEURONDB_HOST=localhost
-NEURONDB_PORT=5433
-NEURONDB_DATABASE=neurondb
-NEURONDB_USER=neurondb
-NEURONDB_PASSWORD=neurondb
-```
-
-### Step 3: Build and Start
+### Step 2: Build Image
 
 ```bash
-docker compose build
-docker compose up -d
+# Build from repository root
+cd /path/to/neurondb
+sudo docker build -f NeuronMCP/docker/Dockerfile.package \
+  --build-arg PACKAGE_VERSION=1.0.0.beta \
+  -t neuronmcp:package .
+```
+
+### Step 3: Start Container
+
+```bash
+# Start NeuronMCP container
+sudo docker run -d --name neuronmcp \
+  -e NEURONDB_HOST=localhost \
+  -e NEURONDB_PORT=5433 \
+  -e NEURONDB_DATABASE=neurondb \
+  -e NEURONDB_USER=neurondb \
+  -e NEURONDB_PASSWORD=neurondb \
+  --network host \
+  neuronmcp:package
+```
+
+**Note**: Using `--network host` allows connection to `localhost:5433`. For Docker network, use container name:
+
+```bash
+# If NeuronDB is in Docker network
+sudo docker run -d --name neuronmcp \
+  -e NEURONDB_HOST=neurondb-cpu \
+  -e NEURONDB_PORT=5432 \
+  -e NEURONDB_DATABASE=neurondb \
+  -e NEURONDB_USER=neurondb \
+  -e NEURONDB_PASSWORD=neurondb \
+  --network neurondb-network \
+  neuronmcp:package
 ```
 
 ### Step 4: Verify Installation
 
+Wait for container to be ready:
+
+```bash
+sleep 10
+```
+
 Check container status:
 
 ```bash
-docker compose ps
+sudo docker ps | grep neuronmcp
 ```
 
 View logs:
 
 ```bash
-docker compose logs neurondb-mcp
+sudo docker logs neuronmcp
 ```
 
-Test stdio communication:
+Test stdio communication (MCP protocol):
 
 ```bash
-docker compose exec neurondb-mcp ./neurondb-mcp
+sudo docker exec -i neuronmcp ./neurondb-mcp
 ```
+
+For MCP client configuration, see [Claude Desktop Configuration](../README.md#claude-desktop-configuration).
 
 ## Configuration
 
