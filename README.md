@@ -1,7 +1,7 @@
 # NeuronDB Ecosystem
 
 <div align="center">
-  <img src="NeuronDB/neurondb.png" alt="NeuronDB Logo" width="200">
+  <img src="neurondb.png" alt="NeuronDB Logo" width="200">
 </div>
 
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16%2C17%2C18-blue.svg)](https://www.postgresql.org/)
