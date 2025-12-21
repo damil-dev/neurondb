@@ -88,11 +88,12 @@ services:
     - cuda
     - gpu
     build:
-      context: ./NeuronDB
-      dockerfile: docker/Dockerfile.gpu.cuda
+      context: .
+      dockerfile: NeuronDB/docker/Dockerfile.package.cuda
       args:
         PG_MAJOR: ${PG_MAJOR:-17}
-        CUDA_VERSION: ${CUDA_VERSION:-12.4.1}
+        CUDA_VERSION: ${CUDA_VERSION:-12.2.0}
+        PACKAGE_VERSION: ${PACKAGE_VERSION:-1.0.0.beta}
         ONNX_VERSION: ${ONNX_VERSION:-1.17.0}
         ENABLE_RAPIDS: ${ENABLE_RAPIDS:-0}
         VERSION: ${VERSION:-latest}
@@ -142,8 +143,9 @@ services:
     networks:
     - neurondb-network
     # GPU access via runtime (requires nvidia-container-toolkit)
-    # Use: docker run --gpus all or docker-compose with runtime
-    runtime: nvidia
+    # Runtime is optional - container will run without GPU if nvidia runtime not available
+    # To enable GPU: install nvidia-container-toolkit and uncomment the runtime line below
+    # runtime: nvidia
     environment:
       NVIDIA_VISIBLE_DEVICES: ${NVIDIA_VISIBLE_DEVICES:-all}
       NVIDIA_DRIVER_CAPABILITIES: ${NVIDIA_DRIVER_CAPABILITIES:-compute,utility}

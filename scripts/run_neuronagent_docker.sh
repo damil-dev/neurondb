@@ -62,9 +62,9 @@ case "${1:-run}" in
         export DB_HOST DB_PORT DB_NAME DB_USER DB_PASSWORD SERVER_PORT
         
         if [ "$USE_PROFILES" = true ]; then
-            $DOCKER_COMPOSE_CMD --profile cpu up -d neuronagent
+            $DOCKER_COMPOSE_CMD --profile cpu up -d --no-deps neuronagent
         else
-            $DOCKER_COMPOSE_CMD up -d neuronagent
+            $DOCKER_COMPOSE_CMD up -d --no-deps neuronagent
         fi
         echo "NeuronAgent is starting..."
         echo "API endpoint: http://localhost:${SERVER_PORT}"

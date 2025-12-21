@@ -89,13 +89,49 @@ case "${1:-run}" in
     run)
         echo "Starting NeuronDB container (PostgreSQL ${PG_MAJOR}, ${VARIANT} variant)..."
         export PG_MAJOR="${PG_MAJOR}"
+        export POSTGRES_USER="${POSTGRES_USER:-neurondb}"
+        export POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-neurondb}"
+        export POSTGRES_DB="${POSTGRES_DB:-neurondb}"
         if [ "$VARIANT" = "cuda" ]; then
             export CUDA_VERSION="${CUDA_VERSION:-12.4.1}"
             export ONNX_VERSION="${ONNX_VERSION:-1.17.0}"
+            # Try docker-compose first, fallback to docker run if it fails
             if [ "$USE_PROFILES" = true ]; then
-                $DOCKER_COMPOSE_CMD --profile ${PROFILE} up -d ${SERVICE_NAME}
+                if ! $DOCKER_COMPOSE_CMD --profile ${PROFILE} up -d ${SERVICE_NAME} 2>/dev/null; then
+                    echo "docker-compose failed, using docker run directly..."
+                    # Ensure network exists
+                    docker network create neurondb-network 2>/dev/null || true
+                    # Start with docker run
+                    docker run -d --name ${CONTAINER_NAME} \
+                        --network neurondb-network \
+                        -p ${PORT}:5432 \
+                        -e POSTGRES_USER="${POSTGRES_USER}" \
+                        -e POSTGRES_PASSWORD="${POSTGRES_PASSWORD}" \
+                        -e POSTGRES_DB="${POSTGRES_DB}" \
+                        -e POSTGRES_HOST_AUTH_METHOD=md5 \
+                        -e NEURONDB_GPU_BACKEND_TYPE=1 \
+                        -e NEURONDB_COMPUTE_MODE=1 \
+                        -v neurondb-cuda-data:/var/lib/postgresql \
+                        neurondb:cuda-pg${PG_MAJOR} 2>/dev/null || \
+                    docker start ${CONTAINER_NAME} 2>/dev/null
+                fi
             else
-                $DOCKER_COMPOSE_CMD up -d ${SERVICE_NAME}
+                if ! $DOCKER_COMPOSE_CMD up -d ${SERVICE_NAME} 2>/dev/null; then
+                    echo "docker-compose failed, using docker run directly..."
+                    docker network create neurondb-network 2>/dev/null || true
+                    docker run -d --name ${CONTAINER_NAME} \
+                        --network neurondb-network \
+                        -p ${PORT}:5432 \
+                        -e POSTGRES_USER="${POSTGRES_USER}" \
+                        -e POSTGRES_PASSWORD="${POSTGRES_PASSWORD}" \
+                        -e POSTGRES_DB="${POSTGRES_DB}" \
+                        -e POSTGRES_HOST_AUTH_METHOD=md5 \
+                        -e NEURONDB_GPU_BACKEND_TYPE=1 \
+                        -e NEURONDB_COMPUTE_MODE=1 \
+                        -v neurondb-cuda-data:/var/lib/postgresql \
+                        neurondb:cuda-pg${PG_MAJOR} 2>/dev/null || \
+                    docker start ${CONTAINER_NAME} 2>/dev/null
+                fi
             fi
         else
             if [ "$USE_PROFILES" = true ]; then
