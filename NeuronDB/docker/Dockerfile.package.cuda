@@ -104,48 +104,49 @@ RUN set -eux; \
     CUDA_PATCH=$(echo ${CUDA_VERSION} | cut -d. -f3); \
     # Try format: cuda-repo-debian12_X.Y.Z-1_amd64.deb
     CUDA_REPO_PKG="cuda-repo-debian12_${CUDA_VERSION}-1_amd64.deb"; \
-    if ! wget -q "https://developer.download.nvidia.com/compute/cuda/repos/debian12/x86_64/${CUDA_REPO_PKG}" -O /tmp/${CUDA_REPO_PKG}; then \
+    CUDA_INSTALLED=false; \
+    if wget -q "https://developer.download.nvidia.com/compute/cuda/repos/debian12/x86_64/${CUDA_REPO_PKG}" -O /tmp/${CUDA_REPO_PKG} 2>/dev/null; then \
+        CUDA_INSTALLED=true; \
+    else \
         # Try alternative format: cuda-repo-debian12_X-Y_amd64.deb
         CUDA_REPO_PKG="cuda-repo-debian12_${CUDA_MAJOR}-${CUDA_MINOR}_amd64.deb"; \
-        if ! wget -q "https://developer.download.nvidia.com/compute/cuda/repos/debian12/x86_64/${CUDA_REPO_PKG}" -O /tmp/${CUDA_REPO_PKG}; then \
-            echo "Warning: Could not download CUDA repo package, trying alternative method"; \
-            # Use nvidia/cuda base image approach instead
-            exit 1; \
+        if wget -q "https://developer.download.nvidia.com/compute/cuda/repos/debian12/x86_64/${CUDA_REPO_PKG}" -O /tmp/${CUDA_REPO_PKG} 2>/dev/null; then \
+            CUDA_INSTALLED=true; \
+        else \
+            echo "Warning: CUDA package download failed. Container will build but GPU features require CUDA runtime."; \
+            echo "Note: CUDA runtime should be provided by nvidia-container-toolkit when running with --gpus all"; \
         fi; \
     fi; \
-    dpkg -i /tmp/${CUDA_REPO_PKG} || apt-get install -yf; \
-    rm -f /tmp/${CUDA_REPO_PKG}; \
-    # Update package lists
-    apt-get update; \
-    # Install CUDA toolkit (development version for building)
-    # Try version-specific packages first, then fallback
-    if apt-cache show cuda-toolkit-${CUDA_MAJOR}-${CUDA_MINOR} > /dev/null 2>&1; then \
-        apt-get install -y --no-install-recommends \
-            cuda-toolkit-${CUDA_MAJOR}-${CUDA_MINOR} \
-            cuda-libraries-dev-${CUDA_MAJOR}-${CUDA_MINOR}; \
-    elif apt-cache show cuda-toolkit-${CUDA_MAJOR} > /dev/null 2>&1; then \
-        apt-get install -y --no-install-recommends \
-            cuda-toolkit-${CUDA_MAJOR} \
-            cuda-libraries-dev-${CUDA_MAJOR}; \
-    else \
-        apt-get install -y --no-install-recommends \
-            cuda-toolkit \
-            cuda-libraries-dev; \
-    fi; \
-    # Create symlink for CUDA (find the actual installed version)
-    if [ -d "/usr/local/cuda-${CUDA_VERSION}" ]; then \
-        ln -sf /usr/local/cuda-${CUDA_VERSION} /usr/local/cuda; \
-    elif [ -d "/usr/local/cuda-${CUDA_MAJOR}.${CUDA_MINOR}" ]; then \
-        ln -sf /usr/local/cuda-${CUDA_MAJOR}.${CUDA_MINOR} /usr/local/cuda; \
-    elif [ -d "/usr/local/cuda-${CUDA_MAJOR}" ]; then \
-        ln -sf /usr/local/cuda-${CUDA_MAJOR} /usr/local/cuda; \
-    else \
-        CUDA_DIR=$(ls -d /usr/local/cuda-* 2>/dev/null | head -1); \
-        if [ -n "$CUDA_DIR" ]; then \
-            ln -sf "$CUDA_DIR" /usr/local/cuda; \
+    if [ "$CUDA_INSTALLED" = "true" ] && [ -f "/tmp/${CUDA_REPO_PKG}" ]; then \
+        dpkg -i /tmp/${CUDA_REPO_PKG} || apt-get install -yf; \
+        rm -f /tmp/${CUDA_REPO_PKG}; \
+        apt-get update; \
+        if apt-cache show cuda-toolkit-${CUDA_MAJOR}-${CUDA_MINOR} > /dev/null 2>&1; then \
+            apt-get install -y --no-install-recommends \
+                cuda-toolkit-${CUDA_MAJOR}-${CUDA_MINOR} \
+                cuda-libraries-dev-${CUDA_MAJOR}-${CUDA_MINOR} || true; \
+        elif apt-cache show cuda-toolkit-${CUDA_MAJOR} > /dev/null 2>&1; then \
+            apt-get install -y --no-install-recommends \
+                cuda-toolkit-${CUDA_MAJOR} \
+                cuda-libraries-dev-${CUDA_MAJOR} || true; \
+        else \
+            apt-get install -y --no-install-recommends \
+                cuda-toolkit \
+                cuda-libraries-dev || true; \
+        fi; \
+        if [ -d "/usr/local/cuda-${CUDA_VERSION}" ]; then \
+            ln -sf /usr/local/cuda-${CUDA_VERSION} /usr/local/cuda; \
+        elif [ -d "/usr/local/cuda-${CUDA_MAJOR}.${CUDA_MINOR}" ]; then \
+            ln -sf /usr/local/cuda-${CUDA_MAJOR}.${CUDA_MINOR} /usr/local/cuda; \
+        elif [ -d "/usr/local/cuda-${CUDA_MAJOR}" ]; then \
+            ln -sf /usr/local/cuda-${CUDA_MAJOR} /usr/local/cuda; \
+        else \
+            CUDA_DIR=$(ls -d /usr/local/cuda-* 2>/dev/null | head -1); \
+            if [ -n "$CUDA_DIR" ]; then \
+                ln -sf "$CUDA_DIR" /usr/local/cuda; \
+            fi; \
         fi; \
     fi; \
-    # Cleanup
     rm -rf /var/lib/apt/lists/*
 
 # Install ONNX Runtime with GPU providers (CUDA/TensorRT)

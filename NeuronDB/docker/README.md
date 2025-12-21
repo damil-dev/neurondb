@@ -18,85 +18,215 @@ All variants support:
 
 ## Quick Start
 
+All commands use package-based builds for faster, more reproducible images. Run commands from the repository root directory.
+
 ### CPU Image
 
+**Build and Run:**
+
 ```bash
-cd Neurondb/docker
+# From repository root
+cd /path/to/neurondb
 
-# Build and run CPU image (PostgreSQL 17)
-docker compose build neurondb
-docker compose up neurondb
+# Build CPU image (PostgreSQL 17)
+sudo docker build -f NeuronDB/docker/Dockerfile.package \
+  --build-arg PG_MAJOR=17 \
+  --build-arg PACKAGE_VERSION=1.0.0.beta \
+  -t neurondb:cpu-package-pg17 .
 
-# Or build directly
-docker build -f docker/Dockerfile --build-arg PG_MAJOR=17 -t neurondb:17-cpu ..
+# Start container
+sudo docker run -d --name neurondb-cpu \
+  -p 5433:5432 \
+  -e POSTGRES_USER=neurondb \
+  -e POSTGRES_PASSWORD=neurondb \
+  -e POSTGRES_DB=neurondb \
+  -e POSTGRES_HOST_AUTH_METHOD=md5 \
+  -v /tmp/neurondb-init:/docker-entrypoint-initdb.d \
+  neurondb:cpu-package-pg17
+
+# Wait for container to be ready
+sleep 20
+
+# Configure shared_preload_libraries
+sudo docker exec neurondb-cpu bash -c "CONF_FILE=\$(find /var/lib/postgresql -name postgresql.conf -type f 2>/dev/null | head -1) && if [ -n \"\$CONF_FILE\" ]; then echo \"shared_preload_libraries = 'neurondb'\" >> \"\$CONF_FILE\" && echo \"neurondb.compute_mode = 0\" >> \"\$CONF_FILE\" && echo \"neurondb.gpu_backend_type = 0\" >> \"\$CONF_FILE\"; fi"
+
+# Restart container to apply configuration
+sudo docker restart neurondb-cpu
+sleep 10
+
+# Create extension
+PGPASSWORD=neurondb psql -h localhost -p 5433 -U neurondb -d neurondb \
+  -c "CREATE EXTENSION IF NOT EXISTS neurondb;"
+
+# Verify installation
+PGPASSWORD=neurondb psql -h localhost -p 5433 -U neurondb -d neurondb \
+  -c "SELECT neurondb.version();"
 ```
 
-Connect:
-
-```bash
-psql "postgresql://neurondb:neurondb@localhost:5433/neurondb" -c '\dx neurondb'
+**Connection String:**
+```
+postgresql://neurondb:neurondb@localhost:5433/neurondb
 ```
 
 ### CUDA GPU Image
 
-**Requirements**: NVIDIA driver ≥ 535, `nvidia-container-toolkit`, Docker Compose v2.
+**Requirements**: NVIDIA driver ≥ 535, `nvidia-container-toolkit` installed.
+
+**Build and Run:**
 
 ```bash
-# Build and run CUDA image
-docker compose --profile cuda build neurondb-cuda
-docker compose --profile cuda up neurondb-cuda
+# From repository root
+cd /path/to/neurondb
 
-# With RAPIDS support (optional)
-docker compose --profile cuda build neurondb-cuda \
-  --build-arg ENABLE_RAPIDS=1 \
-  --build-arg PG_MAJOR=17
-
-# Or build directly
-docker build -f docker/Dockerfile.gpu.cuda \
+# Build CUDA image (PostgreSQL 17)
+sudo docker build -f NeuronDB/docker/Dockerfile.package.cuda \
   --build-arg PG_MAJOR=17 \
+  --build-arg PACKAGE_VERSION=1.0.0.beta \
   --build-arg CUDA_VERSION=12.4.1 \
-  --build-arg ENABLE_RAPIDS=0 \
-  -t neurondb:17-cuda ..
+  -t neurondb:cuda-package-pg17 .
+
+# Start container (with GPU support if nvidia-container-toolkit is configured)
+sudo docker run -d --name neurondb-cuda \
+  -p 5434:5432 \
+  -e POSTGRES_USER=neurondb \
+  -e POSTGRES_PASSWORD=neurondb \
+  -e POSTGRES_DB=neurondb \
+  -e POSTGRES_HOST_AUTH_METHOD=md5 \
+  -v /tmp/neurondb-init:/docker-entrypoint-initdb.d \
+  neurondb:cuda-package-pg17
+
+# Wait for container to be ready
+sleep 20
+
+# Configure shared_preload_libraries with GPU settings
+sudo docker exec neurondb-cuda bash -c "CONF_FILE=\$(find /var/lib/postgresql -name postgresql.conf -type f 2>/dev/null | head -1) && if [ -n \"\$CONF_FILE\" ]; then echo \"shared_preload_libraries = 'neurondb'\" >> \"\$CONF_FILE\" && echo \"neurondb.compute_mode = 1\" >> \"\$CONF_FILE\" && echo \"neurondb.gpu_backend_type = 1\" >> \"\$CONF_FILE\"; fi"
+
+# Restart container to apply configuration
+sudo docker restart neurondb-cuda
+sleep 10
+
+# Create extension
+PGPASSWORD=neurondb psql -h localhost -p 5434 -U neurondb -d neurondb \
+  -c "CREATE EXTENSION IF NOT EXISTS neurondb;"
+
+# Verify installation
+PGPASSWORD=neurondb psql -h localhost -p 5434 -U neurondb -d neurondb \
+  -c "SELECT neurondb.version();"
+
+# Verify GPU access (if nvidia-container-toolkit is configured)
+sudo docker exec neurondb-cuda nvidia-smi
 ```
 
-Verify GPU:
-
-```bash
-docker exec -it neurondb-cuda nvidia-smi
-psql "postgresql://neurondb:neurondb@localhost:5434/neurondb" \
-  -c "SELECT neurondb.gpu_device_info();"
+**Connection String:**
+```
+postgresql://neurondb:neurondb@localhost:5434/neurondb
 ```
 
 ### ROCm GPU Image
 
 **Requirements**: AMD GPU with ROCm drivers, Docker with device access.
 
-```bash
-# Build and run ROCm image
-docker compose --profile rocm build neurondb-rocm
-docker compose --profile rocm up neurondb-rocm
+**Build and Run:**
 
-# Or build directly
-docker build -f docker/Dockerfile.gpu.rocm \
+```bash
+# From repository root
+cd /path/to/neurondb
+
+# Build ROCm image (PostgreSQL 17)
+sudo docker build -f NeuronDB/docker/Dockerfile.package.rocm \
   --build-arg PG_MAJOR=17 \
+  --build-arg PACKAGE_VERSION=1.0.0.beta \
   --build-arg ROCM_VERSION=5.7 \
-  -t neurondb:17-rocm ..
+  -t neurondb:rocm-package-pg17 .
+
+# Start container
+sudo docker run -d --name neurondb-rocm \
+  -p 5435:5432 \
+  --device=/dev/kfd \
+  --device=/dev/dri \
+  -e POSTGRES_USER=neurondb \
+  -e POSTGRES_PASSWORD=neurondb \
+  -e POSTGRES_DB=neurondb \
+  -e POSTGRES_HOST_AUTH_METHOD=md5 \
+  -v /tmp/neurondb-init:/docker-entrypoint-initdb.d \
+  neurondb:rocm-package-pg17
+
+# Wait for container to be ready
+sleep 20
+
+# Configure shared_preload_libraries with GPU settings
+sudo docker exec neurondb-rocm bash -c "CONF_FILE=\$(find /var/lib/postgresql -name postgresql.conf -type f 2>/dev/null | head -1) && if [ -n \"\$CONF_FILE\" ]; then echo \"shared_preload_libraries = 'neurondb'\" >> \"\$CONF_FILE\" && echo \"neurondb.compute_mode = 1\" >> \"\$CONF_FILE\" && echo \"neurondb.gpu_backend_type = 2\" >> \"\$CONF_FILE\"; fi"
+
+# Restart container to apply configuration
+sudo docker restart neurondb-rocm
+sleep 10
+
+# Create extension
+PGPASSWORD=neurondb psql -h localhost -p 5435 -U neurondb -d neurondb \
+  -c "CREATE EXTENSION IF NOT EXISTS neurondb;"
+
+# Verify installation
+PGPASSWORD=neurondb psql -h localhost -p 5435 -U neurondb -d neurondb \
+  -c "SELECT neurondb.version();"
+```
+
+**Connection String:**
+```
+postgresql://neurondb:neurondb@localhost:5435/neurondb
 ```
 
 ### Metal GPU Image (macOS/Apple Silicon)
 
 **Requirements**: macOS with Apple Silicon, Docker Desktop.
 
-```bash
-# Build and run Metal image (arm64 only)
-docker compose --profile metal build neurondb-metal
-docker compose --profile metal up neurondb-metal
+**Note**: Metal support uses source-based build (package-based not available yet).
 
-# Or build directly with buildx for arm64
+**Build and Run:**
+
+```bash
+# From repository root
+cd /path/to/neurondb
+
+# Build Metal image (PostgreSQL 17, arm64 only)
 docker buildx build --platform linux/arm64 \
-  -f docker/Dockerfile.gpu.metal \
+  -f NeuronDB/docker/Dockerfile.gpu.metal \
   --build-arg PG_MAJOR=17 \
-  -t neurondb:17-metal ..
+  --build-arg ONNX_VERSION=1.17.0 \
+  -t neurondb:metal-pg17 \
+  --load .
+
+# Start container
+docker run -d --name neurondb-metal \
+  -p 5436:5432 \
+  -e POSTGRES_USER=neurondb \
+  -e POSTGRES_PASSWORD=neurondb \
+  -e POSTGRES_DB=neurondb \
+  -e POSTGRES_HOST_AUTH_METHOD=md5 \
+  -v /tmp/neurondb-init:/docker-entrypoint-initdb.d \
+  neurondb:metal-pg17
+
+# Wait for container to be ready
+sleep 20
+
+# Configure shared_preload_libraries with GPU settings
+docker exec neurondb-metal bash -c "CONF_FILE=\$(find /var/lib/postgresql -name postgresql.conf -type f 2>/dev/null | head -1) && if [ -n \"\$CONF_FILE\" ]; then echo \"shared_preload_libraries = 'neurondb'\" >> \"\$CONF_FILE\" && echo \"neurondb.compute_mode = 1\" >> \"\$CONF_FILE\" && echo \"neurondb.gpu_backend_type = 3\" >> \"\$CONF_FILE\"; fi"
+
+# Restart container to apply configuration
+docker restart neurondb-metal
+sleep 10
+
+# Create extension
+PGPASSWORD=neurondb psql -h localhost -p 5436 -U neurondb -d neurondb \
+  -c "CREATE EXTENSION IF NOT EXISTS neurondb;"
+
+# Verify installation
+PGPASSWORD=neurondb psql -h localhost -p 5436 -U neurondb -d neurondb \
+  -c "SELECT neurondb.version();"
+```
+
+**Connection String:**
+```
+postgresql://neurondb:neurondb@localhost:5436/neurondb
 ```
 
 ## Build Arguments
