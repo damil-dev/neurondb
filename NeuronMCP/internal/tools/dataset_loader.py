@@ -106,6 +106,29 @@ class DatasetLoader:
         if self.conn:
             self.conn.close()
     
+    def _get_hf_token_from_db(self) -> Optional[str]:
+        """Get HuggingFace API key from PostgreSQL GUC variable"""
+        if not self.conn:
+            return None
+        
+        try:
+            # Query PostgreSQL for the neurondb.llm_api_key GUC variable
+            # The 'true' parameter means return NULL if not set instead of raising an error
+            self.cursor.execute("SELECT current_setting('neurondb.llm_api_key', true)")
+            result = self.cursor.fetchone()
+            if result and result[0]:
+                token = result[0].strip()
+                if token:
+                    return token
+        except Exception as e:
+            # Log but don't fail - dataset might be public
+            print(json.dumps({
+                "warning": f"Could not read HuggingFace API key from PostgreSQL: {e}",
+                "status": "info"
+            }), file=sys.stderr, flush=True)
+        
+        return None
+    
     def load_from_huggingface(self, dataset_name: str, split: str = "train", 
                               limit: int = 0, streaming: bool = True) -> pd.DataFrame:
         """Load dataset from HuggingFace"""
@@ -113,6 +136,22 @@ class DatasetLoader:
             raise Exception("datasets library not available. Install with: pip install datasets")
         
         try:
+            # Get HuggingFace API key from PostgreSQL if available
+            hf_token = self._get_hf_token_from_db()
+            if hf_token:
+                # Set environment variables for HuggingFace authentication
+                os.environ['HF_TOKEN'] = hf_token
+                os.environ['HUGGINGFACE_HUB_TOKEN'] = hf_token
+                print(json.dumps({
+                    "status": "info",
+                    "message": "Using HuggingFace API key from PostgreSQL configuration"
+                }), flush=True)
+            else:
+                print(json.dumps({
+                    "status": "info",
+                    "message": "No HuggingFace API key found in PostgreSQL. Using public access (if dataset is public)"
+                }), flush=True)
+            
             # Set cache directory
             cache_dir = os.environ.get('HF_HOME', '/tmp/hf_cache')
             os.makedirs(cache_dir, exist_ok=True)
