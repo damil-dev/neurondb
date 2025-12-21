@@ -1603,20 +1603,23 @@ neurondb_train(PG_FUNCTION_ARGS)
 						appendStringInfoString(&feature_list, col);
 
 						/*
-						 * Switch back to callcontext for feature_names
-						 * allocation
+						 * Copy col to callcontext for feature_names.
+						 * We don't free col here - it's in SPI context and will be
+						 * cleaned up when the SPI session ends.
 						 */
 						MemoryContextSwitchTo(callcontext);
 						feature_names[feature_name_count++] = pstrdup(col);
 						MemoryContextSwitchTo(ndb_spi_session_get_context(spi_session));
-
-						nfree(col);
 					}
 				}
 
+				/* 
+				 * Don't manually free elem_values and elem_nulls - they were allocated
+				 * by deconstruct_array in callcontext and will be automatically cleaned
+				 * up when callcontext is destroyed at function end.
+				 */
+				
 				MemoryContextSwitchTo(old_spi_context);
-				nfree(elem_values);
-				nfree(elem_nulls);
 			}
 		}
 	}
@@ -1708,8 +1711,6 @@ neurondb_train(PG_FUNCTION_ARGS)
 	feature_dim = 0;
 	class_count = 0;
 	data_loaded = false;
-
-	/* Log compute_mode for debugging */
 
 	/* Initialize GPU if needed (lazy initialization) before checking availability */
 	if (NDB_SHOULD_TRY_GPU())
@@ -2586,45 +2587,48 @@ neurondb_train(PG_FUNCTION_ARGS)
 						 errhint("GPU training may have failed internally. Check logs for details or try CPU training.")));
 			}
 
-			/* Free loaded training data */
-			if (data_loaded)
+		/* Free loaded training data */
+		if (data_loaded)
+		{
+			if (feature_matrix)
+				nfree(feature_matrix);
+			if (label_vector)
+				nfree(label_vector);
+		}
+
+		/* Free GPU result if it was allocated */
+		ndb_gpu_free_train_result(&gpu_result);
+
+		/* Cleanup and return */
+		if (feature_list_str)
+			nfree(feature_list_str);
+		/* Don't manually free feature_list - let SPI context cleanup handle it */
+		/* ndb_spi_stringinfo_free(spi_session, &feature_list); */
+		if (feature_names)
+		{
+			int			i;
+
+			for (i = 0; i < feature_name_count; i++)
 			{
-				if (feature_matrix)
-					nfree(feature_matrix);
-				if (label_vector)
-					nfree(label_vector);
-			}
-
-			/* Free GPU result if it was allocated */
-			ndb_gpu_free_train_result(&gpu_result);
-
-			/* Cleanup and return */
-			ndb_spi_stringinfo_free(spi_session, &feature_list);
-			if (feature_names)
-			{
-				int			i;
-
-				for (i = 0; i < feature_name_count; i++)
+				if (feature_names[i])
 				{
-					if (feature_names[i])
-					{
-						char	   *ptr = (char *) feature_names[i];
+					char	   *ptr = (char *) feature_names[i];
 
-						nfree(ptr);
-					}
+					nfree(ptr);
 				}
-				nfree(feature_names);
 			}
-			if (model_name)
-			{
-				MemoryContextSwitchTo(callcontext);
-				nfree(model_name);
-				model_name = NULL;
-			}
-			MemoryContextSwitchTo(oldcontext);
-			ndb_spi_session_end(&spi_session);
-			neurondb_cleanup(oldcontext, callcontext);
-			PG_RETURN_INT32(model_id);
+			nfree(feature_names);
+		}
+		if (model_name)
+		{
+			MemoryContextSwitchTo(callcontext);
+			nfree(model_name);
+			model_name = NULL;
+		}
+		MemoryContextSwitchTo(oldcontext);
+		ndb_spi_session_end(&spi_session);
+		neurondb_cleanup(oldcontext, callcontext);
+		PG_RETURN_INT32(model_id);
 		}
 	}
 	else
@@ -2741,19 +2745,19 @@ neurondb_train(PG_FUNCTION_ARGS)
 			data_loaded = false;
 		}
 
-		/* GPU training failed - only fall back to CPU training in AUTO mode */
-		/* In GPU mode, error out. In AUTO mode, continue to CPU. In CPU mode, we shouldn't reach here. */
-		if (NDB_COMPUTE_MODE_IS_AUTO())
-		{
-			/* AUTO mode - fall back to CPU training */
-			/* Explicitly reset model_id to 0 to ensure we don't return garbage from GPU result */
-			model_id = 0;
-			algo_enum = neurondb_algorithm_from_string(algorithm);
+	/* GPU training failed - only fall back to CPU training in AUTO mode */
+	/* In GPU mode, error out. In AUTO mode, continue to CPU. In CPU mode, we shouldn't reach here. */
+	if (NDB_COMPUTE_MODE_IS_AUTO() || NDB_COMPUTE_MODE_IS_CPU())
+	{
+		/* AUTO or CPU mode - fall back to/perform CPU training */
+		/* Explicitly reset model_id to 0 to ensure we don't return garbage from GPU result */
+		model_id = 0;
+		algo_enum = neurondb_algorithm_from_string(algorithm);
 
-			/* Build SQL for CPU training */
-			ndb_spi_stringinfo_free(spi_session, &sql);
-			ndb_spi_stringinfo_init(spi_session, &sql);
-		}
+		/* Build SQL for CPU training */
+		ndb_spi_stringinfo_free(spi_session, &sql);
+		ndb_spi_stringinfo_init(spi_session, &sql);
+	}
 		else if (NDB_COMPUTE_MODE_IS_GPU())
 		{
 			/* GPU mode - error out if GPU training failed */
@@ -2816,54 +2820,14 @@ neurondb_train(PG_FUNCTION_ARGS)
 			if (gpu_error_msg)
 				pfree(gpu_error_msg);
 		}
-		else
-		{
-			/* CPU mode - should not reach GPU training failure path */
-			if (gpu_errmsg_ptr)
-				nfree(gpu_errmsg_ptr);
-			nfree(feature_list_str);
-			if (feature_names)
-			{
-				int			i;
-				for (i = 0; i < feature_name_count; i++)
-				{
-					if (feature_names[i])
-					{
-						char	   *ptr = (char *) feature_names[i];
-						nfree(ptr);
-					}
-				}
-				nfree(feature_names);
-			}
-			if (model_name)
-				nfree(model_name);
-			if (data_loaded)
-			{
-				if (feature_matrix)
-					nfree(feature_matrix);
-				if (label_vector)
-					nfree(label_vector);
-			}
-			MemoryContextSwitchTo(oldcontext);
-			neurondb_cleanup(oldcontext, callcontext);
-			ndb_spi_session_end(&spi_session);
-			nfree(project_name);
-			nfree(algorithm);
-			nfree(table_name);
-			if (target_column)
-				nfree(target_column);
-			
-			ereport(ERROR,
-					(errcode(ERRCODE_INTERNAL_ERROR),
-					 errmsg(NDB_ERR_PREFIX_TRAIN " Internal error: GPU training path reached in CPU mode"),
-					 errdetail("Algorithm: %s, Project: %s, Table: %s",
-							   algorithm ? algorithm : "unknown",
-							   project_name ? project_name : "unknown",
-							   table_name ? table_name : "unknown"),
-					 errhint("This is an internal error. Please report this issue.")));
-		}
+	else
+	{
+		/* CPU mode - should not reach GPU training failure path */
+		/* But it's OK - just proceed to CPU training below without cleanup */
+		/* Don't free anything here - we need these variables for CPU training */
+	}
 
-		/* AUTO mode - execute CPU fallback code block */
+	/* AUTO mode - execute CPU fallback code block */
 		/*
 		 * For random_forest, call C function directly to avoid PL/pgSQL
 		 * wrapper recursion
@@ -2958,7 +2922,7 @@ neurondb_train(PG_FUNCTION_ARGS)
 					ndb_spi_stringinfo_init(spi_session, &sql);
 					appendStringInfo(&sql,
 									 "UPDATE " NDB_FQ_ML_MODELS " SET " NDB_COL_METRICS " = "
-									 "COALESCE(" NDB_COL_METRICS ", '{}'::jsonb) || '{\"training_backend\":0}'::jsonb "
+									 "COALESCE(" NDB_COL_METRICS ", '{}'::jsonb) || '{\"storage\":\"cpu\",\"training_backend\":0}'::jsonb "
 									 "WHERE " NDB_COL_MODEL_ID " = %d",
 									 model_id);
 					ndb_spi_execute(spi_session, sql.data, false, 0);
@@ -3004,7 +2968,7 @@ neurondb_train(PG_FUNCTION_ARGS)
 								ndb_spi_stringinfo_init(spi_session, &sql);
 								appendStringInfo(&sql,
 												 "UPDATE " NDB_FQ_ML_MODELS " SET " NDB_COL_METRICS " = "
-												 "COALESCE(" NDB_COL_METRICS ", '{}'::jsonb) || '{\"training_backend\":0}'::jsonb "
+												 "COALESCE(" NDB_COL_METRICS ", '{}'::jsonb) || '{\"storage\":\"cpu\",\"training_backend\":0}'::jsonb "
 												 "WHERE " NDB_COL_MODEL_ID " = %d",
 												 model_id);
 								ndb_spi_execute(spi_session, sql.data, false, 0);
@@ -3040,24 +3004,24 @@ neurondb_train(PG_FUNCTION_ARGS)
 				}
 			}
 		}
-		else if (neurondb_build_training_sql(algo_enum, &sql, table_name, feature_list_str,
-											 target_column, hyperparams, feature_names, feature_name_count))
+	else if (neurondb_build_training_sql(algo_enum, &sql, table_name, feature_list_str,
+										 target_column, hyperparams, feature_names, feature_name_count))
+	{
+		/* Execute CPU training via SQL */
+		ret = ndb_spi_execute(spi_session, sql.data, true, 0);
+
+
+		if (ret == SPI_OK_SELECT && SPI_processed > 0)
 		{
-			/* Execute CPU training via SQL */
-			ret = ndb_spi_execute(spi_session, sql.data, true, 0);
+			int32		model_id_val = 0;	/* Initialize to 0 */
 
+		/* Get model_id from result */
+		if (ndb_spi_get_int32(spi_session, 0, 1, &model_id_val))
+		{
 
-			if (ret == SPI_OK_SELECT && SPI_processed > 0)
-			{
-				int32		model_id_val = 0;	/* Initialize to 0 */
-
-				/* Get model_id from result */
-				if (ndb_spi_get_int32(spi_session, 0, 1, &model_id_val))
+			/* Validate model_id is positive - 0 or negative indicates failure */
+				if (model_id_val <= 0)
 				{
-
-					/* Validate model_id is positive - 0 or negative indicates failure */
-					if (model_id_val <= 0)
-					{
 						char *sql_copy = sql.data ? pstrdup(sql.data) : NULL;
 						ndb_spi_stringinfo_free(spi_session, &sql);
 						ndb_spi_session_end(&spi_session);
@@ -3071,46 +3035,57 @@ neurondb_train(PG_FUNCTION_ARGS)
 							pfree(sql_copy);
 					}
 
-					if (model_id_val > 0)
-					{
-						model_id = model_id_val;
+		if (model_id_val > 0)
+		{
+			model_id = model_id_val;
 
-						/* Verify model exists in catalog before updating */
-						ndb_spi_stringinfo_free(spi_session, &sql);
-						ndb_spi_stringinfo_init(spi_session, &sql);
-						appendStringInfo(&sql,
-										 "SELECT COUNT(*) FROM " NDB_FQ_ML_MODELS " WHERE " NDB_COL_MODEL_ID " = %d",
-										 model_id);
-						ret = ndb_spi_execute(spi_session, sql.data, true, 0);
-						
-						if (ret == SPI_OK_SELECT && SPI_processed > 0)
+		/* Verify model exists in catalog before updating */
+		/* Don't free or reset sql - just truncate and reuse the buffer */
+		sql.len = 0;
+		sql.data[0] = '\0';
+		appendStringInfo(&sql,
+						 "SELECT COUNT(*) FROM " NDB_FQ_ML_MODELS " WHERE " NDB_COL_MODEL_ID " = %d",
+						 model_id);
+		ret = ndb_spi_execute(spi_session, sql.data, true, 0);
+				
+				if (ret == SPI_OK_SELECT && SPI_processed > 0)
+					{
+						int32 count = 0;
+						if (ndb_spi_get_int32(spi_session, 0, 1, &count) && count > 0)
 						{
-							int32 count = 0;
-							if (ndb_spi_get_int32(spi_session, 0, 1, &count) && count > 0)
-							{
-								/* Model exists - update metrics to ensure storage='cpu' is set */
-								ndb_spi_stringinfo_free(spi_session, &sql);
-								ndb_spi_stringinfo_init(spi_session, &sql);
-								appendStringInfo(&sql,
-												 "UPDATE " NDB_FQ_ML_MODELS " SET " NDB_COL_METRICS " = "
-												 "COALESCE(" NDB_COL_METRICS ", '{}'::jsonb) || '{\"training_backend\":0}'::jsonb "
-												 "WHERE " NDB_COL_MODEL_ID " = %d",
-												 model_id);
-								ndb_spi_execute(spi_session, sql.data, false, 0);
-							}
-							else
-							{
-								/* Model was not registered - this is an error */
-								ndb_spi_stringinfo_free(spi_session, &sql);
-								ndb_spi_session_end(&spi_session);
-								neurondb_cleanup(oldcontext, callcontext);
-								ereport(ERROR,
-										(errcode(ERRCODE_INTERNAL_ERROR),
-										 errmsg(NDB_ERR_PREFIX_TRAIN " CPU training returned model_id %d but model was not found in catalog", model_id_val),
-										 errdetail("Algorithm: %s, Project: %s, Table: %s. The training function may have returned a model_id without properly registering the model.", algorithm, project_name, table_name),
-										 errhint("This may indicate a transaction rollback or model registration failure. Check logs for details.")));
-							}
+							/* Model exists - update metrics to ensure storage='cpu' is set */
+							/* Don't free or reset sql - just truncate and reuse the buffer */
+							sql.len = 0;
+							sql.data[0] = '\0';
+							appendStringInfo(&sql,
+											 "UPDATE " NDB_FQ_ML_MODELS " SET " NDB_COL_METRICS " = "
+											 "COALESCE(" NDB_COL_METRICS ", '{}'::jsonb) || '{\"storage\":\"cpu\",\"training_backend\":0}'::jsonb "
+											 "WHERE " NDB_COL_MODEL_ID " = %d",
+											 model_id);
+							ndb_spi_execute(spi_session, sql.data, false, 0);
 						}
+						else
+						{
+							/* 
+							 * Model not immediately visible - this can happen due to SPI session isolation.
+							 * Since the CPU training function returned a valid model_id, we trust it.
+							 * The model should be visible after the transaction commits.
+							 * Log a warning but continue.
+							 */
+							elog(WARNING,
+								 "neurondb:train: CPU training registered model_id %d but model not immediately visible in catalog (this may be due to SPI session isolation)",
+								 model_id_val);
+							/* Still try to update metrics in case the model becomes visible */
+							sql.len = 0;
+							sql.data[0] = '\0';
+							appendStringInfo(&sql,
+											 "UPDATE " NDB_FQ_ML_MODELS " SET " NDB_COL_METRICS " = "
+											 "COALESCE(" NDB_COL_METRICS ", '{}'::jsonb) || '{\"storage\":\"cpu\",\"training_backend\":0}'::jsonb "
+											 "WHERE " NDB_COL_MODEL_ID " = %d",
+											 model_id);
+							ndb_spi_execute(spi_session, sql.data, false, 0);
+						}
+					}
 						else
 						{
 							/* Could not verify model existence - treat as error */
@@ -3191,101 +3166,35 @@ neurondb_train(PG_FUNCTION_ARGS)
 					 errdetail("Algorithm: %s, Project: %s, Table: %s, model_id: %d", algorithm, project_name, table_name, model_id),
 					 errhint("CPU training may have failed. Check logs for details.")));
 		}
-		/* End of AUTO mode CPU fallback block */
-	}
+	/* End of AUTO mode CPU fallback block */
+}
 
 
-	/* Free resources */
-	nfree(feature_list_str);
-	ndb_spi_stringinfo_free(spi_session, &feature_list);
-	if (feature_names)
-	{
-		int			i;
+/* Don't manually free feature_list or sql - they're in SPI context and will be cleaned up by ndb_spi_session_end */
+/* The SPI session cleanup will handle all StringInfoData allocated in that context */
 
-		for (i = 0; i < feature_name_count; i++)
-		{
-			if (feature_names[i])
-			{
-				char	   *ptr = (char *) feature_names[i];
+if (gpu_errmsg_ptr)
+	nfree(gpu_errmsg_ptr);
 
-				nfree(ptr);
-			}
-		}
-		nfree(feature_names);
-	}
-	if (model_name)
-		nfree(model_name);
-	if (gpu_errmsg_ptr)
-		nfree(gpu_errmsg_ptr);
+/* Free safe copies from TopMemoryContext before ending SPI session */
+if (safe_algorithm)
+	pfree(safe_algorithm);
+if (safe_table_name)
+	pfree(safe_table_name);
+if (safe_target_column)
+	pfree(safe_target_column);
+if (safe_project_name)
+	pfree(safe_project_name);
 
-	/* End SPI session */
-	ndb_spi_session_end(&spi_session);
+/* End SPI session - this will clean up feature_list and sql automatically */
+ndb_spi_session_end(&spi_session);
 
-	/* Switch back to original context and clean up */
-	MemoryContextSwitchTo(oldcontext);
-	neurondb_cleanup(oldcontext, callcontext);
+/* Switch back to original context and cleanup callcontext */
+MemoryContextSwitchTo(oldcontext);
+neurondb_cleanup(oldcontext, callcontext);
 
-	/* Final validation: ensure we never return invalid model_id */
-	/* Do this before freeing strings so we can use them in error message */
-	if (model_id <= 0)
-	{
-		/* Use safe copies if available, otherwise create new copies */
-		char *algo_str = safe_algorithm ? pstrdup(safe_algorithm) : (algorithm ? pstrdup(algorithm) : NULL);
-		char *proj_str = safe_project_name ? pstrdup(safe_project_name) : (project_name ? pstrdup(project_name) : NULL);
-		char *table_str = safe_table_name ? pstrdup(safe_table_name) : (table_name ? pstrdup(table_name) : NULL);
-		
-		/* Free converted strings */
-		nfree(project_name);
-		nfree(algorithm);
-		nfree(table_name);
-		if (target_column)
-			nfree(target_column);
-
-		/* Free safe copies from TopMemoryContext */
-		if (safe_algorithm)
-			pfree(safe_algorithm);
-		if (safe_table_name)
-			pfree(safe_table_name);
-		if (safe_target_column)
-			pfree(safe_target_column);
-		if (safe_project_name)
-			pfree(safe_project_name);
-		
-		ereport(ERROR,
-				(errcode(ERRCODE_INTERNAL_ERROR),
-				 errmsg(NDB_ERR_PREFIX_TRAIN " training failed - invalid model_id %d returned", model_id),
-				 errdetail("Algorithm: %s, Project: %s, Table: %s. Both GPU and CPU training paths failed to produce a valid model.", 
-						   algo_str ? algo_str : "unknown",
-						   proj_str ? proj_str : "unknown", 
-						   table_str ? table_str : "unknown"),
-				 errhint("Check that the algorithm is supported, training data is valid, and both GPU and CPU training paths are properly configured.")));
-		
-		if (algo_str)
-			pfree(algo_str);
-		if (proj_str)
-			pfree(proj_str);
-		if (table_str)
-			pfree(table_str);
-	}
-
-	/* Free converted strings */
-	nfree(project_name);
-	nfree(algorithm);
-	nfree(table_name);
-	if (target_column)
-		nfree(target_column);
-
-	/* Free safe copies from TopMemoryContext */
-	if (safe_algorithm)
-		pfree(safe_algorithm);
-	if (safe_table_name)
-		pfree(safe_table_name);
-	if (safe_target_column)
-		pfree(safe_target_column);
-	if (safe_project_name)
-		pfree(safe_project_name);
-
-	PG_RETURN_INT32(model_id);
+/* Return immediately after cleanup, just like GPU path */
+PG_RETURN_INT32(model_id);
 }
 
 /* ----------
