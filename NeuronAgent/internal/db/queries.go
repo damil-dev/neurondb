@@ -92,15 +92,15 @@ const (
 	createMemoryChunkQuery = `
 		INSERT INTO neurondb_agent.memory_chunks 
 		(agent_id, session_id, message_id, content, embedding, importance_score, metadata)
-		VALUES ($1, $2, $3, $4, $5::neurondb_vector, $6, $7::jsonb)
+		VALUES ($1, $2, $3, $4, $5::vector, $6, $7::jsonb)
 		RETURNING id, created_at`
 
 	searchMemoryQuery = `
 		SELECT id, agent_id, session_id, message_id, content, importance_score, metadata, created_at,
-			   1 - (embedding <=> $1::neurondb_vector) AS similarity
+			   1 - (embedding <=> $1::vector) AS similarity
 		FROM neurondb_agent.memory_chunks
 		WHERE agent_id = $2
-		ORDER BY embedding <=> $1::neurondb_vector
+		ORDER BY embedding <=> $1::vector
 		LIMIT $3`
 )
 

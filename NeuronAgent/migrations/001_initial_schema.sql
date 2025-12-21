@@ -63,7 +63,7 @@ CREATE TABLE neurondb_agent.memory_chunks (
     session_id UUID REFERENCES neurondb_agent.sessions(id) ON DELETE SET NULL,
     message_id BIGINT REFERENCES neurondb_agent.messages(id) ON DELETE SET NULL,
     content TEXT NOT NULL,
-    embedding neurondb_vector(768),  -- NeuronDB vector type, configurable dimension
+    embedding vector(768),  -- NeuronDB vector type, configurable dimension
     importance_score REAL DEFAULT 0.5 CHECK (importance_score >= 0 AND importance_score <= 1),
     metadata JSONB DEFAULT '{}',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
