@@ -51,7 +51,13 @@ case "${1:-run}" in
         # Export environment variables for docker-compose
         export NEURONDB_HOST NEURONDB_PORT NEURONDB_DATABASE NEURONDB_USER NEURONDB_PASSWORD
         
-        $DOCKER_COMPOSE_CMD up -d neuronmcp
+        # Use --no-deps to avoid docker-compose trying to recreate dependent services
+        # Services should be started in order: NeuronDB first, then NeuronAgent, then NeuronMCP
+        if [ "$USE_PROFILES" = true ]; then
+            $DOCKER_COMPOSE_CMD --profile cpu up -d --no-deps neuronmcp
+        else
+            $DOCKER_COMPOSE_CMD up -d --no-deps neuronmcp
+        fi
         echo "NeuronMCP is starting..."
         echo "Check status: docker ps | grep neurondb-mcp"
         echo "View logs: docker logs neurondb-mcp -f"
