@@ -1,0 +1,11 @@
+#!/bin/bash
+
+# Post-install script for NeuronDB macOS package
+
+echo "NeuronDB extension installed successfully."
+echo ""
+echo "To use NeuronDB, connect to your database and run:"
+echo "  CREATE EXTENSION neurondb;"
+echo ""
+echo "PostgreSQL must be restarted if it's currently running to load the extension."
+

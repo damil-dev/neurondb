@@ -7,6 +7,8 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PACKAGING_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+REPO_ROOT="$(cd "$PACKAGING_DIR/.." && pwd)"
+REPO_DEB_DIR="$REPO_ROOT/repo/deb/pool/main"
 
 # Load configuration
 if [ -f "$PACKAGING_DIR/config-loader.sh" ]; then
@@ -34,6 +36,31 @@ if ! command -v fakeroot &> /dev/null; then
     exit 1
 fi
 
+# Function to place DEB package in repository structure
+place_deb_in_repo() {
+    local package_file="$1"
+    local component="$2"
+    
+    if [ ! -f "$package_file" ]; then
+        echo "Warning: Package file not found: $package_file"
+        return 1
+    fi
+    
+    # Extract package name from filename (e.g., neurondb_1.0.0.beta_amd64.deb -> neurondb)
+    local package_name=$(basename "$package_file" | sed -E 's/^([^_]+)_.*/\1/')
+    
+    # Use component name if provided, otherwise use package name
+    local repo_component="${component:-$package_name}"
+    
+    # Create destination directory: repo/deb/pool/main/n/<component>/
+    local dest_dir="$REPO_DEB_DIR/n/$repo_component"
+    mkdir -p "$dest_dir"
+    
+    # Copy package to repo
+    cp "$package_file" "$dest_dir/"
+    echo "Placed package in repository: $dest_dir/$(basename "$package_file")"
+}
+
 # Build NeuronDB
 echo "Building NeuronDB DEB package..."
 cd "$SCRIPT_DIR/neurondb"
@@ -42,6 +69,11 @@ export VERSION="$VERSION"
 if [ $? -ne 0 ]; then
     echo "Error: NeuronDB DEB build failed"
     exit 1
+fi
+# Place package in repo structure
+DEB_FILE=$(ls -1 "$SCRIPT_DIR/neurondb"/*.deb 2>/dev/null | head -1)
+if [ -n "$DEB_FILE" ]; then
+    place_deb_in_repo "$DEB_FILE" "neurondb"
 fi
 echo ""
 
@@ -54,6 +86,11 @@ if [ $? -ne 0 ]; then
     echo "Error: NeuronAgent DEB build failed"
     exit 1
 fi
+# Place package in repo structure
+DEB_FILE=$(ls -1 "$SCRIPT_DIR/neuronagent"/*.deb 2>/dev/null | head -1)
+if [ -n "$DEB_FILE" ]; then
+    place_deb_in_repo "$DEB_FILE" "neuronagent"
+fi
 echo ""
 
 # Build NeuronMCP
@@ -64,6 +101,11 @@ export VERSION="$VERSION"
 if [ $? -ne 0 ]; then
     echo "Error: NeuronMCP DEB build failed"
     exit 1
+fi
+# Place package in repo structure
+DEB_FILE=$(ls -1 "$SCRIPT_DIR/neuronmcp"/*.deb 2>/dev/null | head -1)
+if [ -n "$DEB_FILE" ]; then
+    place_deb_in_repo "$DEB_FILE" "neuronmcp"
 fi
 echo ""
 

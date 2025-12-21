@@ -139,6 +139,42 @@ get_neurondb_build_env() {
     echo "$env_vars"
 }
 
+# Function to get GPU dependencies for DEB packages
+get_gpu_deps_deb() {
+    local deps=""
+    
+    if [ "$PACKAGING_CUDA_ENABLED" = "true" ] || [ "$PACKAGING_GPU_BACKENDS" = "cuda" ]; then
+        # CUDA runtime libraries - common package names across CUDA versions
+        deps="libcudart12 | libcudart11 | libcudart10"
+    elif [ "$PACKAGING_ROCM_ENABLED" = "true" ] || [ "$PACKAGING_GPU_BACKENDS" = "rocm" ]; then
+        # ROCm runtime libraries
+        deps="libhip-dev | rocm-libs"
+    elif [ "$PACKAGING_METAL_ENABLED" = "true" ] || [ "$PACKAGING_GPU_BACKENDS" = "metal" ]; then
+        # Metal is built into macOS, no dependencies needed
+        deps=""
+    fi
+    
+    echo "$deps"
+}
+
+# Function to get GPU dependencies for RPM packages
+get_gpu_deps_rpm() {
+    local deps=""
+    
+    if [ "$PACKAGING_CUDA_ENABLED" = "true" ] || [ "$PACKAGING_GPU_BACKENDS" = "cuda" ]; then
+        # CUDA runtime libraries - common package names across CUDA versions
+        deps="cuda-libraries-12-0 | cuda-libraries-11-8 | cuda-libraries-11-0"
+    elif [ "$PACKAGING_ROCM_ENABLED" = "true" ] || [ "$PACKAGING_GPU_BACKENDS" = "rocm" ]; then
+        # ROCm runtime libraries
+        deps="rocm-libs"
+    elif [ "$PACKAGING_METAL_ENABLED" = "true" ] || [ "$PACKAGING_GPU_BACKENDS" = "metal" ]; then
+        # Metal is built into macOS, no dependencies needed
+        deps=""
+    fi
+    
+    echo "$deps"
+}
+
 # Function to print current configuration
 print_config() {
     echo "Build Configuration:"
@@ -160,4 +196,6 @@ print_config() {
     echo "  Metal Enabled: $PACKAGING_METAL_ENABLED"
     echo ""
 }
+
+
 

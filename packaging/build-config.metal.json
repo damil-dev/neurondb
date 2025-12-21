@@ -1,10 +1,10 @@
 {
   "version": "1.0.0.beta",
-  "architecture": "amd64",
+  "architecture": "arm64",
   "neurondb": {
     "postgresql_versions": ["16", "17", "18"],
-    "gpu_backends": "rocm",
-    "compute_mode": "rocm",
+    "gpu_backends": "metal",
+    "compute_mode": "metal",
     "build_args": {
       "CXXFLAGS": "",
       "CFLAGS": "",
@@ -16,29 +16,29 @@
       "version": ""
     },
     "rocm": {
-      "enabled": true,
-      "path": "/opt/rocm",
-      "version": "5.7"
+      "enabled": false,
+      "path": "",
+      "version": ""
     },
     "metal": {
-      "enabled": false
+      "enabled": true
     }
   },
   "neuronagent": {
     "build_args": {
       "CGO_ENABLED": "0",
-      "GOOS": "linux",
+      "GOOS": "darwin",
+      "GOARCH": "arm64",
       "ldflags": "-w -s"
     }
   },
   "neuronmcp": {
     "build_args": {
       "CGO_ENABLED": "0",
-      "GOOS": "linux",
+      "GOOS": "darwin",
+      "GOARCH": "arm64",
       "ldflags": "-w -s"
     }
   }
 }
-
-
 
