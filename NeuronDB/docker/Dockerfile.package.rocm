@@ -182,3 +182,5 @@ HEALTHCHECK --interval=30s --timeout=5s --retries=5 \
 
 # Default entrypoint inherited from postgres image
 
+
+
