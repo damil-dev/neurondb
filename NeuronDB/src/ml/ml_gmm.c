@@ -1550,6 +1550,16 @@ gmm_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 	if (rc != 0 || payload == NULL)
 	{
 		/* On error, GPU backend should have cleaned up - don't free here */
+		/* Ensure error message is set if backend didn't set one */
+		if (errstr && *errstr == NULL)
+		{
+			if (rc != 0)
+				*errstr = pstrdup(psprintf("GMM GPU training failed with return code %d", rc));
+			else if (payload == NULL)
+				*errstr = pstrdup("GMM GPU training returned NULL model data");
+			else
+				*errstr = pstrdup("GMM GPU training failed for unknown reason");
+		}
 		return false;
 	}	if (model->backend_state != NULL)
 	{

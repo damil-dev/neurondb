@@ -138,11 +138,30 @@ ndb_gpu_try_train_model(const char *algorithm,
 		return false;
 	}
 
-	if (feature_matrix == NULL || label_vector == NULL || sample_count <= 0 || feature_dim <= 0)
+	/* Check if algorithm is unsupervised (doesn't require label_vector) */
+	bool is_unsupervised = (algorithm != NULL && (
+		strcmp(algorithm, "gmm") == 0 ||
+		strcmp(algorithm, "kmeans") == 0 ||
+		strcmp(algorithm, "minibatch_kmeans") == 0 ||
+		strcmp(algorithm, "hierarchical") == 0 ||
+		strcmp(algorithm, "dbscan") == 0 ||
+		strcmp(algorithm, "pca") == 0));
+
+	if (feature_matrix == NULL || sample_count <= 0 || feature_dim <= 0)
 	{
 		if (errstr)
-			*errstr = ndb_gpu_strdup_or_null(psprintf("ndb_gpu_try_train_model: invalid parameters (feature_matrix=%p, label_vector=%p, sample_count=%d, feature_dim=%d)",
-							   (void *) feature_matrix, (void *) label_vector, sample_count, feature_dim));
+			*errstr = ndb_gpu_strdup_or_null(psprintf("ndb_gpu_try_train_model: invalid parameters (feature_matrix=%p, sample_count=%d, feature_dim=%d)",
+							   (void *) feature_matrix, sample_count, feature_dim));
+		ndb_gpu_ensure_errstr_top(errstr);
+		return false;
+	}
+
+	/* label_vector is required for supervised algorithms only */
+	if (!is_unsupervised && label_vector == NULL)
+	{
+		if (errstr)
+			*errstr = ndb_gpu_strdup_or_null(psprintf("ndb_gpu_try_train_model: label_vector is NULL for supervised algorithm '%s'",
+							   algorithm ? algorithm : "unknown"));
 		ndb_gpu_ensure_errstr_top(errstr);
 		return false;
 	}
@@ -288,7 +307,8 @@ ndb_gpu_try_train_model(const char *algorithm,
 					   (void *) feature_matrix)));
 
 	if (ops != NULL && ops->train != NULL && ops->serialize != NULL
-		&& feature_matrix != NULL && label_vector != NULL
+		&& feature_matrix != NULL
+		&& (is_unsupervised || label_vector != NULL)
 		&& sample_count > 0 && feature_dim > 0
 		&& (algorithm == NULL || (strcmp(algorithm, "linear_regression") != 0 && strcmp(algorithm, "logistic_regression") != 0 && strcmp(algorithm, "ridge") != 0 && strcmp(algorithm, "lasso") != 0)))
 	{
