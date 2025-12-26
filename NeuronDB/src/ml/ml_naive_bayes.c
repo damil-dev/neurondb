@@ -137,9 +137,23 @@ train_naive_bayes_classifier(PG_FUNCTION_ARGS)
 	text	   *label_col = NULL;
 	text	   *table_name = NULL;
 
-	table_name = PG_GETARG_TEXT_PP(0);
-	feature_col = PG_GETARG_TEXT_PP(1);
-	label_col = PG_GETARG_TEXT_PP(2);
+	table_name = PG_ARGISNULL(0) ? NULL : PG_GETARG_TEXT_PP(0);
+	feature_col = PG_ARGISNULL(1) ? NULL : PG_GETARG_TEXT_PP(1);
+	label_col = PG_ARGISNULL(2) ? NULL : PG_GETARG_TEXT_PP(2);
+
+	/* Validate required parameters */
+	if (table_name == NULL)
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("table_name cannot be NULL")));
+	if (feature_col == NULL)
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("feature_col cannot be NULL")));
+	if (label_col == NULL)
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("label_col cannot be NULL")));
 
 	tbl_str = text_to_cstring(table_name);
 	feat_str = text_to_cstring(feature_col);
@@ -900,9 +914,23 @@ train_naive_bayes_classifier_model_id(PG_FUNCTION_ARGS)
 	bool		feat_is_array;
 	MemoryContext oldcontext;
 
-	table_name = PG_GETARG_TEXT_PP(0);
-	feature_col = PG_GETARG_TEXT_PP(1);
-	label_col = PG_GETARG_TEXT_PP(2);
+	table_name = PG_ARGISNULL(0) ? NULL : PG_GETARG_TEXT_PP(0);
+	feature_col = PG_ARGISNULL(1) ? NULL : PG_GETARG_TEXT_PP(1);
+	label_col = PG_ARGISNULL(2) ? NULL : PG_GETARG_TEXT_PP(2);
+
+	/* Validate required parameters */
+	if (table_name == NULL)
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("table_name cannot be NULL")));
+	if (feature_col == NULL)
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("feature_col cannot be NULL")));
+	if (label_col == NULL)
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("label_col cannot be NULL")));
 
 	/* Save caller's memory context */
 	oldcontext = CurrentMemoryContext;
@@ -1532,6 +1560,14 @@ nb_evaluate_naive_bayes_internal(FunctionCallInfo fcinfo)
 						"model_id is required")));
 
 	model_id = PG_GETARG_INT32(0);
+
+	/* Validate model_id before attempting to load */
+	if (model_id <= 0)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: evaluate_naive_bayes_by_model_id: model_id must be positive, got %d", model_id),
+				 errdetail("Invalid model_id: %d", model_id),
+				 errhint("Provide a valid model_id from neurondb.ml_models catalog.")));
 
 	if (PG_ARGISNULL(1) || PG_ARGISNULL(2) || PG_ARGISNULL(3))
 		ereport(ERROR,

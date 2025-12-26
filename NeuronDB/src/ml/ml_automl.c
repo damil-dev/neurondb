@@ -223,8 +223,16 @@ auto_train(PG_FUNCTION_ARGS)
 	for (i = 0; i < n_algorithms; i++)
 	{
 		int32		model_id = 0;
+		MemoryContext algo_context = NULL;
+		MemoryContext algo_oldcontext = NULL;
 
 		scores[i].algorithm = pstrdup(algorithms[i]);
+
+		/* Create a sub-context for this algorithm to isolate any memory corruption */
+		algo_context = AllocSetContextCreate(automl_context,
+											 "algorithm training context",
+											 ALLOCSET_DEFAULT_SIZES);
+		algo_oldcontext = MemoryContextSwitchTo(algo_context);
 
 		/* Train model using neurondb.train() */
 
@@ -332,83 +340,97 @@ auto_train(PG_FUNCTION_ARGS)
 		PG_CATCH();
 		{
 			/* Individual algorithm failed - log warning and continue */
-			ErrorData *edata = NULL;
-			char *error_message = NULL;
-			MemoryContext safe_context;
+			/* Switch to oldcontext first to avoid using potentially corrupted automl_context */
+			MemoryContextSwitchTo(oldcontext);
 
-			/* Copy error data BEFORE flushing error state */
-			safe_context = oldcontext;
-			if (safe_context == NULL || safe_context == ErrorContext)
-			{
-				safe_context = TopMemoryContext;
-			}
-			MemoryContextSwitchTo(safe_context);
-
-			/* Suppress shadow warnings from nested PG_TRY blocks */
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wshadow=compatible-local"
-			PG_TRY();
-			{
-				edata = CopyErrorData();
-				if (edata && edata->message)
-				{
-					/* Copy error message before freeing edata */
-					error_message = pstrdup(edata->message);
-				}
-			}
-			PG_CATCH();
-			{
-				/* If CopyErrorData fails, just continue without error details */
-				FlushErrorState();
-			}
-			PG_END_TRY();
-#pragma GCC diagnostic pop
-
-			/* Now flush error state after copying */
-			FlushErrorState();
-
-			/* Free error data before using the copied message */
-			if (edata != NULL)
-			{
-				/* Suppress shadow warnings from nested PG_TRY blocks */
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wshadow=compatible-local"
-				PG_TRY();
-				{
-					FreeErrorData(edata);
-				}
-				PG_CATCH();
-				{
-					/* Ignore errors during cleanup */
-					FlushErrorState();
-				}
-				PG_END_TRY();
-#pragma GCC diagnostic pop
-				edata = NULL;
-			}
-
-			/* Switch back to automl_context for elog calls */
-			MemoryContextSwitchTo(automl_context);
-
+			/* Log warning about algorithm failure - don't try to extract error details
+			 * as the error data structure may be corrupted and accessing it could crash */
 			elog(WARNING,
 				 "auto_train: Algorithm '%s' failed, continuing with next algorithm",
 				 algorithms[i]);
-			if (error_message)
-			{
-				elog(WARNING,
-					 "auto_train: Error details for '%s': %s",
-					 algorithms[i], error_message);
-				nfree(error_message);
-			}
 
-			scores[i].score = -1.0f;
-			scores[i].model_id = 0;
+			/* Flush error state AFTER logging to allow SPI cleanup to complete properly */
+			FlushErrorState();
+
+			/* Check if we can safely switch back to automl_context and access scores array */
+			if (MemoryContextIsValid(automl_context))
+			{
+				MemoryContextSwitchTo(automl_context);
+				/* Only access scores if context is valid */
+				scores[i].score = -1.0f;
+				scores[i].model_id = 0;
+			}
+			else
+			{
+				/* Memory context corrupted - cannot continue safely */
+				/* Clean up what we can from oldcontext */
+				if (scores != NULL)
+				{
+					for (int j = 0; j < i; j++)
+					{
+						if (scores[j].algorithm != NULL)
+							pfree(scores[j].algorithm);
+					}
+					pfree(scores);
+				}
+				
+				if (MemoryContextIsValid(oldcontext) && MemoryContextIsValid(automl_context))
+				{
+					MemoryContextDelete(automl_context);
+				}
+				
+				ereport(ERROR,
+						(errcode(ERRCODE_INTERNAL_ERROR),
+						 errmsg("auto_train: Memory corruption detected after algorithm '%s' failure - aborting",
+								algorithms[i]),
+						 errhint("The memory context was corrupted during training. This may indicate a bug in the training implementation.")));
+			}
 		}
 		PG_END_TRY();
 
+		/* Switch back to automl_context and delete the algorithm sub-context */
+		/* This isolates any corruption to the sub-context */
+		MemoryContextSwitchTo(automl_context);
+		if (algo_context != NULL && MemoryContextIsValid(algo_context))
+		{
+			MemoryContextDelete(algo_context);
+		}
+		algo_context = NULL;
+
 		/* Skip to next algorithm if this one failed */
+		/* Check if automl_context is still valid before accessing scores */
+		if (!MemoryContextIsValid(automl_context))
+		{
+			/* Memory context corrupted - cannot continue */
+			MemoryContextSwitchTo(oldcontext);
+			
+			/* Clean up what we can */
+			if (scores != NULL)
+			{
+				for (int j = 0; j <= i; j++)
+				{
+					if (scores[j].algorithm != NULL)
+						pfree(scores[j].algorithm);
+				}
+				pfree(scores);
+			}
+			
+			if (MemoryContextIsValid(oldcontext) && MemoryContextIsValid(automl_context))
+			{
+				MemoryContextDelete(automl_context);
+			}
+			
+			ereport(ERROR,
+					(errcode(ERRCODE_INTERNAL_ERROR),
+					 errmsg("auto_train: Memory corruption detected after algorithm '%s' failure - aborting",
+							algorithms[i]),
+					 errhint("The memory context was corrupted during training. This may indicate a bug in the training implementation.")));
+		}
+		
 		if (scores[i].model_id <= 0)
+		{
 			continue;
+		}
 
 		/* Evaluate model using neurondb.evaluate() directly via function call */
 

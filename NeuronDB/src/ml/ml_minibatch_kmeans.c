@@ -229,11 +229,21 @@ cluster_minibatch_kmeans(PG_FUNCTION_ARGS)
 	bool		typbyval;
 	char		typalign;
 
-	table_name = PG_GETARG_TEXT_PP(0);
-	column_name = PG_GETARG_TEXT_PP(1);
+	table_name = PG_ARGISNULL(0) ? NULL : PG_GETARG_TEXT_PP(0);
+	column_name = PG_ARGISNULL(1) ? NULL : PG_GETARG_TEXT_PP(1);
 	num_clusters = PG_GETARG_INT32(2);
 	batch_size = PG_ARGISNULL(3) ? 100 : PG_GETARG_INT32(3);
 	max_iters = PG_ARGISNULL(4) ? 100 : PG_GETARG_INT32(4);
+
+	/* Validate required parameters */
+	if (table_name == NULL)
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("table_name cannot be NULL")));
+	if (column_name == NULL)
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("column_name cannot be NULL")));
 
 	/* Validation */
 	if (num_clusters < 2)

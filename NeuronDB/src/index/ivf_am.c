@@ -565,14 +565,32 @@ ivfbuild(Relation heap, Relation index, struct IndexInfo *indexInfo)
 	nlists = options ? options->nlists : IVF_DEFAULT_NLISTS;
 
 	/* Initialize metadata page on block 0 */
-	metaBuffer = ReadBuffer(index, 0);
+	/* First, extend the index file if necessary - use P_NEW to ensure block 0 exists */
+	metaBuffer = ReadBufferExtended(index, MAIN_FORKNUM, P_NEW, RBM_NORMAL, NULL);
 	if (!BufferIsValid(metaBuffer))
 	{
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
 				 errmsg("neurondb: ReadBuffer failed")));
 	}
-	LockBuffer(metaBuffer, BUFFER_LOCK_EXCLUSIVE);
+	/* Check if we got block 0 or need to extend */
+	if (BufferGetBlockNumber(metaBuffer) != 0)
+	{
+		/* We got a block number > 0, release it and explicitly get block 0 */
+		UnlockReleaseBuffer(metaBuffer);
+		metaBuffer = ReadBufferExtended(index, MAIN_FORKNUM, 0, RBM_ZERO_AND_LOCK, NULL);
+		if (!BufferIsValid(metaBuffer))
+		{
+			ereport(ERROR,
+					(errcode(ERRCODE_INTERNAL_ERROR),
+					 errmsg("neurondb: ReadBuffer for block 0 failed")));
+		}
+	}
+	else
+	{
+		/* We got block 0, just lock it */
+		LockBuffer(metaBuffer, BUFFER_LOCK_EXCLUSIVE);
+	}
 	metaPage = BufferGetPage(metaBuffer);
 	if (PageIsNew(metaPage))
 		PageInit(metaPage, BufferGetPageSize(metaBuffer), sizeof(IvfMetaPageData));
@@ -882,7 +900,7 @@ ivfinsert(Relation index,
 		UnlockReleaseBuffer(meta_buf);
 		ereport(ERROR,
 				(errcode(ERRCODE_DATA_EXCEPTION),
-				 errmsg("IVF index has no centroids or dimension mismatch")));
+				 errmsg("IVF index has no centroids (nlists=%d)", nlist)));
 		return false;
 	}
 
@@ -1407,13 +1425,81 @@ ivfoptions(Datum reloptions, bool validate)
 		{"lists", RELOPT_TYPE_INT, offsetof(IvfOptions, nlists)},
 		{"probes", RELOPT_TYPE_INT, offsetof(IvfOptions, nprobe)}
 	};
+	IvfOptions *opts = NULL;
+	bytea *result = NULL;
 
 	/* Handle NULL reloptions safely */
 	if (reloptions == (Datum) 0 || reloptions == PointerGetDatum(NULL))
 		reloptions = (Datum) 0;
 
-	return (bytea *) build_reloptions(reloptions, validate, relopt_kind_ivf,
-									  sizeof(IvfOptions), tab, lengthof(tab));
+	result = (bytea *) build_reloptions(reloptions, validate, relopt_kind_ivf,
+										sizeof(IvfOptions), tab, lengthof(tab));
+	
+	/* WORKAROUND: build_reloptions appears to match by position, not by name.
+	 * Manually parse reloptions array and correct the values. */
+	if (result != NULL && reloptions != (Datum) 0 && DatumGetPointer(reloptions))
+	{
+		ArrayType *arr = DatumGetArrayTypeP(reloptions);
+		if (arr != NULL && ARR_NDIM(arr) == 1 && ARR_ELEMTYPE(arr) == TEXTOID)
+		{
+			Datum *elems = NULL;
+			bool *nulls = NULL;
+			int nelems = 0;
+			int parsed_nlists = 0;
+			int parsed_nprobe = 0;
+			bool found_nlists = false;
+			bool found_nprobe = false;
+			
+			deconstruct_array(arr, TEXTOID, -1, false, 'i', &elems, &nulls, &nelems);
+			
+			/* Parse each element to extract parameter name and value */
+			for (int i = 0; i < nelems; i++)
+			{
+				if (!nulls[i] && elems[i] != (Datum) 0)
+				{
+					char *elem_str = text_to_cstring(DatumGetTextP(elems[i]));
+					char *eq_pos = strchr(elem_str, '=');
+					
+					if (eq_pos != NULL)
+					{
+						char *param_name;
+						char *param_value_str;
+						int param_value;
+						
+						*eq_pos = '\0';
+						param_name = elem_str;
+						param_value_str = eq_pos + 1;
+						param_value = atoi(param_value_str);
+						
+						if (strcmp(param_name, "lists") == 0)
+						{
+							parsed_nlists = param_value;
+							found_nlists = true;
+						}
+						else if (strcmp(param_name, "probes") == 0)
+						{
+							parsed_nprobe = param_value;
+							found_nprobe = true;
+						}
+					}
+					nfree(elem_str);
+				}
+			}
+			
+			/* Apply the correctly parsed values */
+			opts = (IvfOptions *) VARDATA(result);
+			if (found_nlists)
+			{
+				opts->nlists = parsed_nlists;
+			}
+			if (found_nprobe)
+			{
+				opts->nprobe = parsed_nprobe;
+			}
+		}
+	}
+	
+	return result;
 }
 
 static bool

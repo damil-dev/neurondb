@@ -45,7 +45,7 @@ typedef struct VectorF16
 {
 	int32		vl_len_;
 	int16		dim;
-	int16		data[FLEXIBLE_ARRAY_MEMBER];
+	uint16		data[FLEXIBLE_ARRAY_MEMBER];
 } VectorF16;
 
 /* INT8 quantized vector (8x compression) */

@@ -144,6 +144,12 @@ RUN set -eux; \
 
 COPY docker/docker-entrypoint-initdb.d/ /docker-entrypoint-initdb.d/
 
+# Copy NeuronMCP SQL files for auto-setup
+COPY NeuronMCP/sql/ /docker-entrypoint-initdb.d/neurondb_mcp/
+
+# Copy NeuronAgent migration files for auto-setup
+COPY NeuronAgent/migrations/ /docker-entrypoint-initdb.d/neurondb_agent/
+
 LABEL com.nvidia.volumes.needed="nvidia_driver"
 
 VOLUME ["/var/lib/postgresql/data"]

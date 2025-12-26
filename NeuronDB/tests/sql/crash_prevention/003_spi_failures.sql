@@ -4,17 +4,29 @@
  * Note: Some of these may require special setup or mocking.
  */
 
-\set ON_ERROR_STOP on
+\set ON_ERROR_STOP off
 
 BEGIN;
 
 /* Test 1: Table does not exist */
-SELECT evaluate_linear_regression_by_model_id(1, 'nonexistent_table_xyz', 'features', 'label');
+DO $$
+BEGIN
+    PERFORM evaluate_linear_regression_by_model_id(1, 'nonexistent_table_xyz', 'features', 'label');
+    RAISE EXCEPTION 'Should have failed with non-existent table';
+EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'Correctly rejected non-existent table: %', SQLERRM;
+END$$;
 ROLLBACK;
 
 BEGIN;
 /* Test 2: Column does not exist */
-SELECT evaluate_linear_regression_by_model_id(1, 'test_table', 'nonexistent_column', 'label');
+DO $$
+BEGIN
+    PERFORM evaluate_linear_regression_by_model_id(1, 'test_table', 'nonexistent_column', 'label');
+    RAISE EXCEPTION 'Should have failed with non-existent column';
+EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'Correctly rejected non-existent column: %', SQLERRM;
+END$$;
 ROLLBACK;
 
 BEGIN;

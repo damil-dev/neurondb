@@ -444,10 +444,13 @@ sparsevec_in(PG_FUNCTION_ARGS)
 					(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
 					 errmsg("invalid index in sparsevec")));
 
-		if (indices[nnz] < 0)
+		/* pgvector sparsevec uses 1-based indexing, convert to 0-based */
+		if (indices[nnz] < 1)
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-					 errmsg("sparsevec indices must be non-negative")));
+					 errmsg("sparsevec indices must be positive (1-based)")));
+		
+		indices[nnz]--;  /* Convert from 1-based to 0-based */
 
 		if (indices[nnz] > max_index)
 			max_index = indices[nnz];
@@ -480,6 +483,24 @@ sparsevec_in(PG_FUNCTION_ARGS)
 					 errmsg("sparsevec must have at least one entry or specify dim")));
 		}
 		/* Allow empty sparsevec if dim is specified */
+	}
+
+	/* Check for /N dimension specifier after closing brace */
+	if (*ptr == '}')
+		ptr++;
+	
+	while (isspace((unsigned char) *ptr))
+		ptr++;
+	
+	if (*ptr == '/')
+	{
+		ptr++;
+		int32 specified_dim = strtol(ptr, &endptr, 10);
+		if (ptr != endptr && specified_dim > 0)
+		{
+			/* Use explicitly specified dimension */
+			dim = specified_dim;
+		}
 	}
 
 	if (nnz > 1000)
@@ -539,7 +560,7 @@ sparsevec_out(PG_FUNCTION_ARGS)
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("neurondb: sparsevec_out requires 1 argument")));
 
-	vec = (VectorMap *) PG_GETARG_POINTER(0);
+	vec = (VectorMap *) PG_DETOAST_DATUM(PG_GETARG_DATUM(0));
 
 	if (vec == NULL)
 		PG_RETURN_CSTRING(pstrdup("NULL"));
@@ -557,7 +578,8 @@ sparsevec_out(PG_FUNCTION_ARGS)
 	{
 		if (i > 0)
 			appendStringInfoChar(&buf, ',');
-		appendStringInfo(&buf, "%d:%g", indices[i], values[i]);
+		/* pgvector sparsevec uses 1-based indexing */
+		appendStringInfo(&buf, "%d:%g", indices[i] + 1, values[i]);
 	}
 
 	appendStringInfoChar(&buf, '}');

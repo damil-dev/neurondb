@@ -541,14 +541,23 @@ COMMENT ON FUNCTION bit_to_vector IS 'Convert PostgreSQL bit type to vector';
 
 -- Type conversion functions (compatibility)
 CREATE FUNCTION vector_to_halfvec(vector) RETURNS halfvec
-    AS 'MODULE_PATHNAME', 'vector_to_halfvec'
+    AS 'MODULE_PATHNAME', 'vector_to_float16'
     LANGUAGE C IMMUTABLE STRICT;
 COMMENT ON FUNCTION vector_to_halfvec IS 'Convert vector to halfvec (compatible)';
 
 CREATE FUNCTION halfvec_to_vector(halfvec) RETURNS vector
-    AS 'MODULE_PATHNAME', 'halfvec_to_vector'
+    AS 'MODULE_PATHNAME', 'float16_to_vector'
     LANGUAGE C IMMUTABLE STRICT;
 COMMENT ON FUNCTION halfvec_to_vector IS 'Convert halfvec to vector (compatible)';
+
+-- Casts between halfvec and vector
+CREATE CAST (halfvec AS vector)
+    WITH FUNCTION halfvec_to_vector(halfvec)
+    AS IMPLICIT;
+
+CREATE CAST (vector AS halfvec)
+    WITH FUNCTION vector_to_halfvec(vector)
+    AS ASSIGNMENT;
 
 CREATE FUNCTION vector_to_sparsevec(vector) RETURNS sparsevec
     AS 'MODULE_PATHNAME', 'vector_to_sparsevec'

@@ -1055,10 +1055,10 @@ static IndexScanDesc
 hnswbeginscan(Relation index, int nkeys, int norderbys)
 {
 	IndexScanDesc scan;
-
 	HnswScanOpaque so = NULL;
 
 	scan = RelationGetIndexScan(index, nkeys, norderbys);
+	
 	nalloc(so, HnswScanOpaqueData, 1);
 	so->efSearch = HNSW_DEFAULT_EF_SEARCH;
 	so->strategy = 1;
@@ -1213,19 +1213,8 @@ hnswgettuple(IndexScanDesc scan, ScanDirection dir)
 		if (node != NULL)
 		{
 			scan->xs_heaptid = node->heapPtr;
-
-			/* Set orderby values for distance ordering */
-			/* Check that both xs_orderbyvals and xs_orderbynulls are non-NULL */
-			/* They should be allocated together by the executor when numberOfOrderBys > 0 */
-			/* If only one is NULL, something is wrong - skip setting orderby values */
-			if (scan->numberOfOrderBys > 0 && 
-				scan->xs_orderbyvals != NULL && 
-				scan->xs_orderbynulls != NULL &&
-				so->distances != NULL)
-			{
-				scan->xs_orderbyvals[0] = Float4GetDatum(so->distances[so->currentResult]);
-				scan->xs_orderbynulls[0] = false;
-			}
+			scan->xs_recheck = false;
+			scan->xs_recheckorderby = false;
 		}
 		else
 		{
@@ -2261,12 +2250,20 @@ hnswSearch(Relation index,
 		}
 
 		topKCount = Min(k, candidateCount);
-		nalloc(topK, BlockNumber, topKCount);
-		nalloc(topKDists, float4, topKCount);
-		for (i = 0; i < topKCount; i++)
+		if (topKCount > 0)
 		{
-			topK[i] = candidates[indices[i]];
-			topKDists[i] = candidateDists[indices[i]];
+			nalloc(topK, BlockNumber, topKCount);
+			nalloc(topKDists, float4, topKCount);
+			for (i = 0; i < topKCount; i++)
+			{
+				topK[i] = candidates[indices[i]];
+				topKDists[i] = candidateDists[indices[i]];
+			}
+		}
+		else
+		{
+			topK = NULL;
+			topKDists = NULL;
 		}
 
 		nfree(indices);

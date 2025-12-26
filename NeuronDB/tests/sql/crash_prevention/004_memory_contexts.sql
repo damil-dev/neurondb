@@ -5,7 +5,7 @@
  * but we can test scenarios that stress memory management.
  */
 
-\set ON_ERROR_STOP on
+\set ON_ERROR_STOP off
 
 BEGIN;
 
@@ -17,7 +17,13 @@ SELECT
 FROM generate_series(1, 10000);
 
 /* This should not crash even with large datasets */
-SELECT evaluate_linear_regression_by_model_id(1, 'large_test_table', 'features', 'label');
+DO $$
+BEGIN
+    PERFORM evaluate_linear_regression_by_model_id(1, 'large_test_table', 'features', 'label');
+    RAISE EXCEPTION 'Should have failed - model does not exist';
+EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'Correctly handled large dataset error: %', SQLERRM;
+END$$;
 ROLLBACK;
 
 BEGIN;

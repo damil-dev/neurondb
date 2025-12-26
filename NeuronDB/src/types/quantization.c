@@ -269,7 +269,7 @@ float16_to_vector(PG_FUNCTION_ARGS)
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("neurondb: float16_to_vector requires 1 argument")));
 
-	vf16 = (VectorF16 *) PG_GETARG_POINTER(0);
+	vf16 = (VectorF16 *) PG_DETOAST_DATUM(PG_GETARG_DATUM(0));
 
 	result = new_vector(vf16->dim);
 	for (i = 0; i < vf16->dim; i++)
@@ -1801,7 +1801,7 @@ halfvec_out(PG_FUNCTION_ARGS)
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("neurondb: halfvec_out requires 1 argument")));
 
-	vf16 = (VectorF16 *) PG_GETARG_POINTER(0);
+	vf16 = (VectorF16 *) PG_DETOAST_DATUM(PG_GETARG_DATUM(0));
 
 	if (vf16 == NULL)
 		PG_RETURN_CSTRING(pstrdup("NULL"));
@@ -1868,7 +1868,7 @@ halfvec_send(PG_FUNCTION_ARGS)
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("neurondb: halfvec_send requires 1 argument")));
 
-	vf16 = (VectorF16 *) PG_GETARG_POINTER(0);
+	vf16 = (VectorF16 *) PG_DETOAST_DATUM(PG_GETARG_DATUM(0));
 
 	pq_begintypsend(&buf);
 	pq_sendint(&buf, vf16->dim, sizeof(int16));
@@ -1896,8 +1896,8 @@ halfvec_eq(PG_FUNCTION_ARGS)
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("neurondb: halfvec_eq requires 2 arguments")));
 
-	a = (VectorF16 *) PG_GETARG_POINTER(0);
-	b = (VectorF16 *) PG_GETARG_POINTER(1);
+	a = (VectorF16 *) PG_DETOAST_DATUM(PG_GETARG_DATUM(0));
+	b = (VectorF16 *) PG_DETOAST_DATUM(PG_GETARG_DATUM(1));
 
 	/* Handle NULL vectors */
 	if (a == NULL && b == NULL)
@@ -1948,7 +1948,7 @@ halfvec_hash(PG_FUNCTION_ARGS)
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("neurondb: halfvec_hash requires 1 argument")));
 
-	v = (VectorF16 *) PG_GETARG_POINTER(0);
+	v = (VectorF16 *) PG_DETOAST_DATUM(PG_GETARG_DATUM(0));
 
 	if (v == NULL)
 		PG_RETURN_UINT32(0);
@@ -1999,7 +1999,7 @@ halfvec_subvector(PG_FUNCTION_ARGS)
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("neurondb: halfvec_subvector requires 3 arguments")));
 
-	v = (VectorF16 *) PG_GETARG_POINTER(0);
+	v = (VectorF16 *) PG_DETOAST_DATUM(PG_GETARG_DATUM(0));
 	start = PG_GETARG_INT32(1);
 	end = PG_GETARG_INT32(2);
 
@@ -2044,7 +2044,7 @@ halfvec_l2_norm(PG_FUNCTION_ARGS)
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("neurondb: halfvec_l2_norm requires 1 argument")));
 
-	v = (VectorF16 *) PG_GETARG_POINTER(0);
+	v = (VectorF16 *) PG_DETOAST_DATUM(PG_GETARG_DATUM(0));
 
 	if (v == NULL)
 		ereport(ERROR,
@@ -2089,8 +2089,8 @@ halfvec_l2_distance(PG_FUNCTION_ARGS)
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("neurondb: halfvec_l2_distance requires 2 arguments")));
 
-	a = (VectorF16 *) PG_GETARG_POINTER(0);
-	b = (VectorF16 *) PG_GETARG_POINTER(1);
+	a = (VectorF16 *) PG_DETOAST_DATUM(PG_GETARG_DATUM(0));
+	b = (VectorF16 *) PG_DETOAST_DATUM(PG_GETARG_DATUM(1));
 
 	if (a == NULL || b == NULL)
 		ereport(ERROR,
@@ -2138,8 +2138,8 @@ halfvec_cosine_distance(PG_FUNCTION_ARGS)
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("neurondb: halfvec_cosine_distance requires 2 arguments")));
 
-	a = (VectorF16 *) PG_GETARG_POINTER(0);
-	b = (VectorF16 *) PG_GETARG_POINTER(1);
+	a = (VectorF16 *) PG_DETOAST_DATUM(PG_GETARG_DATUM(0));
+	b = (VectorF16 *) PG_DETOAST_DATUM(PG_GETARG_DATUM(1));
 
 	if (a == NULL || b == NULL)
 		ereport(ERROR,
@@ -2184,8 +2184,8 @@ halfvec_inner_product(PG_FUNCTION_ARGS)
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("neurondb: halfvec_inner_product requires 2 arguments")));
 
-	a = (VectorF16 *) PG_GETARG_POINTER(0);
-	b = (VectorF16 *) PG_GETARG_POINTER(1);
+	a = (VectorF16 *) PG_DETOAST_DATUM(PG_GETARG_DATUM(0));
+	b = (VectorF16 *) PG_DETOAST_DATUM(PG_GETARG_DATUM(1));
 	{
 		double		sum = 0.0;
 		int			i;
@@ -2232,8 +2232,8 @@ halfvec_add(PG_FUNCTION_ARGS)
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("neurondb: halfvec_add requires 2 arguments")));
 
-	a = (VectorF16 *) PG_GETARG_POINTER(0);
-	b = (VectorF16 *) PG_GETARG_POINTER(1);
+	a = (VectorF16 *) PG_DETOAST_DATUM(PG_GETARG_DATUM(0));
+	b = (VectorF16 *) PG_DETOAST_DATUM(PG_GETARG_DATUM(1));
 
 	if (a == NULL || b == NULL)
 		ereport(ERROR,
@@ -2287,8 +2287,8 @@ halfvec_sub(PG_FUNCTION_ARGS)
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("neurondb: halfvec_sub requires 2 arguments")));
 
-	a = (VectorF16 *) PG_GETARG_POINTER(0);
-	b = (VectorF16 *) PG_GETARG_POINTER(1);
+	a = (VectorF16 *) PG_DETOAST_DATUM(PG_GETARG_DATUM(0));
+	b = (VectorF16 *) PG_DETOAST_DATUM(PG_GETARG_DATUM(1));
 
 	if (a == NULL || b == NULL)
 		ereport(ERROR,
@@ -2342,7 +2342,7 @@ halfvec_mul(PG_FUNCTION_ARGS)
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("neurondb: halfvec_mul requires 2 arguments")));
 
-	v = (VectorF16 *) PG_GETARG_POINTER(0);
+	v = (VectorF16 *) PG_DETOAST_DATUM(PG_GETARG_DATUM(0));
 	scalar = PG_GETARG_FLOAT8(1);
 
 	if (v == NULL)
@@ -2395,7 +2395,7 @@ halfvec_div(PG_FUNCTION_ARGS)
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("neurondb: halfvec_div requires 2 arguments")));
 
-	v = (VectorF16 *) PG_GETARG_POINTER(0);
+	v = (VectorF16 *) PG_DETOAST_DATUM(PG_GETARG_DATUM(0));
 	scalar = PG_GETARG_FLOAT8(1);
 
 	if (v == NULL)
@@ -2452,7 +2452,7 @@ halfvec_neg(PG_FUNCTION_ARGS)
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("neurondb: halfvec_neg requires 1 argument")));
 
-	v = (VectorF16 *) PG_GETARG_POINTER(0);
+	v = (VectorF16 *) PG_DETOAST_DATUM(PG_GETARG_DATUM(0));
 
 	if (v == NULL)
 		ereport(ERROR,

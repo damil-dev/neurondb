@@ -167,8 +167,18 @@ cluster_kmeans(PG_FUNCTION_ARGS)
 	int		   *centroids_idx = NULL;
 	int32		max_iters = PG_GETARG_INT32(3);
 	int32		num_clusters = PG_GETARG_INT32(2);
-	text	   *table_name = PG_GETARG_TEXT_PP(0);
-	text	   *vector_col = PG_GETARG_TEXT_PP(1);
+	text	   *table_name = PG_ARGISNULL(0) ? NULL : PG_GETARG_TEXT_PP(0);
+	text	   *vector_col = PG_ARGISNULL(1) ? NULL : PG_GETARG_TEXT_PP(1);
+
+	/* Validate required parameters */
+	if (table_name == NULL)
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("table_name cannot be NULL")));
+	if (vector_col == NULL)
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("vector_col cannot be NULL")));
 
 	tbl_str = text_to_cstring(table_name);
 	col_str = text_to_cstring(vector_col);
@@ -412,10 +422,10 @@ kmeans_model_deserialize_from_bytea(const bytea * data, float ***centers_out, in
 PG_FUNCTION_INFO_V1(train_kmeans_model_id);
 
 Datum
-train_kmeans_model_id(PG_FUNCTION_ARGS)
+	train_kmeans_model_id(PG_FUNCTION_ARGS)
 {
-	text	   *table_name = PG_GETARG_TEXT_PP(0);
-	text	   *vector_col = PG_GETARG_TEXT_PP(1);
+	text	   *table_name = PG_ARGISNULL(0) ? NULL : PG_GETARG_TEXT_PP(0);
+	text	   *vector_col = PG_ARGISNULL(1) ? NULL : PG_GETARG_TEXT_PP(1);
 	int32		num_clusters = PG_GETARG_INT32(2);
 	int32		max_iters = PG_GETARG_INT32(3);
 
@@ -438,6 +448,16 @@ train_kmeans_model_id(PG_FUNCTION_ARGS)
 	Jsonb *metrics = NULL;
 	StringInfoData metrics_json;
 	int32		model_id;
+
+	/* Validate required parameters */
+	if (table_name == NULL)
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("table_name cannot be NULL")));
+	if (vector_col == NULL)
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("vector_col cannot be NULL")));
 
 	tbl_str = text_to_cstring(table_name);
 	col_str = text_to_cstring(vector_col);
@@ -664,6 +684,14 @@ evaluate_kmeans_by_model_id(PG_FUNCTION_ARGS)
 				 errmsg("neurondb: evaluate_kmeans_by_model_id: model_id is required")));
 
 	model_id = PG_GETARG_INT32(0);
+
+	/* Validate model_id before attempting to load */
+	if (model_id <= 0)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: evaluate_kmeans_by_model_id: model_id must be positive, got %d", model_id),
+				 errdetail("Invalid model_id: %d", model_id),
+				 errhint("Provide a valid model_id from neurondb.ml_models catalog.")));
 
 	if (PG_ARGISNULL(1) || PG_ARGISNULL(2))
 		ereport(ERROR,

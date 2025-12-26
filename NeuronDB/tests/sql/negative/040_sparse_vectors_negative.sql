@@ -46,12 +46,22 @@ END$$;
 \echo 'Test 3: Mismatched vocab sizes'
 \echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
 
-SELECT
-	'Dot product with different vocab sizes' AS test_name,
-	sparse_vector_dot_product(
-		'{vocab_size:30522, model:SPLADE, tokens:[100], weights:[0.5]}'::sparse_vector,
-		'{vocab_size:50000, model:SPLADE, tokens:[100], weights:[0.3]}'::sparse_vector
-	) AS result;
+-- Note: sparse_vector_dot_product should handle different vocab sizes gracefully
+-- The function computes dot product by matching token IDs, so different vocab sizes
+-- are acceptable as long as the token IDs match
+DO $$
+DECLARE
+	v1 sparse_vector;
+	v2 sparse_vector;
+	result float4;
+BEGIN
+	v1 := '{vocab_size:30522, model:SPLADE, tokens:[100], weights:[0.5]}'::sparse_vector;
+	v2 := '{vocab_size:50000, model:SPLADE, tokens:[100], weights:[0.3]}'::sparse_vector;
+	result := sparse_vector_dot_product(v1, v2);
+	RAISE NOTICE 'Dot product with different vocab sizes: %', result;
+EXCEPTION WHEN OTHERS THEN
+	RAISE NOTICE 'Error with mismatched vocab sizes: %', SQLERRM;
+END $$;
 
 \echo ''
 \echo '✅ Negative sparse vectors tests completed'

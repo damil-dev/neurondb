@@ -86,16 +86,25 @@ create_tenant_worker(PG_FUNCTION_ARGS)
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("neurondb: create_tenant_worker requires at least 3 arguments")));
 
+	/* Validate arguments are not NULL before calling PG_GETARG_TEXT_PP */
+	if (PG_ARGISNULL(0))
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("neurondb: create_tenant_worker: tenant_id cannot be NULL")));
+
+	if (PG_ARGISNULL(1))
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("neurondb: create_tenant_worker: worker_type cannot be NULL")));
+
+	if (PG_ARGISNULL(2))
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("neurondb: create_tenant_worker: config cannot be NULL")));
+
 	tenant_id = PG_GETARG_TEXT_PP(0);
 	worker_type = PG_GETARG_TEXT_PP(1);
 	config = PG_GETARG_TEXT_PP(2);
-
-	/* Defensive argument checks */
-	if (tenant_id == NULL || worker_type == NULL || config == NULL)
-		ereport(ERROR,
-				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
-				 errmsg("NULL argument not allowed in "
-						"create_tenant_worker")));
 
 	/* Convert to C string safely */
 	tid_str = ndb_text_to_cstring_safe(tenant_id);
@@ -155,13 +164,15 @@ get_tenant_stats(PG_FUNCTION_ARGS)
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("neurondb: get_tenant_stats requires at least 1 argument")));
 
+		/* Validate argument is not NULL before calling PG_GETARG_TEXT_PP */
+		if (PG_ARGISNULL(0))
+			ereport(ERROR,
+					(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+					 errmsg("neurondb: get_tenant_stats: tenant_id cannot be NULL")));
+
 		funcctx = SRF_FIRSTCALL_INIT();
 
 		tenant_id = PG_GETARG_TEXT_PP(0);
-		if (tenant_id == NULL)
-			ereport(ERROR,
-					(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
-					 errmsg("tenant_id must not be null")));
 
 		tid_str = ndb_text_to_cstring_safe(tenant_id);
 
