@@ -1,9 +1,5 @@
 # NeuronDB Ecosystem
 
-<div align="center">
-  <img src="neurondb.png" alt="NeuronDB Logo" width="200">
-</div>
-
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16%2C17%2C18-blue.svg)](https://www.postgresql.org/)
 [![License](https://img.shields.io/badge/License-Proprietary-red.svg)](LICENSE)
 [![Documentation](https://img.shields.io/badge/docs-latest-brightgreen.svg)](https://www.neurondb.ai/docs)
@@ -34,6 +30,10 @@ PostgreSQL extension with vector search, machine learning algorithms, and agent 
 - [Support](#support)
 
 ## Overview
+
+<div align="center">
+  <img src="neurondb.png" alt="NeuronDB Logo" width="200">
+</div>
 
 NeuronDB provides vector search and machine learning within PostgreSQL. NeuronAgent adds REST API and WebSocket support for agent applications. NeuronMCP exposes NeuronDB through the Model Context Protocol for MCP-compatible clients.
 
