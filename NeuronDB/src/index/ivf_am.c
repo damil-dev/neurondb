@@ -2116,8 +2116,17 @@ ivfgettuple(IndexScanDesc scan, ScanDirection dir)
 		/* Set distance in orderby values if available */
 		if (scan->xs_orderbyvals != NULL && scan->numberOfOrderBys > 0)
 		{
-			scan->xs_orderbyvals[0] = Float4GetDatum(so->distances[so->currentResult]);
-			scan->xs_orderbynulls[0] = false;
+			if (so->distances != NULL)
+			{
+				scan->xs_orderbyvals[0] = Float4GetDatum(so->distances[so->currentResult]);
+				scan->xs_orderbynulls[0] = false;
+			}
+			else
+			{
+				/* No distances available, mark as null */
+				scan->xs_orderbyvals[0] = (Datum) 0;
+				scan->xs_orderbynulls[0] = true;
+			}
 		}
 
 		so->currentResult++;

@@ -103,6 +103,7 @@ def list_sql_files(category: str, module: Optional[str] = None) -> List[str]:
 	"""
 	List SQL files by category from tests/sql (recursively).
 	Optionally filter by module (e.g., 'ml', 'vector', 'embedding').
+	Files are sorted numerically by their prefix (001, 002, 003, etc.) to ensure proper test sequence.
 	"""
 	if not os.path.isdir(TESTS_SQL_DIR):
 		raise FileNotFoundError(f"SQL directory not found: {TESTS_SQL_DIR}")
@@ -114,7 +115,23 @@ def list_sql_files(category: str, module: Optional[str] = None) -> List[str]:
 			if f.endswith(".sql"):
 				rel_path = os.path.relpath(os.path.join(root, f), TESTS_SQL_DIR)
 				all_files.append(rel_path)
-	all_files.sort()
+	
+	# Sort files numerically by their prefix (001, 002, 003, etc.)
+	# First sort by directory path, then by numeric prefix within each directory
+	def sort_key(filepath: str) -> Tuple[str, int, str]:
+		# Split into directory and filename
+		dir_part = os.path.dirname(filepath)
+		basename = os.path.basename(filepath)
+		# Extract numeric prefix
+		match = re.match(r'^(\d{3})_', basename)
+		if match:
+			num = int(match.group(1))
+		else:
+			num = 999999  # Files without numeric prefix go to end
+		# Return (directory, number, full_path) for sorting
+		return (dir_part, num, filepath)
+	
+	all_files.sort(key=sort_key)
 
 	# Filter by category
 	if category == "basic":
