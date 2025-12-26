@@ -17,17 +17,23 @@ package tools
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/neurondb/NeuronMCP/internal/database"
 	"github.com/neurondb/NeuronMCP/internal/logging"
+	"github.com/neurondb/NeuronMCP/pkg/mcp"
 )
 
 /* ToolDefinition represents a tool's definition for MCP */
 type ToolDefinition struct {
-	Name        string                 `json:"name"`
-	Description string                 `json:"description"`
-	InputSchema map[string]interface{} `json:"inputSchema"`
+	Name         string                 `json:"name"`
+	Description  string                 `json:"description"`
+	InputSchema  map[string]interface{} `json:"inputSchema"`
+	OutputSchema map[string]interface{} `json:"outputSchema,omitempty"`
+	Version      string                 `json:"version,omitempty"`
+	Deprecated   bool                   `json:"deprecated,omitempty"`
+	Deprecation  *mcp.DeprecationInfo   `json:"deprecation,omitempty"`
 }
 
 /* ToolRegistry manages tool registration and execution */
@@ -55,14 +61,20 @@ func (r *ToolRegistry) Register(tool Tool) {
 	defer r.mu.Unlock()
 
 	definition := ToolDefinition{
-		Name:        tool.Name(),
-		Description: tool.Description(),
-		InputSchema: tool.InputSchema(),
+		Name:         tool.Name(),
+		Description:  tool.Description(),
+		InputSchema:  tool.InputSchema(),
+		OutputSchema: tool.OutputSchema(),
+		Version:      tool.Version(),
+		Deprecated:   tool.Deprecated(),
+		Deprecation:  tool.Deprecation(),
 	}
 
 	r.tools[tool.Name()] = tool
 	r.definitions[tool.Name()] = definition
-	r.logger.Debug(fmt.Sprintf("Registered tool: %s", tool.Name()), nil)
+	if r.logger != nil {
+		r.logger.Debug(fmt.Sprintf("Registered tool: %s (version: %s)", tool.Name(), tool.Version()), nil)
+	}
 }
 
 /* RegisterAll registers multiple tools */
@@ -129,7 +141,9 @@ func (r *ToolRegistry) Unregister(name string) bool {
 		delete(r.tools, name)
 		delete(r.definitions, name)
 		removed = true
-		r.logger.Debug(fmt.Sprintf("Unregistered tool: %s", name), nil)
+		if r.logger != nil {
+			r.logger.Debug(fmt.Sprintf("Unregistered tool: %s", name), nil)
+		}
 	}
 	return removed
 }
@@ -147,5 +161,54 @@ func (r *ToolRegistry) GetCount() int {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return len(r.tools)
+}
+
+/* Search searches for tools by name or description */
+func (r *ToolRegistry) Search(query string, category string) []ToolDefinition {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	results := make([]ToolDefinition, 0)
+	queryLower := strings.ToLower(strings.TrimSpace(query))
+	categoryLower := strings.ToLower(strings.TrimSpace(category))
+
+	for _, def := range r.definitions {
+		/* Search in name */
+		nameMatch := query == "" || containsIgnoreCase(def.Name, query) || containsIgnoreCase(def.Name, queryLower)
+
+		/* Search in description */
+		descMatch := query == "" || containsIgnoreCase(def.Description, query) || containsIgnoreCase(def.Description, queryLower)
+
+		/* Category filter */
+		categoryMatch := true
+		if category != "" {
+			/* Extract category from tool name prefix */
+			categoryMatch = false
+			toolNameLower := strings.ToLower(def.Name)
+			if strings.HasPrefix(toolNameLower, categoryLower+"_") {
+				categoryMatch = true
+			}
+			/* Also check if category matches common prefixes */
+			categories := []string{"vector", "ml", "rag", "analytics", "indexing", "embedding", "hybrid", "rerank"}
+			for _, cat := range categories {
+				if categoryLower == cat && strings.HasPrefix(toolNameLower, cat+"_") {
+					categoryMatch = true
+					break
+				}
+			}
+		}
+
+		if (nameMatch || descMatch) && categoryMatch {
+			results = append(results, def)
+		}
+	}
+
+	return results
+}
+
+/* containsIgnoreCase checks if a string contains another (case-insensitive) */
+func containsIgnoreCase(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || 
+		strings.Contains(strings.ToLower(s), strings.ToLower(substr)))
 }
 

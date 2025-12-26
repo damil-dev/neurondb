@@ -275,7 +275,7 @@ func TestExecuteTool_ErrorConditions(t *testing.T) {
 	ctx := context.Background()
 
   /* Test with empty tool name - should return error response */
-	resp, err := srv.executeTool(ctx, "", map[string]interface{}{})
+	resp, err := srv.executeTool(ctx, "", map[string]interface{}{}, false, "", false)
 	if err != nil {
 		t.Fatalf("executeTool() should not return error for empty name, but error response: %v", err)
 	}
@@ -287,7 +287,7 @@ func TestExecuteTool_ErrorConditions(t *testing.T) {
 	}
 
   /* Test with nonexistent tool - should return error response */
-	resp, err = srv.executeTool(ctx, "nonexistent_tool_abc", map[string]interface{}{})
+	resp, err = srv.executeTool(ctx, "nonexistent_tool_abc", map[string]interface{}{}, false, "", false)
 	if err != nil {
 		t.Fatalf("executeTool() should not return error for nonexistent tool: %v", err)
 	}
@@ -305,7 +305,7 @@ func TestExecuteTool_ErrorConditions(t *testing.T) {
 				t.Fatalf("executeTool panicked with nil arguments: %v", r)
 			}
 		}()
-		_, _ = srv.executeTool(ctx, "vector_search", nil)
+		_, _ = srv.executeTool(ctx, "vector_search", nil, false, "", false)
 	}()
 
   /* Test with invalid tool name containing null bytes - should not crash */
@@ -315,7 +315,7 @@ func TestExecuteTool_ErrorConditions(t *testing.T) {
 				t.Fatalf("executeTool panicked with invalid tool name: %v", r)
 			}
 		}()
-		_, _ = srv.executeTool(ctx, "vector_search\x00", map[string]interface{}{})
+		_, _ = srv.executeTool(ctx, "vector_search\x00", map[string]interface{}{}, false, "", false)
 	}()
 }
 

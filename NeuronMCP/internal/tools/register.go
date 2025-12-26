@@ -51,6 +51,10 @@ func RegisterAllTools(registry *ToolRegistry, db *database.Database, logger *log
 	registry.Register(NewProcessDocumentTool(db, logger))
 	registry.Register(NewRetrieveContextTool(db, logger))
 	registry.Register(NewGenerateResponseTool(db, logger))
+
+  /* Composite RAG tools */
+	registry.Register(NewIngestDocumentsTool(db, logger))
+	registry.Register(NewAnswerWithCitationsTool(db, logger))
 	registry.Register(NewChunkDocumentTool(db, logger))
 
   /* Indexing tools */

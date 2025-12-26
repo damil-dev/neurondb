@@ -15,13 +15,21 @@
 
 package tools
 
-import "context"
+import (
+	"context"
+
+	"github.com/neurondb/NeuronMCP/pkg/mcp"
+)
 
 /* Tool is the interface that all tools must implement */
 type Tool interface {
 	Name() string
 	Description() string
 	InputSchema() map[string]interface{}
+	OutputSchema() map[string]interface{}
+	Version() string
+	Deprecated() bool
+	Deprecation() *mcp.DeprecationInfo
 	Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error)
 }
 

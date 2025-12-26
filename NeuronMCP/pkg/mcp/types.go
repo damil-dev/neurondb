@@ -42,8 +42,11 @@ type ListToolsRequest struct {
 }
 
 type CallToolRequest struct {
-	Name      string                 `json:"name"`
-	Arguments map[string]interface{} `json:"arguments,omitempty"`
+	Name           string                 `json:"name"`
+	Arguments      map[string]interface{} `json:"arguments,omitempty"`
+	DryRun         bool                   `json:"dryRun,omitempty"`
+	IdempotencyKey string                 `json:"idempotencyKey,omitempty"`
+	RequireConfirm bool                   `json:"requireConfirm,omitempty"`
 }
 
 type ListResourcesRequest struct {
@@ -56,9 +59,22 @@ type ReadResourceRequest struct {
 
 /* MCP Response types */
 type ToolDefinition struct {
-	Name        string                 `json:"name"`
-	Description string                 `json:"description"`
-	InputSchema map[string]interface{} `json:"inputSchema"`
+	Name         string                 `json:"name"`
+	Description  string                 `json:"description"`
+	InputSchema  map[string]interface{} `json:"inputSchema"`
+	OutputSchema map[string]interface{} `json:"outputSchema,omitempty"`
+	Version      string                 `json:"version,omitempty"`
+	Deprecated   bool                   `json:"deprecated,omitempty"`
+	Deprecation  *DeprecationInfo       `json:"deprecation,omitempty"`
+}
+
+/* DeprecationInfo provides information about tool deprecation */
+type DeprecationInfo struct {
+	Message        string `json:"message,omitempty"`
+	DeprecatedAt   string `json:"deprecatedAt,omitempty"`
+	SunsetAt       string `json:"sunsetAt,omitempty"`
+	Replacement    string `json:"replacement,omitempty"`
+	MigrationGuide string `json:"migrationGuide,omitempty"`
 }
 
 type ListToolsResponse struct {
@@ -104,8 +120,20 @@ type ServerInfo struct {
 }
 
 type ServerCapabilities struct {
-	Tools     map[string]interface{} `json:"tools,omitempty"`
-	Resources map[string]interface{} `json:"resources,omitempty"`
+	Tools       ToolsCapability              `json:"tools,omitempty"`
+	Resources   ResourcesCapability          `json:"resources,omitempty"`
+	Prompts     map[string]interface{}       `json:"prompts,omitempty"`
+	Sampling    map[string]interface{}       `json:"sampling,omitempty"`
+	Experimental map[string]interface{}      `json:"experimental,omitempty"`
+}
+
+type ToolsCapability struct {
+	ListChanged bool `json:"listChanged,omitempty"`
+}
+
+type ResourcesCapability struct {
+	Subscribe   bool `json:"subscribe,omitempty"`
+	ListChanged bool `json:"listChanged,omitempty"`
 }
 
 type InitializeRequest struct {

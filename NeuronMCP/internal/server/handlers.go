@@ -38,6 +38,9 @@ func (s *Server) setupToolHandlers() {
 
   /* Call tool handler */
 	s.mcpServer.SetHandler("tools/call", s.handleCallTool)
+
+  /* Search tools handler */
+	s.mcpServer.SetHandler("tools/search", s.handleSearchTools)
 }
 
 /* handleListTools handles the tools/list request */
@@ -48,9 +51,13 @@ func (s *Server) handleListTools(ctx context.Context, params json.RawMessage) (i
 	mcpTools := make([]mcp.ToolDefinition, len(filtered))
 	for i, def := range filtered {
 		mcpTools[i] = mcp.ToolDefinition{
-			Name:        def.Name,
-			Description: def.Description,
-			InputSchema: def.InputSchema,
+			Name:         def.Name,
+			Description:  def.Description,
+			InputSchema:  def.InputSchema,
+			OutputSchema: def.OutputSchema,
+			Version:      def.Version,
+			Deprecated:   def.Deprecated,
+			Deprecation:  def.Deprecation,
 		}
 	}
 	
@@ -71,18 +78,21 @@ func (s *Server) handleCallTool(ctx context.Context, params json.RawMessage) (in
 	mcpReq := &middleware.MCPRequest{
 		Method: "tools/call",
 		Params: map[string]interface{}{
-			"name":      req.Name,
-			"arguments": req.Arguments,
+			"name":           req.Name,
+			"arguments":      req.Arguments,
+			"dryRun":         req.DryRun,
+			"idempotencyKey": req.IdempotencyKey,
+			"requireConfirm": req.RequireConfirm,
 		},
 	}
 
 	return s.middleware.Execute(ctx, mcpReq, func(ctx context.Context) (*middleware.MCPResponse, error) {
-		return s.executeTool(ctx, req.Name, req.Arguments)
+		return s.executeTool(ctx, req.Name, req.Arguments, req.DryRun, req.IdempotencyKey, req.RequireConfirm)
 	})
 }
 
 /* executeTool executes a tool and returns the response */
-func (s *Server) executeTool(ctx context.Context, toolName string, arguments map[string]interface{}) (*middleware.MCPResponse, error) {
+func (s *Server) executeTool(ctx context.Context, toolName string, arguments map[string]interface{}, dryRun bool, idempotencyKey string, requireConfirm bool) (*middleware.MCPResponse, error) {
 	if toolName == "" {
 		return &middleware.MCPResponse{
 			Content: []middleware.ContentBlock{
@@ -109,9 +119,54 @@ func (s *Server) executeTool(ctx context.Context, toolName string, arguments map
 
   /* Log tool execution start */
 	s.logger.Info("Executing tool", map[string]interface{}{
-		"tool_name": toolName,
+		"tool_name":       toolName,
 		"arguments_count": len(arguments),
+		"dry_run":         dryRun,
+		"idempotency_key": idempotencyKey,
+		"require_confirm": requireConfirm,
 	})
+
+	/* Handle dry run mode */
+	if dryRun {
+		dryRunExecutor := tools.NewDryRunExecutor(tool)
+		dryRunResult, err := dryRunExecutor.Execute(ctx, arguments)
+		if err != nil {
+			return s.formatToolError(dryRunResult), nil
+		}
+		resultJSON, _ := json.MarshalIndent(dryRunResult.Data, "", "  ")
+		return &middleware.MCPResponse{
+			Content: []middleware.ContentBlock{
+				{Type: "text", Text: string(resultJSON)},
+			},
+			Metadata: map[string]interface{}{
+				"dryRun": true,
+				"tool":   toolName,
+			},
+		}, nil
+	}
+
+	/* Check if confirmation is required */
+	if requireConfirm && tools.RequiresConfirmation(toolName) {
+		/* Check if confirmation is provided in arguments */
+		if confirmed, ok := arguments["confirmed"].(bool); !ok || !confirmed {
+			return &middleware.MCPResponse{
+				Content: []middleware.ContentBlock{
+					{Type: "text", Text: fmt.Sprintf("Confirmation required for tool '%s' - set 'confirmed' parameter to true", toolName)},
+				},
+				IsError: true,
+				Metadata: map[string]interface{}{
+					"error_code": "CONFIRMATION_REQUIRED",
+					"tool":       toolName,
+				},
+			}, nil
+		}
+	}
+
+	/* Handle idempotency - for now, log it (full implementation would check/store in database) */
+	if idempotencyKey != "" {
+		s.logger.Debug(fmt.Sprintf("Tool execution with idempotency key: %s", idempotencyKey), nil)
+		/* TODO: Check if this idempotency key was already used and return cached result */
+	}
 
 	result, err := tool.Execute(ctx, arguments)
 	if err != nil {
@@ -132,6 +187,9 @@ func (s *Server) formatToolResult(result *tools.ToolResult) (*middleware.MCPResp
 		return s.formatToolError(result), nil
 	}
 
+	/* Validate output against schema if tool has output schema */
+	/* Note: This is a placeholder - full validation would check the tool's output schema */
+	
 	resultJSON, _ := json.MarshalIndent(result.Data, "", "  ")
 	return &middleware.MCPResponse{
 		Content: []middleware.ContentBlock{
@@ -164,5 +222,33 @@ func (s *Server) formatToolError(result *tools.ToolResult) *middleware.MCPRespon
 		IsError: true,
 		Metadata: errorMetadata,
 	}
+}
+
+/* handleSearchTools handles the tools/search request */
+func (s *Server) handleSearchTools(ctx context.Context, params json.RawMessage) (interface{}, error) {
+	var req struct {
+		Query    string `json:"query,omitempty"`
+		Category string `json:"category,omitempty"`
+	}
+	if err := json.Unmarshal(params, &req); err != nil {
+		return nil, fmt.Errorf("failed to parse tools/search request: %w", err)
+	}
+
+	definitions := s.toolRegistry.Search(req.Query, req.Category)
+	
+	mcpTools := make([]mcp.ToolDefinition, len(definitions))
+	for i, def := range definitions {
+		mcpTools[i] = mcp.ToolDefinition{
+			Name:         def.Name,
+			Description:  def.Description,
+			InputSchema:  def.InputSchema,
+			OutputSchema: def.OutputSchema,
+			Version:      def.Version,
+			Deprecated:   def.Deprecated,
+			Deprecation:  def.Deprecation,
+		}
+	}
+	
+	return mcp.ListToolsResponse{Tools: mcpTools}, nil
 }
 

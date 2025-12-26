@@ -562,16 +562,55 @@ VALUES
 ON CONFLICT (config_key) DO NOTHING;
 
 -- ============================================================================
+-- PART 7: PROMPTS (1 table)
+-- ============================================================================
+
+-- 14. Prompts Table
+CREATE TABLE IF NOT EXISTS neurondb.prompts (
+    prompt_id SERIAL PRIMARY KEY,
+    prompt_name TEXT NOT NULL UNIQUE,
+    description TEXT,
+    template TEXT NOT NULL,  -- Prompt template with variables
+    variables JSONB DEFAULT '[]',  -- Array of variable definitions
+    category TEXT,  -- Optional category for organization
+    tags TEXT[],  -- Tags for searchability
+    is_default BOOLEAN DEFAULT false,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    created_by TEXT DEFAULT CURRENT_USER
+);
+COMMENT ON TABLE neurondb.prompts IS 'MCP prompt templates with variable support';
+
+-- Prompts indexes
+CREATE INDEX IF NOT EXISTS idx_prompts_name ON neurondb.prompts(prompt_name);
+CREATE INDEX IF NOT EXISTS idx_prompts_category ON neurondb.prompts(category) WHERE category IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_prompts_tags ON neurondb.prompts USING GIN(tags);
+
+-- Trigger for prompts updated_at
+CREATE TRIGGER trigger_prompts_updated_at
+    BEFORE UPDATE ON neurondb.prompts
+    FOR EACH ROW EXECUTE FUNCTION neurondb.update_updated_at();
+
+-- Insert default prompts
+INSERT INTO neurondb.prompts (prompt_name, description, template, variables, category, tags, is_default)
+VALUES
+    ('rag-query', 'RAG query prompt template', 'Context:\n{{context}}\n\nQuestion: {{question}}\n\nAnswer:', '[{"name": "context", "description": "Retrieved context", "required": true}, {"name": "question", "description": "User question", "required": true}]', 'rag', ARRAY['rag', 'query', 'qa'], true),
+    ('summarization', 'Text summarization prompt', 'Summarize the following text:\n\n{{text}}', '[{"name": "text", "description": "Text to summarize", "required": true}]', 'text', ARRAY['summarization', 'text'], false),
+    ('code-explanation', 'Code explanation prompt', 'Explain the following code:\n\n```{{language}}\n{{code}}\n```', '[{"name": "language", "description": "Programming language", "required": true}, {"name": "code", "description": "Code to explain", "required": true}]', 'code', ARRAY['code', 'explanation'], false)
+ON CONFLICT (prompt_name) DO NOTHING;
+
+-- ============================================================================
 -- COMPLETION MESSAGE
 -- ============================================================================
 
 DO $$
 BEGIN
     RAISE NOTICE 'NeuronMCP Configuration Schema setup completed successfully!';
-    RAISE NOTICE 'Created 13 tables, indexes, views, triggers, and pre-populated default data.';
+    RAISE NOTICE 'Created 14 tables, indexes, views, triggers, and pre-populated default data.';
     RAISE NOTICE 'Next steps:';
     RAISE NOTICE '1. Set API keys using: SELECT neurondb_set_model_key(''model_name'', ''api_key'');';
     RAISE NOTICE '2. Verify setup: SELECT * FROM neurondb.v_llm_models_active;';
     RAISE NOTICE '3. Check ready models: SELECT * FROM neurondb.v_llm_models_ready;';
+    RAISE NOTICE '4. List prompts: SELECT * FROM neurondb.prompts;';
 END $$;
 

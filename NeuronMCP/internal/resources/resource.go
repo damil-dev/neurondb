@@ -130,6 +130,8 @@ func NewManager(db *database.Database) *Manager {
 	m.Register(NewWorkersResource(db))
 	m.Register(NewVectorStatsResource(db))
 	m.Register(NewIndexHealthResource(db))
+	m.Register(NewDatasetsResource(db))
+	m.Register(NewCollectionsResource(db))
 
 	return m
 }
@@ -137,6 +139,20 @@ func NewManager(db *database.Database) *Manager {
 /* Register registers a resource */
 func (m *Manager) Register(resource Resource) {
 	m.resources[resource.URI()] = resource
+}
+
+/* ListResources returns all registered resources */
+func (m *Manager) ListResources() []ResourceDefinition {
+	definitions := make([]ResourceDefinition, 0, len(m.resources))
+	for _, resource := range m.resources {
+		definitions = append(definitions, ResourceDefinition{
+			URI:         resource.URI(),
+			Name:        resource.Name(),
+			Description: resource.Description(),
+			MimeType:    resource.MimeType(),
+		})
+	}
+	return definitions
 }
 
 /* HandleResource handles a resource request */
@@ -159,26 +175,12 @@ func (m *Manager) HandleResource(ctx context.Context, uri string) (*ReadResource
 	return &ReadResourceResponse{
 		Contents: []ResourceContent{
 			{
-				URI:      uri,
+				URI:      resource.URI(),
 				MimeType: resource.MimeType(),
 				Text:     string(contentJSON),
 			},
 		},
 	}, nil
-}
-
-/* ListResources returns all available resources */
-func (m *Manager) ListResources() []ResourceDefinition {
-	definitions := make([]ResourceDefinition, 0, len(m.resources))
-	for _, resource := range m.resources {
-		definitions = append(definitions, ResourceDefinition{
-			URI:         resource.URI(),
-			Name:        resource.Name(),
-			Description: resource.Description(),
-			MimeType:    resource.MimeType(),
-		})
-	}
-	return definitions
 }
 
 /* ResourceDefinition represents a resource definition */
@@ -206,7 +208,9 @@ type ResourceNotFoundError struct {
 	URI string
 }
 
+/* Error returns the error message */
 func (e *ResourceNotFoundError) Error() string {
 	return "resource not found: " + e.URI
 }
+
 
