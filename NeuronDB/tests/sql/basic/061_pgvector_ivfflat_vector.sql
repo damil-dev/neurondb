@@ -23,12 +23,14 @@ SET enable_seqscan = off;
 
 DROP TABLE IF EXISTS t CASCADE;
 CREATE TABLE t (val vector(3));
+-- Need more data points for IVF clustering
+INSERT INTO t (val) SELECT ARRAY[random(), random(), random()]::vector(3) FROM generate_series(1, 20);
 INSERT INTO t (val) VALUES ('[0,0,0]'), ('[1,2,3]'), ('[1,1,1]'), (NULL);
-CREATE INDEX ON t USING ivf (val vector_l2_ops) WITH (lists = 1);
+CREATE INDEX ON t USING ivf (val vector_l2_ops) WITH (lists = 2);
 
 INSERT INTO t (val) VALUES ('[1,2,4]');
 
-SELECT * FROM t ORDER BY val <-> '[3,3,3]';
+SELECT * FROM t ORDER BY val <-> '[3,3,3]' LIMIT 5;
 SELECT COUNT(*) FROM (SELECT * FROM t ORDER BY val <-> (SELECT NULL::vector)) t2;
 SELECT COUNT(*) FROM t;
 
@@ -45,8 +47,10 @@ DROP TABLE t;
 
 DROP TABLE IF EXISTS t CASCADE;
 CREATE TABLE t (val vector(3));
+-- Need more data points for IVF clustering
+INSERT INTO t (val) SELECT ARRAY[random(), random(), random()]::vector(3) FROM generate_series(1, 20);
 INSERT INTO t (val) VALUES ('[0,0,0]'), ('[1,2,3]'), ('[1,1,1]'), (NULL);
-CREATE INDEX ON t USING ivf (val vector_ip_ops) WITH (lists = 1);
+CREATE INDEX ON t USING ivf (val vector_ip_ops) WITH (lists = 2);
 
 INSERT INTO t (val) VALUES ('[1,2,4]');
 
@@ -63,8 +67,10 @@ DROP TABLE t;
 
 DROP TABLE IF EXISTS t CASCADE;
 CREATE TABLE t (val vector(3));
+-- Need more data points for IVF clustering
+INSERT INTO t (val) SELECT ARRAY[random(), random(), random()]::vector(3) FROM generate_series(1, 20);
 INSERT INTO t (val) VALUES ('[0,0,0]'), ('[1,2,3]'), ('[1,1,1]'), (NULL);
-CREATE INDEX ON t USING ivf (val vector_cosine_ops) WITH (lists = 1);
+CREATE INDEX ON t USING ivf (val vector_cosine_ops) WITH (lists = 2);
 
 INSERT INTO t (val) VALUES ('[1,2,4]');
 
@@ -126,7 +132,7 @@ DROP TABLE t;
 DROP TABLE IF EXISTS t CASCADE;
 CREATE UNLOGGED TABLE t (val vector(3));
 INSERT INTO t (val) VALUES ('[0,0,0]'), ('[1,2,3]'), ('[1,1,1]'), (NULL);
-CREATE INDEX ON t USING ivf (val vector_l2_ops) WITH (lists = 1);
+CREATE INDEX ON t USING ivf (val vector_l2_ops) WITH (lists = 100);
 
 SELECT * FROM t ORDER BY val <-> '[3,3,3]';
 

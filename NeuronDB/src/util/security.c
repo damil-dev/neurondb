@@ -25,10 +25,23 @@ PG_FUNCTION_INFO_V1(encrypt_postquantum);
 Datum
 encrypt_postquantum(PG_FUNCTION_ARGS)
 {
-	Vector	   *input = (Vector *) PG_GETARG_POINTER(0);
+	Vector	   *input = NULL;
 	bytea *result = NULL;
 	Size		result_size;
 
+	/* Validate input is not NULL */
+	if (PG_ARGISNULL(0))
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("neurondb: encrypt_postquantum: input vector cannot be NULL")));
+
+	input = (Vector *) PG_GETARG_POINTER(0);
+
+	/* Validate input vector structure */
+	if (input == NULL || VARSIZE_ANY(input) < sizeof(Vector))
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: encrypt_postquantum: invalid input vector")));
 
 	result_size = VARHDRSZ + sizeof(uint32) + (input->dim * sizeof(float4));
 	result = (bytea *) palloc0(result_size);
@@ -50,12 +63,32 @@ PG_FUNCTION_INFO_V1(set_access_mask);
 Datum
 set_access_mask(PG_FUNCTION_ARGS)
 {
-	text	   *role_name = PG_GETARG_TEXT_PP(0);
-	text	   *allowed_metrics = PG_GETARG_TEXT_PP(1);
-	text	   *allowed_indexes = PG_GETARG_TEXT_PP(2);
+	text	   *role_name = NULL;
+	text	   *allowed_metrics = NULL;
+	text	   *allowed_indexes = NULL;
 	char *role_str = NULL;
 	char *metrics_str = NULL;
 	char *indexes_str = NULL;
+
+	/* Validate arguments are not NULL */
+	if (PG_ARGISNULL(0))
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("neurondb: set_access_mask: role_name cannot be NULL")));
+
+	if (PG_ARGISNULL(1))
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("neurondb: set_access_mask: allowed_metrics cannot be NULL")));
+
+	if (PG_ARGISNULL(2))
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("neurondb: set_access_mask: allowed_indexes cannot be NULL")));
+
+	role_name = PG_GETARG_TEXT_PP(0);
+	allowed_metrics = PG_GETARG_TEXT_PP(1);
+	allowed_indexes = PG_GETARG_TEXT_PP(2);
 
 	role_str = text_to_cstring(role_name);
 	metrics_str = text_to_cstring(allowed_metrics);

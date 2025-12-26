@@ -123,6 +123,12 @@ COPY --from=builder /usr/local/onnxruntime ${ONNX_PATH}
 
 COPY docker/docker-entrypoint-initdb.d/ /docker-entrypoint-initdb.d/
 
+# Copy NeuronMCP SQL files for auto-setup
+COPY NeuronMCP/sql/ /docker-entrypoint-initdb.d/neurondb_mcp/
+
+# Copy NeuronAgent migration files for auto-setup
+COPY NeuronAgent/migrations/ /docker-entrypoint-initdb.d/neurondb_agent/
+
 VOLUME ["/var/lib/postgresql/data"]
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=5 CMD pg_isready -U "${POSTGRES_USER:-postgres}"

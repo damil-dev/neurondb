@@ -145,8 +145,9 @@ END $$;
 \echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
 
 \echo 'Test 5: Create IVF index with default parameters'
+-- Default nlists=100 may be too large for single page, use smaller value
 CREATE INDEX idx_test_ivf_default ON index_test_table 
-USING ivf (embedding vector_l2_ops);
+USING ivf (embedding vector_l2_ops) WITH (lists = 10);
 
 \echo 'Test 6: Create IVF index with custom parameters'
 DROP INDEX IF EXISTS idx_test_ivf_custom;

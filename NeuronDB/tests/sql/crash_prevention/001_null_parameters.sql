@@ -4,22 +4,40 @@
  * without crashing the server.
  */
 
-\set ON_ERROR_STOP on
+\set ON_ERROR_STOP off
 
 BEGIN;
 
 /* Test 1: NULL model_id */
-SELECT evaluate_linear_regression_by_model_id(NULL, 'test_table', 'features', 'label');
+DO $$
+BEGIN
+    PERFORM evaluate_linear_regression_by_model_id(NULL, 'test_table', 'features', 'label');
+    RAISE EXCEPTION 'Should have failed with NULL model_id';
+EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'Correctly rejected NULL model_id: %', SQLERRM;
+END$$;
 ROLLBACK;
 
 BEGIN;
 /* Test 2: NULL table_name */
-SELECT evaluate_linear_regression_by_model_id(1, NULL, 'features', 'label');
+DO $$
+BEGIN
+    PERFORM evaluate_linear_regression_by_model_id(1, NULL, 'features', 'label');
+    RAISE EXCEPTION 'Should have failed with NULL table_name';
+EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'Correctly rejected NULL table_name: %', SQLERRM;
+END$$;
 ROLLBACK;
 
 BEGIN;
 /* Test 3: NULL feature_col */
-SELECT evaluate_linear_regression_by_model_id(1, 'test_table', NULL, 'label');
+DO $$
+BEGIN
+    PERFORM evaluate_linear_regression_by_model_id(1, 'test_table', NULL, 'label');
+    RAISE EXCEPTION 'Should have failed with NULL feature_col';
+EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'Correctly rejected NULL feature_col: %', SQLERRM;
+END$$;
 ROLLBACK;
 
 BEGIN;

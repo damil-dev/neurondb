@@ -3169,6 +3169,14 @@ evaluate_linear_regression_by_model_id(PG_FUNCTION_ARGS)
 
 	model_id = PG_GETARG_INT32(0);
 
+	/* Validate model_id before attempting to load */
+	if (model_id <= 0)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: evaluate_linear_regression_by_model_id: model_id must be positive, got %d", model_id),
+				 errdetail("Invalid model_id: %d", model_id),
+				 errhint("Provide a valid model_id from neurondb.ml_models catalog.")));
+
 	if (PG_ARGISNULL(1) || PG_ARGISNULL(2) || PG_ARGISNULL(3))
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
@@ -3181,8 +3189,10 @@ evaluate_linear_regression_by_model_id(PG_FUNCTION_ARGS)
 	result = evaluate_linear_regression_by_model_id_jsonb(model_id, table_name, feature_col, label_col);
 	if (result == NULL)
 		ereport(ERROR,
-				(errcode(ERRCODE_INTERNAL_ERROR),
-				 errmsg("neurondb: evaluate_linear_regression_by_model_id: result is NULL")));
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: evaluate_linear_regression_by_model_id: model %d not found", model_id),
+				 errdetail("Model with model_id %d does not exist in neurondb.ml_models catalog", model_id),
+				 errhint("Verify the model_id exists in neurondb.ml_models catalog.")));
 
 	PG_RETURN_JSONB_P(result);
 }

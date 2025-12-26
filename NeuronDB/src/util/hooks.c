@@ -31,10 +31,24 @@ PG_FUNCTION_INFO_V1(register_custom_operator);
 Datum
 register_custom_operator(PG_FUNCTION_ARGS)
 {
-	text	   *op_name = PG_GETARG_TEXT_PP(0);
-	text	   *op_function = PG_GETARG_TEXT_PP(1);
+	text	   *op_name = NULL;
+	text	   *op_function = NULL;
 	char *name_str = NULL;
 	char *func_str = NULL;
+
+	/* Validate arguments are not NULL */
+	if (PG_ARGISNULL(0))
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("neurondb: register_custom_operator: op_name cannot be NULL")));
+
+	if (PG_ARGISNULL(1))
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("neurondb: register_custom_operator: op_function cannot be NULL")));
+
+	op_name = PG_GETARG_TEXT_PP(0);
+	op_function = PG_GETARG_TEXT_PP(1);
 
 	name_str = text_to_cstring(op_name);
 	func_str = text_to_cstring(op_function);
@@ -49,9 +63,16 @@ PG_FUNCTION_INFO_V1(enable_vector_replication);
 Datum
 enable_vector_replication(PG_FUNCTION_ARGS)
 {
-	text	   *publication_name = PG_GETARG_TEXT_PP(0);
+	text	   *publication_name = NULL;
 	char *pub_str = NULL;
 
+	/* Validate argument is not NULL */
+	if (PG_ARGISNULL(0))
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("neurondb: enable_vector_replication: publication_name cannot be NULL")));
+
+	publication_name = PG_GETARG_TEXT_PP(0);
 	pub_str = text_to_cstring(publication_name);
 
 	(void) pub_str;
@@ -63,12 +84,32 @@ PG_FUNCTION_INFO_V1(create_vector_fdw);
 Datum
 create_vector_fdw(PG_FUNCTION_ARGS)
 {
-	text	   *fdw_name = PG_GETARG_TEXT_PP(0);
-	text	   *remote_type = PG_GETARG_TEXT_PP(1);
-	text	   *connection_string = PG_GETARG_TEXT_PP(2);
+	text	   *fdw_name = NULL;
+	text	   *remote_type = NULL;
+	text	   *connection_string = NULL;
 	char *name_str = NULL;
 	char *type_str = NULL;
 	char *conn_str = NULL;
+
+	/* Validate arguments are not NULL */
+	if (PG_ARGISNULL(0))
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("neurondb: create_vector_fdw: fdw_name cannot be NULL")));
+
+	if (PG_ARGISNULL(1))
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("neurondb: create_vector_fdw: remote_type cannot be NULL")));
+
+	if (PG_ARGISNULL(2))
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("neurondb: create_vector_fdw: connection_string cannot be NULL")));
+
+	fdw_name = PG_GETARG_TEXT_PP(0);
+	remote_type = PG_GETARG_TEXT_PP(1);
+	connection_string = PG_GETARG_TEXT_PP(2);
 
 	name_str = text_to_cstring(fdw_name);
 	type_str = text_to_cstring(remote_type);

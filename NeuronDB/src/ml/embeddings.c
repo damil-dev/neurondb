@@ -353,6 +353,12 @@ embed_text(PG_FUNCTION_ARGS)
 	int			dim = 0;
 	int			i;
 
+	/* Validate input_text is not NULL */
+	if (PG_ARGISNULL(0))
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("neurondb: embed_text: input_text cannot be NULL")));
+
 	input_text = PG_GETARG_TEXT_PP(0);
 	if (PG_ARGISNULL(1))
 		model_text = NULL;
@@ -361,51 +367,62 @@ embed_text(PG_FUNCTION_ARGS)
 
 	input_str = text_to_cstring(input_text);
 
-	if (model_text != NULL)
-		model_str = text_to_cstring(model_text);
-	else
-		model_str = pstrdup("sentence-transformers/all-MiniLM-L6-v2");
-
-	memset(&cfg, 0, sizeof(cfg));
-	cfg.provider = (neurondb_llm_provider != NULL) ? neurondb_llm_provider : "huggingface";
-	cfg.endpoint = (neurondb_llm_endpoint != NULL) ?
-		neurondb_llm_endpoint :
-		"https://api-inference.huggingface.co";
-	cfg.model = model_str != NULL ? model_str :
-		(neurondb_llm_model != NULL ?
-		 neurondb_llm_model :
-		 "sentence-transformers/all-MiniLM-L6-v2");
-	cfg.api_key = neurondb_llm_api_key;
-	cfg.timeout_ms = neurondb_llm_timeout_ms;
-	cfg.prefer_gpu = NDB_SHOULD_TRY_GPU();
-	cfg.require_gpu = NDB_REQUIRE_GPU();
-	if (cfg.provider != NULL &&
-		(pg_strcasecmp(cfg.provider, "huggingface-local") == 0 ||
-		 pg_strcasecmp(cfg.provider, "hf-local") == 0) &&
-		!neurondb_llm_fail_open)
-		cfg.require_gpu = true;
-
-	/* Apply stored model configuration if available */
-	apply_embedding_model_config(&cfg, cfg.model);
-
-	call_opts.task = "embed";
-	call_opts.prefer_gpu = cfg.prefer_gpu;
-	call_opts.require_gpu = cfg.require_gpu;
-	call_opts.fail_open = neurondb_llm_fail_open;
-
-	if (ndb_llm_route_embed(&cfg, &call_opts, input_str, &vec_data, &dim) != 0 ||
-		vec_data == NULL || dim <= 0)
+	/* Handle empty text by generating deterministic embeddings */
+	if (input_str == NULL || strlen(input_str) == 0)
 	{
-		/* Check if we should fail with error or generate fallback data */
-		if (!neurondb_llm_fail_open)
-		{
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("neurondb: embedding generation failed"),
-					 errhint("Configure neurondb.llm_api_key for Hugging Face API access, or set neurondb.llm_provider='onnx' for local models.")));
-		}
+		/* Empty text: generate deterministic zero vector */
+		dim = 384;
+		nalloc(vec_data, float, dim);
+		for (i = 0; i < dim; i++)
+			vec_data[i] = 0.0f;
+	}
+	else
+	{
+		if (model_text != NULL)
+			model_str = text_to_cstring(model_text);
+		else
+			model_str = pstrdup("sentence-transformers/all-MiniLM-L6-v2");
 
-		/* Fallback: Generate deterministic embeddings from text hash */
+		memset(&cfg, 0, sizeof(cfg));
+		cfg.provider = (neurondb_llm_provider != NULL) ? neurondb_llm_provider : "huggingface";
+		cfg.endpoint = (neurondb_llm_endpoint != NULL) ?
+			neurondb_llm_endpoint :
+			"https://api-inference.huggingface.co";
+		cfg.model = model_str != NULL ? model_str :
+			(neurondb_llm_model != NULL ?
+			 neurondb_llm_model :
+			 "sentence-transformers/all-MiniLM-L6-v2");
+		cfg.api_key = neurondb_llm_api_key;
+		cfg.timeout_ms = neurondb_llm_timeout_ms;
+		cfg.prefer_gpu = NDB_SHOULD_TRY_GPU();
+		cfg.require_gpu = NDB_REQUIRE_GPU();
+		if (cfg.provider != NULL &&
+			(pg_strcasecmp(cfg.provider, "huggingface-local") == 0 ||
+			 pg_strcasecmp(cfg.provider, "hf-local") == 0) &&
+			!neurondb_llm_fail_open)
+			cfg.require_gpu = true;
+
+		/* Apply stored model configuration if available */
+		apply_embedding_model_config(&cfg, cfg.model);
+
+		call_opts.task = "embed";
+		call_opts.prefer_gpu = cfg.prefer_gpu;
+		call_opts.require_gpu = cfg.require_gpu;
+		call_opts.fail_open = neurondb_llm_fail_open;
+
+		if (ndb_llm_route_embed(&cfg, &call_opts, input_str, &vec_data, &dim) != 0 ||
+			vec_data == NULL || dim <= 0)
+		{
+			/* Check if we should fail with error or generate fallback data */
+			if (!neurondb_llm_fail_open)
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+						 errmsg("neurondb: embedding generation failed"),
+						 errhint("Configure neurondb.llm_api_key for Hugging Face API access, or set neurondb.llm_provider='onnx' for local models.")));
+			}
+
+			/* Fallback: Generate deterministic embeddings from text hash */
 		{
 			unsigned int hash;
 			int			input_len;
@@ -438,6 +455,9 @@ embed_text(PG_FUNCTION_ARGS)
 				vec_data[i] = ((float) ((hash % 2000) - 1000)) / 1000.0f;
 			}
 		}
+		}
+		if (model_str != NULL)
+			nfree(model_str);
 	}
 
 	/* Allocate Vector with variable-length data array */
@@ -454,8 +474,8 @@ embed_text(PG_FUNCTION_ARGS)
 	for (i = 0; i < dim; i++)
 		result->data[i] = vec_data[i];
 
-	nfree(input_str);
-	nfree(model_str);
+	if (input_str != NULL)
+		nfree(input_str);
 	nfree(vec_data);
 
 	PG_RETURN_POINTER(result);
@@ -833,13 +853,19 @@ embed_image(PG_FUNCTION_ARGS)
 	char *model_str = NULL;
 	NdbLLMConfig cfg;
 
+	/* Validate image_data is not NULL */
+	if (PG_ARGISNULL(0))
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("neurondb: embed_image: image_data cannot be NULL")));
+
 	image_data = PG_GETARG_BYTEA_PP(0);
 
 	/* Validate image data */
-	if (image_data == NULL || VARSIZE_ANY_EXHDR(image_data) == 0)
+	if (VARSIZE_ANY_EXHDR(image_data) == 0)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				 errmsg("embed_image: image_data must not be NULL or empty")));
+				 errmsg("neurondb: embed_image: image_data must not be empty")));
 
 	if (PG_ARGISNULL(1))
 		model_text = NULL;
@@ -951,6 +977,18 @@ embed_multimodal(PG_FUNCTION_ARGS)
 #ifdef NDB_HAVE_MULTIMODAL_EMBED
 	NdbLLMConfig cfg;
 #endif
+
+	/* Validate input_text is not NULL */
+	if (PG_ARGISNULL(0))
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("neurondb: embed_multimodal: input_text cannot be NULL")));
+
+	/* Validate image_data is not NULL */
+	if (PG_ARGISNULL(1))
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("neurondb: embed_multimodal: image_data cannot be NULL")));
 
 	input_text = PG_GETARG_TEXT_PP(0);
 	image_data = PG_GETARG_BYTEA_PP(1);

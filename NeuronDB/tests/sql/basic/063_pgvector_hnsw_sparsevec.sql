@@ -21,14 +21,15 @@ SET enable_seqscan = off;
 \echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
 
 DROP TABLE IF EXISTS t CASCADE;
-CREATE TABLE t (val sparsevec(3));
-INSERT INTO t (val) VALUES ('{}/3'), ('{1:1,2:2,3:3}/3'), ('{1:1,2:1,3:1}/3'), (NULL);
+-- Note: Using standalone test data to avoid dimension conflicts with dataset
+CREATE TABLE t (val sparsevec);
+INSERT INTO t (val) VALUES ('{1:0}/3'::sparsevec), ('{1:1,2:2,3:3}/3'::sparsevec), ('{1:1,2:1,3:1}/3'::sparsevec), (NULL);
 CREATE INDEX ON t USING hnsw (val sparsevec_l2_ops);
 
-INSERT INTO t (val) VALUES ('{1:1,2:2,3:4}/3');
+INSERT INTO t (val) VALUES ('{1:1,2:2,3:4}/3'::sparsevec);
 
-SELECT * FROM t ORDER BY val <-> '{1:3,2:3,3:3}/3';
-SELECT COUNT(*) FROM (SELECT * FROM t ORDER BY val <-> (SELECT NULL::sparsevec)) t2;
+SELECT * FROM t WHERE val IS NOT NULL ORDER BY val <-> '{1:3,2:3,3:3}/3'::sparsevec;
+SELECT COUNT(*) FROM (SELECT * FROM t ORDER BY val <-> (SELECT NULL::sparsevec(3))) t2;
 SELECT COUNT(*) FROM t;
 
 TRUNCATE t;
@@ -43,8 +44,8 @@ DROP TABLE t;
 \echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
 
 DROP TABLE IF EXISTS t CASCADE;
-CREATE TABLE t (val sparsevec(3));
-INSERT INTO t (val) VALUES ('{}/3'), ('{1:1,2:2,3:3}/3'), ('{1:1,2:1,3:1}/3'), (NULL);
+CREATE TABLE t (val sparsevec);
+INSERT INTO t (val) VALUES ('{1:0}/3'), ('{1:1,2:2,3:3}/3'), ('{1:1,2:1,3:1}/3'), (NULL);
 CREATE INDEX ON t USING hnsw (val sparsevec_ip_ops);
 
 INSERT INTO t (val) VALUES ('{1:1,2:2,3:4}/3');
@@ -61,14 +62,14 @@ DROP TABLE t;
 \echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
 
 DROP TABLE IF EXISTS t CASCADE;
-CREATE TABLE t (val sparsevec(3));
-INSERT INTO t (val) VALUES ('{}/3'), ('{1:1,2:2,3:3}/3'), ('{1:1,2:1,3:1}/3'), (NULL);
+CREATE TABLE t (val sparsevec);
+INSERT INTO t (val) VALUES ('{1:0}/3'), ('{1:1,2:2,3:3}/3'), ('{1:1,2:1,3:1}/3'), (NULL);
 CREATE INDEX ON t USING hnsw (val sparsevec_cosine_ops);
 
 INSERT INTO t (val) VALUES ('{1:1,2:2,3:4}/3');
 
 SELECT * FROM t ORDER BY val <=> '{1:3,2:3,3:3}/3';
-SELECT COUNT(*) FROM (SELECT * FROM t ORDER BY val <=> '{}/3') t2;
+SELECT COUNT(*) FROM (SELECT * FROM t ORDER BY val <=> '{1:0}/3') t2;
 SELECT COUNT(*) FROM (SELECT * FROM t ORDER BY val <=> (SELECT NULL::sparsevec)) t2;
 
 DROP TABLE t;
@@ -80,8 +81,8 @@ DROP TABLE t;
 \echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
 
 DROP TABLE IF EXISTS t CASCADE;
-CREATE TABLE t (val sparsevec(3));
-INSERT INTO t (val) VALUES ('{}/3'), ('{1:1,2:2,3:3}/3'), ('{1:1,2:1,3:1}/3'), (NULL);
+CREATE TABLE t (val sparsevec);
+INSERT INTO t (val) VALUES ('{1:0}/3'), ('{1:1,2:2,3:3}/3'), ('{1:1,2:1,3:1}/3'), (NULL);
 CREATE INDEX ON t USING hnsw (val sparsevec_l1_ops);
 
 INSERT INTO t (val) VALUES ('{1:1,2:2,3:4}/3');

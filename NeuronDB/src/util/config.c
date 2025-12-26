@@ -348,6 +348,17 @@ set_vector_config(PG_FUNCTION_ARGS)
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("neurondb: set_vector_config requires at least 2 arguments")));
 
+	/* Validate arguments are not NULL */
+	if (PG_ARGISNULL(0))
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("neurondb: set_vector_config: config_name cannot be NULL")));
+
+	if (PG_ARGISNULL(1))
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("neurondb: set_vector_config: config_value cannot be NULL")));
+
 	config_name = PG_GETARG_TEXT_PP(0);
 	config_value = PG_GETARG_TEXT_PP(1);
 
@@ -383,6 +394,12 @@ get_vector_config(PG_FUNCTION_ARGS)
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("neurondb: get_vector_config requires at least 1 argument")));
 
+	/* Validate argument is not NULL */
+	if (PG_ARGISNULL(0))
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("neurondb: get_vector_config: config_name cannot be NULL")));
+
 	config_name = PG_GETARG_TEXT_PP(0);
 
 	name_str = text_to_cstring(config_name);
@@ -417,11 +434,21 @@ reset_vector_config(PG_FUNCTION_ARGS)
 	{
 		if (opt->guc_var && opt->default_value)
 		{
-			SetConfigOption(opt->guc_var,
-							opt->default_value,
-							PGC_USERSET,
-							PGC_S_SESSION);
-			reset_count++;
+			/* Try to reset the GUC, skip if it doesn't exist */
+			PG_TRY();
+			{
+				SetConfigOption(opt->guc_var,
+								opt->default_value,
+								PGC_USERSET,
+								PGC_S_SESSION);
+				reset_count++;
+			}
+			PG_CATCH();
+			{
+				/* Skip unrecognized GUC parameters */
+				FlushErrorState();
+			}
+			PG_END_TRY();
 		}
 	}
 
