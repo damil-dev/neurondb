@@ -319,6 +319,124 @@ func (h *Handlers) CreateTool(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusCreated, tool)
 }
 
+/* ListTools lists all tools */
+func (h *Handlers) ListTools(w http.ResponseWriter, r *http.Request) {
+	var tools []db.Tool
+	var err error
+	
+	enabledStr := r.URL.Query().Get("enabled")
+	search := r.URL.Query().Get("search")
+	handlerType := r.URL.Query().Get("handler_type")
+	
+	if enabledStr != "" || search != "" || handlerType != "" {
+		var enabled *bool
+		if enabledStr != "" {
+			enabledVal := enabledStr == "true"
+			enabled = &enabledVal
+		}
+		var searchPtr, handlerTypePtr *string
+		if search != "" {
+			searchPtr = &search
+		}
+		if handlerType != "" {
+			handlerTypePtr = &handlerType
+		}
+		tools, err = h.queries.ListToolsWithFilter(r.Context(), enabled, searchPtr, handlerTypePtr)
+	} else {
+		tools, err = h.queries.ListTools(r.Context())
+	}
+	
+	if err != nil {
+		requestID := GetRequestID(r.Context())
+		respondError(w, NewErrorWithContext(http.StatusInternalServerError, "failed to list tools", err, requestID, r.URL.Path, r.Method, "tool", "", nil))
+		return
+	}
+
+	respondJSON(w, http.StatusOK, tools)
+}
+
+/* GetTool gets a tool by name */
+func (h *Handlers) GetTool(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	toolName := vars["name"]
+
+	tool, err := h.queries.GetTool(r.Context(), toolName)
+	if err != nil {
+		requestID := GetRequestID(r.Context())
+		respondError(w, NewErrorWithContext(http.StatusNotFound, "tool not found", err, requestID, r.URL.Path, r.Method, "tool", toolName, nil))
+		return
+	}
+
+	respondJSON(w, http.StatusOK, tool)
+}
+
+/* UpdateTool updates a tool */
+func (h *Handlers) UpdateTool(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	toolName := vars["name"]
+
+	/* Get existing tool */
+	existingTool, err := h.queries.GetTool(r.Context(), toolName)
+	if err != nil {
+		requestID := GetRequestID(r.Context())
+		respondError(w, NewErrorWithContext(http.StatusNotFound, "tool not found", err, requestID, r.URL.Path, r.Method, "tool", toolName, nil))
+		return
+	}
+
+	var req struct {
+		Description   *string                `json:"description"`
+		ArgSchema     map[string]interface{} `json:"arg_schema"`
+		HandlerType   *string                `json:"handler_type"`
+		HandlerConfig map[string]interface{} `json:"handler_config"`
+		Enabled       *bool                  `json:"enabled"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		requestID := GetRequestID(r.Context())
+		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid request body", err, requestID, r.URL.Path, r.Method, "tool", toolName, nil))
+		return
+	}
+
+	/* Update fields if provided */
+	if req.Description != nil {
+		existingTool.Description = *req.Description
+	}
+	if req.ArgSchema != nil {
+		existingTool.ArgSchema = db.FromMap(req.ArgSchema)
+	}
+	if req.HandlerType != nil {
+		existingTool.HandlerType = *req.HandlerType
+	}
+	if req.HandlerConfig != nil {
+		existingTool.HandlerConfig = db.FromMap(req.HandlerConfig)
+	}
+	if req.Enabled != nil {
+		existingTool.Enabled = *req.Enabled
+	}
+
+	if err := h.queries.UpdateTool(r.Context(), existingTool); err != nil {
+		requestID := GetRequestID(r.Context())
+		respondError(w, NewErrorWithContext(http.StatusInternalServerError, "tool update failed", err, requestID, r.URL.Path, r.Method, "tool", toolName, nil))
+		return
+	}
+
+	respondJSON(w, http.StatusOK, existingTool)
+}
+
+/* DeleteTool deletes a tool */
+func (h *Handlers) DeleteTool(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	toolName := vars["name"]
+
+	if err := h.queries.DeleteTool(r.Context(), toolName); err != nil {
+		requestID := GetRequestID(r.Context())
+		respondError(w, NewErrorWithContext(http.StatusNotFound, "tool not found", err, requestID, r.URL.Path, r.Method, "tool", toolName, nil))
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 /* GetToolAnalytics gets analytics for a tool */
 func (h *Handlers) GetToolAnalytics(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)

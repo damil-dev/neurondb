@@ -109,7 +109,16 @@ func (h *Handlers) GetAgent(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) ListAgents(w http.ResponseWriter, r *http.Request) {
-	agents, err := h.queries.ListAgents(r.Context())
+	var agents []db.Agent
+	var err error
+	
+	search := r.URL.Query().Get("search")
+	if search != "" {
+		agents, err = h.queries.ListAgentsWithFilter(r.Context(), &search)
+	} else {
+		agents, err = h.queries.ListAgents(r.Context())
+	}
+	
 	if err != nil {
 		requestID := GetRequestID(r.Context())
 		respondError(w, WrapError(NewError(http.StatusInternalServerError, "failed to list agents", err), requestID))
@@ -260,7 +269,28 @@ func (h *Handlers) ListSessions(w http.ResponseWriter, r *http.Request) {
 		fmt.Sscanf(o, "%d", &offset)
 	}
 
-	sessions, err := h.queries.ListSessions(r.Context(), agentID, limit, offset)
+	var sessions []db.Session
+	externalUserID := r.URL.Query().Get("external_user_id")
+	startDate := r.URL.Query().Get("start_date")
+	endDate := r.URL.Query().Get("end_date")
+	
+	if externalUserID != "" || startDate != "" || endDate != "" {
+		var externalUserIDPtr *string
+		if externalUserID != "" {
+			externalUserIDPtr = &externalUserID
+		}
+		var startDatePtr, endDatePtr *string
+		if startDate != "" {
+			startDatePtr = &startDate
+		}
+		if endDate != "" {
+			endDatePtr = &endDate
+		}
+		sessions, err = h.queries.ListSessionsWithFilter(r.Context(), agentID, externalUserIDPtr, startDatePtr, endDatePtr, limit, offset)
+	} else {
+		sessions, err = h.queries.ListSessions(r.Context(), agentID, limit, offset)
+	}
+	
 	if err != nil {
 		requestID := GetRequestID(r.Context())
 		respondError(w, WrapError(NewError(http.StatusInternalServerError, "failed to list sessions", err), requestID))
@@ -273,6 +303,69 @@ func (h *Handlers) ListSessions(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondJSON(w, http.StatusOK, responses)
+}
+
+func (h *Handlers) UpdateSession(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id, err := uuid.Parse(vars["id"])
+	if err != nil {
+		requestID := GetRequestID(r.Context())
+		respondError(w, WrapError(ErrBadRequest, requestID))
+		return
+	}
+
+	/* Get existing session */
+	session, err := h.queries.GetSession(r.Context(), id)
+	if err != nil {
+		requestID := GetRequestID(r.Context())
+		respondError(w, WrapError(ErrNotFound, requestID))
+		return
+	}
+
+	var req struct {
+		ExternalUserID *string                `json:"external_user_id"`
+		Metadata       map[string]interface{} `json:"metadata"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		requestID := GetRequestID(r.Context())
+		respondError(w, WrapError(ErrBadRequest, requestID))
+		return
+	}
+
+	/* Update fields if provided */
+	if req.ExternalUserID != nil {
+		session.ExternalUserID = req.ExternalUserID
+	}
+	if req.Metadata != nil {
+		session.Metadata = db.FromMap(req.Metadata)
+	}
+
+	if err := h.queries.UpdateSession(r.Context(), session); err != nil {
+		requestID := GetRequestID(r.Context())
+		respondError(w, WrapError(NewError(http.StatusInternalServerError, "failed to update session", err), requestID))
+		return
+	}
+
+	respondJSON(w, http.StatusOK, toSessionResponse(session))
+}
+
+func (h *Handlers) DeleteSession(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id, err := uuid.Parse(vars["id"])
+	if err != nil {
+		requestID := GetRequestID(r.Context())
+		respondError(w, WrapError(ErrBadRequest, requestID))
+		return
+	}
+
+	if err := h.queries.DeleteSession(r.Context(), id); err != nil {
+		requestID := GetRequestID(r.Context())
+		respondError(w, WrapError(ErrNotFound, requestID))
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 /* Messages */
@@ -348,7 +441,32 @@ func (h *Handlers) GetMessages(w http.ResponseWriter, r *http.Request) {
 		_, _ = fmt.Sscanf(o, "%d", &offset)
 	}
 
-	messages, err := h.queries.GetMessages(r.Context(), sessionID, limit, offset)
+	var messages []db.Message
+	role := r.URL.Query().Get("role")
+	contentSearch := r.URL.Query().Get("search")
+	startDate := r.URL.Query().Get("start_date")
+	endDate := r.URL.Query().Get("end_date")
+	
+	if role != "" || contentSearch != "" || startDate != "" || endDate != "" {
+		var rolePtr, contentSearchPtr *string
+		if role != "" {
+			rolePtr = &role
+		}
+		if contentSearch != "" {
+			contentSearchPtr = &contentSearch
+		}
+		var startDatePtr, endDatePtr *string
+		if startDate != "" {
+			startDatePtr = &startDate
+		}
+		if endDate != "" {
+			endDatePtr = &endDate
+		}
+		messages, err = h.queries.GetMessagesWithFilter(r.Context(), sessionID, rolePtr, contentSearchPtr, startDatePtr, endDatePtr, limit, offset)
+	} else {
+		messages, err = h.queries.GetMessages(r.Context(), sessionID, limit, offset)
+	}
+	
 	if err != nil {
 		requestID := GetRequestID(r.Context())
 		respondError(w, WrapError(NewError(http.StatusInternalServerError, "failed to get messages", err), requestID))
@@ -361,6 +479,88 @@ func (h *Handlers) GetMessages(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondJSON(w, http.StatusOK, responses)
+}
+
+func (h *Handlers) GetMessage(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	var id int64
+	if _, err := fmt.Sscanf(vars["id"], "%d", &id); err != nil {
+		requestID := GetRequestID(r.Context())
+		respondError(w, WrapError(ErrBadRequest, requestID))
+		return
+	}
+
+	message, err := h.queries.GetMessageByID(r.Context(), id)
+	if err != nil {
+		requestID := GetRequestID(r.Context())
+		respondError(w, WrapError(ErrNotFound, requestID))
+		return
+	}
+
+	respondJSON(w, http.StatusOK, toMessageResponse(message))
+}
+
+func (h *Handlers) UpdateMessage(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	var id int64
+	if _, err := fmt.Sscanf(vars["id"], "%d", &id); err != nil {
+		requestID := GetRequestID(r.Context())
+		respondError(w, WrapError(ErrBadRequest, requestID))
+		return
+	}
+
+	/* Get existing message */
+	message, err := h.queries.GetMessageByID(r.Context(), id)
+	if err != nil {
+		requestID := GetRequestID(r.Context())
+		respondError(w, WrapError(ErrNotFound, requestID))
+		return
+	}
+
+	var req struct {
+		Content  *string                `json:"content"`
+		Metadata map[string]interface{} `json:"metadata"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		requestID := GetRequestID(r.Context())
+		respondError(w, WrapError(ErrBadRequest, requestID))
+		return
+	}
+
+	/* Update fields if provided */
+	if req.Content != nil {
+		message.Content = *req.Content
+	}
+	if req.Metadata != nil {
+		message.Metadata = req.Metadata
+	}
+
+	if err := h.queries.UpdateMessage(r.Context(), message); err != nil {
+		requestID := GetRequestID(r.Context())
+		respondError(w, WrapError(NewError(http.StatusInternalServerError, "failed to update message", err), requestID))
+		return
+	}
+
+	respondJSON(w, http.StatusOK, toMessageResponse(message))
+}
+
+func (h *Handlers) DeleteMessage(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	var id int64
+	if _, err := fmt.Sscanf(vars["id"], "%d", &id); err != nil {
+		requestID := GetRequestID(r.Context())
+		respondError(w, WrapError(ErrBadRequest, requestID))
+		return
+	}
+
+	if err := h.queries.DeleteMessage(r.Context(), id); err != nil {
+		requestID := GetRequestID(r.Context())
+		respondError(w, WrapError(ErrNotFound, requestID))
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 /* Helper functions */

@@ -18,6 +18,7 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
+	"github.com/neurondb/NeuronAgent/internal/metrics"
 )
 
 const requestIDKey contextKey = "request_id"
@@ -32,6 +33,8 @@ func RequestIDMiddleware(next http.Handler) http.Handler {
 
    /* Add to context */
 		ctx := context.WithValue(r.Context(), requestIDKey, requestID)
+		/* Also add to metrics log context */
+		ctx = metrics.WithLogContext(ctx, requestID, "", "", "", "")
 		r = r.WithContext(ctx)
 
    /* Add to response header */

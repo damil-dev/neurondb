@@ -1,0 +1,122 @@
+name: Publish Packages to Repository
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Package version (e.g., 1.0.0)'
+        required: false
+        type: string
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up build environment
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          dpkg-dev \
+          fakeroot \
+          build-essential \
+          postgresql-server-dev-16 \
+          postgresql-server-dev-17 \
+          postgresql-server-dev-18 \
+          golang-go \
+          createrepo-c \
+          gnupg2 \
+          apt-utils
+
+    - name: Set up RPM build environment
+      run: |
+        # Install RPM build tools (using alien or building in container)
+        # For now, we'll skip RPM builds on Ubuntu and note that RPM builds
+        # should be done on RHEL/CentOS/Rocky systems
+        echo "RPM builds require RHEL/CentOS/Rocky. Skipping RPM build in this workflow."
+        echo "Consider using a matrix build or separate workflow for RPM packages."
+
+    - name: Determine version
+      id: version
+      run: |
+        if [ -n "${{ github.event.inputs.version }}" ]; then
+          VERSION="${{ github.event.inputs.version }}"
+        else
+          VERSION="1.0.0.beta"
+        fi
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "Building version: $VERSION"
+
+    - name: Setup GPG
+      if: env.GPG_PRIVATE_KEY != ''
+      env:
+        GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+        GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
+        GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+      run: |
+        if [ -n "$GPG_PRIVATE_KEY" ]; then
+          echo "Setting up GPG key..."
+          mkdir -p ~/.gnupg
+          chmod 700 ~/.gnupg
+          echo "$GPG_PRIVATE_KEY" | base64 -d | gpg --batch --import
+          echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
+          if [ -n "$GPG_KEY_ID" ]; then
+            echo "Using GPG key: $GPG_KEY_ID"
+          fi
+        else
+          echo "No GPG_PRIVATE_KEY secret found. Packages will be unsigned."
+        fi
+
+    - name: Build DEB packages
+      run: |
+        cd packaging/deb
+        ./build-all-deb.sh "${{ steps.version.outputs.version }}"
+
+    - name: Generate DEB repository
+      env:
+        GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
+      run: |
+        cd packaging/repo
+        if [ -n "$GPG_KEY_ID" ]; then
+          ./generate-deb-repo.sh "$GPG_KEY_ID"
+        else
+          ./generate-deb-repo.sh
+        fi
+
+    - name: Setup Git
+      run: |
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+    - name: Commit and push repository updates
+      run: |
+        # Add and commit repo directory changes
+        git add repo/
+        
+        # Commit if there are changes
+        if git diff --staged --quiet; then
+          echo "No changes to commit"
+        else
+          git commit -m "Update package repository version ${{ steps.version.outputs.version }}"
+          git push origin ${{ github.ref_name }}
+        fi
+
+    - name: Summary
+      run: |
+        echo "## Package Repository Published" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "Version: ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "Repository will be available at:" >> $GITHUB_STEP_SUMMARY
+        echo "- https://${{ github.repository_owner }}.github.io/neurondb/repo/" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Note:** Enable GitHub Pages in repository settings:" >> $GITHUB_STEP_SUMMARY
+        echo "- Source: Deploy from a branch" >> $GITHUB_STEP_SUMMARY
+        echo "- Branch: main (or your default branch)" >> $GITHUB_STEP_SUMMARY
+        echo "- Folder: /repo" >> $GITHUB_STEP_SUMMARY
+

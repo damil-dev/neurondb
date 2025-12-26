@@ -100,8 +100,8 @@ func (t *Tracer) GetSpan(spanID string) (*Span, error) {
 	return span, nil
 }
 
-/* GetTraceIDFromContext gets trace ID from context */
-func GetTraceIDFromContext(ctx context.Context) (TraceID, bool) {
+/* GetTraceIDFromContextTyped gets trace ID from context as TraceID type */
+func GetTraceIDFromContextTyped(ctx context.Context) (TraceID, bool) {
 	traceID, ok := ctx.Value("trace_id").(TraceID)
 	return traceID, ok
 }
