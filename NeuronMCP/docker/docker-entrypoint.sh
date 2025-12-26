@@ -126,29 +126,38 @@ if [ -d "$SQL_DIR" ] && [ -n "$(ls -A $SQL_DIR/*.sql 2>/dev/null)" ]; then
                 fi
             fi
             
-            # Run SQL setup scripts in order
-            SCHEMA_FILE="$SQL_DIR/setup_neurondb_mcp_schema.sql"
-            FUNCTIONS_FILE="$SQL_DIR/neurondb_mcp_functions.sql"
+            # Check if NeuronMCP schema is already set up (idempotency check)
+            SCHEMA_EXISTS=$(psql "$CONN_STR" -tAc "SELECT 1 FROM information_schema.tables WHERE table_schema = 'neurondb' AND table_name = 'llm_providers'" 2>/dev/null || echo "0")
             
-            if [ -f "$SCHEMA_FILE" ]; then
-                log_info "Running schema setup: $(basename $SCHEMA_FILE)"
-                if psql "$CONN_STR" -f "$SCHEMA_FILE" >/dev/null 2>&1; then
-                    log_info "Schema setup completed"
-                else
-                    log_warn "Schema setup had errors (checking if already applied)..."
-                    # Try to show errors but don't fail
-                    psql "$CONN_STR" -f "$SCHEMA_FILE" 2>&1 | grep -i "error\|already exists" | head -5 || true
+            if [ "$SCHEMA_EXISTS" = "1" ]; then
+                log_info "NeuronMCP schema already exists, skipping setup (already initialized by NeuronDB)"
+            else
+                log_info "NeuronMCP schema not found, running setup..."
+                
+                # Run SQL setup scripts in order
+                SCHEMA_FILE="$SQL_DIR/setup_neurondb_mcp_schema.sql"
+                FUNCTIONS_FILE="$SQL_DIR/neurondb_mcp_functions.sql"
+                
+                if [ -f "$SCHEMA_FILE" ]; then
+                    log_info "Running schema setup: $(basename $SCHEMA_FILE)"
+                    if psql "$CONN_STR" -f "$SCHEMA_FILE" >/dev/null 2>&1; then
+                        log_info "Schema setup completed"
+                    else
+                        log_warn "Schema setup had errors (checking if already applied)..."
+                        # Try to show errors but don't fail
+                        psql "$CONN_STR" -f "$SCHEMA_FILE" 2>&1 | grep -i "error\|already exists" | head -5 || true
+                    fi
                 fi
-            fi
-            
-            if [ -f "$FUNCTIONS_FILE" ]; then
-                log_info "Running functions setup: $(basename $FUNCTIONS_FILE)"
-                if psql "$CONN_STR" -f "$FUNCTIONS_FILE" >/dev/null 2>&1; then
-                    log_info "Functions setup completed"
-                else
-                    log_warn "Functions setup had errors (checking if already applied)..."
-                    # Try to show errors but don't fail
-                    psql "$CONN_STR" -f "$FUNCTIONS_FILE" 2>&1 | grep -i "error\|already exists" | head -5 || true
+                
+                if [ -f "$FUNCTIONS_FILE" ]; then
+                    log_info "Running functions setup: $(basename $FUNCTIONS_FILE)"
+                    if psql "$CONN_STR" -f "$FUNCTIONS_FILE" >/dev/null 2>&1; then
+                        log_info "Functions setup completed"
+                    else
+                        log_warn "Functions setup had errors (checking if already applied)..."
+                        # Try to show errors but don't fail
+                        psql "$CONN_STR" -f "$FUNCTIONS_FILE" 2>&1 | grep -i "error\|already exists" | head -5 || true
+                    fi
                 fi
             fi
             

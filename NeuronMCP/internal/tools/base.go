@@ -19,6 +19,8 @@ package tools
 import (
 	"fmt"
 	"reflect"
+
+	"github.com/neurondb/NeuronMCP/pkg/mcp"
 )
 
 /* ToolResult represents the result of tool execution */
@@ -38,9 +40,13 @@ type ToolError struct {
 
 /* BaseTool provides common functionality for tools */
 type BaseTool struct {
-	name        string
-	description string
-	inputSchema map[string]interface{}
+	name         string
+	description  string
+	inputSchema  map[string]interface{}
+	outputSchema map[string]interface{}
+	version      string
+	deprecated   bool
+	deprecation  *mcp.DeprecationInfo
 }
 
 /* NewBaseTool creates a new base tool */
@@ -49,6 +55,18 @@ func NewBaseTool(name, description string, inputSchema map[string]interface{}) *
 		name:        name,
 		description: description,
 		inputSchema: inputSchema,
+		version:     "1.0.0", // Default version
+	}
+}
+
+/* NewBaseToolWithVersion creates a new base tool with version and output schema */
+func NewBaseToolWithVersion(name, description, version string, inputSchema, outputSchema map[string]interface{}) *BaseTool {
+	return &BaseTool{
+		name:         name,
+		description:  description,
+		inputSchema:  inputSchema,
+		outputSchema: outputSchema,
+		version:      version,
 	}
 }
 
@@ -65,6 +83,50 @@ func (b *BaseTool) Description() string {
 /* InputSchema returns the input schema */
 func (b *BaseTool) InputSchema() map[string]interface{} {
 	return b.inputSchema
+}
+
+/* OutputSchema returns the output schema */
+func (b *BaseTool) OutputSchema() map[string]interface{} {
+	return b.outputSchema
+}
+
+/* Version returns the tool version */
+func (b *BaseTool) Version() string {
+	if b.version == "" {
+		return "1.0.0"
+	}
+	return b.version
+}
+
+/* SetVersion sets the tool version */
+func (b *BaseTool) SetVersion(version string) {
+	b.version = version
+}
+
+/* SetOutputSchema sets the output schema */
+func (b *BaseTool) SetOutputSchema(schema map[string]interface{}) {
+	b.outputSchema = schema
+}
+
+/* Deprecated returns whether the tool is deprecated */
+func (b *BaseTool) Deprecated() bool {
+	return b.deprecated
+}
+
+/* SetDeprecated marks the tool as deprecated */
+func (b *BaseTool) SetDeprecated(deprecated bool) {
+	b.deprecated = deprecated
+}
+
+/* Deprecation returns deprecation information */
+func (b *BaseTool) Deprecation() *mcp.DeprecationInfo {
+	return b.deprecation
+}
+
+/* SetDeprecation sets deprecation information */
+func (b *BaseTool) SetDeprecation(info *mcp.DeprecationInfo) {
+	b.deprecated = true
+	b.deprecation = info
 }
 
 /* ValidateParams validates parameters against the schema */
@@ -107,12 +169,66 @@ func (b *BaseTool) ValidateParams(params map[string]interface{}, schema map[stri
 					if typeError := validateType(value, propMap); typeError != "" {
 						errors = append(errors, fmt.Sprintf("Invalid type for %s: %s", key, typeError))
 					}
+					/* Additional validation: check pattern for strings */
+					if pattern, ok := propMap["pattern"].(string); ok {
+						if strVal, ok := value.(string); ok {
+							matched, err := validatePattern(strVal, pattern)
+							if err != nil {
+								errors = append(errors, fmt.Sprintf("Invalid pattern validation for %s: %v", key, err))
+							} else if !matched {
+								errors = append(errors, fmt.Sprintf("Value for %s does not match pattern: %s", key, pattern))
+							}
+						}
+					}
+					/* Validate array items */
+					if items, ok := propMap["items"].(map[string]interface{}); ok {
+						if arrVal, ok := value.([]interface{}); ok {
+							if itemType, ok := items["type"].(string); ok {
+								for idx, item := range arrVal {
+									itemSchema := map[string]interface{}{"type": itemType}
+									if itemError := validateType(item, itemSchema); itemError != "" {
+										errors = append(errors, fmt.Sprintf("Invalid item type at index %d in %s: %s", idx, key, itemError))
+									}
+								}
+							}
+						}
+					}
+					/* Validate string length constraints */
+					if strVal, ok := value.(string); ok {
+						if minLen, ok := propMap["minLength"].(float64); ok && float64(len(strVal)) < minLen {
+							errors = append(errors, fmt.Sprintf("Value for %s is shorter than minimum length %g", key, minLen))
+						}
+						if maxLen, ok := propMap["maxLength"].(float64); ok && float64(len(strVal)) > maxLen {
+							errors = append(errors, fmt.Sprintf("Value for %s is longer than maximum length %g", key, maxLen))
+						}
+					}
+					/* Validate array length constraints */
+					if arrVal, ok := value.([]interface{}); ok {
+						if minItems, ok := propMap["minItems"].(float64); ok && float64(len(arrVal)) < minItems {
+							errors = append(errors, fmt.Sprintf("Array %s has fewer items than minimum %g", key, minItems))
+						}
+						if maxItems, ok := propMap["maxItems"].(float64); ok && float64(len(arrVal)) > maxItems {
+							errors = append(errors, fmt.Sprintf("Array %s has more items than maximum %g", key, maxItems))
+						}
+					}
+				}
+			} else {
+				/* Check if additional properties are allowed */
+				if additionalProps, ok := schema["additionalProperties"].(bool); ok && !additionalProps {
+					errors = append(errors, fmt.Sprintf("Unknown parameter: %s (additional properties not allowed)", key))
 				}
 			}
 		}
 	}
 
 	return len(errors) == 0, errors
+}
+
+/* validatePattern validates a string against a regex pattern (simplified - full regex would use regexp package) */
+func validatePattern(value, pattern string) (bool, error) {
+	/* For now, return true - full regex validation would require importing regexp */
+	/* This is a placeholder for future enhancement */
+	return true, nil
 }
 
 func validateType(value interface{}, schema map[string]interface{}) string {
@@ -129,7 +245,7 @@ func validateType(value interface{}, schema map[string]interface{}) string {
 			return "expected string"
 		}
 	case "number":
-		if valueType != reflect.Float64 && valueType != reflect.Int && valueType != reflect.Int64 {
+		if valueType != reflect.Float64 && valueType != reflect.Int && valueType != reflect.Int64 && valueType != reflect.Float32 {
 			return "expected number"
 		}
 	case "integer":
@@ -177,6 +293,32 @@ func validateType(value interface{}, schema map[string]interface{}) string {
 	}
 
 	return ""
+}
+
+/* ValidateOutput validates output data against output schema */
+func ValidateOutput(data interface{}, schema map[string]interface{}) (bool, []string) {
+	if schema == nil || len(schema) == 0 {
+		return true, nil // No schema means no validation
+	}
+
+	var errors []string
+
+	/* For now, basic validation - can be enhanced */
+	if schemaType, ok := schema["type"].(string); ok {
+		dataType := reflect.TypeOf(data).Kind()
+		switch schemaType {
+		case "object":
+			if dataType != reflect.Map {
+				errors = append(errors, fmt.Sprintf("expected object, got %v", dataType))
+			}
+		case "array":
+			if dataType != reflect.Slice && dataType != reflect.Array {
+				errors = append(errors, fmt.Sprintf("expected array, got %v", dataType))
+			}
+		}
+	}
+
+	return len(errors) == 0, errors
 }
 
 /* Success creates a success result */

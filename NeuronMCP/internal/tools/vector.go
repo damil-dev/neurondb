@@ -36,48 +36,55 @@ type VectorSearchTool struct {
 
 /* NewVectorSearchTool creates a new vector search tool */
 func NewVectorSearchTool(db *database.Database, logger *logging.Logger) *VectorSearchTool {
-	return &VectorSearchTool{
-		BaseTool: NewBaseTool(
-			"vector_search",
-			"Perform vector similarity search using L2, cosine, inner product, L1, Hamming, Chebyshev, or Minkowski distance",
-			map[string]interface{}{
-				"type": "object",
-				"properties": map[string]interface{}{
-					"table": map[string]interface{}{
-						"type":        "string",
-						"description": "Table name containing vectors",
-					},
-					"vector_column": map[string]interface{}{
-						"type":        "string",
-						"description": "Name of the vector column",
-					},
-					"query_vector": map[string]interface{}{
-						"type":        "array",
-						"items":       map[string]interface{}{"type": "number"},
-						"description": "Query vector for similarity search",
-					},
-					"limit": map[string]interface{}{
-						"type":        "number",
-						"default":     10,
-						"minimum":     1,
-						"maximum":     1000,
-						"description": "Maximum number of results",
-					},
-					"distance_metric": map[string]interface{}{
-						"type":        "string",
-						"enum":        []interface{}{"l2", "cosine", "inner_product", "l1", "hamming", "chebyshev", "minkowski"},
-						"default":     "l2",
-						"description": "Distance metric to use",
-					},
-					"additional_columns": map[string]interface{}{
-						"type":        "array",
-						"items":       map[string]interface{}{"type": "string"},
-						"description": "Additional columns to return in results",
-					},
+	tool := NewBaseToolWithVersion(
+		"vector_search",
+		"Perform vector similarity search using L2, cosine, inner product, L1, Hamming, Chebyshev, or Minkowski distance",
+		"1.0.0",
+		map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"table": map[string]interface{}{
+					"type":        "string",
+					"description": "Table name containing vectors",
+					"minLength":   1,
 				},
-				"required": []interface{}{"table", "vector_column", "query_vector"},
+				"vector_column": map[string]interface{}{
+					"type":        "string",
+					"description": "Name of the vector column",
+					"minLength":   1,
+				},
+				"query_vector": map[string]interface{}{
+					"type":        "array",
+					"items":       map[string]interface{}{"type": "number"},
+					"description": "Query vector for similarity search",
+					"minItems":    1,
+				},
+				"limit": map[string]interface{}{
+					"type":        "integer",
+					"default":     10,
+					"minimum":     1,
+					"maximum":     1000,
+					"description": "Maximum number of results",
+				},
+				"distance_metric": map[string]interface{}{
+					"type":        "string",
+					"enum":        []interface{}{"l2", "cosine", "inner_product", "l1", "hamming", "chebyshev", "minkowski"},
+					"default":     "l2",
+					"description": "Distance metric to use",
+				},
+				"additional_columns": map[string]interface{}{
+					"type":        "array",
+					"items":       map[string]interface{}{"type": "string"},
+					"description": "Additional columns to return in results",
+				},
 			},
-		),
+			"required": []interface{}{"table", "vector_column", "query_vector"},
+			"additionalProperties": false,
+		},
+		VectorSearchOutputSchema(),
+	)
+	return &VectorSearchTool{
+		BaseTool:     tool,
 		executor:     NewQueryExecutor(db),
 		logger:       logger,
 		configHelper: database.NewConfigHelper(db),

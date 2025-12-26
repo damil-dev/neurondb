@@ -30,20 +30,34 @@ type Server struct {
 	handlers  map[string]HandlerFunc
 	info      ServerInfo
 	caps      ServerCapabilities
+	maxRequestSize int64 /* Maximum request size in bytes */
 }
 
 /* NewServer creates a new MCP server */
 func NewServer(name, version string) *Server {
+	return NewServerWithMaxRequestSize(name, version, 0) /* Default: unlimited */
+}
+
+/* NewServerWithMaxRequestSize creates a new MCP server with max request size */
+func NewServerWithMaxRequestSize(name, version string, maxRequestSize int64) *Server {
 	return &Server{
-		transport: NewStdioTransport(),
-		handlers:  make(map[string]HandlerFunc),
+		transport:      NewStdioTransportWithMaxSize(maxRequestSize),
+		handlers:       make(map[string]HandlerFunc),
+		maxRequestSize: maxRequestSize,
 		info: ServerInfo{
 			Name:    name,
 			Version: version,
 		},
 		caps: ServerCapabilities{
-			Tools:     make(map[string]interface{}),
-			Resources: make(map[string]interface{}),
+			Tools: ToolsCapability{
+				ListChanged: false,
+			},
+			Resources: ResourcesCapability{
+				Subscribe:   false,
+				ListChanged: false,
+			},
+			Prompts:   make(map[string]interface{}),
+			Sampling:  make(map[string]interface{}),
 		},
 	}
 }
@@ -167,6 +181,11 @@ func (s *Server) Run(ctx context.Context) error {
 			}
 		}
 	}
+}
+
+/* HandleRequest handles an MCP request (exported for HTTP transport) */
+func (s *Server) HandleRequest(ctx context.Context, req *JSONRPCRequest) *JSONRPCResponse {
+	return s.handleRequest(ctx, req)
 }
 
 func (s *Server) handleRequest(ctx context.Context, req *JSONRPCRequest) *JSONRPCResponse {

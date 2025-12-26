@@ -29,13 +29,25 @@ The official documentation provides:
 
 | Feature | Description |
 |---------|-------------|
-| **MCP Protocol** | Full JSON-RPC 2.0 implementation with stdio transport |
-| **Vector Operations** | Search, embedding generation, indexing tools |
-| **ML Tools** | Training and prediction for various algorithms |
-| **Resources** | Schema, models, indexes, config, workers, stats |
-| **Middleware** | Validation, logging, timeout, error handling |
+| **MCP Protocol** | Full JSON-RPC 2.0 implementation with stdio, HTTP, and SSE transport |
+| **Vector Operations** | 50+ tools for search, embedding generation, indexing with 7+ distance metrics |
+| **ML Tools** | Complete ML pipeline: training, prediction, evaluation, AutoML |
+| **RAG Operations** | Document processing, context retrieval, response generation with reranking |
+| **Resources** | Schema, models, indexes, config, workers, stats with real-time subscriptions |
+| **Prompts Protocol** | Full prompts/list and prompts/get with template engine |
+| **Sampling/Completions** | sampling/createMessage with streaming support |
+| **Progress Tracking** | Long-running operation progress with progress/get |
+| **Batch Operations** | Transactional batch tool calls (tools/call_batch) |
+| **Tool Discovery** | Search and filter tools with categorization |
+| **Middleware** | Pluggable middleware: validation, logging, timeout, error handling, auth, rate limiting |
+| **Security** | JWT, API keys, OAuth2 authentication with rate limiting |
+| **Performance** | Caching layer with TTL, connection pooling |
+| **Enterprise** | Metrics (Prometheus), webhooks, retry/resilience (circuit breaker) |
+| **Health Checks** | Database, tools, and resource availability monitoring |
 | **Configuration** | JSON config files with environment variable overrides |
-| **Modular Architecture** | Clean separation of concerns |
+| **Modular Architecture** | 19 independent packages with clean separation of concerns |
+
+> 📊 **See [COMPARISON.md](COMPARISON.md) for a detailed comparison with other MCP servers**
 
 ## Architecture
 

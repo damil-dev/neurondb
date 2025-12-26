@@ -24,19 +24,26 @@ import (
 
 /* StdioTransport handles MCP communication over stdio */
 type StdioTransport struct {
-	stdin  *bufio.Reader
-	stdout *bufio.Writer
-	stderr io.Writer
+	stdin         *bufio.Reader
+	stdout        *bufio.Writer
+	stderr        io.Writer
+	maxRequestSize int64 /* Maximum request size in bytes (0 = unlimited) */
 }
 
 /* NewStdioTransport creates a new stdio transport */
 func NewStdioTransport() *StdioTransport {
-  /* Use a buffered writer for stdout to enable flushing */
+	return NewStdioTransportWithMaxSize(0) /* Default: unlimited */
+}
+
+/* NewStdioTransportWithMaxSize creates a new stdio transport with max request size */
+func NewStdioTransportWithMaxSize(maxRequestSize int64) *StdioTransport {
+	/* Use a buffered writer for stdout to enable flushing */
 	stdoutWriter := bufio.NewWriter(os.Stdout)
 	return &StdioTransport{
-		stdin:  bufio.NewReader(os.Stdin),
-		stdout: stdoutWriter,
-		stderr: os.Stderr,
+		stdin:          bufio.NewReader(os.Stdin),
+		stdout:         stdoutWriter,
+		stderr:         os.Stderr,
+		maxRequestSize: maxRequestSize,
 	}
 }
 
@@ -73,7 +80,13 @@ func (t *StdioTransport) ReadMessage() (*JSONRPCRequest, error) {
    /* If so, Claude Desktop is sending JSON directly without Content-Length headers */
 		if headerLines == 1 && strings.HasPrefix(strings.TrimSpace(line), "{") {
 			t.WriteError(fmt.Errorf("DEBUG: First line is JSON (no Content-Length headers), parsing directly"))
-    /* Parse the JSON directly */
+			
+			/* Enforce maximum request size for JSON without Content-Length */
+			if t.maxRequestSize > 0 && int64(len(line)) > t.maxRequestSize {
+				return nil, fmt.Errorf("request size %d exceeds maximum allowed size %d bytes", len(line), t.maxRequestSize)
+			}
+			
+			/* Parse the JSON directly */
 			return ParseRequest([]byte(line))
 		}
 		
@@ -103,7 +116,13 @@ func (t *StdioTransport) ReadMessage() (*JSONRPCRequest, error) {
 	}
 
 	t.WriteError(fmt.Errorf("DEBUG: Headers parsed, contentLength=%d, reading body", contentLength))
-  /* Read message body */
+	
+	/* Enforce maximum request size */
+	if t.maxRequestSize > 0 && int64(contentLength) > t.maxRequestSize {
+		return nil, fmt.Errorf("request size %d exceeds maximum allowed size %d bytes", contentLength, t.maxRequestSize)
+	}
+	
+	/* Read message body */
 	body := make([]byte, contentLength)
 	if _, err := io.ReadFull(t.stdin, body); err != nil {
 		if err == io.EOF {
