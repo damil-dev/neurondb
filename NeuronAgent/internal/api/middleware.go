@@ -27,9 +27,10 @@ import (
 type contextKey string
 
 const apiKeyContextKey contextKey = "api_key"
+const principalContextKey contextKey = "principal"
 
-/* AuthMiddleware authenticates requests using API keys */
-func AuthMiddleware(keyManager *auth.APIKeyManager, rateLimiter *auth.RateLimiter) func(http.Handler) http.Handler {
+/* AuthMiddleware authenticates requests using API keys and resolves principals */
+func AuthMiddleware(keyManager *auth.APIKeyManager, principalManager *auth.PrincipalManager, rateLimiter *auth.RateLimiter) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
     /* Skip auth for health and metrics endpoints */
@@ -83,8 +84,19 @@ func AuthMiddleware(keyManager *auth.APIKeyManager, rateLimiter *auth.RateLimite
 				return
 			}
 
-    /* Add API key to context */
+    /* Resolve principal */
+			principal, err := principalManager.ResolvePrincipalFromAPIKey(r.Context(), apiKey)
+			if err != nil {
+				fmt.Printf("[MIDDLEWARE] Principal resolution failed: %v\n", err)
+				/* Continue anyway - principal resolution failure should not block requests */
+				/* In production, you might want to log this but still allow the request */
+			}
+
+    /* Add API key and principal to context */
 			ctx := context.WithValue(r.Context(), apiKeyContextKey, apiKey)
+			if principal != nil {
+				ctx = context.WithValue(ctx, principalContextKey, principal)
+			}
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

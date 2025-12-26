@@ -37,6 +37,11 @@ const (
 	getAgentByIDQuery = `SELECT * FROM neurondb_agent.agents WHERE id = $1`
 
 	listAgentsQuery = `SELECT * FROM neurondb_agent.agents ORDER BY created_at DESC`
+	
+	listAgentsWithFilterQuery = `
+		SELECT * FROM neurondb_agent.agents 
+		WHERE ($1::text IS NULL OR name ILIKE $1 OR description ILIKE $1)
+		ORDER BY created_at DESC`
 
 	updateAgentQuery = `
 		UPDATE neurondb_agent.agents 
@@ -62,6 +67,21 @@ const (
 		WHERE agent_id = $1 
 		ORDER BY last_activity_at DESC 
 		LIMIT $2 OFFSET $3`
+	
+	listSessionsWithFilterQuery = `
+		SELECT * FROM neurondb_agent.sessions 
+		WHERE agent_id = $1 
+		AND ($2::text IS NULL OR external_user_id = $2)
+		AND ($3::timestamptz IS NULL OR created_at >= $3)
+		AND ($4::timestamptz IS NULL OR created_at <= $4)
+		ORDER BY last_activity_at DESC 
+		LIMIT $5 OFFSET $6`
+
+	updateSessionQuery = `
+		UPDATE neurondb_agent.sessions 
+		SET external_user_id = $2, metadata = $3::jsonb, last_activity_at = NOW()
+		WHERE id = $1
+		RETURNING id, agent_id, external_user_id, metadata, created_at, last_activity_at`
 
 	deleteSessionQuery = `DELETE FROM neurondb_agent.sessions WHERE id = $1`
 )
@@ -79,12 +99,32 @@ const (
 		WHERE session_id = $1 
 		ORDER BY created_at ASC 
 		LIMIT $2 OFFSET $3`
+	
+	getMessagesWithFilterQuery = `
+		SELECT * FROM neurondb_agent.messages 
+		WHERE session_id = $1 
+		AND ($2::text IS NULL OR role = $2)
+		AND ($3::text IS NULL OR content ILIKE $3)
+		AND ($4::timestamptz IS NULL OR created_at >= $4)
+		AND ($5::timestamptz IS NULL OR created_at <= $5)
+		ORDER BY created_at ASC 
+		LIMIT $6 OFFSET $7`
 
 	getRecentMessagesQuery = `
 		SELECT * FROM neurondb_agent.messages 
 		WHERE session_id = $1 
 		ORDER BY created_at DESC 
 		LIMIT $2`
+
+	getMessageByIDQuery = `SELECT * FROM neurondb_agent.messages WHERE id = $1`
+
+	updateMessageQuery = `
+		UPDATE neurondb_agent.messages 
+		SET content = $2, metadata = $3::jsonb
+		WHERE id = $1
+		RETURNING id, session_id, role, content, tool_name, tool_call_id, token_count, metadata, created_at`
+
+	deleteMessageQuery = `DELETE FROM neurondb_agent.messages WHERE id = $1`
 )
 
 /* Memory chunk queries */
@@ -102,6 +142,17 @@ const (
 		WHERE agent_id = $2
 		ORDER BY embedding <=> $1::vector
 		LIMIT $3`
+
+	getMemoryChunkQuery = `SELECT id, agent_id, session_id, message_id, content, embedding, importance_score, metadata, created_at FROM neurondb_agent.memory_chunks WHERE id = $1`
+
+	listMemoryChunksQuery = `
+		SELECT id, agent_id, session_id, message_id, content, embedding, importance_score, metadata, created_at
+		FROM neurondb_agent.memory_chunks
+		WHERE agent_id = $1
+		ORDER BY created_at DESC
+		LIMIT $2 OFFSET $3`
+
+	deleteMemoryChunkQuery = `DELETE FROM neurondb_agent.memory_chunks WHERE id = $1`
 )
 
 /* Tool queries */
@@ -115,6 +166,13 @@ const (
 	getToolQuery = `SELECT * FROM neurondb_agent.tools WHERE name = $1`
 
 	listToolsQuery = `SELECT * FROM neurondb_agent.tools WHERE enabled = true ORDER BY name`
+	
+	listToolsWithFilterQuery = `
+		SELECT * FROM neurondb_agent.tools 
+		WHERE ($1::boolean IS NULL OR enabled = $1)
+		AND ($2::text IS NULL OR name ILIKE $2 OR description ILIKE $2)
+		AND ($3::text IS NULL OR handler_type = $3)
+		ORDER BY name`
 
 	updateToolQuery = `
 		UPDATE neurondb_agent.tools 
@@ -169,11 +227,11 @@ const (
 const (
 	createAPIKeyQuery = `
 		INSERT INTO neurondb_agent.api_keys 
-		(key_hash, key_prefix, organization_id, user_id, rate_limit_per_minute, roles, metadata, expires_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8)
+		(key_hash, key_prefix, organization_id, user_id, principal_id, rate_limit_per_minute, roles, metadata, expires_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9)
 		RETURNING id, created_at`
 
-	getAPIKeyByPrefixQuery = `SELECT id, key_hash, key_prefix, organization_id, user_id, rate_limit_per_minute, roles, metadata, created_at, last_used_at, expires_at FROM neurondb_agent.api_keys WHERE key_prefix = $1`
+	getAPIKeyByPrefixQuery = `SELECT id, key_hash, key_prefix, organization_id, user_id, principal_id, rate_limit_per_minute, roles, metadata, created_at, last_used_at, expires_at FROM neurondb_agent.api_keys WHERE key_prefix = $1`
 
 	getAPIKeyByIDQuery = `SELECT * FROM neurondb_agent.api_keys WHERE id = $1`
 
@@ -268,6 +326,20 @@ func (q *Queries) ListAgents(ctx context.Context) ([]Agent, error) {
 	return agents, nil
 }
 
+func (q *Queries) ListAgentsWithFilter(ctx context.Context, search *string) ([]Agent, error) {
+	var agents []Agent
+	var searchPattern *string
+	if search != nil && *search != "" {
+		pattern := "%" + *search + "%"
+		searchPattern = &pattern
+	}
+	err := q.DB.SelectContext(ctx, &agents, listAgentsWithFilterQuery, searchPattern)
+	if err != nil {
+		return nil, q.formatQueryError("SELECT", listAgentsWithFilterQuery, 1, "neurondb_agent.agents", err)
+	}
+	return agents, nil
+}
+
 func (q *Queries) UpdateAgent(ctx context.Context, agent *Agent) error {
 	params := []interface{}{agent.ID, agent.Name, agent.Description, agent.SystemPrompt, agent.ModelName,
 		agent.MemoryTable, agent.EnabledTools, agent.Config}
@@ -328,6 +400,36 @@ func (q *Queries) ListSessions(ctx context.Context, agentID uuid.UUID, limit, of
 	return sessions, nil
 }
 
+func (q *Queries) ListSessionsWithFilter(ctx context.Context, agentID uuid.UUID, externalUserID *string, startDate, endDate *string, limit, offset int) ([]Session, error) {
+	var sessions []Session
+	var startDateParsed, endDateParsed interface{}
+	if startDate != nil && *startDate != "" {
+		startDateParsed = *startDate
+	}
+	if endDate != nil && *endDate != "" {
+		endDateParsed = *endDate
+	}
+	params := []interface{}{agentID, externalUserID, startDateParsed, endDateParsed, limit, offset}
+	err := q.DB.SelectContext(ctx, &sessions, listSessionsWithFilterQuery, params...)
+	if err != nil {
+		return nil, q.formatQueryError("SELECT", listSessionsWithFilterQuery, len(params), "neurondb_agent.sessions", err)
+	}
+	return sessions, nil
+}
+
+func (q *Queries) UpdateSession(ctx context.Context, session *Session) error {
+	params := []interface{}{session.ID, session.ExternalUserID, session.Metadata}
+	err := q.DB.GetContext(ctx, session, updateSessionQuery, params...)
+	if err == sql.ErrNoRows {
+		return fmt.Errorf("session not found on %s: query='%s', session_id='%s', table='neurondb_agent.sessions', error=%w",
+			q.getConnInfoString(), updateSessionQuery, session.ID.String(), err)
+	}
+	if err != nil {
+		return q.formatQueryError("UPDATE", updateSessionQuery, len(params), "neurondb_agent.sessions", err)
+	}
+	return nil
+}
+
 func (q *Queries) DeleteSession(ctx context.Context, id uuid.UUID) error {
 	result, err := q.DB.ExecContext(ctx, deleteSessionQuery, id)
 	if err != nil {
@@ -366,6 +468,71 @@ func (q *Queries) GetMessages(ctx context.Context, sessionID uuid.UUID, limit, o
 	return messages, nil
 }
 
+func (q *Queries) GetMessagesWithFilter(ctx context.Context, sessionID uuid.UUID, role, contentSearch *string, startDate, endDate *string, limit, offset int) ([]Message, error) {
+	var messages []Message
+	var contentPattern *string
+	if contentSearch != nil && *contentSearch != "" {
+		pattern := "%" + *contentSearch + "%"
+		contentPattern = &pattern
+	}
+	var startDateParsed, endDateParsed interface{}
+	if startDate != nil && *startDate != "" {
+		startDateParsed = *startDate
+	}
+	if endDate != nil && *endDate != "" {
+		endDateParsed = *endDate
+	}
+	params := []interface{}{sessionID, role, contentPattern, startDateParsed, endDateParsed, limit, offset}
+	err := q.DB.SelectContext(ctx, &messages, getMessagesWithFilterQuery, params...)
+	if err != nil {
+		return nil, q.formatQueryError("SELECT", getMessagesWithFilterQuery, len(params), "neurondb_agent.messages", err)
+	}
+	return messages, nil
+}
+
+func (q *Queries) GetMessageByID(ctx context.Context, id int64) (*Message, error) {
+	var message Message
+	err := q.DB.GetContext(ctx, &message, getMessageByIDQuery, id)
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("message not found on %s: query='%s', message_id=%d, table='neurondb_agent.messages', error=%w",
+			q.getConnInfoString(), getMessageByIDQuery, id, err)
+	}
+	if err != nil {
+		return nil, q.formatQueryError("SELECT", getMessageByIDQuery, 1, "neurondb_agent.messages", err)
+	}
+	return &message, nil
+}
+
+func (q *Queries) UpdateMessage(ctx context.Context, message *Message) error {
+	params := []interface{}{message.ID, message.Content, message.Metadata}
+	err := q.DB.GetContext(ctx, message, updateMessageQuery, params...)
+	if err == sql.ErrNoRows {
+		return fmt.Errorf("message not found on %s: query='%s', message_id=%d, table='neurondb_agent.messages', error=%w",
+			q.getConnInfoString(), updateMessageQuery, message.ID, err)
+	}
+	if err != nil {
+		return q.formatQueryError("UPDATE", updateMessageQuery, len(params), "neurondb_agent.messages", err)
+	}
+	return nil
+}
+
+func (q *Queries) DeleteMessage(ctx context.Context, id int64) error {
+	result, err := q.DB.ExecContext(ctx, deleteMessageQuery, id)
+	if err != nil {
+		return q.formatQueryError("DELETE", deleteMessageQuery, 1, "neurondb_agent.messages", err)
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected for DELETE on %s: query='%s', message_id=%d, table='neurondb_agent.messages', error=%w",
+			q.getConnInfoString(), deleteMessageQuery, id, err)
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("message not found on %s: query='%s', message_id=%d, table='neurondb_agent.messages', rows_affected=0",
+			q.getConnInfoString(), deleteMessageQuery, id)
+	}
+	return nil
+}
+
 func (q *Queries) GetRecentMessages(ctx context.Context, sessionID uuid.UUID, limit int) ([]Message, error) {
 	var messages []Message
 	params := []interface{}{sessionID, limit}
@@ -389,6 +556,46 @@ func (q *Queries) CreateMemoryChunk(ctx context.Context, chunk *MemoryChunk) (*M
 			utils.SanitizeValue(chunk.SessionID), len(chunk.Content), embeddingDim, chunk.ImportanceScore, err)
 	}
 	return chunk, nil
+}
+
+func (q *Queries) GetMemoryChunk(ctx context.Context, id int64) (*MemoryChunk, error) {
+	var chunk MemoryChunk
+	err := q.DB.GetContext(ctx, &chunk, getMemoryChunkQuery, id)
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("memory chunk not found on %s: query='%s', chunk_id=%d, table='neurondb_agent.memory_chunks', error=%w",
+			q.getConnInfoString(), getMemoryChunkQuery, id, err)
+	}
+	if err != nil {
+		return nil, q.formatQueryError("SELECT", getMemoryChunkQuery, 1, "neurondb_agent.memory_chunks", err)
+	}
+	return &chunk, nil
+}
+
+func (q *Queries) ListMemoryChunks(ctx context.Context, agentID uuid.UUID, limit, offset int) ([]MemoryChunk, error) {
+	var chunks []MemoryChunk
+	params := []interface{}{agentID, limit, offset}
+	err := q.DB.SelectContext(ctx, &chunks, listMemoryChunksQuery, params...)
+	if err != nil {
+		return nil, q.formatQueryError("SELECT", listMemoryChunksQuery, len(params), "neurondb_agent.memory_chunks", err)
+	}
+	return chunks, nil
+}
+
+func (q *Queries) DeleteMemoryChunk(ctx context.Context, id int64) error {
+	result, err := q.DB.ExecContext(ctx, deleteMemoryChunkQuery, id)
+	if err != nil {
+		return q.formatQueryError("DELETE", deleteMemoryChunkQuery, 1, "neurondb_agent.memory_chunks", err)
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected for DELETE on %s: query='%s', chunk_id=%d, table='neurondb_agent.memory_chunks', error=%w",
+			q.getConnInfoString(), deleteMemoryChunkQuery, id, err)
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("memory chunk not found on %s: query='%s', chunk_id=%d, table='neurondb_agent.memory_chunks', rows_affected=0",
+			q.getConnInfoString(), deleteMemoryChunkQuery, id)
+	}
+	return nil
 }
 
 func (q *Queries) SearchMemory(ctx context.Context, agentID uuid.UUID, queryEmbedding []float32, topK int) ([]MemoryChunkWithSimilarity, error) {
@@ -434,6 +641,21 @@ func (q *Queries) ListTools(ctx context.Context) ([]Tool, error) {
 	err := q.DB.SelectContext(ctx, &tools, listToolsQuery)
 	if err != nil {
 		return nil, q.formatQueryError("SELECT", listToolsQuery, 0, "neurondb_agent.tools", err)
+	}
+	return tools, nil
+}
+
+func (q *Queries) ListToolsWithFilter(ctx context.Context, enabled *bool, search, handlerType *string) ([]Tool, error) {
+	var tools []Tool
+	var searchPattern *string
+	if search != nil && *search != "" {
+		pattern := "%" + *search + "%"
+		searchPattern = &pattern
+	}
+	params := []interface{}{enabled, searchPattern, handlerType}
+	err := q.DB.SelectContext(ctx, &tools, listToolsWithFilterQuery, params...)
+	if err != nil {
+		return nil, q.formatQueryError("SELECT", listToolsWithFilterQuery, len(params), "neurondb_agent.tools", err)
 	}
 	return tools, nil
 }
@@ -541,12 +763,12 @@ func (q *Queries) CreateAPIKey(ctx context.Context, apiKey *APIKey) error {
 	}
 	
 	params := []interface{}{apiKey.KeyHash, apiKey.KeyPrefix, apiKey.OrganizationID, apiKey.UserID,
-		apiKey.RateLimitPerMin, apiKey.Roles, metadataValue, apiKey.ExpiresAt}
+		apiKey.PrincipalID, apiKey.RateLimitPerMin, apiKey.Roles, metadataValue, apiKey.ExpiresAt}
 	err = q.DB.GetContext(ctx, apiKey, createAPIKeyQuery, params...)
 	if err != nil {
-		return fmt.Errorf("API key creation failed on %s: query='%s', params_count=%d, key_prefix='%s', organization_id=%s, user_id=%s, rate_limit_per_min=%d, table='neurondb_agent.api_keys', error=%w",
+		return fmt.Errorf("API key creation failed on %s: query='%s', params_count=%d, key_prefix='%s', organization_id=%s, user_id=%s, principal_id=%s, rate_limit_per_min=%d, table='neurondb_agent.api_keys', error=%w",
 			q.getConnInfoString(), createAPIKeyQuery, len(params), apiKey.KeyPrefix,
-			utils.SanitizeValue(apiKey.OrganizationID), utils.SanitizeValue(apiKey.UserID), apiKey.RateLimitPerMin, err)
+			utils.SanitizeValue(apiKey.OrganizationID), utils.SanitizeValue(apiKey.UserID), utils.SanitizeValue(apiKey.PrincipalID), apiKey.RateLimitPerMin, err)
 	}
 	return nil
 }

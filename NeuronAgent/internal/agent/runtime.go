@@ -21,20 +21,23 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lib/pq"
+	"github.com/neurondb/NeuronAgent/internal/auth"
 	"github.com/neurondb/NeuronAgent/internal/db"
 	"github.com/neurondb/NeuronAgent/pkg/neurondb"
 )
 
 type Runtime struct {
-	db        *db.DB
-	queries   *db.Queries
-	memory    *MemoryManager
-	planner   *Planner
-	reflector *Reflector
-	prompt    *PromptBuilder
-	llm       *LLMClient
-	tools     ToolRegistry
-	embed     *neurondb.EmbeddingClient
+	db                *db.DB
+	queries           *db.Queries
+	memory            *MemoryManager
+	planner           *Planner
+	reflector         *Reflector
+	prompt            *PromptBuilder
+	llm               *LLMClient
+	tools             ToolRegistry
+	embed             *neurondb.EmbeddingClient
+	toolPermChecker   *auth.ToolPermissionChecker
+	deterministicMode bool
 }
 
 type ExecutionState struct {
@@ -83,15 +86,16 @@ type ToolRegistry interface {
 func NewRuntime(db *db.DB, queries *db.Queries, tools ToolRegistry, embedClient *neurondb.EmbeddingClient) *Runtime {
 	llm := NewLLMClient(db)
 	return &Runtime{
-		db:        db,
-		queries:   queries,
-		memory:    NewMemoryManager(db, queries, embedClient),
-		planner:   NewPlannerWithLLM(llm),
-		reflector: NewReflector(llm),
-		prompt:    NewPromptBuilder(),
-		llm:       llm,
-		tools:     tools,
-		embed:     embedClient,
+		db:              db,
+		queries:         queries,
+		memory:          NewMemoryManager(db, queries, embedClient),
+		planner:         NewPlannerWithLLM(llm),
+		reflector:       NewReflector(llm),
+		prompt:          NewPromptBuilder(),
+		llm:             llm,
+		tools:           tools,
+		embed:           embedClient,
+		toolPermChecker: auth.NewToolPermissionChecker(queries),
 	}
 }
 
@@ -174,8 +178,9 @@ func (r *Runtime) Execute(ctx context.Context, sessionID uuid.UUID, userMessage 
 	if len(llmResponse.ToolCalls) > 0 {
 		state.ToolCalls = llmResponse.ToolCalls
 
-   /* Execute tools */
-		toolResults, err := r.executeTools(ctx, agent, llmResponse.ToolCalls)
+   /* Execute tools - add sessionID to context for permission checking */
+		toolCtx := WithSessionID(WithAgentID(ctx, agent.ID), sessionID)
+		toolResults, err := r.executeTools(toolCtx, agent, llmResponse.ToolCalls)
 		if err != nil {
 			toolNames := make([]string, len(llmResponse.ToolCalls))
 			for i, call := range llmResponse.ToolCalls {
@@ -344,6 +349,26 @@ func (r *Runtime) executeSingleTool(ctx context.Context, agent *db.Agent, call T
 			ToolCallID: call.ID,
 			Error:      fmt.Errorf("tool not enabled for agent: tool_call_id='%s', tool_name='%s', agent_id='%s', agent_name='%s', enabled_tools=[%v]",
 				call.ID, call.Name, agent.ID.String(), agent.Name, agent.EnabledTools),
+		}
+	}
+
+	/* Check tool permissions */
+	sessionID, hasSessionID := GetSessionIDFromContext(ctx)
+	if hasSessionID {
+		allowed, err := r.toolPermChecker.CheckToolPermission(ctx, agent.ID, sessionID, call.Name)
+		if err != nil {
+			return ToolResult{
+				ToolCallID: call.ID,
+				Error:      fmt.Errorf("tool permission check failed: tool_call_id='%s', tool_name='%s', agent_id='%s', session_id='%s', error=%w",
+					call.ID, call.Name, agent.ID.String(), sessionID.String(), err),
+			}
+		}
+		if !allowed {
+			return ToolResult{
+				ToolCallID: call.ID,
+				Error:      fmt.Errorf("tool execution not allowed: tool_call_id='%s', tool_name='%s', agent_id='%s', session_id='%s'",
+					call.ID, call.Name, agent.ID.String(), sessionID.String()),
+			}
 		}
 	}
 

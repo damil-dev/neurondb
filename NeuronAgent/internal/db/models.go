@@ -110,10 +110,90 @@ type APIKey struct {
 	KeyPrefix       string                 `db:"key_prefix"`
 	OrganizationID  *string                `db:"organization_id"`
 	UserID          *string                `db:"user_id"`
+	PrincipalID     *uuid.UUID             `db:"principal_id"`
 	RateLimitPerMin int                    `db:"rate_limit_per_minute"`
 	Roles           pq.StringArray         `db:"roles"`
 	Metadata        JSONBMap               `db:"metadata"`
 	CreatedAt       time.Time              `db:"created_at"`
 	LastUsedAt      *time.Time             `db:"last_used_at"`
 	ExpiresAt       *time.Time             `db:"expires_at"`
+}
+
+type Principal struct {
+	ID        uuid.UUID              `db:"id"`
+	Type      string                 `db:"type"` // 'user', 'org', 'agent', 'tool', 'dataset'
+	Name      string                 `db:"name"`
+	Metadata  JSONBMap               `db:"metadata"`
+	CreatedAt time.Time              `db:"created_at"`
+	UpdatedAt time.Time              `db:"updated_at"`
+}
+
+type Policy struct {
+	ID           uuid.UUID              `db:"id"`
+	PrincipalID  uuid.UUID              `db:"principal_id"`
+	ResourceType string                 `db:"resource_type"`
+	ResourceID   *string                `db:"resource_id"`
+	Permissions  pq.StringArray         `db:"permissions"`
+	Conditions   JSONBMap               `db:"conditions"`
+	CreatedAt    time.Time              `db:"created_at"`
+	UpdatedAt    time.Time              `db:"updated_at"`
+}
+
+type ToolPermission struct {
+	ID        uuid.UUID              `db:"id"`
+	AgentID   uuid.UUID              `db:"agent_id"`
+	ToolName  string                 `db:"tool_name"`
+	Allowed   bool                   `db:"allowed"`
+	Conditions JSONBMap               `db:"conditions"`
+	CreatedAt time.Time              `db:"created_at"`
+	UpdatedAt time.Time              `db:"updated_at"`
+}
+
+type SessionToolPermission struct {
+	ID        uuid.UUID              `db:"id"`
+	SessionID uuid.UUID              `db:"session_id"`
+	ToolName  string                 `db:"tool_name"`
+	Allowed   bool                   `db:"allowed"`
+	Conditions JSONBMap               `db:"conditions"`
+	CreatedAt time.Time              `db:"created_at"`
+}
+
+type DataPermission struct {
+	ID          uuid.UUID              `db:"id"`
+	PrincipalID uuid.UUID              `db:"principal_id"`
+	SchemaName  *string                `db:"schema_name"`
+	TableName   *string                `db:"table_name"`
+	RowFilter   *string                `db:"row_filter"`
+	ColumnMask  JSONBMap               `db:"column_mask"`
+	Permissions pq.StringArray         `db:"permissions"`
+	CreatedAt   time.Time              `db:"created_at"`
+	UpdatedAt   time.Time              `db:"updated_at"`
+}
+
+type AuditLog struct {
+	ID          int64                  `db:"id"`
+	Timestamp   time.Time              `db:"timestamp"`
+	PrincipalID *uuid.UUID             `db:"principal_id"`
+	APIKeyID    *uuid.UUID             `db:"api_key_id"`
+	AgentID     *uuid.UUID             `db:"agent_id"`
+	SessionID   *uuid.UUID             `db:"session_id"`
+	Action      string                 `db:"action"`
+	ResourceType string                `db:"resource_type"`
+	ResourceID  *string                `db:"resource_id"`
+	InputsHash  *string                `db:"inputs_hash"`
+	OutputsHash *string                `db:"outputs_hash"`
+	Inputs      JSONBMap               `db:"inputs"`
+	Outputs     JSONBMap               `db:"outputs"`
+	Metadata    JSONBMap               `db:"metadata"`
+	CreatedAt   time.Time              `db:"created_at"`
+}
+
+type ExecutionSnapshot struct {
+	ID              uuid.UUID              `db:"id"`
+	SessionID       uuid.UUID              `db:"session_id"`
+	AgentID         uuid.UUID              `db:"agent_id"`
+	UserMessage     string                 `db:"user_message"`
+	ExecutionState  JSONBMap               `db:"execution_state"`
+	DeterministicMode bool                 `db:"deterministic_mode"`
+	CreatedAt       time.Time              `db:"created_at"`
 }

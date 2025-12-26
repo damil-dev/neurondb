@@ -72,12 +72,36 @@ elif [ -n "${CONFIG_PATH}" ]; then
     log_warn "Config file specified but not found: ${CONFIG_PATH}"
 fi
 
-# Check if migrations directory exists
+# Check if migrations need to be run
+MIGRATIONS_DIR=""
 if [ -d "/app/migrations" ]; then
-    MIGRATION_COUNT=$(find /app/migrations -name "*.sql" | wc -l)
-    log_info "Found ${MIGRATION_COUNT} migration file(s)"
+    MIGRATIONS_DIR="/app/migrations"
+elif [ -d "/usr/share/neuronagent/migrations" ]; then
+    MIGRATIONS_DIR="/usr/share/neuronagent/migrations"
+fi
+
+if [ -n "$MIGRATIONS_DIR" ]; then
+    MIGRATION_COUNT=$(find "$MIGRATIONS_DIR" -name "*.sql" | wc -l)
+    log_info "Found ${MIGRATION_COUNT} migration file(s) in ${MIGRATIONS_DIR}"
+    
+    # Check if NeuronAgent schema is already set up (idempotency check)
+    if command -v psql >/dev/null 2>&1; then
+        # Build connection string
+        if [ -n "${DB_PASSWORD}" ]; then
+            export PGPASSWORD="${DB_PASSWORD}"
+        fi
+        CONN_STR="postgresql://${DB_USER:-neurondb}:${DB_PASSWORD:-neurondb}@${DB_HOST:-localhost}:${DB_PORT:-5432}/${DB_NAME:-neurondb}"
+        
+        SCHEMA_EXISTS=$(psql "$CONN_STR" -tAc "SELECT 1 FROM information_schema.tables WHERE table_schema = 'neurondb_agent' AND table_name = 'agents'" 2>/dev/null || echo "0")
+        
+        if [ "$SCHEMA_EXISTS" = "1" ]; then
+            log_info "NeuronAgent schema already exists, skipping migrations (already initialized by NeuronDB)"
+        else
+            log_info "NeuronAgent schema not found, migrations may need to be run manually if not auto-initialized"
+        fi
+    fi
 else
-    log_warn "Migrations directory not found: /app/migrations"
+    log_warn "Migrations directory not found in /app/migrations or /usr/share/neuronagent/migrations"
 fi
 
 # Log startup information

@@ -1,0 +1,60 @@
+/*-------------------------------------------------------------------------
+ *
+ * context.go
+ *    Context helper functions for API handlers
+ *
+ * Provides functions to extract API keys, principals, and other context values.
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronAgent/internal/api/context.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
+package api
+
+import (
+	"context"
+
+	"github.com/neurondb/NeuronAgent/internal/db"
+)
+
+/* GetAPIKeyFromContext gets the API key from context */
+func GetAPIKeyFromContext(ctx context.Context) (*db.APIKey, bool) {
+	apiKey, ok := ctx.Value(apiKeyContextKey).(*db.APIKey)
+	return apiKey, ok
+}
+
+/* GetPrincipalFromContext gets the principal from context */
+func GetPrincipalFromContext(ctx context.Context) (*db.Principal, bool) {
+	principal, ok := ctx.Value(principalContextKey).(*db.Principal)
+	return principal, ok
+}
+
+/* MustGetAPIKeyFromContext gets the API key from context or panics */
+func MustGetAPIKeyFromContext(ctx context.Context) *db.APIKey {
+	apiKey, ok := GetAPIKeyFromContext(ctx)
+	if !ok {
+		panic("API key not found in context")
+	}
+	return apiKey
+}
+
+/* MustGetPrincipalFromContext gets the principal from context or panics */
+func MustGetPrincipalFromContext(ctx context.Context) *db.Principal {
+	principal, ok := GetPrincipalFromContext(ctx)
+	if !ok {
+		panic("Principal not found in context")
+	}
+	return principal
+}
+
+/* GetAuthFromContext gets both API key and principal from context */
+func GetAuthFromContext(ctx context.Context) (*db.APIKey, *db.Principal) {
+	apiKey, _ := GetAPIKeyFromContext(ctx)
+	principal, _ := GetPrincipalFromContext(ctx)
+	return apiKey, principal
+}
+

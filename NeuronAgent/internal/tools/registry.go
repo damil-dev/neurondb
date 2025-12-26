@@ -17,25 +17,31 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
+	"github.com/google/uuid"
+	"github.com/neurondb/NeuronAgent/internal/agent"
+	"github.com/neurondb/NeuronAgent/internal/auth"
 	"github.com/neurondb/NeuronAgent/internal/db"
 	"github.com/neurondb/NeuronAgent/pkg/neurondb"
 )
 
 /* Registry manages tool registration and execution */
 type Registry struct {
-	queries  *db.Queries
-	db       *db.DB
-	handlers map[string]ToolHandler
-	mu       sync.RWMutex
+	queries     *db.Queries
+	db          *db.DB
+	handlers    map[string]ToolHandler
+	auditLogger *auth.AuditLogger
+	mu          sync.RWMutex
 }
 
 /* NewRegistry creates a new tool registry */
 func NewRegistry(queries *db.Queries, database *db.DB) *Registry {
 	registry := &Registry{
-		queries:  queries,
-		db:       database,
-		handlers: make(map[string]ToolHandler),
+		queries:     queries,
+		db:          database,
+		handlers:    make(map[string]ToolHandler),
+		auditLogger: auth.NewAuditLogger(queries),
 	}
 
   /* Register built-in handlers */
@@ -142,6 +148,36 @@ func (r *Registry) ExecuteTool(ctx context.Context, tool *db.Tool, args map[stri
 
   /* Execute tool */
 	result, err := handler.Execute(ctx, tool, args)
+	
+  /* Audit log tool execution */
+	agentID, _ := agent.GetAgentIDFromContext(ctx)
+	sessionID, _ := agent.GetSessionIDFromContext(ctx)
+	
+	outputs := make(map[string]interface{})
+	if err == nil {
+		outputs["result"] = result
+		outputs["success"] = true
+	} else {
+		outputs["error"] = err.Error()
+		outputs["success"] = false
+	}
+	
+	/* Log audit trail (async, don't block on errors) */
+	go func() {
+		bgCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		
+		var agentIDPtr, sessionIDPtr *uuid.UUID
+		if agentID != uuid.Nil {
+			agentIDPtr = &agentID
+		}
+		if sessionID != uuid.Nil {
+			sessionIDPtr = &sessionID
+		}
+		
+		_ = r.auditLogger.LogToolCall(bgCtx, nil, nil, agentIDPtr, sessionIDPtr, tool.Name, args, outputs)
+	}()
+	
 	if err != nil {
 		argKeys := make([]string, 0, len(args))
 		for k := range args {
