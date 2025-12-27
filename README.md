@@ -1,13 +1,15 @@
-# NeuronDB Ecosystem
+# NeuronDB: PostgreSQL AI Ecosystem
 
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16%2C17%2C18-blue.svg)](https://www.postgresql.org/)
 [![License](https://img.shields.io/badge/License-Proprietary-red.svg)](LICENSE)
 [![Documentation](https://img.shields.io/badge/docs-latest-brightgreen.svg)](https://www.neurondb.ai/docs)
 [![Website](https://img.shields.io/badge/website-www.neurondb.ai-blue.svg)](https://www.neurondb.ai/)
 
+> **Transform PostgreSQL into an AI-powered database.** Vector search, machine learning, and agent runtime - all native to PostgreSQL. Four integrated components work together to build complete AI applications.
+>
 > **📚 For comprehensive documentation, tutorials, API references, and best practices, visit [https://www.neurondb.ai/docs](https://www.neurondb.ai/docs)**
 
-PostgreSQL extension with vector search, machine learning algorithms, and agent runtime capabilities. Three components operate independently while sharing the same database instance.
+PostgreSQL AI extension with vector search, machine learning algorithms, and agent runtime capabilities. Four components operate independently while sharing the same database instance.
 
 ## Table of Contents
 
@@ -16,6 +18,7 @@ PostgreSQL extension with vector search, machine learning algorithms, and agent 
   - [NeuronDB](#neurondb)
   - [NeuronAgent](#neuronagent)
   - [NeuronMCP](#neuronmcp)
+  - [NeuronDesktop](#neurondesktop)
 - [Quick Start](#quick-start)
 - [Installation](#installation)
 - [Configuration](#configuration)
@@ -35,9 +38,15 @@ PostgreSQL extension with vector search, machine learning algorithms, and agent 
   <img src="neurondb.png" alt="NeuronDB Logo" width="400">
 </div>
 
-NeuronDB provides vector search and machine learning within PostgreSQL. NeuronAgent adds REST API and WebSocket support for agent applications. NeuronMCP exposes NeuronDB through the Model Context Protocol for MCP-compatible clients.
+NeuronDB transforms PostgreSQL into an AI-powered database with native vector search, machine learning algorithms, and agent runtime capabilities. The ecosystem consists of four integrated components that work together seamlessly.
 
-Components connect via database connection strings. Each service configures independently. Services operate without requiring others to run.
+**Core Components:**
+- **NeuronDB** - PostgreSQL extension providing vector search and machine learning within the database
+- **NeuronAgent** - REST API and WebSocket runtime for AI agent applications
+- **NeuronMCP** - Model Context Protocol server for MCP-compatible clients (Claude Desktop, etc.)
+- **NeuronDesktop** - Unified web interface for managing and interacting with all components
+
+Components connect via database connection strings and can operate independently. Services configure separately and work without requiring others to run, providing flexibility in deployment.
 
 ### Component Communication Matrix
 
@@ -49,11 +58,15 @@ Components connect via database connection strings. Each service configures inde
 | **NeuronAgent** | WebSocket | WS | 8080 | Streaming responses |
 | **NeuronMCP** | Database connection | TCP | 5432/5433 | MCP server data access |
 | **NeuronMCP** | Stdio | JSON-RPC 2.0 | - | MCP client communication |
+| **NeuronDesktop** | HTTP/WebSocket | HTTP/WS | 3000/8081 | Web interface |
+| **NeuronDesktop** | Database connection | TCP | 5432/5433 | NeuronDB access |
+| **NeuronDesktop** | HTTP | HTTP | 8080 | NeuronAgent access |
+| **NeuronDesktop** | Stdio | JSON-RPC 2.0 | - | NeuronMCP access |
 
 ### Data Flow
 
-1. **Client Requests** → NeuronAgent (HTTP/WebSocket) or NeuronMCP (stdio)
-2. **Service Processing** → Agent runtime or MCP protocol handler
+1. **Client Requests** → NeuronDesktop (HTTP/WebSocket), NeuronAgent (HTTP/WebSocket), or NeuronMCP (stdio)
+2. **Service Processing** → Web interface, agent runtime, or MCP protocol handler
 3. **Database Queries** → NeuronDB PostgreSQL extension
 4. **Vector/ML Operations** → Extension executes vector search, ML algorithms
 5. **Results Return** → Through service layer back to clients
@@ -61,12 +74,14 @@ Components connect via database connection strings. Each service configures inde
 ### Key Features by Layer
 
 **Client Layer:**
+- Web applications via NeuronDesktop web interface
 - Web applications via REST API
 - Mobile apps via REST/WebSocket
 - CLI tools via REST API
 - MCP clients (Claude Desktop) via stdio
 
 **Service Layer:**
+- NeuronDesktop: Unified web interface, real-time communication, metrics
 - NeuronAgent: Agent state machine, tool execution, memory management
 - NeuronMCP: MCP protocol, tool/resource handlers, middleware
 
@@ -80,6 +95,16 @@ Components connect via database connection strings. Each service configures inde
 - Background workers for async operations
 
 All components access the same PostgreSQL database instance. Services operate independently and can run separately.
+
+## Why NeuronDB?
+
+| Feature | Benefit |
+|---------|---------|
+| **All-in-One Platform** | Vector search, ML algorithms, and agents in one integrated ecosystem |
+| **PostgreSQL Native** | No data movement required, leverage existing SQL skills and infrastructure |
+| **Production Ready** | GPU acceleration, background workers, monitoring, and observability built-in |
+| **Complete Stack** | From database to API to web UI to MCP integration - everything you need |
+| **Enterprise Grade** | Security, scalability, and reliability for production workloads |
 
 ## Components
 
@@ -160,6 +185,36 @@ Model Context Protocol server enabling MCP clients to access NeuronDB through st
 | [Docker Guide](NeuronMCP/docker/README.md) | Container deployment |
 
 **Location:** [`NeuronMCP/`](NeuronMCP/)
+
+### NeuronDesktop
+
+Unified web interface providing a single dashboard for managing and interacting with MCP servers, NeuronDB, and NeuronAgent.
+
+#### Capabilities
+
+| Feature | Description |
+|---------|-------------|
+| Unified Interface | Single dashboard for all NeuronDB ecosystem components |
+| Real-time Communication | WebSocket support for live updates |
+| Secure Authentication | API key-based authentication with rate limiting |
+| Professional UI | Modern, responsive design with smooth animations |
+| Comprehensive Logging | Request/response logging with detailed analytics |
+| Metrics & Monitoring | Built-in metrics collection and health checks |
+| MCP Integration | Full MCP server integration and testing |
+| Agent Management | Create and manage AI agents through the UI |
+
+#### Documentation
+
+| Document | Description |
+|----------|-------------|
+| [Component README](NeuronDesktop/README.md) | Overview and features |
+| [API Reference](NeuronDesktop/docs/API.md) | Complete API documentation |
+| [Deployment Guide](NeuronDesktop/docs/DEPLOYMENT.md) | Production deployment |
+| [Integration Guide](NeuronDesktop/docs/INTEGRATION.md) | Component integration |
+| [NeuronAgent Usage](NeuronDesktop/docs/NEURONAGENT_USAGE.md) | Using NeuronAgent in NeuronDesktop |
+| [NeuronMCP Setup](NeuronDesktop/docs/NEURONMCP_SETUP.md) | MCP server setup |
+
+**Location:** [`NeuronDesktop/`](NeuronDesktop/)
 
 ## Quick Start
 
@@ -1014,6 +1069,7 @@ See [LICENSE](LICENSE) file for complete license terms.
 | [NeuronDB](NeuronDB/README.md) | PostgreSQL extension documentation |
 | [NeuronAgent](NeuronAgent/README.md) | Agent runtime documentation |
 | [NeuronMCP](NeuronMCP/README.md) | MCP server documentation |
+| [NeuronDesktop](NeuronDesktop/README.md) | Web interface documentation |
 
 ### Docker Links
 
@@ -1022,6 +1078,7 @@ See [LICENSE](LICENSE) file for complete license terms.
 | [NeuronDB Docker](NeuronDB/docker/README.md) | Container deployment |
 | [NeuronAgent Docker](NeuronAgent/docker/README.md) | Container deployment |
 | [NeuronMCP Docker](NeuronMCP/docker/README.md) | Container deployment |
+| [NeuronDesktop](NeuronDesktop/README.md) | Container deployment |
 
 ### Feature Links
 
