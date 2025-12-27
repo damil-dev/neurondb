@@ -1061,7 +1061,7 @@ neurondb_build_training_sql(MLAlgorithm algo, StringInfo sql, const char *table_
 					feature_col_xgb = feature_list;
 				
 				appendStringInfo(sql,
-								 "SELECT train_xgboost_classifier(%s, %s, %s, %d, %d, %.6f)",
+								 "SELECT train_xgboost_classifier(%s::text, %s::text, %s::text, %d, %d, %.6f::double precision)",
 								 neurondb_quote_literal_cstr(table_name),
 								 neurondb_quote_literal_cstr(feature_col_xgb),
 								 neurondb_quote_literal_or_null(target_column),
@@ -1079,7 +1079,7 @@ neurondb_build_training_sql(MLAlgorithm algo, StringInfo sql, const char *table_
 				neurondb_parse_hyperparams_int(hyperparams, "depth", &depth, 6);
 				neurondb_parse_hyperparams_float8(hyperparams, "learning_rate", &learning_rate_cb, 0.03);
 				appendStringInfo(sql,
-								 "SELECT train_catboost_classifier(%s, %s, %s, %d, %.6f, %d)",
+								 "SELECT train_catboost_classifier(%s::text, %s::text, %s::text, %d, %.6f::double precision, %d)",
 								 neurondb_quote_literal_cstr(table_name),
 								 neurondb_quote_literal_cstr(feature_list),
 								 neurondb_quote_literal_or_null(target_column),
@@ -1097,7 +1097,7 @@ neurondb_build_training_sql(MLAlgorithm algo, StringInfo sql, const char *table_
 				neurondb_parse_hyperparams_int(hyperparams, "num_leaves", &num_leaves_lgb, 31);
 				neurondb_parse_hyperparams_float8(hyperparams, "learning_rate", &learning_rate_lgb, 0.1);
 				appendStringInfo(sql,
-								 "SELECT train_lightgbm_classifier(%s, %s, %s, %d, %d, %.6f)",
+								 "SELECT train_lightgbm_classifier(%s::text, %s::text, %s::text, %d, %d, %.6f::double precision)",
 								 neurondb_quote_literal_cstr(table_name),
 								 neurondb_quote_literal_cstr(feature_list),
 								 neurondb_quote_literal_or_null(target_column),
@@ -1292,9 +1292,7 @@ neurondb_prepare_feature_list(ArrayType * feature_columns_array, StringInfo feat
  * Returns "classification", "regression", "clustering", or
  * "dimensionality_reduction" based on algorithm type.
  */
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-function"
-static const char *
+static const char * __attribute__((unused))
 neurondb_get_model_type(const char *algorithm)
 {
 	MLAlgorithm algo;
@@ -1339,7 +1337,6 @@ neurondb_get_model_type(const char *algorithm)
 			return "classification";
 	}
 }
-#pragma GCC diagnostic pop
 
 /* ----------
  * neurondb_train
@@ -4177,10 +4174,6 @@ neurondb_evaluate(PG_FUNCTION_ARGS)
 	Jsonb *result = NULL;
 	NdbSpiSession *spi_session = NULL;
 
-	/* Suppress shadow warnings from nested PG_TRY blocks */
-	_Pragma("GCC diagnostic push")
-		_Pragma("GCC diagnostic ignored \"-Wshadow\"");
-
 	if (PG_NARGS() != 4)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
@@ -4641,10 +4634,7 @@ neurondb_evaluate(PG_FUNCTION_ARGS)
 		 */
 		MemoryContextSwitchTo(oldcontext);
 
-		/* Suppress shadow warnings from nested PG_TRY blocks */
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wshadow"
-#pragma GCC diagnostic ignored "-Wshadow=compatible-local"
+		/* Safely copy error data, handling errors in error handling */
 		PG_TRY();
 		{
 			if (CurrentMemoryContext != ErrorContext)
@@ -4662,7 +4652,6 @@ neurondb_evaluate(PG_FUNCTION_ARGS)
 			FlushErrorState();
 		}
 		PG_END_TRY();
-#pragma GCC diagnostic pop
 
 		/* Create safe error message (escape quotes) */
 		if (edata != NULL && edata->message != NULL)

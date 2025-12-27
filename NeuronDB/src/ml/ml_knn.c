@@ -2867,10 +2867,12 @@ evaluate_knn_by_model_id(PG_FUNCTION_ARGS)
 	}
 #endif
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-label"
+#ifndef NDB_GPU_CUDA
+	/* When CUDA is disabled, add dummy reference to label to avoid unused label warning */
+	if (0)
+		goto cpu_evaluation_path;
+#endif
 cpu_evaluation_path:
-#pragma GCC diagnostic pop
 
 	{
 		float *cpu_h_features = NULL;

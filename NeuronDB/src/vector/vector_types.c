@@ -494,8 +494,10 @@ sparsevec_in(PG_FUNCTION_ARGS)
 	
 	if (*ptr == '/')
 	{
+		int32		specified_dim;
+
 		ptr++;
-		int32 specified_dim = strtol(ptr, &endptr, 10);
+		specified_dim = strtol(ptr, &endptr, 10);
 		if (ptr != endptr && specified_dim > 0)
 		{
 			/* Use explicitly specified dimension */

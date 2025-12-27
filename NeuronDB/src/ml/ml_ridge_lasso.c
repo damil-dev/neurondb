@@ -6276,15 +6276,6 @@ ridge_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 	size_t		payload_bytes;
 	int			i;
 
-	(void) state;
-	(void) ridge_model;
-	(void) training_backend;
-	(void) gpu_payload;
-	(void) base;
-	(void) hdr;
-	(void) coef_dest;
-	(void) payload_bytes;
-	(void) i;
 
 	if (errstr != NULL)
 		*errstr = NULL;
@@ -6666,9 +6657,6 @@ lasso_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 	size_t		payload_bytes;
 	int			i;
 
-	(void) state;
-	(void) lasso_model;
-	(void) training_backend;
 	(void) gpu_payload;
 	(void) base;
 	(void) hdr;
@@ -6692,7 +6680,6 @@ lasso_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 
 	payload_bytes = sizeof(NdbCudaLassoModelHeader) +
 		sizeof(float) * (size_t) lasso_model->n_features;
-	tmp = NULL;
 	nalloc(tmp, char, VARHDRSZ + payload_bytes);
 	gpu_payload = (bytea *) tmp;
 	NDB_CHECK_ALLOC(gpu_payload, "gpu_payload");

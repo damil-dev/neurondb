@@ -23,8 +23,16 @@ int			neurondb_ivf_probes = 10;
 int			neurondb_ef_construction = 200;
 
 int			neurondb_compute_mode = 0;
-int			neurondb_gpu_backend_type = 0;	/* Default: CUDA (0=CUDA, 1=ROCm,
-											 * 2=Metal) */
+/* Default GPU backend type: set at compile time based on available backend */
+#if defined(NDB_GPU_METAL)
+#define NDB_GPU_BACKEND_TYPE_DEFAULT 2	/* Metal on macOS */
+#elif defined(NDB_GPU_ROCM)
+#define NDB_GPU_BACKEND_TYPE_DEFAULT 1	/* ROCm on AMD */
+#else
+#define NDB_GPU_BACKEND_TYPE_DEFAULT 0	/* CUDA by default */
+#endif
+
+int			neurondb_gpu_backend_type = NDB_GPU_BACKEND_TYPE_DEFAULT;
 int			neurondb_gpu_device = 0;
 int			neurondb_gpu_batch_size = 8192;
 int			neurondb_gpu_streams = 2;
@@ -282,9 +290,9 @@ neurondb_init_all_gucs(void)
 							"GPU backend type",
 							"Selects GPU backend implementation. Only valid when compute_mode is 'gpu' or 'auto'. "
 							"Values: 0 (cuda) - NVIDIA CUDA; 1 (rocm) - AMD ROCm; 2 (metal) - Apple Metal. "
-							"Default is 0 (cuda). Ignored when compute_mode is 'cpu'.",
+							"Default is platform-specific (cuda=0, rocm=1, metal=2). Ignored when compute_mode is 'cpu'.",
 							&neurondb_gpu_backend_type,
-							0,
+							NDB_GPU_BACKEND_TYPE_DEFAULT,
 							0,
 							2,
 							PGC_USERSET,

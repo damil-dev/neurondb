@@ -2245,6 +2245,7 @@ predict_svm_model_id(PG_FUNCTION_ARGS)
  *
  * Helper function to predict a batch of samples using SVM model.
  * Updates confusion matrix.
+ * Currently unused but kept for potential future batch prediction optimization.
  */
 static void
 svm_predict_batch(const SVMModel * model,
@@ -2695,7 +2696,6 @@ evaluate_svm_by_model_id(PG_FUNCTION_ARGS)
 			int			j;
 			float	   *feat_row = NULL;
 			bool		prediction_made = false;
-			char	   *gpu_err = NULL;
 
 			feat_datum = SPI_getbinval(tuple, tupdesc, 1, &feat_null);
 			targ_datum = SPI_getbinval(tuple, tupdesc, 2, &targ_null);
@@ -2757,6 +2757,7 @@ evaluate_svm_by_model_id(PG_FUNCTION_ARGS)
 				/* GPU predict path */
 #ifdef NDB_GPU_CUDA
 				int			predict_rc;
+				char	   *gpu_err = NULL;
 
 				predict_rc = ndb_gpu_svm_predict_double(gpu_payload,
 													   feat_row,
@@ -3254,14 +3255,6 @@ svm_gpu_serialize(const MLGpuModel *model,
 	double *alpha_src = NULL;
 	int			i;
 
-	(void) state;
-	(void) svm_model;
-	(void) unified_payload;
-	(void) base;
-	(void) hdr;
-	(void) sv_src_float;
-	(void) alpha_src;
-	(void) i;
 
 	if (errstr != NULL)
 		*errstr = NULL;

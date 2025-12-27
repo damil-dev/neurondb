@@ -428,7 +428,6 @@ Datum
 reset_vector_config(PG_FUNCTION_ARGS)
 {
 	const		NeuronDBConfigOpt *opt;
-	int			reset_count = 0;
 
 	for (opt = neuron_config_catalog; opt && opt->name; opt++)
 	{
@@ -441,7 +440,6 @@ reset_vector_config(PG_FUNCTION_ARGS)
 								opt->default_value,
 								PGC_USERSET,
 								PGC_S_SESSION);
-				reset_count++;
 			}
 			PG_CATCH();
 			{
@@ -451,7 +449,6 @@ reset_vector_config(PG_FUNCTION_ARGS)
 			PG_END_TRY();
 		}
 	}
-
 
 	PG_RETURN_BOOL(true);
 }

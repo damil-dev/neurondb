@@ -236,7 +236,6 @@ detect_outliers_zscore(PG_FUNCTION_ARGS)
 		double		mad;		/* Median Absolute Deviation */
 		double *sorted_distances = NULL;
 		double *abs_deviations = NULL;
-		int			num_outliers;
 
 		/* Compute median distance */
 		nalloc(sorted_distances, double, nvec);
@@ -266,17 +265,13 @@ detect_outliers_zscore(PG_FUNCTION_ARGS)
 		}
 
 		/* Modified Z-score: M_i = 0.6745 * (x_i - median) / MAD */
-		num_outliers = 0;
 		for (i = 0; i < nvec; i++)
 		{
 			double		modified_z =
 				0.6745 * fabs(distances[i] - median_dist) / mad;
 
 			outliers[i] = (modified_z > threshold);
-			if (outliers[i])
-				num_outliers++;
 		}
-
 
 		nfree(sorted_distances);
 		nfree(abs_deviations);
@@ -292,7 +287,6 @@ detect_outliers_zscore(PG_FUNCTION_ARGS)
 		double *sorted_distances = NULL;
 		int			q1_idx,
 					q3_idx;
-		int			num_outliers;
 
 		nalloc(sorted_distances, double, nvec);
 		memcpy(sorted_distances, distances, sizeof(double) * nvec);
@@ -309,15 +303,11 @@ detect_outliers_zscore(PG_FUNCTION_ARGS)
 		lower_bound = q1 - threshold * iqr;
 		upper_bound = q3 + threshold * iqr;
 
-		num_outliers = 0;
 		for (i = 0; i < nvec; i++)
 		{
 			outliers[i] = (distances[i] < lower_bound
 						   || distances[i] > upper_bound);
-			if (outliers[i])
-				num_outliers++;
 		}
-
 
 		nfree(sorted_distances);
 	}

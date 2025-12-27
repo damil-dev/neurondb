@@ -140,6 +140,24 @@ static RFModel *rf_model_deserialize(const bytea * data, uint8 * training_backen
 static void rf_free_deserialized_model(RFModel *model);
 static bool rf_load_model_from_catalog(int32 model_id, RFModel **out);
 static bool rf_metadata_is_gpu(Jsonb * metadata);
+/*
+ * Helper function to safely free GPU train result
+ * Extracted to avoid shadow warnings from nested PG_TRY blocks
+ */
+static void
+rf_safe_free_gpu_result(MLGpuTrainResult *gpu_result)
+{
+	PG_TRY();
+	{
+		ndb_gpu_free_train_result(gpu_result);
+	}
+	PG_CATCH();
+	{
+		/* If cleanup fails, just flush the error and continue */
+		FlushErrorState();
+	}
+	PG_END_TRY();
+}
 static bool rf_try_gpu_predict_catalog(int32 model_id,
 									   const Vector *feature_vec,
 									   double *result_out);
@@ -1538,8 +1556,6 @@ train_random_forest_classifier(PG_FUNCTION_ARGS)
 				PG_END_TRY();
 			}
 
-			#pragma GCC diagnostic push
-			#pragma GCC diagnostic ignored "-Wshadow=compatible-local"
 			PG_TRY();
 			{
 				if (ndb_gpu_try_train_model("random_forest",
@@ -1623,27 +1639,12 @@ train_random_forest_classifier(PG_FUNCTION_ARGS)
 			PG_CATCH();
 			{
 				/* Clean up gpu_result if it was partially initialized */
-				/* Use PG_TRY to catch any errors during cleanup */
-				/* Suppress shadow warnings from nested PG_TRY blocks */
-				#pragma GCC diagnostic push
-				#pragma GCC diagnostic ignored "-Wshadow=compatible-local"
-				PG_TRY();
-				{
-					ndb_gpu_free_train_result(&gpu_result);
-				}
-				PG_CATCH();
-				{
-					/* If cleanup fails, just flush the error and continue */
-					FlushErrorState();
-				}
-				PG_END_TRY();
-				#pragma GCC diagnostic pop
+				rf_safe_free_gpu_result(&gpu_result);
 				FlushErrorState();
 				/* Re-throw to allow fallback to CPU */
 				PG_RE_THROW();
 			}
 			PG_END_TRY();
-			#pragma GCC diagnostic pop
 
 			/*
 			 * Don't free gpu_err - it's allocated by GPU function using
@@ -1657,20 +1658,7 @@ train_random_forest_classifier(PG_FUNCTION_ARGS)
 			}
 
 			/* Clean up gpu_result if training failed (returned false) */
-			/* Use PG_TRY to catch any errors during cleanup */
-			#pragma GCC diagnostic push
-			#pragma GCC diagnostic ignored "-Wshadow=compatible-local"
-			PG_TRY();
-			{
-				ndb_gpu_free_train_result(&gpu_result);
-			}
-			PG_CATCH();
-			{
-				/* If cleanup fails, just flush the error and continue */
-				FlushErrorState();
-			}
-			PG_END_TRY();
-			#pragma GCC diagnostic pop
+			rf_safe_free_gpu_result(&gpu_result);
 
 			if (gpu_hyperparams != NULL)
 			{
@@ -4353,6 +4341,7 @@ evaluate_random_forest(PG_FUNCTION_ARGS)
  *
  * Helper function to predict a batch of samples using Random Forest model.
  * Returns predictions array (double*) and updates confusion matrix.
+ * Currently unused but kept for potential future batch prediction optimization.
  */
 static void
 rf_predict_batch(const RFModel *model,
@@ -5014,7 +5003,7 @@ evaluate_random_forest_by_model_id(PG_FUNCTION_ARGS)
 						if (gpu_err)
 							nfree(gpu_err);
 						/* Skip the row-by-row loop */
-						goto metrics_calculated;
+						/* Fall through to metrics calculation */
 					}
 				}
 				else
@@ -5381,8 +5370,6 @@ evaluate_random_forest_by_model_id(PG_FUNCTION_ARGS)
 			nfree(feat_row);
 		}
 
-
-metrics_calculated:
 		/* Calculate metrics from confusion matrix (same for both CPU and GPU) */
 		/* Note: If GPU batch evaluation succeeded, it jumps here with metrics already set */
 		/* Check if metrics need to be calculated from confusion matrix */

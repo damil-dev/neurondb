@@ -1058,9 +1058,7 @@ xgboost_gpu_release_state(XGBoostGpuModelState *state)
 	nfree(state);
 }
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-function"
-static bytea *
+static bytea * __attribute__((unused))
 xgboost_model_serialize_to_bytea(int n_estimators, int max_depth, float learning_rate, int n_features, const char *objective, uint8 training_backend)
 {
 	StringInfoData buf;
@@ -1098,7 +1096,6 @@ xgboost_model_serialize_to_bytea(int n_estimators, int max_depth, float learning
 
 	return result;
 }
-#pragma GCC diagnostic pop
 
 static int
 xgboost_model_deserialize_from_bytea(const bytea *data, int *n_estimators_out, int *max_depth_out, float *learning_rate_out, int *n_features_out, char *objective_out, int obj_max, uint8 * training_backend_out)

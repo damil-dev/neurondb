@@ -72,6 +72,75 @@ static bool rf_cache_initialized = false;
 
 static void rf_gpu_cache_init(void);
 static void rf_gpu_cache_cleanup(int code, Datum arg);
+/*
+ * Helper function to safely extract numeric value from JSONB datum
+ * Extracted to avoid shadow warnings from nested PG_TRY blocks
+ */
+static int32
+gpu_rf_safe_extract_n_trees(Datum n_trees_datum, int32 default_value)
+{
+	Datum		extract_numeric_datum;
+	Numeric		extract_num;
+	int32		result = default_value;
+
+	PG_TRY();
+	{
+		extract_numeric_datum = DirectFunctionCall1(jsonb_numeric, n_trees_datum);
+		if (DatumGetPointer(extract_numeric_datum) != NULL)
+		{
+			extract_num = DatumGetNumeric(extract_numeric_datum);
+			result = DatumGetInt32(
+					 DirectFunctionCall1(numeric_int4,
+										 NumericGetDatum(extract_num)));
+			if (result <= 0)
+				result = default_value;
+			if (result > 10000)
+				result = 10000;
+		}
+	}
+	PG_CATCH();
+	{
+		FlushErrorState();
+		result = default_value;
+	}
+	PG_END_TRY();
+
+	return result;
+}
+
+/*
+ * Helper function to safely parse n_trees from hyperparameters JSONB
+ * Extracted to avoid shadow warnings from nested PG_TRY blocks
+ */
+static int32
+gpu_rf_safe_parse_n_trees(Jsonb *hyperparams, int32 default_value)
+{
+	Datum		parse_n_trees_datum;
+	int32		result = default_value;
+
+	if (hyperparams == NULL)
+		return default_value;
+
+	PG_TRY();
+	{
+		parse_n_trees_datum = DirectFunctionCall2(
+												  jsonb_object_field,
+												  JsonbPGetDatum(hyperparams),
+												  CStringGetTextDatum("n_trees"));
+		if (DatumGetPointer(parse_n_trees_datum) != NULL)
+		{
+			result = gpu_rf_safe_extract_n_trees(parse_n_trees_datum, default_value);
+		}
+	}
+	PG_CATCH();
+	{
+		FlushErrorState();
+		result = default_value;
+	}
+	PG_END_TRY();
+
+	return result;
+}
 
 /* Hash function for model_data bytea */
 static uint32
@@ -342,9 +411,6 @@ ndb_cuda_rf_train(const float *features,
 	/* Note: hyperparameters may be NULL or corrupted JSONB, so we wrap all JSONB operations in error handling */
 	if (hyperparams != NULL)
 	{
-		Datum		n_trees_datum;
-		Datum		numeric_datum;
-		Numeric		num;
 		char	   *hyperparams_text = NULL;
 		bool		parse_success = false;
 
@@ -369,50 +435,7 @@ ndb_cuda_rf_train(const float *features,
 		/* Only try to parse if jsonb_out succeeded */
 		if (!parse_success)
 		{
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wshadow=compatible-local"
-			PG_TRY();
-			{
-				n_trees_datum = DirectFunctionCall2(
-													jsonb_object_field,
-													JsonbPGetDatum(hyperparams),
-													CStringGetTextDatum("n_trees"));
-				if (DatumGetPointer(n_trees_datum) != NULL)
-				{
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wshadow=compatible-local"
-					PG_TRY();
-					{
-						numeric_datum = DirectFunctionCall1(
-														jsonb_numeric, n_trees_datum);
-						if (DatumGetPointer(numeric_datum) != NULL)
-						{
-							num = DatumGetNumeric(numeric_datum);
-							n_trees = DatumGetInt32(
-													DirectFunctionCall1(numeric_int4,
-																		NumericGetDatum(num)));
-							if (n_trees <= 0)
-								n_trees = default_n_trees;
-							if (n_trees > 10000)
-								n_trees = 10000;
-						}
-					}
-					PG_CATCH();
-					{
-						FlushErrorState();
-						n_trees = default_n_trees;
-					}
-					PG_END_TRY();
-#pragma GCC diagnostic pop
-				}
-			}
-			PG_CATCH();
-			{
-				FlushErrorState();
-				n_trees = default_n_trees;
-			}
-			PG_END_TRY();
-#pragma GCC diagnostic pop
+			n_trees = gpu_rf_safe_parse_n_trees(hyperparams, default_n_trees);
 		}
 	}
 	else

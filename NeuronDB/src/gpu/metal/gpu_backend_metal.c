@@ -167,6 +167,7 @@ metal_backend_init_impl(void)
 
 	/* Try to initialize Metal */
 	ok = metal_backend_init();
+	
 	if (!ok)
 	{
 		/* Initialization failed - try to get diagnostic info */
@@ -180,7 +181,9 @@ metal_backend_init_impl(void)
 				 "but device is detectable. "
 				 "This may indicate a Metal framework issue in PostgreSQL context "
 				 "(device creation or command queue creation failed). "
-				 "Falling back to CPU.");
+				 "Device: %s. "
+				 "Falling back to CPU.",
+				 device_name ? device_name : "unknown");
 		}
 		else
 		{
@@ -188,6 +191,7 @@ metal_backend_init_impl(void)
 				 "neurondb: Metal backend initialization failed "
 				 "(MTLCreateSystemDefaultDevice() returned nil). "
 				 "Metal is not available in this process context. "
+				 "This is expected for PostgreSQL running as a background daemon on macOS. "
 				 "Falling back to CPU.");
 		}
 		return false;
@@ -7277,7 +7281,17 @@ ndb_metal_shutdown(void)
 static int
 ndb_metal_is_available(void)
 {
-	return metal_backend_is_available_impl() ? 1 : 0;
+	/*
+	 * On macOS, Metal framework is always available if we're compiled with Metal support.
+	 * Don't call MTLCreateSystemDefaultDevice() here because:
+	 * 1. It may fail when PostgreSQL runs as a daemon (sandboxed process)
+	 * 2. This is just an availability check, not initialization
+	 * 3. CUDA's is_available() doesn't initialize either - it just checks device count
+	 *
+	 * Return true to indicate Metal backend is present. Actual device access
+	 * will be validated during metal_backend_init().
+	 */
+	return 1;
 }
 
 static int
