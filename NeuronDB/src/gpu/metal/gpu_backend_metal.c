@@ -3321,7 +3321,7 @@ ndb_metal_svm_pack(const struct SVMModel *model,
 		metrics_json = DatumGetJsonbP(DirectFunctionCall1(
 														  jsonb_in,
 														  CStringGetTextDatum(buf.data)));
-		nfree(buf.data);
+		pfree(buf.data);
 		*metrics = metrics_json;
 	}
 
@@ -4620,7 +4620,7 @@ ndb_metal_dt_pack(const struct DTModel *model,
 		metrics_json = DatumGetJsonbP(DirectFunctionCall1(
 														  jsonb_in,
 														  CStringGetTextDatum(buf.data)));
-		nfree(buf.data);
+		pfree(buf.data);
 		*metrics = metrics_json;
 	}
 
@@ -4784,7 +4784,7 @@ ndb_metal_ridge_pack(const struct RidgeModel *model,
 		metrics_json = DatumGetJsonbP(DirectFunctionCall1(
 														  jsonb_in,
 														  CStringGetTextDatum(buf.data)));
-		nfree(buf.data);
+		pfree(buf.data);
 		*metrics = metrics_json;
 	}
 
@@ -5215,7 +5215,7 @@ ndb_metal_lasso_pack(const struct LassoModel *model,
 		metrics_json = DatumGetJsonbP(DirectFunctionCall1(
 														  jsonb_in,
 														  CStringGetTextDatum(buf.data)));
-		nfree(buf.data);
+		pfree(buf.data);
 		*metrics = metrics_json;
 	}
 
@@ -5608,7 +5608,7 @@ ndb_metal_nb_pack(const struct GaussianNBModel *model,
 		metrics_json = DatumGetJsonbP(DirectFunctionCall1(
 														  jsonb_in,
 														  CStringGetTextDatum(buf.data)));
-		nfree(buf.data);
+		pfree(buf.data);
 		*metrics = metrics_json;
 	}
 
@@ -5984,7 +5984,7 @@ ndb_metal_gmm_pack(const struct GMMModel *model,
 		metrics_json = DatumGetJsonbP(DirectFunctionCall1(
 														  jsonb_in,
 														  CStringGetTextDatum(buf.data)));
-		nfree(buf.data);
+		pfree(buf.data);
 		*metrics = metrics_json;
 	}
 
@@ -6457,7 +6457,7 @@ ndb_metal_knn_pack(const struct KNNModel *model,
 		metrics_json = DatumGetJsonbP(DirectFunctionCall1(
 														  jsonb_in,
 														  CStringGetTextDatum(buf.data)));
-		nfree(buf.data);
+		pfree(buf.data);
 		*metrics = metrics_json;
 	}
 
@@ -6866,7 +6866,7 @@ ndb_metal_xgboost_train(const float *features,
 		metrics_json = DatumGetJsonbP(DirectFunctionCall1(
 														  jsonb_in,
 														  CStringGetTextDatum(buf.data)));
-		nfree(buf.data);
+		pfree(buf.data);
 		*metrics = metrics_json;
 	}
 
@@ -7093,7 +7093,7 @@ ndb_metal_catboost_train(const float *features,
 		metrics_json = DatumGetJsonbP(DirectFunctionCall1(
 														  jsonb_in,
 														  CStringGetTextDatum(buf.data)));
-		nfree(buf.data);
+		pfree(buf.data);
 		*metrics = metrics_json;
 	}
 

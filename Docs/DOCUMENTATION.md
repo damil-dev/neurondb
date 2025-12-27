@@ -88,7 +88,16 @@ This repository contains local documentation files for quick reference. For the 
 
 ### API References
 - [SQL API Reference](NeuronDB/docs/sql-api.md) - Function documentation
+- [Function Stability Policy](NeuronDB/docs/function-stability.md) - API stability classifications
+- [Deprecation Policy](NeuronDB/docs/deprecation-policy.md) - Deprecation and removal process
+- [API Snapshots](NeuronDB/docs/api-snapshots/README.md) - Versioned API references
 - [NeuronAgent API](NeuronAgent/docs/API.md) - REST API reference
+- [NeuronAgent OpenAPI Spec](NeuronAgent/openapi/openapi.yaml) - OpenAPI 3.0 specification
+- [NeuronMCP Tool Catalog](NeuronMCP/docs/tool-resource-catalog.md) - Complete tool and resource catalog
+- [NeuronMCP Examples](NeuronMCP/docs/examples/) - Example clients and transcripts
+
+### Security
+- [Security Policy](SECURITY.md) - Security policy, responsible disclosure, supported versions, dependency scanning, signed releases
 
 ## Documentation Structure
 

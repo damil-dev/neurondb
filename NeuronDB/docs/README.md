@@ -104,6 +104,13 @@ NeuronDB is a PostgreSQL extension that brings native vector types, approximate 
 - **[Configuration](configuration.md)** - Essential configuration options
 - **[Troubleshooting](troubleshooting.md)** - Common issues and solutions
 
+## API Contract & Policies
+
+- **[SQL API Reference](sql-api.md)** - Complete function reference
+- **[Function Stability Policy](function-stability.md)** - API stability classifications (stable, experimental, internal)
+- **[Deprecation Policy](deprecation-policy.md)** - Deprecation and removal process
+- **[API Snapshots](api-snapshots/README.md)** - Versioned API reference snapshots per release
+
 ---
 
 ## Requirements

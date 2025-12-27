@@ -14,13 +14,116 @@ Thank you for your interest in contributing to NeuronDB!
 
 ## Code Standards
 
-### C Code
+### Code Style Enforcement
+
+All code must conform to the style guidelines enforced by automated tools. Code that doesn't pass style checks will be rejected.
+
+#### C Code (NeuronDB Extension)
+
 - **Style**: 100% PostgreSQL C coding standards
-- **Comments**: Only C-style `/* */` comments
-- **Variables**: Declared at start of function (C89/C99 compliance)
-- **Formatting**: Tabs for indentation (PostgreSQL standard)
-- **Naming**: Prefix all functions with `neurondb_`
-- **Headers**: Include copyright and file description
+- **Formatting Tool**: `pgindent` (PostgreSQL's official formatter)
+- **Check Tool**: `pgident` (identifier style checker)
+
+**Formatting:**
+```bash
+# Format all C files
+cd NeuronDB
+./scripts/run_pgindent.sh
+
+# Check formatting without modifying files
+./scripts/run_pgindent.sh --check
+
+# Show diff of formatting changes
+./scripts/run_pgindent.sh --diff
+```
+
+**Style Rules:**
+- Use tabs for indentation (PostgreSQL standard)
+- Only C-style `/* */` comments (no `//` comments)
+- Variables declared at start of function (C89/C99 compliance)
+- Prefix all functions with `neurondb_`
+- Include copyright and file description in headers
+- Maximum line length: 80-90 characters
+
+**CI Enforcement:**
+- Formatting is checked automatically in CI
+- PRs with formatting violations will fail CI checks
+
+#### Go Code (NeuronAgent, NeuronMCP)
+
+- **Formatting Tool**: `gofmt` (standard Go formatter)
+- **Linting Tool**: `golangci-lint` (recommended)
+
+**Formatting:**
+```bash
+# Format all Go files
+go fmt ./...
+
+# Or use gofmt directly
+gofmt -w .
+```
+
+**Linting:**
+```bash
+# Install golangci-lint (if not installed)
+go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+
+# Run linter
+golangci-lint run ./...
+```
+
+**Style Rules:**
+- Follow standard Go formatting (`gofmt`)
+- Use `golint` guidelines for naming and structure
+- Maximum line length: 120 characters (Go standard)
+- Prefer explicit error handling
+- Use meaningful variable names
+
+**CI Enforcement:**
+- Formatting and linting checked automatically in CI
+- PRs with violations will fail CI checks
+
+#### TypeScript/JavaScript Code (NeuronMCP, NeuronDesktop)
+
+- **Formatting Tool**: `prettier` (recommended) or `eslint --fix`
+- **Linting Tool**: `eslint`
+
+**Formatting:**
+```bash
+# Using prettier
+npm run format
+
+# Using eslint
+npm run lint -- --fix
+```
+
+**Linting:**
+```bash
+# Run linter
+npm run lint
+
+# Fix auto-fixable issues
+npm run lint -- --fix
+```
+
+**Style Rules:**
+- Follow ESLint configuration
+- Use 2 spaces for indentation (JavaScript/TypeScript standard)
+- Maximum line length: 100 characters
+- Prefer `const` over `let`, avoid `var`
+- Use meaningful variable and function names
+
+**CI Enforcement:**
+- Formatting and linting checked automatically in CI
+- PRs with violations will fail CI checks
+
+### Summary Table
+
+| Language | Formatting Tool | Linting Tool | Max Line Length | Indentation |
+|----------|----------------|--------------|-----------------|-------------|
+| C | `pgindent` | `pgident` | 80-90 | Tabs |
+| Go | `gofmt` | `golangci-lint` | 120 | Tabs |
+| TypeScript/JS | `prettier`/`eslint` | `eslint` | 100 | 2 spaces |
 
 ### Build Requirements
 - **Zero warnings**: Code must compile with `-Wall -Wextra` clean
@@ -36,11 +139,95 @@ Thank you for your interest in contributing to NeuronDB!
 
 ## Pull Request Process
 
-1. Update documentation if needed
-2. Add/update tests for new features
-3. Ensure all tests pass
-4. Update CHANGELOG.md
-5. Request review from maintainers
+Before submitting a pull request, ensure you've completed all items in the PR checklist below.
+
+### PR Checklist
+
+Use this checklist when creating your pull request. All items must be completed:
+
+#### Pre-Submission Checklist
+
+- [ ] **Code Style**
+  - [ ] C code formatted with `pgindent` (if applicable)
+  - [ ] Go code formatted with `gofmt` (if applicable)
+  - [ ] TypeScript/JavaScript code formatted with `prettier`/`eslint` (if applicable)
+  - [ ] All linting checks pass locally
+  - [ ] No style warnings or errors
+
+- [ ] **Testing**
+  - [ ] All existing tests pass (`make installcheck` for NeuronDB, `go test ./...` for Go code)
+  - [ ] New tests added for new features
+  - [ ] Tests updated for modified features
+  - [ ] Edge cases and error conditions tested
+  - [ ] Integration tests pass (if applicable)
+
+- [ ] **Documentation**
+  - [ ] Code comments added/updated for public APIs
+  - [ ] User-facing documentation updated (README, docs/)
+  - [ ] API documentation updated (if applicable)
+  - [ ] Changelog updated (CHANGELOG.md or release notes)
+  - [ ] Examples updated (if applicable)
+
+- [ ] **Version Management**
+  - [ ] Version numbers updated (if adding new features or breaking changes)
+  - [ ] Version bump follows semantic versioning
+  - [ ] Migration guides added for breaking changes
+
+- [ ] **Build & CI**
+  - [ ] Code compiles without warnings/errors
+  - [ ] All CI checks pass (formatting, linting, tests)
+  - [ ] Cross-platform compatibility verified (if applicable)
+
+#### PR Description Template
+
+Use this template for your PR description:
+
+```markdown
+## Description
+Brief description of the changes
+
+## Type of Change
+- [ ] Bug fix
+- [ ] New feature
+- [ ] Breaking change
+- [ ] Documentation update
+- [ ] Performance improvement
+- [ ] Refactoring
+
+## Related Issues
+Fixes #(issue number)
+Related to #(issue number)
+
+## Testing
+Describe how you tested the changes
+
+## Checklist
+- [ ] Code style checks pass
+- [ ] Tests pass
+- [ ] Documentation updated
+- [ ] Version updated (if applicable)
+- [ ] CI checks pass
+```
+
+### Review Process
+
+1. **Automated Checks**: CI runs automatically on all PRs
+   - Code formatting validation
+   - Linting checks
+   - Test suite execution
+   - Build verification
+
+2. **Code Review**: At least one maintainer must approve
+   - Code quality and correctness
+   - Adherence to coding standards
+   - Test coverage
+   - Documentation completeness
+
+3. **Merge Requirements**:
+   - All CI checks must pass
+   - At least one approval from code owners
+   - No merge conflicts
+   - All checklist items completed
 
 ## Code Review
 

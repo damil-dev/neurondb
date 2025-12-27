@@ -6,6 +6,23 @@
 http://localhost:8080/api/v1
 ```
 
+## OpenAPI Specification
+
+For machine-readable API specification, see the [OpenAPI 3.0 specification](../openapi/openapi.yaml).
+
+The OpenAPI spec includes:
+- Complete endpoint definitions
+- Request/response schemas
+- Authentication requirements
+- Error responses
+- Example requests and responses
+
+You can use the OpenAPI spec to:
+- Generate client libraries
+- View interactive API documentation (Swagger UI, Redoc)
+- Validate API requests/responses
+- Import into API testing tools
+
 ## Authentication
 
 All API requests require authentication using an API key in the Authorization header:

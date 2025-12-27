@@ -1,86 +1,60 @@
 ## Description
-
-<!-- Provide a clear and concise description of what this PR does. Include which component(s) are affected (NeuronDB, NeuronAgent, NeuronMCP, NeuronDesktop). -->
+<!-- Provide a brief description of the changes in this PR -->
 
 ## Type of Change
-
-<!-- Mark the relevant option with an 'x' -->
-
-- [ ] Bug fix (non-breaking change which fixes an issue)
-- [ ] New feature (non-breaking change which adds functionality)
-- [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
+<!-- Select all that apply -->
+- [ ] Bug fix
+- [ ] New feature
+- [ ] Breaking change
 - [ ] Documentation update
 - [ ] Performance improvement
-- [ ] Code refactoring
-- [ ] Test addition/update
-- [ ] Build/CI changes
-
-## Component(s) Affected
-
-<!-- Mark the relevant component(s) with an 'x' -->
-
-- [ ] NeuronDB (PostgreSQL extension)
-- [ ] NeuronAgent (Agent runtime)
-- [ ] NeuronMCP (MCP server)
-- [ ] NeuronDesktop (Web interface)
-- [ ] Documentation
-- [ ] Build/Packaging
-- [ ] Other: <!-- Please specify -->
-
-## Testing
-
-<!-- Describe the tests you ran and their results. Include test commands if applicable. -->
-
-- [ ] Unit tests pass
-- [ ] Integration tests pass
-- [ ] Manual testing completed
-- [ ] Tested on Linux
-- [ ] Tested on macOS
-- [ ] Tested with PostgreSQL 15
-- [ ] Tested with PostgreSQL 16
-- [ ] Tested with PostgreSQL 17
-- [ ] Tested with PostgreSQL 18
-
-### Test Commands
-```bash
-# Add test commands here
-```
-
-## Checklist
-
-<!-- Mark completed items with an 'x' -->
-
-- [ ] My code follows the project's code style guidelines
-- [ ] I have performed a self-review of my own code
-- [ ] I have commented my code, particularly in hard-to-understand areas
-- [ ] I have updated the documentation accordingly
-- [ ] My changes generate no new warnings
-- [ ] I have added tests that prove my fix is effective or that my feature works
-- [ ] New and existing unit tests pass locally with my changes
-- [ ] Any dependent changes have been merged and published
-- [ ] Commit messages follow the project's commit message guidelines (e.g., "NeuronDB: ...", "NeuronAgent: ...")
-- [ ] Code compiles with `-Wall -Wextra` with zero warnings (for C code)
+- [ ] Refactoring
 
 ## Related Issues
-
-<!-- Link related issues using "Closes #123" or "Fixes #123" or "Related to #123" -->
-
-Closes #
+<!-- Link to related issues -->
+Fixes #
 Related to #
 
-## Screenshots (if applicable)
+## Testing
+<!-- Describe how you tested the changes -->
+- [ ] All existing tests pass
+- [ ] New tests added for new features
+- [ ] Tests updated for modified features
+- [ ] Edge cases tested
+- [ ] Integration tests pass (if applicable)
 
-<!-- Add screenshots to help explain your changes, especially for UI changes -->
+## Code Style & Quality
+<!-- Verify code style compliance -->
+- [ ] C code formatted with `pgindent` (if applicable)
+- [ ] Go code formatted with `gofmt` (if applicable)
+- [ ] TypeScript/JavaScript code formatted with `prettier`/`eslint` (if applicable)
+- [ ] All linting checks pass
+- [ ] No compiler warnings or errors
+- [ ] Code follows project style guidelines
 
-## Additional Context
+## Documentation
+<!-- Verify documentation is updated -->
+- [ ] Code comments added/updated for public APIs
+- [ ] User-facing documentation updated (README, docs/)
+- [ ] API documentation updated (if applicable)
+- [ ] Changelog updated
+- [ ] Examples updated (if applicable)
 
-<!-- Add any other context about the PR here. Include any breaking changes, migration steps, or important notes. -->
+## Version Management
+<!-- Update versions if needed -->
+- [ ] Version numbers updated (if applicable)
+- [ ] Version bump follows semantic versioning
+- [ ] Migration guides added for breaking changes (if applicable)
 
-## Breaking Changes
+## Checklist
+<!-- Complete all relevant items -->
+- [ ] Code style checks pass locally
+- [ ] All tests pass locally
+- [ ] Documentation updated
+- [ ] Version updated (if applicable)
+- [ ] CI checks pass
+- [ ] Reviewed own code before submission
+- [ ] Changes are backward compatible (or migration path provided)
 
-<!-- If this PR introduces breaking changes, describe them here and provide migration instructions -->
-
-## Performance Impact
-
-<!-- If this PR affects performance, describe the impact (positive or negative) -->
-
+## Additional Notes
+<!-- Any additional information for reviewers -->
