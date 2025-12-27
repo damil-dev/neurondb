@@ -57,10 +57,12 @@
 /* Include the header that defines NdbCudaLrModelHeader */
 #include "neurondb_cuda_lr.h"
 
+#if defined(NDB_GPU_CUDA) || defined(NDB_GPU_METAL)
 #ifdef NDB_GPU_CUDA
 #include "neurondb_cuda_runtime.h"
 #include <cublas_v2.h>
 extern cublasHandle_t ndb_cuda_get_cublas_handle(void);
+#endif
 #endif
 
 #include "utils/builtins.h"
@@ -580,7 +582,7 @@ train_logistic_regression(PG_FUNCTION_ARGS)
 				{
 					if (gpu_result.spec.model_data != NULL)
 					{
-#ifdef NDB_GPU_CUDA
+#if defined(NDB_GPU_CUDA) || defined(NDB_GPU_METAL)
 						MLCatalogModelSpec spec;
 						LRModel		lr_model;
 
@@ -824,24 +826,66 @@ train_logistic_regression(PG_FUNCTION_ARGS)
 
 				if (!gpu_training_succeeded)
 				{
-					/* GPU training failed - cleanup and fall back to CPU */
+					/* GPU training failed - check if GPU mode is forced */
+					if (NDB_REQUIRE_GPU())
+					{
+						/* Strict GPU mode: error out, no CPU fallback */
+						char *error_msg = NULL;
+
+						if (gpu_err != NULL)
+						{
+							error_msg = pstrdup(gpu_err);
+							nfree(gpu_err);
+							gpu_err = NULL;
+						}
+						else
+						{
+							error_msg = pstrdup("GPU training failed");
+						}
+
+						/* Clean up GPU result if it was partially initialized */
+						if (gpu_result.spec.model_data != NULL || gpu_result.spec.metrics != NULL ||
+							gpu_result.spec.algorithm != NULL || gpu_result.spec.training_table != NULL ||
+							gpu_result.spec.training_column != NULL || gpu_result.payload != NULL)
+						{
+							ndb_gpu_free_train_result(&gpu_result);
+						}
+						else
+						{
+							/* Just zero it to be safe */
+							memset(&gpu_result, 0, sizeof(MLGpuTrainResult));
+						}
+
+						if (gpu_hyperparams != NULL)
+						{
+							nfree(gpu_hyperparams);
+							gpu_hyperparams = NULL;
+						}
+
+						lr_dataset_free(&dataset);
+						if (hyperbuf.data != NULL)
+							nfree(hyperbuf.data);
+						nfree(tbl_str);
+						nfree(feat_str);
+						nfree(targ_str);
+
+						ereport(ERROR,
+								(errcode(ERRCODE_INTERNAL_ERROR),
+								 errmsg("neurondb: logistic_regression: GPU training failed - GPU mode requires GPU to be available"),
+								 errdetail("%s", error_msg),
+								 errhint("Check GPU availability and model compatibility, or set compute_mode='auto' for automatic CPU fallback.")));
+					}
+
+					/* AUTO/CPU mode: cleanup and fall back to CPU */
 					if (gpu_err != NULL)
 					{
 						nfree(gpu_err);
 						gpu_err = NULL;
 					}
-					else
-					{
-					}
 
 					/*
 					 * Only call ndb_gpu_free_train_result if gpu_result was
 					 * actually used (has non-NULL pointers)
-					 */
-
-					/*
-					 * Since we took the forced CPU path, gpu_result should be
-					 * zeroed, but check to be safe
 					 */
 					if (gpu_result.spec.model_data != NULL || gpu_result.spec.metrics != NULL ||
 						gpu_result.spec.algorithm != NULL || gpu_result.spec.training_table != NULL ||
@@ -3106,7 +3150,7 @@ lr_gpu_serialize(const MLGpuModel *model,
 	if (state->model_blob == NULL)
 		return false;
 
-#ifdef NDB_GPU_CUDA
+#if defined(NDB_GPU_CUDA) || defined(NDB_GPU_METAL)
 	/* Convert GPU format to unified format */
 	{
 		LRModel		lr_model;
@@ -3235,7 +3279,7 @@ lr_gpu_deserialize(MLGpuModel *model,
 				   const Jsonb * metadata,
 				   char **errstr)
 {
-#ifdef NDB_GPU_CUDA
+#if defined(NDB_GPU_CUDA) || defined(NDB_GPU_METAL)
 	LRGpuModelState *state = NULL;
 	LRModel    *lr_model = NULL;
 	uint8		training_backend;
@@ -3253,7 +3297,7 @@ lr_gpu_deserialize(MLGpuModel *model,
 	if (model == NULL || payload == NULL)
 		return false;
 
-#ifdef NDB_GPU_CUDA
+#if defined(NDB_GPU_CUDA) || defined(NDB_GPU_METAL)
 	lr_model = NULL;
 	training_backend = 0;
 	gpu_payload = NULL;
@@ -3436,7 +3480,7 @@ lr_model_deserialize(const bytea * data, uint8 * training_backend_out)
 		/* If first 4 bytes look like a reasonable feature_dim and size is small, might be GPU format */
 		if (first_value > 0 && first_value <= 10000)
 		{
-#ifdef NDB_GPU_CUDA
+#if defined(NDB_GPU_CUDA) || defined(NDB_GPU_METAL)
 			size_t		gpu_header_size = sizeof(NdbCudaLrModelHeader);
 			size_t		expected_gpu_size = gpu_header_size + sizeof(float) * (size_t) first_value;
 			
@@ -3634,7 +3678,7 @@ lr_try_gpu_predict_catalog(int32 model_id,
 	 * prediction
 	 */
 
-#ifdef NDB_GPU_CUDA
+#if defined(NDB_GPU_CUDA) || defined(NDB_GPU_METAL)
 	/* Convert unified format to GPU format for prediction */
 	{
 		LRModel *lr_model = NULL;

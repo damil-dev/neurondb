@@ -48,7 +48,7 @@
 #include "neurondb_constants.h"
 #include "neurondb_json.h"
 #include "ml_decision_tree_internal.h"
-#ifdef NDB_GPU_CUDA
+#if defined(NDB_GPU_CUDA) || defined(NDB_GPU_METAL)
 #include "neurondb_cuda_lr.h"
 #include "ml_logistic_regression_internal.h"
 #include "libpq/pqformat.h"
@@ -2250,7 +2250,7 @@ neurondb_train(PG_FUNCTION_ARGS)
 				/* Convert GPU format to unified format for logistic_regression */
 				if (algorithm != NULL && strcmp(algorithm, "logistic_regression") == 0)
 				{
-#ifdef NDB_GPU_CUDA
+#if defined(NDB_GPU_CUDA) || defined(NDB_GPU_METAL)
 					bytea *unified_model_data = NULL;
 					bytea *gpu_model_data = spec.model_data;
 					

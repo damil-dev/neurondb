@@ -38,11 +38,13 @@
 #include "neurondb_guc.h"
 #include "ml_gpu_naive_bayes.h"
 
+#if defined(NDB_GPU_CUDA) || defined(NDB_GPU_METAL)
 #ifdef NDB_GPU_CUDA
 #include "neurondb_cuda_runtime.h"
 #include <cublas_v2.h>
 extern cublasHandle_t ndb_cuda_get_cublas_handle(void);
 /* ndb_cuda_nb_evaluate_batch is declared in neurondb_cuda_nb.h */
+#endif
 #endif
 
 #include <math.h>

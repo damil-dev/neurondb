@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 
 	"github.com/gorilla/mux"
 	"github.com/neurondb/NeuronDesktop/api/internal/auth"
@@ -37,21 +38,24 @@ func (h *ProfileHandlers) ListProfiles(w http.ResponseWriter, r *http.Request) {
 	
 	// If no profiles exist, create a default profile
 	if len(profiles) == 0 {
+		// Auto-detect NeuronMCP binary and create default config
+		mcpConfig := utils.GetDefaultMCPConfig()
+		
+		// Get default NeuronDB DSN from environment
+		neurondbDSN := utils.GetDefaultNeuronDBDSN()
+		
+		// Get agent endpoint from environment if available
+		agentEndpoint := os.Getenv("NEURONAGENT_ENDPOINT")
+		agentAPIKey := os.Getenv("NEURONAGENT_API_KEY")
+		
 		defaultProfile := &db.Profile{
-			UserID:      userID,
-			Name:        "Default",
-			NeuronDBDSN: "postgresql://nbduser@localhost:5432/neurondb",
-			MCPConfig: map[string]interface{}{
-				"command": "/Users/pgedge/pge/neurondb/NeuronMCP/bin/neurondb-mcp",
-				"args":    []string{},
-				"env": map[string]interface{}{
-					"NEURONDB_HOST":     "localhost",
-					"NEURONDB_PORT":     "5432",
-					"NEURONDB_DATABASE": "neurondb",
-					"NEURONDB_USER":     "nbduser",
-				},
-			},
-			IsDefault: true,
+			UserID:        userID,
+			Name:          "Default",
+			NeuronDBDSN:   neurondbDSN,
+			MCPConfig:     mcpConfig,
+			AgentEndpoint: agentEndpoint,
+			AgentAPIKey:   agentAPIKey,
+			IsDefault:     true,
 		}
 		
 		if err := h.queries.CreateProfile(r.Context(), defaultProfile); err != nil {

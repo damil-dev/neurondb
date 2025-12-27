@@ -126,42 +126,50 @@ UPDATE profiles SET is_default = false WHERE is_default = true;
 -- Step 7: Create Default Profile
 -- ============================================================================
 \echo 'Step 7: Creating default profile...'
+\echo 'Note: For automatic profile setup with NeuronMCP detection, use:'
+\echo '      ./scripts/setup_neurondesktop.sh'
+\echo ''
 
--- Delete any existing "Default" profile to start fresh
-DELETE FROM profiles WHERE name = 'Default' AND user_id = 'nbduser';
-
--- Insert default profile with complete configuration
-INSERT INTO profiles (
-    id,
-    name,
-    user_id,
-    mcp_config,
-    neurondb_dsn,
-    is_default,
-    created_at,
-    updated_at
-) VALUES (
-    uuid_generate_v4(),
-    'Default',
-    'nbduser',
-    '{
-        "command": "/Users/pgedge/pge/neurondb/NeuronMCP/bin/neurondb-mcp",
-        "args": [],
-        "env": {
-            "NEURONDB_HOST": "localhost",
-            "NEURONDB_PORT": "5432",
-            "NEURONDB_DATABASE": "neurondb",
-            "NEURONDB_USER": "nbduser"
-        }
-    }'::jsonb,
-    'postgresql://nbduser@localhost:5432/neurondb',
-    true,
-    NOW(),
-    NOW()
-)
-RETURNING id, name, user_id, is_default;
+-- Get current user for default profile
+DO $$
+DECLARE
+    current_user_name TEXT;
+    default_user_id TEXT := 'default';
+BEGIN
+    -- Try to get current user, fallback to 'default'
+    SELECT current_user INTO current_user_name;
+    IF current_user_name IS NOT NULL THEN
+        default_user_id := current_user_name;
+    END IF;
+    
+    -- Delete any existing "Default" profile to start fresh
+    DELETE FROM profiles WHERE name = 'Default' AND user_id = default_user_id;
+    
+    -- Insert default profile with basic configuration
+    -- Note: MCP config should be set via setup script for auto-detection
+    INSERT INTO profiles (
+        id,
+        name,
+        user_id,
+        neurondb_dsn,
+        is_default,
+        created_at,
+        updated_at
+    ) VALUES (
+        uuid_generate_v4(),
+        'Default',
+        default_user_id,
+        format('postgresql://%s@localhost:5432/neurondb', current_user_name),
+        true,
+        NOW(),
+        NOW()
+    );
+    
+    RAISE NOTICE 'Default profile created for user: %', default_user_id;
+END $$;
 
 \echo '✓ Default profile created'
+\echo '  Note: Run ./scripts/setup_default_profile.sh to configure NeuronMCP'
 \echo ''
 
 -- ============================================================================

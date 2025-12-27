@@ -46,10 +46,12 @@
 #include "neurondb_constants.h"
 #include "neurondb_guc.h"
 
+#if defined(NDB_GPU_CUDA) || defined(NDB_GPU_METAL)
 #ifdef NDB_GPU_CUDA
 #include "neurondb_cuda_runtime.h"
 #include <cublas_v2.h>
 extern cublasHandle_t ndb_cuda_get_cublas_handle(void);
+#endif
 #endif
 
 #include <math.h>
