@@ -251,6 +251,10 @@ NeuronMCP provides comprehensive tools covering all NeuronDB capabilities:
 
 See [TOOLS_REFERENCE.md](TOOLS_REFERENCE.md) for complete parameter lists and examples.
 
+For a comprehensive catalog of all tools and resources, see [docs/tool-resource-catalog.md](docs/tool-resource-catalog.md).
+
+For example client usage and interaction transcripts, see [docs/examples/](docs/examples/).
+
 ### Dataset Loading Examples
 
 The `load_dataset` tool supports multiple data sources with automatic schema detection, embedding generation, and index creation:

@@ -1195,7 +1195,9 @@ catboost_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 		model->backend_state = NULL;
 	}
 
-	state = (CatBoostGpuModelState *) palloc0(sizeof(CatBoostGpuModelState));
+	state = NULL;
+	nalloc(state, CatBoostGpuModelState, 1);
+	memset(state, 0, sizeof(CatBoostGpuModelState));
 	state->model_blob = payload;
 	state->feature_dim = spec->feature_dim;
 	state->n_samples = spec->sample_count;
@@ -1388,7 +1390,9 @@ catboost_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 		}
 	}
 
-	state = (CatBoostGpuModelState *) palloc0(sizeof(CatBoostGpuModelState));
+	state = NULL;
+	nalloc(state, CatBoostGpuModelState, 1);
+	memset(state, 0, sizeof(CatBoostGpuModelState));
 	state->model_blob = payload_copy;
 	state->feature_dim = n_features;
 	state->n_samples = 0;

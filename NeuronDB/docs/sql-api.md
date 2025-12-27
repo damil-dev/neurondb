@@ -232,9 +232,21 @@ Get project information and statistics.
 - `vector_cosine_ops` - Cosine distance operations
 - `vector_ip_ops` - Inner product operations
 
+## API Contract and Policies
+
+NeuronDB follows strict API contract policies to ensure stability and predictability:
+
+- **[Function Stability Policy](function-stability.md)** - Classification of functions as stable, experimental, or internal
+- **[Deprecation Policy](deprecation-policy.md)** - How functions are deprecated and removed
+- **[API Snapshots](api-snapshots/README.md)** - Versioned API reference snapshots for each release
+
+All functions in this reference are classified according to their stability level. Functions marked as `stable` are safe for production use and maintain backward compatibility.
+
 ## Next Steps
 
-- [Indexing and Distance Metrics](indexing.md): Learn about index tuning and distance functions
-- [GPU Acceleration](gpu.md): Configure and optimize GPU operations
-- [ML Analytics](analytics.md): Use clustering and outlier detection
+- [Indexing and Distance Metrics](vector-search/indexing.md): Learn about index tuning and distance functions
+- [GPU Acceleration](gpu/cuda-support.md): Configure and optimize GPU operations
+- [ML Algorithms](ml-algorithms/clustering.md): Use clustering and outlier detection
 - [Configuration Guide](configuration.md): Detailed GUC reference
+- [Function Stability Policy](function-stability.md): Understand API stability classifications
+- [Deprecation Policy](deprecation-policy.md): Learn how deprecations are handled

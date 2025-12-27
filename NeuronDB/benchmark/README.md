@@ -1,310 +1,175 @@
-# NeuronDB Benchmark Suite
+# NeuronDB pgbench Benchmark Suite
 
-A modular and extensible benchmark tool for NeuronDB, designed to compare performance against pgvector and other systems.
+This directory contains custom SQL benchmark files for testing NeuronDB performance using `pgbench`.
 
-## Features
+## Available Benchmarks
 
-- **Modular Architecture**: Clean separation of concerns with easy extensibility
-- **Vector Benchmarks**: Comprehensive vector search benchmarking
-- **Fair Comparison**: Same queries, same data, same hardware
-- **Multiple Output Formats**: Console, JSON, CSV
-- **Extensive Metrics**: Latency (p50, p95, p99), throughput, recall, index sizes
-- **Result Validation**: Automatic accuracy checking and ground truth comparison
-- **Summary Statistics**: Geometric mean calculations and speedup ratios
-- **Easy Runner Script**: Convenient shell script with pre-flight checks
+### `vector.sql`
+Benchmarks vector operations including:
+- Distance calculations (L2, cosine, inner product, L1)
+- Vector arithmetic (addition, subtraction, scalar multiplication)
+- Vector normalization and norms
+- Similarity calculations
 
-## Quick Start
+### `embedding.sql`
+Benchmarks embedding generation functions:
+- Single text embedding (`embed_text`, `neurondb_embed`)
+- Batch embedding generation (`embed_text_batch`, `neurondb_embed_batch`)
+- Cached embeddings (`embed_cached`)
+- Embedding dimension checks
+- Consistency tests
 
-### Using the Runner Script (Recommended)
+### `ml.sql`
+Benchmarks machine learning operations:
+- Model prediction
+- Model information lookup
+- Algorithm listing
+- Feature vector operations
+- Model metrics retrieval
 
-The easiest way to run benchmarks is using the provided shell script:
+### `multimodal.sql`
+Benchmarks multimodal embedding operations:
+- CLIP embeddings (text and image)
+- ImageBind embeddings (text, audio, video)
+- Cross-modal distance calculations
+- Multimodal embedding generation
 
-```bash
-# Set your database connection strings
-export NEURONDB_DSN="host=localhost dbname=neurondb user=postgres"
-export PGVECTOR_DSN="host=localhost dbname=pgvector user=postgres"  # Optional
-
-# Run benchmark with defaults
-./run_benchmark.sh
-
-# Or customize parameters
-export DIMENSIONS="128,384,768"
-export SIZES="1000,10000,100000"
-export ITERATIONS=200
-./run_benchmark.sh
-```
-
-The script will:
-- Check Python dependencies
-- Verify database connections
-- Ensure extensions are installed
-- Run the benchmark
-- Save results to `./results/`
-
-### Manual Installation
-
-```bash
-pip install -r requirements.txt
-```
+### `gpu.sql`
+Benchmarks GPU-accelerated operations:
+- GPU distance calculations (L2, cosine, inner product)
+- GPU batch operations
+- GPU availability checks
+- GPU vs CPU performance comparison
 
 ## Usage
 
-### Basic Vector Benchmark
+### Prerequisites
+
+1. Ensure NeuronDB extension is installed and enabled:
+```sql
+CREATE EXTENSION IF NOT EXISTS neurondb;
+```
+
+2. For embedding benchmarks, configure your embedding provider (optional):
+```sql
+SET neurondb.llm_provider = 'openai';
+SET neurondb.llm_api_key = 'your-api-key';
+```
+
+3. For GPU benchmarks, enable GPU mode:
+```sql
+SET neurondb.compute_mode = true;
+```
+
+### Running Benchmarks
+
+#### Basic Usage
 
 ```bash
-python neurondb_bm.py --vector \
-  --neurondb-dsn "host=localhost dbname=neurondb user=postgres"
+# Initialize pgbench (creates test tables)
+pgbench -i -s 10 -d your_database
+
+# Run vector benchmark
+pgbench -f benchmark/vector.sql -c 10 -j 2 -t 1000 -d your_database
+
+# Run embedding benchmark
+pgbench -f benchmark/embedding.sql -c 5 -j 2 -t 500 -d your_database
+
+# Run ML benchmark
+pgbench -f benchmark/ml.sql -c 10 -j 2 -t 1000 -d your_database
+
+# Run multimodal benchmark
+pgbench -f benchmark/multimodal.sql -c 5 -j 2 -t 500 -d your_database
+
+# Run GPU benchmark
+pgbench -f benchmark/gpu.sql -c 10 -j 2 -t 1000 -d your_database
 ```
 
-### Compare with pgvector
+#### Advanced Usage
 
 ```bash
-python neurondb_bm.py --vector \
-  --neurondb-dsn "host=localhost dbname=neurondb user=postgres" \
-  --pgvector-dsn "host=localhost dbname=pgvector user=postgres"
+# Run with custom duration (60 seconds)
+pgbench -f benchmark/vector.sql -c 10 -j 2 -T 60 -d your_database
+
+# Run with progress reporting
+pgbench -f benchmark/vector.sql -c 10 -j 2 -t 1000 -P 5 -d your_database
+
+# Run with logging
+pgbench -f benchmark/vector.sql -c 10 -j 2 -t 1000 -l -d your_database
+
+# Run multiple benchmarks in sequence
+for bench in vector embedding ml multimodal gpu; do
+    echo "Running $bench benchmark..."
+    pgbench -f benchmark/${bench}.sql -c 10 -j 2 -t 1000 -d your_database
+done
 ```
 
-### Custom Configuration
+### Command Line Options
 
-```bash
-python neurondb_bm.py --vector \
-  --dimensions 128,384,768 \
-  --sizes 1000,10000,100000 \
-  --metrics l2,cosine \
-  --k-values 1,10,100 \
-  --iterations 200 \
-  --index-m 16 \
-  --index-ef-construction 200 \
-  --output console,json,csv \
-  --output-file results
+- `-c, --clients=N`: Number of concurrent database clients (default: 1)
+- `-j, --jobs=N`: Number of worker threads (default: 1)
+- `-t, --transactions=N`: Number of transactions each client runs (default: 10)
+- `-T, --time=N`: Duration of benchmark test in seconds
+- `-f, --file=FILENAME`: Read transaction script from file
+- `-P, --progress=N`: Show progress report every N seconds
+- `-l, --log`: Write transaction times to log file
+- `-d, --dbname=DBNAME`: Database name to connect to
+
+### Interpreting Results
+
+pgbench outputs several metrics:
+
+- **TPS (Transactions Per Second)**: Higher is better
+- **Latency**: Average, minimum, maximum transaction time
+- **Stddev**: Standard deviation of transaction times
+
+Example output:
+```
+transaction type: <builtin: TPC-B (sort of)>
+scaling factor: 10
+query mode: simple
+number of clients: 10
+number of threads: 2
+number of transactions per client: 1000
+number of transactions actually processed: 10000/10000
+latency average = 2.345 ms
+latency stddev = 0.567 ms
+tps = 4263.456789 (including connections establishing)
+tps = 4265.123456 (excluding connections establishing)
 ```
 
-### Sequential Scan Comparison
+## Notes
 
-To compare indexed vs sequential scan performance:
+1. **Embedding Benchmarks**: These may be slower as they involve actual embedding generation. Adjust `-t` (transactions) accordingly.
 
-```bash
-python neurondb_bm.py --vector \
-  --neurondb-dsn "host=localhost dbname=neurondb user=postgres" \
-  --no-index \
-  --output all \
-  --output-file sequential_scan_results
-```
+2. **ML Benchmarks**: The `ml.sql` benchmark assumes models exist. For full ML training benchmarks, use separate long-running tests.
 
-## Command-Line Options
+3. **GPU Benchmarks**: Requires GPU support and `neurondb.compute_mode = true`. Results will vary based on GPU availability.
 
-### Benchmark Selection
-- `--vector`: Run vector search benchmarks
-- `--embeddings`: Run embedding benchmarks (future)
-- `--ml`: Run ML benchmarks (future)
+4. **Variable Randomization**: All benchmarks use `\set` with `random()` to generate varied test data, ensuring realistic performance measurements.
 
-### Database Connections
-- `--neurondb-dsn`: NeuronDB connection string (or set `NEURONDB_DSN` env var)
-- `--pgvector-dsn`: pgvector connection string for comparison (or set `PGVECTOR_DSN` env var)
+5. **Error Handling**: Some benchmarks may fail if required models or configurations are missing. This is expected behavior for benchmarking.
 
-### Benchmark Parameters
-- `--dimensions`: Comma-separated vector dimensions (default: 128,384,768,1536)
-- `--sizes`: Comma-separated dataset sizes (default: 1000,10000,100000)
-- `--metrics`: Distance metrics: l2,cosine,inner_product (default: all)
-- `--k-values`: K values for KNN search (default: 1,10,100)
-- `--index` / `--no-index`: Test with/without indexes (default: with index)
-- `--iterations`: Number of query iterations per test (default: 100)
-- `--warmup`: Number of warmup iterations (default: 10)
-- `--index-m`: HNSW M parameter (default: 16)
-- `--index-ef-construction`: HNSW ef_construction parameter (default: 200)
-- `--compare-sequential-scan`: Also benchmark sequential scan for comparison
+## Customization
 
-### Output
-- `--output`: Output formats: console,json,csv,all (default: console)
-- `--output-file`: Output file path for JSON/CSV
+You can customize the benchmarks by:
 
-## Architecture
-
-```
-neurondb_bm.py (main entry point)
-├── modules/
-│   ├── base.py (Base benchmark class)
-│   └── vector.py (Vector benchmarks)
-├── utils/
-│   ├── database.py (DB connection management)
-│   ├── data_generator.py (Synthetic data generation)
-│   ├── metrics.py (Performance metrics)
-│   └── output.py (Results formatting)
-└── config.py (Configuration management)
-```
-
-## Output Metrics
-
-Each benchmark run collects:
-- **Latency**: p50, p95, p99, mean, min, max (in milliseconds)
-- **Throughput**: Queries per second (QPS)
-- **Accuracy**: Recall@K (validated against ground truth)
-- **Index Metrics**: Build time, index size
-- **Table Metrics**: Table size, insertion time
-- **Summary Statistics**: Geometric mean across all scenarios
-- **Speedup Ratios**: Performance comparison between systems
-
-### Result Validation
-
-The benchmark automatically validates results:
-- Computes ground truth using exact distance calculations
-- Compares database results with ground truth
-- Reports recall@K accuracy
-- Warns if distance calculations don't match expected values
-
-## Examples
-
-### Quick Test
-```bash
-python neurondb_bm.py --vector \
-  --dimensions 128 \
-  --sizes 1000 \
-  --iterations 10
-```
-
-### Full Benchmark Suite
-```bash
-python neurondb_bm.py --vector \
-  --dimensions 128,384,768,1536 \
-  --sizes 1000,10000,100000,1000000 \
-  --metrics l2,cosine,inner_product \
-  --k-values 1,10,100 \
-  --iterations 1000 \
-  --output all \
-  --output-file full_benchmark
-```
-
-## Environment Variables
-
-- `NEURONDB_DSN`: Default NeuronDB connection string
-- `PGVECTOR_DSN`: Default pgvector connection string
-
-## Setup Requirements
-
-### Database Setup
-
-1. **PostgreSQL 12+** installed and running
-2. **NeuronDB extension** installed:
-   ```sql
-   CREATE DATABASE neurondb;
-   \c neurondb
-   CREATE EXTENSION neurondb;
-   ```
-
-3. **pgvector extension** (optional, for comparison):
-   ```sql
-   CREATE DATABASE pgvector;
-   \c pgvector
-   CREATE EXTENSION vector;
-   ```
-
-### Python Dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-Required packages:
-- Python 3.8+
-- psycopg2-binary
-- numpy
-- tabulate
+1. Adjusting the random value ranges in `\set` statements
+2. Modifying the test queries to match your use case
+3. Adding additional benchmark scenarios
+4. Changing the model names or parameters
 
 ## Troubleshooting
 
-### Extension Not Found
+- **Connection errors**: Ensure PostgreSQL is running and accessible
+- **Extension errors**: Verify NeuronDB extension is installed: `\dx neurondb`
+- **GPU errors**: Check GPU availability: `SELECT * FROM neurondb_gpu_info();`
+- **Embedding errors**: Verify embedding provider configuration
+- **ML errors**: Ensure models exist before running ML benchmarks
 
-If you see errors about missing extensions:
+## See Also
 
-```bash
-# Check if extension is installed
-psql -d neurondb -c "SELECT * FROM pg_extension WHERE extname = 'neurondb';"
-
-# Install if missing
-psql -d neurondb -c "CREATE EXTENSION neurondb;"
-```
-
-### Connection Errors
-
-Verify your connection string format:
-```bash
-# Test connection
-psql "host=localhost dbname=neurondb user=postgres" -c "SELECT 1;"
-```
-
-### Index Creation Fails
-
-If index creation fails with large datasets:
-- The benchmark automatically retries with smaller parameters
-- You can manually specify smaller index parameters: `--index-m 8 --index-ef-construction 100`
-
-### Low Recall Scores
-
-If recall@K is low:
-- This may indicate index quality issues
-- Try increasing `--index-ef-construction` for better accuracy
-- Check that vectors are properly normalized (benchmark does this automatically)
-
-## Output Format
-
-### Console Output
-
-The console shows:
-- Per-scenario results with key metrics
-- Side-by-side comparison tables (when comparing systems)
-- Summary statistics with geometric means and speedup ratios
-
-### JSON Output
-
-JSON files contain:
-- Complete results for each scenario
-- Summary statistics
-- All raw metrics for further analysis
-
-### CSV Output
-
-CSV files are suitable for:
-- Spreadsheet analysis
-- Plotting with tools like pandas, matplotlib
-- Statistical analysis
-
-## Examples
-
-### Quick Test (Small Dataset)
-
-```bash
-python neurondb_bm.py --vector \
-  --dimensions 128 \
-  --sizes 1000 \
-  --iterations 10 \
-  --neurondb-dsn "host=localhost dbname=neurondb user=postgres"
-```
-
-### Full Benchmark Suite
-
-```bash
-python neurondb_bm.py --vector \
-  --dimensions 128,384,768,1536 \
-  --sizes 1000,10000,100000,1000000 \
-  --metrics l2,cosine,inner_product \
-  --k-values 1,10,100 \
-  --iterations 1000 \
-  --output all \
-  --output-file full_benchmark \
-  --neurondb-dsn "host=localhost dbname=neurondb user=postgres" \
-  --pgvector-dsn "host=localhost dbname=pgvector user=postgres"
-```
-
-### Custom Index Parameters
-
-```bash
-python neurondb_bm.py --vector \
-  --index-m 32 \
-  --index-ef-construction 400 \
-  --neurondb-dsn "host=localhost dbname=neurondb user=postgres"
-```
-
-## License
-
-See main project LICENSE file.
+- [PostgreSQL pgbench documentation](https://www.postgresql.org/docs/current/pgbench.html)
+- [NeuronDB documentation](../docs/)
+- [NeuronDB SQL API reference](../docs/sql-api.md)
 

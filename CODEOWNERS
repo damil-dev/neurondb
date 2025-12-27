@@ -1,0 +1,75 @@
+# Code Owners
+# Each line is a file pattern followed by one or more owners.
+# Owners are automatically requested for review when code matching
+# the pattern is modified.
+#
+# Pattern format: https://docs.github.com/en/github/creating-cloning-and-archiving-repositories/about-code-owners
+#
+# Order is important; the last matching pattern takes precedence.
+
+# Global owners - fallback for unmatched files
+* @neurondb/maintainers
+
+# NeuronDB Extension (C code, PostgreSQL extension)
+/NeuronDB/ @neurondb/neurondb-maintainers
+/NeuronDB/src/ @neurondb/neurondb-maintainers
+/NeuronDB/include/ @neurondb/neurondb-maintainers
+/NeuronDB/sql/ @neurondb/neurondb-maintainers
+/NeuronDB/t/ @neurondb/neurondb-maintainers
+/NeuronDB/tests/ @neurondb/neurondb-maintainers
+/NeuronDB/Makefile @neurondb/neurondb-maintainers
+/NeuronDB/Makefile.* @neurondb/neurondb-maintainers
+/NeuronDB/INSTALL.md @neurondb/neurondb-maintainers
+/NeuronDB/README.md @neurondb/neurondb-maintainers
+
+# NeuronAgent (Go code, REST API)
+/NeuronAgent/ @neurondb/neuronagent-maintainers
+/NeuronAgent/internal/ @neurondb/neuronagent-maintainers
+/NeuronAgent/cmd/ @neurondb/neuronagent-maintainers
+/NeuronAgent/pkg/ @neurondb/neuronagent-maintainers
+/NeuronAgent/docs/API.md @neurondb/neuronagent-maintainers
+/NeuronAgent/openapi/ @neurondb/neuronagent-maintainers
+
+# NeuronMCP (Go code, MCP protocol)
+/NeuronMCP/ @neurondb/neuronmcp-maintainers
+/NeuronMCP/internal/ @neurondb/neuronmcp-maintainers
+/NeuronMCP/cmd/ @neurondb/neuronmcp-maintainers
+/NeuronMCP/pkg/ @neurondb/neuronmcp-maintainers
+/NeuronMCP/src/ @neurondb/neuronmcp-maintainers @neurondb/typescript-maintainers
+/NeuronMCP/docs/ @neurondb/neuronmcp-maintainers
+
+# NeuronDesktop (Go backend, TypeScript frontend)
+/NeuronDesktop/ @neurondb/neurondesktop-maintainers
+/NeuronDesktop/api/ @neurondb/neurondesktop-maintainers @neurondb/go-maintainers
+/NeuronDesktop/frontend/ @neurondb/neurondesktop-maintainers @neurondb/typescript-maintainers
+
+# Documentation
+/docs/ @neurondb/docs-maintainers
+/Docs/ @neurondb/docs-maintainers
+*.md @neurondb/docs-maintainers
+README.md @neurondb/maintainers
+QUICKSTART.md @neurondb/docs-maintainers @neurondb/maintainers
+CONTRIBUTING.md @neurondb/maintainers
+SECURITY.md @neurondb/security-team @neurondb/maintainers
+
+# Configuration and build files
+/docker-compose.yml @neurondb/devops-maintainers @neurondb/maintainers
+/Makefile @neurondb/maintainers
+/.github/ @neurondb/maintainers
+/.github/workflows/ @neurondb/devops-maintainers
+/.github/pull_request_template.md @neurondb/maintainers
+
+# Packaging
+/packaging/ @neurondb/release-maintainers @neurondb/maintainers
+/packaging/deb/ @neurondb/release-maintainers
+/packaging/rpm/ @neurondb/release-maintainers
+
+# Scripts
+/scripts/ @neurondb/maintainers
+/scripts/smoke-test.sh @neurondb/maintainers @neurondb/testing-maintainers
+
+# Root level files
+/LICENSE @neurondb/maintainers
+/CODEOWNERS @neurondb/maintainers
+/.gitignore @neurondb/maintainers
+

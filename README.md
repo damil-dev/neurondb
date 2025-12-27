@@ -218,6 +218,13 @@ Unified web interface providing a single dashboard for managing and interacting 
 
 ## Quick Start
 
+** New to NeuronDB? Start here: [QUICKSTART.md](QUICKSTART.md)**
+
+The quick start guide provides a complete, step-by-step walkthrough to get NeuronDB running in minutes with:
+- Single-command Docker Compose setup
+- Automated smoke tests
+- Uninstall and cleanup instructions
+
 ### Prerequisites
 
 Install these components before starting:
@@ -748,6 +755,12 @@ The official documentation site provides:
 | [Installation Guide](NeuronDB/INSTALL.md) | Build and install instructions | [Installation Guide](https://www.neurondb.ai/docs/installation) |
 | [Docker Guide](NeuronDB/docker/README.md) | Container deployment | [Docker Deployment](https://www.neurondb.ai/docs/docker) |
 | [SQL API Reference](NeuronDB/docs/sql-api.md) | Function documentation | [Complete API Reference](https://www.neurondb.ai/docs/api) |
+| [Function Stability Policy](NeuronDB/docs/function-stability.md) | API stability classifications | - |
+| [Deprecation Policy](NeuronDB/docs/deprecation-policy.md) | Deprecation and removal process | - |
+| [API Snapshots](NeuronDB/docs/api-snapshots/README.md) | Versioned API references | - |
+| [NeuronAgent OpenAPI Spec](NeuronAgent/openapi/openapi.yaml) | OpenAPI 3.0 specification | - |
+| [NeuronMCP Tool Catalog](NeuronMCP/docs/tool-resource-catalog.md) | Complete tool and resource catalog | - |
+| [Security Policy](SECURITY.md) | Security policy, disclosure, and signed releases | - |
 | [Vector Search](NeuronDB/docs/vector-search/) | Indexing and search guide | [Vector Search Guide](https://www.neurondb.ai/docs/vector-search) |
 | [ML Algorithms](NeuronDB/docs/ml-algorithms/) | Machine learning features | [ML Algorithms](https://www.neurondb.ai/docs/ml-algorithms) |
 | [RAG Pipeline](NeuronDB/docs/rag/) | Retrieval-augmented generation | [RAG Pipeline](https://www.neurondb.ai/docs/rag) |
@@ -1058,8 +1071,9 @@ See [LICENSE](LICENSE) file for complete license terms.
 
 | Link | Description |
 |------|-------------|
+| **[Quick Start Guide](QUICKSTART.md)** | **Start here: Complete setup in minutes** |
 | [NeuronDB Installation](NeuronDB/INSTALL.md) | Install NeuronDB extension |
-| [NeuronDB Quick Start](NeuronDB/docs/getting-started/quickstart.md) | Get started quickly |
+| [NeuronDB Quick Start](NeuronDB/docs/getting-started/quickstart.md) | Detailed quick start guide |
 | [Ecosystem Docker Setup](NeuronDB/docker/ECOSYSTEM.md) | Docker deployment guide |
 
 ### Component Links

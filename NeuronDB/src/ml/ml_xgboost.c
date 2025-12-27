@@ -1055,6 +1055,7 @@ xgboost_gpu_release_state(XGBoostGpuModelState *state)
 		nfree(state->model_blob);
 	if (state->metrics != NULL)
 		nfree(state->metrics);
+	/* State itself could be allocated with either palloc or nalloc - use nfree which is safe for both */
 	nfree(state);
 }
 
@@ -1186,7 +1187,9 @@ xgboost_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 		model->backend_state = NULL;
 	}
 
-	state = (XGBoostGpuModelState *) palloc0(sizeof(XGBoostGpuModelState));
+	/* Use nalloc consistently - not palloc */
+	nalloc(state, XGBoostGpuModelState, 1);
+	memset(state, 0, sizeof(XGBoostGpuModelState));
 	state->model_blob = payload;
 	state->feature_dim = spec->feature_dim;
 	state->n_samples = spec->sample_count;
@@ -1412,7 +1415,11 @@ xgboost_gpu_deserialize(MLGpuModel *model, const bytea *payload,
 	}
 
 	if (model->backend_state != NULL)
-		nfree(model->backend_state);
+	{
+		/* Free old state - it may have been allocated with either palloc or nalloc */
+		/* To be safe, use the release function which handles both cases */
+		xgboost_gpu_release_state((XGBoostGpuModelState *) model->backend_state);
+	}
 
 	model->backend_state = state;
 	model->gpu_ready = true;
