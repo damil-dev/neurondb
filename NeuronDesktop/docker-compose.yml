@@ -12,7 +12,7 @@ services:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./api/migrations:/docker-entrypoint-initdb.d
+      - ./api/initial_schema.sql:/docker-entrypoint-initdb.d/initial_schema.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U neurondesk"]
       interval: 10s
@@ -33,6 +33,15 @@ services:
       SERVER_PORT: 8081
       LOG_LEVEL: info
       LOG_FORMAT: json
+      # Optional: Configure NeuronMCP and NeuronAgent
+      # NEURONMCP_BINARY_PATH: /path/to/neurondb-mcp
+      # NEURONDB_HOST: localhost
+      # NEURONDB_PORT: 5432
+      # NEURONDB_DATABASE: neurondb
+      # NEURONDB_USER: neurondb
+      # NEURONDB_PASSWORD: neurondb
+      # NEURONAGENT_ENDPOINT: http://localhost:8080
+      # NEURONAGENT_API_KEY: your-api-key
     ports:
       - "8081:8081"
     depends_on:
@@ -44,6 +53,8 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    # Note: Default profile is automatically created on startup
+    # For full setup with NeuronMCP detection, run ./scripts/setup_neurondesktop.sh before starting
 
   neurondesk-frontend:
     build:
