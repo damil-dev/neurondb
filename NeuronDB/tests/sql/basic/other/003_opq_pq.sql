@@ -21,10 +21,10 @@ SELECT array_length(train_opq_rotation('opq_pq_test'::text, 'vec'::text, 4), 1) 
 
 -- Test PQ codebook training
 -- Returns bytea codebook
-SELECT octet_length(train_pq_codebook('opq_pq_test'::text, 'vec'::text, 4, 256)) AS codebook_size;
+SELECT octet_length(train_pq_codebook('opq_pq_test'::text, 'vec'::text, 4::integer, 256::integer)) AS codebook_size;
 
 -- Test with different parameters
-SELECT octet_length(train_pq_codebook('opq_pq_test'::text, 'vec'::text, 2, 128)) AS codebook_size_2sub;
+SELECT octet_length(train_pq_codebook('opq_pq_test'::text, 'vec'::text, 2::integer, 128::integer)) AS codebook_size_2sub;
 
 -- Verify functions handle edge cases
 DO $$
@@ -39,7 +39,7 @@ BEGIN
 	END IF;
 	
 	-- Test PQ codebook
-	SELECT train_pq_codebook('opq_pq_test'::text, 'vec'::text, 4, 256) INTO codebook;
+	SELECT train_pq_codebook('opq_pq_test'::text, 'vec'::text, 4::integer, 256::integer) INTO codebook;
 	IF codebook IS NULL THEN
 		RAISE EXCEPTION 'train_pq_codebook returned NULL';
 	END IF;

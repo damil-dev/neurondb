@@ -93,7 +93,7 @@ BEGIN
 	
 	-- Perform PCA transformation using reduce_pca
 	-- reduce_pca returns real[][] (array of real arrays)
-	SELECT reduce_pca('pca_data', 'features', 2) INTO pca_result;
+	SELECT reduce_pca('pca_data'::text, 'features'::text, 2) INTO pca_result;
 	
 	-- Validate result
 	IF pca_result IS NULL OR array_length(pca_result, 1) IS NULL THEN
