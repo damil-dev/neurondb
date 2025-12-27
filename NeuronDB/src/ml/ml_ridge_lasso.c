@@ -56,6 +56,7 @@
 #include "utils/lsyscache.h"
 #include "neurondb_guc.h"
 
+#if defined(NDB_GPU_CUDA) || defined(NDB_GPU_METAL)
 #ifdef NDB_GPU_CUDA
 #include "neurondb_cuda_runtime.h"
 #include <cublas_v2.h>
@@ -80,6 +81,7 @@ extern int	ndb_cuda_lasso_evaluate(const bytea * model_data,
 									double *rmse_out,
 									double *r_squared_out,
 									char **errstr);
+#endif
 #endif
 
 #include <math.h>
@@ -1939,6 +1941,9 @@ train_ridge_regression(PG_FUNCTION_ARGS)
 	const char *quoted_target;
 	MLGpuTrainResult gpu_result;
 
+	/* Initialize gpu_result to zero to avoid undefined behavior */
+	memset(&gpu_result, 0, sizeof(MLGpuTrainResult));
+
 	char *gpu_err = NULL;
 	Jsonb *gpu_hyperparams = NULL;
 	StringInfoData hyperbuf = {0};
@@ -2199,7 +2204,7 @@ train_ridge_regression(PG_FUNCTION_ARGS)
 			/* Only proceed with GPU model if training succeeded AND model_data exists */
 			if (gpu_train_result && gpu_result.spec.model_data != NULL)
 			{
-#ifdef NDB_GPU_CUDA
+#if defined(NDB_GPU_CUDA) || defined(NDB_GPU_METAL)
 				MLCatalogModelSpec spec;
 				RidgeModel	ridge_model;
 
@@ -2364,17 +2369,80 @@ train_ridge_regression(PG_FUNCTION_ARGS)
 			}
 			else
 			{
-				/* GPU training failed - log reason and fall back to CPU */
+				/* GPU training failed - check if we're in strict GPU mode */
+				if (NDB_REQUIRE_GPU())
+				{
+					/* Strict GPU mode: error out, no CPU fallback */
+					char *error_msg = NULL;
+
+					if (gpu_err != NULL)
+					{
+						error_msg = pstrdup(gpu_err);
+						nfree(gpu_err);
+						gpu_err = NULL;
+					}
+					else
+					{
+						error_msg = pstrdup("GPU training failed");
+					}
+
+					/* Safely free GPU result if it was partially initialized */
+					if (gpu_result.spec.model_data != NULL || gpu_result.spec.metrics != NULL ||
+						gpu_result.spec.algorithm != NULL || gpu_result.spec.training_table != NULL ||
+						gpu_result.spec.training_column != NULL || gpu_result.payload != NULL)
+					{
+						ndb_gpu_free_train_result(&gpu_result);
+					}
+					else
+					{
+						/* Just zero it to be safe */
+						memset(&gpu_result, 0, sizeof(MLGpuTrainResult));
+					}
+
+					if (gpu_hyperparams != NULL)
+					{
+						nfree(gpu_hyperparams);
+						gpu_hyperparams = NULL;
+					}
+
+					ridge_dataset_free(&dataset);
+					nfree(tbl_str);
+					nfree(feat_str);
+					nfree(targ_str);
+
+					ereport(ERROR,
+							(errcode(ERRCODE_INTERNAL_ERROR),
+							 errmsg("neurondb: train_ridge_regression: GPU training failed - GPU mode requires GPU to be available"),
+							 errdetail("%s", error_msg),
+							 errhint("Check GPU availability and model compatibility, or set compute_mode='auto' for automatic CPU fallback.")));
+				}
+
+				/* AUTO mode: cleanup and fall back to CPU */
 				if (gpu_err != NULL)
 				{
 					nfree(gpu_err);
+					gpu_err = NULL;
+				}
+
+				/* Safely free GPU result if it was partially initialized */
+				if (gpu_result.spec.model_data != NULL || gpu_result.spec.metrics != NULL ||
+					gpu_result.spec.algorithm != NULL || gpu_result.spec.training_table != NULL ||
+					gpu_result.spec.training_column != NULL || gpu_result.payload != NULL)
+				{
+					ndb_gpu_free_train_result(&gpu_result);
 				}
 				else
 				{
+					/* Just zero it to be safe */
+					memset(&gpu_result, 0, sizeof(MLGpuTrainResult));
 				}
+
 				if (gpu_hyperparams != NULL)
+				{
 					nfree(gpu_hyperparams);
-				ndb_gpu_free_train_result(&gpu_result);
+					gpu_hyperparams = NULL;
+				}
+
 				ridge_dataset_free(&dataset);
 			}
 		}
@@ -2998,6 +3066,9 @@ train_lasso_regression(PG_FUNCTION_ARGS)
 	const char *quoted_target;
 	MLGpuTrainResult gpu_result;
 
+	/* Initialize gpu_result to zero to avoid undefined behavior */
+	memset(&gpu_result, 0, sizeof(MLGpuTrainResult));
+
 	char *gpu_err = NULL;
 	Jsonb *gpu_hyperparams = NULL;
 	StringInfoData hyperbuf;
@@ -3246,7 +3317,7 @@ train_lasso_regression(PG_FUNCTION_ARGS)
 			/* Only proceed with GPU model if training succeeded AND model_data exists */
 			if (gpu_train_result && gpu_result.spec.model_data != NULL)
 			{
-#ifdef NDB_GPU_CUDA
+#if defined(NDB_GPU_CUDA) || defined(NDB_GPU_METAL)
 				MLCatalogModelSpec spec;
 				LassoModel	lasso_model;
 
@@ -3496,16 +3567,80 @@ train_lasso_regression(PG_FUNCTION_ARGS)
 			}
 			else
 			{
+				/* GPU training failed - check if we're in strict GPU mode */
+				if (NDB_REQUIRE_GPU())
+				{
+					/* Strict GPU mode: error out, no CPU fallback */
+					char *error_msg = NULL;
+
+					if (gpu_err != NULL)
+					{
+						error_msg = pstrdup(gpu_err);
+						nfree(gpu_err);
+						gpu_err = NULL;
+					}
+					else
+					{
+						error_msg = pstrdup("GPU training failed");
+					}
+
+					/* Safely free GPU result if it was partially initialized */
+					if (gpu_result.spec.model_data != NULL || gpu_result.spec.metrics != NULL ||
+						gpu_result.spec.algorithm != NULL || gpu_result.spec.training_table != NULL ||
+						gpu_result.spec.training_column != NULL || gpu_result.payload != NULL)
+					{
+						ndb_gpu_free_train_result(&gpu_result);
+					}
+					else
+					{
+						/* Just zero it to be safe */
+						memset(&gpu_result, 0, sizeof(MLGpuTrainResult));
+					}
+
+					if (gpu_hyperparams != NULL)
+					{
+						nfree(gpu_hyperparams);
+						gpu_hyperparams = NULL;
+					}
+
+					lasso_dataset_free(&dataset);
+					nfree(tbl_str);
+					nfree(feat_str);
+					nfree(targ_str);
+
+					ereport(ERROR,
+							(errcode(ERRCODE_INTERNAL_ERROR),
+							 errmsg("neurondb: train_lasso_regression: GPU training failed - GPU mode requires GPU to be available"),
+							 errdetail("%s", error_msg),
+							 errhint("Check GPU availability and model compatibility, or set compute_mode='auto' for automatic CPU fallback.")));
+				}
+
+				/* AUTO mode: cleanup and fall back to CPU */
 				if (gpu_err != NULL)
 				{
 					nfree(gpu_err);
+					gpu_err = NULL;
+				}
+
+				/* Safely free GPU result if it was partially initialized */
+				if (gpu_result.spec.model_data != NULL || gpu_result.spec.metrics != NULL ||
+					gpu_result.spec.algorithm != NULL || gpu_result.spec.training_table != NULL ||
+					gpu_result.spec.training_column != NULL || gpu_result.payload != NULL)
+				{
+					ndb_gpu_free_train_result(&gpu_result);
 				}
 				else
 				{
+					/* Just zero it to be safe */
+					memset(&gpu_result, 0, sizeof(MLGpuTrainResult));
 				}
+
 				if (gpu_hyperparams != NULL)
+				{
 					nfree(gpu_hyperparams);
-				ndb_gpu_free_train_result(&gpu_result);
+					gpu_hyperparams = NULL;
+				}
+
 				lasso_dataset_free(&dataset);
 			}
 		}
@@ -4481,7 +4616,7 @@ evaluate_ridge_regression_by_model_id(PG_FUNCTION_ARGS)
 			if (use_gpu_predict)
 			{
 				/* GPU predict path - prediction based on compute mode */
-#ifdef NDB_GPU_CUDA
+#if defined(NDB_GPU_CUDA) || defined(NDB_GPU_METAL)
 				int			predict_rc;
 				char	   *gpu_err = NULL;
 
@@ -5239,7 +5374,7 @@ evaluate_lasso_regression_by_model_id(PG_FUNCTION_ARGS)
 			if (use_gpu_predict)
 			{
 				/* GPU predict path - prediction based on compute mode */
-#ifdef NDB_GPU_CUDA
+#if defined(NDB_GPU_CUDA) || defined(NDB_GPU_METAL)
 				int			predict_rc;
 				char	   *gpu_err = NULL;
 
@@ -6180,7 +6315,7 @@ ridge_gpu_serialize(const MLGpuModel *model, bytea * *payload_out,
 	if (state->model_blob == NULL)
 		return false;
 
-#ifdef NDB_GPU_CUDA
+#if defined(NDB_GPU_CUDA) || defined(NDB_GPU_METAL)
 	base = VARDATA(state->model_blob);
 	hdr = (NdbCudaRidgeModelHeader *) base;
 	coef_src_float = (float *) (base + sizeof(NdbCudaRidgeModelHeader));
@@ -6282,7 +6417,7 @@ ridge_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 	if (model == NULL || payload == NULL)
 		return false;
 
-#ifdef NDB_GPU_CUDA
+#if defined(NDB_GPU_CUDA) || defined(NDB_GPU_METAL)
 	ridge_model = ridge_model_deserialize(payload, &training_backend);
 	if (ridge_model == NULL)
 	{
@@ -6561,7 +6696,7 @@ lasso_gpu_serialize(const MLGpuModel *model, bytea * *payload_out,
 	if (state->model_blob == NULL)
 		return false;
 
-#ifdef NDB_GPU_CUDA
+#if defined(NDB_GPU_CUDA) || defined(NDB_GPU_METAL)
 	base = VARDATA(state->model_blob);
 	hdr = (NdbCudaLassoModelHeader *) base;
 	coef_src_float = (float *) (base + sizeof(NdbCudaLassoModelHeader));
@@ -6669,7 +6804,7 @@ lasso_gpu_deserialize(MLGpuModel *model, const bytea * payload,
 	if (model == NULL || payload == NULL)
 		return false;
 
-#ifdef NDB_GPU_CUDA
+#if defined(NDB_GPU_CUDA) || defined(NDB_GPU_METAL)
 	lasso_model = lasso_model_deserialize(payload, &training_backend);
 	if (lasso_model == NULL)
 	{

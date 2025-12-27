@@ -959,8 +959,19 @@ ndb_gpu_xgboost_train(const float *features,
 
 	if (errstr)
 		*errstr = NULL;
-	if (!active_backend || active_backend->xgboost_train == NULL)
+	if (!active_backend)
+	{
+		if (errstr)
+			*errstr = pstrdup("GPU backend not available");
 		return -1;
+	}
+	if (active_backend->xgboost_train == NULL)
+	{
+		if (errstr)
+			*errstr = psprintf("GPU backend '%s' does not support xgboost_train",
+							   active_backend->name ? active_backend->name : "unknown");
+		return -1;
+	}
 	return active_backend->xgboost_train(features,
 										  labels,
 										  n_samples,
@@ -1022,8 +1033,19 @@ ndb_gpu_catboost_train(const float *features,
 
 	if (errstr)
 		*errstr = NULL;
-	if (!active_backend || active_backend->catboost_train == NULL)
+	if (!active_backend)
+	{
+		if (errstr)
+			*errstr = pstrdup("GPU backend not available");
 		return -1;
+	}
+	if (active_backend->catboost_train == NULL)
+	{
+		if (errstr)
+			*errstr = psprintf("GPU backend '%s' does not support catboost_train",
+							   active_backend->name ? active_backend->name : "unknown");
+		return -1;
+	}
 	return active_backend->catboost_train(features,
 										  labels,
 										  n_samples,

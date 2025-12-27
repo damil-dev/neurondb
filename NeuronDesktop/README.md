@@ -50,6 +50,56 @@ NeuronDesktop is a comprehensive, production-ready web application that provides
 
 ## Quick Start
 
+### Automated Setup (Recommended)
+
+The easiest way to get started is using the automated setup script:
+
+```bash
+# Clone the repository
+git clone <repository-url>
+cd NeuronDesktop
+
+# Set database connection (optional - defaults shown)
+export DB_HOST=localhost
+export DB_PORT=5432
+export DB_NAME=neurondesk
+export DB_USER=neurondesk
+export DB_PASSWORD=neurondesk
+
+# Run automated setup
+./scripts/setup_neurondesktop.sh
+```
+
+This script will:
+1. ✅ Check database connection
+2. ✅ Run database migrations
+3. ✅ Build NeuronMCP binary (if source available)
+4. ✅ Auto-detect NeuronMCP binary location
+5. ✅ Create default profile with NeuronMCP configured
+6. ✅ Create sample NeuronAgent (if NeuronAgent is running)
+7. ✅ Verify setup
+
+**Environment Variables for Setup:**
+- `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` - Database connection
+- `NEURONMCP_BINARY_PATH` - Override NeuronMCP binary location
+- `NEURONDB_HOST`, `NEURONDB_PORT`, `NEURONDB_DATABASE`, `NEURONDB_USER`, `NEURONDB_PASSWORD` - NeuronDB connection for MCP
+- `NEURONAGENT_ENDPOINT` - NeuronAgent API endpoint (default: http://localhost:8080)
+- `NEURONAGENT_API_KEY` - NeuronAgent API key (optional)
+
+After setup, start the services:
+
+```bash
+# Start API server
+cd api && go run cmd/server/main.go
+
+# In another terminal, start frontend
+cd frontend && npm run dev
+
+# Access the application
+# Frontend: http://localhost:3000
+# Backend: http://localhost:8081
+```
+
 ### Using Docker (Recommended)
 
 ```bash
@@ -64,6 +114,8 @@ docker-compose up -d
 # Frontend: http://localhost:3000
 # Backend: http://localhost:8081
 ```
+
+**Note:** For Docker deployments, the default profile is automatically created on API startup. To configure NeuronMCP, set the environment variables in `docker-compose.yml` or run the setup script before starting containers.
 
 ### Manual Setup
 
@@ -144,6 +196,29 @@ See [docs/API.md](docs/API.md) for complete API documentation.
 
 ## Configuration
 
+### Default Profile
+
+NeuronDesktop automatically creates a default profile on first startup with:
+- **NeuronMCP Integration**: Auto-detected and configured
+- **NeuronDB Connection**: Configured via environment variables
+- **NeuronAgent Integration**: Optional, configured if endpoint is provided
+
+The default profile is marked as `is_default = true` and is used when no specific profile is selected.
+
+### Sample NeuronAgent
+
+If NeuronAgent is running and accessible, the setup script will create a sample agent:
+- **Name**: `sample-assistant`
+- **Description**: General purpose assistant for answering questions and helping with tasks
+- **Model**: `gpt-4` (configurable)
+- **Tools**: `sql`, `http`
+- **Config**: temperature: 0.7, max_tokens: 1000
+
+You can customize the sample agent by setting:
+- `SAMPLE_AGENT_NAME` - Agent name
+- `SAMPLE_AGENT_MODEL` - Model to use
+- `SAMPLE_AGENT_TOOLS` - Comma-separated list of tools
+
 ### Environment Variables
 
 **Backend:**
@@ -151,6 +226,10 @@ See [docs/API.md](docs/API.md) for complete API documentation.
 - `SERVER_PORT` - Server port (default: 8081)
 - `LOG_LEVEL` - Log level (debug, info, warn, error)
 - `CORS_ALLOWED_ORIGINS` - CORS origins (comma-separated)
+- `NEURONMCP_BINARY_PATH` - Override NeuronMCP binary location
+- `NEURONDB_HOST`, `NEURONDB_PORT`, `NEURONDB_DATABASE`, `NEURONDB_USER`, `NEURONDB_PASSWORD` - NeuronDB connection for MCP
+- `NEURONAGENT_ENDPOINT` - NeuronAgent API endpoint
+- `NEURONAGENT_API_KEY` - NeuronAgent API key
 
 **Frontend:**
 - `NEXT_PUBLIC_API_URL` - Backend API URL

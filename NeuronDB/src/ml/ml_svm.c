@@ -43,10 +43,12 @@
 #include "neurondb_constants.h"
 #include "neurondb_guc.h"
 
+#if defined(NDB_GPU_CUDA) || defined(NDB_GPU_METAL)
 #ifdef NDB_GPU_CUDA
 #include "neurondb_cuda_runtime.h"
 #include <cublas_v2.h>
 extern cublasHandle_t ndb_cuda_get_cublas_handle(void);
+#endif
 #endif
 
 #include <math.h>
@@ -933,6 +935,9 @@ train_svm_classifier(PG_FUNCTION_ARGS)
 	const char *quoted_feat;
 	const char *quoted_label;
 	MLGpuTrainResult gpu_result;
+
+	/* Initialize gpu_result to zero to avoid undefined behavior */
+	memset(&gpu_result, 0, sizeof(MLGpuTrainResult));
 
 	char *gpu_err = NULL;
 	Jsonb *gpu_hyperparams = NULL;
@@ -2384,6 +2389,8 @@ evaluate_svm_by_model_id(PG_FUNCTION_ARGS)
 	bytea *gpu_payload = NULL;
 	Jsonb *gpu_metrics = NULL;
 	bool		is_gpu_model = false;
+	bool		gpu_payload_freed = false;
+	bool		gpu_metrics_freed = false;
 	int			valid_rows = 0;
 
 	NdbSpiSession *eval_spi_session = NULL;
@@ -2427,8 +2434,11 @@ evaluate_svm_by_model_id(PG_FUNCTION_ARGS)
 		{
 			if (gpu_payload == NULL)
 			{
-				if (gpu_metrics)
+				if (gpu_metrics && !gpu_metrics_freed)
+				{
 					nfree(gpu_metrics);
+					gpu_metrics_freed = true;
+				}
 				nfree(tbl_str);
 				nfree(feat_str);
 				nfree(targ_str);
@@ -2493,12 +2503,16 @@ evaluate_svm_by_model_id(PG_FUNCTION_ARGS)
 			
 			if (!is_gpu_model)
 			{
-				if (gpu_payload)
+				if (gpu_payload && !gpu_payload_freed)
 				{
 					nfree(gpu_payload);
+					gpu_payload_freed = true;
 				}
-				if (gpu_metrics)
+				if (gpu_metrics && !gpu_metrics_freed)
+				{
 					nfree(gpu_metrics);
+					gpu_metrics_freed = true;
+				}
 				nfree(tbl_str);
 				nfree(feat_str);
 				nfree(targ_str);
@@ -2544,6 +2558,16 @@ evaluate_svm_by_model_id(PG_FUNCTION_ARGS)
 			if (model->support_vector_indices != NULL)
 				nfree(model->support_vector_indices);
 			nfree(model);
+		}
+		if (gpu_payload && !gpu_payload_freed)
+		{
+			nfree(gpu_payload);
+			gpu_payload_freed = true;
+		}
+		if (gpu_metrics && !gpu_metrics_freed)
+		{
+			nfree(gpu_metrics);
+			gpu_metrics_freed = true;
 		}
 		nfree(query.data);
 		nfree(tbl_str);
@@ -2665,8 +2689,16 @@ evaluate_svm_by_model_id(PG_FUNCTION_ARGS)
 					nfree(model->support_labels);
 				nfree(model);
 			}
-			nfree(gpu_payload);
-			nfree(gpu_metrics);
+			if (gpu_payload && !gpu_payload_freed)
+			{
+				nfree(gpu_payload);
+				gpu_payload_freed = true;
+			}
+			if (gpu_metrics && !gpu_metrics_freed)
+			{
+				nfree(gpu_metrics);
+				gpu_metrics_freed = true;
+			}
 			nfree(tbl_str);
 			nfree(feat_str);
 			nfree(targ_str);
@@ -2755,7 +2787,7 @@ evaluate_svm_by_model_id(PG_FUNCTION_ARGS)
 			if (use_gpu_predict)
 			{
 				/* GPU predict path */
-#ifdef NDB_GPU_CUDA
+#if defined(NDB_GPU_CUDA) || defined(NDB_GPU_METAL)
 				int			predict_rc;
 				char	   *gpu_err = NULL;
 
@@ -2778,8 +2810,16 @@ evaluate_svm_by_model_id(PG_FUNCTION_ARGS)
 							nfree(gpu_err);
 						nfree(feat_row);
 						NDB_SPI_SESSION_END(eval_spi_session);
-						nfree(gpu_payload);
-						nfree(gpu_metrics);
+						if (gpu_payload && !gpu_payload_freed)
+						{
+							nfree(gpu_payload);
+							gpu_payload_freed = true;
+						}
+						if (gpu_metrics && !gpu_metrics_freed)
+						{
+							nfree(gpu_metrics);
+							gpu_metrics_freed = true;
+						}
 						nfree(tbl_str);
 						nfree(feat_str);
 						nfree(targ_str);
@@ -2916,8 +2956,16 @@ evaluate_svm_by_model_id(PG_FUNCTION_ARGS)
 					nfree(model->support_labels);
 				nfree(model);
 			}
-			nfree(gpu_payload);
-			nfree(gpu_metrics);
+			if (gpu_payload && !gpu_payload_freed)
+			{
+				nfree(gpu_payload);
+				gpu_payload_freed = true;
+			}
+			if (gpu_metrics && !gpu_metrics_freed)
+			{
+				nfree(gpu_metrics);
+				gpu_metrics_freed = true;
+			}
 			nfree(tbl_str);
 			nfree(feat_str);
 			nfree(targ_str);
@@ -2940,10 +2988,16 @@ evaluate_svm_by_model_id(PG_FUNCTION_ARGS)
 				nfree(model->support_labels);
 			nfree(model);
 		}
-		if (gpu_payload != NULL)
+		if (gpu_payload != NULL && !gpu_payload_freed)
+		{
 			nfree(gpu_payload);
-		if (gpu_metrics != NULL)
+			gpu_payload_freed = true;
+		}
+		if (gpu_metrics != NULL && !gpu_metrics_freed)
+		{
 			nfree(gpu_metrics);
+			gpu_metrics_freed = true;
+		}
 	}
 
 	/* End SPI session BEFORE creating JSONB to avoid context conflicts */
@@ -3269,7 +3323,7 @@ svm_gpu_serialize(const MLGpuModel *model,
 	if (state->model_blob == NULL)
 		return false;
 
-#ifdef NDB_GPU_CUDA
+#if defined(NDB_GPU_CUDA) || defined(NDB_GPU_METAL)
 	/* Convert GPU format to unified format */
 	base = VARDATA(state->model_blob);
 	hdr = (NdbCudaSvmModelHeader *) base;

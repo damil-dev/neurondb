@@ -46,6 +46,7 @@
 #include "neurondb_json.h"
 #include "utils/lsyscache.h"
 
+#if defined(NDB_GPU_CUDA) || defined(NDB_GPU_METAL)
 #ifdef NDB_GPU_CUDA
 #include "neurondb_cuda_runtime.h"
 #include <cublas_v2.h>
@@ -60,6 +61,12 @@ extern int	ndb_cuda_linreg_evaluate(const bytea * model_data,
 									 double *rmse_out,
 									 double *r_squared_out,
 									 char **errstr);
+extern int	ndb_cuda_linreg_predict(const bytea * model_data,
+									 const float *features,
+									 int feature_dim,
+									 double *prediction_out,
+									 char **errstr);
+#endif
 #endif
 
 #include <math.h>
@@ -1205,6 +1212,9 @@ train_linear_regression(PG_FUNCTION_ARGS)
 	const char *quoted_target;
 	MLGpuTrainResult gpu_result;
 
+	/* Initialize gpu_result to zero to avoid undefined behavior */
+	memset(&gpu_result, 0, sizeof(MLGpuTrainResult));
+
 	char *gpu_err = NULL;
 	Jsonb *gpu_hyperparams = NULL;
 	int32		model_id = 0;
@@ -1463,7 +1473,7 @@ train_linear_regression(PG_FUNCTION_ARGS)
 			}
 			if (gpu_train_result && gpu_result.spec.model_data != NULL)
 			{
-#ifdef NDB_GPU_CUDA
+#if defined(NDB_GPU_CUDA) || defined(NDB_GPU_METAL)
 				MLCatalogModelSpec spec;
 				LinRegModel linreg_model;
 
@@ -1731,13 +1741,80 @@ train_linear_regression(PG_FUNCTION_ARGS)
 			}
 			else
 			{
+				/* GPU training failed - check if we're in strict GPU mode */
+				if (NDB_REQUIRE_GPU())
+				{
+					/* Strict GPU mode: error out, no CPU fallback */
+					char *error_msg = NULL;
+
+					if (gpu_err != NULL)
+					{
+						error_msg = pstrdup(gpu_err);
+						nfree(gpu_err);
+						gpu_err = NULL;
+					}
+					else
+					{
+						error_msg = pstrdup("GPU training failed");
+					}
+
+					/* Safely free GPU result if it was partially initialized */
+					if (gpu_result.spec.model_data != NULL || gpu_result.spec.metrics != NULL ||
+						gpu_result.spec.algorithm != NULL || gpu_result.spec.training_table != NULL ||
+						gpu_result.spec.training_column != NULL || gpu_result.payload != NULL)
+					{
+						ndb_gpu_free_train_result(&gpu_result);
+					}
+					else
+					{
+						/* Just zero it to be safe */
+						memset(&gpu_result, 0, sizeof(MLGpuTrainResult));
+					}
+
+					if (gpu_hyperparams != NULL)
+					{
+						nfree(gpu_hyperparams);
+						gpu_hyperparams = NULL;
+					}
+
+					linreg_dataset_free(&dataset);
+					nfree(tbl_str);
+					nfree(feat_str);
+					nfree(targ_str);
+
+					ereport(ERROR,
+							(errcode(ERRCODE_INTERNAL_ERROR),
+							 errmsg("neurondb: train_linear_regression: GPU training failed - GPU mode requires GPU to be available"),
+							 errdetail("%s", error_msg),
+							 errhint("Check GPU availability and model compatibility, or set compute_mode='auto' for automatic CPU fallback.")));
+				}
+
+				/* AUTO mode: cleanup and fall back to CPU */
 				if (gpu_err != NULL)
 				{
 					nfree(gpu_err);
+					gpu_err = NULL;
 				}
-				nfree(gpu_hyperparams);
 
-				ndb_gpu_free_train_result(&gpu_result);
+				/* Safely free GPU result if it was partially initialized */
+				if (gpu_result.spec.model_data != NULL || gpu_result.spec.metrics != NULL ||
+					gpu_result.spec.algorithm != NULL || gpu_result.spec.training_table != NULL ||
+					gpu_result.spec.training_column != NULL || gpu_result.payload != NULL)
+				{
+					ndb_gpu_free_train_result(&gpu_result);
+				}
+				else
+				{
+					/* Just zero it to be safe */
+					memset(&gpu_result, 0, sizeof(MLGpuTrainResult));
+				}
+
+				if (gpu_hyperparams != NULL)
+				{
+					nfree(gpu_hyperparams);
+					gpu_hyperparams = NULL;
+				}
+
 				linreg_dataset_free(&dataset);
 			}
 		}
@@ -2791,7 +2868,7 @@ evaluate_linear_regression_by_model_id_jsonb(int32 model_id, text * table_name, 
 	{
 		bool		use_gpu_predict = false;
 		int			feat_dim = 0;
-#ifdef NDB_GPU_CUDA
+#if defined(NDB_GPU_CUDA) || defined(NDB_GPU_METAL)
 		const NdbCudaLinRegModelHeader *gpu_hdr = NULL;
 		const float *gpu_coefficients = NULL;
 #endif
@@ -2800,7 +2877,7 @@ evaluate_linear_regression_by_model_id_jsonb(int32 model_id, text * table_name, 
 		if (is_gpu_model && neurondb_gpu_is_available() && !NDB_COMPUTE_MODE_IS_CPU())
 		{
 			/* GPU model and GPU mode: use GPU predict */
-#ifdef NDB_GPU_CUDA
+#if defined(NDB_GPU_CUDA) || defined(NDB_GPU_METAL)
 			if (gpu_payload != NULL && VARSIZE(gpu_payload) - VARHDRSZ >= sizeof(NdbCudaLinRegModelHeader))
 			{
 				gpu_hdr = (const NdbCudaLinRegModelHeader *) VARDATA(gpu_payload);
@@ -2819,7 +2896,7 @@ evaluate_linear_regression_by_model_id_jsonb(int32 model_id, text * table_name, 
 		else if (is_gpu_model && gpu_payload != NULL)
 		{
 			/* GPU model but CPU mode: convert to CPU format for CPU predict */
-#ifdef NDB_GPU_CUDA
+#if defined(NDB_GPU_CUDA) || defined(NDB_GPU_METAL)
 			if (VARSIZE(gpu_payload) - VARHDRSZ >= sizeof(NdbCudaLinRegModelHeader))
 			{
 				gpu_hdr = (const NdbCudaLinRegModelHeader *) VARDATA(gpu_payload);
@@ -2965,7 +3042,7 @@ evaluate_linear_regression_by_model_id_jsonb(int32 model_id, text * table_name, 
 			if (use_gpu_predict)
 			{
 				/* GPU predict path */
-#ifdef NDB_GPU_CUDA
+#if defined(NDB_GPU_CUDA) || defined(NDB_GPU_METAL)
 				float	   *feat_row = NULL;
 				int			predict_rc;
 
@@ -2993,6 +3070,7 @@ evaluate_linear_regression_by_model_id_jsonb(int32 model_id, text * table_name, 
 				}
 
 				/* Use GPU predict (which works) */
+#ifdef NDB_GPU_CUDA
 				predict_rc = ndb_cuda_linreg_predict(gpu_payload,
 													  feat_row,
 													  feat_dim,
@@ -3005,6 +3083,13 @@ evaluate_linear_regression_by_model_id_jsonb(int32 model_id, text * table_name, 
 					for (j = 0; j < feat_dim; j++)
 						y_pred += (double) gpu_coefficients[j] * (double) feat_row[j];
 				}
+#else
+				/* Metal backend: use CPU prediction using GPU coefficients */
+				predict_rc = 0; /* Success */
+				y_pred = gpu_hdr->intercept;
+				for (j = 0; j < feat_dim; j++)
+					y_pred += (double) gpu_coefficients[j] * (double) feat_row[j];
+#endif
 				nfree(feat_row);
 #endif
 			}
@@ -3379,7 +3464,7 @@ linreg_gpu_serialize(const MLGpuModel *model,
 					 char **errstr)
 {
 	const		LinRegGpuModelState *state;
-#ifdef NDB_GPU_CUDA
+#if defined(NDB_GPU_CUDA) || defined(NDB_GPU_METAL)
 	LinRegModel linreg_model;
 	bytea	   *unified_payload = NULL;
 	char	   *base = NULL;
@@ -3401,7 +3486,7 @@ linreg_gpu_serialize(const MLGpuModel *model,
 	if (state->model_blob == NULL)
 		return false;
 
-#ifdef NDB_GPU_CUDA
+#if defined(NDB_GPU_CUDA) || defined(NDB_GPU_METAL)
 	/* Convert GPU format to unified format */
 	unified_payload = NULL;
 

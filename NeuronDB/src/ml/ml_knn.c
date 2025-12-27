@@ -40,7 +40,7 @@
 #include "neurondb_json.h"
 #include "utils/elog.h"
 #include "neurondb_guc.h"
-#ifdef NDB_GPU_CUDA
+#if defined(NDB_GPU_CUDA) || defined(NDB_GPU_METAL)
 #include "neurondb_gpu_model.h"
 #endif
 
@@ -2858,7 +2858,7 @@ evaluate_knn_by_model_id(PG_FUNCTION_ARGS)
 			}
 			PG_END_TRY();
 		}
-#endif							/* NDB_GPU_CUDA */
+#endif							/* NDB_GPU_CUDA || NDB_GPU_METAL */
 	}
 #ifndef NDB_GPU_CUDA
 	/* When CUDA is not available, always use CPU path */
@@ -3192,7 +3192,7 @@ cpu_evaluation_path:
 	PG_RETURN_JSONB_P(result_jsonb);
 }
 
-#ifdef NDB_GPU_CUDA
+#if defined(NDB_GPU_CUDA) || defined(NDB_GPU_METAL)
 
 /* GPU Model State */
 typedef struct KnnGpuModelState
@@ -3248,8 +3248,19 @@ knn_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 	}
 
 	backend = ndb_gpu_get_active_backend();
-	if (backend == NULL || backend->knn_train == NULL)
+	if (backend == NULL)
+	{
+		if (errstr)
+			*errstr = pstrdup("GPU backend not available");
 		return false;
+	}
+	if (backend->knn_train == NULL)
+	{
+		if (errstr)
+			*errstr = psprintf("GPU backend '%s' does not support knn_train",
+							   backend->name ? backend->name : "unknown");
+		return false;
+	}
 
 	/* Skip hyperparameter parsing to avoid memory context issues - use defaults */
 	/* Hyperparameters will be parsed in the CUDA backend if needed */
@@ -3525,12 +3536,12 @@ static const MLGpuModelOps knn_gpu_model_ops = {
 	.destroy = knn_gpu_destroy,
 };
 
-#endif							/* NDB_GPU_CUDA */
+#endif							/* NDB_GPU_CUDA || NDB_GPU_METAL */
 
 void
 neurondb_gpu_register_knn_model(void)
 {
-#ifdef NDB_GPU_CUDA
+#if defined(NDB_GPU_CUDA) || defined(NDB_GPU_METAL)
 	static bool registered = false;
 
 	if (registered)

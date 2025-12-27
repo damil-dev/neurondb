@@ -57,6 +57,7 @@
 #include "utils/elog.h"
 #include "neurondb_guc.h"
 
+#if defined(NDB_GPU_CUDA) || defined(NDB_GPU_METAL)
 #ifdef NDB_GPU_CUDA
 #include "neurondb_cuda_runtime.h"
 #include <cublas_v2.h>
@@ -81,6 +82,7 @@ extern int	ndb_cuda_rf_evaluate_batch(const bytea * model_data,
 									   double *recall_out,
 									   double *f1_out,
 									   char **errstr);
+#endif
 #endif
 
 #define RF_BOOTSTRAP_FRACTION 0.8
@@ -3812,7 +3814,7 @@ predict_random_forest(PG_FUNCTION_ARGS)
 						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 						 errmsg("neurondb: predict_random_forest: model %d is GPU-only and GPU prediction failed", model_id),
 						 errdetail("Model %d was trained on GPU and requires GPU for prediction, but GPU prediction failed: %s", 
-								   model_id, "CUDA RF inference failed"),
+								   model_id, "GPU RF inference failed"),
 						 errhint("Check GPU availability and configuration, or train a new model with CPU backend.")));
 			}
 		}
@@ -4866,7 +4868,7 @@ evaluate_random_forest_by_model_id(PG_FUNCTION_ARGS)
 		}
 
 		/* For GPU models in GPU mode, use batch evaluation for better performance and correct metrics */
-#ifdef NDB_GPU_CUDA
+#if defined(NDB_GPU_CUDA) || defined(NDB_GPU_METAL)
 		if (use_gpu_predict && is_gpu_model && gpu_payload != NULL && nvec > 0)
 		{
 			float	   *features_array = NULL;
@@ -4958,6 +4960,7 @@ evaluate_random_forest_by_model_id(PG_FUNCTION_ARGS)
 			/* Call GPU batch evaluation if we have valid samples */
 			if (valid_samples > 0)
 			{
+#ifdef NDB_GPU_CUDA
 				batch_rc = ndb_cuda_rf_evaluate_batch(gpu_payload,
 													  features_array,
 													  labels_array,
@@ -4968,6 +4971,12 @@ evaluate_random_forest_by_model_id(PG_FUNCTION_ARGS)
 													  &recall,
 													  &f1_score,
 													  &gpu_err);
+#else
+				/* Metal backend: use CPU fallback for evaluation */
+				batch_rc = -1;
+				/* Note: gpu_err is passed as &gpu_err to CUDA functions, so we set it directly */
+				gpu_err = pstrdup("Batch evaluation not yet implemented for Metal backend");
+#endif
 
 				if (batch_rc == 0)
 				{
@@ -5128,7 +5137,7 @@ evaluate_random_forest_by_model_id(PG_FUNCTION_ARGS)
 			if (use_gpu_predict)
 			{
 				/* GPU predict path - prediction based on compute mode */
-#ifdef NDB_GPU_CUDA
+#if defined(NDB_GPU_CUDA) || defined(NDB_GPU_METAL)
 				int			predict_rc;
 				char	   *gpu_err = NULL;
 

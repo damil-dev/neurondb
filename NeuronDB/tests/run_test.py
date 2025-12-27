@@ -445,6 +445,7 @@ def find_pg_ctl() -> Optional[str]:
 	
 	# Try common locations
 	common_paths = [
+		"/usr/local/pgsql.18/bin/pg_ctl",  # Explicit PostgreSQL 18 path
 		"/usr/lib/postgresql/*/bin/pg_ctl",
 		"/usr/local/pgsql*/bin/pg_ctl",
 		"/opt/homebrew/opt/postgresql@*/bin/pg_ctl",
@@ -488,6 +489,7 @@ def find_pg_data_dir(host: Optional[str] = None, port: Optional[int] = None) -> 
 	
 	# Try common locations
 	common_paths = [
+		"/usr/local/pgsql.18/data",  # Explicit PostgreSQL 18 path
 		"/var/lib/postgresql/*/main",
 		"/usr/local/pgsql*/data",
 		"/opt/homebrew/var/postgresql@*",
@@ -555,20 +557,27 @@ def restart_postgresql(
 	
 	if pg_ctl and pgdata:
 		try:
-			# Try restart first
+			# Try restart first - use absolute path for log file
+			log_file = os.path.join(pgdata, "pg.log")
+			if not os.path.isabs(log_file):
+				log_file = os.path.abspath(log_file)
 			result = subprocess.run(
-				[pg_ctl, "restart", "-D", pgdata, "-w", "-l", "pg.log"],
+				[pg_ctl, "restart", "-D", pgdata, "-w", "-l", log_file],
 				stdout=subprocess.PIPE,
 				stderr=subprocess.PIPE,
 				text=True,
-				timeout=30
+				timeout=30,
+				cwd=os.path.dirname(pgdata) if os.path.dirname(pgdata) else None
 			)
 			if result.returncode == 0:
 				# Wait a bit
-				time.sleep(2)
+				time.sleep(3)
 				conn_ok, _, _ = check_postgresql_connection(dbname, psql_path, host, port)
 				if conn_ok:
 					return True, f"Restarted via pg_ctl restart"
+			else:
+				if verbose:
+					print(f"pg_ctl restart failed with return code {result.returncode}: {result.stderr}", file=sys.stderr)
 		except (subprocess.TimeoutExpired, Exception) as e:
 			if verbose:
 				print(f"pg_ctl restart failed: {e}", file=sys.stderr)
@@ -585,12 +594,17 @@ def restart_postgresql(
 			)
 			time.sleep(1)
 			# Start
+			# Use absolute path for log file
+			log_file = os.path.join(pgdata, "pg.log")
+			if not os.path.isabs(log_file):
+				log_file = os.path.abspath(log_file)
 			result = subprocess.run(
-				[pg_ctl, "start", "-D", pgdata, "-w", "-l", "pg.log"],
+				[pg_ctl, "start", "-D", pgdata, "-w", "-l", log_file],
 				stdout=subprocess.PIPE,
 				stderr=subprocess.PIPE,
 				text=True,
-				timeout=30
+				timeout=30,
+				cwd=os.path.dirname(pgdata) if os.path.dirname(pgdata) else None
 			)
 			if result.returncode == 0:
 				time.sleep(2)
@@ -613,12 +627,17 @@ def restart_postgresql(
 			)
 			time.sleep(2)
 			# Start
+			# Use absolute path for log file
+			log_file = os.path.join(pgdata, "pg.log")
+			if not os.path.isabs(log_file):
+				log_file = os.path.abspath(log_file)
 			result = subprocess.run(
-				[pg_ctl, "start", "-D", pgdata, "-w", "-l", "pg.log"],
+				[pg_ctl, "start", "-D", pgdata, "-w", "-l", log_file],
 				stdout=subprocess.PIPE,
 				stderr=subprocess.PIPE,
 				text=True,
-				timeout=30
+				timeout=30,
+				cwd=os.path.dirname(pgdata) if os.path.dirname(pgdata) else None
 			)
 			if result.returncode == 0:
 				time.sleep(2)
@@ -2507,25 +2526,90 @@ def main() -> int:
 		return 1
 	
 	# 2.5. Restart PostgreSQL to apply ALTER SYSTEM changes
+	# Check if compute_mode is already set correctly to avoid unnecessary restart
 	when = datetime.now()
 	restart_start = time.perf_counter()
-	restart_ok, restart_msg = restart_postgresql(args.db, args.psql, args.host, args.port, args.verbose)
-	restart_elapsed = time.perf_counter() - restart_start
-	if restart_ok:
-		print(format_status_line(True, when, f"Restarting PostgreSQL to apply GUC changes...", restart_elapsed))
-		# Wait a bit for PostgreSQL to be fully ready
-		time.sleep(2)
-		# Verify connection after restart
-		conn_ok, _, _ = check_postgresql_connection(args.db, args.psql, args.host, args.port)
-		if not conn_ok:
-			print(f"Warning: PostgreSQL restarted but connection verification failed. Waiting 5 more seconds...", file=sys.stderr)
-			time.sleep(5)
+	
+	# Check current compute_mode setting
+	mode_enum = {"cpu": 0, "gpu": 1, "auto": 2}.get(args.compute, 2)
+	current_mode_ok = False
+	try:
+		env = os.environ.copy()
+		if args.host:
+			env["PGHOST"] = args.host
+		if args.port:
+			env["PGPORT"] = str(args.port)
+		cmd_check = [args.psql, "-d", args.db, "-t", "-A", "-c", "SELECT current_setting('neurondb.compute_mode');"]
+		proc = subprocess.Popen(cmd_check, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
+		out_check, err_check = proc.communicate()
+		if proc.returncode == 0 and out_check.strip():
+			current_mode = out_check.strip()
+			if current_mode == str(mode_enum):
+				current_mode_ok = True
+				if args.verbose:
+					print(f"Compute mode already set to {mode_enum}, skipping restart", file=sys.stderr)
+	except Exception:
+		pass
+	
+	restart_ok = False
+	restart_msg = ""
+	if not current_mode_ok:
+		# Only restart if mode is not already correct
+		restart_ok, restart_msg = restart_postgresql(args.db, args.psql, args.host, args.port, args.verbose)
+		restart_elapsed = time.perf_counter() - restart_start
+		if restart_ok:
+			print(format_status_line(True, when, f"Restarting PostgreSQL to apply GUC changes...", restart_elapsed))
+			# Wait a bit for PostgreSQL to be fully ready
+			time.sleep(2)
+			# Verify connection after restart
 			conn_ok, _, _ = check_postgresql_connection(args.db, args.psql, args.host, args.port)
 			if not conn_ok:
-				print(f"Failed to connect to PostgreSQL after restart. Aborting.", file=sys.stderr)
+				print(f"Warning: PostgreSQL restarted but connection verification failed. Waiting 5 more seconds...", file=sys.stderr)
+				time.sleep(5)
+				conn_ok, _, _ = check_postgresql_connection(args.db, args.psql, args.host, args.port)
+				if not conn_ok:
+					print(f"Failed to connect to PostgreSQL after restart. Aborting.", file=sys.stderr)
+					return 1
+		else:
+			# Restart failed - check if connection still works and mode is correct
+			print(format_status_line(False, when, f"Restarting PostgreSQL to apply GUC changes...", restart_elapsed))
+			time.sleep(2)
+			conn_ok, _, _ = check_postgresql_connection(args.db, args.psql, args.host, args.port)
+			if conn_ok:
+				# Connection works - check if mode is already correct
+				try:
+					cmd_check = [args.psql, "-d", args.db, "-t", "-A", "-c", "SELECT current_setting('neurondb.compute_mode');"]
+					proc = subprocess.Popen(cmd_check, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
+					out_check, err_check = proc.communicate()
+					if proc.returncode == 0 and out_check.strip():
+						current_mode = out_check.strip()
+						if current_mode == str(mode_enum):
+							print(f"Warning: Restart failed but compute_mode is already correct ({mode_enum}). Continuing...", file=sys.stderr)
+							restart_ok = True  # Treat as success
+						else:
+							print(f"ERROR: Failed to restart PostgreSQL automatically: {restart_msg}", file=sys.stderr)
+							print(f"ALTER SYSTEM changes require a restart. Please restart PostgreSQL manually and re-run tests.", file=sys.stderr)
+							return 1
+					else:
+						print(f"ERROR: Failed to restart PostgreSQL automatically: {restart_msg}", file=sys.stderr)
+						print(f"ALTER SYSTEM changes require a restart. Please restart PostgreSQL manually and re-run tests.", file=sys.stderr)
+						return 1
+				except Exception as e:
+					print(f"ERROR: Failed to restart PostgreSQL automatically: {restart_msg}", file=sys.stderr)
+					print(f"ALTER SYSTEM changes require a restart. Please restart PostgreSQL manually and re-run tests.", file=sys.stderr)
+					return 1
+			else:
+				print(f"ERROR: Failed to restart PostgreSQL automatically: {restart_msg}", file=sys.stderr)
+				print(f"ALTER SYSTEM changes require a restart. Please restart PostgreSQL manually and re-run tests.", file=sys.stderr)
 				return 1
-		
-		# After restart, initialize GPU in the session (for GPU mode)
+	else:
+		# Mode already correct, skip restart
+		restart_elapsed = time.perf_counter() - restart_start
+		print(format_status_line(True, when, f"Skipping restart (compute_mode already set to {mode_enum})...", restart_elapsed))
+		restart_ok = True
+	
+	if restart_ok:
+		# After restart (or if skipped), initialize GPU in the session (for GPU mode)
 		if args.compute in ("gpu", "auto"):
 			when = datetime.now()
 			gpu_init_start = time.perf_counter()

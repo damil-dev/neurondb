@@ -36,12 +36,14 @@
 #include "neurondb_cuda_gmm.h"
 #include "ml_gpu_registry.h"
 
+#if defined(NDB_GPU_CUDA) || defined(NDB_GPU_METAL)
 #ifdef NDB_GPU_CUDA
 #include "neurondb_cuda_runtime.h"
-#include "neurondb_gpu_model.h"
-#include "neurondb_gpu.h"
 #include <cublas_v2.h>
 extern cublasHandle_t ndb_cuda_get_cublas_handle(void);
+#endif
+#include "neurondb_gpu_model.h"
+#include "neurondb_gpu.h"
 #endif
 
 #include <math.h>
@@ -1444,10 +1446,15 @@ evaluate_gmm_by_model_id(PG_FUNCTION_ARGS)
 
 #include "ml_gpu_registry.h"
 
-#ifdef NDB_GPU_CUDA
+#if defined(NDB_GPU_CUDA) || defined(NDB_GPU_METAL)
 #include "neurondb_gpu_model.h"
 #include "neurondb_safe_memory.h"
 #include "neurondb_macros.h"
+#ifdef NDB_GPU_CUDA
+#include "neurondb_cuda_runtime.h"
+#include <cublas_v2.h>
+extern cublasHandle_t ndb_cuda_get_cublas_handle(void);
+#endif
 
 /* GPU Model State */
 typedef struct GmmGpuModelState
@@ -1794,12 +1801,12 @@ static const MLGpuModelOps gmm_gpu_model_ops = {
 	.destroy = gmm_gpu_destroy,
 };
 
-#endif							/* NDB_GPU_CUDA */
+#endif							/* NDB_GPU_CUDA || NDB_GPU_METAL */
 
 void
 neurondb_gpu_register_gmm_model(void)
 {
-#ifdef NDB_GPU_CUDA
+#if defined(NDB_GPU_CUDA) || defined(NDB_GPU_METAL)
 	static bool registered = false;
 
 	if (registered)

@@ -12,11 +12,13 @@ CREATE TABLE IF NOT EXISTS profiles (
     agent_endpoint TEXT,
     agent_api_key TEXT,
     default_collection TEXT,
+    is_default BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_profiles_user_id ON profiles(user_id);
+CREATE INDEX IF NOT EXISTS idx_profiles_user_id ON profiles(user_id);
+CREATE INDEX IF NOT EXISTS idx_profiles_default ON profiles(is_default) WHERE is_default = true;
 
 -- API keys table
 CREATE TABLE IF NOT EXISTS api_keys (
