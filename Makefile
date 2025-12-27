@@ -9,10 +9,10 @@
         docker-build docker-build-cpu docker-build-cuda docker-build-rocm docker-build-metal \
         docker-run docker-run-cpu docker-run-cuda docker-run-rocm docker-run-metal \
         docker-stop docker-logs docker-ps docker-status docker-health docker-clean \
-        build build-neurondb build-neuronagent build-neuronmcp \
-        test test-neurondb test-neuronagent test-neuronmcp \
-        clean clean-neurondb clean-neuronagent clean-neuronmcp \
-        install install-neurondb install-neuronagent install-neuronmcp
+        build build-neurondb build-neuronagent build-neuronmcp build-neurondesktop \
+        test test-neurondb test-neuronagent test-neuronmcp test-neurondesktop \
+        clean clean-neurondb clean-neuronagent clean-neuronmcp clean-neurondesktop \
+        install install-neurondb install-neuronagent install-neuronmcp install-neurondesktop
 
 # Default target
 .DEFAULT_GOAL := help
@@ -66,12 +66,14 @@ help: ## Show this help message
 	@echo "  make check-deps-neurondb    Check NeuronDB dependencies"
 	@echo "  make check-deps-neuronagent Check NeuronAgent dependencies"
 	@echo "  make check-deps-neuronmcp   Check NeuronMCP dependencies"
+	@echo "  make check-deps-neurondesktop Check NeuronDesktop dependencies"
 	@echo ""
 	@echo "$(GREEN)Source Build:$(NC)"
 	@echo "  make build                  Build all components from source"
 	@echo "  make build-neurondb         Build NeuronDB from source (uses build.sh)"
 	@echo "  make build-neuronagent      Build NeuronAgent from source"
 	@echo "  make build-neuronmcp        Build NeuronMCP from source"
+	@echo "  make build-neurondesktop    Build NeuronDesktop from source"
 	@echo ""
 	@echo "$(GREEN)Debugging & Troubleshooting:$(NC)"
 	@echo "  make check-deps-verbose     Check dependencies with detailed output"
@@ -84,18 +86,21 @@ help: ## Show this help message
 	@echo "  make test-neurondb          Run NeuronDB tests"
 	@echo "  make test-neuronagent       Run NeuronAgent tests"
 	@echo "  make test-neuronmcp         Run NeuronMCP tests"
+	@echo "  make test-neurondesktop     Run NeuronDesktop tests"
 	@echo ""
 	@echo "$(GREEN)Source Install:$(NC)"
 	@echo "  make install                Install all components"
 	@echo "  make install-neurondb       Install NeuronDB extension"
 	@echo "  make install-neuronagent    Install NeuronAgent"
 	@echo "  make install-neuronmcp      Install NeuronMCP"
+	@echo "  make install-neurondesktop  Install NeuronDesktop"
 	@echo ""
 	@echo "$(GREEN)Source Clean:$(NC)"
 	@echo "  make clean                  Clean all build artifacts"
 	@echo "  make clean-neurondb         Clean NeuronDB artifacts"
 	@echo "  make clean-neuronagent      Clean NeuronAgent artifacts"
 	@echo "  make clean-neuronmcp        Clean NeuronMCP artifacts"
+	@echo "  make clean-neurondesktop    Clean NeuronDesktop artifacts"
 	@echo ""
 	@echo "$(YELLOW)Note:$(NC) Use 'docker-*' for containerized builds, or 'build-*' for source builds"
 	@echo ""
@@ -249,7 +254,7 @@ docker-clean: ## Stop and remove containers
 # Dependency Checking
 # ============================================================================
 
-check-deps: check-deps-neurondb check-deps-neuronagent check-deps-neuronmcp ## Check if dependencies are installed
+check-deps: check-deps-neurondb check-deps-neuronagent check-deps-neuronmcp check-deps-neurondesktop ## Check if dependencies are installed
 
 check-deps-neurondb: ## Check NeuronDB dependencies
 	@echo "$(CYAN)Checking NeuronDB dependencies...$(NC)"
@@ -322,6 +327,42 @@ check-deps-neuronmcp: ## Check NeuronMCP dependencies
 		echo "$(GREEN)✓ All NeuronMCP dependencies satisfied$(NC)"; \
 	else \
 		echo "$(YELLOW)⚠ Go needs to be installed$(NC)"; \
+	fi
+
+check-deps-neurondesktop: ## Check NeuronDesktop dependencies
+	@echo "$(CYAN)Checking NeuronDesktop dependencies...$(NC)"
+	@missing=0; \
+	if ! command -v go >/dev/null 2>&1; then \
+		echo "$(YELLOW)⚠ Go compiler not found (need Go 1.23+)$(NC)"; \
+		missing=1; \
+	else \
+		go_version=$$(go version 2>/dev/null | awk '{print $$3}' | sed 's/go//'); \
+		major=$$(echo $$go_version | cut -d. -f1); \
+		minor=$$(echo $$go_version | cut -d. -f2); \
+		if [ $$major -lt 1 ] || ([ $$major -eq 1 ] && [ $$minor -lt 23 ]); then \
+			echo "$(YELLOW)⚠ Go version too old (have $$go_version, need 1.23+)$(NC)"; \
+			missing=1; \
+		else \
+			echo "$(GREEN)✓ Go $$go_version found$(NC)"; \
+		fi; \
+	fi; \
+	if ! command -v npm >/dev/null 2>&1 && ! command -v node >/dev/null 2>&1; then \
+		echo "$(YELLOW)⚠ Node.js/npm not found (need Node.js 18+)$(NC)"; \
+		missing=1; \
+	else \
+		if command -v node >/dev/null 2>&1; then \
+			node_version=$$(node --version 2>/dev/null | sed 's/v//'); \
+			echo "$(GREEN)✓ Node.js $$node_version found$(NC)"; \
+		fi; \
+		if command -v npm >/dev/null 2>&1; then \
+			npm_version=$$(npm --version 2>/dev/null); \
+			echo "$(GREEN)✓ npm $$npm_version found$(NC)"; \
+		fi; \
+	fi; \
+	if [ $$missing -eq 0 ]; then \
+		echo "$(GREEN)✓ All NeuronDesktop dependencies satisfied$(NC)"; \
+	else \
+		echo "$(YELLOW)⚠ Some dependencies need to be installed$(NC)"; \
 	fi
 
 check-deps-verbose: ## Check dependencies with detailed output and package manager status
@@ -422,7 +463,7 @@ fix-locks: ## Check and provide instructions to remove stale package manager loc
 # Source Build Commands
 # ============================================================================
 
-build: build-neurondb build-neuronagent build-neuronmcp ## Build all components from source
+build: build-neurondb build-neuronagent build-neuronmcp build-neurondesktop ## Build all components from source
 
 build-neurondb: ## Build NeuronDB from source (uses build.sh)
 	@echo "$(CYAN)Building NeuronDB from source...$(NC)"
@@ -504,11 +545,16 @@ build-neuronmcp: check-deps-neuronmcp ## Build NeuronMCP from source
 	@cd NeuronMCP && $(MAKE) build
 	@echo "$(GREEN)✓ NeuronMCP built$(NC)"
 
+build-neurondesktop: check-deps-neurondesktop ## Build NeuronDesktop from source
+	@echo "$(CYAN)Building NeuronDesktop from source...$(NC)"
+	@cd NeuronDesktop && $(MAKE) build
+	@echo "$(GREEN)✓ NeuronDesktop built$(NC)"
+
 # ============================================================================
 # Source Test Commands
 # ============================================================================
 
-test: test-neurondb test-neuronagent test-neuronmcp ## Run tests for all components
+test: test-neurondb test-neuronagent test-neuronmcp test-neurondesktop ## Run tests for all components
 
 test-neurondb: ## Run NeuronDB tests
 	@echo "$(CYAN)Running NeuronDB tests...$(NC)"
@@ -522,11 +568,15 @@ test-neuronmcp: ## Run NeuronMCP tests
 	@echo "$(CYAN)Running NeuronMCP tests...$(NC)"
 	@cd NeuronMCP && $(MAKE) test || echo "$(YELLOW)⚠ Some tests may have failed$(NC)"
 
+test-neurondesktop: ## Run NeuronDesktop tests
+	@echo "$(CYAN)Running NeuronDesktop tests...$(NC)"
+	@cd NeuronDesktop && $(MAKE) test || echo "$(YELLOW)⚠ Some tests may have failed$(NC)"
+
 # ============================================================================
 # Source Install Commands
 # ============================================================================
 
-install: install-neurondb install-neuronagent install-neuronmcp ## Install all components
+install: install-neurondb install-neuronagent install-neuronmcp install-neurondesktop ## Install all components
 
 install-neurondb: ## Install NeuronDB extension
 	@echo "$(CYAN)Installing NeuronDB...$(NC)"
@@ -559,11 +609,16 @@ install-neuronmcp: build-neuronmcp ## Install NeuronMCP
 	@echo "$(YELLOW)Note: NeuronMCP binary is in NeuronMCP/bin/$(NC)"
 	@echo "$(GREEN)✓ NeuronMCP ready$(NC)"
 
+install-neurondesktop: build-neurondesktop ## Install NeuronDesktop
+	@echo "$(CYAN)Installing NeuronDesktop...$(NC)"
+	@cd NeuronDesktop && $(MAKE) install
+	@echo "$(GREEN)✓ NeuronDesktop installed$(NC)"
+
 # ============================================================================
 # Source Clean Commands
 # ============================================================================
 
-clean: clean-neurondb clean-neuronagent clean-neuronmcp ## Clean all build artifacts
+clean: clean-neurondb clean-neuronagent clean-neuronmcp clean-neurondesktop ## Clean all build artifacts
 
 clean-neurondb: ## Clean NeuronDB artifacts
 	@echo "$(CYAN)Cleaning NeuronDB...$(NC)"
@@ -579,3 +634,8 @@ clean-neuronmcp: ## Clean NeuronMCP artifacts
 	@echo "$(CYAN)Cleaning NeuronMCP...$(NC)"
 	@cd NeuronMCP && $(MAKE) clean || true
 	@echo "$(GREEN)✓ NeuronMCP cleaned$(NC)"
+
+clean-neurondesktop: ## Clean NeuronDesktop artifacts
+	@echo "$(CYAN)Cleaning NeuronDesktop...$(NC)"
+	@cd NeuronDesktop && $(MAKE) clean || true
+	@echo "$(GREEN)✓ NeuronDesktop cleaned$(NC)"

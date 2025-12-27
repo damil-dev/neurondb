@@ -1,0 +1,238 @@
+# NeuronDesktop
+
+**Unified web interface for MCP servers, NeuronDB, and NeuronAgent**
+
+NeuronDesktop is a comprehensive, production-ready web application that provides a unified interface for managing and interacting with:
+- **MCP Servers** - Model Context Protocol servers with tool inspection and testing
+- **NeuronDB** - Vector database with semantic search and collection management
+- **NeuronAgent** - AI agent runtime with session management
+
+## Features
+
+### 🎯 Core Features
+
+- **Unified Interface** - Single dashboard for all NeuronDB ecosystem components
+- **Real-time Communication** - WebSocket support for live updates
+- **Secure Authentication** - API key-based authentication with rate limiting
+- **Professional UI** - Modern, responsive design with smooth animations
+- **Comprehensive Logging** - Request/response logging with detailed analytics
+- **Metrics & Monitoring** - Built-in metrics collection and health checks
+
+### 🔧 Technical Features
+
+- **Modular Architecture** - Clean separation of concerns, easy to extend
+- **Production Ready** - Error handling, graceful shutdown, connection pooling
+- **Docker Support** - Complete Docker Compose setup for easy deployment
+- **Type Safety** - Full TypeScript frontend, strongly-typed Go backend
+- **Validation** - Comprehensive input validation and SQL injection protection
+- **Rate Limiting** - Configurable rate limits per API key
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    Browser (Frontend)                    │
+│              Next.js + React + TypeScript                │
+└──────────────────────┬──────────────────────────────────┘
+                       │ HTTP/WebSocket
+┌──────────────────────▼──────────────────────────────────┐
+│              NeuronDesktop API (Backend)                │
+│                      Go + Gorilla Mux                   │
+├─────────────────────────────────────────────────────────┤
+│  MCP Proxy  │  NeuronDB Client  │  Agent Client         │
+└──────┬──────────────┬───────────────┬──────────────────┘
+       │              │               │
+┌──────▼──────┐  ┌───▼────┐  ┌───────▼────────┐
+│  MCP Server │  │NeuronDB│  │  NeuronAgent   │
+│  (stdio)   │  │(Postgres)│  │  (HTTP API)   │
+└─────────────┘  └─────────┘  └───────────────┘
+```
+
+## Quick Start
+
+### Using Docker (Recommended)
+
+```bash
+# Clone the repository
+git clone <repository-url>
+cd NeuronDesktop
+
+# Start all services
+docker-compose up -d
+
+# Access the application
+# Frontend: http://localhost:3000
+# Backend: http://localhost:8081
+```
+
+### Manual Setup
+
+#### Backend
+
+```bash
+cd api
+
+# Set environment variables
+export DB_HOST=localhost
+export DB_PORT=5432
+export DB_USER=neurondesk
+export DB_PASSWORD=neurondesk
+export DB_NAME=neurondesk
+
+# Initialize database
+createdb neurondesk
+psql -d neurondesk -f migrations/001_initial_schema.sql
+
+# Run server
+go run cmd/server/main.go
+```
+
+#### Frontend
+
+```bash
+cd frontend
+
+# Install dependencies
+npm install
+
+# Run development server
+npm run dev
+```
+
+## Project Structure
+
+```
+NeuronDesktop/
+├── api/                      # Go backend
+│   ├── cmd/server/          # Server entrypoint
+│   ├── internal/
+│   │   ├── mcp/             # MCP proxy client
+│   │   ├── neurondb/        # NeuronDB Postgres client
+│   │   ├── agent/           # NeuronAgent HTTP client
+│   │   ├── auth/            # Authentication
+│   │   ├── config/          # Configuration
+│   │   ├── db/              # Database layer
+│   │   ├── handlers/        # HTTP handlers
+│   │   ├── logging/         # Logging
+│   │   ├── middleware/      # HTTP middleware
+│   │   ├── metrics/         # Metrics collection
+│   │   └── utils/           # Utilities
+│   ├── migrations/          # Database migrations
+│   └── Dockerfile           # Docker image
+├── frontend/                # Next.js frontend
+│   ├── app/                # Next.js app router
+│   ├── components/         # React components
+│   ├── lib/                # Utilities and API clients
+│   └── Dockerfile          # Docker image
+├── docs/                   # Documentation
+│   ├── API.md             # API documentation
+│   └── DEPLOYMENT.md      # Deployment guide
+└── docker-compose.yml      # Docker Compose configuration
+```
+
+## API Documentation
+
+See [docs/API.md](docs/API.md) for complete API documentation.
+
+### Key Endpoints
+
+- `GET /health` - Health check
+- `GET /api/v1/profiles` - List profiles
+- `GET /api/v1/profiles/{id}/mcp/tools` - List MCP tools
+- `POST /api/v1/profiles/{id}/neurondb/search` - Vector search
+- `GET /api/v1/metrics` - Application metrics
+
+## Configuration
+
+### Environment Variables
+
+**Backend:**
+- `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` - Database connection
+- `SERVER_PORT` - Server port (default: 8081)
+- `LOG_LEVEL` - Log level (debug, info, warn, error)
+- `CORS_ALLOWED_ORIGINS` - CORS origins (comma-separated)
+
+**Frontend:**
+- `NEXT_PUBLIC_API_URL` - Backend API URL
+
+## Development
+
+### Backend Development
+
+```bash
+cd api
+go mod download
+go run cmd/server/main.go
+```
+
+### Frontend Development
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+### Running Tests
+
+```bash
+# Backend tests
+cd api
+go test ./...
+
+# Frontend tests (when added)
+cd frontend
+npm test
+```
+
+## Deployment
+
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for detailed deployment instructions.
+
+### Production Checklist
+
+- [ ] Set strong database passwords
+- [ ] Configure CORS allowed origins
+- [ ] Enable HTTPS
+- [ ] Set up monitoring and alerts
+- [ ] Configure backup strategy
+- [ ] Review rate limits
+- [ ] Set up log aggregation
+
+## Security
+
+- API key authentication required for all endpoints
+- Rate limiting per API key
+- SQL injection protection
+- Input validation on all requests
+- CORS configuration
+- Secure password hashing (bcrypt)
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests
+5. Submit a pull request
+
+## License
+
+See [LICENSE](../LICENSE) file for license information.
+
+## Support
+
+- **Documentation**: See `docs/` directory
+- **Issues**: Report issues on GitHub
+- **Email**: support@neurondb.ai
+
+## Roadmap
+
+- [ ] Multi-user support with organizations
+- [ ] Advanced query builder for NeuronDB
+- [ ] Real-time collaboration features
+- [ ] Plugin system for custom integrations
+- [ ] Advanced analytics dashboard
+- [ ] Export/import functionality
+- [ ] API documentation explorer
+- [ ] Webhook support
