@@ -32,7 +32,7 @@ PostgreSQL extension with vector search, machine learning algorithms, and agent 
 ## Overview
 
 <div align="center">
-  <img src="neurondb.png" alt="NeuronDB Logo" width="200">
+  <img src="neurondb.png" alt="NeuronDB Logo" width="400">
 </div>
 
 NeuronDB provides vector search and machine learning within PostgreSQL. NeuronAgent adds REST API and WebSocket support for agent applications. NeuronMCP exposes NeuronDB through the Model Context Protocol for MCP-compatible clients.
