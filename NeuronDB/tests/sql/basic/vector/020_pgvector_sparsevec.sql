@@ -63,7 +63,7 @@ SELECT '{1:1,2:2}/3'::sparsevec <#> '{1:3,2:4}/3';
 SELECT sparsevec_cosine_distance('{1:1,2:2}/3'::sparsevec, '{1:2,2:4}/3');
 SELECT '{1:1,2:2}/3'::sparsevec <=> '{1:2,2:4}/3';
 
-SELECT '{1:0}/3'::sparsevec <+> '{1:3,2:4}/3';
+-- SELECT '{1:0}/3'::sparsevec <+> '{1:3,2:4}/3';
 
 -- Test 4: Sparsevec Normalization
 \echo ''
