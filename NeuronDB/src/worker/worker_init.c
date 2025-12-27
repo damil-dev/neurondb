@@ -107,6 +107,9 @@ _PG_init(void)
 	add_int_reloption(relopt_kind_ivf, "lists",
 					  "Number of inverted lists",
 					  100, 1, 10000, AccessExclusiveLock);
+	add_int_reloption(relopt_kind_ivf, "probes",
+					  "Number of lists to probe",
+					  10, 1, 1000, AccessExclusiveLock);
 
 	/* Initialize all GUC variables (centralized) */
 	neurondb_init_all_gucs();

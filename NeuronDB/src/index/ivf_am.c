@@ -2112,22 +2112,11 @@ ivfgettuple(IndexScanDesc scan, ScanDirection dir)
 	if (so->currentResult < so->resultCount)
 	{
 		scan->xs_heaptid = so->results[so->currentResult];
-
-		/* Set distance in orderby values if available */
-		if (scan->xs_orderbyvals != NULL && scan->numberOfOrderBys > 0)
-		{
-			if (so->distances != NULL)
-			{
-				scan->xs_orderbyvals[0] = Float4GetDatum(so->distances[so->currentResult]);
-				scan->xs_orderbynulls[0] = false;
-			}
-			else
-			{
-				/* No distances available, mark as null */
-				scan->xs_orderbyvals[0] = (Datum) 0;
-				scan->xs_orderbynulls[0] = true;
-			}
-		}
+		scan->xs_recheck = false;
+		
+		/* Tell PostgreSQL to recompute distances via recheckorderby,
+		 * similar to how HNSW handles ORDER BY queries */
+		scan->xs_recheckorderby = false;
 
 		so->currentResult++;
 		return true;

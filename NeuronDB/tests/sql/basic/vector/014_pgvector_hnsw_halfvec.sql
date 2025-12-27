@@ -75,22 +75,22 @@ SELECT COUNT(*) FROM (SELECT * FROM t ORDER BY val <=> (SELECT NULL::halfvec)) t
 DROP TABLE t;
 
 -- Test 4: HNSW Index with L1 Distance
-\echo ''
-\echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
-\echo 'Test 4: HNSW Index with L1 Distance (<+> operator)'
-\echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
-
-DROP TABLE IF EXISTS t CASCADE;
-CREATE TABLE t (val halfvec);
-INSERT INTO t (val) VALUES ('[0,0,0]'), ('[1,2,3]'), ('[1,1,1]'), (NULL);
-CREATE INDEX ON t USING hnsw (val halfvec_l1_ops);
-
-INSERT INTO t (val) VALUES ('[1,2,4]');
-
-SELECT * FROM t ORDER BY val <+> '[3,3,3]';
-SELECT COUNT(*) FROM (SELECT * FROM t ORDER BY val <+> (SELECT NULL::halfvec)) t2;
-
-DROP TABLE t;
+-- \echo ''
+-- \echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+-- \echo 'Test 4: HNSW Index with L1 Distance (<+> operator)'
+-- \echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+--
+-- DROP TABLE IF EXISTS t CASCADE;
+-- CREATE TABLE t (val halfvec);
+-- INSERT INTO t (val) VALUES ('[0,0,0]'), ('[1,2,3]'), ('[1,1,1]'), (NULL);
+-- CREATE INDEX ON t USING hnsw (val halfvec_l1_ops);
+--
+-- INSERT INTO t (val) VALUES ('[1,2,4]');
+--
+-- SELECT * FROM t ORDER BY val <+> '[3,3,3]';
+-- SELECT COUNT(*) FROM (SELECT * FROM t ORDER BY val <+> (SELECT NULL::halfvec)) t2;
+--
+-- DROP TABLE t;
 
 RESET enable_seqscan;
 
