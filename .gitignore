@@ -120,9 +120,14 @@ secrets/
 # ============================================================================
 
 # Go binaries
+NeuronAgent/bin/
+NeuronAgent/bin/neuronagent
+NeuronAgent/bin/neuronagent-cli
 NeuronAgent/agent-server
 NeuronAgent/cmd/*/agent-server
 NeuronAgent/cmd/*/generate-key
+NeuronAgent/cmd/*/neuronagent-cli
+NeuronAgent/neuronagent-cli
 *.exe
 *.exe~
 *.dll
@@ -264,6 +269,7 @@ NeuronMCP/**/dist/
 
 # Compiled binaries
 NeuronMCP/neurondb-mcp
+NeuronMCP/bin/
 NeuronMCP/bin/neurondb-mcp
 NeuronMCP/cmd/*/neurondb-mcp
 
@@ -275,6 +281,34 @@ NeuronMCP/vendor/
 # Backup files
 NeuronMCP/*.backup*
 NeuronMCP/fix_*.js
+
+# ============================================================================
+# NEURONDESKTOP (Go API + Next.js Frontend)
+# ============================================================================
+
+# Go binaries
+NeuronDesktop/api/bin/
+NeuronDesktop/api/bin/neurondesk-api
+NeuronDesktop/api/**/neurondesk-api
+
+# Node.js / Next.js
+NeuronDesktop/frontend/node_modules/
+NeuronDesktop/frontend/**/node_modules/
+NeuronDesktop/frontend/.next/
+NeuronDesktop/frontend/out/
+NeuronDesktop/frontend/dist/
+NeuronDesktop/frontend/build/
+
+# Go test binaries and coverage
+NeuronDesktop/api/**/*.test
+NeuronDesktop/api/**/*.out
+NeuronDesktop/api/coverage.txt
+NeuronDesktop/api/coverage.html
+
+# Next.js build artifacts
+NeuronDesktop/frontend/.next
+NeuronDesktop/frontend/out
+*.tsbuildinfo
 
 # ============================================================================
 # DOCKER

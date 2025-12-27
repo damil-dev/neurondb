@@ -1,0 +1,10 @@
+*.md
+.git
+.gitignore
+*.test
+*.out
+bin/
+vendor/
+.env
+.env.local
+
