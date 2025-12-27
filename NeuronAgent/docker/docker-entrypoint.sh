@@ -72,17 +72,10 @@ elif [ -n "${CONFIG_PATH}" ]; then
     log_warn "Config file specified but not found: ${CONFIG_PATH}"
 fi
 
-# Check if migrations need to be run
-MIGRATIONS_DIR=""
-if [ -d "/app/migrations" ]; then
-    MIGRATIONS_DIR="/app/migrations"
-elif [ -d "/usr/share/neuronagent/migrations" ]; then
-    MIGRATIONS_DIR="/usr/share/neuronagent/migrations"
-fi
-
-if [ -n "$MIGRATIONS_DIR" ]; then
-    MIGRATION_COUNT=$(find "$MIGRATIONS_DIR" -name "*.sql" | wc -l)
-    log_info "Found ${MIGRATION_COUNT} migration file(s) in ${MIGRATIONS_DIR}"
+# Check if initial schema needs to be run
+INITIAL_SCHEMA="/app/initial_schema.sql"
+if [ -f "$INITIAL_SCHEMA" ]; then
+    log_info "Found initial_schema.sql file"
     
     # Check if NeuronAgent schema is already set up (idempotency check)
     if command -v psql >/dev/null 2>&1; then
@@ -95,13 +88,17 @@ if [ -n "$MIGRATIONS_DIR" ]; then
         SCHEMA_EXISTS=$(psql "$CONN_STR" -tAc "SELECT 1 FROM information_schema.tables WHERE table_schema = 'neurondb_agent' AND table_name = 'agents'" 2>/dev/null || echo "0")
         
         if [ "$SCHEMA_EXISTS" = "1" ]; then
-            log_info "NeuronAgent schema already exists, skipping migrations (already initialized by NeuronDB)"
+            log_info "NeuronAgent schema already exists, skipping initial schema setup"
         else
-            log_info "NeuronAgent schema not found, migrations may need to be run manually if not auto-initialized"
+            log_info "NeuronAgent schema not found, initial schema setup may need to be run manually"
+            log_info "To setup schema manually: psql \$CONN_STR -f $INITIAL_SCHEMA"
         fi
     fi
+elif [ -d "/app/migrations" ]; then
+    MIGRATION_COUNT=$(find "/app/migrations" -name "*.sql" | wc -l)
+    log_info "Found ${MIGRATION_COUNT} migration file(s) in /app/migrations (initial_schema.sql not found, using migration files)"
 else
-    log_warn "Migrations directory not found in /app/migrations or /usr/share/neuronagent/migrations"
+    log_warn "Initial schema file not found at $INITIAL_SCHEMA and migrations directory not found"
 fi
 
 # Log startup information
