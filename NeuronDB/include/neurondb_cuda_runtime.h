@@ -17,6 +17,7 @@
 #else
 /* Minimal shim so host code can build when CUDA support is disabled */
 typedef void *cudaStream_t;
+typedef int cudaError_t;
 #endif
 
 #endif							/* NEURONDB_CUDA_RUNTIME_H */

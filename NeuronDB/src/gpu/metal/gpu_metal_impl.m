@@ -100,13 +100,30 @@ metal_backend_init(void)
 		}
 		
 		/* Retain both device and queue BEFORE autoreleasepool ends */
+		/* Important: Retain must happen inside the autoreleasepool to ensure proper memory management */
 		metal_device = [temp_device retain];
 		metal_command_queue = [temp_queue retain];
+		
+		/* Verify retention succeeded before leaving autoreleasepool */
+		if (!metal_device || !metal_command_queue)
+		{
+			fprintf(stderr, "[Metal] ERROR: Failed to retain device or command queue\n");
+			fflush(stderr);
+			if (metal_device)
+				[metal_device release];
+			if (metal_command_queue)
+				[metal_command_queue release];
+			metal_device = nil;
+			metal_command_queue = nil;
+			return false;
+		}
 	}
 	
-	/* Now we're outside the autoreleasepool, but device/queue are retained */
+	/* Now we're outside the autoreleasepool, verify retained objects are still valid */
 	if (!metal_device || !metal_command_queue)
 	{
+		fprintf(stderr, "[Metal] ERROR: Device or command queue became nil after autoreleasepool\n");
+		fflush(stderr);
 		if (metal_device)
 			[metal_device release];
 		if (metal_command_queue)

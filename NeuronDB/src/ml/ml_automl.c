@@ -103,6 +103,174 @@ neurondb_automl_choose_backend(const char *algorithm)
 }
 
 /*
+ * Helper function to evaluate a model and extract score from JSONB result
+ * This is extracted to avoid shadow warnings from nested PG_TRY blocks
+ */
+static float
+automl_evaluate_model_score(int32 model_id, const char *table_name_str,
+							const char *feature_col_str, const char *label_col_str)
+{
+	FmgrInfo	eval_flinfo;
+	Oid			eval_func_oid;
+	List	   *eval_funcname = NULL;
+	Oid			eval_argtypes[4];
+	Datum		eval_values[4];
+	Datum		eval_result_datum;
+	Jsonb	   *metrics_jsonb = NULL;
+	bool		metrics_isnull = false;
+	JsonbIterator *eval_it = NULL;
+	JsonbValue	eval_v;
+	JsonbIteratorToken eval_r;
+	float		extracted_score = 0.5f;	/* Default score */
+
+	/* Lookup neurondb.evaluate function */
+	eval_funcname = list_make2(makeString("neurondb"), makeString("evaluate"));
+	eval_argtypes[0] = INT4OID; /* model_id */
+	eval_argtypes[1] = TEXTOID; /* table_name */
+	eval_argtypes[2] = TEXTOID; /* feature_col */
+	eval_argtypes[3] = TEXTOID; /* label_col */
+	eval_func_oid = LookupFuncName(eval_funcname, 4, eval_argtypes, false);
+	list_free(eval_funcname);
+
+	if (!OidIsValid(eval_func_oid))
+	{
+		/* Function not found - use default score */
+		return 0.5f;
+	}
+
+	{
+		text	   *eval_table_name_text = NULL;
+		text	   *eval_feature_col_text = NULL;
+		text	   *eval_label_col_text = NULL;
+
+		/* Prepare function call */
+		fmgr_info(eval_func_oid, &eval_flinfo);
+
+		/* Set up arguments - create text objects from strings */
+		eval_table_name_text = cstring_to_text(table_name_str);
+		eval_feature_col_text = cstring_to_text(feature_col_str);
+		eval_label_col_text = cstring_to_text(label_col_str);
+
+		eval_values[0] = Int32GetDatum(model_id);
+		eval_values[1] = PointerGetDatum(eval_table_name_text);
+		eval_values[2] = PointerGetDatum(eval_feature_col_text);
+		eval_values[3] = PointerGetDatum(eval_label_col_text);
+
+		/*
+		 * Call neurondb.evaluate() directly - avoids nested SPI and
+		 * transaction visibility issues
+		 */
+		PG_TRY();
+		{
+			eval_result_datum = FunctionCall4(&eval_flinfo,
+											  eval_values[0], eval_values[1],
+											  eval_values[2], eval_values[3]);
+
+			metrics_jsonb = DatumGetJsonbP(eval_result_datum);
+			metrics_isnull = (metrics_jsonb == NULL);
+
+			if (!metrics_isnull && metrics_jsonb != NULL)
+			{
+				/* Extract metric value from JSONB */
+				eval_it = JsonbIteratorInit((JsonbContainer *) & metrics_jsonb->root);
+
+				while ((eval_r = JsonbIteratorNext(&eval_it, &eval_v, false)) != WJB_DONE)
+				{
+					if (eval_r == WJB_KEY)
+					{
+						char	   *eval_key = pnstrdup(eval_v.val.string.val, eval_v.val.string.len);
+
+						if (strcmp(eval_key, "accuracy") == 0 ||
+							strcmp(eval_key, "r_squared") == 0 ||
+							strcmp(eval_key, "f1_score") == 0)
+						{
+							eval_r = JsonbIteratorNext(&eval_it, &eval_v, false);
+							if (eval_r == WJB_VALUE && eval_v.type == jbvNumeric)
+							{
+								extracted_score = (float) DatumGetFloat8(
+																 DirectFunctionCall1(numeric_float8,
+																					 NumericGetDatum(eval_v.val.numeric)));
+								nfree(eval_key);
+								break;
+							}
+						}
+						nfree(eval_key);
+					}
+				}
+			}
+		}
+		PG_CATCH();
+		{
+			/* Evaluation failed - use default score */
+			FlushErrorState();
+			extracted_score = 0.5f;
+		}
+		PG_END_TRY();
+	}
+
+	return extracted_score;
+}
+
+/*
+ * Helper function to extract score from metrics JSONB
+ * This is extracted to avoid shadow warnings from nested PG_TRY blocks
+ */
+static bool
+automl_extract_score_from_jsonb(Jsonb *metrics_jsonb, float *score_out)
+{
+	JsonbIterator *extract_it = NULL;
+	JsonbValue	extract_v;
+	JsonbIteratorToken extract_r;
+	bool		found = false;
+
+	if (metrics_jsonb == NULL)
+	{
+		*score_out = -1.0f;
+		return false;
+	}
+
+	PG_TRY();
+	{
+		extract_it = JsonbIteratorInit((JsonbContainer *) & metrics_jsonb->root);
+
+		while ((extract_r = JsonbIteratorNext(&extract_it, &extract_v, false)) != WJB_DONE)
+		{
+			if (extract_r == WJB_KEY)
+			{
+				char	   *extract_key = pnstrdup(extract_v.val.string.val,
+												   extract_v.val.string.len);
+
+				extract_r = JsonbIteratorNext(&extract_it, &extract_v, false);
+				if ((strcmp(extract_key, "accuracy") == 0 ||
+					 strcmp(extract_key, "r2") == 0 ||
+					 strcmp(extract_key, "r_squared") == 0) &&
+					extract_v.type == jbvNumeric)
+				{
+					*score_out = (float) DatumGetFloat8(
+												   DirectFunctionCall1(numeric_float8,
+																	   NumericGetDatum(extract_v.val.numeric)));
+					found = true;
+					nfree(extract_key);
+					break;
+				}
+				nfree(extract_key);
+			}
+		}
+	}
+	PG_CATCH();
+	{
+		FlushErrorState();
+		elog(WARNING,
+			 "optimize_hyperparameters: Failed to parse metrics JSONB (possibly corrupted)");
+		found = false;
+		*score_out = -1.0f;
+	}
+	PG_END_TRY();
+
+	return found;
+}
+
+/*
  * auto_train - Automated model selection with GPU acceleration support
  *
  * User-facing function that trains multiple machine learning algorithms and
@@ -432,117 +600,11 @@ auto_train(PG_FUNCTION_ARGS)
 			continue;
 		}
 
-		/* Evaluate model using neurondb.evaluate() directly via function call */
-
-		/*
-		 * This avoids transaction visibility issues by calling the function
-		 * directly
-		 */
-		{
-			FmgrInfo	eval_flinfo;
-			Oid			eval_func_oid;
-			List *eval_funcname = NULL;
-			Oid			eval_argtypes[4];
-			Datum		eval_values[4];
-			Datum		eval_result_datum;
-
-			Jsonb *metrics_jsonb = NULL;
-			bool		metrics_isnull = false;
-			JsonbIterator *it = NULL;
-			JsonbValue	v;
-			JsonbIteratorToken r;
-			float		extracted_score = 0.5f; /* Default score */
-
-			/* Lookup neurondb.evaluate function */
-			eval_funcname = list_make2(makeString("neurondb"), makeString("evaluate"));
-			eval_argtypes[0] = INT4OID; /* model_id */
-			eval_argtypes[1] = TEXTOID; /* table_name */
-			eval_argtypes[2] = TEXTOID; /* feature_col */
-			eval_argtypes[3] = TEXTOID; /* label_col */
-			eval_func_oid = LookupFuncName(eval_funcname, 4, eval_argtypes, false);
-			list_free(eval_funcname);
-
-			if (OidIsValid(eval_func_oid))
-			{
-				text *eval_table_name_text = NULL;
-				text *eval_feature_col_text = NULL;
-				text *eval_label_col_text = NULL;
-
-				/* Prepare function call */
-				fmgr_info(eval_func_oid, &eval_flinfo);
-
-				/* Set up arguments - create text objects from strings */
-				eval_table_name_text = cstring_to_text(table_name_str);
-				eval_feature_col_text = cstring_to_text(feature_col_str);
-				eval_label_col_text = cstring_to_text(label_col_str);
-
-				eval_values[0] = Int32GetDatum(model_id);
-				eval_values[1] = PointerGetDatum(eval_table_name_text);
-				eval_values[2] = PointerGetDatum(eval_feature_col_text);
-				eval_values[3] = PointerGetDatum(eval_label_col_text);
-
-				/*
-				 * Call neurondb.evaluate() directly - avoids nested SPI and
-				 * transaction visibility issues
-				 */
-				/* Suppress shadow warnings from nested PG_TRY blocks */
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wshadow=compatible-local"
-				PG_TRY();
-				{
-					eval_result_datum = FunctionCall4(&eval_flinfo,
-													  eval_values[0], eval_values[1],
-													  eval_values[2], eval_values[3]);
-
-					metrics_jsonb = DatumGetJsonbP(eval_result_datum);
-					metrics_isnull = (metrics_jsonb == NULL);
-
-					if (!metrics_isnull && metrics_jsonb != NULL)
-					{
-						/* Extract metric value from JSONB */
-						it = JsonbIteratorInit((JsonbContainer *) & metrics_jsonb->root);
-
-						while ((r = JsonbIteratorNext(&it, &v, false)) != WJB_DONE)
-						{
-							if (r == WJB_KEY)
-							{
-								char	   *key = pnstrdup(v.val.string.val, v.val.string.len);
-
-								if (strcmp(key, "accuracy") == 0 ||
-									strcmp(key, "r_squared") == 0 ||
-									strcmp(key, "f1_score") == 0)
-								{
-									r = JsonbIteratorNext(&it, &v, false);
-									if (r == WJB_VALUE && v.type == jbvNumeric)
-									{
-										extracted_score = (float) DatumGetFloat8(
-																				 DirectFunctionCall1(numeric_float8,
-																									 NumericGetDatum(v.val.numeric)));
-										break;
-									}
-								}
-								nfree(key);
-							}
-						}
-					}
-				}
-				PG_CATCH();
-				{
-					/* Evaluation failed - use default score */
-					FlushErrorState();
-					extracted_score = 0.5f;
-				}
-				PG_END_TRY();
-#pragma GCC diagnostic pop
-
-				scores[i].score = extracted_score;
-			}
-			else
-			{
-				/* Function not found - use default score */
-				scores[i].score = 0.5f;
-			}
-		}
+		/* Evaluate model using helper function to avoid shadow warnings */
+		scores[i].score = automl_evaluate_model_score(model_id,
+													  table_name_str,
+													  feature_col_str,
+													  label_col_str);
 
 		/* Set first valid model as best */
 		if (best_model_id == 0 && scores[i].model_id > 0)
@@ -710,9 +772,6 @@ optimize_hyperparameters(PG_FUNCTION_ARGS)
 					int32		model_id = 0;
 					float		score = -1.0f;
 					Jsonb *metrics_jsonb = NULL;
-					JsonbIterator *metrics_it = NULL;
-					JsonbValue	metrics_v;
-					int			metrics_r;
 					bool		found_score = false;
 
 					initStringInfo(&params_json);
@@ -830,55 +889,8 @@ optimize_hyperparameters(PG_FUNCTION_ARGS)
 								{
 									metrics_jsonb = DatumGetJsonbP(metrics_datum);
 
-									/*
-									 * Wrap in PG_TRY to handle corrupted
-									 * JSONB gracefully
-									 */
-
-				/*
-				 * Suppress shadow warnings from nested
-				 * PG_TRY blocks
-				 */
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wshadow=compatible-local"
-				PG_TRY();
-									{
-										metrics_it = JsonbIteratorInit((JsonbContainer *) & metrics_jsonb->root);
-
-										while ((metrics_r = JsonbIteratorNext(&metrics_it, &metrics_v, false)) != WJB_DONE)
-										{
-											if (metrics_r == WJB_KEY)
-											{
-												char	   *key = pnstrdup(metrics_v.val.string.val,
-																		   metrics_v.val.string.len);
-
-												metrics_r = JsonbIteratorNext(&metrics_it, &metrics_v, false);
-												if ((strcmp(key, "accuracy") == 0 ||
-													 strcmp(key, "r2") == 0 ||
-													 strcmp(key, "r_squared") == 0) &&
-													metrics_v.type == jbvNumeric)
-												{
-													score = (float) DatumGetFloat8(
-																				   DirectFunctionCall1(numeric_float8,
-																									   NumericGetDatum(metrics_v.val.numeric)));
-													found_score = true;
-													nfree(key);
-													break;
-												}
-												nfree(key);
-											}
-										}
-									}
-									PG_CATCH();
-									{
-										FlushErrorState();
-										elog(WARNING,
-											 "optimize_hyperparameters: Failed to parse metrics JSONB (possibly corrupted)");
-										found_score = false;
-										score = -1.0f;
-									}
-									PG_END_TRY();
-#pragma GCC diagnostic pop
+									/* Extract score from JSONB using helper function */
+									found_score = automl_extract_score_from_jsonb(metrics_jsonb, &score);
 
 									/* Track best combination */
 									if (found_score && score > best_score)

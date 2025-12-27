@@ -1770,26 +1770,6 @@ dt_predict_batch(const DTModel *model,
 			fn++;
 	}
 
-	/* Count actual class distribution for debugging */
-	{
-		int			class0_count = 0,
-					class1_count = 0;
-
-		for (int j = 0; j < i; j++)
-		{
-			double		y = labels[j];
-
-			if (isfinite(y))
-			{
-				int			c = (y > 0.5) ? 1 : 0;
-
-				if (c == 0)
-					class0_count++;
-				else
-					class1_count++;
-			}
-		}
-	}
 
 	if (tp_out)
 		*tp_out = tp;

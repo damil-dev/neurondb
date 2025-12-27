@@ -27,7 +27,6 @@ extern "C"
 #ifdef NDB_GPU_CUDA
 /* cuBLAS handle accessor */
 extern cublasHandle_t ndb_cuda_get_cublas_handle(void);
-#endif
 
 cudaError_t launch_quantize_fp32_to_fp16(const float *input,
 										 void *output,
@@ -60,6 +59,7 @@ cudaError_t launch_quantize_fp32_to_binary(const float *input,
 										   unsigned char *output,
 										   int count,
 										   cudaStream_t stream);
+#endif
 
 int			gpu_kmeans_assign(const float *h_vectors,
 							  const float *h_centroids,

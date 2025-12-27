@@ -1067,9 +1067,7 @@ catboost_gpu_release_state(CatBoostGpuModelState *state)
 	nfree(state);
 }
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-function"
-static bytea *
+static bytea * __attribute__((unused))
 catboost_model_serialize_to_bytea(int iterations, int depth, float learning_rate, int n_features, const char *loss_function, uint8 training_backend)
 {
 	StringInfoData buf;
@@ -1107,7 +1105,6 @@ catboost_model_serialize_to_bytea(int iterations, int depth, float learning_rate
 
 	return result;
 }
-#pragma GCC diagnostic pop
 
 static int
 catboost_model_deserialize_from_bytea(const bytea * data, int *iterations_out, int *depth_out, float *learning_rate_out, int *n_features_out, char *loss_function_out, int loss_max, uint8 * training_backend_out)

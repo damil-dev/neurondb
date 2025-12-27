@@ -868,9 +868,7 @@ ndb_cuda_hf_embed(const char *model_name,
  * ndb_cuda_hf_parse_gen_params is now replaced by ndb_json_parse_gen_params from neurondb_json.h
  * The old implementation is removed - use centralized JSON parsing
  */
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-function"
-static int
+static int __attribute__((unused))
 ndb_cuda_hf_parse_gen_params_OLD_REMOVED(const char *params_json,
 										 const char *model_name,
 										 NdbCudaHfGenParams *gen_params,
@@ -1818,7 +1816,6 @@ ndb_cuda_hf_parse_gen_params_OLD_REMOVED(const char *params_json,
 	nfree(json_copy);
 	return 0;
 }
-#pragma GCC diagnostic pop
 /* OLD FUNCTION REMOVED - use ndb_json_parse_gen_params instead */
 
 /*

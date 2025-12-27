@@ -139,7 +139,9 @@ ndb_gpu_try_train_model(const char *algorithm,
 	}
 
 	/* Check if algorithm is unsupervised (doesn't require label_vector) */
-	bool is_unsupervised = (algorithm != NULL && (
+	bool		is_unsupervised;
+
+	is_unsupervised = (algorithm != NULL && (
 		strcmp(algorithm, "gmm") == 0 ||
 		strcmp(algorithm, "kmeans") == 0 ||
 		strcmp(algorithm, "minibatch_kmeans") == 0 ||
@@ -366,8 +368,8 @@ ndb_gpu_try_train_model(const char *algorithm,
 		PG_CATCH();
 		{
 			/* Catch any PostgreSQL-level errors from ops->train */
-			ErrorData *edata;
-			char *error_msg;
+			ErrorData *edata = NULL;
+			char *error_msg = NULL;
 			
 			/* In GPU mode, re-throw the error immediately - no fallback allowed */
 			/* Don't try to capture error data here as it may be corrupted */

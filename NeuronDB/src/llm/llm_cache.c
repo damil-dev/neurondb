@@ -41,9 +41,7 @@
 #include "neurondb_constants.h"
 #include "neurondb_json.h"
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-function"
-static char *
+static char * __attribute__((unused))
 ndb_json_quote_string_OLD_REMOVED(const char *str)
 {
 	StringInfoData buf;
@@ -98,7 +96,6 @@ ndb_json_quote_string_OLD_REMOVED(const char *str)
 	nfree(buf.data);
 	return result;
 }
-#pragma GCC diagnostic pop
 
 /*
  * Returns true if a non-stale cache entry is found for 'key' (and text value, if non-NULL), false otherwise.
