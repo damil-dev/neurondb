@@ -32,7 +32,7 @@ CREATE OR REPLACE VIEW test_train_view AS SELECT features, label FROM test_train
 \echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
 
 \echo 'Test 1: Create tenant worker'
-SELECT create_tenant_worker('tenant1', 'queue', '{"batch_size": 100}') AS worker_created;
+SELECT create_tenant_worker('tenant1'::text, 'queue'::text, '{"batch_size": 100}'::text) AS worker_created;
 
 \echo 'Test 2: Get tenant statistics'
 SELECT * FROM get_tenant_stats('tenant1');

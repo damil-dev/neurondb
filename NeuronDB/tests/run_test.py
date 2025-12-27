@@ -1065,7 +1065,10 @@ def create_test_views(dbname: str, psql_path: str, num_rows: int, host: Optional
 			test_proc = subprocess.Popen(check_test_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
 			test_out, test_err = test_proc.communicate()
 			
-			if test_proc.returncode == 0 and test_out.strip() and int(test_out.strip()) > 0:
+			# If test table doesn't exist, we'll split train table into train/test views
+			test_table_exists = test_proc.returncode == 0 and test_out.strip() and int(test_out.strip()) > 0
+			
+			if test_table_exists:
 				# Check class distribution in test table - if imbalanced, regenerate
 				check_class_dist_cmd = [
 					psql_path, "-d", dbname, "-t", "-A", "-w",
@@ -1281,18 +1284,256 @@ TRUNCATE TABLE test_metrics;
 				
 				if create_proc.returncode == 0:
 					# Verify views were created and get row count
+					# Check both test_train_view and test_test_view exist and have rows
 					count_cmd = [
 						psql_path, "-d", dbname, "-t", "-A", "-w",
-						"-c", "SELECT COALESCE((SELECT COUNT(*) FROM test_train_view), 0);"
+						"-c", "SELECT COALESCE((SELECT COUNT(*) FROM test_train_view), 0), COALESCE((SELECT COUNT(*) FROM test_test_view), 0);"
 					]
 					
 					count_proc = subprocess.Popen(count_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
 					count_out, count_err = count_proc.communicate()
 					
 					if count_proc.returncode == 0 and count_out.strip():
-						row_count = int(count_out.strip())
-						if row_count > 0:
-							return True, row_count
+						parts = count_out.strip().split('|')
+						if len(parts) >= 2:
+							train_count = int(parts[0].strip())
+							test_count = int(parts[1].strip())
+							if train_count > 0 and test_count > 0:
+								return True, train_count
+							elif train_count > 0:
+								print(f"Warning: test_train_view has {train_count} rows but test_test_view has 0 rows or doesn't exist.", file=sys.stderr)
+					# If row count is 0, something went wrong
+					if count_err:
+						print(f"Warning: View created but has 0 rows. Error: {count_err}", file=sys.stderr)
+				else:
+					# View creation failed - log error for debugging
+					if create_err:
+						# Only show error if it's not about vector type (we handle that gracefully)
+						if "type \"vector\" does not exist" not in create_err.lower():
+							print(f"Warning: View creation failed: {create_err}", file=sys.stderr)
+			else:
+				# Test table doesn't exist, but train table does - split train table into train/test views
+				# Check if vector extension is available
+				check_vector_cmd = [
+					psql_path, "-d", dbname, "-t", "-A", "-w",
+					"-c", "SELECT EXISTS(SELECT 1 FROM pg_type WHERE typname = 'vector');"
+				]
+				vector_check = subprocess.Popen(check_vector_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
+				vector_out, vector_err = vector_check.communicate()
+				has_vector = vector_check.returncode == 0 and vector_out.strip() == "t"
+				
+				# Create views with 80/20 split from train table (80% training, 20% test)
+				train_rows = int(num_rows * 0.8)
+				test_rows = int(num_rows * 0.2)
+				
+				# Use stratified sampling to ensure both classes are represented
+				train_rows_class_0 = int(train_rows * 0.5)
+				train_rows_class_1 = train_rows - train_rows_class_0
+				test_rows_class_0 = int(test_rows * 0.5)
+				test_rows_class_1 = test_rows - test_rows_class_0
+				
+				if has_vector:
+					# Try vector cast, fallback to REAL[] if it fails
+					# Split train table into train/test views (80/20) using row_number with ctid for deterministic ordering
+					create_sql = f"""
+DROP VIEW IF EXISTS test_train_view CASCADE;
+DROP VIEW IF EXISTS test_test_view CASCADE;
+
+DO $$
+BEGIN
+	-- Try to create views with vector cast and stratified sampling from train table
+	BEGIN
+		-- Use row_number with ctid for deterministic ordering, then split 80/20
+		EXECUTE format('CREATE VIEW test_train_view AS 
+			WITH numbered_data AS (
+				SELECT features, label, row_number() OVER (PARTITION BY label ORDER BY ctid) as rn,
+				       COUNT(*) OVER (PARTITION BY label) as total
+				FROM %s
+			)
+			SELECT features::vector(28) as features, label 
+			FROM numbered_data
+			WHERE (label = 0 AND rn <= (total * 0.8)::int) OR (label = 1 AND rn <= (total * 0.8)::int)
+			ORDER BY random()', 
+			'{train_table_full}');
+		
+		EXECUTE format('CREATE VIEW test_test_view AS 
+			WITH numbered_data AS (
+				SELECT features, label, row_number() OVER (PARTITION BY label ORDER BY ctid) as rn,
+				       COUNT(*) OVER (PARTITION BY label) as total
+				FROM %s
+			)
+			SELECT features::vector(28) as features, label 
+			FROM numbered_data
+			WHERE (label = 0 AND rn > (total * 0.8)::int) OR (label = 1 AND rn > (total * 0.8)::int)
+			ORDER BY random()', 
+			'{train_table_full}');
+	EXCEPTION WHEN OTHERS THEN
+		-- Fallback to REAL[] if vector cast fails
+		EXECUTE format('CREATE VIEW test_train_view AS 
+			WITH numbered_data AS (
+				SELECT features, label, row_number() OVER (PARTITION BY label ORDER BY ctid) as rn,
+				       COUNT(*) OVER (PARTITION BY label) as total
+				FROM %s
+			)
+			SELECT features as features, label 
+			FROM numbered_data
+			WHERE (label = 0 AND rn <= (total * 0.8)::int) OR (label = 1 AND rn <= (total * 0.8)::int)
+			ORDER BY random()', 
+			'{train_table_full}');
+		
+		EXECUTE format('CREATE VIEW test_test_view AS 
+			WITH numbered_data AS (
+				SELECT features, label, row_number() OVER (PARTITION BY label ORDER BY ctid) as rn,
+				       COUNT(*) OVER (PARTITION BY label) as total
+				FROM %s
+			)
+			SELECT features as features, label 
+			FROM numbered_data
+			WHERE (label = 0 AND rn > (total * 0.8)::int) OR (label = 1 AND rn > (total * 0.8)::int)
+			ORDER BY random()', 
+			'{train_table_full}');
+	END;
+END $$;
+
+-- Create or truncate test settings table for test runner configuration
+CREATE TABLE IF NOT EXISTS test_settings (
+	setting_key TEXT PRIMARY KEY,
+	setting_value TEXT,
+	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create or truncate test metrics table for storing test results
+CREATE TABLE IF NOT EXISTS test_metrics (
+	test_name TEXT PRIMARY KEY,
+	algorithm TEXT,
+	model_id INTEGER,
+	train_samples BIGINT,
+	test_samples BIGINT,
+	-- Regression metrics
+	mse NUMERIC,
+	rmse NUMERIC,
+	mae NUMERIC,
+	r_squared NUMERIC,
+	-- Classification metrics
+	accuracy NUMERIC,
+	precision NUMERIC,
+	recall NUMERIC,
+	f1_score NUMERIC,
+	-- Clustering metrics
+	silhouette_score NUMERIC,
+	inertia NUMERIC,
+	n_clusters INTEGER,
+	-- Time series metrics
+	mape NUMERIC,
+	-- Predictions (stored as JSONB for flexibility)
+	predictions JSONB,
+	-- Additional metadata
+	metadata JSONB,
+	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+TRUNCATE TABLE test_metrics;
+"""
+				else:
+					# No vector extension, use REAL[] directly with stratified sampling
+					# Split train table into train/test views (80/20) using row_number with ctid for deterministic ordering
+					create_sql = f"""
+DROP VIEW IF EXISTS test_train_view CASCADE;
+DROP VIEW IF EXISTS test_test_view CASCADE;
+
+CREATE VIEW test_train_view AS
+WITH numbered_data AS (
+	SELECT features, label, row_number() OVER (PARTITION BY label ORDER BY ctid) as rn,
+	       COUNT(*) OVER (PARTITION BY label) as total
+	FROM {train_table_full}
+)
+SELECT features as features, label 
+FROM numbered_data
+WHERE (label = 0 AND rn <= (total * 0.8)::int) OR (label = 1 AND rn <= (total * 0.8)::int)
+ORDER BY random();
+
+CREATE VIEW test_test_view AS
+WITH numbered_data AS (
+	SELECT features, label, row_number() OVER (PARTITION BY label ORDER BY ctid) as rn,
+	       COUNT(*) OVER (PARTITION BY label) as total
+	FROM {train_table_full}
+)
+SELECT features as features, label 
+FROM numbered_data
+WHERE (label = 0 AND rn > (total * 0.8)::int) OR (label = 1 AND rn > (total * 0.8)::int)
+ORDER BY random();
+
+-- Create or truncate test settings table for test runner configuration
+CREATE TABLE IF NOT EXISTS test_settings (
+	setting_key TEXT PRIMARY KEY,
+	setting_value TEXT,
+	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create or truncate test metrics table for storing test results
+CREATE TABLE IF NOT EXISTS test_metrics (
+	test_name TEXT PRIMARY KEY,
+	algorithm TEXT,
+	model_id INTEGER,
+	train_samples BIGINT,
+	test_samples BIGINT,
+	-- Regression metrics
+	mse NUMERIC,
+	rmse NUMERIC,
+	mae NUMERIC,
+	r_squared NUMERIC,
+	-- Classification metrics
+	accuracy NUMERIC,
+	precision NUMERIC,
+	recall NUMERIC,
+	f1_score NUMERIC,
+	-- Clustering metrics
+	silhouette_score NUMERIC,
+	inertia NUMERIC,
+	n_clusters INTEGER,
+	-- Time series metrics
+	mape NUMERIC,
+	-- Predictions (stored as JSONB for flexibility)
+	predictions JSONB,
+	-- Additional metadata
+	metadata JSONB,
+	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+TRUNCATE TABLE test_metrics;
+"""
+				
+				create_proc = subprocess.Popen(
+					[psql_path, "-d", dbname, "-w", "-c", create_sql],
+					stdout=subprocess.PIPE,
+					stderr=subprocess.PIPE,
+					text=True,
+					env=env
+				)
+				create_out, create_err = create_proc.communicate()
+				
+				if create_proc.returncode == 0:
+					# Verify views were created and get row count
+					# Check both test_train_view and test_test_view exist and have rows
+					count_cmd = [
+						psql_path, "-d", dbname, "-t", "-A", "-w",
+						"-c", "SELECT COALESCE((SELECT COUNT(*) FROM test_train_view), 0), COALESCE((SELECT COUNT(*) FROM test_test_view), 0);"
+					]
+					
+					count_proc = subprocess.Popen(count_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
+					count_out, count_err = count_proc.communicate()
+					
+					if count_proc.returncode == 0 and count_out.strip():
+						parts = count_out.strip().split('|')
+						if len(parts) >= 2:
+							train_count = int(parts[0].strip())
+							test_count = int(parts[1].strip())
+							if train_count > 0 and test_count > 0:
+								return True, train_count
+							elif train_count > 0:
+								print(f"Warning: test_train_view has {train_count} rows but test_test_view has 0 rows or doesn't exist.", file=sys.stderr)
 					# If row count is 0, something went wrong
 					if count_err:
 						print(f"Warning: View created but has 0 rows. Error: {count_err}", file=sys.stderr)
