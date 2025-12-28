@@ -22,7 +22,7 @@ NeuronDB extends PostgreSQL with vector search, machine learning algorithms,
 and hybrid search capabilities. It provides:
 
   - Vector types and operations with HNSW and IVF indexing
-  - 52+ ML algorithms (classification, regression, clustering)
+  - 50+ ML functions across 19+ algorithms (classification, regression, clustering)
   - Embedding generation (text, image, multimodal)
   - Hybrid search combining vector and full-text
   - RAG pipeline with LLM integration
