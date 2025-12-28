@@ -4341,12 +4341,12 @@ evaluate_random_forest(PG_FUNCTION_ARGS)
 /*
  * rf_predict_batch
  *
- * Helper function to predict a batch of samples using Random Forest model.
- * Returns predictions array (double*) and updates confusion matrix.
- * Currently unused but kept for potential future batch prediction optimization.
+ * (removed unused function rf_predict_batch)
  */
+#if 0
+/* Removed unused function rf_predict_batch */
 static void
-rf_predict_batch(const RFModel *model,
+rf_predict_batch_removed(const RFModel *model,
 				 const float *features,
 				 const double *labels,
 				 int n_samples,
@@ -4549,6 +4549,7 @@ rf_predict_batch(const RFModel *model,
 	if (fn_out)
 		*fn_out = fn;
 }
+#endif
 
 /*
  * evaluate_random_forest_by_model_id
