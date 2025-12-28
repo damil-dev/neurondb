@@ -3,8 +3,38 @@
  * ml_unified_api.c
  *    Unified SQL API for machine learning operations.
  *
- * This module provides a simplified interface for training, prediction,
- * deployment, and model loading through SQL functions.
+ * This module provides a simplified, unified interface for machine learning
+ * operations in NeuronDB. It abstracts the complexity of algorithm-specific
+ * implementations behind a consistent SQL API, supporting both GPU and CPU
+ * execution paths with automatic fallback.
+ *
+ * Main Functions:
+ *    - neurondb_train: Train ML models from SQL tables
+ *    - neurondb_predict: Generate predictions using trained models
+ *    - neurondb_deploy: Deploy models for production use
+ *    - neurondb_load_model: Load external models (ONNX, TensorFlow, etc.)
+ *    - neurondb_evaluate: Evaluate model performance on test data
+ *
+ * Key Features:
+ *    - Automatic GPU/CPU fallback based on availability and configuration
+ *    - Support for supervised and unsupervised algorithms
+ *    - Hyperparameter management via JSONB
+ *    - Model versioning and catalog management
+ *    - Memory-safe operations with proper context management
+ *
+ * Memory Management:
+ *    All functions use dedicated memory contexts to prevent leaks. Memory
+ *    allocated in call contexts must be freed before context deletion.
+ *    SPI sessions are managed separately and must be properly ended.
+ *
+ * Thread Safety:
+ *    Functions are called from PostgreSQL backend processes. Each function
+ *    call operates in its own memory context. SPI operations are session-local.
+ *
+ * CHANGE NOTES:
+ *    - CAN MODIFY: Algorithm support, hyperparameter defaults, error messages
+ *    - CANNOT MODIFY: Memory context lifecycle, SPI session management order
+ *    - BREAKS IF: Memory contexts deleted while in use, SPI sessions used after end
  *
  * Copyright (c) 2024-2025, neurondb, Inc.
  *
@@ -61,12 +91,52 @@ PG_FUNCTION_INFO_V1(neurondb_load_model);
 PG_FUNCTION_INFO_V1(neurondb_evaluate);
 
 /*
- * ML Algorithm enumeration
- * This enum provides type-safe algorithm identification
+ * MLAlgorithm
+ *		Type-safe enumeration of supported machine learning algorithms.
+ *
+ * This enum provides compile-time type safety for algorithm identification
+ * throughout the unified API. Algorithms are grouped by learning type:
+ *
+ * Classification Algorithms:
+ *		- ML_ALGO_LOGISTIC_REGRESSION: Binary/multi-class classification
+ *		- ML_ALGO_RANDOM_FOREST: Ensemble tree-based classifier
+ *		- ML_ALGO_SVM: Support Vector Machine classifier
+ *		- ML_ALGO_DECISION_TREE: Single decision tree classifier
+ *		- ML_ALGO_NAIVE_BAYES: Probabilistic classifier
+ *		- ML_ALGO_XGBOOST: Gradient boosting classifier
+ *		- ML_ALGO_CATBOOST: Categorical boosting classifier
+ *		- ML_ALGO_LIGHTGBM: Light gradient boosting classifier
+ *		- ML_ALGO_KNN: K-nearest neighbors (classification mode)
+ *		- ML_ALGO_KNN_CLASSIFIER: Explicit KNN classifier
+ *
+ * Regression Algorithms:
+ *		- ML_ALGO_LINEAR_REGRESSION: Linear regression
+ *		- ML_ALGO_RIDGE: Ridge regression (L2 regularization)
+ *		- ML_ALGO_LASSO: Lasso regression (L1 regularization)
+ *		- ML_ALGO_KNN_REGRESSOR: K-nearest neighbors (regression mode)
+ *
+ * Clustering Algorithms:
+ *		- ML_ALGO_KMEANS: K-means clustering
+ *		- ML_ALGO_GMM: Gaussian Mixture Model clustering
+ *		- ML_ALGO_MINIBATCH_KMEANS: Mini-batch K-means (scalable)
+ *		- ML_ALGO_HIERARCHICAL: Hierarchical clustering
+ *		- ML_ALGO_DBSCAN: Density-based clustering
+ *
+ * Dimensionality Reduction:
+ *		- ML_ALGO_PCA: Principal Component Analysis
+ *		- ML_ALGO_OPQ: Optimized Product Quantization
+ *
+ * Time Series:
+ *		- ML_ALGO_TIMESERIES: Time series forecasting (ARIMA)
+ *
+ * CHANGE NOTES:
+ *		- CAN MODIFY: Add new algorithm types (must update string mapping)
+ *		- CANNOT MODIFY: ML_ALGO_UNKNOWN = 0 (used as sentinel value)
+ *		- BREAKS IF: Enum values reordered without updating string mappings
  */
 typedef enum
 {
-	ML_ALGO_UNKNOWN = 0,
+	ML_ALGO_UNKNOWN = 0,		/* Sentinel value for invalid/unknown algorithms */
 	/* Classification algorithms */
 	ML_ALGO_LOGISTIC_REGRESSION,
 	ML_ALGO_RANDOM_FOREST,
@@ -97,29 +167,100 @@ typedef enum
 }			MLAlgorithm;
 
 /* Forward declarations */
+/*
+ * Memory and resource management
+ */
 static void neurondb_cleanup(MemoryContext oldcontext, MemoryContext callcontext);
+
+/*
+ * SQL string utilities
+ */
 static char *neurondb_quote_literal_cstr(const char *str);
 static char *neurondb_quote_literal_or_null(const char *str);
+
+/*
+ * Algorithm identification and validation
+ */
 static MLAlgorithm neurondb_algorithm_from_string(const char *algorithm);
-static bool ml_metrics_is_gpu(Jsonb * metrics);
+static bool neurondb_is_unsupervised_algorithm(const char *algorithm);
+static const char *neurondb_get_model_type(const char *algorithm);
+
+/*
+ * Training data and feature management
+ */
+static bool neurondb_load_training_data(NdbSpiSession *session,
+										const char *table_name,
+										const char *feature_list_str,
+										const char *target_column,
+										float **feature_matrix_out,
+										double **label_vector_out,
+										int *n_samples_out,
+										int *feature_dim_out,
+										int *class_count_out);
+static int	neurondb_prepare_feature_list(ArrayType * feature_columns_array, StringInfo feature_list, const char ***feature_names_out, int *feature_name_count_out);
+
+/*
+ * Hyperparameter parsing
+ */
 static void neurondb_parse_hyperparams_int(Jsonb * hyperparams, const char *key, int *value, int default_value);
 static void neurondb_parse_hyperparams_float8(Jsonb * hyperparams, const char *key, double *value, double default_value);
+
+/*
+ * Training SQL generation
+ */
 static bool neurondb_build_training_sql(MLAlgorithm algo, StringInfo sql, const char *table_name, const char *feature_list, const char *target_column, Jsonb * hyperparams, const char **feature_names, int feature_name_count);
+
+/*
+ * Input validation
+ */
 static void neurondb_validate_training_inputs(const char *project_name, const char *algorithm, const char *table_name, const char *target_column);
-static bool neurondb_is_unsupervised_algorithm(const char *algorithm);
-static int	neurondb_prepare_feature_list(ArrayType * feature_columns_array, StringInfo feature_list, const char ***feature_names_out, int *feature_name_count_out);
+
+/*
+ * Model metadata utilities
+ */
+static bool ml_metrics_is_gpu(Jsonb * metrics);
 
 
 /*
  * neurondb_cleanup
  *		Restore memory context and delete call context.
  *
- * This function is defensive and handles NULL contexts safely.
+ * This function performs safe cleanup of memory contexts used during function
+ * execution. It switches back to the original memory context and deletes the
+ * call-specific context, freeing all memory allocated within it.
+ *
+ * Parameters:
+ *		oldcontext - The memory context to restore (typically the caller's context)
+ *		callcontext - The call-specific context to delete (may be NULL)
+ *
+ * Side Effects:
+ *		- Switches CurrentMemoryContext back to oldcontext
+ *		- Deletes callcontext and all memory allocated within it
+ *		- May raise ERROR if context operations fail
+ *
+ * Error Handling:
+ *		- Raises ERROR if both oldcontext and CurrentMemoryContext are NULL
+ *		- Raises ERROR if MemoryContextSwitchTo fails unexpectedly
+ *		- Logs WARNING if callcontext is invalid (but continues)
+ *
+ * Thread Safety:
+ *		Memory context operations are thread-local. This function is safe to call
+ *		from any PostgreSQL backend process.
+ *
+ * CHANGE NOTES:
+ *		- CAN MODIFY: Warning/error message text, defensive NULL checks
+ *		- CANNOT MODIFY: Order of context switch before deletion (must switch first)
+ *		- BREAKS IF: Deletes callcontext before switching away from it
+ *		- BREAKS IF: Attempts to use callcontext after deletion
  */
 static void
 neurondb_cleanup(MemoryContext oldcontext, MemoryContext callcontext)
 {
 	MemoryContext current_context;
+
+	ereport(DEBUG2,
+			(errmsg("neurondb_cleanup: starting cleanup"),
+			 errdetail("oldcontext=%p, callcontext=%p", (void *) oldcontext, (void *) callcontext)));
 
 	if (oldcontext == NULL)
 	{
@@ -135,6 +276,7 @@ neurondb_cleanup(MemoryContext oldcontext, MemoryContext callcontext)
 		}
 	}
 
+	/* CRITICAL: Must switch away from callcontext before deleting it */
 	current_context = MemoryContextSwitchTo(oldcontext);
 	if (current_context == NULL && oldcontext != CurrentMemoryContext)
 	{
@@ -149,6 +291,8 @@ neurondb_cleanup(MemoryContext oldcontext, MemoryContext callcontext)
 	{
 		if (MemoryContextIsValid(callcontext))
 		{
+			ereport(DEBUG2,
+					(errmsg("neurondb_cleanup: deleting callcontext")));
 			MemoryContextDelete(callcontext);
 		}
 		else
@@ -156,14 +300,67 @@ neurondb_cleanup(MemoryContext oldcontext, MemoryContext callcontext)
 			elog(WARNING, "neurondb_cleanup: callcontext is not valid, skipping deletion");
 		}
 	}
+
+	ereport(DEBUG2,
+			(errmsg("neurondb_cleanup: cleanup completed successfully")));
 }
 
 /*
  * neurondb_load_training_data
- *		Load training data from table into feature_matrix and label_vector.
+ *		Load training data from SQL table into feature matrix and label vector.
  *
- * Returns true on success, false on failure. Allocates memory for feature_matrix
- * and label_vector which must be freed by caller using nfree.
+ * This function executes a SELECT query to retrieve training data from a table,
+ * converts it into dense float arrays suitable for ML algorithms, and determines
+ * the number of classes for classification tasks.
+ *
+ * Parameters:
+ *		session - Active SPI session for executing queries (must be valid)
+ *		table_name - Name of the table containing training data
+ *		feature_list_str - SQL expression for feature columns (e.g., "col1, col2" or "*")
+ *		target_column - Name of target/label column (NULL for unsupervised algorithms)
+ *		feature_matrix_out - Output: allocated feature matrix (n_samples × feature_dim)
+ *		label_vector_out - Output: allocated label vector (n_samples) or NULL
+ *		n_samples_out - Output: number of valid training samples
+ *		feature_dim_out - Output: number of features per sample
+ *		class_count_out - Output: number of unique classes (for classification)
+ *
+ * Returns:
+ *		true on success, false on failure. On failure, output pointers are set to NULL.
+ *
+ * Memory Management:
+ *		- Allocates feature_matrix using nalloc (caller must free with nfree)
+ *		- Allocates label_vector using nalloc if target_column is provided
+ *		- Memory is allocated in the current memory context
+ *		- On failure, allocated memory is freed before returning
+ *
+ * Data Format Support:
+ *		- PostgreSQL arrays (float4[], float8[])
+ *		- Vector type (neurondb vector extension)
+ *		- Scalar float4/float8 (treated as 1D feature)
+ *
+ * Limitations:
+ *		- Maximum 200,000 samples per call (hardcoded limit)
+ *		- NULL values in features are skipped (row excluded)
+ *		- All feature vectors must have same dimension
+ *		- Memory allocation checked against MaxAllocSize
+ *
+ * Side Effects:
+ *		- Executes SPI query (must be in valid SPI context)
+ *		- Allocates memory for feature_matrix and label_vector
+ *		- May raise ERROR on invalid input or memory limits
+ *
+ * Error Handling:
+ *		- Raises ERROR if table doesn't exist or is inaccessible
+ *		- Raises ERROR if no data found in table
+ *		- Raises ERROR if memory allocation exceeds MaxAllocSize
+ *		- Returns false if feature dimension mismatch detected
+ *
+ * CHANGE NOTES:
+ *		- CAN MODIFY: max_samples_limit (200000), supported data types
+ *		- CANNOT MODIFY: Memory allocation order (must allocate after dimension check)
+ *		- CANNOT MODIFY: SPI session usage (must use provided session)
+ *		- BREAKS IF: Memory freed before caller uses it
+ *		- BREAKS IF: SPI session used after it's been ended
  */
 static bool
 neurondb_load_training_data(NdbSpiSession *session,
@@ -195,6 +392,13 @@ neurondb_load_training_data(NdbSpiSession *session,
 				j;
 	Oid			feature_type;
 
+
+	ereport(DEBUG1,
+			(errmsg("neurondb_load_training_data: starting data load"),
+			 errdetail("table_name=%s, feature_list=%s, target_column=%s",
+					   table_name ? table_name : "NULL",
+					   feature_list_str ? feature_list_str : "NULL",
+					   target_column ? target_column : "NULL")));
 
 	if (feature_matrix_out)
 		*feature_matrix_out = NULL;
@@ -232,6 +436,10 @@ neurondb_load_training_data(NdbSpiSession *session,
 		}
 	}
 
+	ereport(DEBUG2,
+			(errmsg("neurondb_load_training_data: executing query"),
+			 errdetail("query=%s", sql.data)));
+
 	ret = ndb_spi_execute(session, sql.data, true, 0);
 	if (ret != SPI_OK_SELECT)
 	{
@@ -245,6 +453,9 @@ neurondb_load_training_data(NdbSpiSession *session,
 	}
 
 	n_samples = SPI_processed;
+	ereport(DEBUG2,
+			(errmsg("neurondb_load_training_data: query returned rows"),
+			 errdetail("n_samples=%d", n_samples)));
 	if (n_samples == 0)
 	{
 		ndb_spi_stringinfo_free(session, &sql);
@@ -295,10 +506,17 @@ neurondb_load_training_data(NdbSpiSession *session,
 	}
 
 	feature_type = SPI_gettypeid(tupdesc, 1);
+	ereport(DEBUG2,
+			(errmsg("neurondb_load_training_data: determining feature dimension"),
+			 errdetail("feature_type=%u", feature_type)));
+
 	if (feature_type == FLOAT4ARRAYOID || feature_type == FLOAT8ARRAYOID)
 	{
 		feat_arr = DatumGetArrayTypeP(feat_datum);
 		feature_dim = ArrayGetNItems(ARR_NDIM(feat_arr), ARR_DIMS(feat_arr));
+		ereport(DEBUG2,
+				(errmsg("neurondb_load_training_data: feature type is array"),
+				 errdetail("feature_dim=%d", feature_dim)));
 	}
 	else
 	{
@@ -309,11 +527,17 @@ neurondb_load_training_data(NdbSpiSession *session,
 		{
 			feature_dim = vec->dim;
 			feat_arr = NULL;
+			ereport(DEBUG2,
+					(errmsg("neurondb_load_training_data: feature type is vector"),
+					 errdetail("feature_dim=%d", feature_dim)));
 		}
 		else
 		{
 			feature_dim = 1;
 			feat_arr = NULL;
+			ereport(DEBUG2,
+					(errmsg("neurondb_load_training_data: feature type is scalar"),
+					 errdetail("feature_dim=1")));
 		}
 	}
 	{
@@ -346,12 +570,26 @@ neurondb_load_training_data(NdbSpiSession *session,
 		}
 	}
 
+	ereport(DEBUG2,
+			(errmsg("neurondb_load_training_data: allocating memory"),
+			 errdetail("n_samples=%d, feature_dim=%d, matrix_size=%zu bytes",
+					   n_samples, feature_dim,
+					   (size_t) n_samples * (size_t) feature_dim * sizeof(float))));
+
 	nalloc(feature_matrix, float, (size_t) n_samples * (size_t) feature_dim);
 
 	if (target_column)
+	{
+		ereport(DEBUG2,
+				(errmsg("neurondb_load_training_data: allocating label vector"),
+				 errdetail("label_vector_size=%zu bytes",
+						   (size_t) n_samples * sizeof(double))));
 		nalloc(label_vector, double, (size_t) n_samples);
+	}
 
 	valid_samples = 0;
+	ereport(DEBUG2,
+			(errmsg("neurondb_load_training_data: starting data extraction loop")));
 	for (i = 0; i < n_samples; i++)
 	{
 		HeapTuple	current_tuple;
@@ -446,7 +684,6 @@ neurondb_load_training_data(NdbSpiSession *session,
 		{
 			Oid			label_type;
 
-			/* Safe access for label - validate tupdesc has at least 2 columns */
 			if (tupdesc == NULL || tupdesc->natts < 2)
 			{
 				continue;
@@ -517,14 +754,43 @@ neurondb_load_training_data(NdbSpiSession *session,
 	if (class_count_out)
 		*class_count_out = class_count;
 
+	ereport(DEBUG1,
+			(errmsg("neurondb_load_training_data: data load completed successfully"),
+			 errdetail("n_samples=%d, feature_dim=%d, class_count=%d, valid_samples=%d",
+					   n_samples, feature_dim, class_count, valid_samples)));
+
 	return true;
 }
 
 /*
  * neurondb_quote_literal_cstr
- *		Return a quoted SQL literal string.
+ *		Quote a C string for safe use in SQL queries.
  *
- * Result must be freed by caller using pfree.
+ * This function wraps PostgreSQL's quote_literal() function to safely quote
+ * strings for use in dynamically generated SQL. The result is properly
+ * escaped and quoted according to SQL string literal rules.
+ *
+ * Parameters:
+ *		str - C string to quote (must not be NULL)
+ *
+ * Returns:
+ *		Quoted SQL string literal (e.g., 'value' becomes '''value''')
+ *		Memory allocated in CurrentMemoryContext, caller must free with pfree/nfree
+ *
+ * Side Effects:
+ *		- Allocates memory for quoted string
+ *		- Allocates temporary text object (freed before return)
+ *		- Raises ERROR if str is NULL
+ *
+ * Memory Management:
+ *		- Returned string must be freed by caller using pfree() or nfree()
+ *		- Temporary text object is freed internally
+ *
+ * CHANGE NOTES:
+ *		- CAN MODIFY: Error message text
+ *		- CANNOT MODIFY: Use of PostgreSQL quote_literal() function (SQL safety)
+ *		- BREAKS IF: Returned string not freed (memory leak)
+ *		- BREAKS IF: NULL string passed (will raise ERROR)
  */
 static char *
 neurondb_quote_literal_cstr(const char *str)
@@ -539,6 +805,10 @@ neurondb_quote_literal_cstr(const char *str)
 				 errdetail("Internal function called with NULL string pointer"),
 				 errhint("This is an internal error. Please report this issue.")));
 
+	ereport(DEBUG2,
+			(errmsg("neurondb_quote_literal_cstr: quoting string"),
+			 errdetail("str_length=%zu", strlen(str))));
+
 	txt = cstring_to_text(str);
 
 	ret = TextDatumGetCString(
@@ -550,27 +820,78 @@ neurondb_quote_literal_cstr(const char *str)
 
 /*
  * neurondb_quote_literal_or_null
- *		Quote literal string or return "NULL" string for SQL.
+ *		Quote a C string for SQL, or return "NULL" if string is NULL.
+ *
+ * This is a convenience wrapper around neurondb_quote_literal_cstr() that
+ * handles NULL strings by returning the SQL literal "NULL" instead of
+ * raising an error. Useful for optional parameters in SQL generation.
+ *
+ * Parameters:
+ *		str - C string to quote, or NULL
+ *
+ * Returns:
+ *		- If str is NULL: returns pstrdup("NULL") (caller must free)
+ *		- If str is not NULL: returns quoted string from neurondb_quote_literal_cstr()
+ *
+ * Memory Management:
+ *		- Returned string must be freed by caller using pfree() or nfree()
+ *		- Always allocates new memory (never returns input pointer)
+ *
+ * CHANGE NOTES:
+ *		- CAN MODIFY: NULL handling (currently returns "NULL" string)
+ *		- CANNOT MODIFY: Delegation to neurondb_quote_literal_cstr() for non-NULL
+ *		- BREAKS IF: Returned string not freed (memory leak)
  */
 static char *
 neurondb_quote_literal_or_null(const char *str)
 {
 	if (str == NULL)
+	{
+		ereport(DEBUG2,
+				(errmsg("neurondb_quote_literal_or_null: input is NULL, returning 'NULL'")));
 		return pstrdup("NULL");
+	}
 	return neurondb_quote_literal_cstr(str);
 }
 
 /*
  * neurondb_algorithm_from_string
- *		Convert algorithm string to MLAlgorithm enum.
+ *		Convert algorithm name string to MLAlgorithm enum value.
  *
- * Returns ML_ALGO_UNKNOWN for unrecognized algorithms.
+ * This function performs case-sensitive string matching to convert algorithm
+ * names (as provided by users in SQL) to the corresponding enum value. This
+ * provides type safety and allows compile-time checking of algorithm support.
+ *
+ * Parameters:
+ *		algorithm - Algorithm name string (e.g., "logistic_regression", "kmeans")
+ *
+ * Returns:
+ *		MLAlgorithm enum value corresponding to the algorithm name
+ *		Returns ML_ALGO_UNKNOWN if algorithm is NULL or unrecognized
+ *
+ * Algorithm Name Mapping:
+ *		The function matches against constants defined in neurondb_constants.h:
+ *		- NDB_ALGO_LOGISTIC_REGRESSION, NDB_ALGO_RANDOM_FOREST, etc.
+ *
+ * CHANGE NOTES:
+ *		- CAN MODIFY: Add new algorithm mappings (must add to enum first)
+ *		- CANNOT MODIFY: ML_ALGO_UNKNOWN return for NULL/invalid (used as sentinel)
+ *		- BREAKS IF: Algorithm name constants changed without updating this function
+ *		- BREAKS IF: Enum values reordered without updating string comparisons
  */
 static MLAlgorithm
 neurondb_algorithm_from_string(const char *algorithm)
 {
 	if (algorithm == NULL)
+	{
+		ereport(DEBUG2,
+				(errmsg("neurondb_algorithm_from_string: NULL algorithm, returning UNKNOWN")));
 		return ML_ALGO_UNKNOWN;
+	}
+
+	ereport(DEBUG2,
+			(errmsg("neurondb_algorithm_from_string: converting algorithm string"),
+			 errdetail("algorithm=%s", algorithm)));
 
 	if (strcmp(algorithm, NDB_ALGO_LOGISTIC_REGRESSION) == 0)
 		return ML_ALGO_LOGISTIC_REGRESSION;
@@ -615,16 +936,46 @@ neurondb_algorithm_from_string(const char *algorithm)
 	if (strcmp(algorithm, NDB_ALGO_OPQ) == 0)
 		return ML_ALGO_OPQ;
 	if (strcmp(algorithm, NDB_ALGO_TIMESERIES) == 0)
+	{
+		ereport(DEBUG2,
+				(errmsg("neurondb_algorithm_from_string: matched TIMESERIES")));
 		return ML_ALGO_TIMESERIES;
+	}
 
+	ereport(DEBUG2,
+			(errmsg("neurondb_algorithm_from_string: unrecognized algorithm"),
+			 errdetail("algorithm=%s, returning UNKNOWN", algorithm)));
 	return ML_ALGO_UNKNOWN;
 }
 
 /*
  * ml_metrics_is_gpu
- *		Check if metrics JSONB indicates GPU training.
+ *		Check if metrics JSONB indicates GPU training was used.
  *
- * Returns true if metrics contains "training_backend": 1, false otherwise.
+ * This function examines the metrics JSONB object to determine if the model
+ * was trained on GPU by checking for the "training_backend" field. A value
+ * of 1 indicates GPU training, 0 indicates CPU training.
+ *
+ * Parameters:
+ *		metrics - JSONB object containing training metrics (may be NULL)
+ *
+ * Returns:
+ *		true if metrics contains "training_backend": 1 (GPU training)
+ *		false if metrics is NULL, field missing, or value is not 1
+ *
+ * JSONB Structure Expected:
+ *		{"training_backend": 1, ...}  - GPU training
+ *		{"training_backend": 0, ...}  - CPU training
+ *		{} or missing field           - Unknown (returns false)
+ *
+ * Side Effects:
+ *		- Iterates through JSONB structure
+ *		- Allocates temporary string for key comparison (freed internally)
+ *
+ * CHANGE NOTES:
+ *		- CAN MODIFY: Field name checked ("training_backend"), value checked (1)
+ *		- CANNOT MODIFY: JSONB iteration pattern (PostgreSQL API)
+ *		- BREAKS IF: JSONB structure changes without updating field name
  */
 static bool
 ml_metrics_is_gpu(Jsonb * metrics)
@@ -635,9 +986,15 @@ ml_metrics_is_gpu(Jsonb * metrics)
 	JsonbIteratorToken r;
 
 	if (metrics == NULL)
+	{
+		ereport(DEBUG2,
+				(errmsg("ml_metrics_is_gpu: metrics is NULL, returning false")));
 		return false;
+	}
 
-	/* Check for training_backend integer in metrics */
+	ereport(DEBUG2,
+			(errmsg("ml_metrics_is_gpu: checking metrics for GPU training")));
+
 	it = JsonbIteratorInit((JsonbContainer *) & metrics->root);
 	while ((r = JsonbIteratorNext(&it, &v, true)) != WJB_DONE)
 	{
@@ -653,20 +1010,49 @@ ml_metrics_is_gpu(Jsonb * metrics)
 					int			backend = DatumGetInt32(DirectFunctionCall1(numeric_int4, NumericGetDatum(v.val.numeric)));
 
 					is_gpu = (backend == 1);
+					ereport(DEBUG2,
+							(errmsg("ml_metrics_is_gpu: found training_backend value"),
+							 errdetail("backend=%d, is_gpu=%s", backend, is_gpu ? "true" : "false")));
 				}
 			}
 			nfree(key);
 		}
 	}
 
+	ereport(DEBUG2,
+			(errmsg("ml_metrics_is_gpu: final result"),
+			 errdetail("is_gpu=%s", is_gpu ? "true" : "false")));
 	return is_gpu;
 }
 
 /*
  * neurondb_parse_hyperparams_int
- *		Parse integer hyperparameter from JSONB.
+ *		Parse integer hyperparameter from JSONB hyperparameters object.
  *
- * If key is not found, value remains at default_value.
+ * This function safely extracts an integer hyperparameter value from a JSONB
+ * object. If the key is not found or the JSONB is corrupted, the default value
+ * is used. The function handles JSONB parsing errors gracefully.
+ *
+ * Parameters:
+ *		hyperparams - JSONB object containing hyperparameters (may be NULL)
+ *		key - Key name to look up in hyperparams object
+ *		value - Output parameter: parsed integer value (set to default if not found)
+ *		default_value - Default value to use if key not found or parsing fails
+ *
+ * Side Effects:
+ *		- Modifies *value parameter
+ *		- May allocate temporary memory for JSONB iteration (freed internally)
+ *		- Catches and handles JSONB parsing errors
+ *
+ * Error Handling:
+ *		- If hyperparams, key, or value is NULL: sets *value to default and returns
+ *		- If JSONB is corrupted: catches error, uses default, logs DEBUG2 message
+ *		- If key not found: *value remains at default_value
+ *
+ * CHANGE NOTES:
+ *		- CAN MODIFY: Default value handling, error message text
+ *		- CANNOT MODIFY: PG_TRY/PG_CATCH structure (required for error handling)
+ *		- BREAKS IF: JSONB structure changes without updating field access
  */
 static void
 neurondb_parse_hyperparams_int(Jsonb * hyperparams, const char *key, int *value, int default_value)
@@ -699,15 +1085,26 @@ neurondb_parse_hyperparams_int(Jsonb * hyperparams, const char *key, int *value,
 				if (r == WJB_VALUE && v.type == jbvNumeric)
 				{
 					*value = DatumGetInt32(DirectFunctionCall1(numeric_int4, NumericGetDatum(v.val.numeric)));
+					ereport(DEBUG2,
+							(errmsg("neurondb_parse_hyperparams_int: parsed value"),
+							 errdetail("key=%s, value=%d", key, *value)));
 					break;
 				}
 			}
+		}
+		else
+		{
+			ereport(DEBUG2,
+					(errmsg("neurondb_parse_hyperparams_int: key not found, using default"),
+					 errdetail("key=%s, default_value=%d", key, default_value)));
 		}
 	}
 	PG_CATCH();
 	{
 		FlushErrorState();
-		elog(DEBUG2, "neurondb_parse_hyperparams_int: Failed to parse hyperparameters JSONB (possibly corrupted), using default value");
+		ereport(DEBUG2,
+				(errmsg("neurondb_parse_hyperparams_int: JSONB parsing error, using default"),
+				 errdetail("key=%s, default_value=%d", key, default_value)));
 		*value = default_value;
 	}
 	PG_END_TRY();
@@ -715,9 +1112,32 @@ neurondb_parse_hyperparams_int(Jsonb * hyperparams, const char *key, int *value,
 
 /*
  * neurondb_parse_hyperparams_float8
- *		Parse float8 hyperparameter from JSONB.
+ *		Parse float8 (double precision) hyperparameter from JSONB hyperparameters object.
  *
- * If key is not found, value remains at default_value.
+ * This function safely extracts a floating-point hyperparameter value from a JSONB
+ * object. If the key is not found or the JSONB is corrupted, the default value
+ * is used. The function handles JSONB parsing errors gracefully.
+ *
+ * Parameters:
+ *		hyperparams - JSONB object containing hyperparameters (may be NULL)
+ *		key - Key name to look up in hyperparams object
+ *		value - Output parameter: parsed double value (set to default if not found)
+ *		default_value - Default value to use if key not found or parsing fails
+ *
+ * Side Effects:
+ *		- Modifies *value parameter
+ *		- May allocate temporary memory for JSONB iteration (freed internally)
+ *		- Catches and handles JSONB parsing errors
+ *
+ * Error Handling:
+ *		- If hyperparams, key, or value is NULL: sets *value to default and returns
+ *		- If JSONB is corrupted: catches error, uses default, logs DEBUG2 message
+ *		- If key not found: *value remains at default_value
+ *
+ * CHANGE NOTES:
+ *		- CAN MODIFY: Default value handling, error message text
+ *		- CANNOT MODIFY: PG_TRY/PG_CATCH structure (required for error handling)
+ *		- BREAKS IF: JSONB structure changes without updating field access
  */
 static void
 neurondb_parse_hyperparams_float8(Jsonb * hyperparams, const char *key, double *value, double default_value)
@@ -731,10 +1151,16 @@ neurondb_parse_hyperparams_float8(Jsonb * hyperparams, const char *key, double *
 	{
 		if (value)
 			*value = default_value;
+		ereport(DEBUG2,
+				(errmsg("neurondb_parse_hyperparams_float8: NULL parameter, using default"),
+				 errdetail("default_value=%.6f", default_value)));
 		return;
 	}
 
 	*value = default_value;
+	ereport(DEBUG2,
+			(errmsg("neurondb_parse_hyperparams_float8: parsing hyperparameter"),
+			 errdetail("key=%s, default_value=%.6f", key, default_value)));
 
 	/* Wrap JSONB operations in PG_TRY to handle corrupted JSONB gracefully */
 	PG_TRY();
@@ -750,15 +1176,26 @@ neurondb_parse_hyperparams_float8(Jsonb * hyperparams, const char *key, double *
 				if (r == WJB_VALUE && v.type == jbvNumeric)
 				{
 					*value = DatumGetFloat8(DirectFunctionCall1(numeric_float8, NumericGetDatum(v.val.numeric)));
+					ereport(DEBUG2,
+							(errmsg("neurondb_parse_hyperparams_float8: parsed value"),
+							 errdetail("key=%s, value=%.6f", key, *value)));
 					break;
 				}
 			}
+		}
+		else
+		{
+			ereport(DEBUG2,
+					(errmsg("neurondb_parse_hyperparams_float8: key not found, using default"),
+					 errdetail("key=%s, default_value=%.6f", key, default_value)));
 		}
 	}
 	PG_CATCH();
 	{
 		FlushErrorState();
-		elog(DEBUG2, "neurondb_parse_hyperparams_float8: Failed to parse hyperparameters JSONB (possibly corrupted), using default value");
+		ereport(DEBUG2,
+				(errmsg("neurondb_parse_hyperparams_float8: JSONB parsing error, using default"),
+				 errdetail("key=%s, default_value=%.6f", key, default_value)));
 		*value = default_value;
 	}
 	PG_END_TRY();
@@ -766,10 +1203,51 @@ neurondb_parse_hyperparams_float8(Jsonb * hyperparams, const char *key, double *
 
 /*
  * neurondb_build_training_sql
- *		Build training SQL for simple algorithms.
+ *		Generate SQL statement for algorithm-specific training functions.
  *
- * Returns true if SQL was built successfully, false if algorithm requires
- * special handling and should be processed separately.
+ * This function constructs SQL statements that call algorithm-specific training
+ * functions (e.g., train_linear_regression, train_logistic_regression). It handles
+ * hyperparameter extraction and SQL string generation for algorithms that support
+ * direct SQL-based training.
+ *
+ * Parameters:
+ *		algo - MLAlgorithm enum value specifying which algorithm to train
+ *		sql - StringInfo buffer to append generated SQL to (must be initialized)
+ *		table_name - Name of table containing training data
+ *		feature_list - SQL expression for feature columns (e.g., "col1, col2" or "*")
+ *		target_column - Name of target/label column (NULL for unsupervised algorithms)
+ *		hyperparams - JSONB object containing hyperparameters (may be NULL)
+ *		feature_names - Array of feature column names (may be NULL)
+ *		feature_name_count - Number of elements in feature_names array
+ *
+ * Returns:
+ *		true if SQL was successfully generated and appended to sql buffer
+ *		false if algorithm requires special handling (e.g., hierarchical clustering)
+ *
+ * Supported Algorithms:
+ *		- Linear/Logistic Regression, Ridge, Lasso
+ *		- Random Forest, Decision Tree, SVM
+ *		- K-means, GMM, Mini-batch K-means
+ *		- XGBoost, CatBoost, LightGBM
+ *		- Naive Bayes, KNN variants
+ *		- Time series (ARIMA)
+ *
+ * SQL Generation:
+ *		- Appends SELECT statement calling algorithm-specific training function
+ *		- Parameters are properly quoted using neurondb_quote_literal_cstr()
+ *		- Hyperparameters are extracted from JSONB and included in function call
+ *
+ * Side Effects:
+ *		- Modifies sql StringInfo buffer (appends SQL)
+ *		- May allocate memory for quoted strings (freed by caller)
+ *		- Calls hyperparameter parsing functions
+ *
+ * CHANGE NOTES:
+ *		- CAN MODIFY: Default hyperparameter values, SQL function names
+ *		- CAN MODIFY: Add new algorithm cases (must have corresponding SQL function)
+ *		- CANNOT MODIFY: StringInfo append order (must match function signatures)
+ *		- BREAKS IF: SQL function signatures change without updating SQL generation
+ *		- BREAKS IF: Feature column selection logic changes incorrectly
  */
 static bool
 __attribute__((unused))
@@ -787,9 +1265,15 @@ neurondb_build_training_sql(MLAlgorithm algo, StringInfo sql, const char *table_
 	int			max_features;
 	const char *feature_col;
 
+	ereport(DEBUG1,
+			(errmsg("neurondb_build_training_sql: building SQL for algorithm"),
+			 errdetail("algo=%d, table_name=%s", (int) algo, table_name ? table_name : "NULL")));
+
 	switch (algo)
 	{
 		case ML_ALGO_LINEAR_REGRESSION:
+			ereport(DEBUG2,
+					(errmsg("neurondb_build_training_sql: generating SQL for linear regression")));
 			appendStringInfo(sql,
 							 "SELECT train_linear_regression(%s, %s, %s)",
 							 neurondb_quote_literal_cstr(table_name),
@@ -862,7 +1346,6 @@ neurondb_build_training_sql(MLAlgorithm algo, StringInfo sql, const char *table_
 								 max_iters, learning_rate, lambda);
 
 
-				/* Free the quoted strings */
 				nfree(quoted_table);
 				nfree(quoted_feature);
 				if (quoted_target != NULL && strcmp(quoted_target, "NULL") != 0)
@@ -1193,18 +1676,56 @@ neurondb_build_training_sql(MLAlgorithm algo, StringInfo sql, const char *table_
 
 		default:
 			/* Algorithm requires special handling, not simple SQL generation */
+			ereport(DEBUG2,
+					(errmsg("neurondb_build_training_sql: algorithm requires special handling"),
+					 errdetail("algo=%d, returning false", (int) algo)));
 			return false;
 	}
+
+	ereport(DEBUG1,
+			(errmsg("neurondb_build_training_sql: SQL generation completed"),
+			 errdetail("sql_length=%d", sql->len)));
 }
 
 /*
- * Validate training inputs
+ * neurondb_validate_training_inputs
+ *		Validate input parameters for training operations.
+ *
+ * This function performs comprehensive validation of all input parameters
+ * required for model training. It checks for NULL values and ensures that
+ * supervised algorithms have target columns specified.
+ *
+ * Parameters:
+ *		project_name - Name of the ML project (must not be NULL)
+ *		algorithm - Algorithm name string (must not be NULL)
+ *		table_name - Name of training data table (must not be NULL)
+ *		target_column - Name of target/label column (may be NULL for unsupervised)
+ *
+ * Side Effects:
+ *		- Raises ERROR if any required parameter is NULL
+ *		- Raises ERROR if supervised algorithm lacks target_column
+ *
+ * Error Handling:
+ *		- All validation errors raise ERROR with detailed messages
+ *		- Error messages include hints for users
+ *
+ * CHANGE NOTES:
+ *		- CAN MODIFY: Error message text, validation rules
+ *		- CANNOT MODIFY: NULL checks for project_name, algorithm, table_name
+ *		- BREAKS IF: Validation logic removed (will allow invalid inputs)
  */
 static void
 __attribute__((unused))
 neurondb_validate_training_inputs(const char *project_name, const char *algorithm,
 								  const char *table_name, const char *target_column)
 {
+	ereport(DEBUG1,
+			(errmsg("neurondb_validate_training_inputs: validating inputs"),
+			 errdetail("project_name=%s, algorithm=%s, table_name=%s",
+					   project_name ? project_name : "NULL",
+					   algorithm ? algorithm : "NULL",
+					   table_name ? table_name : "NULL")));
+
 	if (project_name == NULL)
 		ereport(ERROR,
 				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
@@ -1233,35 +1754,96 @@ neurondb_validate_training_inputs(const char *project_name, const char *algorith
 				 errdetail("Algorithm '%s' is a supervised learning algorithm and requires a target column", algorithm),
 				 errhint("Provide a target_column name, or use an unsupervised algorithm like 'kmeans', 'gmm', or 'hierarchical' if you don't have target labels")));
 	}
+
+	ereport(DEBUG1,
+			(errmsg("neurondb_validate_training_inputs: validation passed")));
 }
 
 /*
  * neurondb_is_unsupervised_algorithm
- *		Check if algorithm is unsupervised (doesn't require target_column).
+ *		Determine if an algorithm is unsupervised (doesn't require target_column).
  *
- * Uses MLAlgorithm enum for type-safe checking.
+ * Unsupervised algorithms learn patterns from data without labeled examples.
+ * They include clustering algorithms (K-means, GMM, hierarchical) and
+ * dimensionality reduction techniques.
+ *
+ * Parameters:
+ *		algorithm - Algorithm name string (may be NULL)
+ *
+ * Returns:
+ *		true if algorithm is unsupervised (doesn't need target_column)
+ *		false if algorithm is supervised or NULL/invalid
+ *
+ * Unsupervised Algorithms:
+ *		- ML_ALGO_KMEANS: K-means clustering
+ *		- ML_ALGO_GMM: Gaussian Mixture Model clustering
+ *		- ML_ALGO_MINIBATCH_KMEANS: Mini-batch K-means
+ *		- ML_ALGO_HIERARCHICAL: Hierarchical clustering
+ *		- ML_ALGO_DBSCAN: Density-based clustering
+ *
+ * CHANGE NOTES:
+ *		- CAN MODIFY: Add new unsupervised algorithms to the check list
+ *		- CANNOT MODIFY: Use of neurondb_algorithm_from_string() (type safety)
+ *		- BREAKS IF: Algorithm enum values change without updating comparisons
  */
 static bool
 neurondb_is_unsupervised_algorithm(const char *algorithm)
 {
 	MLAlgorithm algo_enum;
+	bool		is_unsupervised;
 
 	if (algorithm == NULL)
+	{
+		ereport(DEBUG2,
+				(errmsg("neurondb_is_unsupervised_algorithm: NULL algorithm, returning false")));
 		return false;
+	}
 
 	algo_enum = neurondb_algorithm_from_string(algorithm);
-	return (algo_enum == ML_ALGO_GMM ||
-			algo_enum == ML_ALGO_KMEANS ||
-			algo_enum == ML_ALGO_MINIBATCH_KMEANS ||
-			algo_enum == ML_ALGO_HIERARCHICAL ||
-			algo_enum == ML_ALGO_DBSCAN);
+	is_unsupervised = (algo_enum == ML_ALGO_GMM ||
+						algo_enum == ML_ALGO_KMEANS ||
+						algo_enum == ML_ALGO_MINIBATCH_KMEANS ||
+						algo_enum == ML_ALGO_HIERARCHICAL ||
+						algo_enum == ML_ALGO_DBSCAN);
+
+	ereport(DEBUG2,
+			(errmsg("neurondb_is_unsupervised_algorithm: algorithm check"),
+			 errdetail("algorithm=%s, is_unsupervised=%s", algorithm, is_unsupervised ? "true" : "false")));
+
+	return is_unsupervised;
 }
 
 /*
  * neurondb_prepare_feature_list
- *		Prepare feature list from array and populate feature_names array.
+ *		Prepare feature list string and feature names array from input array.
  *
- * Returns number of features on success.
+ * This function processes a PostgreSQL array of feature column names and
+ * generates both a SQL-compatible feature list string and an array of
+ * individual feature names. Currently implements a simplified version that
+ * uses "*" to select all columns.
+ *
+ * Parameters:
+ *		feature_columns_array - PostgreSQL array of feature column names (currently unused)
+ *		feature_list - StringInfo buffer to append feature list to (must be initialized)
+ *		feature_names_out - Output: array of feature name strings (caller must free)
+ *		feature_name_count_out - Output: number of feature names
+ *
+ * Returns:
+ *		Number of features prepared (currently always 1 for "*")
+ *
+ * Memory Management:
+ *		- Allocates feature_names array using nalloc (caller must free with nfree)
+ *		- Allocates individual feature name strings (freed when array freed)
+ *		- Modifies feature_list StringInfo buffer
+ *
+ * Current Implementation:
+ *		- Simplified version that always uses "*" (all columns)
+ *		- Future: should parse feature_columns_array to extract individual names
+ *
+ * CHANGE NOTES:
+ *		- CAN MODIFY: Implementation to parse feature_columns_array properly
+ *		- CANNOT MODIFY: Output parameter initialization (must set before return)
+ *		- BREAKS IF: feature_names not freed by caller (memory leak)
  */
 static int
 __attribute__((unused))
@@ -1270,6 +1852,9 @@ neurondb_prepare_feature_list(ArrayType * feature_columns_array, StringInfo feat
 {
 	const char **feature_names = NULL;
 	int			feature_name_count = 0;
+
+	ereport(DEBUG2,
+			(errmsg("neurondb_prepare_feature_list: preparing feature list")));
 
 	/* Temporary: simplified version to bypass array processing issues */
 	appendStringInfoString(feature_list, "*");
@@ -1282,15 +1867,42 @@ neurondb_prepare_feature_list(ArrayType * feature_columns_array, StringInfo feat
 	if (feature_name_count_out)
 		*feature_name_count_out = feature_name_count;
 
+	ereport(DEBUG2,
+			(errmsg("neurondb_prepare_feature_list: feature list prepared"),
+			 errdetail("feature_name_count=%d, feature_list=%s", feature_name_count, feature_list->data)));
+
 	return feature_name_count;
 }
 
 /*
  * neurondb_get_model_type
- *		Return canonical model type for a known ML algorithm.
+ *		Return canonical model type string for a known ML algorithm.
  *
- * Returns "classification", "regression", "clustering", or
- * "dimensionality_reduction" based on algorithm type.
+ * This function maps ML algorithms to their canonical model type categories.
+ * The model type is used for catalog organization and API documentation.
+ *
+ * Parameters:
+ *		algorithm - Algorithm name string (may be NULL)
+ *
+ * Returns:
+ *		Canonical model type string:
+ *		- "classification": For classification algorithms
+ *		- "regression": For regression algorithms
+ *		- "clustering": For clustering algorithms
+ *		- "dimensionality_reduction": For dimensionality reduction algorithms
+ *		- "classification": Default if algorithm is NULL or unknown
+ *
+ * Model Type Mapping:
+ *		Classification: Logistic Regression, Random Forest, SVM, Decision Tree,
+ *			Naive Bayes, XGBoost, CatBoost, LightGBM, KNN (classifier variants)
+ *		Regression: Linear Regression, Ridge, Lasso, KNN (regressor)
+ *		Clustering: K-means, GMM, Mini-batch K-means, Hierarchical, DBSCAN
+ *		Dimensionality Reduction: PCA, OPQ
+ *
+ * CHANGE NOTES:
+ *		- CAN MODIFY: Add new algorithms to appropriate case statements
+ *		- CANNOT MODIFY: Return string literals (used as constants elsewhere)
+ *		- BREAKS IF: Return strings changed without updating catalog code
  */
 static const char * __attribute__((unused))
 neurondb_get_model_type(const char *algorithm)
@@ -1298,7 +1910,15 @@ neurondb_get_model_type(const char *algorithm)
 	MLAlgorithm algo;
 
 	if (algorithm == NULL)
+	{
+		ereport(DEBUG2,
+				(errmsg("neurondb_get_model_type: NULL algorithm, returning 'classification'")));
 		return "classification";
+	}
+
+	ereport(DEBUG2,
+			(errmsg("neurondb_get_model_type: determining model type"),
+			 errdetail("algorithm=%s", algorithm)));
 
 	algo = neurondb_algorithm_from_string(algorithm);
 
@@ -1314,12 +1934,16 @@ neurondb_get_model_type(const char *algorithm)
 		case ML_ALGO_LIGHTGBM:
 		case ML_ALGO_KNN:
 		case ML_ALGO_KNN_CLASSIFIER:
+			ereport(DEBUG2,
+					(errmsg("neurondb_get_model_type: classification algorithm")));
 			return "classification";
 
 		case ML_ALGO_LINEAR_REGRESSION:
 		case ML_ALGO_RIDGE:
 		case ML_ALGO_LASSO:
 		case ML_ALGO_KNN_REGRESSOR:
+			ereport(DEBUG2,
+					(errmsg("neurondb_get_model_type: regression algorithm")));
 			return "regression";
 
 		case ML_ALGO_KMEANS:
@@ -1327,20 +1951,94 @@ neurondb_get_model_type(const char *algorithm)
 		case ML_ALGO_MINIBATCH_KMEANS:
 		case ML_ALGO_HIERARCHICAL:
 		case ML_ALGO_DBSCAN:
+			ereport(DEBUG2,
+					(errmsg("neurondb_get_model_type: clustering algorithm")));
 			return "clustering";
 
 		case ML_ALGO_PCA:
 		case ML_ALGO_OPQ:
+			ereport(DEBUG2,
+					(errmsg("neurondb_get_model_type: dimensionality reduction algorithm")));
 			return "dimensionality_reduction";
 
 		default:
+			ereport(DEBUG2,
+					(errmsg("neurondb_get_model_type: unknown algorithm, defaulting to classification")));
 			return "classification";
 	}
 }
 
 /* ----------
  * neurondb_train
- * Unified model training interface
+ *		Unified SQL interface for training machine learning models.
+ *
+ * This is the main entry point for model training in NeuronDB. It provides a
+ * unified API that abstracts GPU/CPU execution, algorithm-specific details, and
+ * model catalog management. The function supports automatic fallback from GPU
+ * to CPU when GPU is unavailable or when algorithms are unsupported on GPU.
+ *
+ * SQL Function Signature:
+ *		neurondb.train(project_name TEXT, algorithm TEXT, table_name TEXT,
+ *					   target_column TEXT, feature_columns TEXT[],
+ *					   hyperparams JSONB) RETURNS INTEGER
+ *
+ * Parameters:
+ *		project_name - Name of ML project (organizes models)
+ *		algorithm - Algorithm name (e.g., 'logistic_regression', 'kmeans')
+ *		table_name - Name of table containing training data
+ *		target_column - Name of target/label column (NULL for unsupervised)
+ *		feature_columns - Array of feature column names (currently simplified)
+ *		hyperparams - JSONB object with algorithm-specific hyperparameters
+ *
+ * Returns:
+ *		INTEGER: model_id of the trained model (positive integer)
+ *		Raises ERROR on failure
+ *
+ * Execution Flow:
+ *		1. Validate and parse input parameters
+ *		2. Create/get project in catalog
+ *		3. Attempt GPU training (if GPU available and algorithm supported)
+ *		4. Fall back to CPU training if GPU fails or unavailable
+ *		5. Register model in catalog with metadata
+ *		6. Return model_id
+ *
+ * GPU/CPU Fallback Logic:
+ *		- GPU mode (compute_mode='gpu'): Requires GPU, errors if unavailable
+ *		- AUTO mode (compute_mode='auto'): Tries GPU first, falls back to CPU
+ *		- CPU mode (compute_mode='cpu'): Uses CPU only
+ *		- Metal backend: Some algorithms unsupported, auto-fallback to CPU
+ *
+ * Memory Management:
+ *		- Creates dedicated memory context for function execution
+ *		- Allocates training data arrays (feature_matrix, label_vector)
+ *		- Manages SPI session lifecycle
+ *		- All memory freed via neurondb_cleanup() on exit
+ *
+ * Model Catalog:
+ *		- Creates/updates project in neurondb.ml_projects
+ *		- Registers model in neurondb.ml_models with full metadata
+ *		- Stores training metrics, hyperparameters, and model data
+ *		- Uses advisory locks for concurrent safety
+ *
+ * Error Handling:
+ *		- Comprehensive error messages with hints
+ *		- Proper cleanup on all error paths
+ *		- GPU errors include detailed diagnostics
+ *		- CPU fallback errors include GPU error context
+ *
+ * Thread Safety:
+ *		- Uses advisory locks for project-level concurrency control
+ *		- Each function call operates in its own memory context
+ *		- SPI sessions are session-local
+ *
+ * CHANGE NOTES:
+ *		- CAN MODIFY: Default hyperparameters, error message text, algorithm support
+ *		- CANNOT MODIFY: Memory context lifecycle (must create before use, delete after)
+ *		- CANNOT MODIFY: SPI session management order (begin before use, end after)
+ *		- CANNOT MODIFY: GPU/CPU fallback decision logic (critical for correctness)
+ *		- BREAKS IF: Memory contexts deleted while in use
+ *		- BREAKS IF: SPI sessions used after end
+ *		- BREAKS IF: Model catalog schema changes without updating SQL
  * ----------
  */
 Datum
@@ -1385,18 +2083,20 @@ neurondb_train(PG_FUNCTION_ARGS)
 	int			feature_dim = 0;
 	int			class_count = 0;
 	bool		data_loaded = false;
-
 	char *feature_list_str = NULL;
 	bool		gpu_available = false;
 	bool		load_success = false;
 	bool		gpu_train_result = false;
 	bool		metal_requested_fallback = false;  /* Track if Metal backend requested CPU fallback */
 	int			saved_compute_mode = -1;  /* Save compute_mode when temporarily changing for Metal unsupported algorithms */
-
 	char *safe_algorithm = NULL;
 	char *safe_table_name = NULL;
 	char *safe_target_column = NULL;
 	char *safe_project_name = NULL;
+
+	ereport(DEBUG1,
+			(errmsg("neurondb_train: starting model training"),
+			 errdetail("nargs=%d", PG_NARGS())));
 
 
 	if (PG_NARGS() != 6)
@@ -1456,10 +2156,8 @@ neurondb_train(PG_FUNCTION_ARGS)
 										ALLOCSET_DEFAULT_SIZES);
 	oldcontext = MemoryContextSwitchTo(callcontext);
 
-	/* Pre-allocate "default" string early in callcontext */
 	default_project_name = pstrdup("default");
 	
-	/* Copy hyperparams into callcontext to ensure it's valid throughout the function */
 	if (hyperparams != NULL)
 	{
 		hyperparams = (Jsonb *) PG_DETOAST_DATUM_COPY(PointerGetDatum(hyperparams));
@@ -1555,7 +2253,6 @@ neurondb_train(PG_FUNCTION_ARGS)
 			bool		elem_byval;
 			char		elem_align;
 
-			/* Check that elements are TEXT */
 			if (elem_type != TEXTOID)
 			{
 				ndb_spi_session_end(&spi_session);
@@ -1585,7 +2282,6 @@ neurondb_train(PG_FUNCTION_ARGS)
 				MemoryContext old_spi_context;
 
 				nalloc(feature_names, const char *, nelems);
-				/* Zero-initialize to avoid accessing uninitialized pointers */
 				MemSet(feature_names, 0, nelems * sizeof(const char *));
 
 				/* Switch to SPI context before appending to feature_list */
@@ -1634,14 +2330,12 @@ neurondb_train(PG_FUNCTION_ARGS)
 		MemoryContextSwitchTo(old_spi_context);
 
 		nalloc(feature_names, const char *, 1);
-		/* Zero-initialize to avoid accessing uninitialized pointers */
 		MemSet(feature_names, 0, sizeof(const char *));
 		feature_names[0] = pstrdup("*");
 		feature_name_count = 1;
 	}
 
 
-	/* Safety check: ensure feature_list.data is valid */
 	if (feature_list.data == NULL || feature_list.len == 0)
 	{
 		ndb_spi_session_end(&spi_session);
@@ -1663,7 +2357,6 @@ neurondb_train(PG_FUNCTION_ARGS)
 	 * Copy feature_list.data to callcontext to ensure it's valid when used
 	 * later
 	 */
-	/* This is necessary because feature_list was allocated in SPI context */
 	MemoryContextSwitchTo(callcontext);
 	feature_list_str = pstrdup(feature_list.data);
 	if (feature_list_str == NULL)
@@ -1703,7 +2396,6 @@ neurondb_train(PG_FUNCTION_ARGS)
 				 errmsg(NDB_ERR_PREFIX_TRAIN " failed to allocate memory for model_name")));
 	}
 
-	/* Initialize data loading variables */
 	feature_matrix = NULL;
 	label_vector = NULL;
 	n_samples = 0;
@@ -1711,24 +2403,20 @@ neurondb_train(PG_FUNCTION_ARGS)
 	class_count = 0;
 	data_loaded = false;
 
-	/* Initialize GPU if needed (lazy initialization) before checking availability */
 	if (NDB_SHOULD_TRY_GPU())
 	{
 		ndb_gpu_init_if_needed();
 	}
 
-	/* Check GPU availability after initialization */
 	gpu_available = neurondb_gpu_is_available();
 
 	/* GPU mode requires GPU to be available */
 	if (NDB_REQUIRE_GPU() && !gpu_available)
 	{
-		/* Free feature_names BEFORE cleaning up callcontext */
 		if (feature_names)
 		{
 			int			i;
 
-			/* Switch to callcontext before freeing, as strings were allocated there */
 			MemoryContextSwitchTo(callcontext);
 			for (i = 0; i < feature_name_count; i++)
 			{
@@ -1800,7 +2488,6 @@ neurondb_train(PG_FUNCTION_ARGS)
 	if (data_loaded && !NDB_COMPUTE_MODE_IS_CPU() && 
 		(NDB_REQUIRE_GPU() || NDB_COMPUTE_MODE_IS_AUTO()))
 	{
-		/* Additional safety check: never attempt GPU in CPU mode */
 		if (NDB_COMPUTE_MODE_IS_CPU())
 		{
 			elog(WARNING, "neurondb_train: CPU mode detected, skipping GPU training (defensive check)");
@@ -1814,14 +2501,11 @@ neurondb_train(PG_FUNCTION_ARGS)
 			 * prevent JSON parsing errors in GPU code. This matches the
 			 * behavior in CPU training code (ml_linear_regression.c).
 			 */
-			/* Ensure hyperparams is copied into callcontext before GPU training */
-			/* This matches the pattern used by linear regression and other algorithms */
 			Jsonb *gpu_hyperparams = NULL;
 			MemoryContext prev_gpu_context = MemoryContextSwitchTo(callcontext);
 			
 			if (hyperparams != NULL)
 			{
-				/* Copy hyperparams into callcontext to ensure it's valid */
 				gpu_hyperparams = (Jsonb *) PG_DETOAST_DATUM_COPY(PointerGetDatum(hyperparams));
 			}
 			else
@@ -1956,7 +2640,6 @@ neurondb_train(PG_FUNCTION_ARGS)
 				edata = NULL;
 				error_msg = NULL;
 
-				/* Save algorithm before freeing (it might be NULL) */
 				algorithm_safe = algorithm ? pstrdup(algorithm) : NULL;
 
 				if (CurrentMemoryContext != ErrorContext)
@@ -1973,8 +2656,7 @@ neurondb_train(PG_FUNCTION_ARGS)
 						{
 							error_msg = pstrdup(edata->message);
 						}
-						/* Also set gpu_errmsg_ptr so it's included in the final error */
-						if (gpu_errmsg_ptr == NULL && error_msg != NULL)
+								if (gpu_errmsg_ptr == NULL && error_msg != NULL)
 						{
 							gpu_errmsg_ptr = pstrdup(error_msg);
 						}
@@ -2037,7 +2719,6 @@ neurondb_train(PG_FUNCTION_ARGS)
 				}
 				else
 				{
-					/* Check if GPU mode is required - if so, error out instead of falling back */
 					if (NDB_REQUIRE_GPU())
 					{
 						/* GPU mode: re-raise error, no fallback */
@@ -2057,7 +2738,6 @@ neurondb_train(PG_FUNCTION_ARGS)
 
 						MemoryContextSwitchTo(safe_context);
 
-						/* Save algorithm before freeing (it might be NULL) */
 						algorithm_safe = algorithm ? pstrdup(algorithm) : NULL;
 
 						if (CurrentMemoryContext != ErrorContext)
@@ -2074,7 +2754,6 @@ neurondb_train(PG_FUNCTION_ARGS)
 								{
 									error_msg = pstrdup(edata->message);
 								}
-								/* Also set gpu_errmsg_ptr so it's included in the final error */
 								if (gpu_errmsg_ptr == NULL && error_msg != NULL)
 								{
 									gpu_errmsg_ptr = pstrdup(error_msg);
@@ -2086,7 +2765,6 @@ neurondb_train(PG_FUNCTION_ARGS)
 						if (algorithm_safe)
 							nfree(algorithm_safe);
 
-						/* Free loaded training data if it was loaded */
 						if (data_loaded && callcontext != NULL && MemoryContextIsValid(callcontext))
 						{
 							MemoryContextSwitchTo(callcontext);
@@ -2110,7 +2788,6 @@ neurondb_train(PG_FUNCTION_ARGS)
 							data_loaded = false;
 						}
 
-						/* Free resources before error */
 						nfree(feature_list_str);
 						if (feature_names)
 						{
@@ -2237,7 +2914,6 @@ neurondb_train(PG_FUNCTION_ARGS)
 		PG_END_TRY();
 	}
 
-	/* Check if Metal backend requested CPU fallback (indicated in error message) */
 	if (gpu_errmsg_ptr && 
 		(strstr(gpu_errmsg_ptr, "using CPU fallback") != NULL ||
 		 strstr(gpu_errmsg_ptr, "Metal backend:") != NULL ||
@@ -2255,14 +2931,20 @@ neurondb_train(PG_FUNCTION_ARGS)
 
 	if (gpu_train_result && (gpu_result.model_id > 0 || gpu_result.spec.model_data != NULL))
 	{
+		ereport(DEBUG1,
+				(errmsg("neurondb_train: GPU training succeeded"),
+				 errdetail("algorithm=%s, model_id=%d", algorithm ? algorithm : "unknown", gpu_result.model_id)));
+
 		/* GPU training succeeded - use the model_id from GPU result */
 		if (gpu_result.model_id > 0)
 			{
 				model_id = gpu_result.model_id;
+				ereport(DEBUG2,
+						(errmsg("neurondb_train: using GPU training model_id"),
+						 errdetail("model_id=%d", model_id)));
 			}
 			else if (gpu_result.model_id == 0 && gpu_result.spec.model_data != NULL)
 			{
-				/* GPU created model but didn't set model_id - register it */
 				spec = gpu_result.spec;
 				
 				/* Convert GPU format to unified format for logistic_regression */
@@ -2272,7 +2954,6 @@ neurondb_train(PG_FUNCTION_ARGS)
 					bytea *unified_model_data = NULL;
 					bytea *gpu_model_data = spec.model_data;
 					
-					/* Check if model_data is in GPU format (starts with NdbCudaLrModelHeader) */
 					if (gpu_model_data != NULL && VARSIZE(gpu_model_data) - VARHDRSZ >= sizeof(int32))
 					{
 						const int32 *first_int = (const int32 *) VARDATA(gpu_model_data);
@@ -2286,7 +2967,6 @@ neurondb_train(PG_FUNCTION_ARGS)
 							size_t		expected_gpu_size = gpu_header_size + sizeof(float) * (size_t) first_value;
 							size_t		actual_size = VARSIZE(gpu_model_data) - VARHDRSZ;
 							
-							/* Check if size matches GPU format */
 							if (actual_size >= gpu_header_size && 
 								actual_size >= expected_gpu_size - 10 && 
 								actual_size <= expected_gpu_size + 10)
@@ -2345,17 +3025,6 @@ neurondb_train(PG_FUNCTION_ARGS)
 								
 								/* Serialize using unified format with training_backend=1 (GPU) */
 								/* Declare the function - it's static in ml_logistic_regression.c */
-								/* We need to call it through a helper or make it non-static */
-								/* For now, we'll need to include the header or make the function public */
-								/* Actually, we can't call lr_model_serialize from here as it's static */
-								/* We need to either make it public or duplicate the conversion logic */
-								/* Let's check if there's a public API for this */
-								
-								/* Since lr_model_serialize is static, we need to duplicate the logic here */
-								/* or make it public. For now, let's add a public wrapper function. */
-								/* Actually, let me check if we can just call the training function's conversion */
-								
-								/* For now, let's add the conversion inline */
 								{
 									StringInfoData buf;
 									int			j;
@@ -2394,7 +3063,6 @@ neurondb_train(PG_FUNCTION_ARGS)
 								{
 									spec.model_data = unified_model_data;
 									
-									/* Update metrics to ensure storage="gpu" and training_backend=1 are set */
 									{
 										Jsonb	   *gpu_metrics_update = NULL;
 										Jsonb	   *updated_metrics = NULL;
@@ -2491,7 +3159,6 @@ neurondb_train(PG_FUNCTION_ARGS)
 				 */
 
 				/* Defensive: NULL-safe fallback - use safe copies from TopMemoryContext */
-				/* Use MemoryContextStrdup to ensure allocation in TopMemoryContext */
 				spec.algorithm = safe_algorithm ? MemoryContextStrdup(TopMemoryContext, safe_algorithm) : 
 								 (algorithm ? MemoryContextStrdup(TopMemoryContext, algorithm) : NULL);
 				spec.training_table = safe_table_name ? MemoryContextStrdup(TopMemoryContext, safe_table_name) : 
@@ -2505,7 +3172,6 @@ neurondb_train(PG_FUNCTION_ARGS)
 				 */
 				PG_TRY();
 				{
-					/* Check project_name safely */
 				}
 				PG_CATCH();
 				{
@@ -2538,7 +3204,6 @@ neurondb_train(PG_FUNCTION_ARGS)
 					 * the model was successfully registered. We trust ml_catalog_register_model's
 					 * return value since it validates the INSERT internally.
 					 */
-					/* Verify model actually exists in catalog (non-blocking check) */
 					ndb_spi_stringinfo_free(spi_session, &sql);
 					ndb_spi_stringinfo_init(spi_session, &sql);
 					appendStringInfo(&sql,
@@ -2602,7 +3267,6 @@ neurondb_train(PG_FUNCTION_ARGS)
 						 errhint("GPU training may have failed internally. Check logs for details or try CPU training.")));
 			}
 
-		/* Free loaded training data */
 		if (data_loaded)
 		{
 			if (feature_matrix)
@@ -2611,14 +3275,11 @@ neurondb_train(PG_FUNCTION_ARGS)
 				nfree(label_vector);
 		}
 
-		/* Free GPU result if it was allocated */
 		ndb_gpu_free_train_result(&gpu_result);
 
 		/* Cleanup and return */
 		if (feature_list_str)
 			nfree(feature_list_str);
-		/* Don't manually free feature_list - let SPI context cleanup handle it */
-		/* ndb_spi_stringinfo_free(spi_session, &feature_list); */
 		if (feature_names)
 		{
 			int			i;
@@ -2643,24 +3304,27 @@ neurondb_train(PG_FUNCTION_ARGS)
 		MemoryContextSwitchTo(oldcontext);
 		ndb_spi_session_end(&spi_session);
 		neurondb_cleanup(oldcontext, callcontext);
+
+		ereport(DEBUG1,
+				(errmsg("neurondb_train: training completed successfully"),
+				 errdetail("model_id=%d, algorithm=%s, project=%s", model_id, algorithm ? algorithm : "unknown", project_name ? project_name : "unknown")));
+
 		PG_RETURN_INT32(model_id);
 		}
 	}
 	else
 	{
 cpu_fallback_training:
+		ereport(DEBUG1,
+				(errmsg("neurondb_train: attempting CPU fallback training"),
+				 errdetail("algorithm=%s, gpu_train_result=%s", algorithm ? algorithm : "unknown", gpu_train_result ? "true" : "false")));
+
 		/* GPU training failed or not attempted - handle based on compute mode */
 
-		/* CPU mode: never attempt GPU, just fall back to CPU */
-		/* In CPU mode, we should NEVER reach this error path */
 		if (NDB_COMPUTE_MODE_IS_CPU())
 		{
-			/* CPU mode - skip GPU checks and proceed to CPU training */
-			/* This should be the only path in CPU mode */
 		}
 		/* GPU mode: error if GPU was required but not available */
-		/* Only check GPU requirement if NOT in CPU mode */
-		/* EXCEPT: Allow CPU fallback if Metal backend explicitly requested it */
 		else if (!NDB_COMPUTE_MODE_IS_CPU() && NDB_REQUIRE_GPU() && !metal_requested_fallback)
 		{
 			nfree(feature_list_str);
@@ -2682,11 +3346,8 @@ cpu_fallback_training:
 			if (model_name)
 				nfree(model_name);
 			ndb_spi_session_end(&spi_session);
-		/* Report error BEFORE freeing strings - they're needed in errdetail */
-		/* Save gpu_errmsg_ptr before freeing - it contains the actual error */
 		{
 			char *gpu_error_msg = NULL;
-			/* Try to get error message from gpu_errmsg_ptr first */
 			if (gpu_errmsg_ptr && strlen(gpu_errmsg_ptr) > 0)
 			{
 				gpu_error_msg = pstrdup(gpu_errmsg_ptr);
@@ -2730,12 +3391,8 @@ cpu_fallback_training:
 		}
 		}
 
-		/* AUTO mode or CPU mode: fall back to CPU training */
-		/* Free loaded training data if it was loaded */
-		/* Make sure we're in the right context before freeing */
 		if (data_loaded && callcontext != NULL && MemoryContextIsValid(callcontext))
 		{
-			/* Switch to callcontext where the memory was allocated */
 			MemoryContextSwitchTo(callcontext);
 			if (feature_matrix)
 			{
@@ -2756,7 +3413,6 @@ cpu_fallback_training:
 			 * Can't free safely - just mark as not loaded to avoid
 			 * double-free
 			 */
-			/* The memory will be freed when callcontext is deleted */
 			feature_matrix = NULL;
 			label_vector = NULL;
 			data_loaded = false;
@@ -3201,13 +3857,9 @@ cpu_fallback_training:
 }
 
 
-/* Don't manually free feature_list or sql - they're in SPI context and will be cleaned up by ndb_spi_session_end */
-/* The SPI session cleanup will handle all StringInfoData allocated in that context */
-
 if (gpu_errmsg_ptr)
 	nfree(gpu_errmsg_ptr);
 
-/* Free safe copies from TopMemoryContext before ending SPI session */
 if (safe_algorithm)
 	pfree(safe_algorithm);
 if (safe_table_name)
@@ -3217,20 +3869,59 @@ if (safe_target_column)
 if (safe_project_name)
 	pfree(safe_project_name);
 
-/* End SPI session - this will clean up feature_list and sql automatically */
 ndb_spi_session_end(&spi_session);
 
-/* Switch back to original context and cleanup callcontext */
-MemoryContextSwitchTo(oldcontext);
-neurondb_cleanup(oldcontext, callcontext);
+	/* Switch back to original context and cleanup callcontext */
+	MemoryContextSwitchTo(oldcontext);
+	neurondb_cleanup(oldcontext, callcontext);
 
-/* Return immediately after cleanup, just like GPU path */
-PG_RETURN_INT32(model_id);
+	ereport(DEBUG1,
+			(errmsg("neurondb_train: CPU training completed successfully"),
+			 errdetail("model_id=%d, algorithm=%s, project=%s", model_id, algorithm ? algorithm : "unknown", project_name ? project_name : "unknown")));
+
+	/* Return immediately after cleanup, just like GPU path */
+	PG_RETURN_INT32(model_id);
 }
 
 /* ----------
  * neurondb_predict
- * Unified prediction interface.
+ *		Generate predictions using a trained ML model.
+ *
+ * This function provides a unified interface for making predictions with
+ * trained models. It loads model metadata, dispatches to algorithm-specific
+ * prediction functions, and returns the prediction result.
+ *
+ * SQL Function Signature:
+ *		neurondb.predict(model_id INTEGER, features FLOAT8[]) RETURNS FLOAT8
+ *
+ * Parameters:
+ *		model_id - ID of the trained model (from neurondb.train)
+ *		features - Array of feature values (must match training feature count)
+ *
+ * Returns:
+ *		FLOAT8: Prediction value (class probability, regression value, etc.)
+ *		Raises ERROR if model not found or features invalid
+ *
+ * Algorithm Support:
+ *		Supports all algorithms that have prediction functions registered.
+ *		The function looks up the algorithm from the model catalog and
+ *		dispatches to the appropriate prediction function.
+ *
+ * Memory Management:
+ *		- Creates dedicated memory context for function execution
+ *		- Manages SPI session for catalog queries
+ *		- All memory freed via neurondb_cleanup() on exit
+ *
+ * Error Handling:
+ *		- Validates model_id exists in catalog
+ *		- Validates features array is 1-dimensional
+ *		- Validates feature count matches model expectations
+ *		- Comprehensive error messages with hints
+ *
+ * CHANGE NOTES:
+ *		- CAN MODIFY: Feature validation rules, error messages
+ *		- CANNOT MODIFY: Memory context lifecycle, SPI session management
+ *		- BREAKS IF: Model catalog schema changes without updating queries
  * ----------
  */
 Datum
@@ -3255,6 +3946,10 @@ neurondb_predict(PG_FUNCTION_ARGS)
 	float8 *features_float = NULL;	/* Allocated if conversion needed */
 	NdbSpiSession *spi_session = NULL;
 
+	ereport(DEBUG1,
+			(errmsg("neurondb_predict: starting prediction"),
+			 errdetail("nargs=%d", PG_NARGS())));
+
 	if (PG_NARGS() != 2)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
@@ -3270,7 +3965,6 @@ neurondb_predict(PG_FUNCTION_ARGS)
 										ALLOCSET_DEFAULT_SIZES);
 	oldcontext = MemoryContextSwitchTo(callcontext);
 
-	/* Begin SPI session - always connect since this is called from SQL */
 	spi_session = ndb_spi_session_begin(callcontext, false);
 
 	ndb_spi_stringinfo_init(spi_session, &sql);
@@ -3949,12 +4643,50 @@ neurondb_predict(PG_FUNCTION_ARGS)
 	ndb_spi_session_end(&spi_session);
 	neurondb_cleanup(oldcontext, callcontext);
 
+	ereport(DEBUG1,
+			(errmsg("neurondb_predict: prediction completed"),
+			 errdetail("model_id=%d, algorithm=%s, prediction=%.6f", model_id, algorithm ? algorithm : "unknown", prediction)));
+
 	PG_RETURN_FLOAT8(prediction);
 }
 
 /* ----------
  * neurondb_deploy
- * Deploy trained model for usage.
+ *		Deploy a trained model for production use.
+ *
+ * This function creates a deployment record for a trained model, making it
+ * available for production predictions. Deployments track model versions,
+ * deployment strategies, and status.
+ *
+ * SQL Function Signature:
+ *		neurondb.deploy(model_id INTEGER, [strategy TEXT]) RETURNS INTEGER
+ *
+ * Parameters:
+ *		model_id - ID of the trained model to deploy
+ *		strategy - Deployment strategy (optional, defaults to 'replace')
+ *
+ * Returns:
+ *		INTEGER: deployment_id of the created deployment
+ *		Raises ERROR if model not found or deployment creation fails
+ *
+ * Deployment Strategies:
+ *		- 'replace': Replace existing active deployment (default)
+ *		- Other strategies may be supported in future versions
+ *
+ * Side Effects:
+ *		- Creates deployment table if it doesn't exist
+ *		- Inserts deployment record in neurondb.ml_deployments
+ *		- Generates unique deployment name with timestamp
+ *
+ * Memory Management:
+ *		- Creates dedicated memory context for function execution
+ *		- Manages SPI session for catalog operations
+ *		- All memory freed via neurondb_cleanup() on exit
+ *
+ * CHANGE NOTES:
+ *		- CAN MODIFY: Default strategy, deployment name format
+ *		- CANNOT MODIFY: Memory context lifecycle, SPI session management
+ *		- BREAKS IF: Deployment table schema changes without updating SQL
  * ----------
  */
 Datum
@@ -3966,10 +4698,14 @@ neurondb_deploy(PG_FUNCTION_ARGS)
 	MemoryContext callcontext;
 	MemoryContext oldcontext;
 	StringInfoData sql;
+
 	int			ret;
 	int			deployment_id = 0;
-
 	NdbSpiSession *spi_session = NULL;
+
+	ereport(DEBUG1,
+			(errmsg("neurondb_deploy: starting deployment"),
+			 errdetail("nargs=%d", PG_NARGS())));
 
 	if (PG_NARGS() < 1 || PG_NARGS() > 2)
 		ereport(ERROR,
@@ -3990,7 +4726,6 @@ neurondb_deploy(PG_FUNCTION_ARGS)
 	else
 		strategy = pstrdup("replace");
 
-	/* Begin SPI session - always connect since this is called from SQL */
 	spi_session = ndb_spi_session_begin(callcontext, false);
 
 	ndb_spi_stringinfo_init(spi_session, &sql);
@@ -4036,12 +4771,54 @@ neurondb_deploy(PG_FUNCTION_ARGS)
 	ndb_spi_session_end(&spi_session);
 	neurondb_cleanup(oldcontext, callcontext);
 
+	ereport(DEBUG1,
+			(errmsg("neurondb_deploy: deployment completed successfully"),
+			 errdetail("deployment_id=%d, model_id=%d, strategy=%s", deployment_id, model_id, strategy ? strategy : "NULL")));
+
 	PG_RETURN_INT32(deployment_id);
 }
 
 /* ----------
  * neurondb_load_model
- * Load an external ML model and register its metadata.
+ *		Load an external ML model and register its metadata in the catalog.
+ *
+ * This function allows importing models trained outside NeuronDB (e.g., with
+ * scikit-learn, TensorFlow, PyTorch, ONNX) and registering them in the
+ * NeuronDB catalog for use with the unified prediction API.
+ *
+ * SQL Function Signature:
+ *		neurondb.load_model(project_name TEXT, model_path TEXT, model_format TEXT)
+ *		RETURNS INTEGER
+ *
+ * Parameters:
+ *		project_name - Name of ML project to register model under
+ *		model_path - File system path to the model file
+ *		model_format - Model format: 'onnx', 'tensorflow', 'pytorch', or 'sklearn'
+ *
+ * Returns:
+ *		INTEGER: model_id of the registered model
+ *		Raises ERROR if format unsupported or registration fails
+ *
+ * Supported Formats:
+ *		- 'onnx': ONNX format models
+ *		- 'tensorflow': TensorFlow SavedModel or H5 format
+ *		- 'pytorch': PyTorch model files
+ *		- 'sklearn': scikit-learn pickle files
+ *
+ * Side Effects:
+ *		- Creates/updates project in neurondb.ml_projects
+ *		- Registers model in neurondb.ml_models with external model metadata
+ *		- Uses advisory locks for concurrent safety
+ *
+ * Memory Management:
+ *		- Creates dedicated memory context for function execution
+ *		- Manages SPI session for catalog operations
+ *		- All memory freed via neurondb_cleanup() on exit
+ *
+ * CHANGE NOTES:
+ *		- CAN MODIFY: Supported formats, validation rules
+ *		- CANNOT MODIFY: Memory context lifecycle, SPI session management
+ *		- BREAKS IF: Model catalog schema changes without updating SQL
  * ----------
  */
 Datum
@@ -4052,6 +4829,7 @@ neurondb_load_model(PG_FUNCTION_ARGS)
 	text *model_format_text = NULL;
 	MemoryContext callcontext;
 	MemoryContext oldcontext;
+
 	StringInfoData sql;
 	char *project_name = NULL;
 	char *model_path = NULL;
@@ -4059,8 +4837,11 @@ neurondb_load_model(PG_FUNCTION_ARGS)
 	int			ret;
 	int			model_id = 0;
 	int			project_id = 0;
-
 	NdbSpiSession *spi_session = NULL;
+
+	ereport(DEBUG1,
+			(errmsg("neurondb_load_model: starting model load"),
+			 errdetail("nargs=%d", PG_NARGS())));
 
 	if (PG_NARGS() != 3)
 		ereport(ERROR,
@@ -4090,7 +4871,6 @@ neurondb_load_model(PG_FUNCTION_ARGS)
 										ALLOCSET_DEFAULT_SIZES);
 	oldcontext = MemoryContextSwitchTo(callcontext);
 
-	/* Begin SPI session - always connect since this is called from SQL */
 	spi_session = ndb_spi_session_begin(callcontext, false);
 
 	ndb_spi_stringinfo_init(spi_session, &sql);
@@ -4178,13 +4958,66 @@ neurondb_load_model(PG_FUNCTION_ARGS)
 	ndb_spi_session_end(&spi_session);
 	neurondb_cleanup(oldcontext, callcontext);
 
+	ereport(DEBUG1,
+			(errmsg("neurondb_load_model: model load completed successfully"),
+			 errdetail("model_id=%d, project_name=%s, model_format=%s", model_id, project_name ? project_name : "NULL", model_format ? model_format : "NULL")));
+
 	PG_RETURN_INT32(model_id);
 }
 
 /* ----------
  * neurondb_evaluate
- * Unified model evaluation interface
- * Dispatches to algorithm-specific evaluate functions
+ *		Evaluate a trained model's performance on test data.
+ *
+ * This function provides a unified interface for model evaluation. It loads
+ * model metadata, validates inputs, and dispatches to algorithm-specific
+ * evaluation functions that compute metrics (accuracy, precision, recall,
+ * F1-score, MSE, R², etc.).
+ *
+ * SQL Function Signature:
+ *		neurondb.evaluate(model_id INTEGER, table_name TEXT, feature_col TEXT,
+ *						label_col TEXT) RETURNS JSONB
+ *
+ * Parameters:
+ *		model_id - ID of the trained model to evaluate
+ *		table_name - Name of table containing test data
+ *		feature_col - Name of feature column in test table
+ *		label_col - Name of label column (NULL for unsupervised algorithms)
+ *
+ * Returns:
+ *		JSONB: Evaluation metrics (algorithm-specific)
+ *		Returns NULL if evaluation fails (instead of raising error)
+ *		Raises ERROR if model not found or parameters invalid
+ *
+ * Evaluation Metrics:
+ *		Classification: accuracy, precision, recall, F1-score, confusion matrix
+ *		Regression: MSE, RMSE, MAE, R²
+ *		Clustering: silhouette score, inertia, cluster assignments
+ *
+ * Algorithm Support:
+ *		Supports all algorithms that have evaluation functions registered.
+ *		The function looks up the algorithm from the model catalog and
+ *		dispatches to the appropriate evaluation function.
+ *
+ * Error Handling:
+ *		- Comprehensive input validation
+ *		- Validates model exists in catalog
+ *		- Validates label_col required for supervised algorithms
+ *		- Returns NULL (not error) if evaluation query fails
+ *		- Wraps evaluation in PG_TRY/PG_CATCH for safety
+ *
+ * Memory Management:
+ *		- Creates dedicated memory context for function execution
+ *		- Manages SPI session for catalog queries and evaluation
+ *		- All memory freed via neurondb_cleanup() on exit
+ *		- JSONB result copied to caller's context before cleanup
+ *
+ * CHANGE NOTES:
+ *		- CAN MODIFY: Evaluation metrics returned, error handling strategy
+ *		- CANNOT MODIFY: Memory context lifecycle, SPI session management
+ *		- CANNOT MODIFY: PG_TRY/PG_CATCH structure (required for safety)
+ *		- BREAKS IF: Model catalog schema changes without updating queries
+ *		- BREAKS IF: Algorithm-specific evaluation function signatures change
  * ----------
  */
 Datum
@@ -4199,14 +5032,16 @@ neurondb_evaluate(PG_FUNCTION_ARGS)
 	StringInfoData sql;
 	int			ret;
 	bool		isnull = false;
-
 	char *algorithm = NULL;
 	char *table_name = NULL;
 	char *feature_col = NULL;
 	char *label_col = NULL;
-
 	Jsonb *result = NULL;
 	NdbSpiSession *spi_session = NULL;
+
+	ereport(DEBUG1,
+			(errmsg("neurondb_evaluate: starting model evaluation"),
+			 errdetail("nargs=%d", PG_NARGS())));
 
 	if (PG_NARGS() != 4)
 		ereport(ERROR,
@@ -4259,7 +5094,6 @@ neurondb_evaluate(PG_FUNCTION_ARGS)
 										ALLOCSET_DEFAULT_SIZES);
 	oldcontext = MemoryContextSwitchTo(callcontext);
 
-	/* Begin SPI session - always connect since this is called from SQL */
 	spi_session = ndb_spi_session_begin(callcontext, false);
 
 	/* Get algorithm from model_id */
@@ -4776,8 +5610,9 @@ neurondb_evaluate(PG_FUNCTION_ARGS)
 
 	/* oldcontext is current, result lives there */
 
-	/* CRITICAL SAFETY: Never return invalid data that could crash PostgreSQL */
-	elog(DEBUG2, "neurondb_evaluate: final validation - result=%p", result);
+	ereport(DEBUG2,
+			(errmsg("neurondb_evaluate: final validation"),
+			 errdetail("result=%p", (void *) result)));
 
 	if (result == NULL)
 	{
@@ -4799,15 +5634,20 @@ neurondb_evaluate(PG_FUNCTION_ARGS)
 		PG_RETURN_NULL();
 	}
 
-	elog(DEBUG2, "neurondb_evaluate: about to return JSONB result, size=%d", VARSIZE(result));
+	ereport(DEBUG2,
+			(errmsg("neurondb_evaluate: about to return JSONB result"),
+			 errdetail("result_size=%d", VARSIZE(result))));
 
-	/* EMERGENCY SAFETY: Ensure result is ALWAYS valid before returning */
 	if (result == NULL || VARSIZE(result) < sizeof(Jsonb))
 	{
 		/* Return NULL instead of invalid JSONB */
 		elog(WARNING, "neurondb_evaluate: EMERGENCY - result invalid, returning NULL");
 		PG_RETURN_NULL();
 	}
+
+	ereport(DEBUG1,
+			(errmsg("neurondb_evaluate: evaluation completed successfully"),
+			 errdetail("model_id=%d, algorithm=%s, result_size=%d", model_id, algorithm ? algorithm : "unknown", VARSIZE(result))));
 
 	PG_RETURN_JSONB_P(result);
 }
