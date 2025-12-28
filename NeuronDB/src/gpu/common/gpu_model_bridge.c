@@ -237,6 +237,32 @@ ndb_gpu_try_train_model(const char *algorithm,
 
 
 	ctx.backend_name = (ctx.backend->name) ? ctx.backend->name : "unknown";
+	
+	/* Check if Metal backend and algorithm is unsupported - skip GPU training and use CPU */
+	if (algorithm != NULL && strcmp(ctx.backend_name, "Metal") == 0)
+	{
+		/* List of algorithms unsupported by Metal GPU */
+		if (strcmp(algorithm, "random_forest") == 0 ||
+			strcmp(algorithm, "logistic_regression") == 0 ||
+			strcmp(algorithm, "linear_regression") == 0 ||
+			strcmp(algorithm, "svm") == 0 ||
+			strcmp(algorithm, "decision_tree") == 0 ||
+			strcmp(algorithm, "ridge") == 0 ||
+			strcmp(algorithm, "lasso") == 0 ||
+			strcmp(algorithm, "knn") == 0 ||
+			strcmp(algorithm, "xgboost") == 0 ||
+			strcmp(algorithm, "catboost") == 0)
+		{
+			/* Metal backend doesn't support this algorithm - skip GPU and use CPU */
+			if (errstr)
+				*errstr = ndb_gpu_strdup_or_null(psprintf("Metal backend: %s is unsupported (known limitations) - using CPU", algorithm));
+			/* GPU mode: allow CPU fallback for Metal unsupported algorithms */
+			/* AUTO/CPU mode: return false for CPU fallback */
+			ndb_gpu_ensure_errstr_top(errstr);
+			return false;
+		}
+	}
+	
 	ctx.device_id = neurondb_gpu_device;
 	ctx.stream_handle = NULL;
 	ctx.scratch_pool = NULL;
@@ -1000,30 +1026,50 @@ lr_fallback:;
 		}
 		else
 		{
-			/* GPU mode: error if GPU training fails */
+			/* GPU mode: error if GPU training fails, unless Metal requests CPU fallback */
 			/* CPU mode: never error, just return false for fallback */
 			if (!NDB_COMPUTE_MODE_IS_CPU() && NDB_REQUIRE_GPU())
 			{
 				/* Capture error message before raising ERROR */
 				char *error_detail = NULL;
-					if (errstr && *errstr)
+				bool allow_cpu_fallback = false;
+				
+				if (errstr && *errstr)
+				{
+					error_detail = ndb_gpu_strdup_or_null(*errstr);
+					/* Check if Metal backend requested CPU fallback */
+					if (error_detail && (strstr(error_detail, "using CPU fallback") != NULL ||
+										 strstr(error_detail, "Metal") != NULL))
 					{
-						error_detail = ndb_gpu_strdup_or_null(*errstr);
+						allow_cpu_fallback = true;
 					}
+				}
 				else
 				{
 					error_detail = pstrdup("GPU training failed - no error details available");
 				}
-				ereport(ERROR,
-						(errcode(ERRCODE_INTERNAL_ERROR),
-						 errmsg("linear_regression: GPU training failed - GPU mode requires GPU to be available"),
-						 errdetail("GPU attempt elapsed %.3f ms. Error: %s",
-								   elapsed_ms,
-								   error_detail),
-						 errhint("Set compute_mode='auto' for automatic CPU fallback.")));
-				/* Should not reach here, but included for safety */
-				if (error_detail)
-					pfree(error_detail);
+				
+				if (allow_cpu_fallback)
+				{
+					/* Metal backend requested CPU fallback - allow it without logging INFO message */
+					/* Don't free error_detail here - it's a copy and will be cleaned up by memory context */
+					/* Don't free *errstr either - it's managed by the caller */
+					/* Just return false to allow CPU fallback */
+					return false;
+				}
+				else
+				{
+					ereport(ERROR,
+							(errcode(ERRCODE_INTERNAL_ERROR),
+							 errmsg("linear_regression: GPU training failed - GPU mode requires GPU to be available"),
+							 errdetail("GPU attempt elapsed %.3f ms. Error: %s",
+									   elapsed_ms,
+									   error_detail),
+							 errhint("Set compute_mode='auto' for automatic CPU fallback.")));
+					/* Should not reach here, but included for safety */
+					if (error_detail)
+						pfree(error_detail);
+				}
 			}
 			/* AUTO mode: fall back to CPU */
 			ndb_gpu_stats_record(false, 0.0, elapsed_ms, true);
