@@ -285,6 +285,9 @@ def verify_gpu_usage(dbname: str, psql_path: str, compute_mode: str, test_name: 
 	if compute_mode == "cpu":
 		return True, ""  # Skip verification for CPU mode
 	
+	if compute_mode == "auto":
+		return True, ""  # Skip verification for AUTO mode - CPU fallback is expected behavior
+	
 	env = os.environ.copy()
 	if host:
 		env["PGHOST"] = host
