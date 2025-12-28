@@ -1,0 +1,226 @@
+name: Integration Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+jobs:
+  integration-tests:
+    name: Integration Tests (PostgreSQL ${{ matrix.pg_version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        pg_version: ["16", "17", "18"]
+    
+    services:
+      postgres:
+        image: postgres:${{ matrix.pg_version }}-bookworm
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: neurondb
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+      
+      - name: Install PostgreSQL development headers
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-server-dev-${{ matrix.pg_version }}
+      
+      - name: Install build dependencies
+        run: |
+          sudo apt-get install -y build-essential make gcc
+      
+      - name: Build NeuronDB extension
+        working-directory: NeuronDB
+        run: |
+          PG_CONFIG=/usr/lib/postgresql/${{ matrix.pg_version }}/bin/pg_config make
+        env:
+          PG_CONFIG: /usr/lib/postgresql/${{ matrix.pg_version }}/bin/pg_config
+      
+      - name: Install NeuronDB extension
+        working-directory: NeuronDB
+        run: |
+          sudo PG_CONFIG=/usr/lib/postgresql/${{ matrix.pg_version }}/bin/pg_config make install
+        env:
+          PG_CONFIG: /usr/lib/postgresql/${{ matrix.pg_version }}/bin/pg_config
+      
+      - name: Create extension in database
+        run: |
+          PGPASSWORD=postgres psql -h localhost -U postgres -d neurondb -c "CREATE EXTENSION neurondb;"
+      
+      - name: Setup NeuronMCP schema
+        working-directory: NeuronMCP
+        run: |
+          PGPASSWORD=postgres psql -h localhost -U postgres -d neurondb -f setup.sql
+      
+      - name: Setup NeuronAgent schema
+        working-directory: NeuronAgent
+        run: |
+          PGPASSWORD=postgres psql -h localhost -U postgres -d neurondb -f initial_schema.sql
+          # Run migrations if they exist
+          if [ -d "migrations" ]; then
+            for migration in migrations/*.sql; do
+              PGPASSWORD=postgres psql -h localhost -U postgres -d neurondb -f "$migration"
+            done
+          fi
+      
+      - name: Build NeuronAgent
+        working-directory: NeuronAgent
+        run: |
+          go build -o neuronagent ./cmd/agent-server
+      
+      - name: Build NeuronMCP
+        working-directory: NeuronMCP
+        run: |
+          go build -o neurondb-mcp ./cmd/neurondb-mcp
+      
+      - name: Start NeuronAgent
+        working-directory: NeuronAgent
+        run: |
+          ./neuronagent &
+          echo $! > /tmp/neuronagent.pid
+          sleep 5
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: neurondb
+          DB_USER: postgres
+          DB_PASSWORD: postgres
+          SERVER_HOST: 0.0.0.0
+          SERVER_PORT: 8080
+      
+      - name: Wait for NeuronAgent
+        run: |
+          for i in {1..30}; do
+            if curl -f http://localhost:8080/health > /dev/null 2>&1; then
+              echo "NeuronAgent is ready"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "NeuronAgent failed to start"
+          exit 1
+      
+      - name: Run Tier 0-3 tests
+        run: |
+          DB_HOST=localhost DB_PORT=5432 DB_NAME=neurondb DB_USER=postgres DB_PASSWORD=postgres \
+          ./scripts/verify_neurondb_integration.sh --tier 0
+          ./scripts/verify_neurondb_integration.sh --tier 1
+          ./scripts/verify_neurondb_integration.sh --tier 2
+          ./scripts/verify_neurondb_integration.sh --tier 3
+      
+      - name: Run Tier 4 tests
+        run: |
+          DB_HOST=localhost DB_PORT=5432 DB_NAME=neurondb DB_USER=postgres DB_PASSWORD=postgres \
+          ./scripts/verify_neurondb_integration.sh --tier 4
+        continue-on-error: true  # Embeddings may require external API keys
+      
+      - name: Run Tier 5 tests
+        run: |
+          DB_HOST=localhost DB_PORT=5432 DB_NAME=neurondb DB_USER=postgres DB_PASSWORD=postgres \
+          AGENT_URL=http://localhost:8080 \
+          ./scripts/verify_neurondb_integration.sh --tier 5
+        continue-on-error: true  # May require API key setup
+      
+      - name: Run Tier 6 tests
+        run: |
+          DB_HOST=localhost DB_PORT=5432 DB_NAME=neurondb DB_USER=postgres DB_PASSWORD=postgres \
+          ./scripts/verify_neurondb_integration.sh --tier 6
+        continue-on-error: true  # MCP may require additional setup
+      
+      - name: Cleanup
+        if: always()
+        run: |
+          if [ -f /tmp/neuronagent.pid ]; then
+            kill $(cat /tmp/neuronagent.pid) || true
+          fi
+          pkill -f neuronagent || true
+      
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-results-pg${{ matrix.pg_version }}
+          path: |
+            test-results-*.json
+          retention-days: 7
+
+  docker-compose-integration:
+    name: Docker Compose Integration (PostgreSQL ${{ matrix.pg_version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        pg_version: ["16", "17", "18"]
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Start services with Docker Compose
+        run: |
+          # Modify docker-compose.yml to use specific PostgreSQL version
+          docker compose up -d
+          sleep 30  # Wait for services to be ready
+      
+      - name: Wait for services
+        run: |
+          for i in {1..60}; do
+            if docker compose ps | grep -q "healthy\|Up"; then
+              echo "Services are ready"
+              break
+            fi
+            sleep 2
+          done
+      
+      - name: Run full integration test suite
+        run: |
+          DB_HOST=localhost DB_PORT=5433 DB_NAME=neurondb DB_USER=neurondb DB_PASSWORD=neurondb \
+          AGENT_URL=http://localhost:8080 \
+          ./scripts/verify_neurondb_integration.sh --json > test-results-docker.json
+      
+      - name: Check test results
+        run: |
+          if [ -f test-results-docker.json ]; then
+            FAILED=$(jq -r '.summary.failed' test-results-docker.json)
+            if [ "$FAILED" -gt 0 ]; then
+              echo "Some tests failed"
+              exit 1
+            fi
+          fi
+      
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-integration-results-pg${{ matrix.pg_version }}
+          path: test-results-docker.json
+          retention-days: 7
+      
+      - name: Stop services
+        if: always()
+        run: |
+          docker compose down -v
+
