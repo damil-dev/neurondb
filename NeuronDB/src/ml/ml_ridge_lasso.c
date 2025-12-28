@@ -2370,9 +2370,18 @@ train_ridge_regression(PG_FUNCTION_ARGS)
 			else
 			{
 				/* GPU training failed - check if we're in strict GPU mode */
-				if (NDB_REQUIRE_GPU())
+				/* EXCEPT: Allow CPU fallback if Metal backend reports unsupported algorithm */
+				bool metal_unsupported = false;
+				if (gpu_err != NULL && 
+					(strstr(gpu_err, "Metal backend:") != NULL || 
+					 (strstr(gpu_err, "Metal") != NULL && strstr(gpu_err, "unsupported") != NULL)))
 				{
-					/* Strict GPU mode: error out, no CPU fallback */
+					metal_unsupported = true;
+				}
+				
+				if (NDB_REQUIRE_GPU() && !metal_unsupported)
+				{
+					/* Strict GPU mode: error out, no CPU fallback (unless Metal unsupported) */
 					char *error_msg = NULL;
 
 					if (gpu_err != NULL)
@@ -3568,9 +3577,18 @@ train_lasso_regression(PG_FUNCTION_ARGS)
 			else
 			{
 				/* GPU training failed - check if we're in strict GPU mode */
-				if (NDB_REQUIRE_GPU())
+				/* EXCEPT: Allow CPU fallback if Metal backend reports unsupported algorithm */
+				bool metal_unsupported = false;
+				if (gpu_err != NULL && 
+					(strstr(gpu_err, "Metal backend:") != NULL || 
+					 (strstr(gpu_err, "Metal") != NULL && strstr(gpu_err, "unsupported") != NULL)))
 				{
-					/* Strict GPU mode: error out, no CPU fallback */
+					metal_unsupported = true;
+				}
+				
+				if (NDB_REQUIRE_GPU() && !metal_unsupported)
+				{
+					/* Strict GPU mode: error out, no CPU fallback (unless Metal unsupported) */
 					char *error_msg = NULL;
 
 					if (gpu_err != NULL)
