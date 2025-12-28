@@ -935,14 +935,13 @@ train_svm_classifier(PG_FUNCTION_ARGS)
 	const char *quoted_feat;
 	const char *quoted_label;
 	MLGpuTrainResult gpu_result;
-
-	/* Initialize gpu_result to zero to avoid undefined behavior */
-	memset(&gpu_result, 0, sizeof(MLGpuTrainResult));
-
 	char *gpu_err = NULL;
 	Jsonb *gpu_hyperparams = NULL;
 	int32		model_id = 0;
 	SVMModel	model;
+
+	/* Initialize gpu_result to zero to avoid undefined behavior */
+	memset(&gpu_result, 0, sizeof(MLGpuTrainResult));
 
 	if (PG_NARGS() < 3 || PG_NARGS() > 5)
 	{
@@ -2243,110 +2242,6 @@ predict_svm_model_id(PG_FUNCTION_ARGS)
 	}
 
 	PG_RETURN_FLOAT8(prediction);
-}
-
-/*
- * svm_predict_batch
- *
- * Helper function to predict a batch of samples using SVM model.
- * Updates confusion matrix.
- * Currently unused but kept for potential future batch prediction optimization.
- */
-static void
-svm_predict_batch(const SVMModel * model,
-				  const float *features,
-				  const double *labels,
-				  int n_samples,
-				  int feature_dim,
-				  int *tp_out,
-				  int *tn_out,
-				  int *fp_out,
-				  int *fn_out)
-{
-	int			i;
-	int			tp = 0;
-	int			tn = 0;
-	int			fp = 0;
-	int			fn = 0;
-
-	if (model == NULL || features == NULL || labels == NULL || n_samples <= 0)
-	{
-		if (tp_out)
-			*tp_out = 0;
-		if (tn_out)
-			*tn_out = 0;
-		if (fp_out)
-			*fp_out = 0;
-		if (fn_out)
-			*fn_out = 0;
-		return;
-	}
-
-
-	for (i = 0; i < n_samples; i++)
-	{
-		const float *row = features + (i * feature_dim);
-		double		y_true = labels[i];
-		int			true_class;
-		double		prediction = 0.0;
-		int			pred_class;
-		int			j;
-
-		if (!isfinite(y_true))
-			continue;
-
-		/* y_true is -1 or 1 after normalization */
-		true_class = (y_true <= 0.0) ? -1 : 1;
-
-		/* Compute prediction using support vectors */
-		prediction = model->bias;
-		if (model->n_support_vectors == 0)
-		{
-		}
-		for (j = 0; j < model->n_support_vectors; j++)
-		{
-			float	   *sv = model->support_vectors + j * model->n_features;
-			double		kernel_val = 0.0;
-			int			k;
-
-			/* Linear kernel: K(x, y) = x^T * y */
-			for (k = 0; k < feature_dim; k++)
-				kernel_val += (double) sv[k] * (double) row[k];
-
-			prediction += model->alphas[j]
-				* model->support_labels[j]	/* y_i */
-				* kernel_val;
-		}
-
-		/*
-		 * Convert to binary class (-1 or 1) consistent with SVM label
-		 * encoding
-		 */
-		pred_class = (prediction >= 0.0) ? 1 : -1;
-
-		if (i < 5)				/* Log first 5 predictions for debugging */
-		{
-		}
-
-		/* Update confusion matrix (labels are -1 or 1) */
-		if (true_class == 1 && pred_class == 1)
-			tp++;
-		else if (true_class == -1 && pred_class == -1)
-			tn++;
-		else if (true_class == -1 && pred_class == 1)
-			fp++;
-		else if (true_class == 1 && pred_class == -1)
-			fn++;
-	}
-
-	if (tp_out)
-		*tp_out = tp;
-	if (tn_out)
-		*tn_out = tn;
-	if (fp_out)
-		*fp_out = fp;
-	if (fn_out)
-		*fn_out = fn;
 }
 
 /*

@@ -112,7 +112,6 @@ static void lr_stream_process_chunk(const char *quoted_tbl,
 									int *rows_processed);
 static bytea * lr_model_serialize(const LRModel *model, uint8 training_backend);
 static LRModel *lr_model_deserialize(const bytea * data, uint8 * training_backend_out);
-static bool lr_metadata_is_gpu(Jsonb * metadata);
 static bool lr_try_gpu_predict_catalog(int32 model_id,
 									   const Vector *feature_vec,
 									   double *result_out);
@@ -3595,13 +3594,12 @@ lr_model_deserialize(const bytea * data, uint8 * training_backend_out)
 }
 
 /*
- * lr_metadata_is_gpu
- *
- * Checks if a model's metadata indicates it's a GPU-trained model.
- * Now checks for training_backend integer (1=GPU, 0=CPU) instead of "storage" string.
+ * (removed unused function lr_metadata_is_gpu)
  */
+#if 0
+/* Removed unused function lr_metadata_is_gpu */
 static bool
-lr_metadata_is_gpu(Jsonb * metadata)
+lr_metadata_is_gpu_removed(Jsonb * metadata)
 {
 	bool		is_gpu = false;
 	JsonbIterator *it = NULL;
@@ -3635,6 +3633,7 @@ lr_metadata_is_gpu(Jsonb * metadata)
 
 	return is_gpu;
 }
+#endif
 
 /*
  * lr_try_gpu_predict_catalog

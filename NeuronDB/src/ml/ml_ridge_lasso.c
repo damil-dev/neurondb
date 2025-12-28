@@ -1940,17 +1940,15 @@ train_ridge_regression(PG_FUNCTION_ARGS)
 	const char *quoted_feat;
 	const char *quoted_target;
 	MLGpuTrainResult gpu_result;
-
-	/* Initialize gpu_result to zero to avoid undefined behavior */
-	memset(&gpu_result, 0, sizeof(MLGpuTrainResult));
-
 	char *gpu_err = NULL;
 	Jsonb *gpu_hyperparams = NULL;
 	StringInfoData hyperbuf = {0};
 	MemoryContext oldcontext;
-
 	NdbSpiSession *train_spi_session = NULL;
 	int32		model_id = 0;
+
+	/* Initialize gpu_result to zero to avoid undefined behavior */
+	memset(&gpu_result, 0, sizeof(MLGpuTrainResult));
 
 	table_name = PG_GETARG_TEXT_PP(0);
 	feature_col = PG_GETARG_TEXT_PP(1);
@@ -3074,15 +3072,14 @@ train_lasso_regression(PG_FUNCTION_ARGS)
 	const char *quoted_feat;
 	const char *quoted_target;
 	MLGpuTrainResult gpu_result;
-
-	/* Initialize gpu_result to zero to avoid undefined behavior */
-	memset(&gpu_result, 0, sizeof(MLGpuTrainResult));
-
 	char *gpu_err = NULL;
 	Jsonb *gpu_hyperparams = NULL;
 	StringInfoData hyperbuf;
 	MemoryContext oldcontext;
 	int32		model_id = 0;
+
+	/* Initialize gpu_result to zero to avoid undefined behavior */
+	memset(&gpu_result, 0, sizeof(MLGpuTrainResult));
 
 	oldcontext = CurrentMemoryContext;
 	Assert(oldcontext != NULL);
