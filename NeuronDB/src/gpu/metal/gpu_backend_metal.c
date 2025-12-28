@@ -138,49 +138,6 @@ static int	ndb_metal_stream_create(ndb_stream_t * stream);
 static int	ndb_metal_stream_destroy(ndb_stream_t stream);
 static int	ndb_metal_stream_synchronize(ndb_stream_t stream);
 
-/*
- * Check if an ML algorithm is unsupported by Metal GPU backend.
- * 
- * Metal has known limitations with certain algorithms due to memory corruption
- * and other issues. This function returns true if the algorithm should use
- * CPU fallback instead of attempting Metal GPU training.
- * 
- * List of unsupported algorithms (as of 2025-12-28):
- * - random_forest: memory corruption
- * - logistic_regression: memory corruption
- * - linear_regression: memory corruption in X'X loop
- * - svm: memory corruption
- * - decision_tree: memory corruption
- * - ridge: memory corruption
- * - lasso: memory corruption
- * - knn: memory corruption
- * - xgboost: pfree errors
- * - catboost: pfree errors
- */
-static bool
-ndb_metal_is_algorithm_unsupported(const char *algorithm)
-{
-	if (algorithm == NULL)
-		return false;
-	
-	/* List of algorithms unsupported by Metal GPU */
-	if (strcmp(algorithm, "random_forest") == 0 ||
-		strcmp(algorithm, "logistic_regression") == 0 ||
-		strcmp(algorithm, "linear_regression") == 0 ||
-		strcmp(algorithm, "svm") == 0 ||
-		strcmp(algorithm, "decision_tree") == 0 ||
-		strcmp(algorithm, "ridge") == 0 ||
-		strcmp(algorithm, "lasso") == 0 ||
-		strcmp(algorithm, "knn") == 0 ||
-		strcmp(algorithm, "xgboost") == 0 ||
-		strcmp(algorithm, "catboost") == 0)
-	{
-		return true;
-	}
-	
-	return false;
-}
-
 bool		neurondb_gpu_rf_predict_backend(const void *rf_hdr,
 											const void *trees,
 											const void *nodes,
@@ -269,15 +226,6 @@ metal_backend_cleanup_impl(void)
 		 "neurondb: Metal GPU backend cleanup: all queues, kernels, and "
 		 "state released");
 }
-
-static bool
-metal_backend_is_available_impl(void)
-{
-	bool		avail;
-
-	avail = metal_backend_is_available();
-	return avail;
-	}
 
 static int
 metal_backend_get_device_count_impl(void)
@@ -1310,17 +1258,8 @@ ndb_metal_rf_train(const float *features,
 				   Jsonb * *metrics,
 				   char **errstr)
 {
-	/* TODO: Metal backend has memory corruption issues in random forest training.
-	 * Root cause: Similar to other ML algorithms - memory management issues.
-	 * CUDA backend works fine. Until fixed, fall back to CPU.
-	 */
-	if (errstr)
-		*errstr = pstrdup("Metal RF: using CPU fallback (memory corruption - TODO: fix Metal backend)");
-	return -1;
-
 	const int	default_n_trees = 32;
 	int			n_trees;
-
 	int *label_ints = NULL;
 	int *class_counts = NULL;
 	int *best_left_counts = NULL;
@@ -2282,21 +2221,12 @@ ndb_metal_lr_train(const float *features,
 				   Jsonb * *metrics,
 				   char **errstr)
 {
-	/* TODO: Metal backend has similar memory corruption as linear regression.
-	 * Root cause: Same issue as linreg - memory corruption in training loops.
-	 * CUDA backend works fine. Until fixed, fall back to CPU.
-	 */
-	if (errstr)
-		*errstr = pstrdup("Metal logreg: using CPU fallback (memory corruption - TODO: fix Metal backend)");
-	return -1;
-
 	const int	default_max_iters = 1000;
 	const double default_learning_rate = 0.01;
 	const double default_lambda = 0.001;
 	int			max_iters = default_max_iters;
 	double		learning_rate = default_learning_rate;
 	double		lambda = default_lambda;
-
 	double *weights = NULL;
 	double *grad_weights = NULL;
 	double *predictions = NULL;
@@ -2311,6 +2241,14 @@ ndb_metal_lr_train(const float *features,
 	double		final_loss = 0.0;
 	int			correct = 0;
 	double		accuracy = 0.0;
+
+	/* TODO: Metal backend has similar memory corruption as linear regression.
+	 * Root cause: Same issue as linreg - memory corruption in training loops.
+	 * CUDA backend works fine. Until fixed, fall back to CPU.
+	 */
+	if (errstr)
+		*errstr = pstrdup("Metal logreg: using CPU fallback (memory corruption - TODO: fix Metal backend)");
+	return -1;
 
 	if (errstr)
 		*errstr = NULL;
@@ -2785,16 +2723,6 @@ ndb_metal_linreg_train(const float *features,
 					   Jsonb * *metrics,
 					   char **errstr)
 {
-	/* TODO: Metal backend has memory corruption in X'X computation loop.
-	 * Root cause: Crash occurs after xi array allocation during matrix accumulation.
-	 * The issue appears to be related to nalloc/palloc memory management mixing
-	 * or array indexing in the nested loops. CUDA backend works fine.
-	 * Until fixed, fall back to CPU which is stable and tested.
-	 */
-	if (errstr)
-		*errstr = pstrdup("Metal linreg: using CPU fallback (memory corruption in X'X loop - TODO: fix Metal backend)");
-	return -1;
-
 	double *h_XtX = NULL;
 	double *h_Xty = NULL;
 	double *h_XtX_inv = NULL;
@@ -2809,6 +2737,16 @@ ndb_metal_linreg_train(const float *features,
 				j,
 				k;
 	int			rc = -1;
+
+	/* TODO: Metal backend has memory corruption in X'X computation loop.
+	 * Root cause: Crash occurs after xi array allocation during matrix accumulation.
+	 * The issue appears to be related to nalloc/palloc memory management mixing
+	 * or array indexing in the nested loops. CUDA backend works fine.
+	 * Until fixed, fall back to CPU which is stable and tested.
+	 */
+	if (errstr)
+		*errstr = pstrdup("Metal linreg: using CPU fallback (memory corruption in X'X loop - TODO: fix Metal backend)");
+	return -1;
 
 	ereport(DEBUG2,
 			(errmsg("ndb_metal_linreg_train: entry"),
@@ -3415,17 +3353,8 @@ ndb_metal_svm_train(const float *features,
 					Jsonb * *metrics,
 					char **errstr)
 {
-	/* TODO: Metal backend has memory corruption issues in SVM training.
-	 * Root cause: Similar to other ML algorithms - memory management issues.
-	 * CUDA backend works fine. Until fixed, fall back to CPU.
-	 */
-	if (errstr)
-		*errstr = pstrdup("Metal SVM: using CPU fallback (memory corruption - TODO: fix Metal backend)");
-	return -1;
-
 	double		C = 1.0;
 	int			max_iters = 1000;
-
 	float *alphas = NULL;
 	float *errors = NULL;
 	float *kernel_matrix = NULL;
@@ -4404,6 +4333,16 @@ ndb_metal_dt_train(const float *features,
 				  Jsonb * *metrics,
 				  char **errstr)
 {
+	int			max_depth = 10;
+	int			min_samples_split = 2;
+	bool		is_classification = true;
+	int			class_count = 2;
+	DTModel *model = NULL;
+	DTNode *root = NULL;
+	int *indices = NULL;
+	int			i;
+	int			rc = -1;
+
 	/* TODO: Metal backend has memory corruption issues in decision tree training.
 	 * Root cause: Similar to other ML algorithms - memory management issues.
 	 * CUDA backend works fine. Until fixed, fall back to CPU.
@@ -4411,17 +4350,6 @@ ndb_metal_dt_train(const float *features,
 	if (errstr)
 		*errstr = pstrdup("Metal DT: using CPU fallback (memory corruption - TODO: fix Metal backend)");
 	return -1;
-
-	int			max_depth = 10;
-	int			min_samples_split = 2;
-	bool		is_classification = true;
-	int			class_count = 2;
-
-	DTModel *model = NULL;
-	DTNode *root = NULL;
-	int *indices = NULL;
-	int			i;
-	int			rc = -1;
 
 	if (errstr)
 		*errstr = NULL;
@@ -4894,16 +4822,7 @@ ndb_metal_ridge_train(const float *features,
 					  Jsonb * *metrics,
 					  char **errstr)
 {
-	/* TODO: Metal backend has memory corruption issues in ridge regression training.
-	 * Root cause: Similar to linear regression - memory corruption in matrix operations.
-	 * CUDA backend works fine. Until fixed, fall back to CPU.
-	 */
-	if (errstr)
-		*errstr = pstrdup("Metal Ridge: using CPU fallback (memory corruption - TODO: fix Metal backend)");
-	return -1;
-
 	double		lambda = 0.01;	/* Default regularization */
-
 	double *h_XtX = NULL;
 	double *h_Xty = NULL;
 	double *h_XtX_inv = NULL;
@@ -4918,6 +4837,14 @@ ndb_metal_ridge_train(const float *features,
 				j,
 				k;
 	int			rc = -1;
+
+	/* TODO: Metal backend has memory corruption issues in ridge regression training.
+	 * Root cause: Similar to linear regression - memory corruption in matrix operations.
+	 * CUDA backend works fine. Until fixed, fall back to CPU.
+	 */
+	if (errstr)
+		*errstr = pstrdup("Metal Ridge: using CPU fallback (memory corruption - TODO: fix Metal backend)");
+	return -1;
 
 	if (errstr)
 		*errstr = NULL;
@@ -5333,17 +5260,8 @@ ndb_metal_lasso_train(const float *features,
 					  Jsonb * *metrics,
 					  char **errstr)
 {
-	/* TODO: Metal backend has memory corruption issues in lasso regression training.
-	 * Root cause: Similar to linear regression - memory corruption in matrix operations.
-	 * CUDA backend works fine. Until fixed, fall back to CPU.
-	 */
-	if (errstr)
-		*errstr = pstrdup("Metal Lasso: using CPU fallback (memory corruption - TODO: fix Metal backend)");
-	return -1;
-
 	double		lambda = 0.01;	/* Default regularization */
 	int			max_iters = 1000;	/* Default iterations */
-
 	double *weights = NULL;
 	double *weights_old = NULL;
 	double *residuals = NULL;
@@ -6585,6 +6503,13 @@ ndb_metal_knn_train(const float *features,
 					Jsonb * *metrics,
 					char **errstr)
 {
+	struct KNNModel model;
+	bytea *blob = NULL;
+	Jsonb *metrics_json = NULL;
+	float *features_copy = NULL;
+	double *labels_copy = NULL;
+	int			rc = -1;
+
 	/* TODO: Metal backend has memory corruption issues in KNN training.
 	 * Root cause: Similar to other ML algorithms - memory management issues.
 	 * CUDA backend works fine. Until fixed, fall back to CPU.
@@ -6592,14 +6517,6 @@ ndb_metal_knn_train(const float *features,
 	if (errstr)
 		*errstr = pstrdup("Metal KNN: using CPU fallback (memory corruption - TODO: fix Metal backend)");
 	return -1;
-
-	struct KNNModel model;
-
-	bytea *blob = NULL;
-	Jsonb *metrics_json = NULL;
-	float *features_copy = NULL;
-	double *labels_copy = NULL;
-	int			rc = -1;
 
 	if (errstr)
 		*errstr = NULL;
@@ -6828,15 +6745,6 @@ ndb_metal_xgboost_train(const float *features,
 					   Jsonb * *metrics,
 					   char **errstr)
 {
-	/* TODO: Metal backend has pfree invalid pointer errors in XGBoost training.
-	 * Root cause: Memory corruption when freeing text_to_cstring results or buf.data.
-	 * Fixed pfree(obj_str) and removed pfree(buf.data), but still has issues.
-	 * CUDA backend works fine. Until fully fixed, fall back to CPU.
-	 */
-	if (errstr)
-		*errstr = pstrdup("Metal XGBoost: using CPU fallback (pfree errors - TODO: fix Metal backend)");
-	return -1;
-
 	int			n_estimators = 100;
 	int			max_depth = 6;
 	float		learning_rate = 0.1f;
@@ -6846,7 +6754,15 @@ ndb_metal_xgboost_train(const float *features,
 	char	   *blob_raw = NULL;
 	char	   *base = NULL;
 	NdbCudaXGBoostModelHeader *hdr = NULL;
-	int			i;
+
+	/* TODO: Metal backend has pfree invalid pointer errors in XGBoost training.
+	 * Root cause: Memory corruption when freeing text_to_cstring results or buf.data.
+	 * Fixed pfree(obj_str) and removed pfree(buf.data), but still has issues.
+	 * CUDA backend works fine. Until fully fixed, fall back to CPU.
+	 */
+	if (errstr)
+		*errstr = pstrdup("Metal XGBoost: using CPU fallback (pfree errors - TODO: fix Metal backend)");
+	return -1;
 
 	if (errstr)
 		*errstr = NULL;
@@ -6865,7 +6781,6 @@ ndb_metal_xgboost_train(const float *features,
 		Datum		n_estimators_datum;
 		Datum		max_depth_datum;
 		Datum		learning_rate_datum;
-		Datum		objective_datum;
 		Datum		numeric_datum;
 		Numeric		num;
 		text	   *obj_text = NULL;
@@ -7063,14 +6978,6 @@ ndb_metal_catboost_train(const float *features,
 						Jsonb * *metrics,
 						char **errstr)
 {
-	/* TODO: Metal backend has pfree invalid pointer errors in CatBoost training.
-	 * Root cause: Same as XGBoost - memory corruption when freeing text_to_cstring results.
-	 * CUDA backend works fine. Until fully fixed, fall back to CPU.
-	 */
-	if (errstr)
-		*errstr = pstrdup("Metal CatBoost: using CPU fallback (pfree errors - TODO: fix Metal backend)");
-	return -1;
-
 	int			iterations = 1000;
 	int			depth = 6;
 	float		learning_rate = 0.03f;
@@ -7080,6 +6987,14 @@ ndb_metal_catboost_train(const float *features,
 	char	   *blob_raw = NULL;
 	char	   *base = NULL;
 	NdbCudaCatBoostModelHeader *hdr = NULL;
+
+	/* TODO: Metal backend has pfree invalid pointer errors in CatBoost training.
+	 * Root cause: Same as XGBoost - memory corruption when freeing text_to_cstring results.
+	 * CUDA backend works fine. Until fully fixed, fall back to CPU.
+	 */
+	if (errstr)
+		*errstr = pstrdup("Metal CatBoost: using CPU fallback (pfree errors - TODO: fix Metal backend)");
+	return -1;
 
 	if (errstr)
 		*errstr = NULL;
@@ -7098,7 +7013,6 @@ ndb_metal_catboost_train(const float *features,
 		Datum		iterations_datum;
 		Datum		depth_datum;
 		Datum		learning_rate_datum;
-		Datum		loss_function_datum;
 		Datum		numeric_datum;
 		Numeric		num;
 		text	   *loss_text = NULL;
