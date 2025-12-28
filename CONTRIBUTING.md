@@ -223,11 +223,72 @@ Describe how you tested the changes
    - Test coverage
    - Documentation completeness
 
-3. **Merge Requirements**:
+3. **Review SLA Expectations**:
+   - **First review:** Within 48 hours of PR submission
+   - **Follow-up reviews:** Within 24 hours of author response
+   - **Review focus areas:**
+     - Code correctness and edge cases
+     - Performance implications
+     - Security considerations
+     - API contract compliance (for public APIs)
+     - Test coverage adequacy
+
+4. **Merge Requirements**:
    - All CI checks must pass
    - At least one approval from code owners
    - No merge conflicts
    - All checklist items completed
+
+### Test Requirements
+
+**Minimum Test Coverage:**
+- **New features:** 80%+ code coverage for new code
+- **Bug fixes:** Test case that reproduces and verifies fix
+- **API changes:** Integration tests for public APIs
+
+**Test Types Required:**
+- **Unit tests:** For individual functions/components
+- **Integration tests:** For cross-component interactions
+- **Regression tests:** For SQL functions (in `sql/` directory)
+- **Performance tests:** For performance-critical changes
+
+**Running Tests:**
+```bash
+# NeuronDB extension tests
+cd NeuronDB
+make installcheck
+
+# Go component tests
+cd NeuronAgent
+go test ./...
+
+cd ../NeuronMCP
+go test ./...
+
+# Integration tests
+./scripts/verify_neurondb_integration.sh
+```
+
+### Style Enforcement
+
+**Pre-commit Hooks:**
+We recommend setting up pre-commit hooks to catch style issues early:
+
+```bash
+# Install pre-commit (if not installed)
+pip install pre-commit
+
+# Set up hooks
+pre-commit install
+
+# Run hooks manually
+pre-commit run --all-files
+```
+
+**Automated Enforcement:**
+- CI automatically checks formatting and linting
+- PRs with style violations will fail CI
+- Fix style issues before requesting review
 
 ## Code Review
 
