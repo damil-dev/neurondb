@@ -1691,13 +1691,11 @@ predict_decision_tree_model_id(PG_FUNCTION_ARGS)
 }
 
 /*
- * dt_predict_batch
- *
- * Helper function to predict a batch of samples using Decision Tree model.
- * Updates confusion matrix.
+ * (removed unused function dt_predict_batch)
  */
+#if 0
 static void
-dt_predict_batch(const DTModel *model,
+dt_predict_batch_removed(const DTModel *model,
 				 const float *features,
 				 const double *labels,
 				 int n_samples,
@@ -1782,6 +1780,7 @@ dt_predict_batch(const DTModel *model,
 	if (fn_out)
 		*fn_out = fn;
 }
+#endif
 
 /*
  * evaluate_decision_tree_by_model_id

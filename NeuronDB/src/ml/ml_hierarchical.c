@@ -162,7 +162,6 @@ cluster_hierarchical(PG_FUNCTION_ARGS)
 
 	ClusterNode *clusters = NULL;
 	int *cluster_assignments = NULL;
-	int			n_active_clusters;
 	int			iter,
 				i,
 				j,
@@ -311,8 +310,6 @@ cluster_hierarchical(PG_FUNCTION_ARGS)
 		}
 	}
 
-	n_active_clusters = nvec;
-
 	/* Agglomerative merge */
 	for (iter = 0; iter < nvec - num_clusters; iter++)
 	{
@@ -379,8 +376,6 @@ cluster_hierarchical(PG_FUNCTION_ARGS)
 			clusters[merge_j].size = 0;
 			clusters[merge_j].members = NULL;
 			clusters[merge_j].centroid = NULL;
-
-			n_active_clusters--;
 		}
 	}
 
