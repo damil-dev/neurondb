@@ -5975,32 +5975,20 @@ BEGIN
 			-- Delegate to C function with default project
 			RETURN neurondb.train('default', 'knn', table_name, label_col, ARRAY[feature_col], params);
 		WHEN 'decision_tree' THEN
-			max_depth := COALESCE((params->>'max_depth')::integer, 10);
-			min_samples := COALESCE((params->>'min_samples_split')::integer, 2);
-			RETURN train_decision_tree_classifier(table_name, feature_col, label_col, max_depth, min_samples);
+			-- Delegate to unified API (6-parameter C function) to handle Metal unsupported algorithms
+			RETURN neurondb.train('default', 'decision_tree', table_name, label_col, ARRAY[feature_col], params);
 		WHEN 'random_forest' THEN
 			-- Delegate to C function with default project
 			RETURN neurondb.train('default', 'random_forest', table_name, label_col, ARRAY[feature_col], params);
 		WHEN 'svm' THEN
-			c_param := COALESCE((params->>'C')::float8, 1.0);
-			max_iters := COALESCE((params->>'max_iters')::integer, 1000);
-			RETURN train_svm_classifier(table_name, feature_col, label_col, c_param, max_iters);
+			-- Delegate to unified API (6-parameter C function) to handle Metal unsupported algorithms
+			RETURN neurondb.train('default', 'svm', table_name, label_col, ARRAY[feature_col], params);
 		WHEN 'logistic_regression' THEN
-			max_iters := COALESCE((params->>'max_iters')::integer, 1000);
-			learning_rate := COALESCE((params->>'learning_rate')::float8, 0.01);
-			RETURN train_logistic_regression(
-				table_name, feature_col, label_col,
-				max_iters, learning_rate,
-				COALESCE((params->>'lambda')::float8, 0.001)
-			);
+			-- Delegate to unified API (6-parameter C function) to handle Metal unsupported algorithms
+			RETURN neurondb.train('default', 'logistic_regression', table_name, label_col, ARRAY[feature_col], params);
 		WHEN 'xgboost' THEN
-			n_estimators := COALESCE((params->>'n_estimators')::integer, 100);
-			max_depth := COALESCE((params->>'max_depth')::integer, 6);
-			learning_rate := COALESCE((params->>'learning_rate')::float8, 0.3);
-			RETURN train_xgboost_classifier(
-				table_name, feature_col, label_col,
-				n_estimators, max_depth, learning_rate
-			);
+			-- Delegate to unified API (6-parameter C function) to handle Metal unsupported algorithms
+			RETURN neurondb.train('default', 'xgboost', table_name, label_col, ARRAY[feature_col], params);
 		WHEN 'neural_network', 'deep_learning' THEN
 			RETURN train_neural_network(
 				table_name, feature_col, label_col,
@@ -6011,14 +5999,14 @@ BEGIN
 			IF label_col IS NULL THEN
 				RAISE EXCEPTION 'label_col cannot be NULL for linear_regression';
 			END IF;
-			RETURN train_linear_regression(table_name, feature_col, label_col);
+			-- Delegate to unified API (6-parameter C function) to handle Metal unsupported algorithms
+			RETURN neurondb.train('default', 'linear_regression', table_name, label_col, ARRAY[feature_col], params);
 		WHEN 'ridge' THEN
-			RETURN train_ridge_regression(table_name, feature_col, label_col,
-				COALESCE((params->>'lambda')::float8, 0.1));
+			-- Delegate to unified API (6-parameter C function) to handle Metal unsupported algorithms
+			RETURN neurondb.train('default', 'ridge', table_name, label_col, ARRAY[feature_col], params);
 		WHEN 'lasso' THEN
-			RETURN train_lasso_regression(table_name, feature_col, label_col,
-				COALESCE((params->>'lambda')::float8, 0.1),
-				COALESCE((params->>'max_iters')::integer, 1000));
+			-- Delegate to unified API (6-parameter C function) to handle Metal unsupported algorithms
+			RETURN neurondb.train('default', 'lasso', table_name, label_col, ARRAY[feature_col], params);
 		WHEN 'rag' THEN
 			-- RAG is a special algorithm that doesn't require traditional training
 			-- Return a placeholder model_id for compatibility
