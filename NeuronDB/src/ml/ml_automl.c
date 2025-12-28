@@ -392,7 +392,6 @@ auto_train(PG_FUNCTION_ARGS)
 	{
 		int32		model_id = 0;
 		MemoryContext algo_context = NULL;
-		MemoryContext algo_oldcontext = NULL;
 
 		scores[i].algorithm = pstrdup(algorithms[i]);
 
@@ -400,7 +399,7 @@ auto_train(PG_FUNCTION_ARGS)
 		algo_context = AllocSetContextCreate(automl_context,
 											 "algorithm training context",
 											 ALLOCSET_DEFAULT_SIZES);
-		algo_oldcontext = MemoryContextSwitchTo(algo_context);
+		MemoryContextSwitchTo(algo_context);
 
 		/* Train model using neurondb.train() */
 

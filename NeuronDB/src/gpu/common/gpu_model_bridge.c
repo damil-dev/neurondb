@@ -119,6 +119,7 @@ ndb_gpu_try_train_model(const char *algorithm,
 	volatile bool retval = false;
 	volatile bool ops_failed_with_exception = false;
 	bool		ops_trained = false;
+	bool		is_unsupervised;
 
 	/* Initialize all local variables to safe defaults */
 	memset(&model, 0, sizeof(MLGpuModel));
@@ -139,7 +140,6 @@ ndb_gpu_try_train_model(const char *algorithm,
 	}
 
 	/* Check if algorithm is unsupervised (doesn't require label_vector) */
-	bool		is_unsupervised;
 
 	is_unsupervised = (algorithm != NULL && (
 		strcmp(algorithm, "gmm") == 0 ||

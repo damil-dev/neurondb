@@ -1211,14 +1211,13 @@ train_linear_regression(PG_FUNCTION_ARGS)
 	const char *quoted_feat;
 	const char *quoted_target;
 	MLGpuTrainResult gpu_result;
-
-	/* Initialize gpu_result to zero to avoid undefined behavior */
-	memset(&gpu_result, 0, sizeof(MLGpuTrainResult));
-
 	char *gpu_err = NULL;
 	Jsonb *gpu_hyperparams = NULL;
 	int32		model_id = 0;
 	MemoryContext oldcontext;
+
+	/* Initialize gpu_result to zero to avoid undefined behavior */
+	memset(&gpu_result, 0, sizeof(MLGpuTrainResult));
 
 	/*
 	 * Save the function's memory context - this is the per-call context that
@@ -3053,7 +3052,6 @@ evaluate_linear_regression_by_model_id_jsonb(int32 model_id, text * table_name, 
 				/* GPU predict path */
 #if defined(NDB_GPU_CUDA) || defined(NDB_GPU_METAL)
 				float	   *feat_row = NULL;
-				int			predict_rc;
 
 				/* Extract features to float array for GPU predict */
 				nalloc(feat_row, float, feat_dim);
@@ -3080,21 +3078,24 @@ evaluate_linear_regression_by_model_id_jsonb(int32 model_id, text * table_name, 
 
 				/* Use GPU predict (which works) */
 #ifdef NDB_GPU_CUDA
-				predict_rc = ndb_cuda_linreg_predict(gpu_payload,
+				{
+					int			predict_rc = 0;
+
+					predict_rc = ndb_cuda_linreg_predict(gpu_payload,
 													  feat_row,
 													  feat_dim,
 													  &y_pred,
 													  NULL);
-				if (predict_rc != 0)
-				{
-					/* GPU predict failed - fall back to CPU prediction using GPU coefficients */
-					y_pred = gpu_hdr->intercept;
-					for (j = 0; j < feat_dim; j++)
-						y_pred += (double) gpu_coefficients[j] * (double) feat_row[j];
+					if (predict_rc != 0)
+					{
+						/* GPU predict failed - fall back to CPU prediction using GPU coefficients */
+						y_pred = gpu_hdr->intercept;
+						for (j = 0; j < feat_dim; j++)
+							y_pred += (double) gpu_coefficients[j] * (double) feat_row[j];
+					}
 				}
 #else
 				/* Metal backend: use CPU prediction using GPU coefficients */
-				predict_rc = 0; /* Success */
 				y_pred = gpu_hdr->intercept;
 				for (j = 0; j < feat_dim; j++)
 					y_pred += (double) gpu_coefficients[j] * (double) feat_row[j];
