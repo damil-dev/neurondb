@@ -31,6 +31,26 @@
 
 **Note:** We recommend always using the latest stable release for security updates and bug fixes.
 
+### Supported Versions Matrix
+
+| Component | Version | Security Updates Until | EOL Date |
+|-----------|---------|----------------------|----------|
+| NeuronDB | 1.0.x | Current + 6 months | TBD |
+| NeuronDB | 0.x.x | ❌ EOL | 2024-12-31 |
+| NeuronAgent | 1.0.x | Current + 6 months | TBD |
+| NeuronAgent | 0.x.x | ❌ EOL | 2024-12-31 |
+| NeuronMCP | 1.0.x | Current + 6 months | TBD |
+| NeuronMCP | 0.x.x | ❌ EOL | 2024-12-31 |
+| NeuronDesktop | 1.0.x | Current + 6 months | TBD |
+| NeuronDesktop | 0.x.x | ❌ EOL | 2024-12-31 |
+
+**PostgreSQL Version Support:**
+- PostgreSQL 16.x: Supported until PostgreSQL 16 EOL
+- PostgreSQL 17.x: Supported until PostgreSQL 17 EOL
+- PostgreSQL 18.x: Supported until PostgreSQL 18 EOL
+
+See [COMPATIBILITY.md](../COMPATIBILITY.md) for detailed version compatibility information.
+
 ## Responsible Disclosure Process
 
 We take the security of NeuronDB seriously. We follow a coordinated responsible disclosure process to ensure vulnerabilities are properly handled and users are protected.
@@ -64,32 +84,52 @@ This information will help us triage and resolve your report more quickly.
 
 ### Responsible Disclosure Timeline
 
-We follow a coordinated disclosure process:
+We follow a coordinated disclosure process with explicit SLA commitments:
 
 1. **Initial Report** (Day 0)
    - Vulnerability reported via secure email
-   - Confirmation of receipt within 48 hours
+   - **SLA:** Confirmation of receipt within **48 hours**
 
 2. **Initial Assessment** (Days 1-7)
    - We analyze the report and verify the vulnerability
    - We determine severity and affected versions
    - We provide initial assessment and acknowledgment
+   - **SLA:** Initial assessment within **7 days**
 
 3. **Resolution Development** (Days 8-90)
    - We develop and test security fixes
    - We coordinate with reporter on testing (if appropriate)
    - Regular updates on progress (at least every 30 days)
+   - **SLA:** 
+     - Critical: Fix target **30 days**
+     - High: Fix target **60 days**
+     - Medium: Fix target **90 days**
+     - Low: Fix target **120 days**
 
-4. **Fix Release** (Target: 90 days from report)
+4. **Fix Release** (Target: Based on severity)
    - Security fix released in a patch version
    - Security advisory published
+   - **SLA:** Release within target timeframe based on severity
 
 5. **Public Disclosure** (After fix is available)
    - Public announcement (with reporter credit unless anonymous)
    - CVE assignment (if applicable)
    - Release notes updated
+   - **SLA:** Public disclosure within **7 days** of fix release
 
 **Note:** Timelines may vary based on vulnerability severity and complexity. Critical vulnerabilities will be prioritized for faster resolution.
+
+### CVE Process
+
+**CVE Assignment:**
+- Critical and High severity vulnerabilities will receive CVE assignments
+- CVEs are requested through MITRE or GitHub Security Advisories
+- CVE assignment typically occurs within 7 days of fix release
+
+**CVE Publication:**
+- CVEs are published in GitHub Security Advisories
+- Included in release notes for the patch version
+- Listed in [SECURITY.md](SECURITY.md) changelog
 
 ### What to Expect
 

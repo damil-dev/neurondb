@@ -21,7 +21,7 @@ The official documentation site provides comprehensive guides, tutorials, API re
 #### NeuronDB
 - **[NeuronDB Documentation](https://www.neurondb.ai/docs/neurondb)** - Complete PostgreSQL extension guide
 - **[Vector Search Guide](https://www.neurondb.ai/docs/vector-search)** - HNSW indexing, distance metrics, quantization
-- **[ML Algorithms Guide](https://www.neurondb.ai/docs/ml-algorithms)** - 52 ML algorithms with examples
+- **[ML Algorithms Guide](https://www.neurondb.ai/docs/ml-algorithms)** - 19+ ML algorithms with 50+ functions
 - **[RAG Pipeline Guide](https://www.neurondb.ai/docs/rag)** - Complete RAG implementation
 - **[GPU Acceleration Guide](https://www.neurondb.ai/docs/gpu)** - CUDA, ROCm, Metal support
 - **[Hybrid Search Guide](https://www.neurondb.ai/docs/hybrid-search)** - Vector + full-text search
@@ -125,7 +125,7 @@ The official documentation at [www.neurondb.ai/docs](https://www.neurondb.ai/doc
 - Performance optimization
 
 #### Machine Learning
-- 52 ML algorithms
+- 50+ ML functions across 19+ algorithms
 - Model training and inference
 - Embedding generation
 - AutoML and feature store

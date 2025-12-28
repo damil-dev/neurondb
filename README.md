@@ -87,7 +87,7 @@ Components connect via database connection strings and can operate independently
 
 **Database Layer:**
 - Vector search with HNSW/IVF indexing
-- 52+ ML algorithms (classification, regression, clustering, etc.)
+- 50+ ML functions across 19+ algorithms (classification, regression, clustering, etc.)
 - Embedding generation (text, image, multimodal)
 - Hybrid search combining vector and full-text
 - RAG pipeline with LLM integration
@@ -110,7 +110,7 @@ All components access the same PostgreSQL database instance. Services operate in
 
 ### NeuronDB
 
-PostgreSQL extension adding vector search, machine learning, and embedding generation.
+Database-native vector + ML primitives. Embed directly in PostgreSQL workloads. Provides vector search, machine learning algorithms, and embedding generation as SQL functions.
 
 #### Capabilities
 
@@ -136,7 +136,7 @@ PostgreSQL extension adding vector search, machine learning, and embedding gener
 
 ### NeuronAgent
 
-Agent runtime system providing REST API and WebSocket endpoints for building applications with memory and tool execution.
+HTTP/WebSocket runtime for applications. Use when building agent-based apps. Provides REST API and WebSocket endpoints for agent state management, tool execution, and long-term memory.
 
 #### Capabilities
 
@@ -164,7 +164,7 @@ Agent runtime system providing REST API and WebSocket endpoints for building app
 
 ### NeuronMCP
 
-Model Context Protocol server enabling MCP clients to access NeuronDB through stdio communication.
+MCP bridge for desktop clients and agent frameworks. Use with Claude Desktop, LangChain, and other MCP-compatible tools. Provides stdio-based JSON-RPC 2.0 protocol for accessing NeuronDB capabilities.
 
 #### Capabilities
 
@@ -266,12 +266,16 @@ After setup, verify all components are properly integrated:
 ./scripts/verify_neurondb_integration.sh
 ```
 
-This will test:
-- NeuronDB extension functionality
-- NeuronMCP schema and functions
-- NeuronAgent schema and tables
-- Cross-module integration
-- Vector operations
+This comprehensive test suite runs 6 tiers of verification:
+- **Tier 0:** Basic extension (loads, version, schema)
+- **Tier 1:** Vector operations (create, index, kNN query)
+- **Tier 2:** Hybrid search (vector + full-text)
+- **Tier 3:** ML algorithms (classification, regression, clustering)
+- **Tier 4:** Embeddings (generation, storage, query)
+- **Tier 5:** NeuronAgent integration (API, agent creation, messaging)
+- **Tier 6:** NeuronMCP integration (MCP protocol, tools)
+
+Run specific tiers: `./scripts/verify_neurondb_integration.sh --tier 0`
 
 ### Installation Steps
 
@@ -791,6 +795,19 @@ The official documentation site provides:
 | [Network Setup](NeuronDB/docker/ECOSYSTEM.md#network-configuration) | Networking options | [Network Setup](https://www.neurondb.ai/docs/network) |
 | [Troubleshooting](NeuronDB/docker/ECOSYSTEM.md#troubleshooting) | Common issues | [Troubleshooting](https://www.neurondb.ai/docs/troubleshooting) |
 
+## Choosing the Right Component
+
+Not sure where to start? Use this decision table:
+
+| Use Case | Start With | Why |
+|----------|------------|-----|
+| Building an app with agents | NeuronAgent | REST API, WebSocket, agent runtime, tool execution |
+| Integrating tooling (Claude Desktop, LangChain) | NeuronMCP | MCP protocol, stdio transport, tool/resource access |
+| Embedding in Postgres workloads | NeuronDB extension | Direct SQL, no service layer, native database integration |
+| Web UI for all components | NeuronDesktop | Unified dashboard, real-time updates, metrics |
+
+**All components connect to the same PostgreSQL database** and can be used together or independently.
+
 ## System Requirements
 
 ### NeuronDB
@@ -800,6 +817,8 @@ The official documentation site provides:
 | PostgreSQL | 16, 17, or 18 |
 | Build Tools | C compiler (GCC or Clang), Make |
 | Optional GPU | CUDA (NVIDIA), ROCm (AMD), Metal (macOS) |
+
+**Compatibility:** See [COMPATIBILITY.md](COMPATIBILITY.md) for detailed version matrices, tested combinations, and platform-specific notes.
 
 See [installation guide](NeuronDB/INSTALL.md) for platform-specific requirements.
 
