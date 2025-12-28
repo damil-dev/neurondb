@@ -1390,6 +1390,8 @@ neurondb_train(PG_FUNCTION_ARGS)
 	bool		gpu_available = false;
 	bool		load_success = false;
 	bool		gpu_train_result = false;
+	bool		metal_requested_fallback = false;  /* Track if Metal backend requested CPU fallback */
+	int			saved_compute_mode = -1;  /* Save compute_mode when temporarily changing for Metal unsupported algorithms */
 
 	char *safe_algorithm = NULL;
 	char *safe_table_name = NULL;
@@ -2232,13 +2234,29 @@ neurondb_train(PG_FUNCTION_ARGS)
 					}
 				}
 			}
-			PG_END_TRY();
-		}
+		PG_END_TRY();
+	}
 
-		if (gpu_train_result)
-		{
-			/* GPU training succeeded - use the model_id from GPU result */
-			if (gpu_result.model_id > 0)
+	/* Check if Metal backend requested CPU fallback (indicated in error message) */
+	if (gpu_errmsg_ptr && 
+		(strstr(gpu_errmsg_ptr, "using CPU fallback") != NULL ||
+		 strstr(gpu_errmsg_ptr, "Metal backend:") != NULL ||
+		 (strstr(gpu_errmsg_ptr, "Metal") != NULL && strstr(gpu_errmsg_ptr, "unsupported") != NULL)))
+	{
+		metal_requested_fallback = true;
+	}
+
+	/* In AUTO mode, or if Metal backend requested fallback, skip GPU result processing and go to CPU training */
+	if (!gpu_train_result && (NDB_COMPUTE_MODE_IS_AUTO() || NDB_COMPUTE_MODE_IS_CPU() || metal_requested_fallback))
+	{
+		/* Skip GPU result processing, jump directly to CPU training fallback below */
+		goto cpu_fallback_training;
+	}
+
+	if (gpu_train_result && (gpu_result.model_id > 0 || gpu_result.spec.model_data != NULL))
+	{
+		/* GPU training succeeded - use the model_id from GPU result */
+		if (gpu_result.model_id > 0)
 			{
 				model_id = gpu_result.model_id;
 			}
@@ -2630,6 +2648,7 @@ neurondb_train(PG_FUNCTION_ARGS)
 	}
 	else
 	{
+cpu_fallback_training:
 		/* GPU training failed or not attempted - handle based on compute mode */
 
 		/* CPU mode: never attempt GPU, just fall back to CPU */
@@ -2641,7 +2660,8 @@ neurondb_train(PG_FUNCTION_ARGS)
 		}
 		/* GPU mode: error if GPU was required but not available */
 		/* Only check GPU requirement if NOT in CPU mode */
-		else if (!NDB_COMPUTE_MODE_IS_CPU() && NDB_REQUIRE_GPU())
+		/* EXCEPT: Allow CPU fallback if Metal backend explicitly requested it */
+		else if (!NDB_COMPUTE_MODE_IS_CPU() && NDB_REQUIRE_GPU() && !metal_requested_fallback)
 		{
 			nfree(feature_list_str);
 			if (feature_names)
@@ -2742,20 +2762,28 @@ neurondb_train(PG_FUNCTION_ARGS)
 			data_loaded = false;
 		}
 
-	/* GPU training failed - only fall back to CPU training in AUTO mode */
-	/* In GPU mode, error out. In AUTO mode, continue to CPU. In CPU mode, we shouldn't reach here. */
-	if (NDB_COMPUTE_MODE_IS_AUTO() || NDB_COMPUTE_MODE_IS_CPU())
+	/* GPU training failed - only fall back to CPU training in AUTO mode or if Metal requested fallback */
+	/* In GPU mode, error out unless Metal explicitly requested CPU fallback. In AUTO mode, continue to CPU. */
+	if (NDB_COMPUTE_MODE_IS_AUTO() || NDB_COMPUTE_MODE_IS_CPU() || metal_requested_fallback)
 	{
-		/* AUTO or CPU mode - fall back to/perform CPU training */
+		/* AUTO/CPU mode, or Metal requested fallback - fall back to/perform CPU training */
 		/* Explicitly reset model_id to 0 to ensure we don't return garbage from GPU result */
 		model_id = 0;
 		algo_enum = neurondb_algorithm_from_string(algorithm);
+
+		/* For Metal unsupported algorithms in GPU mode, temporarily set compute_mode to AUTO */
+		/* so that CPU training SQL functions will use CPU directly without trying GPU first */
+		saved_compute_mode = neurondb_compute_mode;
+		if (metal_requested_fallback && NDB_COMPUTE_MODE_IS_GPU())
+		{
+			neurondb_compute_mode = NDB_COMPUTE_MODE_AUTO;
+		}
 
 		/* Build SQL for CPU training */
 		ndb_spi_stringinfo_free(spi_session, &sql);
 		ndb_spi_stringinfo_init(spi_session, &sql);
 	}
-		else if (NDB_COMPUTE_MODE_IS_GPU())
+	else if (NDB_COMPUTE_MODE_IS_GPU())
 		{
 			/* GPU mode - error out if GPU training failed */
 			char *gpu_error_msg = NULL;
@@ -3148,6 +3176,12 @@ neurondb_train(PG_FUNCTION_ARGS)
 					 errmsg(NDB_ERR_PREFIX_TRAIN " algorithm '%s' does not support CPU training fallback", algorithm),
 					 errdetail("GPU training failed and no CPU training implementation available. Algorithm: %s, Project: %s, Table: %s", algorithm, project_name, table_name),
 					 errhint("Try a different algorithm or ensure GPU is properly configured.")));
+		}
+		
+		/* Restore compute_mode if we temporarily changed it for Metal unsupported algorithms */
+		if (saved_compute_mode >= 0 && saved_compute_mode != neurondb_compute_mode)
+		{
+			neurondb_compute_mode = saved_compute_mode;
 		}
 		
 		/* Ensure model_id was set by CPU training - if not, error out */
