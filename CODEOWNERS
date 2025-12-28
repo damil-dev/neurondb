@@ -14,7 +14,10 @@
 /NeuronDB/ @neurondb/neurondb-maintainers
 /NeuronDB/src/ @neurondb/neurondb-maintainers
 /NeuronDB/include/ @neurondb/neurondb-maintainers
-/NeuronDB/sql/ @neurondb/neurondb-maintainers
+/NeuronDB/src/gpu/ @neurondb/gpu-maintainers @neurondb/neurondb-maintainers
+/NeuronDB/src/gpu/** @neurondb/gpu-maintainers
+/NeuronDB/sql/ @neurondb/sql-maintainers @neurondb/neurondb-maintainers
+/NeuronDB/sql/*.sql @neurondb/sql-maintainers
 /NeuronDB/t/ @neurondb/neurondb-maintainers
 /NeuronDB/tests/ @neurondb/neurondb-maintainers
 /NeuronDB/Makefile @neurondb/neurondb-maintainers
@@ -28,7 +31,8 @@
 /NeuronAgent/cmd/ @neurondb/neuronagent-maintainers
 /NeuronAgent/pkg/ @neurondb/neuronagent-maintainers
 /NeuronAgent/docs/API.md @neurondb/neuronagent-maintainers
-/NeuronAgent/openapi/ @neurondb/neuronagent-maintainers
+/NeuronAgent/openapi/ @neurondb/api-maintainers @neurondb/neuronagent-maintainers
+/NeuronAgent/openapi/*.yaml @neurondb/api-maintainers
 
 # NeuronMCP (Go code, MCP protocol)
 /NeuronMCP/ @neurondb/neuronmcp-maintainers
