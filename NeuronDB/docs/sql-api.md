@@ -25,18 +25,19 @@ SELECT ARRAY[1.0, 2.0, 3.0]::vector(3);
 
 ## Distance Operators
 
-| Operator | Description | Return Type | Example |
-|----------|-------------|-------------|---------|
-| `<->` | L2 (Euclidean) distance | `float` | `embedding <-> '[1,2,3]'` |
-| `<=>` | Cosine distance | `float` | `embedding <=> '[1,2,3]'` |
-| `<#>` | Inner product (negative dot product) | `float` | `embedding <#> '[1,2,3]'` |
+| Operator | Description | Return Type | Stability | Example |
+|----------|-------------|-------------|-----------|---------|
+| `<->` | L2 (Euclidean) distance | `float` | **Stable** | `embedding <-> '[1,2,3]'` |
+| `<=>` | Cosine distance | `float` | **Stable** | `embedding <=> '[1,2,3]'` |
+| `<#>` | Inner product (negative dot product) | `float` | **Stable** | `embedding <#> '[1,2,3]'` |
 
 ## Embedding Functions
 
-### `neurondb_embed(text, model)`
+### `neurondb_embed(text, model)` {#stability-stable}
 
 Generate embeddings using configured LLM providers.
 
+**Stability:** **Stable**  
 **Parameters:** text (TEXT), model (TEXT)  
 **Returns:** vector
 
@@ -54,10 +55,11 @@ SELECT content, neurondb_embed(content, 'text-embedding-ada-002')
 FROM source_documents;
 ```
 
-### `neurondb_embed_batch(texts, model)`
+### `neurondb_embed_batch(texts, model)` {#stability-stable}
 
 Generate embeddings for multiple texts in a single API call (more efficient).
 
+**Stability:** **Stable**  
 **Parameters:** texts (TEXT[]), model (TEXT)  
 **Returns:** vector[]
 
@@ -73,9 +75,11 @@ SELECT neurondb_embed_batch(
 
 GPU-accelerated distance computation functions. Require `neurondb.compute_mode = true`.
 
-### `vector_l2_distance_gpu(a, b)`
+### `vector_l2_distance_gpu(a, b)` {#stability-experimental}
+
 Compute L2 distance on GPU.
 
+**Stability:** **Experimental**  
 **Parameters:** a (vector), b (vector)  
 **Returns:** float8
 
@@ -84,21 +88,31 @@ SET neurondb.compute_mode = true;
 SELECT vector_l2_distance_gpu(embedding, '[1,2,3]'::vector) FROM documents;
 ```
 
-### `vector_cosine_distance_gpu(a, b)`
+### `vector_cosine_distance_gpu(a, b)` {#stability-experimental}
+
 Compute cosine distance on GPU.
 
-### `vector_inner_product_gpu(a, b)`
+**Stability:** **Experimental**
+
+### `vector_inner_product_gpu(a, b)` {#stability-experimental}
+
 Compute inner product on GPU.
 
-### `vector_to_int8_gpu(v)`, `vector_to_fp16_gpu(v)`, `vector_to_binary_gpu(v)`
+**Stability:** **Experimental**
+
+### `vector_to_int8_gpu(v)`, `vector_to_fp16_gpu(v)`, `vector_to_binary_gpu(v)` {#stability-experimental}
+
 Quantize vectors on GPU.
+
+**Stability:** **Experimental**
 
 ## ML Analytics Functions
 
-### `cluster_kmeans(data, k, max_iter, tol)`
+### `cluster_kmeans(data, k, max_iter, tol)` {#stability-stable}
 
 K-Means clustering aggregate function.
 
+**Stability:** **Stable**  
 **Parameters:** data (vector), k (int), max_iter (int, default 100), tol (float8, default 0.0001)  
 **Returns:** TABLE(cluster_id int, centroid vector, size bigint)
 
@@ -111,17 +125,19 @@ SELECT * FROM cluster_kmeans(
 );
 ```
 
-### `cluster_minibatch_kmeans(data, k, batch_size, max_iter)`
+### `cluster_minibatch_kmeans(data, k, batch_size, max_iter)` {#stability-stable}
 
 Mini-batch K-Means for large datasets.
 
+**Stability:** **Stable**  
 **Parameters:** data (vector), k (int), batch_size (int, default 100), max_iter (int, default 100)  
 **Returns:** TABLE(cluster_id int, centroid vector, size bigint)
 
-### `cluster_gmm(data, k, max_iter, tol)`
+### `cluster_gmm(data, k, max_iter, tol)` {#stability-experimental}
 
 Gaussian Mixture Model clustering with soft assignments.
 
+**Stability:** **Experimental**  
 **Parameters:** data (vector), k (int), max_iter (int, default 100), tol (float8, default 0.0001)  
 **Returns:** TABLE(cluster_id int, mean vector, covariance vector, weight float8)
 
@@ -136,10 +152,11 @@ SELECT gmm_to_clusters(
 FROM documents;
 ```
 
-### `detect_outliers_zscore(data, threshold)`
+### `detect_outliers_zscore(data, threshold)` {#stability-stable}
 
 Detect outliers using Z-score method.
 
+**Stability:** **Stable**  
 **Parameters:** data (vector), threshold (float8, default 3.0)  
 **Returns:** TABLE(vector_data vector, is_outlier boolean, z_score float8)
 
@@ -160,23 +177,41 @@ WHERE (stats).is_outlier;
 
 ## ML Project Management
 
-### `neurondb_create_ml_project(name, description)`
+### `neurondb_create_ml_project(name, description)` {#stability-experimental}
+
 Create a new ML project for model management.
 
-### `neurondb_train_kmeans_project(project_id, data, k, max_iter)`
+**Stability:** **Experimental**
+
+### `neurondb_train_kmeans_project(project_id, data, k, max_iter)` {#stability-experimental}
+
 Train a K-Means model within a project.
 
-### `neurondb_list_project_models(project_id)`
+**Stability:** **Experimental**
+
+### `neurondb_list_project_models(project_id)` {#stability-experimental}
+
 List all models in a project.
 
-### `neurondb_deploy_model(model_id, deployment_name)`
+**Stability:** **Experimental**
+
+### `neurondb_deploy_model(model_id, deployment_name)` {#stability-experimental}
+
 Deploy a model for inference.
 
-### `neurondb_get_deployed_model(deployment_name)`
+**Stability:** **Experimental**
+
+### `neurondb_get_deployed_model(deployment_name)` {#stability-experimental}
+
 Retrieve deployed model metadata.
 
-### `neurondb_get_project_info(project_id)`
+**Stability:** **Experimental**
+
+### `neurondb_get_project_info(project_id)` {#stability-experimental}
+
 Get project information and statistics.
+
+**Stability:** **Experimental**
 
 ## Configuration Parameters (GUCs)
 
