@@ -519,8 +519,15 @@ PG_FUNCTION_INFO_V1(neurondb_gpu_enable);
 Datum
 neurondb_gpu_enable(PG_FUNCTION_ARGS)
 {
-	/* Set compute_mode to GPU */
-	neurondb_compute_mode = NDB_COMPUTE_MODE_GPU;
+	/* 
+	 * Only set compute_mode to GPU if it's currently CPU (0)
+	 * If it's already AUTO (2), keep it as AUTO to allow CPU fallback
+	 * If it's already GPU (1), keep it as GPU
+	 */
+	if (neurondb_compute_mode == NDB_COMPUTE_MODE_CPU)
+	{
+		neurondb_compute_mode = NDB_COMPUTE_MODE_GPU;
+	}
 	gpu_disabled = false;
 
 	/*
