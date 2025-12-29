@@ -12,7 +12,7 @@ services:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./api/initial_schema.sql:/docker-entrypoint-initdb.d/initial_schema.sql
+      - ./api/neurondesktop.sql:/docker-entrypoint-initdb.d/neurondesktop.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U neurondesk"]
       interval: 10s
@@ -33,6 +33,7 @@ services:
       SERVER_PORT: 8081
       LOG_LEVEL: info
       LOG_FORMAT: json
+      ENABLE_SQL_CONSOLE: "true"
       # Optional: Configure NeuronMCP and NeuronAgent
       # NEURONMCP_BINARY_PATH: /path/to/neurondb-mcp
       # NEURONDB_HOST: localhost
