@@ -1,8 +1,14 @@
-# NeuronMCP Tools Reference
+# NeuronMCP Tools Reference - Complete Guide
 
-Complete reference for all 74+ NeuronMCP tools with parameters, examples, and error codes.
+**The Most Comprehensive MCP Server Tool Reference**
 
-**Total Tools: 74+** covering all NeuronDB capabilities.
+Complete reference for all **100+ NeuronMCP tools** with detailed parameters, comprehensive examples, use cases, and error codes.
+
+**Total Tools: 100+** covering:
+- **27 PostgreSQL Administration Tools** - Complete database management and monitoring
+- **70+ NeuronDB Tools** - Vector search, ML, RAG, analytics, and more
+
+This is the definitive reference for the most complete and powerful MCP server available, providing 100% coverage of PostgreSQL administration combined with cutting-edge AI/ML capabilities through NeuronDB.
 
 ## Vector Operations
 
@@ -232,12 +238,16 @@ Automatically optimize HNSW index parameters.
 
 ## PostgreSQL Tools
 
-### postgresql_version
+Complete PostgreSQL administration and monitoring tools (29 tools total).
+
+### Server Information
+
+#### postgresql_version
 Get PostgreSQL server version information.
 
 **Parameters:** None
 
-### postgresql_stats
+#### postgresql_stats
 Get comprehensive PostgreSQL server statistics.
 
 **Parameters:**
@@ -246,20 +256,178 @@ Get comprehensive PostgreSQL server statistics.
 - `include_connection_stats` (boolean, default: true): Include connection statistics
 - `include_performance_stats` (boolean, default: true): Include performance metrics
 
-### postgresql_connections
+#### postgresql_databases
+List all PostgreSQL databases with sizes and connection counts.
+
+**Parameters:**
+- `include_system` (boolean, default: false): Include system databases
+
+#### postgresql_settings
+Get PostgreSQL configuration settings.
+
+**Parameters:**
+- `pattern` (string, optional): Filter settings by name pattern
+
+#### postgresql_extensions
+List installed PostgreSQL extensions.
+
+**Parameters:** None
+
+### Database Object Management
+
+#### postgresql_tables
+List all tables with metadata (schema, owner, size, row count).
+
+**Parameters:**
+- `schema` (string, optional): Filter by schema name
+- `include_system` (boolean, default: false): Include system tables
+
+#### postgresql_indexes
+List all indexes with statistics (size, usage, scan counts).
+
+**Parameters:**
+- `schema` (string, optional): Filter by schema name
+- `table` (string, optional): Filter by table name
+- `include_system` (boolean, default: false): Include system indexes
+
+#### postgresql_schemas
+List all schemas with ownership and permissions.
+
+**Parameters:**
+- `include_system` (boolean, default: false): Include system schemas
+
+#### postgresql_views
+List all views with definitions.
+
+**Parameters:**
+- `schema` (string, optional): Filter by schema name
+- `include_system` (boolean, default: false): Include system views
+- `include_definition` (boolean, default: true): Include view definition SQL
+
+#### postgresql_sequences
+List all sequences with current values and ranges.
+
+**Parameters:**
+- `schema` (string, optional): Filter by schema name
+- `include_system` (boolean, default: false): Include system sequences
+
+#### postgresql_functions
+List all functions with parameters and return types.
+
+**Parameters:**
+- `schema` (string, optional): Filter by schema name
+- `include_system` (boolean, default: false): Include system functions
+
+#### postgresql_triggers
+List all triggers with event types and functions.
+
+**Parameters:**
+- `schema` (string, optional): Filter by schema name
+- `table` (string, optional): Filter by table name
+
+#### postgresql_constraints
+List constraints (primary keys, foreign keys, unique, check).
+
+**Parameters:**
+- `schema` (string, optional): Filter by schema name
+- `table` (string, optional): Filter by table name
+- `constraint_type` (string, optional): Filter by type (primary_key, foreign_key, unique, check, not_null)
+
+### User and Role Management
+
+#### postgresql_users
+List all users with login and connection info.
+
+**Parameters:** None
+
+#### postgresql_roles
+List all roles with membership and attributes.
+
+**Parameters:** None
+
+#### postgresql_permissions
+List database object permissions (tables, functions, etc.).
+
+**Parameters:**
+- `schema` (string, optional): Filter by schema name
+- `object_type` (string, optional): Filter by type (table, function, sequence, schema)
+
+### Performance and Statistics
+
+#### postgresql_table_stats
+Get detailed per-table statistics (scans, inserts, updates, deletes, tuples).
+
+**Parameters:**
+- `schema` (string, optional): Filter by schema name
+- `table` (string, optional): Filter by table name
+
+#### postgresql_index_stats
+Get detailed per-index statistics (scans, size, bloat).
+
+**Parameters:**
+- `schema` (string, optional): Filter by schema name
+- `table` (string, optional): Filter by table name
+
+#### postgresql_active_queries
+Show currently active/running queries with details.
+
+**Parameters:**
+- `include_idle` (boolean, default: false): Include idle queries
+- `limit` (number, default: 100, max: 1000): Maximum number of queries to return
+
+#### postgresql_wait_events
+Show wait events and blocking queries.
+
+**Parameters:** None
+
+#### postgresql_connections
 Get detailed PostgreSQL connection information.
 
 **Parameters:** None
 
-### postgresql_locks
+#### postgresql_locks
 Get PostgreSQL lock information.
 
 **Parameters:** None
 
-### postgresql_extensions
-List installed PostgreSQL extensions.
+#### postgresql_replication
+Get PostgreSQL replication status.
 
 **Parameters:** None
+
+### Size and Storage
+
+#### postgresql_table_size
+Get size of specific tables (with options for total, indexes, toast).
+
+**Parameters:**
+- `schema` (string, optional): Schema name
+- `table` (string, optional): Table name
+- `include_indexes` (boolean, default: true): Include index sizes
+- `include_toast` (boolean, default: true): Include TOAST size
+
+#### postgresql_index_size
+Get size of specific indexes.
+
+**Parameters:**
+- `schema` (string, optional): Filter by schema name
+- `table` (string, optional): Filter by table name
+- `index` (string, optional): Filter by index name
+
+#### postgresql_bloat
+Check table and index bloat (estimated).
+
+**Parameters:**
+- `schema` (string, optional): Filter by schema name
+- `table` (string, optional): Filter by table name
+- `min_bloat_percent` (number, default: 10, range: 0-100): Minimum bloat percentage to report
+
+#### postgresql_vacuum_stats
+Get vacuum statistics and recommendations.
+
+**Parameters:**
+- `schema` (string, optional): Filter by schema name
+- `table` (string, optional): Filter by table name
 
 ## Vector Graph Operations
 

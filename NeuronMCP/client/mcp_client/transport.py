@@ -122,7 +122,8 @@ class StdioTransport:
     def _read_response(self) -> JSONRPCResponse:
         """
         Read a JSON-RPC response from stdout.
-        Supports both Content-Length format and Claude Desktop format (JSON directly).
+        Expects Content-Length headers per MCP specification (Claude Desktop compatible).
+        Falls back to direct JSON for backward compatibility only.
 
         Returns:
             JSON-RPC response
@@ -140,9 +141,10 @@ class StdioTransport:
         
         first_line_str = first_line.decode('utf-8').strip()
         
-        # Claude Desktop format: JSON directly (starts with '{')
+        # Backward compatibility: Check for direct JSON (non-standard format)
+        # Standard MCP protocol always uses Content-Length headers
         if first_line_str.startswith('{'):
-            # This is a JSON response (Claude Desktop format)
+            # This is a JSON response (fallback for backward compatibility)
             return JSONRPCResponse.from_json(first_line_str)
         
         # Standard MCP format: Content-Length headers

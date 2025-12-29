@@ -156,7 +156,8 @@ func (t *ClientTransport) SendNotification(notification map[string]interface{}) 
 }
 
 /* readResponse reads a JSON-RPC response from stdout */
-/* Supports both Content-Length format and Claude Desktop format (JSON directly) */
+/* Expects Content-Length headers per MCP specification (Claude Desktop compatible) */
+/* Falls back to direct JSON for backward compatibility only */
 func (t *ClientTransport) readResponse(expectedID json.RawMessage) (*mcp.JSONRPCResponse, error) {
 	if t.process == nil {
 		return nil, fmt.Errorf("transport not started")
@@ -175,7 +176,8 @@ func (t *ClientTransport) readResponse(expectedID json.RawMessage) (*mcp.JSONRPC
 
 		var response mcp.JSONRPCResponse
 
-   /* Claude Desktop format: JSON directly (starts with '{') */
+   /* Backward compatibility: Check for direct JSON (non-standard format) */
+   /* Standard MCP protocol always uses Content-Length headers */
 		if strings.HasPrefix(firstLine, "{") {
 			if err := json.Unmarshal([]byte(firstLine), &response); err != nil {
 				return nil, fmt.Errorf("failed to parse JSON response: %w", err)

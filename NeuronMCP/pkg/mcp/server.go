@@ -132,7 +132,7 @@ func (s *Server) Run(ctx context.Context) error {
 				continue
 			}
 
-    /* Handle initialize specially - send initialized notification */
+    /* Handle initialize request - respond with server capabilities */
 			if req.Method == "initialize" && !initializedSent {
 				s.transport.WriteError(fmt.Errorf("DEBUG: Received initialize request"))
 				
@@ -142,7 +142,7 @@ func (s *Server) Run(ctx context.Context) error {
 				
      /* CRITICAL: ALWAYS send response for initialize request immediately */
 				if !IsNotification(req) {
-      /* Send the initialize response FIRST - must happen synchronously */
+      /* Send the initialize response - client will then send notifications/initialized */
 					s.transport.WriteError(fmt.Errorf("DEBUG: About to write initialize response"))
 					if err := s.transport.WriteMessage(resp); err != nil {
 						s.transport.WriteError(fmt.Errorf("CRITICAL: failed to write initialize response: %w", err))
@@ -150,15 +150,10 @@ func (s *Server) Run(ctx context.Context) error {
 						s.transport.WriteError(fmt.Errorf("DEBUG: Initialize response written successfully"))
 					}
 					
-      /* If response was successful, send initialized notification */
+      /* Note: Client sends notifications/initialized notification, not the server */
+      /* Per MCP spec: client -> server: initialize request, server -> client: initialize response, */
+      /* then client -> server: notifications/initialized notification */
 					if resp.Error == nil {
-       /* Send initialized notification AFTER response */
-						s.transport.WriteError(fmt.Errorf("DEBUG: About to write initialized notification"))
-						if err := s.transport.WriteNotification("notifications/initialized", nil); err != nil {
-							s.transport.WriteError(fmt.Errorf("failed to write initialized notification: %w", err))
-						} else {
-							s.transport.WriteError(fmt.Errorf("DEBUG: Initialized notification written successfully"))
-						}
 						initializedSent = true
 					} else {
        /* Even if there was an error, mark as initialized to prevent retry loops */
@@ -166,7 +161,7 @@ func (s *Server) Run(ctx context.Context) error {
 					}
 				}
 				s.transport.WriteError(fmt.Errorf("DEBUG: Finished processing initialize, continuing loop"))
-     /* Continue loop to wait for next message - server stays alive */
+     /* Continue loop to wait for next message (including notifications/initialized from client) */
 			} else {
      /* Handle other requests */
 				resp := s.handleRequest(ctx, req)

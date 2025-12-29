@@ -15,7 +15,6 @@ package sampling
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -50,15 +49,17 @@ type SamplingResponse struct {
 
 /* Manager manages sampling operations */
 type Manager struct {
-	db     *database.Database
-	logger *logging.Logger
+	db        *database.Database
+	logger    *logging.Logger
+	llmClient *LLMClient
 }
 
 /* NewManager creates a new sampling manager */
 func NewManager(db *database.Database, logger *logging.Logger) *Manager {
 	return &Manager{
-		db:     db,
-		logger: logger,
+		db:        db,
+		logger:    logger,
+		llmClient: NewLLMClient(),
 	}
 }
 
@@ -85,170 +86,128 @@ func (m *Manager) CreateMessage(ctx context.Context, req SamplingRequest) (*Samp
 	/* Determine model to use */
 	modelName := req.Model
 	if modelName == "" {
-		/* Get default chat model */
-		defaultModel, err := m.getDefaultChatModel(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get default model: %w", err)
+		return nil, fmt.Errorf("model name is required")
+	}
+
+	/* Use NeuronDB's built-in LLM function: neurondb.llm() */
+	/* This provides 100% compatibility with Claude Desktop MCP protocol */
+	/* while using NeuronDB's native AI capabilities */
+	
+	/* Build prompt from messages (convert chat format to prompt) */
+	var promptBuilder strings.Builder
+	for _, msg := range req.Messages {
+		switch msg.Role {
+		case "user":
+			promptBuilder.WriteString("User: ")
+			promptBuilder.WriteString(msg.Content)
+			promptBuilder.WriteString("\n\n")
+		case "assistant":
+			promptBuilder.WriteString("Assistant: ")
+			promptBuilder.WriteString(msg.Content)
+			promptBuilder.WriteString("\n\n")
+		case "system":
+			promptBuilder.WriteString("System: ")
+			promptBuilder.WriteString(msg.Content)
+			promptBuilder.WriteString("\n\n")
+		default:
+			promptBuilder.WriteString(fmt.Sprintf("%s: %s\n\n", msg.Role, msg.Content))
 		}
-		modelName = defaultModel
 	}
+	/* Add final prompt for assistant response */
+	promptBuilder.WriteString("Assistant: ")
+	prompt := promptBuilder.String()
 
-	if modelName == "" {
-		return nil, fmt.Errorf("model name cannot be empty")
+	/* Build LLM parameters */
+	temperature := 0.7
+	if req.Temperature != nil {
+		temperature = *req.Temperature
 	}
-
-	/* Build prompt from messages */
-	prompt := m.buildPromptFromMessages(req.Messages)
-	if prompt == "" {
-		return nil, fmt.Errorf("generated prompt is empty")
+	maxTokens := 2048
+	if req.MaxTokens != nil {
+		maxTokens = *req.MaxTokens
 	}
-
-	/* Prepare LLM parameters */
-	llmParams := m.buildLLMParams(req)
-
-	/* Call NeuronDB LLM completion function */
-	query := `
-		SELECT neurondb_llm_completion(
-			$1::text,
-			$2::text,
-			$3::jsonb
-		) AS completion
-	`
-
+	
+	llmParamsJSON := fmt.Sprintf(`{"temperature": %.2f, "max_tokens": %d}`, temperature, maxTokens)
+	
+	/* Call neurondb.llm() function directly */
+	/* neurondb.llm(task, model, input_text, input_array, params, max_length) returns JSONB */
+	/* Task 'complete' generates text completion */
+	/* Response format: {"text": "...", "model": "...", "task": "complete"} */
+	/* Use NULL for model to use the configured default (neurondb.llm_model setting) */
+	query := `SELECT (neurondb.llm('complete', NULL, $1, NULL, $2::jsonb, $3)->>'text') AS response`
+	
 	var completion string
-	err := m.db.QueryRow(ctx, query, modelName, prompt, llmParams).Scan(&completion)
+	err := m.db.QueryRow(ctx, query, prompt, llmParamsJSON, maxTokens).Scan(&completion)
 	if err != nil {
-		/* Fallback: try direct SQL function call */
-		fallbackQuery := `
-			SELECT neurondb_llm_chat(
-				$1::text,
-				$2::jsonb,
-				$3::jsonb
-			) AS response
-		`
-		
-		messagesJSON, _ := json.Marshal(req.Messages)
-		err = m.db.QueryRow(ctx, fallbackQuery, modelName, string(messagesJSON), llmParams).Scan(&completion)
-		if err != nil {
-			return nil, fmt.Errorf("failed to generate completion: %w", err)
-		}
+		return nil, fmt.Errorf("failed to call neurondb.llm(): %w", err)
+	}
+	
+	if completion == "" {
+		return nil, fmt.Errorf("empty response from neurondb.llm()")
 	}
 
 	return &SamplingResponse{
-		Content:  completion,
-		Model:     modelName,
+		Content:    completion,
+		Model:      modelName, /* Return the requested model name for compatibility */
 		StopReason: "stop",
-		Metadata:  req.Metadata,
+		Metadata:   req.Metadata,
 	}, nil
 }
 
-/* getDefaultChatModel gets the default chat model */
-func (m *Manager) getDefaultChatModel(ctx context.Context) (string, error) {
+/* ModelConfig represents a model configuration */
+type ModelConfig struct {
+	Provider string
+	BaseURL  string
+	APIKey   string
+}
+
+/* getModelConfig gets model configuration */
+func (m *Manager) getModelConfig(ctx context.Context, modelName string) (*ModelConfig, error) {
+	/* Try to get model config from neurondesk database */
 	query := `
-		SELECT model_name
-		FROM neurondb.llm_models
-		WHERE model_type = 'chat'
-			AND is_default = true
-			AND status = 'available'
+		SELECT 
+			model_provider,
+			COALESCE(base_url, '') as base_url,
+			COALESCE(api_key, '') as api_key
+		FROM model_configs
+		WHERE model_name = $1
 		LIMIT 1
 	`
 
-	var modelName string
-	err := m.db.QueryRow(ctx, query).Scan(&modelName)
+	var config ModelConfig
+	err := m.db.QueryRow(ctx, query, modelName).Scan(
+		&config.Provider,
+		&config.BaseURL,
+		&config.APIKey,
+	)
+
 	if err != nil {
-		/* Fallback to any available chat model */
-		fallbackQuery := `
-			SELECT model_name
-			FROM neurondb.llm_models
-			WHERE model_type = 'chat'
-				AND status = 'available'
-			LIMIT 1
-		`
-		err = m.db.QueryRow(ctx, fallbackQuery).Scan(&modelName)
-		if err != nil {
-			return "", fmt.Errorf("no chat model available: %w", err)
+		/* Fallback: assume it's Ollama if no config found */
+		m.logger.Warn("Model config not found, assuming Ollama", map[string]interface{}{
+			"model": modelName,
+		})
+		return &ModelConfig{
+			Provider: "ollama",
+			BaseURL:  "http://localhost:11434",
+			APIKey:   "",
+		}, nil
+	}
+
+	/* Set default base URLs if not configured */
+	if config.BaseURL == "" {
+		switch config.Provider {
+		case "ollama":
+			config.BaseURL = "http://localhost:11434"
+		case "openai":
+			config.BaseURL = "https://api.openai.com/v1"
+		case "anthropic":
+			config.BaseURL = "https://api.anthropic.com"
+		case "google":
+			config.BaseURL = "https://generativelanguage.googleapis.com/v1beta"
 		}
 	}
 
-	return modelName, nil
+	return &config, nil
 }
 
-/* buildPromptFromMessages builds a prompt string from messages */
-func (m *Manager) buildPromptFromMessages(messages []Message) string {
-	if len(messages) == 0 {
-		return ""
-	}
-
-	var builder strings.Builder
-	for i, msg := range messages {
-		if i > 0 {
-			builder.WriteString("\n\n")
-		}
-
-		switch strings.ToLower(msg.Role) {
-		case "system":
-			builder.WriteString(fmt.Sprintf("System: %s", msg.Content))
-		case "user":
-			builder.WriteString(fmt.Sprintf("User: %s", msg.Content))
-		case "assistant":
-			builder.WriteString(fmt.Sprintf("Assistant: %s", msg.Content))
-		default:
-			builder.WriteString(fmt.Sprintf("%s: %s", msg.Role, msg.Content))
-		}
-	}
-	return builder.String()
-}
-
-/* buildLLMParams builds LLM parameters from request */
-func (m *Manager) buildLLMParams(req SamplingRequest) json.RawMessage {
-	params := make(map[string]interface{})
-	
-	/* Temperature validation */
-	if req.Temperature != nil {
-		temp := *req.Temperature
-		if temp < 0.0 {
-			temp = 0.0
-		}
-		if temp > 2.0 {
-			temp = 2.0
-		}
-		params["temperature"] = temp
-	} else {
-		params["temperature"] = 0.7
-	}
-	
-	/* MaxTokens validation */
-	if req.MaxTokens != nil {
-		maxTokens := *req.MaxTokens
-		if maxTokens < 1 {
-			maxTokens = 1
-		}
-		if maxTokens > 100000 {
-			maxTokens = 100000
-		}
-		params["max_tokens"] = maxTokens
-	}
-	
-	/* TopP validation */
-	if req.TopP != nil {
-		topP := *req.TopP
-		if topP < 0.0 {
-			topP = 0.0
-		}
-		if topP > 1.0 {
-			topP = 1.0
-		}
-		params["top_p"] = topP
-	}
-
-	paramsJSON, err := json.Marshal(params)
-	if err != nil {
-		/* Fallback to default params if marshaling fails */
-		defaultParams := map[string]interface{}{
-			"temperature": 0.7,
-		}
-		paramsJSON, _ = json.Marshal(defaultParams)
-	}
-	return json.RawMessage(paramsJSON)
-}
 

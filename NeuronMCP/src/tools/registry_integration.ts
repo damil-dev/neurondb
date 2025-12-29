@@ -160,5 +160,24 @@ export function registerAllTools(registry: ToolRegistry, db: Database, logger: L
 	registry.register(new PostgreSQLTools.PostgreSQLReplicationTool(db, logger));
 	registry.register(new PostgreSQLTools.PostgreSQLSettingsTool(db, logger));
 	registry.register(new PostgreSQLTools.PostgreSQLExtensionsTool(db, logger));
+	registry.register(new PostgreSQLTools.PostgreSQLTablesTool(db, logger));
+	registry.register(new PostgreSQLTools.PostgreSQLIndexesTool(db, logger));
+	registry.register(new PostgreSQLTools.PostgreSQLSchemasTool(db, logger));
+	registry.register(new PostgreSQLTools.PostgreSQLViewsTool(db, logger));
+	registry.register(new PostgreSQLTools.PostgreSQLSequencesTool(db, logger));
+	registry.register(new PostgreSQLTools.PostgreSQLFunctionsTool(db, logger));
+	registry.register(new PostgreSQLTools.PostgreSQLTriggersTool(db, logger));
+	registry.register(new PostgreSQLTools.PostgreSQLUsersTool(db, logger));
+	registry.register(new PostgreSQLTools.PostgreSQLRolesTool(db, logger));
+	registry.register(new PostgreSQLTools.PostgreSQLPermissionsTool(db, logger));
+	registry.register(new PostgreSQLTools.PostgreSQLTableStatsTool(db, logger));
+	registry.register(new PostgreSQLTools.PostgreSQLIndexStatsTool(db, logger));
+	registry.register(new PostgreSQLTools.PostgreSQLActiveQueriesTool(db, logger));
+	registry.register(new PostgreSQLTools.PostgreSQLWaitEventsTool(db, logger));
+	registry.register(new PostgreSQLTools.PostgreSQLTableSizeTool(db, logger));
+	registry.register(new PostgreSQLTools.PostgreSQLIndexSizeTool(db, logger));
+	registry.register(new PostgreSQLTools.PostgreSQLConstraintsTool(db, logger));
+	registry.register(new PostgreSQLTools.PostgreSQLBloatTool(db, logger));
+	registry.register(new PostgreSQLTools.PostgreSQLVacuumStatsTool(db, logger));
 }
 
