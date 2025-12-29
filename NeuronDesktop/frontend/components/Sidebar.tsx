@@ -6,6 +6,7 @@ import { useSidebar } from '@/contexts/SidebarContext'
 import {
   HomeIcon,
   ChatBubbleLeftRightIcon,
+  ChatIcon,
   DatabaseIcon,
   DocumentTextIcon,
   Cog6ToothIcon,
@@ -13,11 +14,14 @@ import {
   CpuChipIcon,
   SparklesIcon,
   Bars3Icon,
-  XMarkIcon
+  XMarkIcon,
+  WrenchScrewdriverIcon
 } from '@/components/Icons'
 
 const navigation = [
   { name: 'Home', href: '/', icon: HomeIcon },
+  { name: 'Factory', href: '/setup', icon: WrenchScrewdriverIcon },
+  { name: 'Chat', href: '/chat', icon: ChatIcon },
   { name: 'MCP Console', href: '/mcp', icon: ChatBubbleLeftRightIcon },
   { name: 'NeuronDB', href: '/neurondb', icon: DatabaseIcon },
   { name: 'Agents', href: '/agents', icon: CpuChipIcon },
@@ -43,13 +47,13 @@ export default function Sidebar() {
       
       {/* Sidebar */}
       <div className={`
-        fixed left-0 top-0 h-screen w-64 bg-[#252525] border-r border-[#333333] flex flex-col shadow-2xl z-50 
+        fixed left-0 top-10 h-[calc(100vh-2.5rem)] w-64 bg-[#252525] border-r border-[#333333] flex flex-col shadow-2xl z-50 
         transform transition-transform duration-300 ease-in-out
         ${isOpen 
           ? 'translate-x-0' 
           : '-translate-x-full'
         }
-        lg:static lg:z-auto lg:transform-none lg:transition-none
+        lg:static lg:top-0 lg:h-screen lg:z-auto lg:transform-none lg:transition-none
         ${isOpen ? 'lg:flex' : 'lg:hidden'}
       `}>
         <div className="p-6 border-b border-[#333333]">
@@ -68,7 +72,7 @@ export default function Sidebar() {
               <XMarkIcon className="w-5 h-5" />
             </button>
           </div>
-          <p className="text-xs text-[#999999] mt-1 font-medium">Unified AI Platform</p>
+          <p className="text-xs text-[#999999] mt-1 font-medium">NeuronDB PostgreSQL AI Factory</p>
         </div>
         
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">

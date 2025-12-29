@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { profilesAPI, mcpAPI, agentAPI, modelConfigAPI, type Profile, type ModelConfig } from '@/lib/api'
-import { setAPIKey, getAPIKey } from '@/lib/auth'
+import { profilesAPI, mcpAPI, agentAPI, modelConfigAPI, factoryAPI, type Profile, type ModelConfig, type FactoryStatus, type ComponentStatus } from '@/lib/api'
+import { getErrorMessage } from '@/lib/errors'
+import { useTheme } from '@/contexts/ThemeContext'
+// Authentication is now handled via JWT tokens, no need for API key management
 import { 
-  KeyIcon,
   ServerIcon,
   DatabaseIcon,
   PlusIcon,
@@ -17,15 +18,12 @@ import {
 } from '@/components/Icons'
 
 export default function SettingsPage() {
+  const { theme, setTheme } = useTheme()
   const [profiles, setProfiles] = useState<Profile[]>([])
-  const [apiKey, setApiKey] = useState('')
-  const [showApiKey, setShowApiKey] = useState(false)
   const [expandedProfile, setExpandedProfile] = useState<string | null>(null)
   const [editingProfile, setEditingProfile] = useState<Profile | null>(null)
-  const [showCreateModal, setShowCreateModal] = useState(false)
-  const [newProfileName, setNewProfileName] = useState('')
-  const [newProfileDSN, setNewProfileDSN] = useState('')
-  const [creatingProfile, setCreatingProfile] = useState(false)
+  const [profileError, setProfileError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   // MCP Config state
   const [mcpCommand, setMcpCommand] = useState('')
@@ -45,6 +43,22 @@ export default function SettingsPage() {
   const [agentTestLoading, setAgentTestLoading] = useState(false)
   const [agentTestError, setAgentTestError] = useState<string | null>(null)
 
+  // Connection Status state
+  const [connectionStatus, setConnectionStatus] = useState<FactoryStatus | null>(null)
+  const [statusLoading, setStatusLoading] = useState(false)
+  const [statusError, setStatusError] = useState<string | null>(null)
+  const [testingService, setTestingService] = useState<'neurondb' | 'neuronagent' | 'neuronmcp' | null>(null)
+  
+  // Configuration editing state
+  const [editingNeuronDB, setEditingNeuronDB] = useState(false)
+  const [editingNeuronAgent, setEditingNeuronAgent] = useState(false)
+  const [neurondbDSN, setNeurondbDSN] = useState('')
+  const [neurondbSaving, setNeurondbSaving] = useState(false)
+  const [neuronagentEndpoint, setNeuronagentEndpoint] = useState('')
+  const [neuronagentApiKey, setNeuronagentApiKey] = useState('')
+  const [neuronagentSaving, setNeuronagentSaving] = useState(false)
+  const [showNeuronagentApiKey, setShowNeuronagentApiKey] = useState(false)
+
   // Model Config state
   const [modelConfigs, setModelConfigs] = useState<ModelConfig[]>([])
   const [selectedProfileForModels, setSelectedProfileForModels] = useState<string>('')
@@ -56,6 +70,18 @@ export default function SettingsPage() {
   const [newModelBaseUrl, setNewModelBaseUrl] = useState<string>('')
   const [newModelIsDefault, setNewModelIsDefault] = useState(false)
   const [showModelApiKey, setShowModelApiKey] = useState(false)
+  
+  // Inline editing state
+  const [editingApiKeyId, setEditingApiKeyId] = useState<string | null>(null)
+  const [inlineApiKey, setInlineApiKey] = useState<string>('')
+  const [savingApiKey, setSavingApiKey] = useState<string | null>(null)
+  const [settingDefault, setSettingDefault] = useState<string | null>(null)
+  const [togglingEnabled, setTogglingEnabled] = useState<string | null>(null)
+
+  // Active settings section with nested support
+  const [activeSection, setActiveSection] = useState<'modules' | 'appearance' | 'profiles'>('modules')
+  const [activeSubSection, setActiveSubSection] = useState<'neurondb' | 'neuronagent' | 'neuronmcp' | 'models' | null>('neurondb')
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['modules', 'profiles']))
 
   // Model providers configuration
   const MODEL_PROVIDERS = {
@@ -113,11 +139,31 @@ export default function SettingsPage() {
 
   useEffect(() => {
     loadProfiles()
-    const stored = localStorage.getItem('neurondesk_api_key') || localStorage.getItem('api_key')
-    if (stored) {
-      setApiKey(stored)
-    }
+    loadConnectionStatus()
+    // Refresh status every 30 seconds
+    const interval = setInterval(loadConnectionStatus, 30000)
+    return () => clearInterval(interval)
   }, [])
+
+  // Load current configurations when status is loaded
+  useEffect(() => {
+    if (connectionStatus && profiles.length > 0) {
+      const defaultProfile = profiles.find(p => p.is_default) || profiles[0]
+      if (defaultProfile) {
+        if (!editingNeuronDB && defaultProfile.neurondb_dsn) {
+          setNeurondbDSN(defaultProfile.neurondb_dsn)
+        }
+        if (!editingNeuronAgent) {
+          if (defaultProfile.agent_endpoint) {
+            setNeuronagentEndpoint(defaultProfile.agent_endpoint)
+          }
+          if (defaultProfile.agent_api_key) {
+            setNeuronagentApiKey(defaultProfile.agent_api_key)
+          }
+        }
+      }
+    }
+  }, [connectionStatus, profiles])
 
   useEffect(() => {
     if (selectedProfileForModels) {
@@ -141,37 +187,131 @@ export default function SettingsPage() {
   const loadModelConfigs = async () => {
     if (!selectedProfileForModels) return
     try {
-      const response = await modelConfigAPI.list(selectedProfileForModels, false)
+      // Load with API keys for inline editing
+      const response = await modelConfigAPI.list(selectedProfileForModels, true)
       setModelConfigs(response.data)
     } catch (error) {
       console.error('Failed to load model configs:', error)
     }
   }
 
+  const loadConnectionStatus = async () => {
+    setStatusLoading(true)
+    setStatusError(null)
+    try {
+      const response = await factoryAPI.getStatus()
+      setConnectionStatus(response.data)
+    } catch (error: any) {
+      console.error('Failed to load connection status:', error)
+      setStatusError(error.response?.data?.error || error.message || 'Failed to load connection status')
+    } finally {
+      setStatusLoading(false)
+    }
+  }
+
+  const testServiceConnection = async (service: 'neurondb' | 'neuronagent' | 'neuronmcp') => {
+    setTestingService(service)
+    try {
+      // Reload status to get fresh connection test
+      await loadConnectionStatus()
+      setNotice({ type: 'success', message: `${service} connection status updated.` })
+    } catch (error: any) {
+      setNotice({ type: 'error', message: `Failed to test ${service}: ${error.message}` })
+    } finally {
+      setTestingService(null)
+    }
+  }
+
+  const getStatusColor = (status: ComponentStatus | undefined) => {
+    if (!status) return 'text-slate-600 dark:text-slate-400'
+    if (status.status === 'running' && status.reachable) return 'text-green-400'
+    if (status.status === 'reachable') return 'text-yellow-400'
+    return 'text-red-400'
+  }
+
+  const getStatusBadge = (status: ComponentStatus | undefined) => {
+    if (!status) return { text: 'Unknown', color: 'bg-slate-600' }
+    if (status.status === 'running' && status.reachable) return { text: 'Connected', color: 'bg-green-600' }
+    if (status.status === 'reachable') return { text: 'Reachable', color: 'bg-yellow-600' }
+    if (status.status === 'installed') return { text: 'Installed', color: 'bg-blue-600' }
+    return { text: 'Disconnected', color: 'bg-red-600' }
+  }
+
+  const handleSaveNeuronDBConfig = async () => {
+    const defaultProfile = profiles.find(p => p.is_default) || profiles[0]
+    if (!defaultProfile || !neurondbDSN.trim()) {
+      setNotice({ type: 'error', message: 'Please enter a valid DSN' })
+      return
+    }
+
+    setNeurondbSaving(true)
+    try {
+      const updatedProfile = {
+        ...defaultProfile,
+        neurondb_dsn: neurondbDSN.trim()
+      }
+      await profilesAPI.update(defaultProfile.id, updatedProfile)
+      await loadProfiles()
+      await loadConnectionStatus()
+      setEditingNeuronDB(false)
+      setNotice({ type: 'success', message: 'NeuronDB DSN updated successfully' })
+    } catch (error: any) {
+      setNotice({ type: 'error', message: 'Failed to update DSN: ' + (error.response?.data?.error || error.message) })
+    } finally {
+      setNeurondbSaving(false)
+    }
+  }
+
+  const handleSaveNeuronAgentConfig = async () => {
+    const defaultProfile = profiles.find(p => p.is_default) || profiles[0]
+    if (!defaultProfile || !neuronagentEndpoint.trim()) {
+      setNotice({ type: 'error', message: 'Please enter a valid endpoint' })
+      return
+    }
+
+    setNeuronagentSaving(true)
+    try {
+      const updatedProfile = {
+        ...defaultProfile,
+        agent_endpoint: neuronagentEndpoint.trim(),
+        agent_api_key: neuronagentApiKey.trim() || undefined
+      }
+      await profilesAPI.update(defaultProfile.id, updatedProfile)
+      await loadProfiles()
+      await loadConnectionStatus()
+      setEditingNeuronAgent(false)
+      setNotice({ type: 'success', message: 'NeuronAgent configuration updated successfully' })
+    } catch (error: any) {
+      setNotice({ type: 'error', message: 'Failed to update configuration: ' + (error.response?.data?.error || error.message) })
+    } finally {
+      setNeuronagentSaving(false)
+    }
+  }
+
   const handleCreateModel = async () => {
     if (!selectedProfileForModels) {
-      alert('Please select a profile first')
+      setNotice({ type: 'error', message: 'Please select a profile first.' })
       return
     }
 
     const provider = MODEL_PROVIDERS[newModelProvider as keyof typeof MODEL_PROVIDERS]
     if (!provider) {
-      alert('Invalid provider')
+      setNotice({ type: 'error', message: 'Invalid provider.' })
       return
     }
 
     if (provider.requiresKey && !newModelApiKey.trim()) {
-      alert('API key is required for this provider')
+      setNotice({ type: 'error', message: 'API key is required for this provider.' })
       return
     }
 
     if (provider.requiresBaseUrl && !newModelBaseUrl.trim()) {
-      alert('Base URL is required for this provider')
+      setNotice({ type: 'error', message: 'Base URL is required for this provider.' })
       return
     }
 
     if (!newModelName.trim()) {
-      alert('Model name is required')
+      setNotice({ type: 'error', message: 'Model name is required.' })
       return
     }
 
@@ -191,10 +331,10 @@ export default function SettingsPage() {
       setNewModelApiKey('')
       setNewModelBaseUrl('')
       setNewModelIsDefault(false)
-      alert('Model configuration created successfully!')
+      setNotice({ type: 'success', message: 'Model configuration created.' })
     } catch (error: any) {
       console.error('Failed to create model config:', error)
-      alert('Failed to create model configuration: ' + (error.response?.data?.error || error.message))
+      setNotice({ type: 'error', message: 'Failed to create model configuration: ' + (error.response?.data?.error || error.message) })
     }
   }
 
@@ -206,10 +346,10 @@ export default function SettingsPage() {
     try {
       await modelConfigAPI.delete(selectedProfileForModels, id)
       await loadModelConfigs()
-      alert('Model configuration deleted successfully!')
+      setNotice({ type: 'success', message: 'Model configuration deleted.' })
     } catch (error: any) {
       console.error('Failed to delete model config:', error)
-      alert('Failed to delete model configuration: ' + (error.response?.data?.error || error.message))
+      setNotice({ type: 'error', message: 'Failed to delete model configuration: ' + (error.response?.data?.error || error.message) })
     }
   }
 
@@ -228,7 +368,7 @@ export default function SettingsPage() {
 
     const provider = MODEL_PROVIDERS[newModelProvider as keyof typeof MODEL_PROVIDERS]
     if (provider?.requiresKey && !newModelApiKey.trim()) {
-      alert('API key is required for this provider')
+      setNotice({ type: 'error', message: 'API key is required for this provider.' })
       return
     }
 
@@ -243,19 +383,74 @@ export default function SettingsPage() {
       await loadModelConfigs()
       setShowModelModal(false)
       setEditingModel(null)
-      alert('Model configuration updated successfully!')
+      setNotice({ type: 'success', message: 'Model configuration updated.' })
     } catch (error: any) {
       console.error('Failed to update model config:', error)
-      alert('Failed to update model configuration: ' + (error.response?.data?.error || error.message))
+      setNotice({ type: 'error', message: 'Failed to update model configuration: ' + (error.response?.data?.error || error.message) })
     }
   }
 
-  const handleSaveApiKey = () => {
-    localStorage.setItem('neurondesk_api_key', apiKey)
-    // Also set legacy key for backward compatibility
-    localStorage.setItem('api_key', apiKey)
-    alert('API key saved!')
+  const handleSetDefault = async (modelId: string) => {
+    if (!selectedProfileForModels) return
+    setSettingDefault(modelId)
+    try {
+      await modelConfigAPI.setDefault(selectedProfileForModels, modelId)
+      await loadModelConfigs()
+      setNotice({ type: 'success', message: 'Default model updated.' })
+    } catch (error: any) {
+      console.error('Failed to set default model:', error)
+      setNotice({ type: 'error', message: 'Failed to set default model: ' + (error.response?.data?.error || error.message) })
+    } finally {
+      setSettingDefault(null)
+    }
   }
+
+  const handleSaveInlineApiKey = async (modelId: string) => {
+    if (!selectedProfileForModels) return
+    setSavingApiKey(modelId)
+    try {
+      await modelConfigAPI.update(selectedProfileForModels, modelId, {
+        api_key: inlineApiKey || undefined,
+      })
+      await loadModelConfigs()
+      setEditingApiKeyId(null)
+      setInlineApiKey('')
+      setNotice({ type: 'success', message: 'API key updated.' })
+    } catch (error: any) {
+      console.error('Failed to update API key:', error)
+      setNotice({ type: 'error', message: 'Failed to update API key: ' + (error.response?.data?.error || error.message) })
+    } finally {
+      setSavingApiKey(null)
+    }
+  }
+
+  const handleToggleEnabled = async (modelId: string, currentEnabled: boolean) => {
+    if (!selectedProfileForModels) return
+    setTogglingEnabled(modelId)
+    try {
+      const config = modelConfigs.find(m => m.id === modelId)
+      if (!config) return
+      
+      await modelConfigAPI.update(selectedProfileForModels, modelId, {
+        metadata: {
+          ...(config.metadata || {}),
+          enabled: !currentEnabled,
+        },
+      })
+      await loadModelConfigs()
+      setNotice({ type: 'success', message: `Model ${!currentEnabled ? 'enabled' : 'disabled'}.` })
+    } catch (error: any) {
+      console.error('Failed to toggle model enabled state:', error)
+      setNotice({ type: 'error', message: 'Failed to update model: ' + (error.response?.data?.error || error.message) })
+    } finally {
+      setTogglingEnabled(null)
+    }
+  }
+
+  const isModelEnabled = (config: ModelConfig): boolean => {
+    return config.metadata?.enabled !== false // Default to enabled if not specified
+  }
+
 
   const handleEditProfile = (profile: Profile) => {
     setEditingProfile(profile)
@@ -365,11 +560,11 @@ export default function SettingsPage() {
       }
       
       await profilesAPI.update(editingProfile.id, updatedProfile)
-      alert('MCP configuration saved!')
       await loadProfiles()
+      setNotice({ type: 'success', message: `MCP configuration saved to profile "${editingProfile.name}".` })
     } catch (error) {
       console.error('Failed to save MCP config:', error)
-      alert('Failed to save MCP configuration')
+      setNotice({ type: 'error', message: 'Failed to save MCP configuration.' })
     }
   }
 
@@ -384,11 +579,11 @@ export default function SettingsPage() {
       }
       
       await profilesAPI.update(editingProfile.id, updatedProfile)
-      alert('Agent configuration saved!')
       await loadProfiles()
+      setNotice({ type: 'success', message: `Agent configuration saved to profile "${editingProfile.name}".` })
     } catch (error) {
       console.error('Failed to save agent config:', error)
-      alert('Failed to save agent configuration')
+      setNotice({ type: 'error', message: 'Failed to save agent configuration.' })
     }
   }
 
@@ -428,105 +623,558 @@ export default function SettingsPage() {
     setMcpEnv(newEnv)
   }
 
-  const handleCreateProfile = async () => {
-    if (!newProfileName.trim()) {
-      alert('Profile name is required')
-      return
-    }
-    
-    if (!newProfileDSN.trim()) {
-      alert('NeuronDB DSN is required')
-      return
-    }
 
-    setCreatingProfile(true)
-    try {
-      const newProfile = {
-        name: newProfileName.trim(),
-        neurondb_dsn: newProfileDSN.trim(),
-        mcp_config: {
-          command: 'neurondb-mcp',
-          args: [],
-          env: {}
-        },
-        agent_endpoint: '',
-        agent_api_key: '',
-        default_collection: ''
+  const settingsSections = [
+    { 
+      id: 'modules' as const, 
+      name: 'Modules', 
+      icon: ServerIcon,
+      subSections: [
+        { id: 'neurondb' as const, name: 'NeuronDB', icon: DatabaseIcon },
+        { id: 'neuronagent' as const, name: 'NeuronAgent', icon: CpuIcon },
+        { id: 'neuronmcp' as const, name: 'NeuronMCP', icon: SparklesIcon },
+      ]
+    },
+    { id: 'appearance' as const, name: 'Appearance', icon: SparklesIcon },
+    { 
+      id: 'profiles' as const, 
+      name: 'Profiles', 
+      icon: ServerIcon,
+      subSections: [
+        { id: 'models' as const, name: 'Models', icon: SparklesIcon },
+      ]
+    },
+  ]
+
+  const toggleSection = (sectionId: string) => {
+    const newExpanded = new Set(expandedSections)
+    if (newExpanded.has(sectionId)) {
+      newExpanded.delete(sectionId)
+    } else {
+      newExpanded.add(sectionId)
+    }
+    setExpandedSections(newExpanded)
+  }
+
+  const handleSectionClick = (sectionId: string, subSectionId?: string) => {
+    setActiveSection(sectionId as any)
+    if (subSectionId) {
+      setActiveSubSection(subSectionId as any)
+    } else {
+      // Clear sub-section when clicking a section without submenus
+      const section = settingsSections.find(s => s.id === sectionId)
+      if (!section?.subSections || section.subSections.length === 0) {
+        setActiveSubSection(null)
       }
-
-      await profilesAPI.create(newProfile)
-      setShowCreateModal(false)
-      setNewProfileName('')
-      setNewProfileDSN('')
-      await loadProfiles()
-      alert('Profile created successfully!')
-    } catch (error: any) {
-      console.error('Failed to create profile:', error)
-      const errorMsg = error.response?.data?.message || error.response?.data?.error || error.message || 'Failed to create profile'
-      alert(`Failed to create profile: ${errorMsg}`)
-    } finally {
-      setCreatingProfile(false)
+    }
+    // Auto-expand section when clicking
+    if (!expandedSections.has(sectionId)) {
+      setExpandedSections(new Set([...expandedSections, sectionId]))
     }
   }
 
   return (
-    <div className="h-full overflow-auto bg-slate-800">
-      <div className="max-w-4xl mx-auto p-6">
-        <h1 className="text-3xl font-bold text-slate-100 mb-8">Settings</h1>
+    <div className="w-full -mx-6 px-6" style={{ minHeight: 'calc(100vh - 4rem)', display: 'flex' }}>
+      <div className="flex flex-1" style={{ minHeight: '100%' }}>
+        {/* Sidebar Navigation */}
+        <aside className="w-64 flex-shrink-0 py-6 border-r border-slate-700 flex flex-col" style={{ minHeight: '100%' }}>
+          <h1 className="text-2xl font-bold text-slate-100 mb-6 px-4">Settings</h1>
+          <nav className="space-y-1">
+            {settingsSections.map((section) => {
+              const Icon = section.icon
+              const isExpanded = expandedSections.has(section.id)
+              const hasSubSections = section.subSections && section.subSections.length > 0
+              const isActive = activeSection === section.id && (!hasSubSections || activeSubSection !== null)
+              
+              return (
+                <div key={section.id}>
+                  <button
+                    onClick={() => {
+                      if (hasSubSections) {
+                        if (!isExpanded) {
+                          // Expand and select first submenu
+                          setExpandedSections(new Set([...expandedSections, section.id]))
+                          if (section.subSections && section.subSections.length > 0) {
+                            handleSectionClick(section.id, section.subSections[0].id)
+                          }
+                        } else {
+                          // Just toggle collapse
+                          toggleSection(section.id)
+                        }
+                      } else {
+                        handleSectionClick(section.id)
+                      }
+                    }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
+                      isActive && !hasSubSections
+                        ? 'bg-purple-600 text-white'
+                        : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                    }`}
+                  >
+                    <Icon className="w-5 h-5 flex-shrink-0" />
+                    <span className="font-medium truncate flex-1 min-w-0">{section.name}</span>
+                    {hasSubSections && (
+                      <span className={`text-xs transition-transform flex-shrink-0 ${isExpanded ? 'rotate-90' : ''}`}>
+                        ›
+                      </span>
+                    )}
+                  </button>
+                  
+                  {/* Sub-sections */}
+                  {hasSubSections && isExpanded && section.subSections && (
+                    <div className="ml-4 space-y-1">
+                      {section.subSections.map((subSection) => {
+                        const SubIcon = subSection.icon
+                        const isSubActive = activeSection === section.id && activeSubSection === subSection.id
+                        return (
+                          <button
+                            key={subSection.id}
+                            onClick={() => handleSectionClick(section.id, subSection.id)}
+                            className={`w-full flex items-center gap-3 px-4 py-2 text-left transition-colors text-sm ${
+                              isSubActive
+                                ? 'bg-purple-600 text-white'
+                                : 'text-slate-700 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-200'
+                            }`}
+                          >
+                            <SubIcon className="w-4 h-4 flex-shrink-0" />
+                            <span className="truncate flex-1 min-w-0">{subSection.name}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </nav>
+        </aside>
 
-        {/* API Key Section */}
-        <div className="card mb-6">
-          <div className="flex items-center gap-3 mb-4">
-            <KeyIcon className="w-6 h-6 text-slate-400" />
-            <h2 className="text-xl font-semibold text-slate-100">API Key</h2>
+        {/* Main Content Area */}
+        <div className="flex-1 min-w-0 py-6 overflow-y-auto px-6">
+          <div className="w-full">
+            {notice && (
+              <div
+                className={`mb-6 px-4 py-3 rounded-lg border ${
+                  notice.type === 'success'
+                    ? 'bg-green-500/10 border-green-500/50 text-green-300'
+                    : 'bg-red-500/10 border-red-500/50 text-red-300'
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  {notice.type === 'success' ? (
+                    <CheckCircleIcon className="w-5 h-5 mt-0.5 flex-shrink-0" />
+                  ) : (
+                    <XCircleIcon className="w-5 h-5 mt-0.5 flex-shrink-0" />
+                  )}
+                  <div className="flex-1">
+                    <p className="text-sm">{notice.message}</p>
+                  </div>
+                  <button
+                    onClick={() => setNotice(null)}
+                    className="text-slate-700 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 text-sm"
+                    aria-label="Dismiss notice"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Modules Section - NeuronDB */}
+            {activeSection === 'modules' && activeSubSection === 'neurondb' && (
+              <div className="card mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <DatabaseIcon className="w-6 h-6 text-slate-600 dark:text-slate-400" />
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-slate-100">NeuronDB Connection</h2>
+            </div>
+            <button
+              onClick={loadConnectionStatus}
+              disabled={statusLoading}
+              className="btn btn-secondary text-sm"
+            >
+              {statusLoading ? 'Refreshing...' : 'Refresh Status'}
+            </button>
           </div>
-          <p className="text-sm text-slate-400 mb-4">
-            Your API key is stored locally in your browser. It's used to authenticate all requests to the backend.
-          </p>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-200 mb-2">
-                API Key
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type={showApiKey ? 'text' : 'password'}
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  className="input flex-1"
-                  placeholder="Enter your API key"
-                />
+
+          {statusError && (
+            <div className="mb-4 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/50 text-red-300 text-sm">
+              {statusError}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 gap-4">
+            {/* NeuronDB Status */}
+            <div className="border border-slate-700 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <DatabaseIcon className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+                  <h3 className="font-semibold text-slate-100">NeuronDB</h3>
+                </div>
+                <div className="flex items-center gap-2">
+                  {testingService === 'neurondb' ? (
+                    <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <div className={`w-3 h-3 rounded-full ${getStatusBadge(connectionStatus?.neurondb).color}`} />
+                  )}
+                  {!editingNeuronDB && (
+                    <button
+                      onClick={() => setEditingNeuronDB(true)}
+                      className="p-1 text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400"
+                      title="Edit configuration"
+                    >
+                      <PencilIcon className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-slate-700 dark:text-slate-400">Status:</span>
+                  <span className={`font-medium ${getStatusColor(connectionStatus?.neurondb)}`}>
+                    {getStatusBadge(connectionStatus?.neurondb).text}
+                  </span>
+                </div>
+                
+                {editingNeuronDB ? (
+                  <div className="space-y-2 mt-3">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-300 mb-1">DSN</label>
+                      <input
+                        type="text"
+                        value={neurondbDSN}
+                        onChange={(e) => setNeurondbDSN(e.target.value)}
+                        className="input w-full text-xs"
+                        placeholder="postgresql://user:password@host:port/database"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleSaveNeuronDBConfig}
+                        disabled={neurondbSaving}
+                        className="flex-1 btn btn-primary text-xs py-1.5"
+                      >
+                        {neurondbSaving ? 'Saving...' : 'Save'}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setEditingNeuronDB(false)
+                          const defaultProfile = profiles.find(p => p.is_default) || profiles[0]
+                          if (defaultProfile?.neurondb_dsn) {
+                            setNeurondbDSN(defaultProfile.neurondb_dsn)
+                          }
+                        }}
+                        className="btn btn-secondary text-xs py-1.5"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {connectionStatus?.neurondb?.details && (
+                      <div className="text-xs text-slate-700 dark:text-slate-500 space-y-1">
+                        {connectionStatus.neurondb.details.dsn && (
+                          <div className="break-all">DSN: {String(connectionStatus.neurondb.details.dsn)}</div>
+                        )}
+                        {connectionStatus.neurondb.details.postgres_version && (
+                          <div>PostgreSQL: {String(connectionStatus.neurondb.details.postgres_version).split(' ')[0]}</div>
+                        )}
+                        {connectionStatus.neurondb.details.extension_version && (
+                          <div>Extension: {String(connectionStatus.neurondb.details.extension_version)}</div>
+                        )}
+                      </div>
+                    )}
+                    {connectionStatus?.neurondb?.error_message && (
+                      <div className="text-xs text-red-400 mt-2 p-2 bg-red-500/10 rounded">
+                        {connectionStatus.neurondb.error_message}
+                      </div>
+                    )}
+                    <button
+                      onClick={() => testServiceConnection('neurondb')}
+                      disabled={testingService === 'neurondb'}
+                      className="w-full mt-2 btn btn-secondary text-xs py-1.5"
+                    >
+                      Test Connection
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+            )}
+
+            {/* Modules Section - NeuronAgent */}
+            {activeSection === 'modules' && activeSubSection === 'neuronagent' && (
+              <div className="card mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <CpuIcon className="w-6 h-6 text-slate-600 dark:text-slate-400" />
+              <h2 className="text-xl font-semibold text-slate-100">NeuronAgent Connection</h2>
+            </div>
+            <button
+              onClick={loadConnectionStatus}
+              disabled={statusLoading}
+              className="btn btn-secondary text-sm"
+            >
+              {statusLoading ? 'Refreshing...' : 'Refresh Status'}
+            </button>
+          </div>
+
+          {statusError && (
+            <div className="mb-4 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/50 text-red-300 text-sm">
+              {statusError}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 gap-4">
+            {/* NeuronAgent Status */}
+            <div className="border border-slate-700 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <CpuIcon className="w-5 h-5 text-slate-400" />
+                  <h3 className="font-semibold text-slate-100">NeuronAgent</h3>
+                </div>
+                <div className="flex items-center gap-2">
+                  {testingService === 'neuronagent' ? (
+                    <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <div className={`w-3 h-3 rounded-full ${getStatusBadge(connectionStatus?.neuronagent).color}`} />
+                  )}
+                  {!editingNeuronAgent && (
+                    <button
+                      onClick={() => setEditingNeuronAgent(true)}
+                      className="p-1 text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400"
+                      title="Edit configuration"
+                    >
+                      <PencilIcon className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-slate-700 dark:text-slate-400">Status:</span>
+                  <span className={`font-medium ${getStatusColor(connectionStatus?.neuronagent)}`}>
+                    {getStatusBadge(connectionStatus?.neuronagent).text}
+                  </span>
+                </div>
+                
+                {editingNeuronAgent ? (
+                  <div className="space-y-2 mt-3">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-300 mb-1">Endpoint</label>
+                      <input
+                        type="text"
+                        value={neuronagentEndpoint}
+                        onChange={(e) => setNeuronagentEndpoint(e.target.value)}
+                        className="input w-full text-xs"
+                        placeholder="http://localhost:8080"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-300 mb-1">API Key (optional)</label>
+                      <div className="flex gap-2">
+                        <input
+                          type={showNeuronagentApiKey ? 'text' : 'password'}
+                          value={neuronagentApiKey}
+                          onChange={(e) => setNeuronagentApiKey(e.target.value)}
+                          className="input flex-1 text-xs"
+                          placeholder="Enter API key"
+                        />
+                        <button
+                          onClick={() => setShowNeuronagentApiKey(!showNeuronagentApiKey)}
+                          className="px-2 py-1 border border-slate-600 rounded text-xs"
+                        >
+                          {showNeuronagentApiKey ? 'Hide' : 'Show'}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleSaveNeuronAgentConfig}
+                        disabled={neuronagentSaving}
+                        className="flex-1 btn btn-primary text-xs py-1.5"
+                      >
+                        {neuronagentSaving ? 'Saving...' : 'Save'}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setEditingNeuronAgent(false)
+                          const defaultProfile = profiles.find(p => p.is_default) || profiles[0]
+                          if (defaultProfile) {
+                            if (defaultProfile.agent_endpoint) {
+                              setNeuronagentEndpoint(defaultProfile.agent_endpoint)
+                            }
+                            if (defaultProfile.agent_api_key) {
+                              setNeuronagentApiKey(defaultProfile.agent_api_key)
+                            }
+                          }
+                        }}
+                        className="btn btn-secondary text-xs py-1.5"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {connectionStatus?.neuronagent?.details && (
+                      <div className="text-xs text-slate-700 dark:text-slate-500 space-y-1">
+                        {connectionStatus.neuronagent.details.endpoint && (
+                          <div className="break-all">Endpoint: {String(connectionStatus.neuronagent.details.endpoint)}</div>
+                        )}
+                        {connectionStatus.neuronagent.details.health_check && (
+                          <div>Health: {String(connectionStatus.neuronagent.details.health_check)}</div>
+                        )}
+                      </div>
+                    )}
+                    {connectionStatus?.neuronagent?.error_message && (
+                      <div className="text-xs text-red-400 mt-2 p-2 bg-red-500/10 rounded">
+                        {connectionStatus.neuronagent.error_message}
+                      </div>
+                    )}
+                    <button
+                      onClick={() => testServiceConnection('neuronagent')}
+                      disabled={testingService === 'neuronagent'}
+                      className="w-full mt-2 btn btn-secondary text-xs py-1.5"
+                    >
+                      Test Connection
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+            )}
+
+            {/* Modules Section - NeuronMCP */}
+            {activeSection === 'modules' && activeSubSection === 'neuronmcp' && (
+              <div className="card mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <SparklesIcon className="w-6 h-6 text-slate-400" />
+              <h2 className="text-xl font-semibold text-slate-100">NeuronMCP Connection</h2>
+            </div>
+            <button
+              onClick={loadConnectionStatus}
+              disabled={statusLoading}
+              className="btn btn-secondary text-sm"
+            >
+              {statusLoading ? 'Refreshing...' : 'Refresh Status'}
+            </button>
+          </div>
+
+          {statusError && (
+            <div className="mb-4 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/50 text-red-300 text-sm">
+              {statusError}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 gap-4">
+            {/* NeuronMCP Status */}
+            <div className="border border-slate-700 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <SparklesIcon className="w-5 h-5 text-slate-400" />
+                  <h3 className="font-semibold text-slate-100">NeuronMCP</h3>
+                </div>
+                {testingService === 'neuronmcp' ? (
+                  <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <div className={`w-3 h-3 rounded-full ${getStatusBadge(connectionStatus?.neuronmcp).color}`} />
+                )}
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-slate-700 dark:text-slate-400">Status:</span>
+                  <span className={`font-medium ${getStatusColor(connectionStatus?.neuronmcp)}`}>
+                    {getStatusBadge(connectionStatus?.neuronmcp).text}
+                  </span>
+                </div>
+                {connectionStatus?.neuronmcp?.details && (
+                  <div className="text-xs text-slate-700 dark:text-slate-500 space-y-1">
+                    {connectionStatus.neuronmcp.details.binary_path && (
+                      <div className="break-all">Binary: {String(connectionStatus.neuronmcp.details.binary_path)}</div>
+                    )}
+                  </div>
+                )}
+                {connectionStatus?.neuronmcp?.error_message && (
+                  <div className="text-xs text-red-400 mt-2 p-2 bg-red-500/10 rounded break-words">
+                    {connectionStatus.neuronmcp.error_message}
+                  </div>
+                )}
                 <button
-                  onClick={() => setShowApiKey(!showApiKey)}
-                  className="px-4 py-2 border border-slate-700 rounded-lg hover:bg-slate-800"
+                  onClick={() => testServiceConnection('neuronmcp')}
+                  disabled={testingService === 'neuronmcp'}
+                  className="w-full mt-2 btn btn-secondary text-xs py-1.5"
                 >
-                  {showApiKey ? 'Hide' : 'Show'}
+                  Test Connection
                 </button>
               </div>
             </div>
-            <button
-              onClick={handleSaveApiKey}
-              className="btn btn-primary"
-            >
-              Save API Key
-            </button>
           </div>
         </div>
+            )}
 
-        {/* Profiles Section */}
-        <div className="card mb-6">
+            {/* Appearance Section */}
+            {activeSection === 'appearance' && (
+              <div className="card mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <SparklesIcon className="w-6 h-6 text-purple-500" />
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-slate-100">Appearance</h2>
+            </div>
+          </div>
+          
+          <div className="space-y-4">
+            <div className="flex items-center justify-between py-3 border-b border-slate-200 dark:border-slate-700">
+              <div>
+                <h3 className="font-medium text-gray-900 dark:text-slate-100">Theme</h3>
+                <p className="text-sm text-gray-700 dark:text-slate-400 mt-1">
+                  Choose between light and dark theme
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setTheme('light')}
+                  className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                    theme === 'light'
+                      ? 'bg-purple-500 text-white'
+                      : 'bg-slate-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  Light
+                </button>
+                <button
+                  onClick={() => setTheme('dark')}
+                  className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                    theme === 'dark'
+                      ? 'bg-purple-500 text-white'
+                      : 'bg-slate-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  Dark
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+            )}
+
+            {/* Profiles Section */}
+            {activeSection === 'profiles' && activeSubSection !== 'models' && (
+              <div className="card mb-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <ServerIcon className="w-6 h-6 text-slate-400" />
               <h2 className="text-xl font-semibold text-slate-100">Connection Profiles</h2>
             </div>
-            <button 
-              onClick={() => setShowCreateModal(true)}
-              className="btn btn-primary flex items-center gap-2"
-            >
-              <PlusIcon className="w-4 h-4" />
-              New Profile
-            </button>
+            <p className="text-sm text-slate-400">
+              Profiles are automatically created when users sign up. Admin users can view and manage all profiles.
+            </p>
           </div>
           
           <div className="space-y-3">
@@ -537,16 +1185,31 @@ export default function SettingsPage() {
                     <div className="flex items-center gap-2 mb-2">
                       <h3 className="font-semibold text-slate-100">{profile.name}</h3>
                       <span className="text-xs text-slate-400">({profile.id.slice(0, 8)}...)</span>
+                      {profile.is_default && (
+                        <span className="px-2 py-0.5 text-xs bg-blue-600 text-white rounded">Default</span>
+                      )}
+                      {profile.mcp_config && profile.mcp_config.command && (
+                        <span className="px-2 py-0.5 text-xs bg-purple-600 text-white rounded flex items-center gap-1">
+                          <SparklesIcon className="w-3 h-3" />
+                          MCP
+                        </span>
+                      )}
+                      {profile.agent_endpoint && (
+                        <span className="px-2 py-0.5 text-xs bg-green-600 text-white rounded flex items-center gap-1">
+                          <CpuIcon className="w-3 h-3" />
+                          Agent
+                        </span>
+                      )}
                     </div>
                     <div className="space-y-1 text-sm text-slate-400">
                       <div className="flex items-center gap-2">
-                        <DatabaseIcon className="w-4 h-4" />
-                        <span className="font-mono text-xs">{profile.neurondb_dsn.split('@')[1] || profile.neurondb_dsn}</span>
+                        <DatabaseIcon className="w-4 h-4 flex-shrink-0" />
+                        <span className="font-mono text-xs break-all">{profile.neurondb_dsn.split('@')[1] || profile.neurondb_dsn}</span>
                       </div>
                       {profile.agent_endpoint && (
                         <div className="flex items-center gap-2">
-                          <ServerIcon className="w-4 h-4" />
-                          <span>{profile.agent_endpoint}</span>
+                          <ServerIcon className="w-4 h-4 flex-shrink-0" />
+                          <span className="break-all">{profile.agent_endpoint}</span>
                         </div>
                       )}
                     </div>
@@ -554,7 +1217,7 @@ export default function SettingsPage() {
                   <div className="flex items-center gap-2">
                     <button 
                       onClick={() => handleEditProfile(profile)}
-                      className="p-2 text-slate-500 hover:text-blue-600"
+                      className="p-2 text-slate-700 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-400"
                     >
                       <PencilIcon className="w-4 h-4" />
                     </button>
@@ -568,14 +1231,14 @@ export default function SettingsPage() {
                               setExpandedProfile(null)
                               setEditingProfile(null)
                             }
-                            alert('Profile deleted successfully')
+                            setNotice({ type: 'success', message: 'Profile deleted.' })
                           } catch (error: any) {
                             console.error('Failed to delete profile:', error)
-                            alert('Failed to delete profile: ' + (error.response?.data?.error || error.message))
+                            setNotice({ type: 'error', message: 'Failed to delete profile: ' + (error.response?.data?.error || error.message) })
                           }
                         }
                       }}
-                      className="p-2 text-slate-500 hover:text-red-600"
+                      className="p-2 text-slate-700 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-400"
                     >
                       <TrashIcon className="w-4 h-4" />
                     </button>
@@ -592,7 +1255,7 @@ export default function SettingsPage() {
                           setExpandedProfile(null)
                           setEditingProfile(null)
                         }}
-                        className="text-sm text-slate-400 hover:text-slate-200"
+                        className="text-sm text-slate-700 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
                       >
                         Close
                       </button>
@@ -604,6 +1267,9 @@ export default function SettingsPage() {
                         <SparklesIcon className="w-5 h-5 text-slate-400" />
                         <h3 className="text-lg font-semibold text-slate-100">MCP Configuration</h3>
                       </div>
+                      <p className="text-sm text-slate-700 dark:text-slate-400 mb-4">
+                        Configure NeuronMCP settings for this profile. These settings will be saved and used when connecting to MCP tools.
+                      </p>
                       <div className="space-y-4">
                         <div>
                           <label className="block text-sm font-medium text-slate-200 mb-2">
@@ -711,7 +1377,7 @@ export default function SettingsPage() {
                           </div>
                         </div>
                         
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 flex-wrap">
                           <button
                             onClick={handleTestMCP}
                             disabled={mcpTestLoading}
@@ -732,13 +1398,17 @@ export default function SettingsPage() {
                             </div>
                           )}
                         </div>
-                        <button
-                          onClick={handleSaveMCPConfig}
-                          disabled={!mcpTestPassed}
-                          className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          Save MCP Configuration
-                        </button>
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={handleSaveMCPConfig}
+                            className="btn btn-primary"
+                          >
+                            Save MCP Configuration to Profile
+                          </button>
+                          <span className="text-xs text-slate-400">
+                            Settings will be saved to {editingProfile?.name || 'this profile'}
+                          </span>
+                        </div>
                       </div>
                     </div>
                     
@@ -748,6 +1418,9 @@ export default function SettingsPage() {
                         <CpuIcon className="w-5 h-5 text-slate-400" />
                         <h3 className="text-lg font-semibold text-slate-100">Agent Configuration</h3>
                       </div>
+                      <p className="text-sm text-slate-700 dark:text-slate-400 mb-4">
+                        Configure NeuronAgent endpoint and API key for this profile. These settings will be saved and used when connecting to the agent service.
+                      </p>
                       <div className="space-y-4">
                         <div>
                           <label className="block text-sm font-medium text-slate-200 mb-2">
@@ -791,7 +1464,7 @@ export default function SettingsPage() {
                           </div>
                         </div>
                         
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 flex-wrap">
                           <button
                             onClick={handleTestAgent}
                             disabled={agentTestLoading}
@@ -812,13 +1485,17 @@ export default function SettingsPage() {
                             </div>
                           )}
                         </div>
-                        <button
-                          onClick={handleSaveAgentConfig}
-                          disabled={!agentTestPassed}
-                          className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          Save Agent Configuration
-                        </button>
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={handleSaveAgentConfig}
+                            className="btn btn-primary"
+                          >
+                            Save Agent Configuration to Profile
+                          </button>
+                          <span className="text-xs text-slate-400">
+                            Settings will be saved to {editingProfile?.name || 'this profile'}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -829,179 +1506,312 @@ export default function SettingsPage() {
             {profiles.length === 0 && (
               <div className="text-center py-8 text-slate-400">
                 <ServerIcon className="w-12 h-12 mx-auto mb-2 text-slate-500" />
-                <p>No profiles configured. Create one to get started.</p>
-              </div>
-            )}
-          </div>
-
-        {/* Model Configurations Section */}
-        <div className="card mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <SparklesIcon className="w-6 h-6 text-slate-400" />
-              <h2 className="text-xl font-semibold text-slate-100">Model Configurations</h2>
-            </div>
-            <button 
-              onClick={() => {
-                setEditingModel(null)
-                setNewModelProvider('openai')
-                setNewModelName('')
-                setNewModelApiKey('')
-                setNewModelBaseUrl('')
-                setNewModelIsDefault(false)
-                setShowModelModal(true)
-              }}
-              className="btn btn-primary flex items-center gap-2"
-              disabled={!selectedProfileForModels}
-            >
-              <PlusIcon className="w-4 h-4" />
-              New Model
-            </button>
-          </div>
-
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-200 mb-2">
-                Select Profile
-              </label>
-              <select
-                value={selectedProfileForModels}
-                onChange={(e) => setSelectedProfileForModels(e.target.value)}
-                className="input w-full"
-              >
-                <option value="">Select a profile</option>
-                {profiles.map((profile) => (
-                  <option key={profile.id} value={profile.id}>
-                    {profile.name} {profile.is_default && '(Default)'}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {selectedProfileForModels && (
-              <div className="space-y-3">
-                {modelConfigs.length === 0 ? (
-                  <div className="text-center py-8 text-slate-400">
-                    <SparklesIcon className="w-12 h-12 mx-auto mb-2 text-slate-500" />
-                    <p>No model configurations. Create one to get started.</p>
-                  </div>
-                ) : (
-                  modelConfigs.map((config) => (
-                    <div key={config.id} className="border border-slate-700 rounded-lg p-4">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <span className="font-semibold text-slate-100">
-                              {config.model_provider} - {config.model_name}
-                            </span>
-                            {config.is_default && (
-                              <span className="px-2 py-1 text-xs bg-blue-600 text-white rounded">Default</span>
-                            )}
-                            {config.is_free && (
-                              <span className="px-2 py-1 text-xs bg-green-600 text-white rounded">Free</span>
-                            )}
-                          </div>
-                          <div className="text-sm text-slate-400 space-y-1">
-                            {config.api_key && (
-                              <div>API Key: {config.api_key.substring(0, 8)}...</div>
-                            )}
-                            {config.base_url && (
-                              <div>Base URL: {config.base_url}</div>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleEditModel(config)}
-                            className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-700 rounded"
-                            title="Edit"
-                          >
-                            <PencilIcon className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteModel(config.id)}
-                            className="p-2 text-red-400 hover:text-red-300 hover:bg-slate-700 rounded"
-                            title="Delete"
-                          >
-                            <TrashIcon className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
+                <p>No profiles found. Profiles are created automatically during signup.</p>
               </div>
             )}
           </div>
         </div>
+            )}
+
+            {/* Models Section - Submenu of Profiles */}
+            {activeSection === 'profiles' && activeSubSection === 'models' && (
+              <div className="card mb-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <SparklesIcon className="w-6 h-6 text-slate-400" />
+                    <h2 className="text-xl font-semibold text-slate-100">Model Configurations</h2>
+                  </div>
+                  <button
+                    onClick={() => setShowModelModal(true)}
+                    className="btn btn-primary text-sm"
+                  >
+                    <PlusIcon className="w-4 h-4 mr-2" />
+                    Add Model
+                  </button>
+                </div>
+
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    Select Profile
+                  </label>
+                  <select
+                    value={selectedProfileForModels}
+                    onChange={(e) => setSelectedProfileForModels(e.target.value)}
+                    className="input w-full max-w-md"
+                  >
+                    {profiles.map((profile) => (
+                      <option key={profile.id} value={profile.id}>
+                        {profile.name} {profile.is_default && '(Default)'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {selectedProfileForModels && (() => {
+                  // Get all available models from all providers (excluding custom)
+                  const allAvailableModels: Array<{
+                    provider: string
+                    providerName: string
+                    modelName: string
+                    displayName: string
+                    requiresKey: boolean
+                    requiresBaseUrl: boolean
+                    defaultBaseUrl?: string
+                    isFree: boolean
+                  }> = []
+                  
+                  Object.entries(MODEL_PROVIDERS).forEach(([providerKey, provider]) => {
+                    if (providerKey !== 'custom') {
+                      provider.models.forEach((model) => {
+                        allAvailableModels.push({
+                          provider: providerKey,
+                          providerName: provider.name,
+                          modelName: model.name,
+                          displayName: model.displayName,
+                          requiresKey: provider.requiresKey,
+                          requiresBaseUrl: provider.requiresBaseUrl,
+                          defaultBaseUrl: (provider as any).defaultBaseUrl,
+                          isFree: providerKey === 'ollama',
+                        })
+                      })
+                    }
+                  })
+                  
+                  // Create a map of configured models by provider+modelName
+                  const configuredModelsMap = new Map<string, ModelConfig>()
+                  const availableModelsSet = new Set<string>()
+                  allAvailableModels.forEach((model) => {
+                    availableModelsSet.add(`${model.provider}:${model.modelName}`)
+                  })
+                  
+                  modelConfigs.forEach((config) => {
+                    const key = `${config.model_provider}:${config.model_name}`
+                    configuredModelsMap.set(key, config)
+                    
+                    // Add custom models (not in predefined list) to the display
+                    if (!availableModelsSet.has(key)) {
+                      const provider = MODEL_PROVIDERS[config.model_provider as keyof typeof MODEL_PROVIDERS]
+                      if (provider) {
+                        allAvailableModels.push({
+                          provider: config.model_provider,
+                          providerName: provider.name,
+                          modelName: config.model_name,
+                          displayName: config.model_name,
+                          requiresKey: provider.requiresKey,
+                          requiresBaseUrl: provider.requiresBaseUrl,
+                          defaultBaseUrl: (provider as any).defaultBaseUrl,
+                          isFree: config.is_free || false,
+                        })
+                        availableModelsSet.add(key)
+                      }
+                    }
+                  })
+                  
+                  return (
+                    <div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead>
+                            <tr className="border-b border-slate-700">
+                              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-300">Model</th>
+                              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-300">Provider</th>
+                              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-300">API Key</th>
+                              <th className="text-center py-3 px-4 text-sm font-semibold text-slate-300">Status</th>
+                              <th className="text-center py-3 px-4 text-sm font-semibold text-slate-300">Default</th>
+                              <th className="text-center py-3 px-4 text-sm font-semibold text-slate-300">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {allAvailableModels.map((availableModel) => {
+                              const configKey = `${availableModel.provider}:${availableModel.modelName}`
+                              const config = configuredModelsMap.get(configKey)
+                              const isConfigured = !!config
+                              const isEnabled = config ? isModelEnabled(config) : false
+                              const isEditingApiKey = config && editingApiKeyId === config.id
+                              
+                              return (
+                                <tr 
+                                  key={configKey} 
+                                  className={`border-b border-slate-800 hover:bg-slate-800/30 transition-colors ${
+                                    !isConfigured ? 'opacity-50' : !isEnabled ? 'opacity-60' : ''
+                                  }`}
+                                >
+                                  {/* Model Name */}
+                                  <td className="py-3 px-4">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-medium text-slate-100">{availableModel.displayName}</span>
+                                      {availableModel.isFree && (
+                                        <span className="px-1.5 py-0.5 text-xs bg-green-600 text-white rounded">Free</span>
+                                      )}
+                                      {!isConfigured && (
+                                        <span className="px-1.5 py-0.5 text-xs bg-slate-600 text-slate-300 rounded">Not Configured</span>
+                                      )}
+                                    </div>
+                                    <div className="text-xs text-slate-700 dark:text-slate-500 mt-1">{availableModel.modelName}</div>
+                                    {config?.base_url && (
+                                      <div className="text-xs text-slate-700 dark:text-slate-500 mt-1 break-all">{config.base_url}</div>
+                                    )}
+                                  </td>
+                                  
+                                  {/* Provider */}
+                                  <td className="py-3 px-4">
+                                    <span className="text-sm text-slate-300">{availableModel.providerName}</span>
+                                  </td>
+                                  
+                                  {/* API Key */}
+                                  <td className="py-3 px-4">
+                                    {!isConfigured ? (
+                                      <span className="text-sm text-slate-500">-</span>
+                                    ) : availableModel.requiresKey ? (
+                                      isEditingApiKey ? (
+                                        <div className="flex items-center gap-2">
+                                          <input
+                                            type="password"
+                                            value={inlineApiKey}
+                                            onChange={(e) => setInlineApiKey(e.target.value)}
+                                            placeholder="Enter API key"
+                                            className="input text-sm w-48"
+                                            autoFocus
+                                          />
+                                          <button
+                                            onClick={() => handleSaveInlineApiKey(config!.id)}
+                                            disabled={savingApiKey === config!.id}
+                                            className="btn btn-primary text-xs px-2 py-1"
+                                          >
+                                            {savingApiKey === config!.id ? '...' : 'Save'}
+                                          </button>
+                                          <button
+                                            onClick={() => {
+                                              setEditingApiKeyId(null)
+                                              setInlineApiKey('')
+                                            }}
+                                            className="btn btn-secondary text-xs px-2 py-1"
+                                          >
+                                            Cancel
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-sm text-slate-400">
+                                            {config.api_key ? '••••••••••••' : 'Not set'}
+                                          </span>
+                                          <button
+                                            onClick={() => {
+                                              setEditingApiKeyId(config.id)
+                                              setInlineApiKey(config.api_key || '')
+                                            }}
+                                            className="text-xs text-blue-400 hover:text-blue-300"
+                                          >
+                                            {config.api_key ? 'Change' : 'Set'}
+                                          </button>
+                                        </div>
+                                      )
+                                    ) : (
+                                      <span className="text-sm text-slate-500">N/A</span>
+                                    )}
+                                  </td>
+                                  
+                                  {/* Enable/Disable Status */}
+                                  <td className="py-3 px-4 text-center">
+                                    {!isConfigured ? (
+                                      <span className="text-sm text-slate-500">-</span>
+                                    ) : (
+                                      <button
+                                        onClick={() => handleToggleEnabled(config!.id, isEnabled)}
+                                        disabled={togglingEnabled === config!.id}
+                                        className={`px-3 py-1 text-xs rounded transition-colors ${
+                                          isEnabled
+                                            ? 'bg-green-600/20 text-green-400 hover:bg-green-600/30'
+                                            : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                                        }`}
+                                        title={isEnabled ? 'Disable model' : 'Enable model'}
+                                      >
+                                        {togglingEnabled === config!.id ? (
+                                          <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin mx-auto" />
+                                        ) : (
+                                          isEnabled ? 'Enabled' : 'Disabled'
+                                        )}
+                                      </button>
+                                    )}
+                                  </td>
+                                  
+                                  {/* Default */}
+                                  <td className="py-3 px-4 text-center">
+                                    {!isConfigured ? (
+                                      <span className="text-sm text-slate-500">-</span>
+                                    ) : config.is_default ? (
+                                      <span className="px-2 py-1 text-xs bg-blue-600 text-white rounded">Default</span>
+                                    ) : (
+                                      <button
+                                        onClick={() => handleSetDefault(config.id)}
+                                        disabled={settingDefault === config.id}
+                                        className="px-3 py-1 text-xs bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 rounded transition-colors"
+                                        title="Set as default model"
+                                      >
+                                        {settingDefault === config.id ? (
+                                          <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin mx-auto" />
+                                        ) : (
+                                          'Set Default'
+                                        )}
+                                      </button>
+                                    )}
+                                  </td>
+                                  
+                                  {/* Actions */}
+                                  <td className="py-3 px-4">
+                                    <div className="flex items-center justify-center gap-2">
+                                      {!isConfigured ? (
+                                        <button
+                                          onClick={() => {
+                                            setNewModelProvider(availableModel.provider)
+                                            setNewModelName(availableModel.modelName)
+                                            setNewModelBaseUrl(availableModel.defaultBaseUrl || '')
+                                            setNewModelApiKey('')
+                                            setNewModelIsDefault(false)
+                                            setShowModelModal(true)
+                                          }}
+                                          className="btn btn-primary text-xs px-3 py-1"
+                                          title="Add this model"
+                                        >
+                                          <PlusIcon className="w-3 h-3 mr-1 inline" />
+                                          Add
+                                        </button>
+                                      ) : (
+                                        <>
+                                          <button
+                                            onClick={() => handleEditModel(config)}
+                                            className="p-1.5 text-slate-700 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                                            title="Edit model configuration"
+                                          >
+                                            <PencilIcon className="w-4 h-4" />
+                                          </button>
+                                          <button
+                                            onClick={() => handleDeleteModel(config.id)}
+                                            className="p-1.5 text-slate-700 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                                            title="Delete model"
+                                          >
+                                            <TrashIcon className="w-4 h-4" />
+                                          </button>
+                                        </>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )
+                })()}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Create Profile Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-900 rounded-xl shadow-2xl max-w-md w-full">
-            <div className="p-6 border-b border-slate-800">
-              <h2 className="text-2xl font-bold text-slate-100">Create New Profile</h2>
-            </div>
-
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Profile Name *
-                </label>
-                <input
-                  type="text"
-                  value={newProfileName}
-                  onChange={(e) => setNewProfileName(e.target.value)}
-                  className="input w-full"
-                  placeholder="my-profile"
-                  autoFocus
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
-                  NeuronDB DSN *
-                </label>
-                <input
-                  type="text"
-                  value={newProfileDSN}
-                  onChange={(e) => setNewProfileDSN(e.target.value)}
-                  className="input w-full"
-                  placeholder="postgresql://user:password@localhost:5432/dbname"
-                />
-                <p className="text-xs text-slate-400 mt-1">
-                  PostgreSQL connection string for NeuronDB
-                </p>
-              </div>
-            </div>
-
-            <div className="p-6 border-t border-slate-800 flex justify-end gap-3">
-              <button
-                onClick={() => {
-                  setShowCreateModal(false)
-                  setNewProfileName('')
-                  setNewProfileDSN('')
-                }}
-                className="btn btn-secondary"
-                disabled={creatingProfile}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleCreateProfile}
-                disabled={creatingProfile || !newProfileName.trim() || !newProfileDSN.trim()}
-                className="btn btn-primary"
-              >
-                {creatingProfile ? 'Creating...' : 'Create Profile'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Model Configuration Modal */}
+      {/* Model Configuration Modal - Always available */}
       {showModelModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-slate-900 rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -1051,18 +1861,23 @@ export default function SettingsPage() {
                     placeholder="Enter custom model name"
                   />
                 ) : (
-                  <select
-                    value={newModelName}
-                    onChange={(e) => setNewModelName(e.target.value)}
-                    className="input w-full"
-                  >
-                    <option value="">Select a model</option>
+                  <div className="space-y-2 max-h-64 overflow-y-auto border border-slate-700 rounded-lg p-3 bg-slate-800/50">
                     {MODEL_PROVIDERS[newModelProvider as keyof typeof MODEL_PROVIDERS]?.models.map((model) => (
-                      <option key={model.name} value={model.name}>
-                        {model.displayName}
-                      </option>
+                      <button
+                        key={model.name}
+                        type="button"
+                        onClick={() => setNewModelName(model.name)}
+                        className={`w-full text-left px-4 py-2 rounded-lg border transition-colors ${
+                          newModelName === model.name
+                            ? 'border-purple-500 bg-purple-500/20 text-purple-300'
+                            : 'border-slate-600 bg-slate-800/50 text-slate-300 hover:border-slate-500 hover:bg-slate-700/50'
+                        }`}
+                      >
+                        <div className="font-medium">{model.displayName}</div>
+                        <div className="text-xs text-slate-700 dark:text-slate-500 mt-0.5">{model.name}</div>
+                      </button>
                     ))}
-                  </select>
+                  </div>
                 )}
               </div>
 

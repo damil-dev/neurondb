@@ -21,21 +21,21 @@ export default function JSONViewer({ data, title, defaultExpanded = false }: JSO
   }
 
   return (
-    <div className="border border-slate-700 rounded-lg overflow-hidden bg-slate-900">
+    <div className="border border-slate-300 rounded-lg overflow-hidden bg-white">
       {(title || !defaultExpanded) && (
-        <div className="flex items-center justify-between px-4 py-2 bg-slate-800 border-b border-slate-700">
-          {title && <h3 className="text-sm font-medium text-slate-200">{title}</h3>}
+        <div className="flex items-center justify-between px-4 py-2 bg-slate-100 border-b border-slate-300">
+          {title && <h3 className="text-sm font-medium text-gray-900">{title}</h3>}
           <div className="flex items-center gap-2">
             <button
               onClick={handleCopy}
-              className="text-xs text-slate-400 hover:text-slate-100 px-2 py-1 rounded hover:bg-slate-800"
+              className="text-xs text-gray-700 hover:text-gray-900 px-2 py-1 rounded hover:bg-slate-200"
             >
               {copied ? 'Copied!' : 'Copy'}
             </button>
             {!defaultExpanded && (
               <button
                 onClick={() => setIsExpanded(!isExpanded)}
-                className="text-xs text-slate-400 hover:text-slate-100 px-2 py-1 rounded hover:bg-slate-800"
+                className="text-xs text-gray-700 hover:text-gray-900 px-2 py-1 rounded hover:bg-slate-200"
               >
                 {isExpanded ? 'Collapse' : 'Expand'}
               </button>
@@ -44,7 +44,7 @@ export default function JSONViewer({ data, title, defaultExpanded = false }: JSO
         </div>
       )}
       {isExpanded && (
-        <pre className="p-4 bg-slate-950 text-slate-200 text-xs overflow-x-auto max-h-96 overflow-y-auto font-mono">
+        <pre className="p-4 bg-slate-50 text-gray-800 text-xs overflow-x-auto max-h-96 overflow-y-auto font-mono">
           {jsonString}
         </pre>
       )}

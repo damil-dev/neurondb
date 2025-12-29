@@ -1,7 +1,7 @@
 'use client'
 
 interface StatusBadgeProps {
-  status: 'connected' | 'disconnected' | 'error' | 'loading'
+  status: 'connected' | 'disconnected' | 'error' | 'loading' | 'connecting'
   label?: string
 }
 
@@ -35,13 +35,20 @@ export default function StatusBadge({ status, label }: StatusBadgeProps) {
       border: 'border-amber-700/50',
       defaultLabel: 'Connecting...',
     },
+    connecting: {
+      bg: 'bg-amber-900/30',
+      text: 'text-amber-300',
+      dot: 'bg-amber-500',
+      border: 'border-amber-700/50',
+      defaultLabel: 'Connecting...',
+    },
   }
 
   const style = config[status]
 
   return (
     <div className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold border ${style.bg} ${style.text} ${style.border}`}>
-      <span className={`w-2 h-2 rounded-full mr-2 ${style.dot} ${status === 'loading' ? 'animate-pulse' : ''}`}></span>
+      <span className={`w-2 h-2 rounded-full mr-2 ${style.dot} ${status === 'loading' || status === 'connecting' ? 'animate-pulse' : ''}`}></span>
       {label || style.defaultLabel}
     </div>
   )
