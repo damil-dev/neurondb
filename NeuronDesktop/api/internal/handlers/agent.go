@@ -70,18 +70,17 @@ func (h *AgentHandlers) ListAgents(w http.ResponseWriter, r *http.Request) {
 	
 	client, err := h.getClient(r.Context(), profileID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		WriteError(w, r, http.StatusInternalServerError, err, nil)
 		return
 	}
 	
 	agents, err := client.ListAgents(r.Context())
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		WriteError(w, r, http.StatusInternalServerError, err, nil)
 		return
 	}
 	
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(agents)
+	WriteSuccess(w, agents, http.StatusOK)
 }
 
 // CreateSession creates a session
@@ -91,25 +90,23 @@ func (h *AgentHandlers) CreateSession(w http.ResponseWriter, r *http.Request) {
 	
 	var req agent.CreateSessionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		WriteError(w, r, http.StatusBadRequest, fmt.Errorf("invalid request body"), nil)
 		return
 	}
 	
 	client, err := h.getClient(r.Context(), profileID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		WriteError(w, r, http.StatusInternalServerError, err, nil)
 		return
 	}
 	
 	session, err := client.CreateSession(r.Context(), req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		WriteError(w, r, http.StatusInternalServerError, err, nil)
 		return
 	}
 	
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(session)
+	WriteSuccess(w, session, http.StatusCreated)
 }
 
 // SendMessage sends a message
@@ -148,18 +145,17 @@ func (h *AgentHandlers) GetAgent(w http.ResponseWriter, r *http.Request) {
 	
 	client, err := h.getClient(r.Context(), profileID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		WriteError(w, r, http.StatusInternalServerError, err, nil)
 		return
 	}
 	
 	agent, err := client.GetAgent(r.Context(), agentID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		WriteError(w, r, http.StatusInternalServerError, err, nil)
 		return
 	}
 	
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(agent)
+	WriteSuccess(w, agent, http.StatusOK)
 }
 
 // CreateAgent creates a new agent
@@ -169,25 +165,28 @@ func (h *AgentHandlers) CreateAgent(w http.ResponseWriter, r *http.Request) {
 	
 	var req agent.CreateAgentRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		WriteError(w, r, http.StatusBadRequest, fmt.Errorf("invalid request body"), nil)
+		return
+	}
+	
+	if req.Name == "" {
+		WriteError(w, r, http.StatusBadRequest, fmt.Errorf("name is required"), nil)
 		return
 	}
 	
 	client, err := h.getClient(r.Context(), profileID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		WriteError(w, r, http.StatusInternalServerError, err, nil)
 		return
 	}
 	
 	agent, err := client.CreateAgent(r.Context(), req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		WriteError(w, r, http.StatusInternalServerError, err, nil)
 		return
 	}
 	
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(agent)
+	WriteSuccess(w, agent, http.StatusCreated)
 }
 
 // TestAgentConfig tests an Agent configuration without saving it
@@ -198,12 +197,12 @@ func (h *AgentHandlers) TestAgentConfig(w http.ResponseWriter, r *http.Request) 
 	}
 	
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		WriteError(w, http.StatusBadRequest, fmt.Errorf("invalid request body"), nil)
+		WriteError(w, r, http.StatusBadRequest, fmt.Errorf("invalid request body"), nil)
 		return
 	}
 	
 	if req.Endpoint == "" {
-		WriteError(w, http.StatusBadRequest, fmt.Errorf("endpoint is required"), nil)
+		WriteError(w, r, http.StatusBadRequest, fmt.Errorf("endpoint is required"), nil)
 		return
 	}
 	
@@ -216,7 +215,7 @@ func (h *AgentHandlers) TestAgentConfig(w http.ResponseWriter, r *http.Request) 
 	
 	_, err := testClient.ListAgents(ctx)
 	if err != nil {
-		WriteError(w, http.StatusBadRequest, fmt.Errorf("failed to connect to agent: %w", err), nil)
+		WriteError(w, r, http.StatusBadRequest, fmt.Errorf("failed to connect to agent: %w", err), nil)
 		return
 	}
 	
@@ -290,5 +289,71 @@ func (h *AgentHandlers) ListModels(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"models": models,
 	})
+}
+
+// ListSessions lists sessions for an agent
+func (h *AgentHandlers) ListSessions(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	profileID := vars["profile_id"]
+	agentID := vars["agent_id"]
+	
+	client, err := h.getClient(r.Context(), profileID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	
+	sessions, err := client.ListSessions(r.Context(), agentID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(sessions)
+}
+
+// GetSession gets a session
+func (h *AgentHandlers) GetSession(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	profileID := vars["profile_id"]
+	sessionID := vars["session_id"]
+	
+	client, err := h.getClient(r.Context(), profileID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	
+	session, err := client.GetSession(r.Context(), sessionID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(session)
+}
+
+// GetMessages gets messages from a session
+func (h *AgentHandlers) GetMessages(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	profileID := vars["profile_id"]
+	sessionID := vars["session_id"]
+	
+	client, err := h.getClient(r.Context(), profileID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	
+	messages, err := client.GetMessages(r.Context(), sessionID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(messages)
 }
 

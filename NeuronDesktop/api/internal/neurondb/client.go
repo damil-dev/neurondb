@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -104,8 +105,14 @@ func (c *Client) ListCollections(ctx context.Context) ([]CollectionInfo, error) 
 		// Get indexes
 		indexes, _ := c.getIndexes(ctx, schema, table)
 		
-		// Get row count
+		// Get row count (schema and table are from system tables, safe)
 		var rowCount int64
+		if err := validateIdentifier(schema); err != nil {
+			continue
+		}
+		if err := validateIdentifier(table); err != nil {
+			continue
+		}
 		countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM %s.%s`, 
 			quoteIdentifier(schema), quoteIdentifier(table))
 		c.db.QueryRowContext(ctx, countQuery).Scan(&rowCount)
@@ -203,16 +210,29 @@ func (c *Client) Search(ctx context.Context, req SearchRequest) ([]SearchResult,
 		req.DistanceType = "cosine"
 	}
 	
-	// Get vector column
+	// Validate identifiers (prevent SQL injection)
+	if err := validateIdentifier(req.Schema); err != nil {
+		return nil, fmt.Errorf("invalid schema name: %w", err)
+	}
+	if err := validateIdentifier(req.Collection); err != nil {
+		return nil, fmt.Errorf("invalid collection name: %w", err)
+	}
+	
+	// Get vector column (validates collection exists)
 	vectorCol, err := c.getVectorColumn(ctx, req.Schema, req.Collection)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find vector column: %w", err)
 	}
 	
-	// Convert query vector to SQL array format
+	// Validate vector column name
+	if err := validateIdentifier(vectorCol); err != nil {
+		return nil, fmt.Errorf("invalid vector column name: %w", err)
+	}
+	
+	// Convert query vector to SQL array format (safe - numeric array)
 	vectorStr := formatVector(req.QueryVector)
 	
-	// Build distance operator
+	// Build distance operator (safe - hardcoded values)
 	var distanceOp string
 	switch req.DistanceType {
 	case "l2":
@@ -225,7 +245,9 @@ func (c *Client) Search(ctx context.Context, req SearchRequest) ([]SearchResult,
 		distanceOp = "<=>" // Default to cosine
 	}
 	
-	// Build query
+	// Build query with validated identifiers
+	// Note: vectorStr is generated from numeric array, so safe to interpolate
+	// Identifiers are validated above, so safe to use in query
 	tableName := fmt.Sprintf("%s.%s", quoteIdentifier(req.Schema), quoteIdentifier(req.Collection))
 	query := fmt.Sprintf(`
 		SELECT *, 
@@ -236,6 +258,7 @@ func (c *Client) Search(ctx context.Context, req SearchRequest) ([]SearchResult,
 	`, quoteIdentifier(vectorCol), distanceOp, vectorStr, tableName, 
 		quoteIdentifier(vectorCol), distanceOp, vectorStr)
 	
+	// Execute query (limit is parameterized, vector is safe numeric string)
 	rows, err := c.db.QueryContext(ctx, query, req.Limit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute search: %w", err)
@@ -362,7 +385,90 @@ func (c *Client) ExecuteSQL(ctx context.Context, query string) (interface{}, err
 	return results, nil
 }
 
+// ExecuteSQLFull executes any SQL query (full database access)
+// This allows CREATE, INSERT, UPDATE, DELETE, DROP, etc.
+// Use with extreme caution - no safety checks are performed
+func (c *Client) ExecuteSQLFull(ctx context.Context, query string) (interface{}, error) {
+	queryUpper := strings.ToUpper(strings.TrimSpace(query))
+	
+	// Check if it's a SELECT query (return results)
+	if strings.HasPrefix(queryUpper, "SELECT") {
+		rows, err := c.db.QueryContext(ctx, query)
+		if err != nil {
+			return nil, fmt.Errorf("SQL execution failed: %w", err)
+		}
+		defer rows.Close()
+		
+		columns, err := rows.Columns()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get columns: %w", err)
+		}
+		
+		var results []map[string]interface{}
+		for rows.Next() {
+			values := make([]interface{}, len(columns))
+			valuePtrs := make([]interface{}, len(columns))
+			for i := range values {
+				valuePtrs[i] = &values[i]
+			}
+			
+			if err := rows.Scan(valuePtrs...); err != nil {
+				continue
+			}
+			
+			row := make(map[string]interface{})
+			for i, col := range columns {
+				val := values[i]
+				if bytes, ok := val.([]byte); ok {
+					var jsonVal interface{}
+					if err := json.Unmarshal(bytes, &jsonVal); err == nil {
+						row[col] = jsonVal
+					} else {
+						row[col] = string(bytes)
+					}
+				} else {
+					row[col] = val
+				}
+			}
+			results = append(results, row)
+		}
+		
+		return results, nil
+	}
+	
+	// For non-SELECT queries (INSERT, UPDATE, DELETE, CREATE, etc.)
+	// Execute the query and return affected rows count
+	result, err := c.db.ExecContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("SQL execution failed: %w", err)
+	}
+	
+	rowsAffected, _ := result.RowsAffected()
+	
+	return map[string]interface{}{
+		"rows_affected": rowsAffected,
+		"message": "Query executed successfully",
+	}, nil
+}
+
 // Helper functions
+
+// validateIdentifier validates that an identifier is safe to use in SQL
+// Only allows alphanumeric, underscore, and must start with letter/underscore
+var identifierRegex = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
+
+func validateIdentifier(name string) error {
+	if name == "" {
+		return fmt.Errorf("identifier cannot be empty")
+	}
+	if len(name) > 63 {
+		return fmt.Errorf("identifier too long (max 63 chars)")
+	}
+	if !identifierRegex.MatchString(name) {
+		return fmt.Errorf("identifier contains invalid characters: %s", name)
+	}
+	return nil
+}
 
 func quoteIdentifier(name string) string {
 	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`

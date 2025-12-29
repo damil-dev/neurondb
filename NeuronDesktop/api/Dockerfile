@@ -26,8 +26,8 @@ WORKDIR /root/
 # Copy the binary from builder
 COPY --from=builder /app/neurondesk-api .
 
-# Copy initial schema file
-COPY initial_schema.sql ./initial_schema.sql
+# Copy complete schema file
+COPY neurondesktop.sql ./neurondesktop.sql
 
 # Expose port
 EXPOSE 8081

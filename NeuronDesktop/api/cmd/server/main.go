@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -13,11 +14,14 @@ import (
 	"github.com/gorilla/mux"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/neurondb/NeuronDesktop/api/internal/auth"
+	"github.com/neurondb/NeuronDesktop/api/internal/auth/oidc"
 	"github.com/neurondb/NeuronDesktop/api/internal/config"
 	"github.com/neurondb/NeuronDesktop/api/internal/db"
 	"github.com/neurondb/NeuronDesktop/api/internal/handlers"
+	"github.com/neurondb/NeuronDesktop/api/internal/initialization"
 	"github.com/neurondb/NeuronDesktop/api/internal/logging"
 	"github.com/neurondb/NeuronDesktop/api/internal/middleware"
+	"github.com/neurondb/NeuronDesktop/api/internal/session"
 )
 
 func main() {
@@ -58,135 +62,81 @@ func main() {
 	
 	// Initialize components
 	queries := db.NewQueries(database)
-	keyManager := auth.NewAPIKeyManager(queries)
+	keyManager := auth.NewAPIKeyManager(queries) // Keep for backwards compatibility if needed
 	
-	// Ensure default profile exists on startup
+	// Validate JWT secret if JWT mode is enabled
+	if cfg.Auth.Mode == "jwt" || cfg.Auth.Mode == "hybrid" {
+		if cfg.Auth.JWTSecret == "" {
+			logger.Error("JWT_SECRET is required when using JWT authentication", fmt.Errorf("JWT_SECRET environment variable not set"), nil)
+			os.Exit(1)
+		}
+	}
+	
+	// Initialize session manager
+	sessionMgr := session.NewManager(
+		database,
+		cfg.Session.AccessTTL,
+		cfg.Session.RefreshTTL,
+		cfg.Session.CookieDomain,
+		cfg.Session.CookieSecure,
+		cfg.Session.CookieSameSite,
+	)
+	
+	// Initialize OIDC provider if configured
+	var oidcProvider *oidc.Provider
+	var oidcHandlers *handlers.OIDCHandlers
+	if cfg.Auth.Mode == "oidc" || cfg.Auth.Mode == "hybrid" {
+		if cfg.Auth.OIDC.IssuerURL != "" {
+			var err error
+			oidcProvider, err = oidc.NewProvider(
+				ctx,
+				cfg.Auth.OIDC.IssuerURL,
+				cfg.Auth.OIDC.ClientID,
+				cfg.Auth.OIDC.ClientSecret,
+				cfg.Auth.OIDC.RedirectURL,
+				cfg.Auth.OIDC.Scopes,
+			)
+			if err != nil {
+				logger.Error("Failed to initialize OIDC provider", err, nil)
+				// Continue without OIDC if it fails
+			} else {
+				oidcHandlers = handlers.NewOIDCHandlers(oidcProvider, sessionMgr, queries, cfg.Auth.OIDC.IssuerURL)
+				logger.Info("OIDC provider initialized", map[string]interface{}{
+					"issuer": cfg.Auth.OIDC.IssuerURL,
+				})
+			}
+		}
+	}
+	
+	// Bootstrap application (admin user, default profile, schema, connections)
 	initCtx, initCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer initCancel()
 	
-	defaultProfile, err := queries.GetDefaultProfile(initCtx)
-	if err != nil || defaultProfile == nil {
-		// Create default profile if it doesn't exist
-		logger.Info("Creating default profile", nil)
-		defaultProfile := &db.Profile{
-			UserID:      "nbduser",
-			Name:        "Default",
-			NeuronDBDSN: "postgresql://nbduser@localhost:5432/neurondb",
-			MCPConfig: map[string]interface{}{
-				"command": "/Users/pgedge/pge/neurondb/NeuronMCP/bin/neurondb-mcp",
-				"args":    []string{},
-				"env": map[string]interface{}{
-					"NEURONDB_HOST":     "localhost",
-					"NEURONDB_PORT":     "5432",
-					"NEURONDB_DATABASE": "neurondb",
-					"NEURONDB_USER":     "nbduser",
-				},
-			},
-			IsDefault: true,
-		}
-		
-		if err := queries.CreateProfile(initCtx, defaultProfile); err != nil {
-			logger.Error("Failed to create default profile", err, nil)
-		} else {
-			if err := queries.SetDefaultProfile(initCtx, defaultProfile.ID); err != nil {
-				logger.Error("Failed to set default profile", err, nil)
-			} else {
-				logger.Info("Default profile created successfully", map[string]interface{}{
-					"profile_id": defaultProfile.ID,
-					"name":       defaultProfile.Name,
-				})
-				defaultProfile, _ = queries.GetDefaultProfile(initCtx)
-			}
-		}
-	} else {
-		logger.Info("Default profile already exists", map[string]interface{}{
-			"profile_id": defaultProfile.ID,
-			"name":       defaultProfile.Name,
-		})
-	}
-	
-	// Verify connections on startup
-	if defaultProfile != nil {
-		logger.Info("Verifying connections for default profile", map[string]interface{}{
-			"profile_id": defaultProfile.ID,
-		})
-		
-		// Verify PostgreSQL (NeuronDB) connection
-		logger.Info("Verifying PostgreSQL (NeuronDB) connection", map[string]interface{}{
-			"dsn": defaultProfile.NeuronDBDSN,
-		})
-		neurondbConn, err := sql.Open("pgx", defaultProfile.NeuronDBDSN)
-		if err == nil {
-			testCtx, testCancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer testCancel()
-			if err := neurondbConn.PingContext(testCtx); err == nil {
-				logger.Info("✓ PostgreSQL (NeuronDB) connection verified", map[string]interface{}{
-					"dsn": defaultProfile.NeuronDBDSN,
-				})
-				// Test NeuronDB extension (optional - may not be installed)
-				var version string
-				if err := neurondbConn.QueryRowContext(testCtx, "SELECT neurondb.version()").Scan(&version); err == nil {
-					logger.Info("✓ NeuronDB extension verified", map[string]interface{}{
-						"version": version,
-					})
-				} else {
-					logger.Info("⚠ NeuronDB extension not found (database may not have extension installed)", nil)
-				}
-			} else {
-				logger.Info("⚠ PostgreSQL (NeuronDB) connection failed", map[string]interface{}{
-					"error": err.Error(),
-				})
-			}
-			neurondbConn.Close()
-		} else {
-			logger.Info("⚠ Failed to open PostgreSQL (NeuronDB) connection", map[string]interface{}{
-				"error": err.Error(),
-			})
-		}
-		
-		// Verify MCP server connection
-		if defaultProfile.MCPConfig != nil {
-			logger.Info("Verifying MCP server connection", map[string]interface{}{
-				"command": defaultProfile.MCPConfig["command"],
-			})
-			mcpManager := handlers.NewMCPManager(queries)
-			client, err := mcpManager.GetClient(initCtx, defaultProfile.ID)
-			if err == nil {
-				// Try to list tools to verify connection
-				tools, err := client.ListTools()
-				if err == nil {
-					logger.Info("✓ MCP server connection verified", map[string]interface{}{
-						"tools_count": len(tools.Tools),
-						"command":     defaultProfile.MCPConfig["command"],
-					})
-				} else {
-					logger.Info("⚠ MCP server connected but tools listing failed", map[string]interface{}{
-						"error": err.Error(),
-					})
-				}
-			} else {
-				logger.Info("⚠ MCP server connection failed", map[string]interface{}{
-					"error": err.Error(),
-				})
-			}
-		}
+	bootstrap := initialization.NewBootstrap(queries, logger)
+	if err := bootstrap.Initialize(initCtx); err != nil {
+		logger.Error("Failed to bootstrap application", err, nil)
+		// Continue anyway - some features may still work
 	}
 	
 	// Initialize handlers
+	authHandlers := handlers.NewAuthHandlers(queries)
 	mcpManager := handlers.NewMCPManager(queries)
 	mcpHandlers := handlers.NewMCPHandlers(mcpManager)
-	neurondbHandlers := handlers.NewNeuronDBHandlers(queries)
+	neurondbHandlers := handlers.NewNeuronDBHandlers(queries, cfg.Security.EnableSQLConsole)
 	agentHandlers := handlers.NewAgentHandlers(queries)
 	profileHandlers := handlers.NewProfileHandlers(queries)
 	metricsHandlers := handlers.NewMetricsHandlers()
+	factoryHandlers := handlers.NewFactoryHandlers(queries)
+	systemMetricsHandlers := handlers.NewSystemMetricsHandlers(logger)
 	
-	// Initialize rate limiter
-	rateLimiter := middleware.NewRateLimiter(100, 1*time.Minute)
+	// Initialize rate limiter (increased for development - 10000 requests per minute)
+	rateLimiter := middleware.NewRateLimiter(10000, 1*time.Minute)
 	
 	// Setup router
 	router := mux.NewRouter()
 	
-	// Apply middleware
+	// Apply middleware (order matters)
+	router.Use(middleware.RequestIDMiddleware())
 	router.Use(middleware.RecoveryMiddleware(logger))
 	router.Use(middleware.LoggingMiddleware(logger))
 	
@@ -200,10 +150,89 @@ func main() {
 		})
 	}).Methods("GET")
 	
+	// System metrics endpoints (no auth, public)
+	systemMetricsRouter := router.PathPrefix("/api/v1/system-metrics").Subrouter()
+	systemMetricsRouter.HandleFunc("", systemMetricsHandlers.GetSystemMetrics).Methods("GET")
+	systemMetricsRouter.HandleFunc("/ws", systemMetricsHandlers.SystemMetricsWebSocket).Methods("GET")
+	
+	// Database test handler (no auth required)
+	databaseTestHandlers := handlers.NewDatabaseTestHandlers()
+	
+	// Auth routes (no auth required)
+	authRouter := router.PathPrefix("/api/v1/auth").Subrouter()
+	// Handle OPTIONS for CORS preflight on auth routes
+	if cfg.Auth.EnableLocalAuth {
+		authRouter.HandleFunc("/register", func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == "OPTIONS" {
+				w.WriteHeader(http.StatusOK)
+				return
+			}
+			authHandlers.Register(w, r)
+		}).Methods("POST", "OPTIONS")
+		authRouter.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == "OPTIONS" {
+				w.WriteHeader(http.StatusOK)
+				return
+			}
+			authHandlers.Login(w, r)
+		}).Methods("POST", "OPTIONS")
+	}
+	
+	// OIDC routes
+	if oidcHandlers != nil {
+		authRouter.HandleFunc("/oidc/start", oidcHandlers.StartOIDCFlow).Methods("GET")
+		authRouter.HandleFunc("/oidc/callback", oidcHandlers.OIDCCallback).Methods("GET")
+		authRouter.HandleFunc("/refresh", oidcHandlers.RefreshToken).Methods("POST")
+	}
+	
+	// Logout route (requires auth)
+	authRouter.HandleFunc("/logout", func(w http.ResponseWriter, r *http.Request) {
+		if oidcHandlers != nil {
+			oidcHandlers.Logout(w, r)
+		} else {
+			// Fallback for JWT logout (just clear token on client)
+			handlers.WriteSuccess(w, map[string]interface{}{"message": "logged out"}, http.StatusOK)
+		}
+	}).Methods("POST")
+	
+	// Database test route (no auth required)
+	// Handle OPTIONS for CORS preflight
+	router.HandleFunc("/api/v1/database/test", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		databaseTestHandlers.TestConnection(w, r)
+	}).Methods("POST", "OPTIONS")
+	
 	// API routes (with auth and rate limiting)
 	apiRouter := router.PathPrefix("/api/v1").Subrouter()
-	apiRouter.Use(auth.Middleware(keyManager))
+	
+	// Use session middleware if OIDC is enabled, otherwise JWT
+	if cfg.Auth.Mode == "oidc" && oidcHandlers != nil {
+		apiRouter.Use(sessionMgr.SessionMiddleware())
+	} else if cfg.Auth.Mode == "hybrid" {
+		// Hybrid mode: try session first, fallback to JWT
+		apiRouter.Use(func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				// Try session first
+				if sessionMgr.GetAccessTokenFromRequest(r) != "" {
+					sessionMgr.SessionMiddleware()(next).ServeHTTP(w, r)
+					return
+				}
+				// Fallback to JWT
+				auth.JWTMiddleware()(next).ServeHTTP(w, r)
+			})
+		})
+	} else {
+		// JWT only mode
+		apiRouter.Use(auth.JWTMiddleware())
+	}
+	
 	apiRouter.Use(middleware.RateLimitMiddleware(rateLimiter))
+	
+	// Current user endpoint
+	apiRouter.HandleFunc("/auth/me", authHandlers.GetCurrentUser).Methods("GET")
 	
 	// API Key routes
 	apiKeyHandlers := handlers.NewAPIKeyHandlers(keyManager, queries)
@@ -211,12 +240,31 @@ func main() {
 	apiRouter.HandleFunc("/api-keys", apiKeyHandlers.ListAPIKeys).Methods("GET")
 	apiRouter.HandleFunc("/api-keys/{id}", apiKeyHandlers.DeleteAPIKey).Methods("DELETE")
 	
-	// Profile routes
-	apiRouter.HandleFunc("/profiles", profileHandlers.ListProfiles).Methods("GET")
-	apiRouter.HandleFunc("/profiles", profileHandlers.CreateProfile).Methods("POST")
-	apiRouter.HandleFunc("/profiles/{id}", profileHandlers.GetProfile).Methods("GET")
-	apiRouter.HandleFunc("/profiles/{id}", profileHandlers.UpdateProfile).Methods("PUT")
-	apiRouter.HandleFunc("/profiles/{id}", profileHandlers.DeleteProfile).Methods("DELETE")
+	// Profile routes (with OPTIONS support for CORS)
+	apiRouter.HandleFunc("/profiles", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		if r.Method == "GET" {
+			profileHandlers.ListProfiles(w, r)
+		} else if r.Method == "POST" {
+			profileHandlers.CreateProfile(w, r)
+		}
+	}).Methods("GET", "POST", "OPTIONS")
+	apiRouter.HandleFunc("/profiles/{id}", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		if r.Method == "GET" {
+			profileHandlers.GetProfile(w, r)
+		} else if r.Method == "PUT" {
+			profileHandlers.UpdateProfile(w, r)
+		} else if r.Method == "DELETE" {
+			profileHandlers.DeleteProfile(w, r)
+		}
+	}).Methods("GET", "PUT", "DELETE", "OPTIONS")
 	
 	// MCP routes
 	apiRouter.HandleFunc("/mcp/connections", mcpHandlers.ListConnections).Methods("GET")
@@ -225,10 +273,25 @@ func main() {
 	apiRouter.HandleFunc("/profiles/{profile_id}/mcp/tools/call", mcpHandlers.CallTool).Methods("POST")
 	apiRouter.HandleFunc("/profiles/{profile_id}/mcp/ws", mcpHandlers.MCPWebSocket).Methods("GET")
 	
+	// MCP Chat Thread routes
+	apiRouter.HandleFunc("/profiles/{profile_id}/mcp/threads", mcpHandlers.ListThreads).Methods("GET")
+	apiRouter.HandleFunc("/profiles/{profile_id}/mcp/threads", mcpHandlers.CreateThread).Methods("POST")
+	apiRouter.HandleFunc("/profiles/{profile_id}/mcp/threads/{thread_id}", mcpHandlers.GetThread).Methods("GET")
+	apiRouter.HandleFunc("/profiles/{profile_id}/mcp/threads/{thread_id}", mcpHandlers.UpdateThread).Methods("PUT")
+	apiRouter.HandleFunc("/profiles/{profile_id}/mcp/threads/{thread_id}", mcpHandlers.DeleteThread).Methods("DELETE")
+	apiRouter.HandleFunc("/profiles/{profile_id}/mcp/threads/{thread_id}/messages", mcpHandlers.AddMessage).Methods("POST")
+	
 	// NeuronDB routes
 	apiRouter.HandleFunc("/profiles/{profile_id}/neurondb/collections", neurondbHandlers.ListCollections).Methods("GET")
 	apiRouter.HandleFunc("/profiles/{profile_id}/neurondb/search", neurondbHandlers.Search).Methods("POST")
 	apiRouter.HandleFunc("/profiles/{profile_id}/neurondb/sql", neurondbHandlers.ExecuteSQL).Methods("POST")
+	apiRouter.HandleFunc("/profiles/{profile_id}/neurondb/sql/execute", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		neurondbHandlers.ExecuteSQLFull(w, r)
+	}).Methods("POST", "OPTIONS")
 	
 	// Agent routes
 	apiRouter.HandleFunc("/agent/test", agentHandlers.TestAgentConfig).Methods("POST")
@@ -237,7 +300,10 @@ func main() {
 	apiRouter.HandleFunc("/profiles/{profile_id}/agent/agents/{agent_id}", agentHandlers.GetAgent).Methods("GET")
 	apiRouter.HandleFunc("/profiles/{profile_id}/agent/models", agentHandlers.ListModels).Methods("GET")
 	apiRouter.HandleFunc("/profiles/{profile_id}/agent/sessions", agentHandlers.CreateSession).Methods("POST")
+	apiRouter.HandleFunc("/profiles/{profile_id}/agent/agents/{agent_id}/sessions", agentHandlers.ListSessions).Methods("GET")
+	apiRouter.HandleFunc("/profiles/{profile_id}/agent/sessions/{session_id}", agentHandlers.GetSession).Methods("GET")
 	apiRouter.HandleFunc("/profiles/{profile_id}/agent/sessions/{session_id}/messages", agentHandlers.SendMessage).Methods("POST")
+	apiRouter.HandleFunc("/profiles/{profile_id}/agent/sessions/{session_id}/messages", agentHandlers.GetMessages).Methods("GET")
 	apiRouter.HandleFunc("/profiles/{profile_id}/agent/ws", agentHandlers.AgentWebSocket).Methods("GET")
 	
 	// Model configuration routes
@@ -253,39 +319,77 @@ func main() {
 	apiRouter.HandleFunc("/metrics", metricsHandlers.GetMetrics).Methods("GET")
 	apiRouter.HandleFunc("/metrics/reset", metricsHandlers.ResetMetrics).Methods("POST")
 	
-	// CORS middleware
-	router.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			origin := r.Header.Get("Origin")
-			allowed := false
-			for _, allowedOrigin := range cfg.CORS.AllowedOrigins {
-				if allowedOrigin == "*" || allowedOrigin == origin {
-					allowed = true
-					break
-				}
+	// Factory endpoints
+	apiRouter.HandleFunc("/factory/status", factoryHandlers.GetFactoryStatus).Methods("GET")
+	apiRouter.HandleFunc("/factory/setup-state", factoryHandlers.GetSetupState).Methods("GET")
+	apiRouter.HandleFunc("/factory/setup-state", factoryHandlers.SetSetupState).Methods("POST")
+	
+	// CORS handler wrapper
+	//
+	// Important: we wrap the router at the HTTP handler level (instead of router.Use),
+	// so CORS headers and OPTIONS preflight responses work even when gorilla/mux would
+	// otherwise return 404 for method-mismatches (e.g. OPTIONS on a GET-only route).
+	corsHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Check if this is a WebSocket upgrade request
+		// WebSocket upgrades need direct access to the underlying connection (Hijacker interface)
+		// so we bypass the CORS wrapper for WebSocket requests
+		if r.Header.Get("Upgrade") == "websocket" {
+			router.ServeHTTP(w, r)
+			return
+		}
+
+		origin := r.Header.Get("Origin")
+		allowed := false
+		allowAll := false
+
+		// Check if origin is allowed
+		for _, allowedOrigin := range cfg.CORS.AllowedOrigins {
+			if allowedOrigin == "*" {
+				allowAll = true
+				allowed = true
+				break
+			} else if allowedOrigin == origin {
+				allowed = true
+				break
 			}
-			if allowed {
+		}
+
+		// Set CORS headers
+		if allowed {
+			// If "*" is allowed, use the actual origin (required when credentials are allowed)
+			if allowAll && origin != "" {
+				w.Header().Set("Access-Control-Allow-Origin", origin)
+			} else if allowAll {
+				// If "*" is allowed but no origin header, allow all (but can't use credentials)
+				w.Header().Set("Access-Control-Allow-Origin", "*")
+				// Don't set credentials when using wildcard
+			} else if origin != "" {
 				w.Header().Set("Access-Control-Allow-Origin", origin)
 			}
-			
-			w.Header().Set("Access-Control-Allow-Methods", joinStrings(cfg.CORS.AllowedMethods, ", "))
-			w.Header().Set("Access-Control-Allow-Headers", joinStrings(cfg.CORS.AllowedHeaders, ", "))
+		}
+
+		// Only set credentials if we're using a specific origin (not "*")
+		if allowed && (!allowAll || origin != "") {
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
-			
-			if r.Method == "OPTIONS" {
-				w.WriteHeader(http.StatusOK)
-				return
-			}
-			
-			next.ServeHTTP(w, r)
-		})
+		}
+
+		w.Header().Set("Access-Control-Allow-Methods", joinStrings(cfg.CORS.AllowedMethods, ", "))
+		w.Header().Set("Access-Control-Allow-Headers", joinStrings(cfg.CORS.AllowedHeaders, ", "))
+
+		// Preflight
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		router.ServeHTTP(w, r)
 	})
 	
 	// Create HTTP server
 	addr := cfg.Server.Host + ":" + cfg.Server.Port
 	srv := &http.Server{
 		Addr:         addr,
-		Handler:      router,
+		Handler:      corsHandler,
 		ReadTimeout:  cfg.Server.ReadTimeout,
 		WriteTimeout: cfg.Server.WriteTimeout,
 	}

@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -39,7 +40,8 @@ func NewClient(config MCPConfig) (*Client, error) {
 	
 	cmd := exec.CommandContext(ctx, config.Command, config.Args...)
 	
-	// Set environment variables
+	// Start with current environment, then add/override with config.Env
+	cmd.Env = os.Environ()
 	for k, v := range config.Env {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, v))
 	}
@@ -93,13 +95,15 @@ func NewClient(config MCPConfig) (*Client, error) {
 	return client, nil
 }
 
-// initialize performs the MCP initialize handshake
+// initialize performs the MCP initialize handshake (like Claude Desktop)
 func (c *Client) initialize() error {
 	req := InitializeRequest{
 		ProtocolVersion: ProtocolVersion,
 		Capabilities: map[string]interface{}{
 			"tools":     map[string]interface{}{},
 			"resources": map[string]interface{}{},
+			"prompts":   map[string]interface{}{},
+			"sampling":  map[string]interface{}{},
 		},
 		ClientInfo: map[string]interface{}{
 			"name":    "neurondesk",
@@ -161,12 +165,13 @@ func (c *Client) Call(method string, params interface{}) (interface{}, error) {
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 	
-	// Write request (MCP uses newline-delimited JSON)
+	// Write request (MCP uses Content-Length headers)
+	header := fmt.Sprintf("Content-Length: %d\r\n\r\n", len(reqBytes))
+	if _, err := c.stdin.Write([]byte(header)); err != nil {
+		return nil, fmt.Errorf("failed to write header: %w", err)
+	}
 	if _, err := c.stdin.Write(reqBytes); err != nil {
 		return nil, fmt.Errorf("failed to write request: %w", err)
-	}
-	if _, err := c.stdin.Write([]byte("\n")); err != nil {
-		return nil, fmt.Errorf("failed to write newline: %w", err)
 	}
 	
 	// Wait for response with timeout
@@ -199,11 +204,13 @@ func (c *Client) Notify(method string, params interface{}) error {
 		return fmt.Errorf("failed to marshal notification: %w", err)
 	}
 	
+	// Write notification (MCP uses Content-Length headers)
+	header := fmt.Sprintf("Content-Length: %d\r\n\r\n", len(reqBytes))
+	if _, err := c.stdin.Write([]byte(header)); err != nil {
+		return fmt.Errorf("failed to write header: %w", err)
+	}
 	if _, err := c.stdin.Write(reqBytes); err != nil {
 		return fmt.Errorf("failed to write notification: %w", err)
-	}
-	if _, err := c.stdin.Write([]byte("\n")); err != nil {
-		return fmt.Errorf("failed to write newline: %w", err)
 	}
 	
 	return nil
@@ -212,25 +219,54 @@ func (c *Client) Notify(method string, params interface{}) error {
 // readResponses reads JSON-RPC responses from stdout
 func (c *Client) readResponses() {
 	for {
-		line, err := c.stdout.ReadBytes('\n')
-		if err != nil {
+		// Read Content-Length header
+		var contentLength int
+		for {
+			line, err := c.stdout.ReadString('\n')
+			if err != nil {
+				if err == io.EOF {
+					return
+				}
+				// Handle error - notify all pending requests
+				c.mu.Lock()
+				for _, ch := range c.requests {
+					select {
+					case ch <- nil:
+					default:
+					}
+				}
+				c.mu.Unlock()
+				return
+			}
+			
+			line = strings.TrimRight(line, "\r\n")
+			
+			// Empty line means end of headers
+			if line == "" {
+				break
+			}
+			
+			// Parse Content-Length
+			if strings.HasPrefix(strings.ToLower(line), "content-length:") {
+				fmt.Sscanf(line, "Content-Length: %d", &contentLength)
+			}
+		}
+		
+		if contentLength <= 0 {
+			continue
+		}
+		
+		// Read message body
+		body := make([]byte, contentLength)
+		if _, err := io.ReadFull(c.stdout, body); err != nil {
 			if err == io.EOF {
 				return
 			}
-			// Handle error - notify all pending requests
-			c.mu.Lock()
-			for _, ch := range c.requests {
-				select {
-				case ch <- nil:
-				default:
-				}
-			}
-			c.mu.Unlock()
-			return
+			continue
 		}
 		
 		var resp JSONRPCResponse
-		if err := json.Unmarshal(line, &resp); err != nil {
+		if err := json.Unmarshal(body, &resp); err != nil {
 			continue // Skip malformed responses
 		}
 		
@@ -307,6 +343,83 @@ func (c *Client) ListResources() (*ListResourcesResponse, error) {
 	}
 	
 	return &resourcesResp, nil
+}
+
+// ReadResource reads a resource from the MCP server
+func (c *Client) ReadResource(uri string) (*ReadResourceResponse, error) {
+	req := ReadResourceRequest{
+		URI: uri,
+	}
+	
+	resp, err := c.Call("resources/read", req)
+	if err != nil {
+		return nil, err
+	}
+	
+	respBytes, _ := json.Marshal(resp)
+	var resourceResp ReadResourceResponse
+	if err := json.Unmarshal(respBytes, &resourceResp); err != nil {
+		return nil, fmt.Errorf("failed to parse resources/read response: %w", err)
+	}
+	
+	return &resourceResp, nil
+}
+
+// ListPrompts lists available prompts from the MCP server
+func (c *Client) ListPrompts() (*ListPromptsResponse, error) {
+	resp, err := c.Call("prompts/list", nil)
+	if err != nil {
+		return nil, err
+	}
+	
+	respBytes, _ := json.Marshal(resp)
+	var promptsResp ListPromptsResponse
+	if err := json.Unmarshal(respBytes, &promptsResp); err != nil {
+		return nil, fmt.Errorf("failed to parse prompts/list response: %w", err)
+	}
+	
+	return &promptsResp, nil
+}
+
+// GetPrompt gets a prompt from the MCP server
+func (c *Client) GetPrompt(name string, arguments map[string]interface{}) (*GetPromptResponse, error) {
+	req := GetPromptRequest{
+		Name:      name,
+		Arguments: arguments,
+	}
+	
+	resp, err := c.Call("prompts/get", req)
+	if err != nil {
+		return nil, err
+	}
+	
+	respBytes, _ := json.Marshal(resp)
+	var promptResp GetPromptResponse
+	if err := json.Unmarshal(respBytes, &promptResp); err != nil {
+		return nil, fmt.Errorf("failed to parse prompts/get response: %w", err)
+	}
+	
+	return &promptResp, nil
+}
+
+// CreateMessage uses MCP sampling/createMessage for chat (like Claude Desktop)
+func (c *Client) CreateMessage(messages []map[string]interface{}, model string, temperature float64) (interface{}, error) {
+	params := map[string]interface{}{
+		"messages": messages,
+	}
+	if model != "" {
+		params["model"] = model
+	}
+	if temperature > 0 {
+		params["temperature"] = temperature
+	}
+	
+	resp, err := c.Call("sampling/createMessage", params)
+	if err != nil {
+		return nil, err
+	}
+	
+	return resp, nil
 }
 
 // Close shuts down the MCP client and process

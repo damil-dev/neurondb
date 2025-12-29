@@ -31,7 +31,7 @@ func (h *APIKeyHandlers) GenerateAPIKey(w http.ResponseWriter, r *http.Request) 
 	}
 	
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		WriteError(w, http.StatusBadRequest, err, nil)
+		WriteError(w, r, http.StatusBadRequest, err, nil)
 		return
 	}
 	
@@ -41,7 +41,7 @@ func (h *APIKeyHandlers) GenerateAPIKey(w http.ResponseWriter, r *http.Request) 
 	
 	key, apiKey, err := h.keyManager.GenerateAPIKey(r.Context(), req.UserID, req.RateLimit)
 	if err != nil {
-		WriteError(w, http.StatusInternalServerError, err, nil)
+		WriteError(w, r, http.StatusInternalServerError, err, nil)
 		return
 	}
 	
@@ -62,7 +62,7 @@ func (h *APIKeyHandlers) ListAPIKeys(w http.ResponseWriter, r *http.Request) {
 	// Query all API keys from database using queries helper
 	keys, err := h.queries.GetAllAPIKeys(r.Context())
 	if err != nil {
-		WriteError(w, http.StatusInternalServerError, err, nil)
+		WriteError(w, r, http.StatusInternalServerError, err, nil)
 		return
 	}
 	
@@ -89,7 +89,7 @@ func (h *APIKeyHandlers) DeleteAPIKey(w http.ResponseWriter, r *http.Request) {
 	keyID := vars["id"]
 	
 	if err := h.keyManager.DeleteAPIKey(r.Context(), keyID); err != nil {
-		WriteError(w, http.StatusInternalServerError, err, nil)
+		WriteError(w, r, http.StatusInternalServerError, err, nil)
 		return
 	}
 	

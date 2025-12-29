@@ -9,6 +9,8 @@ type Profile struct {
 	ID              string                 `json:"id"`
 	Name            string                 `json:"name"`
 	UserID          string                 `json:"user_id"`
+	ProfileUsername string                 `json:"profile_username,omitempty"` // Username for this profile
+	ProfilePassword string                 `json:"-"` // Password hash (never serialize)
 	MCPConfig      map[string]interface{} `json:"mcp_config"`
 	NeuronDBDSN     string                 `json:"neurondb_dsn"`
 	AgentEndpoint   string                 `json:"agent_endpoint,omitempty"`
@@ -57,5 +59,22 @@ type ModelConfig struct {
 	Metadata    map[string]interface{} `json:"metadata,omitempty"`
 	CreatedAt   time.Time              `json:"created_at"`
 	UpdatedAt   time.Time              `json:"updated_at"`
+}
+
+// AppSetting represents an application setting
+type AppSetting struct {
+	Key       string                 `json:"key"`
+	Value     map[string]interface{} `json:"value"`
+	UpdatedAt time.Time              `json:"updated_at"`
+}
+
+// User represents a user account
+type User struct {
+	ID           string    `json:"id"`
+	Username     string    `json:"username"`
+	IsAdmin      bool      `json:"is_admin"`
+	PasswordHash string    `json:"-"` // Never serialize password hash
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 
