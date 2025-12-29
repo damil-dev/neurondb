@@ -14,7 +14,7 @@ URL: https://www.neurondb.ai
 Vendor: neurondb
 Packager: neurondb <admin@neurondb.com>
 
-Requires: postgresql >= 16, ca-certificates
+Requires: postgresql16 >= 16.0 | postgresql17 >= 17.0 | postgresql18 >= 18.0 | postgresql >= 16, ca-certificates
 BuildRequires: golang >= 1.23
 
 %description

@@ -2,12 +2,57 @@
 
 # Post-install script for NeuronAgent macOS package
 
+# Create neuronagent user and group if they don't exist
+if ! dscl . -read /Groups/neuronagent > /dev/null 2>&1; then
+    dscl . -create /Groups/neuronagent
+    dscl . -create /Groups/neuronagent gid 500
+fi
+
+if ! dscl . -read /Users/neuronagent > /dev/null 2>&1; then
+    dscl . -create /Users/neuronagent
+    dscl . -create /Users/neuronagent UserShell /usr/bin/false
+    dscl . -create /Users/neuronagent RealName "NeuronAgent service user"
+    dscl . -create /Users/neuronagent UniqueID 500
+    dscl . -create /Users/neuronagent PrimaryGroupID 500
+    dscl . -create /Users/neuronagent NFSHomeDirectory /var/lib/neuronagent
+fi
+
+# Create directories
+mkdir -p /var/lib/neuronagent
+mkdir -p /var/log/neuronagent
+
+# Set permissions
+chown -R neuronagent:neuronagent /var/lib/neuronagent
+chown -R neuronagent:neuronagent /var/log/neuronagent
+chmod 755 /var/lib/neuronagent
+chmod 755 /var/log/neuronagent
+
+# If config doesn't exist, copy example
+if [ ! -f /etc/neuronagent/config.yaml ]; then
+    if [ -f /etc/neuronagent/config.yaml.example ]; then
+        cp /etc/neuronagent/config.yaml.example /etc/neuronagent/config.yaml
+        chown neuronagent:neuronagent /etc/neuronagent/config.yaml
+        chmod 640 /etc/neuronagent/config.yaml
+        echo "Created /etc/neuronagent/config.yaml from example"
+        echo "Please edit /etc/neuronagent/config.yaml to configure your database connection"
+    fi
+fi
+
+# Set permissions on launchd plist
+if [ -f /Library/LaunchDaemons/com.neurondb.neuronagent.plist ]; then
+    chown root:wheel /Library/LaunchDaemons/com.neurondb.neuronagent.plist
+    chmod 644 /Library/LaunchDaemons/com.neurondb.neuronagent.plist
+fi
+
 echo "NeuronAgent installed successfully."
 echo ""
-echo "Configuration file: /etc/neuronagent/config.yaml.example"
-echo "Copy it to config.yaml and edit as needed:"
-echo "  sudo cp /etc/neuronagent/config.yaml.example /etc/neuronagent/config.yaml"
+echo "Configuration: /etc/neuronagent/config.yaml"
+echo "Logs: /var/log/neuronagent/"
 echo ""
-echo "To run NeuronAgent:"
-echo "  /usr/local/bin/neuronagent"
+echo "To start the service:"
+echo "  sudo launchctl load /Library/LaunchDaemons/com.neurondb.neuronagent.plist"
+echo "  sudo launchctl start com.neurondb.neuronagent"
+echo ""
+echo "To check status:"
+echo "  sudo launchctl list | grep neuronagent"
 

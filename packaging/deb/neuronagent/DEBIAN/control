@@ -3,7 +3,7 @@ Version: 1.0.0.beta
 Section: database
 Priority: optional
 Architecture: amd64
-Depends: postgresql-client, ca-certificates, libc6 (>= 2.17)
+Depends: postgresql-client-16 | postgresql-client-17 | postgresql-client-18 | postgresql-client (>= 16), ca-certificates, libc6 (>= 2.17)
 Maintainer: neurondb <admin@neurondb.com>
 Description: NeuronAgent - AI Agent Runtime System
  NeuronAgent is a production-ready AI agent runtime system that provides

@@ -109,6 +109,22 @@ if [ -n "$DEB_FILE" ]; then
 fi
 echo ""
 
+# Build NeuronDesktop
+echo "Building NeuronDesktop DEB package..."
+cd "$SCRIPT_DIR/neurondesktop"
+export VERSION="$VERSION"
+./build.sh
+if [ $? -ne 0 ]; then
+    echo "Error: NeuronDesktop DEB build failed"
+    exit 1
+fi
+# Place package in repo structure
+DEB_FILE=$(ls -1 "$SCRIPT_DIR/neurondesktop"/*.deb 2>/dev/null | head -1)
+if [ -n "$DEB_FILE" ]; then
+    place_deb_in_repo "$DEB_FILE" "neurondesktop"
+fi
+echo ""
+
 echo "=========================================="
 echo "All DEB packages built successfully!"
 echo "=========================================="

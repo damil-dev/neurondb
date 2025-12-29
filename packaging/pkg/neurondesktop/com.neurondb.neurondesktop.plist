@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.neurondb.neurondesktop</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/neurondesktop-api</string>
+    </array>
+    <key>RunAtLoad</key>
+    <false/>
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>/var/log/neurondesktop/neurondesktop.log</string>
+    <key>StandardErrorPath</key>
+    <string>/var/log/neurondesktop/neurondesktop.error.log</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>CONFIG_PATH</key>
+        <string>/etc/neurondesktop/config.yaml</string>
+    </dict>
+    <key>WorkingDirectory</key>
+    <string>/var/lib/neurondesktop</string>
+    <key>UserName</key>
+    <string>neurondesktop</string>
+</dict>
+</plist>
+
+

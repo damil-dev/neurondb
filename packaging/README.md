@@ -4,11 +4,43 @@ This directory contains scripts to build DEB (Debian/Ubuntu), RPM (RHEL/CentOS/R
 
 ## Components
 
-Three separate packages are provided:
+The NeuronDB ecosystem consists of two types of components with different installation requirements:
+
+Four separate packages are provided:
+
+### PostgreSQL Extension
 
 - **neurondb**: PostgreSQL extension for vector search and ML
+  - **Installation Type**: Extension files placed in PostgreSQL directories
+  - **Dependency**: Requires appropriate PostgreSQL version (16, 17, or 18)
+  - **Location**: Files installed to PostgreSQL extension directories:
+    - Linux: `/usr/lib/postgresql/*/lib/` and `/usr/share/postgresql/*/extension/`
+    - macOS: `/opt/homebrew/opt/postgresql@*/lib/` and `/opt/homebrew/opt/postgresql@*/share/postgresql/extension/`
+  - **Activation**: Must be enabled per database with `CREATE EXTENSION neurondb;`
+  - **No Service**: Does not run as a service - it's part of PostgreSQL
+
+### Applications (Services)
+
+These are standalone applications that must be installed and configured as OS services:
+
 - **neuronagent**: AI agent runtime system with REST API
+  - **Installation Type**: Application binary + system service
+  - **Service Type**: 
+    - Linux: systemd service (`/etc/systemd/system/neuronagent.service`)
+    - macOS: launchd service (plist file)
+  - **Auto-start**: Service is enabled but not started by default (requires configuration)
+
 - **neuronmcp**: Model Context Protocol server
+  - **Installation Type**: Application binary (typically used via stdio, not as a service)
+  - **Service Type**: Optional systemd/launchd service for background operation
+  - **Usage**: Primarily used by MCP clients via stdio communication
+
+- **neurondesktop**: Unified web interface dashboard
+  - **Installation Type**: Application binary + frontend + system service
+  - **Service Type**:
+    - Linux: systemd service (`/etc/systemd/system/neurondesktop.service`)
+    - macOS: launchd service (plist file)
+  - **Auto-start**: Service is enabled but not started by default (requires configuration)
 
 ## Configuration
 
@@ -95,6 +127,41 @@ cp build-config.cuda.json build-config.json
 ./build-all-deb.sh
 ```
 
+## Package Dependencies
+
+### NeuronDB Extension Package
+
+**Strict PostgreSQL Version Requirements:**
+- **DEB**: Requires `postgresql-16 (>= 16.0) | postgresql-17 (>= 17.0) | postgresql-18 (>= 18.0)`
+- **RPM**: Requires `postgresql16-server >= 16.0 | postgresql17-server >= 17.0 | postgresql18-server >= 18.0`
+
+**Required Shared Libraries:**
+- `libc6` (>= 2.17) - Standard C library
+- `libcurl4` (>= 7.16.2) - HTTP client library for ML model runtime
+- `libssl3` (>= 3.0.0) | `libssl1.1` (>= 1.1.0) - OpenSSL for encryption
+- `zlib1g` (>= 1:1.2.3.4) - Compression library
+
+**Important Notes:**
+- The extension is built for specific PostgreSQL versions (16, 17, or 18)
+- The package installs extension files for all PostgreSQL versions found during build
+- At least one supported PostgreSQL version must be installed
+- Extension files are version-specific and must match the PostgreSQL server version
+
+### Application Packages (NeuronAgent, NeuronMCP, NeuronDesktop)
+
+**PostgreSQL Client Requirements:**
+- **DEB**: Requires `postgresql-client-16 | postgresql-client-17 | postgresql-client-18 | postgresql-client (>= 16)`
+- **RPM**: Requires `postgresql16 >= 16.0 | postgresql17 >= 17.0 | postgresql18 >= 18.0 | postgresql >= 16`
+
+**Required Shared Libraries:**
+- `libc6` (>= 2.17) - Standard C library
+- `ca-certificates` - SSL certificate bundle for HTTPS connections
+
+**Important Notes:**
+- Applications connect to PostgreSQL via client libraries
+- They require PostgreSQL 16, 17, or 18 client libraries
+- The client version should match or be compatible with the server version
+
 ## Prerequisites
 
 ### For DEB Packages
@@ -103,11 +170,17 @@ cp build-config.cuda.json build-config.json
 # Ubuntu/Debian
 sudo apt-get install -y dpkg-dev fakeroot build-essential
 
-# For NeuronDB
+# For NeuronDB (build-time)
 sudo apt-get install -y postgresql-server-dev-16 postgresql-server-dev-17 postgresql-server-dev-18
 
-# For Go services (NeuronAgent, NeuronMCP)
+# For NeuronDB (runtime - at least one required)
+sudo apt-get install -y postgresql-16 | postgresql-17 | postgresql-18
+
+# For Go services (NeuronAgent, NeuronMCP, NeuronDesktop)
 sudo apt-get install -y golang-go  # Or install Go 1.23+ from golang.org
+
+# For NeuronDesktop (also requires Node.js)
+sudo apt-get install -y nodejs npm  # Node.js 18+ required
 ```
 
 ### For RPM Packages
@@ -116,11 +189,17 @@ sudo apt-get install -y golang-go  # Or install Go 1.23+ from golang.org
 # RHEL/CentOS/Rocky
 sudo dnf install -y rpm-build gcc make
 
-# For NeuronDB
-sudo dnf install -y postgresql17-devel postgresql16-devel postgresql18-devel
+# For NeuronDB (build-time)
+sudo dnf install -y postgresql16-devel postgresql17-devel postgresql18-devel
 
-# For Go services
+# For NeuronDB (runtime - at least one required)
+sudo dnf install -y postgresql16-server | postgresql17-server | postgresql18-server
+
+# For Go services (NeuronAgent, NeuronMCP, NeuronDesktop)
 sudo dnf install -y golang  # Or install Go 1.23+ from golang.org
+
+# For NeuronDesktop (also requires Node.js)
+sudo dnf install -y nodejs npm  # Node.js 18+ required
 ```
 
 ### For macOS Packages (.pkg)
@@ -132,11 +211,14 @@ xcode-select --install
 # Install Homebrew if not already installed
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
-# For NeuronDB - install PostgreSQL via Homebrew
-brew install postgresql@17  # or postgresql@16, postgresql@18
+# For NeuronDB - install PostgreSQL via Homebrew (at least one required)
+brew install postgresql@16 | postgresql@17 | postgresql@18
 
-# For Go services - install Go
+# For Go services (NeuronAgent, NeuronMCP, NeuronDesktop) - install Go
 brew install go  # Or install Go 1.23+ from golang.org
+
+# For NeuronDesktop (also requires Node.js)
+brew install node  # Node.js 18+ required
 ```
 
 ## Building Packages
@@ -199,6 +281,20 @@ cd packaging/pkg/neuronmcp
 ./build.sh
 ```
 
+**NeuronDesktop:**
+```bash
+cd packaging/deb/neurondesktop
+./build.sh
+
+# Or for RPM
+cd packaging/rpm/neurondesktop
+./build.sh
+
+# Or for macOS
+cd packaging/pkg/neurondesktop
+./build.sh
+```
+
 ## Package Contents
 
 ### NeuronDB Package
@@ -225,60 +321,102 @@ cd packaging/pkg/neuronmcp
 - **User**: `neuronmcp` (Linux only, created automatically)
 - **Directories**: `/var/lib/neuronmcp`, `/var/log/neuronmcp` (Linux only)
 
+### NeuronDesktop Package
+
+- **Binary**: `/usr/bin/neurondesktop-api` (Linux) or `/usr/local/bin/neurondesktop-api` (macOS)
+- **Frontend**: `/var/www/neurondesktop/` (production build)
+- **Configuration**: `/etc/neurondesktop/config.yaml`
+- **Systemd service**: `/etc/systemd/system/neurondesktop.service` (Linux only)
+- **Launchd service**: `/Library/LaunchDaemons/com.neurondb.neurondesktop.plist` (macOS only)
+- **User**: `neurondesktop` (created automatically)
+- **Directories**: `/var/lib/neurondesktop`, `/var/log/neurondesktop`, `/var/www/neurondesktop`
+
 ## Installation
 
 ### DEB Packages (Ubuntu/Debian)
 
+**Important**: Before installing, ensure you have at least one PostgreSQL version (16, 17, or 18) installed:
+
 ```bash
+# Install PostgreSQL (at least one version required)
+sudo apt-get install -y postgresql-16 | postgresql-17 | postgresql-18
+
 # Install all packages
 sudo dpkg -i neurondb_1.0.0.beta_amd64.deb
 sudo dpkg -i neuronagent_1.0.0.beta_amd64.deb
 sudo dpkg -i neuronmcp_1.0.0.beta_amd64.deb
+sudo dpkg -i neurondesktop_1.0.0.beta_amd64.deb
 
 # Fix any missing dependencies
 sudo apt-get install -f
 ```
 
+**Note**: The `neurondb` package requires at least one PostgreSQL server version (16, 17, or 18) to be installed. The package will install extension files for all PostgreSQL versions found on the system.
+
 ### RPM Packages (RHEL/CentOS/Rocky)
 
+**Important**: Before installing, ensure you have at least one PostgreSQL version (16, 17, or 18) installed:
+
 ```bash
+# Install PostgreSQL (at least one version required)
+sudo dnf install -y postgresql16-server | postgresql17-server | postgresql18-server
+
 # Install all packages
 sudo rpm -ivh neurondb-1.0.0.beta-1.el*.rpm
 sudo rpm -ivh neuronagent-1.0.0.beta-1.el*.rpm
 sudo rpm -ivh neuronmcp-1.0.0.beta-1.el*.rpm
+sudo rpm -ivh neurondesktop-1.0.0.beta-1.el*.rpm
 ```
+
+**Note**: The `neurondb` package requires at least one PostgreSQL server version (16, 17, or 18) to be installed. The package will install extension files for all PostgreSQL versions found on the system.
 
 ### macOS Packages (.pkg)
 
+**Important**: Before installing, ensure you have at least one PostgreSQL version (16, 17, or 18) installed via Homebrew:
+
 ```bash
+# Install PostgreSQL (at least one version required)
+brew install postgresql@16 | postgresql@17 | postgresql@18
+
 # Install individual packages
 sudo installer -pkg neurondb-1.0.0.beta-arm64.pkg -target /
 sudo installer -pkg neuronagent-1.0.0.beta-arm64.pkg -target /
 sudo installer -pkg neuronmcp-1.0.0.beta-arm64.pkg -target /
+sudo installer -pkg neurondesktop-1.0.0.beta-arm64.pkg -target /
 
 # Or use the installer GUI by double-clicking the .pkg file
 ```
 
+**Note**: The `neurondb` package requires at least one PostgreSQL version (16, 17, or 18) to be installed. The package will install extension files for all PostgreSQL versions found on the system.
+
 ## Post-Installation
 
-### NeuronDB
+### NeuronDB (PostgreSQL Extension)
 
-1. Connect to your PostgreSQL database:
+**Important**: NeuronDB is a PostgreSQL extension, not a service. It only needs to be placed in the correct PostgreSQL directories (which the package does automatically). The extension must be enabled per database.
+
+1. The package installs files to PostgreSQL extension directories for each PostgreSQL version (16, 17, 18) found on the system.
+
+2. Connect to your PostgreSQL database:
    ```bash
    psql -d your_database
    ```
 
-2. Create the extension:
+3. Create the extension in your database:
    ```sql
    CREATE EXTENSION neurondb;
    ```
 
-3. Verify installation:
+4. Verify installation:
    ```sql
    SELECT neurondb.version();
    ```
 
-### NeuronAgent
+**Note**: The extension is version-specific. If you have multiple PostgreSQL versions installed, the package installs the extension for all of them. Use the appropriate `pg_config` path when building, or install packages built for your specific PostgreSQL version.
+
+### NeuronAgent (Application Service)
+
+**Important**: NeuronAgent is an application that runs as a system service. It must be configured and started as a service on your OS.
 
 1. Configure database connection:
    ```bash
@@ -288,15 +426,17 @@ sudo installer -pkg neuronmcp-1.0.0.beta-arm64.pkg -target /
    # macOS
    sudo nano /etc/neuronagent/config.yaml
    ```
+   Edit the database connection parameters in the config file.
 
 2. Start the service:
    ```bash
    # Linux (systemd)
    sudo systemctl start neuronagent
-   sudo systemctl enable neuronagent
+   sudo systemctl enable neuronagent  # Enable auto-start on boot
    
-   # macOS (run manually or use launchd)
-   /usr/local/bin/neuronagent
+   # macOS (launchd)
+   sudo launchctl load /Library/LaunchDaemons/com.neurondb.neuronagent.plist
+   sudo launchctl start com.neurondb.neuronagent
    ```
 
 3. Check status:
@@ -306,10 +446,15 @@ sudo installer -pkg neuronmcp-1.0.0.beta-arm64.pkg -target /
    curl http://localhost:8080/health
    
    # macOS
+   sudo launchctl list | grep neuronagent
    curl http://localhost:8080/health
    ```
 
-### NeuronMCP
+### NeuronMCP (Application)
+
+**Important**: NeuronMCP is an application that can run as a service or be invoked directly by MCP clients via stdio.
+
+**Option 1: Use with MCP clients (stdio mode - recommended)**
 
 1. Configure database connection:
    ```bash
@@ -318,7 +463,48 @@ sudo installer -pkg neuronmcp-1.0.0.beta-arm64.pkg -target /
 
 2. Configure your MCP client (e.g., Claude Desktop) to use:
    ```
-   /usr/bin/neurondb-mcp
+   /usr/bin/neurondb-mcp  # Linux
+   /usr/local/bin/neurondb-mcp  # macOS
+   ```
+
+**Option 2: Run as a background service (optional)**
+
+1. Configure database connection (same as above)
+
+2. Start as service:
+   ```bash
+   # Linux (systemd)
+   sudo systemctl start neuronmcp
+   sudo systemctl enable neuronmcp
+   
+   # macOS (launchd)
+   sudo launchctl load /Library/LaunchDaemons/com.neurondb.neuronmcp.plist
+   sudo launchctl start com.neurondb.neuronmcp
+   ```
+
+### NeuronDesktop (Application Service)
+
+**Important**: NeuronDesktop is an application that runs as a system service providing a web interface.
+
+1. Configure database and API connections:
+   ```bash
+   sudo nano /etc/neurondesktop/config.yaml
+   ```
+
+2. Start the service:
+   ```bash
+   # Linux (systemd)
+   sudo systemctl start neurondesktop
+   sudo systemctl enable neurondesktop
+   
+   # macOS (launchd)
+   sudo launchctl load /Library/LaunchDaemons/com.neurondb.neurondesktop.plist
+   sudo launchctl start com.neurondb.neurondesktop
+   ```
+
+3. Access the web interface:
+   ```
+   http://localhost:3000
    ```
 
 ## Package Structure

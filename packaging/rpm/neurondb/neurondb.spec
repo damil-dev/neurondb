@@ -14,8 +14,8 @@ URL: https://www.neurondb.ai
 Vendor: neurondb
 Packager: neurondb <admin@neurondb.com>
 
-Requires: postgresql-server >= 16, libcurl, openssl-libs
-BuildRequires: postgresql-devel >= 16, gcc, make, libcurl-devel, openssl-devel, zlib-devel
+Requires: postgresql16-server >= 16.0 | postgresql17-server >= 17.0 | postgresql18-server >= 18.0, libcurl >= 7.0, openssl-libs >= 1.1.0, zlib >= 1.2.3
+BuildRequires: postgresql16-devel >= 16.0 | postgresql17-devel >= 17.0 | postgresql18-devel >= 18.0, gcc, make, libcurl-devel, openssl-devel, zlib-devel
 
 %description
 NeuronDB extends PostgreSQL with vector search, machine learning algorithms,

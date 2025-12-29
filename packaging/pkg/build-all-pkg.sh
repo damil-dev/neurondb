@@ -62,6 +62,17 @@ if [ $? -ne 0 ]; then
 fi
 echo ""
 
+# Build NeuronDesktop
+echo "Building NeuronDesktop macOS package..."
+cd "$SCRIPT_DIR/neurondesktop"
+export VERSION="$VERSION"
+./build.sh
+if [ $? -ne 0 ]; then
+    echo "Error: NeuronDesktop macOS build failed"
+    exit 1
+fi
+echo ""
+
 echo "=========================================="
 echo "All macOS packages built successfully!"
 echo "=========================================="

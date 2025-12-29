@@ -1,0 +1,21 @@
+Package: neurondesktop
+Version: 1.0.0.beta
+Section: database
+Priority: optional
+Architecture: amd64
+Depends: postgresql-client-16 | postgresql-client-17 | postgresql-client-18 | postgresql-client (>= 16), ca-certificates, libc6 (>= 2.17)
+Maintainer: neurondb <admin@neurondb.com>
+Description: NeuronDesktop - Unified Web Interface for NeuronDB Ecosystem
+ NeuronDesktop is a comprehensive web application that provides a unified
+ interface for managing and interacting with MCP servers, NeuronDB, and
+ NeuronAgent.
+ .
+ Features:
+  - Unified dashboard for all NeuronDB ecosystem components
+  - Real-time communication via WebSocket
+  - Secure API key-based authentication
+  - Professional UI with modern, responsive design
+  - Comprehensive logging and metrics
+  - MCP server integration and testing
+  - Agent management through the UI
+
