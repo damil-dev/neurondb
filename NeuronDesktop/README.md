@@ -102,20 +102,33 @@ cd frontend && npm run dev
 
 ### Using Docker (Recommended)
 
-```bash
-# Clone the repository
-git clone <repository-url>
-cd NeuronDesktop
+NeuronDesktop is integrated into the root-level Docker Compose configuration. From the repository root:
 
-# Start all services
-docker-compose up -d
+```bash
+# Start all services (NeuronDB, NeuronAgent, NeuronMCP, and NeuronDesktop)
+docker compose --profile default up -d
 
 # Access the application
 # Frontend: http://localhost:3000
-# Backend: http://localhost:8081
+# Backend API: http://localhost:8081
 ```
 
-**Note:** For Docker deployments, the default profile is automatically created on API startup. To configure NeuronMCP, set the environment variables in `docker-compose.yml` or run the setup script before starting containers.
+**Note:** 
+- NeuronDesktop automatically uses the existing `neurondb` Postgres container (no separate Postgres needed)
+- The `neurondesk` database is automatically created and initialized on first startup
+- The default profile is automatically created on API startup
+- To configure NeuronMCP, set the environment variables in the root `docker-compose.yml` or run the setup script before starting containers
+
+**Standalone Docker Setup (Alternative):**
+
+If you need to run NeuronDesktop independently, you can use the standalone `NeuronDesktop/docker-compose.yml`:
+
+```bash
+cd NeuronDesktop
+docker-compose up -d
+```
+
+**Note:** The standalone setup uses its own Postgres container on port 5433, which may conflict with the root-level stack if both are running simultaneously.
 
 ### Manual Setup
 
