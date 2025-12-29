@@ -50,9 +50,6 @@ func GetAPIKeyFromContext(ctx context.Context) (*db.APIKey, bool) {
 	return key, ok
 }
 
-// GetUserIDFromContext gets the user ID from context
-func GetUserIDFromContext(ctx context.Context) (string, bool) {
-	userID, ok := ctx.Value("user_id").(string)
-	return userID, ok
-}
+// NOTE: GetUserIDFromContext is now in middleware_jwt.go for JWT authentication
+// This file is kept for API key functionality if needed for backwards compatibility
 

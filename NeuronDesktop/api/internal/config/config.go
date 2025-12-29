@@ -13,6 +13,9 @@ type Config struct {
 	Server   ServerConfig
 	Logging  LoggingConfig
 	CORS     CORSConfig
+	Auth     AuthConfig
+	Session  SessionConfig
+	Security SecurityConfig
 }
 
 // DatabaseConfig holds database configuration
@@ -49,6 +52,37 @@ type CORSConfig struct {
 	AllowedHeaders []string
 }
 
+// AuthConfig holds authentication configuration
+type AuthConfig struct {
+	Mode            string // "oidc", "jwt", "hybrid"
+	OIDC            OIDCConfig
+	JWTSecret       string
+	EnableLocalAuth bool
+}
+
+// OIDCConfig holds OIDC configuration
+type OIDCConfig struct {
+	IssuerURL    string
+	ClientID     string
+	ClientSecret string
+	RedirectURL  string
+	Scopes       []string
+}
+
+// SessionConfig holds session configuration
+type SessionConfig struct {
+	CookieDomain   string
+	CookieSecure   bool
+	CookieSameSite string // "Lax", "Strict", "None"
+	AccessTTL      time.Duration
+	RefreshTTL     time.Duration
+}
+
+// SecurityConfig holds security-related configuration
+type SecurityConfig struct {
+	EnableSQLConsole bool // Enable arbitrary SQL execution endpoint (default: false)
+}
+
 // Load loads configuration from environment variables
 func Load() *Config {
 	return &Config{
@@ -77,6 +111,28 @@ func Load() *Config {
 			AllowedOrigins: getEnvSlice("CORS_ALLOWED_ORIGINS", []string{"*"}),
 			AllowedMethods: getEnvSlice("CORS_ALLOWED_METHODS", []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}),
 			AllowedHeaders: getEnvSlice("CORS_ALLOWED_HEADERS", []string{"Content-Type", "Authorization"}),
+		},
+		Auth: AuthConfig{
+			Mode:            getEnv("AUTH_MODE", "oidc"),
+			JWTSecret:       getEnv("JWT_SECRET", ""),
+			EnableLocalAuth: getEnv("ENABLE_LOCAL_AUTH", "true") == "true",
+			OIDC: OIDCConfig{
+				IssuerURL:    getEnv("OIDC_ISSUER_URL", ""),
+				ClientID:     getEnv("OIDC_CLIENT_ID", ""),
+				ClientSecret: getEnv("OIDC_CLIENT_SECRET", ""),
+				RedirectURL:  getEnv("OIDC_REDIRECT_URL", ""),
+				Scopes:       getEnvSlice("OIDC_SCOPES", []string{"openid", "profile", "email"}),
+			},
+		},
+		Session: SessionConfig{
+			CookieDomain:   getEnv("SESSION_COOKIE_DOMAIN", ""),
+			CookieSecure:   getEnv("SESSION_SECURE", "true") == "true",
+			CookieSameSite: getEnv("SESSION_SAMESITE", "Lax"),
+			AccessTTL:      getEnvDuration("SESSION_ACCESS_TTL", 15*time.Minute),
+			RefreshTTL:     getEnvDuration("SESSION_REFRESH_TTL", 30*24*time.Hour),
+		},
+		Security: SecurityConfig{
+			EnableSQLConsole: getEnv("ENABLE_SQL_CONSOLE", "false") == "true",
 		},
 	}
 }

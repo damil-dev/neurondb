@@ -189,6 +189,21 @@ func (c *Client) GetMessages(ctx context.Context, sessionID string) ([]Message, 
 	return messages, nil
 }
 
+// ListSessions lists sessions for an agent
+func (c *Client) ListSessions(ctx context.Context, agentID string) ([]Session, error) {
+	req, err := c.newRequest(ctx, "GET", fmt.Sprintf("/api/v1/agents/%s/sessions", agentID), nil)
+	if err != nil {
+		return nil, err
+	}
+	
+	var sessions []Session
+	if err := c.doRequest(req, &sessions); err != nil {
+		return nil, err
+	}
+	
+	return sessions, nil
+}
+
 // Helper methods
 
 func (c *Client) newRequest(ctx context.Context, method, path string, body interface{}) (*http.Request, error) {

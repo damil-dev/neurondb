@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"fmt"
 	"net/http"
 	"sync"
 	"time"
@@ -123,11 +124,34 @@ func (rl *RateLimiter) cleanup() {
 func RateLimitMiddleware(limiter *RateLimiter) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Get rate limit key (API key or IP)
+			// Skip rate limiting for lightweight auth verification endpoint
+			// This endpoint is called immediately after login to verify the token works
+			if r.URL.Path == "/api/v1/auth/me" {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			// Get rate limit key (user ID from context, session ID, or IP)
 			key := r.RemoteAddr
-			if apiKey := r.Header.Get("Authorization"); apiKey != "" {
-				// Use API key as rate limit key
-				key = apiKey
+			
+			// Try to get user ID from context (set by session or JWT middleware)
+			// This is set by both session middleware and JWT middleware
+			if userID, ok := r.Context().Value("user_id").(string); ok && userID != "" {
+				key = "user:" + userID
+			} else if authHeader := r.Header.Get("Authorization"); authHeader != "" {
+				// For JWT/API key, use a hash of the token (not the full token)
+				// Extract just the token part and hash it
+				if len(authHeader) > 7 && authHeader[:7] == "Bearer " {
+					token := authHeader[7:]
+					// Use first 16 chars as key (safe for rate limiting)
+					if len(token) > 16 {
+						key = "token:" + token[:16]
+					} else {
+						key = "token:" + token
+					}
+				} else {
+					key = "auth:" + authHeader[:min(32, len(authHeader))]
+				}
 			}
 
 			if !limiter.Allow(key) {
@@ -141,11 +165,18 @@ func RateLimitMiddleware(limiter *RateLimiter) func(http.Handler) http.Handler {
 
 			remaining := limiter.Remaining(key)
 			w.Header().Set("X-RateLimit-Limit", "100")
-			w.Header().Set("X-RateLimit-Remaining", string(rune(remaining)))
+			w.Header().Set("X-RateLimit-Remaining", fmt.Sprintf("%d", remaining))
 			w.Header().Set("X-RateLimit-Reset", time.Now().Add(1*time.Minute).Format(time.RFC1123))
 
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 

@@ -1,10 +1,12 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 
+	"github.com/neurondb/NeuronDesktop/api/internal/middleware"
 	"github.com/neurondb/NeuronDesktop/api/internal/utils"
 )
 
@@ -18,13 +20,21 @@ type ErrorResponse struct {
 }
 
 // WriteError writes an error response
-func WriteError(w http.ResponseWriter, statusCode int, err error, details map[string]interface{}) {
+func WriteError(w http.ResponseWriter, r *http.Request, statusCode int, err error, details map[string]interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
 
 	response := ErrorResponse{
 		Error:   http.StatusText(statusCode),
 		Message: err.Error(),
+	}
+
+	// Add request ID from context
+	if r != nil {
+		requestID := middleware.GetRequestID(r.Context())
+		if requestID != "" {
+			response.RequestID = requestID
+		}
 	}
 
 	if details != nil {
@@ -34,17 +44,53 @@ func WriteError(w http.ResponseWriter, statusCode int, err error, details map[st
 	// Add validation errors if applicable
 	if validationErr, ok := err.(*utils.ValidationError); ok {
 		response.Code = "VALIDATION_ERROR"
-		response.Details = map[string]interface{}{
-			"field":   validationErr.Field,
-			"message": validationErr.Message,
+		if response.Details == nil {
+			response.Details = make(map[string]interface{})
 		}
+		response.Details["field"] = validationErr.Field
+		response.Details["message"] = validationErr.Message
+	}
+
+	json.NewEncoder(w).Encode(response)
+}
+
+// WriteErrorWithContext writes an error response with context
+func WriteErrorWithContext(ctx context.Context, w http.ResponseWriter, statusCode int, err error, details map[string]interface{}) {
+	requestID := middleware.GetRequestID(ctx)
+	
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+
+	response := ErrorResponse{
+		Error:     http.StatusText(statusCode),
+		Message:   err.Error(),
+		RequestID: requestID,
+	}
+
+	if details != nil {
+		response.Details = details
+	}
+
+	// Add validation errors if applicable
+	if validationErr, ok := err.(*utils.ValidationError); ok {
+		response.Code = "VALIDATION_ERROR"
+		if response.Details == nil {
+			response.Details = make(map[string]interface{})
+		}
+		response.Details["field"] = validationErr.Field
+		response.Details["message"] = validationErr.Message
 	}
 
 	json.NewEncoder(w).Encode(response)
 }
 
 // WriteValidationErrors writes multiple validation errors
-func WriteValidationErrors(w http.ResponseWriter, errors []error) {
+func WriteValidationErrors(w http.ResponseWriter, r *http.Request, errors []error) {
+	requestID := ""
+	if r != nil {
+		requestID = middleware.GetRequestID(r.Context())
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusBadRequest)
 
@@ -59,9 +105,10 @@ func WriteValidationErrors(w http.ResponseWriter, errors []error) {
 	}
 
 	response := ErrorResponse{
-		Error:   "Validation Failed",
-		Code:    "VALIDATION_ERROR",
-		Details: map[string]interface{}{"errors": validationErrors},
+		Error:     "Validation Failed",
+		Code:      "VALIDATION_ERROR",
+		Details:   map[string]interface{}{"errors": validationErrors},
+		RequestID: requestID,
 	}
 
 	json.NewEncoder(w).Encode(response)
@@ -77,7 +124,7 @@ func WriteSuccess(w http.ResponseWriter, data interface{}, statusCode int) {
 // HandlePanic recovers from panics and writes error response
 func HandlePanic(w http.ResponseWriter, r *http.Request) {
 	if err := recover(); err != nil {
-		WriteError(w, http.StatusInternalServerError, fmt.Errorf("internal server error: %v", err), nil)
+		WriteError(w, r, http.StatusInternalServerError, fmt.Errorf("internal server error: %v", err), nil)
 	}
 }
 

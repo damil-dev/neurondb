@@ -62,6 +62,10 @@ type ListResourcesResponse struct {
 	Resources []ResourceDefinition `json:"resources"`
 }
 
+type ReadResourceRequest struct {
+	URI string `json:"uri"`
+}
+
 type ReadResourceResponse struct {
 	Contents []ResourceContent `json:"contents"`
 }
@@ -70,6 +74,39 @@ type ResourceContent struct {
 	URI      string `json:"uri"`
 	MimeType string `json:"mimeType"`
 	Text     string `json:"text"`
+}
+
+// Prompts types
+type ListPromptsResponse struct {
+	Prompts []PromptDefinition `json:"prompts"`
+}
+
+type PromptDefinition struct {
+	Name        string                 `json:"name"`
+	Description string                 `json:"description,omitempty"`
+	Arguments   []PromptArgument       `json:"arguments,omitempty"`
+}
+
+type PromptArgument struct {
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	Required    bool   `json:"required,omitempty"`
+}
+
+type GetPromptRequest struct {
+	Name      string                 `json:"name"`
+	Arguments map[string]interface{} `json:"arguments,omitempty"`
+}
+
+type GetPromptResponse struct {
+	Description string                 `json:"description,omitempty"`
+	Messages    []PromptMessage        `json:"messages"`
+}
+
+type PromptMessage struct {
+	Role    string                 `json:"role"`
+	Content string                 `json:"content,omitempty"`
+	Data    map[string]interface{} `json:"data,omitempty"`
 }
 
 type ServerInfo struct {

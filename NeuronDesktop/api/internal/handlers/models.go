@@ -29,12 +29,11 @@ func (h *ModelConfigHandlers) ListModelConfigs(w http.ResponseWriter, r *http.Re
 
 	configs, err := h.queries.ListModelConfigs(r.Context(), profileID, includeAPIKey)
 	if err != nil {
-		WriteError(w, http.StatusInternalServerError, err, nil)
+		WriteError(w, r, http.StatusInternalServerError, err, nil)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(configs)
+	WriteSuccess(w, configs, http.StatusOK)
 }
 
 // CreateModelConfig creates a new model configuration
@@ -44,7 +43,7 @@ func (h *ModelConfigHandlers) CreateModelConfig(w http.ResponseWriter, r *http.R
 
 	var config db.ModelConfig
 	if err := json.NewDecoder(r.Body).Decode(&config); err != nil {
-		WriteError(w, http.StatusBadRequest, err, nil)
+		WriteError(w, r, http.StatusBadRequest, err, nil)
 		return
 	}
 
@@ -57,24 +56,22 @@ func (h *ModelConfigHandlers) CreateModelConfig(w http.ResponseWriter, r *http.R
 	if config.IsDefault {
 		// First create the config
 		if err := h.queries.CreateModelConfig(r.Context(), &config); err != nil {
-			WriteError(w, http.StatusInternalServerError, err, nil)
+			WriteError(w, r, http.StatusInternalServerError, err, nil)
 			return
 		}
 		// Then set it as default (which unsets others)
 		if err := h.queries.SetDefaultModelConfig(r.Context(), profileID, config.ID); err != nil {
-			WriteError(w, http.StatusInternalServerError, err, nil)
+			WriteError(w, r, http.StatusInternalServerError, err, nil)
 			return
 		}
 	} else {
 		if err := h.queries.CreateModelConfig(r.Context(), &config); err != nil {
-			WriteError(w, http.StatusInternalServerError, err, nil)
+			WriteError(w, r, http.StatusInternalServerError, err, nil)
 			return
 		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(config)
+	WriteSuccess(w, config, http.StatusCreated)
 }
 
 // UpdateModelConfig updates a model configuration
@@ -84,14 +81,14 @@ func (h *ModelConfigHandlers) UpdateModelConfig(w http.ResponseWriter, r *http.R
 
 	var config db.ModelConfig
 	if err := json.NewDecoder(r.Body).Decode(&config); err != nil {
-		WriteError(w, http.StatusBadRequest, err, nil)
+		WriteError(w, r, http.StatusBadRequest, err, nil)
 		return
 	}
 
 	// Get existing config to preserve profile_id
 	existing, err := h.queries.GetModelConfig(r.Context(), configID, false)
 	if err != nil {
-		WriteError(w, http.StatusNotFound, err, nil)
+		WriteError(w, r, http.StatusNotFound, err, nil)
 		return
 	}
 
@@ -104,22 +101,21 @@ func (h *ModelConfigHandlers) UpdateModelConfig(w http.ResponseWriter, r *http.R
 	// If setting as default, unset others
 	if config.IsDefault {
 		if err := h.queries.UpdateModelConfig(r.Context(), &config); err != nil {
-			WriteError(w, http.StatusInternalServerError, err, nil)
+			WriteError(w, r, http.StatusInternalServerError, err, nil)
 			return
 		}
 		if err := h.queries.SetDefaultModelConfig(r.Context(), config.ProfileID, config.ID); err != nil {
-			WriteError(w, http.StatusInternalServerError, err, nil)
+			WriteError(w, r, http.StatusInternalServerError, err, nil)
 			return
 		}
 	} else {
 		if err := h.queries.UpdateModelConfig(r.Context(), &config); err != nil {
-			WriteError(w, http.StatusInternalServerError, err, nil)
+			WriteError(w, r, http.StatusInternalServerError, err, nil)
 			return
 		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(config)
+	WriteSuccess(w, config, http.StatusOK)
 }
 
 // DeleteModelConfig deletes a model configuration
@@ -128,7 +124,7 @@ func (h *ModelConfigHandlers) DeleteModelConfig(w http.ResponseWriter, r *http.R
 	configID := vars["id"]
 
 	if err := h.queries.DeleteModelConfig(r.Context(), configID); err != nil {
-		WriteError(w, http.StatusInternalServerError, err, nil)
+		WriteError(w, r, http.StatusInternalServerError, err, nil)
 		return
 	}
 
@@ -142,12 +138,11 @@ func (h *ModelConfigHandlers) GetDefaultModelConfig(w http.ResponseWriter, r *ht
 
 	config, err := h.queries.GetDefaultModelConfig(r.Context(), profileID)
 	if err != nil {
-		WriteError(w, http.StatusNotFound, err, nil)
+		WriteError(w, r, http.StatusNotFound, err, nil)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(config)
+	WriteSuccess(w, config, http.StatusOK)
 }
 
 // SetDefaultModelConfig sets a model as default
@@ -157,7 +152,7 @@ func (h *ModelConfigHandlers) SetDefaultModelConfig(w http.ResponseWriter, r *ht
 	configID := vars["id"]
 
 	if err := h.queries.SetDefaultModelConfig(r.Context(), profileID, configID); err != nil {
-		WriteError(w, http.StatusInternalServerError, err, nil)
+		WriteError(w, r, http.StatusInternalServerError, err, nil)
 		return
 	}
 

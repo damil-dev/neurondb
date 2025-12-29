@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 
 	"github.com/gorilla/mux"
@@ -55,25 +56,25 @@ func (h *MCPHandlers) CallTool(w http.ResponseWriter, r *http.Request) {
 	}
 	
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		WriteError(w, http.StatusBadRequest, fmt.Errorf("invalid request body"), nil)
+		WriteError(w, r, http.StatusBadRequest, fmt.Errorf("invalid request body"), nil)
 		return
 	}
 	
 	// Validate tool call
 	if errors := utils.ValidateToolCall(req.Name, req.Arguments); len(errors) > 0 {
-		WriteValidationErrors(w, errors)
+		WriteValidationErrors(w, r, errors)
 		return
 	}
 	
 	client, err := h.mcpManager.GetClient(r.Context(), profileID)
 	if err != nil {
-		WriteError(w, http.StatusInternalServerError, err, nil)
+		WriteError(w, r, http.StatusInternalServerError, err, nil)
 		return
 	}
 	
 	result, err := client.CallTool(req.Name, req.Arguments)
 	if err != nil {
-		WriteError(w, http.StatusInternalServerError, err, nil)
+		WriteError(w, r, http.StatusInternalServerError, err, nil)
 		return
 	}
 	
@@ -97,7 +98,7 @@ func (h *MCPHandlers) TestMCPConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		WriteError(w, http.StatusBadRequest, fmt.Errorf("invalid request body"), nil)
+		WriteError(w, r, http.StatusBadRequest, fmt.Errorf("invalid request body"), nil)
 		return
 	}
 	
@@ -109,7 +110,7 @@ func (h *MCPHandlers) TestMCPConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	
 	if mcpConfig.Command == "" {
-		mcpConfig.Command = "neurondb-mcp"
+		mcpConfig.Command = "/home/pge/pge/neurondb/NeuronMCP/bin/neurondb-mcp"
 	}
 	if mcpConfig.Args == nil {
 		mcpConfig.Args = []string{}
@@ -121,7 +122,7 @@ func (h *MCPHandlers) TestMCPConfig(w http.ResponseWriter, r *http.Request) {
 	// Try to create and initialize client
 	testClient, err := mcp.NewClient(mcpConfig)
 	if err != nil {
-		WriteError(w, http.StatusBadRequest, fmt.Errorf("failed to create MCP client: %w", err), nil)
+		WriteError(w, r, http.StatusBadRequest, fmt.Errorf("failed to create MCP client: %w", err), nil)
 		return
 	}
 	defer testClient.Close()
@@ -129,7 +130,7 @@ func (h *MCPHandlers) TestMCPConfig(w http.ResponseWriter, r *http.Request) {
 	// Try to list tools as a test
 	_, err = testClient.ListTools()
 	if err != nil {
-		WriteError(w, http.StatusBadRequest, fmt.Errorf("failed to list tools: %w", err), nil)
+		WriteError(w, r, http.StatusBadRequest, fmt.Errorf("failed to list tools: %w", err), nil)
 		return
 	}
 	
@@ -181,7 +182,7 @@ func (m *MCPManager) GetClient(ctx context.Context, profileID string) (*mcp.Clie
 	
 	// Parse MCP config
 	mcpConfig := mcp.MCPConfig{
-		Command: "neurondb-mcp", // Default
+		Command: "/home/pge/pge/neurondb/NeuronMCP/bin/neurondb-mcp", // Default full path
 		Args:    []string{},
 		Env:     make(map[string]string),
 	}
@@ -234,5 +235,146 @@ func (m *MCPManager) ListConnections() []map[string]interface{} {
 	}
 	
 	return connections
+}
+
+// ListThreads lists all chat threads for a profile
+func (h *MCPHandlers) ListThreads(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	profileID := vars["profile_id"]
+	
+	threads, err := h.mcpManager.queries.ListMCPThreads(r.Context(), profileID)
+	if err != nil {
+		// Check if it's a "table doesn't exist" error
+		errStr := err.Error()
+		if strings.Contains(errStr, "does not exist") || strings.Contains(errStr, "relation") || strings.Contains(errStr, "mcp_chat_threads") {
+			WriteError(w, r, http.StatusInternalServerError, fmt.Errorf("database tables not found. Please run migration: psql -d neurondb -f NeuronDesktop/api/migrations/007_mcp_chat_threads.sql"), nil)
+			return
+		}
+		WriteError(w, r, http.StatusInternalServerError, err, nil)
+		return
+	}
+	
+	WriteSuccess(w, threads, http.StatusOK)
+}
+
+// CreateThread creates a new chat thread
+func (h *MCPHandlers) CreateThread(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	profileID := vars["profile_id"]
+	
+	var req struct {
+		Title string `json:"title"`
+	}
+	
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		WriteError(w, r, http.StatusBadRequest, fmt.Errorf("invalid request body"), nil)
+		return
+	}
+	
+	title := req.Title
+	if title == "" {
+		title = "New chat"
+	}
+	
+	thread, err := h.mcpManager.queries.CreateMCPThread(r.Context(), profileID, title)
+	if err != nil {
+		WriteError(w, r, http.StatusInternalServerError, err, nil)
+		return
+	}
+	
+	WriteSuccess(w, thread, http.StatusCreated)
+}
+
+// GetThread gets a thread with its messages
+func (h *MCPHandlers) GetThread(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	threadID := vars["thread_id"]
+	// profileID is available but not needed for this query
+	
+	thread, err := h.mcpManager.queries.GetMCPThread(r.Context(), threadID)
+	if err != nil {
+		WriteError(w, r, http.StatusInternalServerError, err, nil)
+		return
+	}
+	
+	if thread == nil {
+		WriteError(w, r, http.StatusNotFound, fmt.Errorf("thread not found"), nil)
+		return
+	}
+	
+	messages, err := h.mcpManager.queries.ListMCPMessages(r.Context(), threadID)
+	if err != nil {
+		WriteError(w, r, http.StatusInternalServerError, err, nil)
+		return
+	}
+	
+	response := map[string]interface{}{
+		"thread":   thread,
+		"messages": messages,
+	}
+	
+	WriteSuccess(w, response, http.StatusOK)
+}
+
+// UpdateThread updates a thread (e.g., title)
+func (h *MCPHandlers) UpdateThread(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	threadID := vars["thread_id"]
+	
+	var req struct {
+		Title string `json:"title"`
+	}
+	
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		WriteError(w, r, http.StatusBadRequest, fmt.Errorf("invalid request body"), nil)
+		return
+	}
+	
+	thread, err := h.mcpManager.queries.UpdateMCPThread(r.Context(), threadID, req.Title)
+	if err != nil {
+		WriteError(w, r, http.StatusInternalServerError, err, nil)
+		return
+	}
+	
+	WriteSuccess(w, thread, http.StatusOK)
+}
+
+// DeleteThread deletes a thread
+func (h *MCPHandlers) DeleteThread(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	threadID := vars["thread_id"]
+	
+	if err := h.mcpManager.queries.DeleteMCPThread(r.Context(), threadID); err != nil {
+		WriteError(w, r, http.StatusInternalServerError, err, nil)
+		return
+	}
+	
+	WriteSuccess(w, map[string]interface{}{"success": true}, http.StatusOK)
+}
+
+// AddMessage adds a message to a thread
+func (h *MCPHandlers) AddMessage(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	threadID := vars["thread_id"]
+	
+	var req struct {
+		Role     string                 `json:"role"`
+		Content  string                 `json:"content"`
+		ToolName string                 `json:"tool_name,omitempty"`
+		Data     map[string]interface{} `json:"data,omitempty"`
+	}
+	
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		WriteError(w, r, http.StatusBadRequest, fmt.Errorf("invalid request body"), nil)
+		return
+	}
+	
+	message, err := h.mcpManager.queries.CreateMCPMessage(r.Context(), threadID, req.Role, req.Content, req.ToolName, req.Data)
+	if err != nil {
+		WriteError(w, r, http.StatusInternalServerError, err, nil)
+		return
+	}
+	
+	WriteSuccess(w, message, http.StatusCreated)
 }
 

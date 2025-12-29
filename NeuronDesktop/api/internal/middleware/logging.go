@@ -1,8 +1,10 @@
 package middleware
 
 import (
+	"bufio"
 	"bytes"
 	"io"
+	"net"
 	"net/http"
 	"time"
 
@@ -13,6 +15,13 @@ import (
 func LoggingMiddleware(logger *logging.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Skip logging middleware for WebSocket upgrade requests
+			// WebSocket upgrades need direct access to the underlying connection (Hijacker interface)
+			if r.Header.Get("Upgrade") == "websocket" {
+				next.ServeHTTP(w, r)
+				return
+			}
+
 			start := time.Now()
 			
 			// Read request body
@@ -53,5 +62,13 @@ type responseRecorder struct {
 func (r *responseRecorder) WriteHeader(code int) {
 	r.statusCode = code
 	r.ResponseWriter.WriteHeader(code)
+}
+
+// Hijack preserves the http.Hijacker interface for WebSocket support
+func (r *responseRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	if hijacker, ok := r.ResponseWriter.(http.Hijacker); ok {
+		return hijacker.Hijack()
+	}
+	return nil, nil, http.ErrHijacked
 }
 
