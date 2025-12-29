@@ -441,6 +441,23 @@ This comprehensive test verifies:
 
 Docker installation provides isolation and consistent environments.
 
+**Unified Setup (Recommended):**
+
+Start all services from the repository root:
+
+```bash
+# From repository root - starts NeuronDB, NeuronAgent, NeuronMCP, and NeuronDesktop
+docker compose --profile default up -d
+
+# Access services:
+# - NeuronDB: postgresql://neurondb:neurondb@localhost:5433/neurondb
+# - NeuronAgent API: http://localhost:8080
+# - NeuronDesktop Web UI: http://localhost:3000
+# - NeuronDesktop API: http://localhost:8081
+```
+
+**Individual Service Setup (Alternative):**
+
 ```bash
 # NeuronDB
 cd NeuronDB/docker
@@ -453,6 +470,10 @@ docker compose up -d agent-server
 # NeuronMCP
 cd ../../NeuronMCP/docker
 docker compose up -d neurondb-mcp
+
+# NeuronDesktop (uses root docker-compose.yml)
+cd ../..
+docker compose --profile default up -d neurondesk-api neurondesk-frontend
 ```
 
 ### Source Installation
@@ -666,6 +687,17 @@ Use NeuronMCP to connect MCP-compatible clients.
 
 ### Starting Services
 
+**Unified Start (Recommended):**
+
+Start all services from the repository root:
+
+```bash
+# From repository root - starts all services
+docker compose --profile default up -d
+```
+
+**Individual Service Start:**
+
 Start services independently in any order:
 
 ```bash
@@ -680,6 +712,10 @@ docker compose up -d agent-server
 # Start NeuronMCP
 cd ../../NeuronMCP/docker
 docker compose up -d neurondb-mcp
+
+# Start NeuronDesktop (from repository root)
+cd ../..
+docker compose --profile default up -d neurondesk-api neurondesk-frontend
 ```
 
 ### Stopping Services
@@ -687,9 +723,14 @@ docker compose up -d neurondb-mcp
 Stop services without affecting others:
 
 ```bash
+# From repository root
 docker compose stop neurondb
-docker compose stop agent-server
-docker compose stop neurondb-mcp
+docker compose stop neuronagent
+docker compose stop neuronmcp
+docker compose stop neurondesk-api neurondesk-frontend
+
+# Or stop all at once
+docker compose --profile default down
 ```
 
 ### Health Checks
@@ -697,14 +738,18 @@ docker compose stop neurondb-mcp
 Verify service status:
 
 ```bash
-# NeuronDB
+# From repository root - check all services
+docker compose ps
+
+# Individual service checks
 docker compose ps neurondb
+docker compose ps neuronagent
+docker compose ps neuronmcp
+docker compose ps neurondesk-api neurondesk-frontend
 
-# NeuronAgent
-curl http://localhost:8080/health
-
-# NeuronMCP
-docker compose ps neurondb-mcp
+# API health checks
+curl http://localhost:8080/health  # NeuronAgent
+curl http://localhost:8081/health  # NeuronDesktop API
 ```
 
 ### Viewing Logs
@@ -712,10 +757,12 @@ docker compose ps neurondb-mcp
 Access service logs:
 
 ```bash
-# Follow logs
+# Follow logs (from repository root)
 docker compose logs -f neurondb
-docker compose logs -f agent-server
-docker compose logs -f neurondb-mcp
+docker compose logs -f neuronagent
+docker compose logs -f neuronmcp
+docker compose logs -f neurondesk-api
+docker compose logs -f neurondesk-frontend
 
 # View last 100 lines
 docker compose logs --tail=100 neurondb
@@ -726,9 +773,11 @@ docker compose logs --tail=100 neurondb
 Restart individual services:
 
 ```bash
+# From repository root
 docker compose restart neurondb
-docker compose restart agent-server
-docker compose restart neurondb-mcp
+docker compose restart neuronagent
+docker compose restart neuronmcp
+docker compose restart neurondesk-api neurondesk-frontend
 ```
 
 ## Documentation
