@@ -34,7 +34,7 @@ interface Thread {
   messages: Message[]
 }
 
-export default function MCPPage() {
+function MCPPage() {
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [selectedProfile, setSelectedProfile] = useState<string>('')
   const [tools, setTools] = useState<ToolDefinition[]>([])
@@ -1163,6 +1163,17 @@ export default function MCPPage() {
     </div>
   )
 }
+
+// Wrap component with ErrorBoundary for comprehensive error handling
+function MCPPageWithErrorBoundary() {
+  return (
+    <ErrorBoundary>
+      <MCPPage />
+    </ErrorBoundary>
+  )
+}
+
+export default MCPPageWithErrorBoundary
 
 // Tool Card Component
 function ToolCard({ tool, onCall, disabled }: { tool: ToolDefinition, onCall: (tool: ToolDefinition, args: Record<string, any>) => Promise<any>, disabled: boolean }) {

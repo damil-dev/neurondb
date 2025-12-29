@@ -756,6 +756,141 @@ services:
         max-size: 10m
         max-file: '3'
         compress: 'true'
+  neurondesk-init:
+    profiles:
+    - default
+    - cpu
+    image: postgres:16-alpine
+    container_name: neurondesk-init
+    init: true
+    labels:
+    - com.neurondb.service=neurondesk-init
+    - com.neurondb.variant=cpu
+    depends_on:
+      neurondb:
+        condition: service_healthy
+    environment:
+      PGHOST: neurondb
+      PGPORT: 5432
+      PGUSER: ${POSTGRES_USER:-neurondb}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-neurondb}
+      PGDATABASE: postgres
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        echo "Waiting for neurondb to be ready..."
+        until pg_isready -h neurondb -p 5432 -U $${PGUSER}; do
+          sleep 1
+        done
+        echo "Creating neurondesk database if it doesn't exist..."
+        psql -h neurondb -U $${PGUSER} -d postgres -tc "SELECT 1 FROM pg_database WHERE datname = 'neurondesk'" | grep -q 1 || psql -h neurondb -U $${PGUSER} -d postgres -c "CREATE DATABASE neurondesk;"
+        echo "Applying NeuronDesktop schema..."
+        psql -h neurondb -U $${PGUSER} -d neurondesk -f /schema/neurondesktop.sql || echo "Schema may already be applied (some errors are expected if tables exist)"
+        echo "NeuronDesktop database initialization complete!"
+    volumes:
+      - ./NeuronDesktop/api/neurondesktop.sql:/schema/neurondesktop.sql:ro
+    networks:
+    - neurondb-network
+    restart: "no"
+  neurondesk-api:
+    profiles:
+    - default
+    - cpu
+    build:
+      context: .
+      dockerfile: NeuronDesktop/api/Dockerfile
+    container_name: neurondesk-api
+    init: true
+    labels:
+    - com.neurondb.service=neurondesk-api
+    - com.neurondb.variant=cpu
+    - com.neurondb.version=${VERSION:-latest}
+    depends_on:
+      neurondesk-init:
+        condition: service_completed_successfully
+      neurondb:
+        condition: service_healthy
+    environment:
+      DB_HOST: neurondb
+      DB_PORT: 5432
+      DB_USER: ${POSTGRES_USER:-neurondb}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-neurondb}
+      DB_NAME: neurondesk
+      SERVER_HOST: 0.0.0.0
+      SERVER_PORT: 8081
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+      NEURONDB_HOST: ${NEURONDB_HOST:-neurondb}
+      NEURONDB_PORT: ${NEURONDB_PORT:-5432}
+      NEURONDB_DATABASE: ${NEURONDB_DATABASE:-neurondb}
+      NEURONDB_USER: ${NEURONDB_USER:-neurondb}
+      NEURONDB_PASSWORD: ${NEURONDB_PASSWORD:-neurondb}
+      NEURONAGENT_ENDPOINT: ${NEURONAGENT_ENDPOINT:-http://neuronagent:8080}
+      NEURONAGENT_API_KEY: ${NEURONAGENT_API_KEY:-}
+    ports:
+    - "8081:8081"
+    healthcheck:
+      test:
+      - CMD
+      - wget
+      - --no-verbose
+      - --tries=1
+      - --spider
+      - http://localhost:8081/health
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+        compress: 'true'
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 512M
+    restart: unless-stopped
+    networks:
+    - neurondb-network
+  neurondesk-frontend:
+    profiles:
+    - default
+    - cpu
+    build:
+      context: ./NeuronDesktop/frontend
+      dockerfile: Dockerfile
+    container_name: neurondesk-frontend
+    init: true
+    labels:
+    - com.neurondb.service=neurondesk-frontend
+    - com.neurondb.variant=cpu
+    - com.neurondb.version=${VERSION:-latest}
+    depends_on:
+      neurondesk-api:
+        condition: service_healthy
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8081/api/v1
+    ports:
+    - "3000:3000"
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+        compress: 'true'
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+    restart: unless-stopped
+    networks:
+    - neurondb-network
 volumes:
   neurondb-data: null
   neurondb-cuda-data: null
