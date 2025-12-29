@@ -109,6 +109,23 @@ for RPM_FILE in "$SCRIPT_DIR/neuronmcp"/*.rpm; do
 done
 echo ""
 
+# Build NeuronDesktop
+echo "Building NeuronDesktop RPM package..."
+cd "$SCRIPT_DIR/neurondesktop"
+export VERSION="$VERSION"
+./build.sh
+if [ $? -ne 0 ]; then
+    echo "Error: NeuronDesktop RPM build failed"
+    exit 1
+fi
+# Place package(s) in repo structure
+for RPM_FILE in "$SCRIPT_DIR/neurondesktop"/*.rpm; do
+    if [ -f "$RPM_FILE" ]; then
+        place_rpm_in_repo "$RPM_FILE"
+    fi
+done
+echo ""
+
 echo "=========================================="
 echo "All RPM packages built successfully!"
 echo "=========================================="

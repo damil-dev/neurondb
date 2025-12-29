@@ -121,6 +121,21 @@ for PG_VERSION in $PG_VERSIONS; do
         echo "  Metal: Enabled"
     fi
     
+    # Add ML library linking flags if libraries are installed
+    # Check for XGBoost
+    if find /usr/local/lib -name "libxgboost*.so*" -o -name "libxgboost*.a" 2>/dev/null | grep -q .; then
+        BUILD_ENV="$BUILD_ENV SHLIB_LINK=\"\$(SHLIB_LINK) -L/usr/local/lib -lxgboost -Wl,-rpath,/usr/local/lib\""
+    fi
+    # Check for LightGBM (can be lib_lightgbm or liblightgbm)
+    if find /usr/local/lib -name "*lightgbm*.so*" -o -name "*lightgbm*.a" 2>/dev/null | grep -q .; then
+        # Try to find the actual library name
+        LIGHTGBM_LIB=$(find /usr/local/lib -name "*lightgbm*.so*" 2>/dev/null | head -1 | xargs basename -s .so 2>/dev/null | sed 's/\.so.*//' || echo "lightgbm")
+        BUILD_ENV="$BUILD_ENV SHLIB_LINK=\"\$(SHLIB_LINK) -L/usr/local/lib -l${LIGHTGBM_LIB#lib} -Wl,-rpath,/usr/local/lib\""
+    fi
+    # Check for CatBoost
+    if find /usr/local/lib -name "*catboost*.so*" -o -name "*catboost*.a" 2>/dev/null | grep -q .; then
+        BUILD_ENV="$BUILD_ENV SHLIB_LINK=\"\$(SHLIB_LINK) -L/usr/local/lib -lcatboostmodel -Wl,-rpath,/usr/local/lib\""
+    fi
     eval "$BUILD_ENV make PG_CONFIG=\"$PG_CONFIG\""
     
     # Install to package directory

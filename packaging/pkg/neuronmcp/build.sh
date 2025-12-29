@@ -41,6 +41,9 @@ fi
 rm -rf "$PACKAGE_DIR"
 mkdir -p "$PACKAGE_DIR/usr/local/bin"
 mkdir -p "$PACKAGE_DIR/etc/neuronmcp"
+mkdir -p "$PACKAGE_DIR/Library/LaunchDaemons"
+mkdir -p "$PACKAGE_DIR/var/lib/neuronmcp"
+mkdir -p "$PACKAGE_DIR/var/log/neuronmcp"
 mkdir -p "$PACKAGE_DIR/scripts"
 
 # Build NeuronMCP binary
@@ -61,6 +64,11 @@ if [ -f "mcp-config.json.example" ]; then
     cp mcp-config.json.example "$PACKAGE_DIR/etc/neuronmcp/mcp-config.json.example"
 elif [ -f "mcp-config.example.json" ]; then
     cp mcp-config.example.json "$PACKAGE_DIR/etc/neuronmcp/mcp-config.json.example"
+fi
+
+# Copy launchd plist file
+if [ -f "$SCRIPT_DIR/com.neurondb.neuronmcp.plist" ]; then
+    cp "$SCRIPT_DIR/com.neurondb.neuronmcp.plist" "$PACKAGE_DIR/Library/LaunchDaemons/"
 fi
 
 # Copy postinstall script

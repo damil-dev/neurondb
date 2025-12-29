@@ -1,0 +1,85 @@
+#!/bin/bash
+
+# Post-install script for NeuronDesktop macOS package
+
+# Create neurondesktop user and group if they don't exist
+if ! dscl . -read /Groups/neurondesktop > /dev/null 2>&1; then
+    dscl . -create /Groups/neurondesktop
+    dscl . -create /Groups/neurondesktop gid 502
+fi
+
+if ! dscl . -read /Users/neurondesktop > /dev/null 2>&1; then
+    dscl . -create /Users/neurondesktop
+    dscl . -create /Users/neurondesktop UserShell /usr/bin/false
+    dscl . -create /Users/neurondesktop RealName "NeuronDesktop service user"
+    dscl . -create /Users/neurondesktop UniqueID 502
+    dscl . -create /Users/neurondesktop PrimaryGroupID 502
+    dscl . -create /Users/neurondesktop NFSHomeDirectory /var/lib/neurondesktop
+fi
+
+# Create directories
+mkdir -p /var/lib/neurondesktop
+mkdir -p /var/log/neurondesktop
+mkdir -p /var/www/neurondesktop
+
+# Set permissions
+chown -R neurondesktop:neurondesktop /var/lib/neurondesktop
+chown -R neurondesktop:neurondesktop /var/log/neurondesktop
+chown -R neurondesktop:neurondesktop /var/www/neurondesktop
+chmod 755 /var/lib/neurondesktop
+chmod 755 /var/log/neurondesktop
+chmod 755 /var/www/neurondesktop
+
+# If config doesn't exist, create it
+if [ ! -f /etc/neurondesktop/config.yaml ]; then
+    cat > /etc/neurondesktop/config.yaml << 'EOF'
+# NeuronDesktop Configuration
+server:
+  host: "0.0.0.0"
+  port: 8081
+  frontend_dir: "/var/www/neurondesktop"
+
+database:
+  host: "localhost"
+  port: 5432
+  name: "neurondesk"
+  user: "neurondesk"
+  password: ""
+
+neuronagent:
+  endpoint: "http://localhost:8080"
+  api_key: ""
+
+neurondb:
+  host: "localhost"
+  port: 5432
+  database: "neurondb"
+  user: "neurondb"
+  password: ""
+EOF
+    chown neurondesktop:neurondesktop /etc/neurondesktop/config.yaml
+    chmod 640 /etc/neurondesktop/config.yaml
+    echo "Created /etc/neurondesktop/config.yaml"
+    echo "Please edit /etc/neurondesktop/config.yaml to configure your connections"
+fi
+
+# Set permissions on launchd plist
+if [ -f /Library/LaunchDaemons/com.neurondb.neurondesktop.plist ]; then
+    chown root:wheel /Library/LaunchDaemons/com.neurondb.neurondesktop.plist
+    chmod 644 /Library/LaunchDaemons/com.neurondb.neurondesktop.plist
+fi
+
+echo "NeuronDesktop installed successfully."
+echo ""
+echo "Configuration: /etc/neurondesktop/config.yaml"
+echo "Logs: /var/log/neurondesktop/"
+echo "Web interface: http://localhost:8081"
+echo ""
+echo "To start the service:"
+echo "  sudo launchctl load /Library/LaunchDaemons/com.neurondb.neurondesktop.plist"
+echo "  sudo launchctl start com.neurondb.neurondesktop"
+echo ""
+echo "To check status:"
+echo "  sudo launchctl list | grep neurondesktop"
+
+

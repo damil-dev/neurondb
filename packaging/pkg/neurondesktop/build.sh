@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-# Build script for NeuronAgent macOS .pkg package
+# Build script for NeuronDesktop macOS .pkg package
 # Usage: ./build.sh
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -23,7 +23,7 @@ if [ -z "$ARCH" ] || [ "$ARCH" = "amd64" ]; then
     ARCH=$(uname -m)
 fi
 
-echo "Building NeuronAgent macOS package version $VERSION for $ARCH"
+echo "Building NeuronDesktop macOS package version $VERSION for $ARCH"
 
 # Check for required tools
 if ! command -v pkgbuild &> /dev/null; then
@@ -37,19 +37,30 @@ if ! command -v go &> /dev/null; then
     exit 1
 fi
 
+# Check for Node.js and npm
+if ! command -v node &> /dev/null; then
+    echo "Error: Node.js not found. Please install Node.js 18+ and npm."
+    exit 1
+fi
+
+if ! command -v npm &> /dev/null; then
+    echo "Error: npm not found. Please install npm."
+    exit 1
+fi
+
 # Clean previous build
 rm -rf "$PACKAGE_DIR"
 mkdir -p "$PACKAGE_DIR/usr/local/bin"
-mkdir -p "$PACKAGE_DIR/etc/neuronagent"
-mkdir -p "$PACKAGE_DIR/usr/local/share/neuronagent/migrations"
+mkdir -p "$PACKAGE_DIR/etc/neurondesktop"
+mkdir -p "$PACKAGE_DIR/var/www/neurondesktop"
 mkdir -p "$PACKAGE_DIR/Library/LaunchDaemons"
-mkdir -p "$PACKAGE_DIR/var/lib/neuronagent"
-mkdir -p "$PACKAGE_DIR/var/log/neuronagent"
+mkdir -p "$PACKAGE_DIR/var/lib/neurondesktop"
+mkdir -p "$PACKAGE_DIR/var/log/neurondesktop"
 mkdir -p "$PACKAGE_DIR/scripts"
 
-# Build NeuronAgent binary
-cd "$REPO_ROOT/NeuronAgent"
-echo "Building NeuronAgent binary..."
+# Build NeuronDesktop API binary
+cd "$REPO_ROOT/NeuronDesktop/api"
+echo "Building NeuronDesktop API binary..."
 
 # Download dependencies
 go mod download
@@ -57,24 +68,38 @@ go mod download
 # Build binary for macOS
 CGO_ENABLED=0 GOOS=darwin GOARCH="$ARCH" go build -a -installsuffix cgo \
     -ldflags="-w -s" \
-    -o "$PACKAGE_DIR/usr/local/bin/neuronagent" \
-    ./cmd/agent-server
+    -o "$PACKAGE_DIR/usr/local/bin/neurondesktop-api" \
+    ./cmd/server
 
-# Copy configuration example
-if [ -f "config.yaml" ]; then
-    cp config.yaml "$PACKAGE_DIR/etc/neuronagent/config.yaml.example"
-elif [ -f "configs/config.yaml.example" ]; then
-    cp configs/config.yaml.example "$PACKAGE_DIR/etc/neuronagent/config.yaml.example"
+# Build NeuronDesktop frontend
+cd "$REPO_ROOT/NeuronDesktop/frontend"
+echo "Building NeuronDesktop frontend..."
+
+# Install dependencies if needed
+if [ ! -d "node_modules" ]; then
+    npm install
 fi
 
-# Copy migrations
-if [ -d "migrations" ]; then
-    cp -r migrations/* "$PACKAGE_DIR/usr/local/share/neuronagent/migrations/"
+# Build production frontend
+npm run build
+
+# Copy frontend build to package
+if [ -d ".next" ]; then
+    cp -r .next "$PACKAGE_DIR/var/www/neurondesktop/"
+fi
+if [ -d "public" ]; then
+    cp -r public "$PACKAGE_DIR/var/www/neurondesktop/" || true
+fi
+
+# Copy migrations if they exist
+if [ -d "$REPO_ROOT/NeuronDesktop/api/migrations" ]; then
+    mkdir -p "$PACKAGE_DIR/usr/local/share/neurondesktop/migrations"
+    cp -r "$REPO_ROOT/NeuronDesktop/api/migrations"/* "$PACKAGE_DIR/usr/local/share/neurondesktop/migrations/"
 fi
 
 # Copy launchd plist file
-if [ -f "$SCRIPT_DIR/com.neurondb.neuronagent.plist" ]; then
-    cp "$SCRIPT_DIR/com.neurondb.neuronagent.plist" "$PACKAGE_DIR/Library/LaunchDaemons/"
+if [ -f "$SCRIPT_DIR/com.neurondb.neurondesktop.plist" ]; then
+    cp "$SCRIPT_DIR/com.neurondb.neurondesktop.plist" "$PACKAGE_DIR/Library/LaunchDaemons/"
 fi
 
 # Copy postinstall script
@@ -84,15 +109,15 @@ if [ -f "$SCRIPT_DIR/scripts/postinstall" ]; then
 fi
 
 # Make binary executable
-chmod +x "$PACKAGE_DIR/usr/local/bin/neuronagent"
+chmod +x "$PACKAGE_DIR/usr/local/bin/neurondesktop-api"
 
 # Build component package
 echo "Building macOS package..."
-COMPONENT_PKG="$SCRIPT_DIR/neuronagent-${VERSION}-${ARCH}.pkg"
+COMPONENT_PKG="$SCRIPT_DIR/neurondesktop-${VERSION}-${ARCH}.pkg"
 
 pkgbuild \
     --root "$PACKAGE_DIR" \
-    --identifier com.neurondb.neuronagent \
+    --identifier com.neurondb.neurondesktop \
     --version "$VERSION" \
     --install-location "/" \
     --scripts "$PACKAGE_DIR/scripts" \
@@ -101,4 +126,5 @@ pkgbuild \
 echo "Package built: $COMPONENT_PKG"
 echo ""
 echo "Install with: sudo installer -pkg $COMPONENT_PKG -target /"
+
 
