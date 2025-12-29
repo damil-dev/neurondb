@@ -27,7 +27,7 @@ export default function SidebarToggle() {
     <button
       onClick={toggle}
       className={`
-        fixed top-4 z-50 p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg shadow-lg 
+        fixed top-14 z-50 p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg shadow-lg 
         transition-all duration-300 border border-slate-700
         ${isOpen && !isDesktop ? 'left-[272px]' : 'left-4'}
         lg:hidden

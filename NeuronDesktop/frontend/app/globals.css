@@ -3,20 +3,47 @@
 @tailwind utilities;
 
 :root {
-  /* Claude Desktop inspired color scheme */
-  --foreground-rgb: 224, 224, 224;
-  --background-start-rgb: 26, 26, 26;
-  --background-end-rgb: 26, 26, 26;
-  --card-bg: 37, 37, 37;
-  --sidebar-bg: 37, 37, 37;
-  --border-color: 51, 51, 51;
+  /* Light color scheme - Professional soothing slate */
+  --foreground-rgb: 17, 24, 39;
+  --background-start-rgb: 248, 250, 252; /* Soft soothing slate-50 */
+  --background-end-rgb: 248, 250, 252;
+  --card-bg: 255, 255, 255;
+  --sidebar-bg: 255, 255, 255;
+  --border-color: 226, 232, 240;
   --accent-primary: 139, 92, 246; /* Purple accent like Claude */
   --accent-hover: 167, 139, 250;
   --accent-secondary: 99, 102, 241; /* Indigo */
-  --text-primary: 240, 240, 240;
-  --text-secondary: 200, 200, 200;
-  --text-muted: 150, 150, 150;
-  --hover-bg: 45, 45, 45;
+  --text-primary: 17, 24, 39;
+  --text-secondary: 30, 41, 59; /* Darker for better contrast */
+  --text-muted: 71, 85, 105; /* Darker for better contrast */
+  --hover-bg: 249, 250, 251;
+  --menu-footer-bg: 241, 245, 249; /* Slightly darker slate-100 for menu and footer */
+  --code-bg: 248, 250, 252;
+  --gradient-start: 239, 246, 255; /* blue-50 */
+  --gradient-mid: 238, 242, 255; /* indigo-50 */
+  --gradient-end: 250, 245, 255; /* purple-50 */
+}
+
+.dark {
+  /* Dark color scheme */
+  --foreground-rgb: 224, 224, 224;
+  --background-start-rgb: 15, 23, 42; /* slate-900 */
+  --background-end-rgb: 15, 23, 42;
+  --card-bg: 30, 41, 59; /* slate-800 */
+  --sidebar-bg: 30, 41, 59;
+  --border-color: 51, 65, 85; /* slate-700 */
+  --accent-primary: 139, 92, 246; /* Purple accent */
+  --accent-hover: 167, 139, 250;
+  --accent-secondary: 99, 102, 241; /* Indigo */
+  --text-primary: 241, 245, 249; /* slate-100 */
+  --text-secondary: 203, 213, 225; /* slate-300 */
+  --text-muted: 148, 163, 184; /* slate-400 */
+  --hover-bg: 51, 65, 85; /* slate-700 */
+  --menu-footer-bg: 30, 41, 59; /* slate-800 */
+  --code-bg: 20, 20, 20;
+  --gradient-start: 15, 23, 42; /* slate-900 */
+  --gradient-mid: 15, 23, 42;
+  --gradient-end: 15, 23, 42;
 }
 
 * {
@@ -25,10 +52,20 @@
 
 body {
   color: rgb(var(--text-primary));
-  background: rgb(var(--background-start-rgb));
+  background: linear-gradient(to bottom right, rgb(var(--gradient-start)), rgb(var(--gradient-mid)), rgb(var(--gradient-end)));
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+body:not(.dark) {
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(139, 92, 246, 0.03) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(99, 102, 241, 0.03) 0px, transparent 50%);
+}
+
+body.dark {
   background-image: 
     radial-gradient(at 0% 0%, rgba(139, 92, 246, 0.05) 0px, transparent 50%),
     radial-gradient(at 100% 100%, rgba(99, 102, 241, 0.05) 0px, transparent 50%);
@@ -41,16 +78,16 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: rgb(26, 26, 26);
+  background: rgb(var(--background-start-rgb));
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgb(51, 51, 51);
+  background: rgb(var(--border-color));
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgb(70, 70, 70);
+  background: rgb(var(--text-muted));
 }
 
 /* Professional card styling - Claude Desktop style */
@@ -63,12 +100,14 @@ body {
 }
 
 .card:hover {
-  border-color: rgb(70, 70, 70);
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+  border-color: rgb(148, 163, 184);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
 }
 
 /* Professional button styling - Claude Desktop style */
 .btn-primary {
+  position: relative;
+  z-index: 10;
   background: rgb(var(--accent-primary));
   color: white;
   font-weight: 600;
@@ -107,7 +146,7 @@ body {
 
 .btn-secondary:hover {
   background: rgb(var(--hover-bg));
-  border-color: rgb(70, 70, 70);
+  border-color: rgb(148, 163, 184);
 }
 
 /* Professional input styling - Claude Desktop style */
@@ -134,7 +173,7 @@ body {
 
 /* Professional code/JSON viewer - Claude Desktop style */
 .code-block {
-  background: rgb(20, 20, 20);
+  background: rgb(var(--code-bg));
   border: 1px solid rgb(var(--border-color));
   border-radius: 6px;
   padding: 1rem;
@@ -212,7 +251,7 @@ body {
 
 /* Code block styling - Claude Desktop style */
 pre {
-  background: rgb(20, 20, 20);
+  background: rgb(var(--code-bg));
   color: rgb(var(--text-secondary));
   padding: 1rem;
   border-radius: 6px;
@@ -224,7 +263,7 @@ pre {
 }
 
 code {
-  background: rgb(20, 20, 20);
+  background: rgb(var(--code-bg));
   color: rgb(var(--text-secondary));
   padding: 0.125rem 0.375rem;
   border-radius: 4px;
@@ -257,7 +296,7 @@ td {
   padding: 0.75rem 1rem;
   font-size: 0.875rem;
   color: rgb(var(--text-primary));
-  border-bottom: 1px solid rgb(30, 30, 30);
+  border-bottom: 1px solid rgb(var(--border-color));
 }
 
 tbody tr:hover {

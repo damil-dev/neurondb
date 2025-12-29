@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { mcpAPI, profilesAPI, modelConfigAPI, type Profile, type ToolDefinition, type ToolResult, type ModelConfig } from '@/lib/api'
-import ProfileSelector from '@/components/ProfileSelector'
+import { mcpAPI, profilesAPI, modelConfigAPI, type Profile, type ToolDefinition, type ToolResult, type ModelConfig, type MCPThread, type MCPMessage } from '@/lib/api'
 import StatusBadge from '@/components/StatusBadge'
 import JSONViewer from '@/components/JSONViewer'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { 
   PaperAirplaneIcon, 
   WrenchScrewdriverIcon,
@@ -12,7 +12,9 @@ import {
   XCircleIcon,
   ChatBubbleLeftRightIcon,
   SparklesIcon,
-  PlusIcon
+  PlusIcon,
+  MagnifyingGlassIcon,
+  TrashIcon
 } from '@/components/Icons'
 
 interface Message {
@@ -20,8 +22,16 @@ interface Message {
   role: 'user' | 'assistant' | 'system' | 'tool'
   content: string
   toolName?: string
-  timestamp: Date
+  timestamp: number
   data?: any
+}
+
+interface Thread {
+  id: string
+  title: string
+  createdAt: number
+  updatedAt: number
+  messages: Message[]
 }
 
 export default function MCPPage() {
@@ -31,30 +41,299 @@ export default function MCPPage() {
   const [modelConfigs, setModelConfigs] = useState<ModelConfig[]>([])
   const [selectedModel, setSelectedModel] = useState<string>('')
   const [modelError, setModelError] = useState<string | null>(null)
-  const [messages, setMessages] = useState<Message[]>([])
+  const [threads, setThreads] = useState<Thread[]>([])
+  const [activeThreadId, setActiveThreadId] = useState<string>('')
+  const [threadSearch, setThreadSearch] = useState('')
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const wsRef = useRef<WebSocket | null>(null)
   const [connected, setConnected] = useState(false)
+  const [connecting, setConnecting] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const [showTools, setShowTools] = useState(false)
   const [profileError, setProfileError] = useState<string | null>(null)
   const [loadingProfiles, setLoadingProfiles] = useState(true)
+  const [mcpError, setMcpError] = useState<string | null>(null)
+  const [loadingThreads, setLoadingThreads] = useState(false)
+  const errorShownRef = useRef<boolean>(false)
+  const reconnectAttemptRef = useRef<number>(0)
+  const shouldAutoConnectRef = useRef<boolean>(true)
+  const initializedRef = useRef<boolean>(false)
+  const isMountedRef = useRef<boolean>(true)
 
+  // Comprehensive error logging function - NEVER fails silently
+  const logError = (context: string, error: any, additionalInfo?: Record<string, any>) => {
+    const errorDetails = {
+      context,
+      timestamp: new Date().toISOString(),
+      error: {
+        message: error?.message || String(error),
+        stack: error?.stack,
+        name: error?.name,
+        code: error?.code,
+        response: error?.response ? {
+          status: error.response.status,
+          statusText: error.response.statusText,
+          data: error.response.data,
+        } : undefined,
+      },
+      additionalInfo,
+      userAgent: typeof window !== 'undefined' ? window.navigator.userAgent : undefined,
+      url: typeof window !== 'undefined' ? window.location.href : undefined,
+    }
+    
+    // Always log to console with full details
+    console.error(`[ERROR] ${context}:`, errorDetails)
+    
+    // Display error to user if component is mounted
+    if (isMountedRef.current) {
+      const userMessage = parseError(error)
+      setMcpError(userMessage)
+    }
+    
+    // In production, send to error reporting service
+    // Example: if (process.env.NODE_ENV === 'production') { Sentry.captureException(error, { extra: errorDetails }) }
+    
+    return errorDetails
+  }
+
+  // Helper to parse error and return simple one-line message
+  const parseError = (error: any): string => {
+    if (!error) return 'Unknown error'
+    
+    const msg = error.response?.data?.error || error.response?.data?.message || error.message || String(error)
+    const msgLower = msg.toLowerCase()
+    
+    // Check if NeuronMCP is not running
+    if (msgLower.includes('connection refused') || 
+        msgLower.includes('connection reset') ||
+        msgLower.includes('econnrefused') ||
+        msgLower.includes('failed to connect') ||
+        msgLower.includes('not running') ||
+        msgLower.includes('cannot connect')) {
+      return 'NeuronMCP not running'
+    }
+    
+    // Check for timeout
+    if (msgLower.includes('timeout') || msgLower.includes('timed out')) {
+      return 'NeuronMCP not responding'
+    }
+    
+    // Check for database migration errors
+    if (msgLower.includes('does not exist') || msgLower.includes('relation') || msgLower.includes('mcp_chat_threads') || msgLower.includes('database tables not found')) {
+      return 'Database migration required. Run: psql -d neurondb -f NeuronDesktop/api/migrations/007_mcp_chat_threads.sql'
+    }
+    
+    // Return the actual error message (first line only)
+    return msg.split('\n')[0].trim() || 'Configuration error'
+  }
+
+  // Track component mount state to prevent state updates after unmount
   useEffect(() => {
-    loadProfiles()
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+    }
   }, [])
 
   useEffect(() => {
-    if (selectedProfile) {
-      loadTools()
-      loadModelConfigs()
-      connectWebSocket()
+    // Prevent double initialization in React StrictMode
+    if (initializedRef.current) return
+    initializedRef.current = true
+    
+    loadProfiles().catch((error) => {
+      logError('loadProfiles initialization', error, { phase: 'initialization' })
+    })
+  }, [])
+
+  // Prevent page reloads from unhandled promise rejections
+  useEffect(() => {
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      console.error('Unhandled promise rejection:', event.reason)
+      // Prevent default browser behavior (page reload) for non-critical errors
+      if (event.reason && typeof event.reason === 'object') {
+        const error = event.reason as any
+        // Only prevent reload for API errors, not critical system errors
+        if (error?.response?.status || error?.code === 'ERR_BAD_RESPONSE' || error?.message?.includes('500')) {
+          event.preventDefault()
+          return
+        }
+      }
+      event.preventDefault() // Prevent default for all promise rejections
     }
+    
+    const handleError = (event: ErrorEvent) => {
+      console.error('Unhandled error:', event.error)
+      // Prevent default for non-critical errors
+      if (event.error && typeof event.error === 'object') {
+        const error = event.error as any
+        if (error?.response?.status || error?.code === 'ERR_BAD_RESPONSE') {
+          event.preventDefault()
+        }
+      }
+    }
+    
+    window.addEventListener('unhandledrejection', handleUnhandledRejection)
+    window.addEventListener('error', handleError)
+    
+    return () => {
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection)
+      window.removeEventListener('error', handleError)
+    }
+  }, [])
+
+  // Load conversation threads from API when profile is selected
+  useEffect(() => {
+    if (!selectedProfile) return
+    
+    const loadThreads = async () => {
+      if (!isMountedRef.current || !selectedProfile) return
+      
+      setLoadingThreads(true)
+      try {
+        const response = await mcpAPI.listThreads(selectedProfile)
+        if (!isMountedRef.current) return
+        
+        const apiThreads = response.data || []
+        
+        if (apiThreads.length > 0) {
+          // Load full thread data with messages
+          const threadsWithMessages = (await Promise.all(
+            apiThreads.map(async (apiThread) => {
+              try {
+                const threadResponse = await mcpAPI.getThread(selectedProfile, apiThread.id)
+                return convertAPIThreadToLocal(threadResponse.data)
+              } catch (error) {
+                logError(`loadThread - ${apiThread.id}`, error, { threadId: apiThread.id, selectedProfile })
+                return null
+              }
+            })
+          )).filter((thread): thread is Thread => thread !== null)
+          
+          if (!isMountedRef.current) return
+          
+          if (threadsWithMessages.length > 0) {
+            setThreads(threadsWithMessages)
+            setActiveThreadId(threadsWithMessages[0].id)
+          } else {
+            // All threads failed to load, create a new one
+            try {
+              const newThread = await createNewThreadInDB()
+              if (isMountedRef.current) {
+                setThreads([newThread])
+                setActiveThreadId(newThread.id)
+              }
+            } catch (error) {
+              logError('loadThreads - createNewThread fallback', error, { selectedProfile })
+            }
+          }
+        } else {
+          // Create initial thread if none exist
+          try {
+            const newThread = await createNewThreadInDB()
+            if (isMountedRef.current) {
+              setThreads([newThread])
+              setActiveThreadId(newThread.id)
+            }
+          } catch (error) {
+            logError('loadThreads - createInitialThread', error, { selectedProfile })
+          }
+        }
+      } catch (error: any) {
+        logError('loadThreads', error, { selectedProfile })
+        
+        // Try to create initial thread on error (might fail if tables don't exist)
+        try {
+          const newThread = await createNewThreadInDB()
+          if (isMountedRef.current) {
+            setThreads([newThread])
+            setActiveThreadId(newThread.id)
+            setMcpError(null) // Clear error if thread creation succeeds
+          }
+        } catch (createError: any) {
+          logError('loadThreads - createThreadOnError', createError, { selectedProfile, originalError: error })
+        }
+      } finally {
+        if (isMountedRef.current) {
+          setLoadingThreads(false)
+        }
+      }
+    }
+    
+    loadThreads()
+  }, [selectedProfile])
+
+  // Convert API thread format to local format
+  const convertAPIThreadToLocal = (apiThread: { thread: MCPThread; messages: MCPMessage[] } | null | undefined): Thread | null => {
+    if (!apiThread || !apiThread.thread) {
+      return null
+    }
+    return {
+      id: apiThread.thread.id,
+      title: apiThread.thread.title,
+      createdAt: new Date(apiThread.thread.created_at).getTime(),
+      updatedAt: new Date(apiThread.thread.updated_at).getTime(),
+      messages: (apiThread.messages || []).map((msg) => ({
+        id: msg.id,
+        role: msg.role as Message['role'],
+        content: msg.content,
+        toolName: typeof msg.tool_name === 'string' ? msg.tool_name : (msg.tool_name as any)?.String || undefined,
+        timestamp: new Date(msg.created_at).getTime(),
+        data: msg.data,
+      })),
+    }
+  }
+
+  // Create new thread in database
+  const createNewThreadInDB = async (): Promise<Thread> => {
+    if (!selectedProfile) {
+      throw new Error('No profile selected')
+    }
+    
+    const response = await mcpAPI.createThread(selectedProfile, 'New chat')
+    const apiThread = response.data
+    
+    return {
+      id: apiThread.id,
+      title: apiThread.title,
+      createdAt: new Date(apiThread.created_at).getTime(),
+      updatedAt: new Date(apiThread.updated_at).getTime(),
+      messages: [],
+    }
+  }
+
+  useEffect(() => {
+    if (!selectedProfile || !shouldAutoConnectRef.current) return
+    
+    // Prevent multiple simultaneous initializations
+    if (connecting || connected) return
+    
+    try {
+      loadTools().catch((error) => {
+        logError('useEffect - loadTools', error, { selectedProfile })
+      })
+      loadModelConfigs().catch((error) => {
+        logError('useEffect - loadModelConfigs', error, { selectedProfile })
+      })
+      connectWebSocket()
+    } catch (error) {
+      logError('useEffect - initializeMCPConnection', error, { selectedProfile })
+      // Don't let initialization errors crash the component
+    }
+    
     return () => {
       if (wsRef.current) {
-        wsRef.current.close()
+        try {
+          wsRef.current.close()
+        } catch (error) {
+          logError('useEffect cleanup - closeWebSocket', error, { selectedProfile })
+        }
+        wsRef.current = null
+      }
+      if (isMountedRef.current) {
+        setConnected(false)
+        setConnecting(false)
       }
     }
   }, [selectedProfile])
@@ -67,43 +346,56 @@ export default function MCPPage() {
     }
   }, [selectedModel])
 
+  const activeThread = threads.find((t) => t.id === activeThreadId) || null
+  // Deduplicate messages by ID to prevent showing the same message multiple times
+  const messages = activeThread?.messages ? 
+    activeThread.messages.filter((msg, index, self) => 
+      index === self.findIndex((m) => m.id === msg.id)
+    ) : []
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
   const loadProfiles = async () => {
+    if (!isMountedRef.current) return
+    
     setLoadingProfiles(true)
     setProfileError(null)
     try {
-      // Check if API key exists
-      const apiKey = localStorage.getItem('neurondesk_api_key') || localStorage.getItem('api_key')
-      if (!apiKey) {
-        const errorMsg = 'API key not set. Please go to Settings and add your API key.'
-        setProfileError(errorMsg)
-        addMessage('system', errorMsg)
-        setLoadingProfiles(false)
-        return
-      }
-      
       const response = await profilesAPI.list()
+      if (!isMountedRef.current) return
+      
       console.log('Profiles loaded:', response.data)
       setProfiles(response.data)
+      
       if (response.data.length > 0 && !selectedProfile) {
-        // Prefer default profile if available
+        // Use active profile (set at login); otherwise default/first profile.
+        const activeProfileId = localStorage.getItem('active_profile_id')
+        if (activeProfileId) {
+          const activeProfile = response.data.find((p: Profile) => p.id === activeProfileId)
+          if (activeProfile) {
+            setSelectedProfile(activeProfileId)
+            if (isMountedRef.current) setLoadingProfiles(false)
+            return
+          }
+        }
+
         const defaultProfile = response.data.find((p: Profile) => p.is_default)
         setSelectedProfile(defaultProfile ? defaultProfile.id : response.data[0].id)
       } else if (response.data.length === 0) {
-        setProfileError('No profiles found. Please create a profile in Settings.')
+        setProfileError('No profiles found. Profiles are created automatically during signup.')
       }
     } catch (error: any) {
-      console.error('Failed to load profiles:', error)
-      const errorMsg = error.response?.status === 401 
-        ? 'Authentication failed. Please check your API key in Settings. Current key: ' + (localStorage.getItem('neurondesk_api_key')?.substring(0, 8) || 'not set') + '...'
-        : error.response?.data?.error || error.message || 'Failed to load profiles'
-      setProfileError(errorMsg)
-      addMessage('system', `Error loading profiles: ${errorMsg}`)
+      logError('loadProfiles', error, { selectedProfile })
+      if (isMountedRef.current) {
+        const errorMsg = parseError(error)
+        setProfileError(errorMsg)
+      }
     } finally {
-      setLoadingProfiles(false)
+      if (isMountedRef.current) {
+        setLoadingProfiles(false)
+      }
     }
   }
 
@@ -112,9 +404,11 @@ export default function MCPPage() {
     try {
       const response = await mcpAPI.listTools(selectedProfile)
       setTools(response.data.tools || [])
+      setMcpError(null)
     } catch (error: any) {
       console.error('Failed to load tools:', error)
-      addMessage('system', `Failed to load tools: ${error.response?.data?.error || error.response?.data?.message || error.message || 'Failed to load tools'}. Make sure MCP server is configured correctly in Settings.`)
+      const errorMsg = parseError(error)
+      setMcpError(errorMsg)
     }
   }
 
@@ -123,7 +417,6 @@ export default function MCPPage() {
     try {
       const response = await modelConfigAPI.list(selectedProfile, false)
       setModelConfigs(response.data)
-      // Set default model if available
       const defaultModel = response.data.find(m => m.is_default)
       if (defaultModel) {
         setSelectedModel(defaultModel.id)
@@ -147,7 +440,6 @@ export default function MCPPage() {
       return
     }
 
-    // Check if API key is required and set
     const provider = model.model_provider
     if (provider !== 'ollama' && !model.is_free) {
       try {
@@ -169,113 +461,381 @@ export default function MCPPage() {
   const connectWebSocket = () => {
     if (!selectedProfile) return
     
-    // Close existing connection
+    // Prevent multiple simultaneous connection attempts
+    if (connecting || connected) return
+    
     if (wsRef.current) {
       wsRef.current.close()
       wsRef.current = null
     }
     
-    // Get API key from localStorage
-    const apiKey = typeof window !== 'undefined' 
-      ? (localStorage.getItem('neurondesk_api_key') || localStorage.getItem('api_key'))
-      : null
+    setConnecting(true)
+    setConnected(false)
+    setMcpError(null)
+    errorShownRef.current = false
     
     const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081/api/v1'
     const wsBaseUrl = apiBaseUrl.replace(/^http/, 'ws')
-    const wsUrl = apiKey
-      ? `${wsBaseUrl}/profiles/${selectedProfile}/mcp/ws?api_key=${encodeURIComponent(apiKey)}`
-      : `${wsBaseUrl}/profiles/${selectedProfile}/mcp/ws`
+    // Browser WebSockets can't set Authorization headers; pass JWT via query param (?token=...)
+    const token = localStorage.getItem('neurondesk_auth_token')
+    const tokenParam = token ? `?token=${encodeURIComponent(token)}` : ''
+    const wsUrl = `${wsBaseUrl}/profiles/${selectedProfile}/mcp/ws${tokenParam}`
+    
+    console.log('Connecting to WebSocket:', wsUrl.replace(/token=[^&]+/, 'token=***'))
+    console.log('Token present:', !!token)
     
     const ws = new WebSocket(wsUrl)
     
     ws.onopen = () => {
+      if (!isMountedRef.current) return
       setConnected(true)
-      addMessage('system', 'Connected to MCP server')
+      setConnecting(false)
+      setMcpError(null)
+      errorShownRef.current = false
+      reconnectAttemptRef.current = 0
       ws.send(JSON.stringify({ type: 'list_tools' }))
     }
     
-    ws.onmessage = (event) => {
+    ws.onmessage = async (event) => {
       try {
         const data = JSON.parse(event.data)
+        console.log('WebSocket message received:', data) // Debug logging
+        
         if (data.type === 'connected') {
-          addMessage('system', data.message)
+          // Skip adding 'connected' message if threads aren't loaded yet
+          // It will be added once threads are ready
+          if (activeThreadId && !activeThreadId.startsWith('temp-')) {
+            try {
+              await addMessage('system', data.message)
+            } catch (error) {
+              logError('WebSocket - addConnectedMessage', error, { activeThreadId, message: data.message })
+            }
+          }
         } else if (data.type === 'tool_result') {
-          addMessage('tool', JSON.stringify(data.result, null, 2), undefined, data.result)
+          try {
+            await addMessage('tool', JSON.stringify(data.result, null, 2), undefined, data.result)
+            if (isMountedRef.current) setLoading(false) // Clear loading state after tool result
+          } catch (error) {
+            logError('WebSocket - addToolResultMessage', error, { result: data.result })
+            if (isMountedRef.current) setLoading(false)
+          }
         } else if (data.type === 'tools') {
-          setTools(data.tools || [])
+          if (isMountedRef.current) setTools(data.tools || [])
         } else if (data.type === 'error') {
-          addMessage('system', `Error: ${data.error || 'Unknown error'}`)
+          if (!isMountedRef.current) return
+          setConnecting(false)
           setConnected(false)
+          setLoading(false) // Clear loading state on error
+          const errorMsg = parseError({ message: data.error || 'Unknown error' })
+          logError('WebSocket - error message', new Error(data.error || 'Unknown error'), { errorData: data })
+          try {
+            await addMessage('system', `Error: ${errorMsg}`)
+          } catch (error) {
+            logError('WebSocket - addErrorMessage', error, { errorMsg })
+          }
+          if (!errorShownRef.current) {
+            setMcpError(errorMsg)
+            errorShownRef.current = true
+          }
+          shouldAutoConnectRef.current = false
         } else if (data.type === 'assistant') {
-          addMessage('assistant', data.content || data.message || '')
+          const content = data.content || data.message || data.text || ''
+          if (content) {
+            try {
+              await addMessage('assistant', content)
+              if (isMountedRef.current) setLoading(false) // Clear loading state after receiving assistant response
+            } catch (error) {
+              logError('WebSocket - addAssistantMessage', error, { contentLength: content.length })
+              if (isMountedRef.current) setLoading(false)
+            }
+          } else {
+            logError('WebSocket - emptyAssistantMessage', new Error('Received assistant message with no content'), { data })
+            if (isMountedRef.current) setLoading(false)
+            try {
+              await addMessage('system', 'Received empty response from server. Check browser console for details.')
+            } catch (error) {
+              logError('WebSocket - addEmptyResponseMessage', error)
+            }
+          }
         } else if (data.type === 'ping') {
           ws.send(JSON.stringify({ type: 'pong' }))
+        } else {
+          // Handle unknown message types
+          logError('WebSocket - unknownMessageType', new Error(`Unknown message type: ${data.type}`), { messageType: data.type, data })
+          // Try to extract any content that might be there
+          if (data.content || data.message || data.text) {
+            try {
+              await addMessage('assistant', data.content || data.message || data.text || '')
+              if (isMountedRef.current) setLoading(false)
+            } catch (error) {
+              logError('WebSocket - addUnknownTypeMessage', error, { messageType: data.type })
+              if (isMountedRef.current) setLoading(false)
+            }
+          } else {
+            if (isMountedRef.current) setLoading(false)
+            try {
+              await addMessage('system', `Received unexpected message type: ${data.type}. Check console for details.`)
+            } catch (error) {
+              logError('WebSocket - addUnexpectedTypeMessage', error, { messageType: data.type })
+            }
+          }
         }
       } catch (error) {
-        console.error('Failed to parse WebSocket message:', error)
-        addMessage('system', 'Failed to parse message')
+        logError('WebSocket - parseMessage', error, { 
+          rawData: typeof event.data === 'string' ? event.data.substring(0, 500) : String(event.data).substring(0, 500),
+          dataLength: typeof event.data === 'string' ? event.data.length : String(event.data).length
+        })
+        if (isMountedRef.current) {
+          setLoading(false) // Clear loading state on parse error
+          if (!errorShownRef.current) {
+            setMcpError('Invalid response from NeuronMCP')
+            errorShownRef.current = true
+          }
+        }
       }
     }
     
     ws.onerror = (error) => {
-      console.error('WebSocket error:', error)
-      addMessage('system', 'WebSocket connection error. Check if MCP server is running and profile is configured correctly.')
+      logError('WebSocket onerror', error, { 
+        selectedProfile, 
+        wsState: ws.readyState,
+        wsUrl: wsUrl.replace(/token=[^&]+/, 'token=***')
+      })
+      if (!isMountedRef.current) return
+      setConnecting(false)
       setConnected(false)
+      if (!errorShownRef.current) {
+        setMcpError('NeuronMCP not running')
+        errorShownRef.current = true
+      }
+      shouldAutoConnectRef.current = false // Stop auto-reconnecting
     }
     
     ws.onclose = (event) => {
+      console.log('WebSocket closed:', { code: event.code, reason: event.reason, wasClean: event.wasClean })
+      if (!isMountedRef.current) return
+      setConnecting(false)
       setConnected(false)
       if (event.code !== 1000) {
-        addMessage('system', `Connection closed unexpectedly (code: ${event.code}). Check MCP server configuration.`)
-      } else {
-        addMessage('system', 'Disconnected from MCP server')
-      }
-      if (selectedProfile && event.code !== 1000) {
-        setTimeout(() => {
-          if (selectedProfile) {
-            connectWebSocket()
+        // Only show the first error message
+        if (!errorShownRef.current) {
+          // Common close codes that indicate server not running
+          if (event.code === 1006 || event.code === 1001) {
+            setMcpError('Connection failed - check auth token or MCP server')
+          } else {
+            setMcpError(`Connection error (code: ${event.code})`)
           }
-        }, 3000)
+          errorShownRef.current = true
+        }
+        // Stop auto-reconnecting - user must manually connect
+        shouldAutoConnectRef.current = false
+      } else {
+        // Normal close - allow auto-reconnect on next profile change
+        shouldAutoConnectRef.current = true
       }
     }
     
     wsRef.current = ws
   }
 
-  const addMessage = (role: Message['role'], content: string, toolName?: string, data?: any) => {
-    setMessages((prev) => [...prev, { 
-      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-      role, 
+  const createNewThread = async () => {
+    if (!selectedProfile) return
+    
+    try {
+      const newThread = await createNewThreadInDB()
+      setThreads((prev) => [newThread, ...prev])
+      setActiveThreadId(newThread.id)
+      setInput('')
+    } catch (error: any) {
+      console.error('Failed to create thread:', error)
+      setMcpError(parseError(error))
+    }
+  }
+
+  const deleteThread = async (threadId: string) => {
+    if (!selectedProfile) return
+    
+    try {
+      await mcpAPI.deleteThread(selectedProfile, threadId)
+      setThreads((prev) => {
+        const next = prev.filter((t) => t.id !== threadId)
+        // Ensure we always have at least one thread.
+        if (next.length === 0) {
+          createNewThreadInDB().then((t) => {
+            setThreads([t])
+            setActiveThreadId(t.id)
+          })
+          return []
+        }
+
+        if (activeThreadId === threadId) {
+          setActiveThreadId(next[0].id)
+        }
+        return next
+      })
+    } catch (error: any) {
+      logError('deleteThread', error, { threadId, selectedProfile })
+      if (isMountedRef.current) {
+        setMcpError(parseError(error))
+      }
+    }
+  }
+
+  const addMessage = async (role: Message['role'], content: string, toolName?: string, data?: any) => {
+    if (!selectedProfile || !isMountedRef.current) return
+    
+    // If no active thread, create one
+    if (!activeThreadId) {
+      try {
+        const newThread = await createNewThreadInDB()
+        if (!isMountedRef.current) return
+        setThreads((prev) => [newThread, ...prev])
+        setActiveThreadId(newThread.id)
+      } catch (error) {
+        if (!isMountedRef.current) return
+        logError('addMessage - createThread', error, { role, contentLength: content.length })
+        // Create temp thread in memory
+        const tempThread: Thread = {
+          id: `temp-${Date.now()}`,
+          title: 'New chat',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          messages: [],
+        }
+        setThreads((prev) => [tempThread, ...prev])
+        setActiveThreadId(tempThread.id)
+      }
+    }
+
+    // Create message with temp ID immediately (don't wait for DB)
+    const now = Date.now()
+    const msg: Message = {
+      id: `temp-${now}-${Math.random().toString(36).slice(2, 9)}`,
+      role,
       content,
       toolName,
-      timestamp: new Date(),
-      data
-    }])
+      timestamp: now,
+      data,
+    }
+
+    // Add to UI immediately (only if still mounted)
+    if (!isMountedRef.current) return
+    setThreads((prev) => {
+      return prev.map((t) => {
+        if (t.id !== activeThreadId) return t
+        
+        // Check if message already exists to prevent duplicates
+        const messageExists = t.messages.some(m => m.content === content && m.role === role && m.timestamp > now - 1000)
+        if (messageExists) {
+          return t
+        }
+        
+        return {
+          ...t,
+          updatedAt: now,
+          messages: [...t.messages, msg],
+        }
+      })
+    })
+
+    // Try to save to DB in background (don't block UI)
+    // Only save if thread ID is not a temp ID (starts with 'temp-')
+    if (activeThreadId && !activeThreadId.startsWith('temp-')) {
+      try {
+        const response = await mcpAPI.addMessage(selectedProfile, activeThreadId, role, content, toolName, data)
+        if (!isMountedRef.current) return
+        
+        const apiMessage = response.data
+        
+        // Update with real ID from DB
+        setThreads((prev) => {
+          return prev.map((t) => {
+            if (t.id !== activeThreadId) return t
+            return {
+              ...t,
+              messages: t.messages.map((m) => 
+                m.id === msg.id ? { ...m, id: apiMessage.id } : m
+              ),
+            }
+          })
+        })
+      } catch (error: any) {
+        if (!isMountedRef.current) return
+        logError('addMessage - saveToDB', error, { 
+          role, 
+          contentLength: content.length, 
+          threadId: activeThreadId,
+          toolName,
+          note: 'Message displayed in UI but not saved to DB - non-fatal'
+        })
+        // Message is already in UI, so this is non-fatal
+      }
+    } else {
+      // Thread is temporary, don't try to save to DB
+      console.log('Message added to temp thread, skipping DB save')
+    }
   }
 
   const handleSendMessage = async () => {
     if (!input.trim() || loading || !selectedModel || modelError) return
     
+    if (!connected) {
+      const errorMsg = 'WebSocket not connected. Please wait for connection or click "Connect to MCP" button.'
+      setMcpError(errorMsg)
+      addMessage('system', `Error: ${errorMsg}`)
+      return
+    }
+    
     const userMessage = input.trim()
     setInput('')
-    addMessage('user', userMessage)
+    await addMessage('user', userMessage)
     setLoading(true)
+    setMcpError(null) // Clear any previous errors
     
     try {
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify({
+        const message = {
           type: 'chat',
           content: userMessage,
           model_id: selectedModel
-        }))
+        }
+        console.log('Sending WebSocket message:', message) // Debug logging
+        wsRef.current.send(JSON.stringify(message))
+        
+        // Set a timeout to clear loading state if no response is received
+        const timeoutId = setTimeout(() => {
+          setLoading((prevLoading) => {
+            if (prevLoading) {
+              console.warn('No response received within timeout')
+              const timeoutMsg = 'No response received within 60 seconds. The MCP server may be slow or not responding.'
+              setMcpError(timeoutMsg)
+              addMessage('system', timeoutMsg)
+              return false
+            }
+            return prevLoading
+          })
+        }, 60000) // 60 second timeout
+        
+        // Store timeout ID to clear it if response comes early (handled in onmessage)
+        // Note: In a production app, you'd want to track multiple timeouts, but for simplicity we'll let it run
       } else {
-        // Fallback to HTTP if WebSocket not available
-        addMessage('assistant', 'WebSocket not connected. Please check your connection.')
+        setLoading(false)
+        const errorMsg = `WebSocket connection is not open (state: ${wsRef.current?.readyState}). Please refresh the page or reconnect.`
+        setMcpError(errorMsg)
+        addMessage('system', `Error: ${errorMsg}`)
+        console.error('WebSocket state:', {
+          wsRefExists: !!wsRef.current,
+          readyState: wsRef.current?.readyState,
+          connected,
+          connecting
+        })
       }
     } catch (error: any) {
-      addMessage('system', `Error: ${error.message || 'Failed to send message'}`)
-    } finally {
       setLoading(false)
+      const errorMsg = parseError(error)
+      setMcpError(errorMsg)
+      addMessage('system', `Error: ${errorMsg}`)
+      console.error('Error sending message:', error)
     }
   }
 
@@ -305,297 +865,450 @@ export default function MCPPage() {
         addMessage('tool', JSON.stringify(result.data, null, 2), tool.name, result.data)
       }
     } catch (error: any) {
-      addMessage('system', `Error: ${error.response?.data?.error || error.message || 'Tool call failed'}`)
+      const errorMsg = parseError(error)
+      setMcpError(errorMsg)
     } finally {
       setLoading(false)
     }
   }
 
+  const handleToolCallWithResult = async (tool: ToolDefinition, args: Record<string, any>): Promise<any> => {
+    if (!selectedProfile) {
+      throw new Error('No profile selected')
+    }
+    
+    try {
+      // Always use API call for ToolCard to get immediate results
+      const result = await mcpAPI.callTool(selectedProfile, tool.name, args)
+      // Also add to chat messages
+      addMessage('tool', JSON.stringify(result.data, null, 2), tool.name, result.data)
+      return result.data
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.error || error.message || 'Tool call failed'
+      throw new Error(errorMsg)
+    }
+  }
+
+  const filteredThreads = threads
+    .slice()
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+    .filter((t) => {
+      const q = threadSearch.trim().toLowerCase()
+      if (!q) return true
+      return (t.title || '').toLowerCase().includes(q)
+    })
+
   return (
-    <div className="h-full flex flex-col bg-[#1a1a1a]">
-      {/* Top Bar - Model Selection and Profile */}
-      <div className="bg-[#252525] border-b border-[#333333] px-6 py-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4 flex-1">
-            <div className="flex items-center gap-2">
-              <SparklesIcon className="w-5 h-5 text-[#999999]" />
-              <label className="text-sm font-medium text-[#c8c8c8]">Model:</label>
+    <div className="h-full w-full flex overflow-hidden bg-white dark:bg-slate-950">
+      {/* Conversation Sidebar (ChatGPT-style) */}
+      <aside className="w-72 flex flex-col bg-white dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800">
+        <div className="p-3 border-b border-slate-200 dark:border-slate-800">
+          <button
+            onClick={createNewThread}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-600 text-gray-900 dark:text-slate-100 transition-colors"
+          >
+            <PlusIcon className="w-4 h-4" />
+            New chat
+          </button>
+
+          <div className="mt-3 space-y-2">
+            <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-slate-400">
+              <StatusBadge status={connected ? 'connected' : connecting ? 'connecting' : 'disconnected'} />
+              <span className="truncate">
+                {profileError
+                  ? 'Profile error'
+                  : loadingProfiles
+                    ? 'Loading profile…'
+                    : `Profile: ${profiles.find((p) => p.id === selectedProfile)?.name || '…'}`}
+              </span>
             </div>
-            <select
-              value={selectedModel}
-              onChange={(e) => setSelectedModel(e.target.value)}
-              className="input bg-[#1a1a1a] border-[#333333] text-[#e0e0e0] max-w-xs"
-            >
-              <option value="">Select a model</option>
-              {modelConfigs.map((model) => (
-                <option key={model.id} value={model.id}>
-                  {model.model_provider} - {model.model_name} {model.is_default && '(Default)'}
-                </option>
-              ))}
-            </select>
-            {modelError && (
-              <div className="flex items-center gap-2 text-red-400 text-sm">
-                <XCircleIcon className="w-4 h-4" />
-                <span>{modelError}</span>
-              </div>
+            {!connected && !connecting && selectedProfile && (
+              <button
+                onClick={() => {
+                  shouldAutoConnectRef.current = true
+                  errorShownRef.current = false
+                  connectWebSocket()
+                }}
+                className="w-full px-3 py-1.5 text-xs rounded-lg bg-purple-600 hover:bg-purple-700 text-white transition-colors flex items-center justify-center gap-2"
+              >
+                <span>Connect to MCP</span>
+              </button>
             )}
-            {selectedModel && !modelError && (
-              <div className="flex items-center gap-2 text-green-400 text-sm">
-                <CheckCircleIcon className="w-4 h-4" />
-                <span>Ready</span>
+            {connecting && (
+              <div className="w-full px-3 py-1.5 text-xs text-center text-gray-600 dark:text-slate-400">
+                Connecting...
               </div>
             )}
           </div>
-          <div className="flex items-center gap-4">
-            <div className="w-64">
-              {profileError ? (
-                <div className="px-4 py-2 bg-red-900/20 border border-red-700 rounded-lg">
-                  <div className="text-xs text-red-400 font-medium">Profile Error</div>
-                  <div className="text-xs text-red-300 mt-1">{profileError}</div>
-                  <a 
-                    href="/settings" 
-                    className="text-xs text-blue-400 hover:text-blue-300 underline mt-1 inline-block"
-                  >
-                    Go to Settings →
-                  </a>
+
+          <div className="mt-3 relative">
+            <MagnifyingGlassIcon className="w-4 h-4 text-gray-500 dark:text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              value={threadSearch}
+              onChange={(e) => setThreadSearch(e.target.value)}
+              placeholder="Search chats"
+              className="w-full pl-9 pr-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-gray-900 dark:text-slate-200 placeholder-gray-500 dark:placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500/50"
+            />
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-2 space-y-1">
+          {filteredThreads.map((t) => {
+            const active = t.id === activeThreadId
+            return (
+              <div
+                key={t.id}
+                className={`group flex items-center gap-2 rounded-lg px-2 py-2 cursor-pointer transition-colors ${
+                  active ? 'bg-slate-200 dark:bg-slate-800' : 'hover:bg-slate-100 dark:hover:bg-slate-900'
+                }`}
+                onClick={() => setActiveThreadId(t.id)}
+                role="button"
+                tabIndex={0}
+              >
+                <ChatBubbleLeftRightIcon className="w-4 h-4 text-gray-500 dark:text-slate-500 flex-shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <div className={`text-sm truncate ${active ? 'text-gray-900 dark:text-slate-100' : 'text-gray-700 dark:text-slate-200'}`}>
+                    {t.title || 'New chat'}
+                  </div>
+                  <div className="text-[11px] text-gray-500 dark:text-slate-500 truncate">
+                    {t.messages.length} messages
+                  </div>
                 </div>
-              ) : loadingProfiles ? (
-                <div className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-400">
-                  Loading profiles...
-                </div>
-              ) : (
-                <ProfileSelector
-                  profiles={profiles}
-                  selectedProfile={selectedProfile}
-                  onSelect={setSelectedProfile}
-                />
-              )}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    deleteThread(t.id)
+                  }}
+                  className="opacity-0 group-hover:opacity-100 p-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200 transition-all"
+                  title="Delete chat"
+                >
+                  <TrashIcon className="w-4 h-4" />
+                </button>
+              </div>
+            )
+          })}
+        </div>
+
+        <div className="p-3 border-t border-slate-200 dark:border-slate-800 text-xs text-gray-500 dark:text-slate-500">
+          Chats are stored locally in this browser.
+        </div>
+      </aside>
+
+      {/* Main chat column */}
+      <section className="flex-1 flex flex-col min-w-0">
+        {/* Error Banner */}
+        {mcpError && (
+          <div className="px-4 py-2 bg-red-50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-800/50 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <XCircleIcon className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0" />
+              <span className="text-sm text-red-700 dark:text-red-300 truncate">{mcpError}</span>
             </div>
-            <StatusBadge status={connected ? 'connected' : 'disconnected'} />
+            {mcpError.includes('not running') && (
+              <a
+                href="/settings"
+                className="text-xs text-red-600 dark:text-red-300 hover:text-red-800 dark:hover:text-red-200 underline whitespace-nowrap"
+              >
+                Run NeuronMCP
+              </a>
+            )}
+          </div>
+        )}
+        
+        {/* Header */}
+        <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-950/30">
+          <div className="min-w-0">
+            <div className="text-sm text-gray-900 dark:text-slate-200 truncate">
+              {activeThread?.title || 'New chat'}
+            </div>
+            {profileError && (
+              <div className="text-xs text-red-600 dark:text-red-400 truncate">
+                {profileError} <a href="/settings" className="underline text-red-500 dark:text-red-300 hover:text-red-700 dark:hover:text-red-200">Settings</a>
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* Model selector (ChatGPT-style placement: top) */}
+            <div className="flex items-center gap-2">
+              <SparklesIcon className="w-4 h-4 text-gray-500 dark:text-slate-500" />
+              <select
+                value={selectedModel}
+                onChange={(e) => setSelectedModel(e.target.value)}
+                className="px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-gray-900 dark:text-slate-200 hover:border-slate-400 dark:hover:border-slate-600 focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500/50 transition-colors"
+              >
+                <option value="">Select a model</option>
+                {modelConfigs.map((model) => (
+                  <option key={model.id} value={model.id}>
+                    {model.model_provider} - {model.model_name} {model.is_default && '(Default)'}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {modelError ? (
+              <div className="hidden sm:flex items-center gap-2 text-red-400 text-xs">
+                <XCircleIcon className="w-4 h-4" />
+                <span className="max-w-56 truncate">{modelError}</span>
+              </div>
+            ) : selectedModel ? (
+              <div className="hidden sm:flex items-center gap-2 text-green-400 text-xs">
+                <CheckCircleIcon className="w-4 h-4" />
+                <span>Ready</span>
+              </div>
+            ) : null}
+
             <button
-              onClick={() => setShowTools(!showTools)}
-              className="p-2 text-[#999999] hover:text-[#e0e0e0] hover:bg-[#2d2d2d] rounded-lg transition-colors"
-              title="Toggle Tools"
+              onClick={() => setShowTools((v) => !v)}
+              className="p-2 text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-900 rounded-lg transition-colors"
+              title="Tools"
             >
               <WrenchScrewdriverIcon className="w-5 h-5" />
             </button>
           </div>
         </div>
-      </div>
 
-      <div className="flex-1 flex overflow-hidden">
-        {/* Tools Sidebar - Collapsible */}
-        {showTools && (
-          <div className="w-80 bg-[#252525] border-r border-[#333333] flex flex-col">
-            <div className="p-4 border-b border-[#333333]">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-[#e0e0e0]">Available Tools</h2>
-                <button
-                  onClick={() => setShowTools(false)}
-                  className="text-[#999999] hover:text-[#e0e0e0]"
-                >
-                  <XCircleIcon className="w-5 h-5" />
-                </button>
-              </div>
-              <p className="text-sm text-[#999999] mt-1">{tools.length} tools available</p>
-            </div>
-            <div className="flex-1 overflow-y-auto p-2">
-              {tools.map((tool) => (
-                <ToolCard
-                  key={tool.name}
-                  tool={tool}
-                  onCall={handleToolCall}
-                  disabled={!selectedModel || !!modelError || loading}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Main Chat Area */}
-        <div className="flex-1 flex flex-col">
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-4">
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="max-w-3xl mx-auto px-4 py-6">
             {messages.length === 0 && (
-              <div className="text-center py-12">
-                <ChatBubbleLeftRightIcon className="w-16 h-16 text-[#999999] mx-auto mb-4" />
-                <h2 className="text-xl font-semibold text-[#e0e0e0] mb-2">Start a conversation</h2>
-                <p className="text-[#999999] mb-6">Select a model and start chatting with MCP tools</p>
-                {!showTools && (
-                  <button
-                    onClick={() => setShowTools(true)}
-                    className="btn btn-primary flex items-center gap-2 mx-auto"
-                  >
-                    <WrenchScrewdriverIcon className="w-4 h-4" />
-                    View Available Tools
-                  </button>
-                )}
+              <div className="flex flex-col items-center justify-center h-full min-h-[45vh]">
+                <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center mb-4">
+                  <SparklesIcon className="w-8 h-8 text-white" />
+                </div>
+                <h2 className="text-2xl font-semibold text-gray-900 dark:text-slate-100 mb-2">How can I help you today?</h2>
+                <p className="text-gray-600 dark:text-slate-400 mb-6">Pick a model, then send a message. Tools are in the right drawer.</p>
               </div>
             )}
+
             {messages.map((msg) => (
               <MessageBubble key={msg.id} message={msg} />
             ))}
+
             {loading && messages.length > 0 && (
-              <div className="flex items-center gap-2 text-[#999999]">
-                <div className="w-2 h-2 bg-[#999999] rounded-full animate-bounce" />
-                <div className="w-2 h-2 bg-[#999999] rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
-                <div className="w-2 h-2 bg-[#999999] rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
+              <div className="flex items-center gap-2 text-gray-500 dark:text-slate-400 py-4">
+                <div className="w-2 h-2 bg-gray-400 dark:bg-slate-400 rounded-full animate-bounce" />
+                <div className="w-2 h-2 bg-gray-400 dark:bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                <div className="w-2 h-2 bg-gray-400 dark:bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
               </div>
             )}
             <div ref={messagesEndRef} />
           </div>
+        </div>
 
-          {/* Input Area */}
-          <div className="border-t border-[#333333] bg-[#252525] p-4">
-            <div className="max-w-4xl mx-auto">
-              <div className="flex items-end gap-3">
-                <div className="flex-1 relative">
-                  <textarea
-                    ref={inputRef}
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyPress={handleKeyPress}
-                    placeholder={selectedModel ? "Type your message..." : "Select a model first..."}
-                    disabled={!selectedModel || !!modelError || loading}
-                    rows={1}
-                    className="input w-full resize-none min-h-[44px] max-h-32 bg-[#1a1a1a] border-[#333333] text-[#e0e0e0] placeholder-[#666666] disabled:opacity-50 disabled:cursor-not-allowed"
-                    style={{
-                      height: 'auto',
-                      overflow: 'auto'
-                    }}
-                    onInput={(e) => {
-                      const target = e.target as HTMLTextAreaElement
-                      target.style.height = 'auto'
-                      target.style.height = `${Math.min(target.scrollHeight, 128)}px`
-                    }}
-                  />
-                </div>
+        {/* Composer */}
+        <div className="border-t border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-950/30">
+          <div className="max-w-3xl mx-auto px-4 py-4">
+            <div className="relative">
+              <div className="relative flex items-end bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-2xl shadow-lg hover:border-slate-400 dark:hover:border-slate-600 focus-within:border-purple-500 focus-within:ring-2 focus-within:ring-purple-500/20 transition-all">
+                <textarea
+                  ref={inputRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  placeholder={selectedModel ? 'Message…' : 'Select a model first…'}
+                  disabled={!selectedModel || !!modelError || loading}
+                  rows={1}
+                  className="flex-1 px-4 py-3 bg-transparent text-gray-900 dark:text-slate-100 placeholder-gray-500 dark:placeholder-slate-500 resize-none focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed max-h-32 overflow-y-auto"
+                  style={{ height: 'auto' }}
+                  onInput={(e) => {
+                    const target = e.target as HTMLTextAreaElement
+                    target.style.height = 'auto'
+                    target.style.height = `${Math.min(target.scrollHeight, 128)}px`
+                  }}
+                />
                 <button
                   onClick={handleSendMessage}
                   disabled={!input.trim() || !selectedModel || !!modelError || loading}
-                  className="btn btn-primary p-3 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="m-2 p-2 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+                  title="Send message"
                 >
                   <PaperAirplaneIcon className="w-5 h-5" />
                 </button>
               </div>
               {!selectedModel && (
-                <p className="text-xs text-red-400 mt-2">Please select a model to start chatting</p>
+                <p className="text-xs text-red-600 dark:text-red-400 mt-2 text-center">Please select a model to start chatting</p>
               )}
             </div>
           </div>
         </div>
-      </div>
+      </section>
+
+      {/* Tools Drawer (right) */}
+      {showTools && (
+        <aside className="w-96 bg-white dark:bg-slate-950 border-l border-slate-200 dark:border-slate-800 flex flex-col">
+          <div className="p-4 border-b border-slate-200 dark:border-slate-800">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-slate-100">Tools</h2>
+              <button
+                onClick={() => setShowTools(false)}
+                className="text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200"
+              >
+                <XCircleIcon className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-slate-400 mt-1">{tools.length} available</p>
+          </div>
+          <div className="flex-1 overflow-y-auto p-3 space-y-2">
+            {tools.map((tool) => (
+              <ToolCard
+                key={tool.name}
+                tool={tool}
+                onCall={handleToolCallWithResult}
+                disabled={!selectedModel || !!modelError || loading}
+              />
+            ))}
+          </div>
+        </aside>
+      )}
     </div>
   )
 }
 
 // Tool Card Component
-function ToolCard({ tool, onCall, disabled }: { tool: ToolDefinition, onCall: (tool: ToolDefinition, args: Record<string, any>) => void, disabled: boolean }) {
+function ToolCard({ tool, onCall, disabled }: { tool: ToolDefinition, onCall: (tool: ToolDefinition, args: Record<string, any>) => Promise<any>, disabled: boolean }) {
   const [expanded, setExpanded] = useState(false)
   const [args, setArgs] = useState<Record<string, any>>({})
+  const [result, setResult] = useState<any>(null)
+  const [calling, setCalling] = useState(false)
 
-  const handleCall = () => {
-    onCall(tool, args)
-    setArgs({})
-    setExpanded(false)
+  const handleCall = async () => {
+    setCalling(true)
+    setResult(null)
+    try {
+      const toolResult = await onCall(tool, args)
+      setResult(toolResult)
+    } catch (error) {
+      setResult({ error: error instanceof Error ? error.message : 'Tool call failed' })
+    } finally {
+      setCalling(false)
+    }
   }
 
   return (
-    <div className="mb-2 border border-[#333333] rounded-lg bg-[#1a1a1a]">
+    <div className="border border-slate-300 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-800 flex flex-col">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full text-left p-3 hover:bg-[#2d2d2d] transition-colors"
+        className="w-full text-left p-3 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
       >
-        <div className="font-medium text-sm text-[#e0e0e0]">{tool.name}</div>
-        <div className="text-xs text-[#999999] mt-1 line-clamp-2">{tool.description}</div>
+        <div className="font-medium text-sm text-gray-900 dark:text-slate-100">{tool.name}</div>
+        <div className="text-xs text-gray-600 dark:text-slate-400 mt-1 line-clamp-2">{tool.description}</div>
       </button>
       {expanded && (
-        <div className="p-3 border-t border-[#333333] space-y-3">
-          {Object.entries(tool.inputSchema?.properties || {}).map(([key, schema]: [string, any]) => (
-            <div key={key}>
-              <label className="block text-xs font-medium text-[#c8c8c8] mb-1">
-                {key} {schema.required && <span className="text-red-500">*</span>}
-              </label>
-              <input
-                type="text"
-                value={args[key] || ''}
-                onChange={(e) => {
-                  let value: any = e.target.value
-                  if (value.startsWith('{') || value.startsWith('[')) {
-                    try {
-                      value = JSON.parse(value)
-                    } catch {}
-                  }
-                  setArgs({ ...args, [key]: value })
-                }}
-                className="input text-sm bg-[#252525] border-[#333333] text-[#e0e0e0]"
-                placeholder={schema.description || schema.type || key}
-              />
-            </div>
-          ))}
-          <button
-            onClick={handleCall}
-            disabled={disabled}
-            className="btn btn-primary w-full text-sm disabled:opacity-50"
-          >
-            Call Tool
-          </button>
+        <div className="flex flex-col border-t border-slate-300 dark:border-slate-700" style={{ maxHeight: '600px' }}>
+          {/* Results Display - Top */}
+          <div className="flex-1 p-3 border-b border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/50 min-h-[200px] max-h-[300px] overflow-y-auto">
+            <div className="text-xs font-semibold text-gray-700 dark:text-slate-300 mb-2">Results:</div>
+            {result ? (
+              <div className="text-xs">
+                <JSONViewer data={result} defaultExpanded={false} />
+              </div>
+            ) : calling ? (
+              <div className="flex items-center gap-2 text-gray-500 dark:text-slate-400">
+                <div className="w-2 h-2 bg-gray-400 dark:bg-slate-400 rounded-full animate-bounce" />
+                <div className="w-2 h-2 bg-gray-400 dark:bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                <div className="w-2 h-2 bg-gray-400 dark:bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
+                <span className="ml-2">Calling tool...</span>
+              </div>
+            ) : (
+              <div className="text-xs text-gray-500 dark:text-slate-500 italic">No results yet. Fill in the test parameters below and click Call Tool.</div>
+            )}
+          </div>
+          
+          {/* Test Inputs - Bottom */}
+          <div className="p-3 space-y-3">
+            {Object.entries(tool.inputSchema?.properties || {}).map(([key, schema]: [string, any]) => (
+              <div key={key}>
+                <label className="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1">
+                  {key} {schema.required && <span className="text-red-500">*</span>}
+                </label>
+                <input
+                  type="text"
+                  value={args[key] || ''}
+                  onChange={(e) => {
+                    let value: any = e.target.value
+                    if (value.startsWith('{') || value.startsWith('[')) {
+                      try {
+                        value = JSON.parse(value)
+                      } catch {}
+                    }
+                    setArgs({ ...args, [key]: value })
+                  }}
+                  className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-gray-900 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  placeholder={schema.description || schema.type || key}
+                />
+              </div>
+            ))}
+            <button
+              onClick={handleCall}
+              disabled={disabled || calling}
+              className="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors"
+            >
+              {calling ? 'Calling...' : 'Call Tool'}
+            </button>
+          </div>
         </div>
       )}
     </div>
   )
 }
 
-// Message Bubble Component
+// Message Bubble Component - ChatGPT Style
 function MessageBubble({ message }: { message: Message }) {
-  const getRoleColor = () => {
-    switch (message.role) {
-      case 'user':
-        return 'bg-[#8b5cf6]/20 border-[#8b5cf6]/50'
-      case 'assistant':
-        return 'bg-[#2d2d2d] border-[#333333]'
-      case 'tool':
-        return 'bg-green-500/10 border-green-500/50'
-      case 'system':
-        return 'bg-blue-500/10 border-blue-500/50'
-      default:
-        return 'bg-[#2d2d2d] border-[#333333]'
-    }
-  }
+  const isUser = message.role === 'user'
+  const isSystem = message.role === 'system'
+  const isTool = message.role === 'tool'
 
-  const getRoleIcon = () => {
-    switch (message.role) {
-      case 'user':
-        return null
-      case 'assistant':
-        return <SparklesIcon className="w-5 h-5 text-[#8b5cf6]" />
-      case 'tool':
-        return <WrenchScrewdriverIcon className="w-5 h-5 text-green-500" />
-      case 'system':
-        return <CheckCircleIcon className="w-5 h-5 text-blue-500" />
-      default:
-        return null
-    }
+  if (isSystem) {
+    return (
+      <div className="flex justify-center my-4">
+        <div className="px-4 py-2 bg-blue-500/10 border border-blue-500/30 rounded-lg text-sm text-blue-300">
+          {message.content}
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className={`card border-2 ${getRoleColor()} animate-fade-in`}>
-      <div className="flex items-start gap-3">
-        {getRoleIcon() && <div className="mt-1">{getRoleIcon()}</div>}
-        <div className="flex-1">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-semibold text-[#e0e0e0] capitalize">
-              {message.role === 'user' ? 'You' : message.role === 'assistant' ? 'Assistant' : message.role === 'tool' ? `Tool: ${message.toolName || 'Unknown'}` : 'System'}
-            </span>
-            <span className="text-xs text-[#999999]">{message.timestamp.toLocaleTimeString()}</span>
-          </div>
-          {message.data ? (
-            <JSONViewer data={message.data} defaultExpanded={message.role !== 'system'} />
+    <div className={`flex gap-4 py-4 ${isUser ? 'justify-end' : 'justify-start'}`}>
+      {!isUser && (
+        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
+          {isTool ? (
+            <WrenchScrewdriverIcon className="w-4 h-4 text-white" />
           ) : (
-            <div className="text-[#e0e0e0] whitespace-pre-wrap">{message.content}</div>
+            <SparklesIcon className="w-4 h-4 text-white" />
           )}
         </div>
+      )}
+      
+      <div className={`flex-1 ${isUser ? 'max-w-[85%] flex justify-end' : 'max-w-[85%]'}`}>
+        <div className={`rounded-2xl px-4 py-3 ${
+          isUser 
+            ? 'bg-purple-600 text-white' 
+            : isTool
+            ? 'bg-green-500/10 border border-green-500/30 text-green-700 dark:text-green-100'
+            : 'bg-slate-100 dark:bg-slate-800 text-gray-900 dark:text-slate-100'
+        }`}>
+          {message.toolName && (
+            <div className="text-xs font-semibold mb-2 opacity-70">
+              Tool: {message.toolName}
+            </div>
+          )}
+          {message.data ? (
+            <JSONViewer data={message.data} defaultExpanded={!isSystem} />
+          ) : (
+            <div className="whitespace-pre-wrap leading-relaxed">{message.content}</div>
+          )}
+        </div>
+        <div className={`text-xs text-gray-500 dark:text-slate-500 mt-1 ${isUser ? 'text-right' : 'text-left'}`}>
+          {new Date(message.timestamp).toLocaleTimeString()}
+        </div>
       </div>
+
+      {isUser && (
+        <div className="w-8 h-8 rounded-full bg-slate-300 dark:bg-slate-700 flex items-center justify-center flex-shrink-0">
+          <span className="text-xs font-semibold text-gray-700 dark:text-slate-300">U</span>
+        </div>
+      )}
     </div>
   )
 }

@@ -1,13 +1,11 @@
 import type { Metadata } from 'next'
-import { SidebarProvider } from '@/contexts/SidebarContext'
-import Sidebar from '@/components/Sidebar'
-import SidebarToggle from '@/components/SidebarToggle'
-import MainContent from '@/components/MainContent'
+import AuthGuard from '@/components/AuthGuard'
+import ThemeProvider from '@/components/ThemeProvider'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'NeuronDesktop - Unified AI Platform',
-  description: 'Unified interface for MCP servers, NeuronDB, and NeuronAgent',
+  title: 'NeuronDesktop - NeuronDB PostgreSQL AI Factory',
+  description: 'NeuronDB PostgreSQL AI Factory - Unified interface for MCP servers, NeuronDB, and NeuronAgent',
 }
 
 export default function RootLayout({
@@ -17,16 +15,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="bg-[#1a1a1a] text-[#e0e0e0]">
-        <SidebarProvider>
-          <div className="flex h-screen bg-[#1a1a1a] relative">
-            <Sidebar />
-            <SidebarToggle />
-            <MainContent>
-              {children}
-            </MainContent>
-          </div>
-        </SidebarProvider>
+      <body>
+        <ThemeProvider>
+          <AuthGuard>
+            {children}
+          </AuthGuard>
+        </ThemeProvider>
       </body>
     </html>
   )

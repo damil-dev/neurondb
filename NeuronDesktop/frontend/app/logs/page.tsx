@@ -32,23 +32,23 @@ export default function LogsPage() {
   ]
 
   return (
-    <div className="h-full flex flex-col bg-slate-800">
+    <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-800">
       {/* Header */}
-      <div className="bg-slate-800 border-b border-slate-700 px-6 py-4">
+      <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-slate-100">Request Logs</h1>
-            <p className="text-sm text-slate-400 mt-1">View and inspect all API requests and responses</p>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100">Request Logs</h1>
+            <p className="text-sm text-gray-600 dark:text-slate-400 mt-1">View and inspect all API requests and responses</p>
           </div>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="bg-slate-800 border-b border-slate-700 px-6 py-4">
+      <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-6 py-4">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <FunnelIcon className="w-5 h-5 text-slate-500" />
-            <span className="text-sm font-medium text-slate-200">Filters:</span>
+            <FunnelIcon className="w-5 h-5 text-gray-600 dark:text-slate-500" />
+            <span className="text-sm font-medium text-gray-900 dark:text-slate-200">Filters:</span>
           </div>
           
           <select
@@ -87,9 +87,9 @@ export default function LogsPage() {
       <div className="flex-1 overflow-y-auto p-6">
         {logs.length === 0 ? (
           <div className="text-center py-12">
-            <DocumentTextIcon className="w-12 h-12 text-slate-500 mx-auto mb-4" />
-            <p className="text-slate-400">No logs available yet.</p>
-            <p className="text-sm text-slate-500 mt-2">Logs will appear here as you make requests.</p>
+            <DocumentTextIcon className="w-12 h-12 text-gray-500 dark:text-slate-500 mx-auto mb-4" />
+            <p className="text-gray-700 dark:text-slate-400">No logs available yet.</p>
+            <p className="text-sm text-gray-600 dark:text-slate-500 mt-2">Logs will appear here as you make requests.</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -105,23 +105,23 @@ export default function LogsPage() {
                     <div>
                       <div className="flex items-center gap-2">
                         <span className={`px-2 py-1 rounded text-xs font-medium ${
-                          log.method === 'GET' ? 'bg-blue-100 text-blue-800' :
-                          log.method === 'POST' ? 'bg-green-100 text-green-800' :
-                          log.method === 'PUT' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-red-100 text-red-800'
+                          log.method === 'GET' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300' :
+                          log.method === 'POST' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' :
+                          log.method === 'PUT' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300' :
+                          'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
                         }`}>
                           {log.method}
                         </span>
-                        <span className="font-mono text-sm text-slate-100">{log.endpoint}</span>
+                        <span className="font-mono text-sm text-gray-900 dark:text-slate-100">{log.endpoint}</span>
                         <span className={`px-2 py-1 rounded text-xs font-medium ${
-                          log.statusCode >= 200 && log.statusCode < 300 ? 'bg-green-100 text-green-800' :
-                          log.statusCode >= 400 && log.statusCode < 500 ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-red-100 text-red-800'
+                          log.statusCode >= 200 && log.statusCode < 300 ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' :
+                          log.statusCode >= 400 && log.statusCode < 500 ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300' :
+                          'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
                         }`}>
                           {log.statusCode}
                         </span>
                       </div>
-                      <div className="flex items-center gap-4 mt-2 text-xs text-slate-400">
+                      <div className="flex items-center gap-4 mt-2 text-xs text-gray-600 dark:text-slate-400">
                         <div className="flex items-center gap-1">
                           <CalendarIcon className="w-3 h-3" />
                           {log.timestamp.toLocaleString()}
@@ -134,7 +134,7 @@ export default function LogsPage() {
                 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <h4 className="text-sm font-medium text-slate-200 mb-2">Request</h4>
+                    <h4 className="text-sm font-medium text-gray-900 dark:text-slate-200 mb-2">Request</h4>
                     <JSONViewer data={log.requestBody} defaultExpanded={false} />
                   </div>
                   <div>

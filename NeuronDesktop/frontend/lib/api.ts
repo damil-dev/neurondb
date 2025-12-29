@@ -1,4 +1,5 @@
-import axios from 'axios'
+import axios, { AxiosError } from 'axios'
+import { getErrorMessage } from './errors'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081/api/v1'
 
@@ -7,21 +8,102 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout: 30000, // 30 second timeout
+  withCredentials: true, // Enable cookies for session-based auth
 })
 
-// Add API key to requests
+// No longer need to add Authorization header - cookies are sent automatically
+// Keep for backward compatibility with JWT if needed
 api.interceptors.request.use((config) => {
-  const apiKey = localStorage.getItem('neurondesk_api_key') || localStorage.getItem('api_key')
-  if (apiKey) {
-    config.headers.Authorization = `Bearer ${apiKey}`
+  // Only add Authorization header if we have a token in localStorage (JWT fallback)
+  const token = localStorage.getItem('neurondesk_auth_token')
+  if (token && !config.headers.Authorization) {
+    config.headers.Authorization = `Bearer ${token}`
   }
   return config
 })
+
+// Add error response interceptor for better error messages
+api.interceptors.response.use(
+  (response) => response,
+  (error: AxiosError) => {
+    // Log error for debugging
+    console.error('API Error:', {
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      message: error.message,
+      code: error.code,
+      hasResponse: !!error.response,
+      hasRequest: !!error.request
+    })
+
+    // Enhance error with better message
+    if (error.response) {
+      const data = error.response.data as any
+      // Store user-friendly error message in error object
+      if (data?.error) {
+        error.message = data.error
+      } else if (data?.message) {
+        error.message = data.message
+      } else if (error.response.status === 401) {
+        error.message = 'Authentication required. Your session may have expired. Please log in again.'
+        // Try to refresh session first
+        if (typeof window !== 'undefined') {
+          // Attempt silent refresh
+          api.post('/api/v1/auth/refresh').catch(() => {
+            // Refresh failed, clear any stored tokens and redirect
+            localStorage.removeItem('neurondesk_auth_token')
+            if (!window.location.pathname.includes('/login')) {
+              setTimeout(() => {
+                window.location.href = '/login'
+              }, 1000)
+            }
+          })
+        }
+      } else if (error.response.status === 403) {
+        error.message = 'Access denied. You do not have permission to perform this action.'
+      } else if (error.response.status >= 500) {
+        error.message = 'Server error. Please try again later.'
+      }
+    } else if (error.request) {
+      // Network error - check if it might be CORS or auth issue
+      const token = localStorage.getItem('neurondesk_auth_token')
+      if (!token) {
+        error.message = 'Not authenticated. Please log in first.'
+        if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+          setTimeout(() => {
+            window.location.href = '/login'
+          }, 1000)
+        }
+      } else {
+        // Check if this might be a preflight CORS failure (which can hide 401 errors)
+        // Try to provide more helpful error message
+        if (error.code === 'ECONNREFUSED' || error.message.includes('ECONNREFUSED')) {
+          error.message = 'Cannot connect to server. Please check if the API server is running on http://localhost:8081'
+        } else if (error.code === 'ETIMEDOUT' || error.code === 'ECONNABORTED') {
+          error.message = 'Request timeout. The server took too long to respond.'
+        } else if (error.code === 'ERR_NETWORK' || error.message.includes('Network Error')) {
+          // Network error could be CORS blocking a 401 response
+          error.message = 'Network error. This might be an authentication issue. Please try: 1) Log out and log back in, 2) Check if API server is running on http://localhost:8081, 3) Check browser console (F12) for detailed errors.'
+        } else {
+          error.message = 'Network error. Please check your connection and try again.'
+        }
+      }
+    } else {
+      // No response and no request - likely a configuration issue
+      error.message = 'Request failed. Please check your configuration and try again.'
+    }
+    
+    return Promise.reject(error)
+  }
+)
 
 export interface Profile {
   id: string
   name: string
   user_id: string
+  profile_username?: string
   mcp_config: Record<string, any>
   neurondb_dsn: string
   agent_endpoint?: string
@@ -98,6 +180,28 @@ export const profilesAPI = {
 }
 
 // MCP API
+export interface MCPThread {
+  id: string
+  profile_id: string
+  title: string
+  created_at: string
+  updated_at: string
+}
+
+export interface MCPMessage {
+  id: string
+  thread_id: string
+  role: 'user' | 'assistant' | 'system' | 'tool'
+  content: string
+  tool_name?: string
+  data?: any
+  created_at: string
+}
+
+export interface MCPThreadWithMessages extends MCPThread {
+  messages: MCPMessage[]
+}
+
 export const mcpAPI = {
   listConnections: () => api.get('/mcp/connections'),
   listTools: (profileId: string) => api.get<{ tools: ToolDefinition[] }>(`/profiles/${profileId}/mcp/tools`),
@@ -105,6 +209,14 @@ export const mcpAPI = {
     api.post<ToolResult>(`/profiles/${profileId}/mcp/tools/call`, { name, arguments: args }),
   testConfig: (config: { command: string; args?: string[]; env?: Record<string, string> }) =>
     api.post('/mcp/test', config),
+  // Chat thread endpoints
+  listThreads: (profileId: string) => api.get<MCPThread[]>(`/profiles/${profileId}/mcp/threads`),
+  createThread: (profileId: string, title?: string) => api.post<MCPThread>(`/profiles/${profileId}/mcp/threads`, { title: title || 'New chat' }),
+  getThread: (profileId: string, threadId: string) => api.get<MCPThreadWithMessages>(`/profiles/${profileId}/mcp/threads/${threadId}`),
+  updateThread: (profileId: string, threadId: string, title: string) => api.put<MCPThread>(`/profiles/${profileId}/mcp/threads/${threadId}`, { title }),
+  deleteThread: (profileId: string, threadId: string) => api.delete(`/profiles/${profileId}/mcp/threads/${threadId}`),
+  addMessage: (profileId: string, threadId: string, role: string, content: string, toolName?: string, data?: any) =>
+    api.post<MCPMessage>(`/profiles/${profileId}/mcp/threads/${threadId}/messages`, { role, content, tool_name: toolName, data }),
 }
 
 // NeuronDB API
@@ -114,6 +226,8 @@ export const neurondbAPI = {
     api.post<SearchResult[]>(`/profiles/${profileId}/neurondb/search`, request),
   executeSQL: (profileId: string, query: string) =>
     api.post(`/profiles/${profileId}/neurondb/sql`, { query }),
+  executeSQLFull: (profileId: string, query: string) =>
+    api.post(`/profiles/${profileId}/neurondb/sql/execute`, { query }),
 }
 
 // Agent API
@@ -169,6 +283,10 @@ export const agentAPI = {
   listModels: (profileId: string) => api.get<{ models: Model[] }>(`/profiles/${profileId}/agent/models`),
   createSession: (profileId: string, agentId: string, externalUserId?: string) =>
     api.post<Session>(`/profiles/${profileId}/agent/sessions`, { agent_id: agentId, external_user_id: externalUserId }),
+  listSessions: (profileId: string, agentId: string) =>
+    api.get<Session[]>(`/profiles/${profileId}/agent/agents/${agentId}/sessions`),
+  getSession: (profileId: string, sessionId: string) =>
+    api.get<Session>(`/profiles/${profileId}/agent/sessions/${sessionId}`),
   sendMessage: (profileId: string, sessionId: string, content: string, stream?: boolean) =>
     api.post<Message>(`/profiles/${profileId}/agent/sessions/${sessionId}/messages`, {
       role: 'user',
@@ -197,6 +315,133 @@ export const modelConfigAPI = {
     api.get<ModelConfig>(`/profiles/${profileId}/models/default`),
   setDefault: (profileId: string, id: string) => 
     api.post(`/profiles/${profileId}/models/${id}/set-default`),
+}
+
+// Factory API
+export interface FactoryStatus {
+  os: {
+    type: string
+    distro: string
+    version: string
+    arch: string
+  }
+  docker: {
+    available: boolean
+    version?: string
+  }
+  neurondb: ComponentStatus
+  neuronagent: ComponentStatus
+  neuronmcp: ComponentStatus
+  install_commands: {
+    docker?: string[]
+    deb?: string[]
+    rpm?: string[]
+    macpkg?: string[]
+  }
+}
+
+export interface ComponentStatus {
+  installed: boolean
+  running: boolean
+  reachable: boolean
+  status: string
+  error_message?: string
+  details?: Record<string, any>
+}
+
+export interface SetupState {
+  setup_complete: boolean
+}
+
+export const factoryAPI = {
+  getStatus: () => api.get<FactoryStatus>('/factory/status'),
+  getSetupState: () => api.get<SetupState>('/factory/setup-state'),
+  setSetupState: (completed: boolean) => 
+    api.post<SetupState>('/factory/setup-state', { completed }),
+}
+
+// Database Test API (public endpoint, no auth required)
+const databaseTestApi = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  timeout: 30000,
+  withCredentials: false, // Don't send credentials for database test
+})
+
+// Log the API base URL for debugging
+if (typeof window !== 'undefined') {
+  console.log('Database Test API Base URL:', API_BASE_URL)
+  console.log('Full test endpoint URL:', API_BASE_URL + '/database/test')
+}
+
+// Add request interceptor for debugging
+databaseTestApi.interceptors.request.use(
+  (config) => {
+    console.log('Database test request:', {
+      method: config.method,
+      url: config.url,
+      baseURL: config.baseURL,
+      fullURL: config.baseURL + config.url,
+      data: config.data,
+    })
+    return config
+  },
+  (error) => {
+    console.error('Database test request error:', error)
+    return Promise.reject(error)
+  }
+)
+
+// Add error response interceptor for better error messages
+databaseTestApi.interceptors.response.use(
+  (response) => response,
+  (error: AxiosError) => {
+    if (error.response) {
+      const data = error.response.data as any
+      if (data?.error) {
+        error.message = data.error
+      } else if (data?.message) {
+        error.message = data.message
+      } else if (error.response.status >= 500) {
+        error.message = 'Server error. Please try again later.'
+      }
+    } else if (error.request) {
+      // Network error - request was made but no response received
+      if (error.code === 'ECONNREFUSED' || error.message.includes('ECONNREFUSED')) {
+        error.message = 'Cannot connect to server. Please check if the API server is running on ' + API_BASE_URL
+      } else if (error.code === 'ETIMEDOUT' || error.code === 'ECONNABORTED') {
+        error.message = 'Request timeout. The server took too long to respond.'
+      } else if (error.code === 'ERR_NETWORK' || error.message.includes('Network Error')) {
+        error.message = 'Network error. Please check if the API server is running on ' + API_BASE_URL + '. If it is, check browser console for CORS errors.'
+      } else {
+        error.message = 'Network error: ' + (error.message || error.code || 'Unknown error') + '. Please check if the API server is running on ' + API_BASE_URL
+      }
+    }
+    return Promise.reject(error)
+  }
+)
+
+export interface DatabaseTestRequest {
+  host: string
+  port: string
+  database: string
+  user: string
+  password: string
+}
+
+export interface DatabaseTestResponse {
+  success: boolean
+  message: string
+  schema_exists: boolean
+  missing_tables?: string[]
+  dsn?: string
+}
+
+export const databaseTestAPI = {
+  test: (request: DatabaseTestRequest) => 
+    databaseTestApi.post<DatabaseTestResponse>('/database/test', request),
 }
 
 export default api
