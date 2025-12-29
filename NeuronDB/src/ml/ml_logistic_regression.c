@@ -825,19 +825,24 @@ train_logistic_regression(PG_FUNCTION_ARGS)
 
 				if (!gpu_training_succeeded)
 				{
-					/* GPU training failed - check if GPU mode is forced */
-					/* EXCEPT: Allow CPU fallback if Metal backend reports unsupported algorithm */
-					bool metal_unsupported = false;
-					if (gpu_err != NULL && 
-						(strstr(gpu_err, "Metal backend:") != NULL || 
-						 (strstr(gpu_err, "Metal") != NULL && strstr(gpu_err, "unsupported") != NULL)))
+					/* GPU training failed - determine fallback behavior */
+					/* GPU mode + CUDA/ROCm: error out (GPU must work) */
+					/* GPU mode + Metal: allow CPU fallback (Metal has limitations) */
+					/* AUTO mode: always allow CPU fallback */
+					/* CPU mode: should not reach here, but allow fallback */
+					bool allow_fallback = true;
+					GPUBackend backend = neurondb_gpu_get_backend();
+					bool is_metal_backend = (backend == GPU_BACKEND_METAL);
+					
+					if (NDB_REQUIRE_GPU() && !is_metal_backend)
 					{
-						metal_unsupported = true;
+						/* GPU mode with CUDA/ROCm: GPU must work, error out */
+						allow_fallback = false;
 					}
 					
-					if (NDB_REQUIRE_GPU() && !metal_unsupported)
+					if (!allow_fallback)
 					{
-						/* Strict GPU mode: error out, no CPU fallback (unless Metal unsupported) */
+						/* Strict GPU mode for CUDA/ROCm: error out, no CPU fallback */
 						char *error_msg = NULL;
 
 						if (gpu_err != NULL)
@@ -884,7 +889,7 @@ train_logistic_regression(PG_FUNCTION_ARGS)
 								 errhint("Check GPU availability and model compatibility, or set compute_mode='auto' for automatic CPU fallback.")));
 					}
 
-					/* AUTO/CPU mode: cleanup and fall back to CPU */
+					/* AUTO/CPU mode OR Metal backend: cleanup and fall back to CPU */
 					if (gpu_err != NULL)
 					{
 						nfree(gpu_err);

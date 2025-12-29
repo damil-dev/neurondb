@@ -414,6 +414,34 @@ endif
 
 SHLIB_LINK += -lm -lz -lcrypto -lcurl -lssl
 
+# Auto-detect and link ML libraries if available
+# XGBoost
+ifneq ($(wildcard /usr/local/lib/libxgboost.so),)
+	SHLIB_LINK += -L/usr/local/lib -lxgboost -Wl,-rpath,/usr/local/lib
+else
+ifneq ($(wildcard /usr/local/lib/libxgboost.a),)
+	SHLIB_LINK += -L/usr/local/lib -lxgboost -Wl,-rpath,/usr/local/lib
+endif
+endif
+
+# LightGBM (check for both naming conventions)
+ifneq ($(wildcard /usr/local/lib/lib_lightgbm.so),)
+	SHLIB_LINK += -L/usr/local/lib -l_lightgbm -Wl,-rpath,/usr/local/lib
+else
+ifneq ($(wildcard /usr/local/lib/liblightgbm.so),)
+	SHLIB_LINK += -L/usr/local/lib -llightgbm -Wl,-rpath,/usr/local/lib
+endif
+endif
+
+# CatBoost
+ifneq ($(wildcard /usr/local/lib/libcatboostmodel.so),)
+	SHLIB_LINK += -L/usr/local/lib -lcatboostmodel -Wl,-rpath,/usr/local/lib
+else
+ifneq ($(wildcard /usr/local/lib/libcatboostmodel.a),)
+	SHLIB_LINK += -L/usr/local/lib -lcatboostmodel -Wl,-rpath,/usr/local/lib
+endif
+endif
+
 # macOS: Note - symbol export issue being investigated
 # Functions are exported but PostgreSQL 17 loader cannot find them
 # This appears to be a PostgreSQL 17/macOS dylib loader bug

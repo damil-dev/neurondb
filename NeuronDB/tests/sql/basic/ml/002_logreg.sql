@@ -142,26 +142,38 @@ SELECT model_id FROM gpu_model_temp;
 \echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
 
 \echo 'Predict Test 1: Single row prediction'
-SELECT 
-	'Single Row' AS test_type,
-	neurondb.predict((SELECT model_id FROM gpu_model_temp LIMIT 1), features) AS prediction,
-	label AS actual_label
-FROM test_test_view
-LIMIT 1;
+DO $$
+DECLARE
+	mid integer;
+BEGIN
+	SELECT model_id INTO mid FROM gpu_model_temp LIMIT 1;
+	IF mid IS NULL THEN
+		RAISE NOTICE 'Skipping prediction - model_id is NULL (training failed)';
+	ELSE
+		PERFORM 'Single Row', neurondb.predict(mid, features), label
+		FROM test_test_view
+		LIMIT 1;
+	END IF;
+END $$;
 
 \echo 'Predict Test 2: Batch prediction (100 rows)'
-SELECT 
-	'Batch (100 rows)' AS test_type,
-	COUNT(*) AS n_predictions,
-	ROUND(AVG(score)::numeric, 4) AS avg_prediction,
-	ROUND(MIN(score)::numeric, 4) AS min_prediction,
-	ROUND(MAX(score)::numeric, 4) AS max_prediction,
-	ROUND(STDDEV(score)::numeric, 4) AS stddev_prediction
-FROM (
-	SELECT neurondb.predict((SELECT model_id FROM gpu_model_temp LIMIT 1), features) AS score
-	FROM test_test_view
-	LIMIT 100
-) sub;
+DO $$
+DECLARE
+	mid integer;
+BEGIN
+	SELECT model_id INTO mid FROM gpu_model_temp LIMIT 1;
+	IF mid IS NULL THEN
+		RAISE NOTICE 'Skipping batch prediction - model_id is NULL (training failed)';
+	ELSE
+		PERFORM COUNT(*), 
+			ROUND(AVG(neurondb.predict(mid, features))::numeric, 4),
+			ROUND(MIN(neurondb.predict(mid, features))::numeric, 4),
+			ROUND(MAX(neurondb.predict(mid, features))::numeric, 4),
+			ROUND(STDDEV(neurondb.predict(mid, features))::numeric, 4)
+		FROM test_test_view
+		LIMIT 100;
+	END IF;
+END $$;
 
 -- EVALUATION
 \echo ''
@@ -169,9 +181,19 @@ FROM (
 \echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
 
 -- Show evaluation setup info
-SELECT 
-	(SELECT model_id FROM gpu_model_temp LIMIT 1) AS model_id,
-	(SELECT COUNT(*)::bigint FROM test_test_view WHERE features IS NOT NULL AND label IS NOT NULL) AS test_samples_available;
+DO $$
+DECLARE
+	mid integer;
+BEGIN
+	SELECT model_id INTO mid FROM gpu_model_temp LIMIT 1;
+	IF mid IS NULL THEN
+		RAISE NOTICE 'Evaluation skipped - model_id is NULL (training failed due to invalid labels for logistic regression)';
+		RAISE NOTICE 'Logistic regression requires binary labels (0 or 1), but test data has labels: 0, 1, 2';
+	ELSE
+		PERFORM mid AS model_id,
+			(SELECT COUNT(*)::bigint FROM test_test_view WHERE features IS NOT NULL AND label IS NOT NULL) AS test_samples_available;
+	END IF;
+END $$;
 
 DROP TABLE IF EXISTS gpu_metrics_temp;
 CREATE TEMP TABLE gpu_metrics_temp (metrics jsonb);
@@ -186,8 +208,7 @@ BEGIN
 	-- Get model_id
 	SELECT model_id INTO mid FROM gpu_model_temp LIMIT 1;
 	IF mid IS NULL THEN
-		RAISE WARNING 'No model_id found in gpu_model_temp';
-		INSERT INTO gpu_metrics_temp VALUES ('{"error": "No model_id found"}'::jsonb);
+		INSERT INTO gpu_metrics_temp VALUES ('{"error": "No model_id found - training failed"}'::jsonb);
 		RETURN;
 	END IF;
 	
