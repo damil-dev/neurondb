@@ -34,6 +34,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 /* Check if XGBoost C API is available */
 #if __has_include(<xgboost/c_api.h>)
@@ -126,8 +127,8 @@ load_training_data(const char *table,
 			(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				errmsg("neurondb: null feature vector found")));
 
-	if (tupdesc->attrs[0]->atttypid == FLOAT4ARRAYOID
-		|| tupdesc->attrs[0]->atttypid == FLOAT8ARRAYOID)
+	if (TupleDescAttr(tupdesc, 0)->atttypid == FLOAT4ARRAYOID
+		|| TupleDescAttr(tupdesc, 0)->atttypid == FLOAT8ARRAYOID)
 	{
 		feat_arr = DatumGetArrayTypeP(feat_datum);
 		ncols = ArrayGetNItems(ARR_NDIM(feat_arr), ARR_DIMS(feat_arr));
@@ -191,10 +192,10 @@ load_training_data(const char *table,
 			}
 		} else
 		{
-			if (tupdesc->attrs[0]->atttypid == FLOAT8OID)
+			if (TupleDescAttr(tupdesc, 0)->atttypid == FLOAT8OID)
 				features[i * ncols] =
 					(float)DatumGetFloat8(featval);
-			else if (tupdesc->attrs[0]->atttypid == FLOAT4OID)
+			else if (TupleDescAttr(tupdesc, 0)->atttypid == FLOAT4OID)
 				features[i * ncols] =
 					(float)DatumGetFloat4(featval);
 			else
@@ -214,11 +215,11 @@ load_training_data(const char *table,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					errmsg("neurondb: null label/target in row %d", i)));
 
-		if (tupdesc->attrs[1]->atttypid == INT4OID)
+		if (TupleDescAttr(tupdesc, 1)->atttypid == INT4OID)
 			labels[i] = (float)DatumGetInt32(labelval);
-		else if (tupdesc->attrs[1]->atttypid == FLOAT4OID)
+		else if (TupleDescAttr(tupdesc, 1)->atttypid == FLOAT4OID)
 			labels[i] = (float)DatumGetFloat4(labelval);
-		else if (tupdesc->attrs[1]->atttypid == FLOAT8OID)
+		else if (TupleDescAttr(tupdesc, 1)->atttypid == FLOAT8OID)
 			labels[i] = (float)DatumGetFloat8(labelval);
 		else
 			elog(ERROR, "Unsupported label/target column type");
@@ -405,8 +406,6 @@ train_xgboost_classifier(PG_FUNCTION_ARGS)
 	char *out_bytes = NULL;
 	int32 model_id;
 
-		"neurondb: XGBoost Classifier: table=%s, feature=%s, label=%s, "
-
 	load_training_data(table_str,
 		feature_str,
 		label_str,
@@ -453,18 +452,16 @@ train_xgboost_classifier(PG_FUNCTION_ARGS)
 	for (i = 0; i < param_count; i++)
 	{
 		if (XGBoosterSetParam(booster, keys[i], vals[i]) != 0)
-			elog(ERROR,
+			elog(ERROR, "Failed to set XGBoost parameter");
 	}
 
 	for (iter = 0; iter < n_estimators; iter++)
 	{
 		if (XGBoosterUpdateOneIter(booster, iter, dtrain) != 0)
-			elog(ERROR,
+			elog(ERROR, "Failed to update XGBoost booster");
 	}
 
-	if (XGBoosterSaveModelToBuffer(
-		    booster, &out_len, (const char **)&out_bytes)
-		!= 0)
+	if (XGBoosterSaveModelToBuffer(booster, "json", (const char **)&out_bytes, &out_len) != 0)
 		elog(ERROR, "Failed to serialize XGBoost model");
 
 	model_id = store_xgboost_model(out_bytes, out_len,
@@ -524,8 +521,6 @@ train_xgboost_regressor(PG_FUNCTION_ARGS)
 	char *out_bytes = NULL;
 	int32 model_id;
 
-		"neurondb: XGBoost Regressor: table=%s, feature=%s, target=%s, "
-
 	load_training_data(table_str,
 		feature_str,
 		target_str,
@@ -560,17 +555,15 @@ train_xgboost_regressor(PG_FUNCTION_ARGS)
 	for (i = 0; i < param_count; i++)
 	{
 		if (XGBoosterSetParam(booster, keys[i], vals[i]) != 0)
-			elog(ERROR,
+			elog(ERROR, "Failed to set XGBoost parameter");
 	}
 	for (iter = 0; iter < n_estimators; iter++)
 	{
 		if (XGBoosterUpdateOneIter(booster, iter, dtrain) != 0)
-			elog(ERROR,
+			elog(ERROR, "Failed to update XGBoost booster");
 	}
 
-	if (XGBoosterSaveModelToBuffer(
-		    booster, &out_len, (const char **)&out_bytes)
-		!= 0)
+	if (XGBoosterSaveModelToBuffer(booster, "json", (const char **)&out_bytes, &out_len) != 0)
 		elog(ERROR, "Failed to serialize XGBoost model");
 
 	model_id = store_xgboost_model(out_bytes, out_len,
@@ -621,7 +614,6 @@ predict_xgboost(PG_FUNCTION_ARGS)
 		ARR_NDIM(features_array), ARR_DIMS(features_array));
 	features = (float8 *)ARR_DATA_PTR(features_array);
 
-	float *feat_f = NULL;
 	nalloc(feat_f, float, n_dims);
 	for (i = 0; i < n_dims; i++)
 		feat_f[i] = (float)features[i];
@@ -1029,6 +1021,7 @@ evaluate_xgboost_by_model_id(PG_FUNCTION_ARGS)
 
 #endif /* HAVE_XGBOOST */
 
+#if HAVE_XGBOOST
 #include "neurondb_gpu_model.h"
 #include "ml_gpu_registry.h"
 #include "ml_gpu_xgboost.h"
@@ -1464,9 +1457,12 @@ static const MLGpuModelOps xgboost_gpu_model_ops = {
 void
 neurondb_gpu_register_xgboost_model(void)
 {
+#if HAVE_XGBOOST
 	static bool registered = false;
 	if (registered)
 		return;
 	ndb_gpu_register_model_ops(&xgboost_gpu_model_ops);
 	registered = true;
+#endif /* HAVE_XGBOOST */
 }
+#endif /* HAVE_XGBOOST */

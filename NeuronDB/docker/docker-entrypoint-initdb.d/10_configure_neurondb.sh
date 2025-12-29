@@ -29,13 +29,36 @@ else
     postgresql_conf="/var/lib/postgresql/18/docker/postgresql.conf"
 fi
 
-# If config file doesn't exist yet (during initdb), it will be created by PostgreSQL
-# We'll configure it after PostgreSQL starts using ALTER SYSTEM
+# If config file doesn't exist yet (during initdb), wait for it or try alternative locations
 if [ ! -f "$postgresql_conf" ]; then
-    echo "[INFO] postgresql.conf not found at $postgresql_conf yet (will be created by PostgreSQL)"
-    echo "[INFO] Configuration will be applied after PostgreSQL starts"
-    # Don't fail - PostgreSQL will create the config file
-    exit 0
+    echo "[INFO] postgresql.conf not found at $postgresql_conf, searching..."
+    # Wait up to 5 seconds for config file to appear (initdb might still be running)
+    for i in {1..10}; do
+        if [ -f "$postgresql_conf" ]; then
+            break
+        fi
+        # Try to find it in common locations
+        if postgresql_conf=$(find /var/lib/postgresql -name postgresql.conf -type f 2>/dev/null | head -1); then
+            if [ -n "$postgresql_conf" ] && [ -f "$postgresql_conf" ]; then
+                echo "[INFO] Found postgresql.conf at $postgresql_conf"
+                break
+            fi
+        fi
+        sleep 0.5
+    done
+    
+    # If still not found, try PGDATA location
+    if [ ! -f "$postgresql_conf" ] && [ -n "${PGDATA:-}" ]; then
+        postgresql_conf="${PGDATA}/postgresql.conf"
+    fi
+    
+    # If still not found, we'll configure it later via ALTER SYSTEM
+    if [ ! -f "$postgresql_conf" ]; then
+        echo "[WARN] postgresql.conf not found, configuration will be applied after PostgreSQL starts"
+        echo "[WARN] You may need to restart the container for NeuronDB to work properly"
+        # Don't fail - we'll configure it after PostgreSQL starts
+        exit 0
+    fi
 fi
 
 # Compute mode parameter (0=cpu, 1=gpu, 2=auto, default=2)
@@ -64,12 +87,15 @@ esac
 
 # Check if shared_preload_libraries is set (uncommented and active)
 if ! grep -q "^shared_preload_libraries.*neurondb" "${postgresql_conf}"; then
+    echo "[INFO] Configuring shared_preload_libraries in $postgresql_conf"
     # If shared_preload_libraries exists but is commented out, uncomment and set it
     if grep -q "^#shared_preload_libraries" "${postgresql_conf}"; then
         sed -i "s/^#shared_preload_libraries.*/shared_preload_libraries = 'neurondb'/" "${postgresql_conf}"
+        echo "[INFO] Uncommented and set shared_preload_libraries = 'neurondb'"
     # If it exists but doesn't include neurondb, add neurondb to it
     elif grep -q "^shared_preload_libraries" "${postgresql_conf}"; then
         sed -i "s/^shared_preload_libraries.*/shared_preload_libraries = 'neurondb'/" "${postgresql_conf}"
+        echo "[INFO] Updated shared_preload_libraries = 'neurondb'"
     # If it doesn't exist at all, add it
     else
         cat <<CONF >> "${postgresql_conf}"
@@ -77,7 +103,10 @@ if ! grep -q "^shared_preload_libraries.*neurondb" "${postgresql_conf}"; then
 # Added by NeuronDB docker image
 shared_preload_libraries = 'neurondb'
 CONF
+        echo "[INFO] Added shared_preload_libraries = 'neurondb'"
     fi
+else
+    echo "[INFO] shared_preload_libraries already configured with neurondb"
 fi
 
 # Set compute_mode

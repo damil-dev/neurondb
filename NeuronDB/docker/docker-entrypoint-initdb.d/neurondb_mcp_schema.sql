@@ -15,7 +15,14 @@ DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'neurondb') THEN
         RAISE NOTICE '[neurondb_mcp] NeuronDB extension not found, creating it...';
-        CREATE EXTENSION IF NOT EXISTS neurondb;
+        BEGIN
+            CREATE EXTENSION IF NOT EXISTS neurondb;
+        EXCEPTION
+            WHEN OTHERS THEN
+                -- If extension creation fails (e.g., shared_preload_libraries not configured),
+                -- log a warning but don't fail the initialization
+                RAISE WARNING '[neurondb_mcp] Could not create NeuronDB extension: %. Extension will need to be created manually after PostgreSQL restart with shared_preload_libraries configured.', SQLERRM;
+        END;
     ELSE
         RAISE NOTICE '[neurondb_mcp] NeuronDB extension already exists';
     END IF;

@@ -459,9 +459,22 @@ ndb_gpu_try_train_model(const char *algorithm,
 		}
 		else if (ops_trained || ops_serialized)
 		{
-			/* GPU mode: error if GPU training fails */
+			/* GPU training failed - determine fallback behavior */
+			/* GPU mode + CUDA/ROCm: error out (GPU must work) */
+			/* GPU mode + Metal: allow CPU fallback (Metal has limitations) */
+			/* AUTO mode: always allow CPU fallback */
 			/* CPU mode: never error, just return false for fallback */
-			if (!NDB_COMPUTE_MODE_IS_CPU() && NDB_REQUIRE_GPU())
+			GPUBackend backend = neurondb_gpu_get_backend();
+			bool is_metal_backend = (backend == GPU_BACKEND_METAL);
+			bool allow_fallback = true;
+			
+			if (NDB_REQUIRE_GPU() && !is_metal_backend)
+			{
+				/* GPU mode with CUDA/ROCm: GPU must work, error out */
+				allow_fallback = false;
+			}
+			
+			if (!allow_fallback)
 			{
 				ereport(ERROR,
 						(errcode(ERRCODE_INTERNAL_ERROR),
@@ -471,7 +484,7 @@ ndb_gpu_try_train_model(const char *algorithm,
 								   elapsed_ms),
 						 errhint("Set compute_mode='auto' for automatic CPU fallback.")));
 			}
-			/* AUTO mode: fall back to CPU */
+			/* AUTO/CPU mode OR Metal backend: fall back to CPU */
 			ndb_gpu_stats_record(false, 0.0, elapsed_ms, true);
 		}
 	}
@@ -507,9 +520,21 @@ ndb_gpu_try_train_model(const char *algorithm,
 		}
 		else
 		{
-			/* GPU mode: error if GPU training fails */
-			/* CPU mode: never error, just return false for fallback */
-			if (!NDB_COMPUTE_MODE_IS_CPU() && NDB_REQUIRE_GPU())
+			/* GPU training failed - determine fallback behavior */
+			/* GPU mode + CUDA/ROCm: error out (GPU must work) */
+			/* GPU mode + Metal: allow CPU fallback (Metal has limitations) */
+			/* AUTO mode: always allow CPU fallback */
+			GPUBackend backend = neurondb_gpu_get_backend();
+			bool is_metal_backend = (backend == GPU_BACKEND_METAL);
+			bool allow_fallback = true;
+			
+			if (NDB_REQUIRE_GPU() && !is_metal_backend)
+			{
+				/* GPU mode with CUDA/ROCm: GPU must work, error out */
+				allow_fallback = false;
+			}
+			
+			if (!allow_fallback)
 			{
 				ereport(ERROR,
 						(errcode(ERRCODE_INTERNAL_ERROR),
@@ -519,7 +544,7 @@ ndb_gpu_try_train_model(const char *algorithm,
 								   (errstr && *errstr) ? *errstr : "no error"),
 						 errhint("Set compute_mode='auto' for automatic CPU fallback.")));
 			}
-			/* AUTO mode: fall back to CPU */
+			/* AUTO mode OR Metal backend: fall back to CPU */
 			ndb_gpu_stats_record(false, 0.0, elapsed_ms, true);
 		}
 	}
@@ -746,9 +771,21 @@ ndb_gpu_try_train_model(const char *algorithm,
 		}
 		else
 		{
-			/* GPU mode: error if GPU training fails */
-			/* CPU mode: never error, just return false for fallback */
-			if (!NDB_COMPUTE_MODE_IS_CPU() && NDB_REQUIRE_GPU())
+			/* GPU training failed - determine fallback behavior */
+			/* GPU mode + CUDA/ROCm: error out (GPU must work) */
+			/* GPU mode + Metal: allow CPU fallback (Metal has limitations) */
+			/* AUTO mode: always allow CPU fallback */
+			GPUBackend backend = neurondb_gpu_get_backend();
+			bool is_metal_backend = (backend == GPU_BACKEND_METAL);
+			bool allow_fallback = true;
+			
+			if (NDB_REQUIRE_GPU() && !is_metal_backend)
+			{
+				/* GPU mode with CUDA/ROCm: GPU must work, error out */
+				allow_fallback = false;
+			}
+			
+			if (!allow_fallback)
 			{
 				/* Capture error message before raising ERROR */
 				/* Also ensure errstr is set so it's available to the caller */
@@ -777,7 +814,7 @@ ndb_gpu_try_train_model(const char *algorithm,
 				if (error_detail)
 					pfree(error_detail);
 			}
-			/* AUTO mode: fall back to CPU */
+			/* AUTO/CPU mode OR Metal backend: fall back to CPU */
 			ndb_gpu_stats_record(false, 0.0, elapsed_ms, true);
 		}
 lr_fallback:;
