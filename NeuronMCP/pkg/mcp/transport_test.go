@@ -197,9 +197,26 @@ func TestStdioTransport_WriteMessage(t *testing.T) {
 		t.Fatal("WriteMessage() produced no output")
 	}
 
-  /* Should contain JSON */
+  /* Should start with Content-Length header per MCP specification */
+	if !strings.HasPrefix(output, "Content-Length:") {
+		t.Error("WriteMessage() should start with Content-Length header")
+	}
+
+  /* Should contain JSON body after headers */
 	if !strings.Contains(output, "jsonrpc") {
 		t.Error("WriteMessage() should include jsonrpc in output")
+	}
+	
+  /* Verify Content-Length header format: Content-Length: <number>\r\n\r\n */
+	lines := strings.Split(output, "\r\n")
+	if len(lines) < 3 {
+		t.Error("WriteMessage() should have Content-Length header followed by empty line")
+	}
+	if !strings.HasPrefix(lines[0], "Content-Length:") {
+		t.Error("First line should be Content-Length header")
+	}
+	if lines[1] != "" {
+		t.Error("Second line should be empty (end of headers)")
 	}
 }
 
@@ -248,9 +265,26 @@ func TestStdioTransport_WriteNotification(t *testing.T) {
 		t.Fatal("WriteNotification() produced no output")
 	}
 
+  /* Should start with Content-Length header per MCP specification */
+	if !strings.HasPrefix(output, "Content-Length:") {
+		t.Error("WriteNotification() should start with Content-Length header")
+	}
+
   /* Should contain method */
 	if !strings.Contains(output, "method") {
 		t.Error("WriteNotification() should include method in JSON")
+	}
+	
+  /* Verify Content-Length header format: Content-Length: <number>\r\n\r\n */
+	lines := strings.Split(output, "\r\n")
+	if len(lines) < 3 {
+		t.Error("WriteNotification() should have Content-Length header followed by empty line")
+	}
+	if !strings.HasPrefix(lines[0], "Content-Length:") {
+		t.Error("First line should be Content-Length header")
+	}
+	if lines[1] != "" {
+		t.Error("Second line should be empty (end of headers)")
 	}
 }
 

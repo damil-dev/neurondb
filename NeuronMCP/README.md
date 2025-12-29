@@ -247,9 +247,11 @@ NeuronMCP provides comprehensive tools covering all NeuronDB capabilities:
 | **Vector Graph** | `vector_graph` (BFS, DFS, PageRank, community detection) |
 | **Vecmap Operations** | `vecmap_operations` (distances, arithmetic, norm on sparse vectors) |
 | **Dataset Loading** | `load_dataset` (HuggingFace, URLs, GitHub, S3, local files with auto-embedding) |
-| **PostgreSQL** | `postgresql_version`, `postgresql_stats`, `postgresql_databases`, `postgresql_connections`, `postgresql_locks`, `postgresql_replication`, `postgresql_settings`, `postgresql_extensions` |
+| **PostgreSQL (27 tools)** | Complete PostgreSQL administration: `postgresql_version`, `postgresql_stats`, `postgresql_databases`, `postgresql_connections`, `postgresql_locks`, `postgresql_replication`, `postgresql_settings`, `postgresql_extensions`, `postgresql_tables`, `postgresql_indexes`, `postgresql_schemas`, `postgresql_views`, `postgresql_sequences`, `postgresql_functions`, `postgresql_triggers`, `postgresql_constraints`, `postgresql_users`, `postgresql_roles`, `postgresql_permissions`, `postgresql_table_stats`, `postgresql_index_stats`, `postgresql_active_queries`, `postgresql_wait_events`, `postgresql_table_size`, `postgresql_index_size`, `postgresql_bloat`, `postgresql_vacuum_stats` |
 
-See [TOOLS_REFERENCE.md](TOOLS_REFERENCE.md) for complete parameter lists and examples.
+**Comprehensive Documentation:**
+- **[TOOLS_REFERENCE.md](TOOLS_REFERENCE.md)** - Complete reference for all 100+ tools with parameters, examples, and error codes
+- **[POSTGRESQL_TOOLS.md](POSTGRESQL_TOOLS.md)** - Detailed documentation for all 27 PostgreSQL administration tools
 
 For a comprehensive catalog of all tools and resources, see [docs/tool-resource-catalog.md](docs/tool-resource-catalog.md).
 

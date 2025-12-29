@@ -76,10 +76,11 @@ func (t *StdioTransport) ReadMessage() (*JSONRPCRequest, error) {
    /* Remove trailing newline/carriage return */
 		line = strings.TrimRight(line, "\r\n")
 		
-   /* Check if the first line is JSON (starts with '{') */
-   /* If so, Claude Desktop is sending JSON directly without Content-Length headers */
+   /* Backward compatibility: Check if the first line is JSON (starts with '{') */
+   /* Standard MCP protocol always uses Content-Length headers */
+   /* Claude Desktop sends with Content-Length, but we support direct JSON for compatibility */
 		if headerLines == 1 && strings.HasPrefix(strings.TrimSpace(line), "{") {
-			t.WriteError(fmt.Errorf("DEBUG: First line is JSON (no Content-Length headers), parsing directly"))
+			t.WriteError(fmt.Errorf("DEBUG: First line is JSON (fallback mode, no Content-Length headers), parsing directly"))
 			
 			/* Enforce maximum request size for JSON without Content-Length */
 			if t.maxRequestSize > 0 && int64(len(line)) > t.maxRequestSize {
@@ -143,15 +144,16 @@ func (t *StdioTransport) WriteMessage(resp *JSONRPCResponse) error {
 
 	t.WriteError(fmt.Errorf("DEBUG: Writing response: %s", string(data)))
 
-  /* Claude Desktop expects JSON directly without Content-Length headers */
-  /* Write JSON followed by newline */
-	if _, err := t.stdout.Write(data); err != nil {
-		return fmt.Errorf("failed to write body: %w", err)
+  /* MCP protocol requires Content-Length headers for all messages */
+  /* Format: Content-Length: <len>\r\n\r\n<body> */
+	header := fmt.Sprintf("Content-Length: %d\r\n\r\n", len(data))
+	if _, err := t.stdout.WriteString(header); err != nil {
+		return fmt.Errorf("failed to write header: %w", err)
 	}
 	
-  /* Add newline after JSON */
-	if _, err := t.stdout.Write([]byte("\n")); err != nil {
-		return fmt.Errorf("failed to write newline: %w", err)
+  /* Write JSON body (no newline after body per MCP spec) */
+	if _, err := t.stdout.Write(data); err != nil {
+		return fmt.Errorf("failed to write body: %w", err)
 	}
 
   /* Flush stdout to ensure message is sent immediately */
@@ -182,15 +184,16 @@ func (t *StdioTransport) WriteNotification(method string, params interface{}) er
 
 	t.WriteError(fmt.Errorf("DEBUG: Writing notification: %s", string(data)))
 
-  /* Claude Desktop expects JSON directly without Content-Length headers */
-  /* Write JSON followed by newline */
-	if _, err := t.stdout.Write(data); err != nil {
-		return fmt.Errorf("failed to write body: %w", err)
+  /* MCP protocol requires Content-Length headers for all messages */
+  /* Format: Content-Length: <len>\r\n\r\n<body> */
+	header := fmt.Sprintf("Content-Length: %d\r\n\r\n", len(data))
+	if _, err := t.stdout.WriteString(header); err != nil {
+		return fmt.Errorf("failed to write header: %w", err)
 	}
 	
-  /* Add newline after JSON */
-	if _, err := t.stdout.Write([]byte("\n")); err != nil {
-		return fmt.Errorf("failed to write newline: %w", err)
+  /* Write JSON body (no newline after body per MCP spec) */
+	if _, err := t.stdout.Write(data); err != nil {
+		return fmt.Errorf("failed to write body: %w", err)
 	}
 
   /* Flush stdout to ensure message is sent immediately */
