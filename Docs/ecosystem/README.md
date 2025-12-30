@@ -38,7 +38,7 @@ All components connect to the same NeuronDB PostgreSQL instance:
 - **NeuronDB**: Database server with extension
 - **NeuronAgent**: Connects via PostgreSQL connection string
 - **NeuronMCP**: Connects via PostgreSQL connection string
-- **NeuronDesktop**: Connects to all three components
+- **NeuronDesktop**: Connects to NeuronDB, NeuronAgent, and NeuronMCP (all three other components)
 
 ### Communication Matrix
 

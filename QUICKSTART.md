@@ -31,7 +31,8 @@ This command will:
 2. Start PostgreSQL with NeuronDB extension
 3. Start NeuronAgent (REST API server)
 4. Start NeuronMCP (MCP protocol server)
-5. Configure networking between all components
+5. Start NeuronDesktop (web interface with API and frontend)
+6. Configure networking between all components
 
 **What to expect:**
 - First run: 5-10 minutes (building images)
@@ -43,10 +44,12 @@ This command will:
 docker compose ps
 ```
 
-You should see three services running:
+You should see five services running:
 - `neurondb-cpu` (PostgreSQL with NeuronDB extension)
 - `neuronagent` (REST API server)
 - `neurondb-mcp` (MCP protocol server)
+- `neurondesk-api` (NeuronDesktop API server)
+- `neurondesk-frontend` (NeuronDesktop web interface)
 
 Wait for all services to show "healthy" status (may take 30-60 seconds).
 
@@ -166,6 +169,8 @@ curl -X POST http://localhost:8080/api/v1/agents \
 docker compose logs neurondb
 docker compose logs neuronagent
 docker compose logs neurondb-mcp
+docker compose logs neurondesk-api
+docker compose logs neurondesk-frontend
 ```
 
 **Common issues:**
@@ -195,6 +200,8 @@ All services should show "healthy" status. If not, check logs:
 docker compose logs --tail=50 neurondb
 docker compose logs --tail=50 neuronagent
 docker compose logs --tail=50 neurondb-mcp
+docker compose logs --tail=50 neurondesk-api
+docker compose logs --tail=50 neurondesk-frontend
 ```
 
 **Wait for initialization:**
@@ -223,7 +230,7 @@ This stops all containers but preserves data volumes.
 docker compose down -v
 
 # Remove Docker images (optional)
-docker rmi neurondb:cpu-pg17 neuronagent:latest neurondb-mcp:latest
+docker rmi neurondb:cpu-pg17 neuronagent:latest neurondb-mcp:latest neurondesk-api:latest neurondesk-frontend:latest
 
 # Remove Docker network (if it persists)
 docker network rm neurondb-network 2>/dev/null || true
@@ -256,6 +263,8 @@ After `docker compose up -d`, you have:
 | **NeuronDB** | `neurondb-cpu` | 5433 | PostgreSQL with NeuronDB extension |
 | **NeuronAgent** | `neuronagent` | 8080 | REST API server for agent runtime |
 | **NeuronMCP** | `neurondb-mcp` | - | MCP protocol server (stdio) |
+| **NeuronDesktop API** | `neurondesk-api` | 8081 | NeuronDesktop backend API |
+| **NeuronDesktop Frontend** | `neurondesk-frontend` | 3000 | NeuronDesktop web interface |
 
 **Network:** All services communicate via `neurondb-network` Docker network.
 
@@ -294,6 +303,18 @@ cd NeuronMCP/client
 ./neurondb_mcp_client.py -c ../../neuronmcp_server.json -e "list_tools"
 ```
 
+### NeuronDesktop Web Interface
+
+Access the unified web interface:
+
+```bash
+# Web UI (browser)
+http://localhost:3000
+
+# API endpoint
+curl http://localhost:8081/health
+```
+
 ## Configuration
 
 All services use default configuration suitable for development. To customize:
@@ -316,4 +337,5 @@ See component-specific documentation for detailed configuration options.
 - Explore [NeuronDB examples](NeuronDB/demo/)
 - Try [NeuronAgent examples](NeuronAgent/examples/)
 - Check out [NeuronMCP documentation](NeuronMCP/README.md)
+- Access [NeuronDesktop web interface](http://localhost:3000) and see [NeuronDesktop documentation](NeuronDesktop/README.md)
 

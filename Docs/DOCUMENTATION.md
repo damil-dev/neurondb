@@ -78,9 +78,10 @@ The official documentation site provides comprehensive guides, tutorials, API re
 This repository contains local documentation files for quick reference. For the most up-to-date and comprehensive documentation, always refer to the official site.
 
 ### Component READMEs
-- [NeuronDB README](NeuronDB/README.md) - Local feature overview
-- [NeuronAgent README](NeuronAgent/README.md) - Local component guide
-- [NeuronMCP README](NeuronMCP/README.md) - Local component guide
+- [NeuronDB README](../NeuronDB/README.md) - Local feature overview
+- [NeuronAgent README](../NeuronAgent/README.md) - Local component guide
+- [NeuronMCP README](../NeuronMCP/README.md) - Local component guide
+- [NeuronDesktop README](../NeuronDesktop/README.md) - Local component guide
 
 ### Installation Guides
 - [NeuronDB Installation](NeuronDB/INSTALL.md) - Build from source

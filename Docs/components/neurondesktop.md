@@ -43,9 +43,18 @@ NeuronDesktop is a comprehensive, production-ready web application that provides
 
 ### Docker (Recommended)
 
+Using the root docker-compose.yml (recommended):
+
+```bash
+# From repository root
+docker compose --profile default up -d neurondesk-api neurondesk-frontend
+```
+
+Or using standalone NeuronDesktop docker-compose.yml:
+
 ```bash
 cd NeuronDesktop
-docker-compose up -d
+docker compose up -d
 ```
 
 ### Manual Setup

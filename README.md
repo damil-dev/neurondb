@@ -221,7 +221,7 @@ Unified web interface providing a single dashboard for managing and interacting 
 ** New to NeuronDB? Start here: [QUICKSTART.md](QUICKSTART.md)**
 
 The quick start guide provides a complete, step-by-step walkthrough to get NeuronDB running in minutes with:
-- Single-command Docker Compose setup
+- Single-command Docker Compose setup (includes all four components: NeuronDB, NeuronAgent, NeuronMCP, and NeuronDesktop)
 - Automated smoke tests
 - Uninstall and cleanup instructions
 
@@ -237,7 +237,7 @@ See [NeuronDB installation guide](NeuronDB/INSTALL.md) for platform-specific req
 
 ### Unified Setup (Recommended)
 
-For a complete integrated setup of all three modules, use the unified setup script:
+For a complete integrated setup of all four components (NeuronDB, NeuronAgent, NeuronMCP, and NeuronDesktop), use the unified setup script:
 
 ```bash
 # Set database connection parameters (optional - defaults shown)

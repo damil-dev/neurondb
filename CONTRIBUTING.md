@@ -5,7 +5,7 @@ Thank you for your interest in contributing to NeuronDB!
 ## Getting Started
 
 1. Fork the repository
-2. Clone your fork: `git clone https://github.com/YOUR_USERNAME/NeurondB.git`
+2. Clone your fork: `git clone https://github.com/YOUR_USERNAME/NeurondB.git` (replace `YOUR_USERNAME` with your GitHub username)
 3. Create a feature branch: `git checkout -b feature/my-feature`
 4. Make your changes
 5. Test your changes: `make clean && make && make installcheck`
@@ -129,7 +129,7 @@ npm run lint -- --fix
 - **Zero warnings**: Code must compile with `-Wall -Wextra` clean
 - **Zero errors**: All compilation must succeed
 - **All platforms**: Test on Linux and macOS
-- **PostgreSQL versions**: Support PG 15, 16, 17, 18
+- **PostgreSQL versions**: Support PG 16, 17, 18
 
 ### Testing
 - Add regression tests in `sql/` with expected output in `expected/`

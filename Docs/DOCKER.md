@@ -1,10 +1,10 @@
 # NeuronDB Ecosystem - Unified Docker Orchestration
 
-Complete guide for building and running NeuronDB, NeuronAgent, and NeuronMCP together using Docker Compose.
+Complete guide for building and running NeuronDB, NeuronAgent, NeuronMCP, and NeuronDesktop together using Docker Compose.
 
 ## Overview
 
-This unified Docker orchestration system provides simple commands to build and run all three services with automatic networking and default connection settings. The system uses Docker Compose profiles to support CPU and GPU variants (CUDA, ROCm, Metal).
+This unified Docker orchestration system provides simple commands to build and run all four services (NeuronDB, NeuronAgent, NeuronMCP, and NeuronDesktop) with automatic networking and default connection settings. The system uses Docker Compose profiles to support CPU and GPU variants (CUDA, ROCm, Metal).
 
 ## Quick Start
 
