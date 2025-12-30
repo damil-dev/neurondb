@@ -110,6 +110,6 @@ VERSION=1.0.0.beta ./build.sh
 
 - Package-based builds require the `packaging/` directory to be present
 - The build scripts automatically detect PostgreSQL versions
-- All three components now have complete DEB packaging
+- All four components (NeuronDB, NeuronAgent, NeuronMCP, and NeuronDesktop) now have complete DEB packaging
 - RPM packaging is also available for NeuronDB and NeuronAgent
 

@@ -464,6 +464,71 @@ fix-locks: ## Check and provide instructions to remove stale package manager loc
 # ============================================================================
 
 build: build-neurondb build-neuronagent build-neuronmcp build-neurondesktop ## Build all components from source
+	@echo "$(CYAN)Copying binaries and configuration files to bin/ directory...$(NC)"
+	@# Create directories for each component
+	@mkdir -p bin/neurondb bin/neuronagent bin/neuronmcp bin/neurondesktop
+	@# Copy NeuronDB extension files
+	@if [ -f NeuronDB/neurondb.control ]; then \
+		cp NeuronDB/neurondb.control bin/neurondb/ && echo "$(GREEN)✓ Copied neurondb.control$(NC)"; \
+	fi
+	@if [ -f NeuronDB/neurondb--1.0.sql ]; then \
+		cp NeuronDB/neurondb--1.0.sql bin/neurondb/ && echo "$(GREEN)✓ Copied neurondb--1.0.sql$(NC)"; \
+	fi
+	@if [ -f NeuronDB/neurondb.so ]; then \
+		cp NeuronDB/neurondb.so bin/neurondb/ && echo "$(GREEN)✓ Copied neurondb.so$(NC)"; \
+	elif [ -f NeuronDB/neurondb.dylib ]; then \
+		cp NeuronDB/neurondb.dylib bin/neurondb/ && echo "$(GREEN)✓ Copied neurondb.dylib$(NC)"; \
+	fi
+	@# Copy NeuronAgent binary, configuration files, and setup SQL
+	@if [ -f NeuronAgent/bin/neuronagent ]; then \
+		cp NeuronAgent/bin/neuronagent bin/neuronagent/ && echo "$(GREEN)✓ Copied neuronagent binary$(NC)"; \
+	fi
+	@if [ -f NeuronAgent/configs/config.yaml.example ]; then \
+		cp NeuronAgent/configs/config.yaml.example bin/neuronagent/ && echo "$(GREEN)✓ Copied neuronagent config.yaml.example$(NC)"; \
+	fi
+	@if [ -f NeuronAgent/configs/agent_profiles.yaml ]; then \
+		cp NeuronAgent/configs/agent_profiles.yaml bin/neuronagent/ && echo "$(GREEN)✓ Copied neuronagent agent_profiles.yaml$(NC)"; \
+	fi
+	@if [ -f NeuronAgent/setup.sql ]; then \
+		cp NeuronAgent/setup.sql bin/neuronagent/ && echo "$(GREEN)✓ Copied neuronagent setup.sql$(NC)"; \
+	fi
+	@if [ -f NeuronAgent/initial_schema.sql ]; then \
+		cp NeuronAgent/initial_schema.sql bin/neuronagent/ && echo "$(GREEN)✓ Copied neuronagent initial_schema.sql$(NC)"; \
+	fi
+	@if [ -d NeuronAgent/migrations ]; then \
+		cp -r NeuronAgent/migrations bin/neuronagent/ && echo "$(GREEN)✓ Copied neuronagent migrations/ directory$(NC)"; \
+	fi
+	@# Copy NeuronMCP binary, configuration files, and setup SQL
+	@if [ -f NeuronMCP/bin/neuronmcp ]; then \
+		cp NeuronMCP/bin/neuronmcp bin/neuronmcp/ && echo "$(GREEN)✓ Copied neuronmcp binary$(NC)"; \
+	fi
+	@if [ -f NeuronMCP/mcp-config.json.example ]; then \
+		cp NeuronMCP/mcp-config.json.example bin/neuronmcp/ && echo "$(GREEN)✓ Copied neuronmcp mcp-config.json.example$(NC)"; \
+	fi
+	@if [ -f NeuronMCP/neuronmcp.sql ]; then \
+		cp NeuronMCP/neuronmcp.sql bin/neuronmcp/ && echo "$(GREEN)✓ Copied neuronmcp.sql (comprehensive setup)$(NC)"; \
+	fi
+	@# Copy NeuronDesktop binary and setup SQL
+	@if [ -f NeuronDesktop/bin/neurondesktop ]; then \
+		cp NeuronDesktop/bin/neurondesktop bin/neurondesktop/ && echo "$(GREEN)✓ Copied neurondesktop binary$(NC)"; \
+	fi
+	@if [ -f NeuronDesktop/setup.sql ]; then \
+		cp NeuronDesktop/setup.sql bin/neurondesktop/ && echo "$(GREEN)✓ Copied neurondesktop setup.sql$(NC)"; \
+	fi
+	@if [ -f NeuronDesktop/neuron-desktop.sql ]; then \
+		cp NeuronDesktop/neuron-desktop.sql bin/neurondesktop/ && echo "$(GREEN)✓ Copied neurondesktop neuron-desktop.sql$(NC)"; \
+	fi
+	@if [ -d NeuronDesktop/api/migrations ]; then \
+		cp -r NeuronDesktop/api/migrations bin/neurondesktop/ && echo "$(GREEN)✓ Copied neurondesktop migrations/ directory$(NC)"; \
+	fi
+	@# Copy NeuronDesktop frontend build output
+	@if [ -d NeuronDesktop/frontend/.next ]; then \
+		cp -r NeuronDesktop/frontend/.next bin/neurondesktop/ && echo "$(GREEN)✓ Copied neurondesktop frontend .next/ directory$(NC)"; \
+	fi
+	@if [ -f NeuronDesktop/frontend/package.json ]; then \
+		cp NeuronDesktop/frontend/package.json bin/neurondesktop/frontend-package.json && echo "$(GREEN)✓ Copied neurondesktop frontend package.json$(NC)"; \
+	fi
+	@echo "$(GREEN)✓ All binaries and configuration files copied to bin/$(NC)"
 
 build-neurondb: ## Build NeuronDB from source (uses build.sh)
 	@echo "$(CYAN)Building NeuronDB from source...$(NC)"
@@ -601,17 +666,18 @@ install-neurondb: ## Install NeuronDB extension
 
 install-neuronagent: build-neuronagent ## Install NeuronAgent
 	@echo "$(CYAN)Installing NeuronAgent...$(NC)"
-	@echo "$(YELLOW)Note: NeuronAgent binary is in NeuronAgent/bin/$(NC)"
+	@echo "$(YELLOW)Note: NeuronAgent binary is in bin/neuronagent$(NC)"
 	@echo "$(GREEN)✓ NeuronAgent ready$(NC)"
 
 install-neuronmcp: build-neuronmcp ## Install NeuronMCP
 	@echo "$(CYAN)Installing NeuronMCP...$(NC)"
-	@echo "$(YELLOW)Note: NeuronMCP binary is in NeuronMCP/bin/$(NC)"
+	@echo "$(YELLOW)Note: NeuronMCP binary is in bin/neuronmcp$(NC)"
 	@echo "$(GREEN)✓ NeuronMCP ready$(NC)"
 
 install-neurondesktop: build-neurondesktop ## Install NeuronDesktop
 	@echo "$(CYAN)Installing NeuronDesktop...$(NC)"
 	@cd NeuronDesktop && $(MAKE) install
+	@echo "$(YELLOW)Note: NeuronDesktop binary is in bin/neurondesktop$(NC)"
 	@echo "$(GREEN)✓ NeuronDesktop installed$(NC)"
 
 # ============================================================================
@@ -619,6 +685,9 @@ install-neurondesktop: build-neurondesktop ## Install NeuronDesktop
 # ============================================================================
 
 clean: clean-neurondb clean-neuronagent clean-neuronmcp clean-neurondesktop ## Clean all build artifacts
+	@echo "$(CYAN)Cleaning root bin/ directory...$(NC)"
+	@rm -rf bin/neuronagent bin/neuronmcp bin/neurondesktop bin/neurondb
+	@echo "$(GREEN)✓ Root bin/ cleaned$(NC)"
 
 clean-neurondb: ## Clean NeuronDB artifacts
 	@echo "$(CYAN)Cleaning NeuronDB...$(NC)"
