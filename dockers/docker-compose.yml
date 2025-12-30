@@ -34,8 +34,8 @@ services:
     - default
     - cpu
     build:
-      context: .
-      dockerfile: NeuronDB/docker/Dockerfile.package
+      context: ..
+      dockerfile: dockers/neurondb/Dockerfile
       args:
         PG_MAJOR: ${PG_MAJOR:-17}
         PACKAGE_VERSION: ${PACKAGE_VERSION:-1.0.0.beta}
@@ -88,8 +88,8 @@ services:
     - cuda
     - gpu
     build:
-      context: .
-      dockerfile: NeuronDB/docker/Dockerfile.package.cuda
+      context: ..
+      dockerfile: dockers/neurondb/Dockerfile.cuda
       args:
         PG_MAJOR: ${PG_MAJOR:-17}
         CUDA_VERSION: ${CUDA_VERSION:-12.2.0}
@@ -154,8 +154,8 @@ services:
     - rocm
     - gpu
     build:
-      context: ./NeuronDB
-      dockerfile: docker/Dockerfile.gpu.rocm
+      context: ..
+      dockerfile: dockers/neurondb/Dockerfile.gpu.rocm
       args:
         PG_MAJOR: ${PG_MAJOR:-17}
         ROCM_VERSION: ${ROCM_VERSION:-5.7}
@@ -212,8 +212,8 @@ services:
     - metal
     - gpu
     build:
-      context: ./NeuronDB
-      dockerfile: docker/Dockerfile.gpu.metal
+      context: ..
+      dockerfile: dockers/neurondb/Dockerfile.gpu.metal
       args:
         PG_MAJOR: ${PG_MAJOR:-17}
         ONNX_VERSION: ${ONNX_VERSION:-1.17.0}
@@ -267,8 +267,8 @@ services:
     - default
     - cpu
     build:
-      context: .
-      dockerfile: NeuronAgent/docker/Dockerfile.package
+      context: ..
+      dockerfile: dockers/neuronagent/Dockerfile.package
       args:
         PACKAGE_VERSION: ${PACKAGE_VERSION:-1.0.0.beta}
         VERSION: ${VERSION:-latest}
@@ -329,8 +329,8 @@ services:
     - cuda
     - gpu
     build:
-      context: ./NeuronAgent
-      dockerfile: docker/Dockerfile
+      context: ..
+      dockerfile: dockers/neuronagent/Dockerfile
       args:
         VERSION: ${VERSION:-latest}
         BUILD_DATE: ${BUILD_DATE:-}
@@ -390,8 +390,8 @@ services:
     - rocm
     - gpu
     build:
-      context: ./NeuronAgent
-      dockerfile: docker/Dockerfile
+      context: ..
+      dockerfile: dockers/neuronagent/Dockerfile
       args:
         VERSION: ${VERSION:-latest}
         BUILD_DATE: ${BUILD_DATE:-}
@@ -451,8 +451,8 @@ services:
     - metal
     - gpu
     build:
-      context: ./NeuronAgent
-      dockerfile: docker/Dockerfile
+      context: ..
+      dockerfile: dockers/neuronagent/Dockerfile
       args:
         VERSION: ${VERSION:-latest}
         BUILD_DATE: ${BUILD_DATE:-}
@@ -512,8 +512,8 @@ services:
     - default
     - cpu
     build:
-      context: .
-      dockerfile: NeuronMCP/docker/Dockerfile.package
+      context: ..
+      dockerfile: dockers/neuronmcp/Dockerfile.package
       args:
         PACKAGE_VERSION: ${PACKAGE_VERSION:-1.0.0.beta}
         VERSION: ${VERSION:-latest}
@@ -549,10 +549,10 @@ services:
       - CMD
       - test
       - -f
-      - /app/neurondb-mcp
+      - /app/neuronmcp
       - -a
       - -x
-      - /app/neurondb-mcp
+      - /app/neuronmcp
       interval: 30s
       timeout: 5s
       retries: 3
@@ -575,8 +575,8 @@ services:
     - cuda
     - gpu
     build:
-      context: ./NeuronMCP
-      dockerfile: docker/Dockerfile
+      context: ..
+      dockerfile: dockers/neuronmcp/Dockerfile
       args:
         VERSION: ${VERSION:-latest}
         BUILD_DATE: ${BUILD_DATE:-}
@@ -606,10 +606,10 @@ services:
       - CMD
       - test
       - -f
-      - /app/neurondb-mcp
+      - /app/neuronmcp
       - -a
       - -x
-      - /app/neurondb-mcp
+      - /app/neuronmcp
       interval: 10s
       timeout: 5s
       retries: 5
@@ -637,8 +637,8 @@ services:
     - rocm
     - gpu
     build:
-      context: ./NeuronMCP
-      dockerfile: docker/Dockerfile
+      context: ..
+      dockerfile: dockers/neuronmcp/Dockerfile
       args:
         VERSION: ${VERSION:-latest}
         BUILD_DATE: ${BUILD_DATE:-}
@@ -668,10 +668,10 @@ services:
       - CMD
       - test
       - -f
-      - /app/neurondb-mcp
+      - /app/neuronmcp
       - -a
       - -x
-      - /app/neurondb-mcp
+      - /app/neuronmcp
       interval: 10s
       timeout: 5s
       retries: 5
@@ -699,8 +699,8 @@ services:
     - metal
     - gpu
     build:
-      context: ./NeuronMCP
-      dockerfile: docker/Dockerfile
+      context: ..
+      dockerfile: dockers/neuronmcp/Dockerfile
       args:
         VERSION: ${VERSION:-latest}
         BUILD_DATE: ${BUILD_DATE:-}
@@ -730,10 +730,10 @@ services:
       - CMD
       - test
       - -f
-      - /app/neurondb-mcp
+      - /app/neuronmcp
       - -a
       - -x
-      - /app/neurondb-mcp
+      - /app/neuronmcp
       interval: 10s
       timeout: 5s
       retries: 5
@@ -790,7 +790,7 @@ services:
         psql -h neurondb -U $${PGUSER} -d neurondesk -f /schema/neurondesktop.sql || echo "Schema may already be applied (some errors are expected if tables exist)"
         echo "NeuronDesktop database initialization complete!"
     volumes:
-      - ./NeuronDesktop/api/neurondesktop.sql:/schema/neurondesktop.sql:ro
+      - ../NeuronDesktop/api/neurondesktop.sql:/schema/neurondesktop.sql:ro
     networks:
     - neurondb-network
     restart: "no"
@@ -799,8 +799,8 @@ services:
     - default
     - cpu
     build:
-      context: .
-      dockerfile: NeuronDesktop/api/Dockerfile
+      context: ..
+      dockerfile: dockers/neurondesktop/Dockerfile
     container_name: neurondesk-api
     init: true
     labels:
@@ -862,7 +862,7 @@ services:
     - default
     - cpu
     build:
-      context: ./NeuronDesktop/frontend
+      context: ../NeuronDesktop/frontend
       dockerfile: Dockerfile
     container_name: neurondesk-frontend
     init: true
