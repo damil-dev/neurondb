@@ -39,3 +39,7 @@ cd "$SCRIPT_DIR"
 # Run the MCP server
 exec "$BINARY_PATH"
 
+
+
+
+

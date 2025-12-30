@@ -34,6 +34,12 @@ func (s *Server) filterToolsByFeatures(definitions []tools.ToolDefinition) []too
 
 /* shouldIncludeTool determines if a tool should be included based on feature flags */
 func shouldIncludeTool(toolName string, features *config.FeaturesConfig) bool {
+  /* PostgreSQL tools - always enabled by default */
+	if isPostgreSQLTool(toolName) {
+		/* PostgreSQL core tools are always enabled */
+		return true
+	}
+	
   /* Vector tools */
 	if isVectorTool(toolName) {
 		return features.Vector != nil && features.Vector.Enabled
@@ -127,5 +133,10 @@ func isGPUTool(name string) bool {
 		}
 	}
 	return false
+}
+
+func isPostgreSQLTool(name string) bool {
+	/* PostgreSQL tools start with "postgresql_" */
+	return len(name) >= 11 && name[:11] == "postgresql_"
 }
 

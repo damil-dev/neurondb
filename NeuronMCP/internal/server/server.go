@@ -50,8 +50,13 @@ type Server struct {
 
 /* NewServer creates a new server */
 func NewServer() (*Server, error) {
+	return NewServerWithConfig("")
+}
+
+/* NewServerWithConfig creates a new server with a specific config path */
+func NewServerWithConfig(configPath string) (*Server, error) {
 	cfgMgr := config.NewConfigManager()
-	_, err := cfgMgr.Load("")
+	_, err := cfgMgr.Load(configPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load config: %w", err)
 	}
@@ -111,6 +116,7 @@ func NewServer() (*Server, error) {
 	resources.RegisterAllResources(resourcesManager, db)
 	promptsManager := prompts.NewManager(db, logger)
 	samplingManager := sampling.NewManager(db, logger)
+	samplingManager.SetToolRegistry(toolRegistry) /* Enable tool calling in sampling */
 	healthChecker := health.NewChecker(db, logger)
 	progressTracker := progress.NewTracker()
 	batchProcessor := batch.NewProcessor(db, toolRegistry, logger)

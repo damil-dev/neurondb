@@ -123,6 +123,10 @@ class NeurondbMCPServer {
 
 			// Filter tools based on feature flags
 			const enabledTools = allDefinitions.filter((tool) => {
+				// PostgreSQL tools - always enabled by default
+				if (tool.name.startsWith("postgresql_")) {
+					return features.postgresql?.enabled !== false;
+				}
 				if (tool.name.startsWith("vector_") || tool.name.startsWith("embed_")) {
 					return features.vector?.enabled !== false;
 				}
