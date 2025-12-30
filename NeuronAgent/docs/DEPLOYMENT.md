@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- PostgreSQL 15+ with NeuronDB extension
+- PostgreSQL 16+ with NeuronDB extension
 - Go 1.21+
 - Docker (optional)
 
