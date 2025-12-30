@@ -1,7 +1,7 @@
 .PHONY: build clean test run build-client
 
 build:
-	go build -o bin/neurondb-mcp ./cmd/neurondb-mcp
+	go build -o bin/neuronmcp ./cmd/neurondb-mcp
 
 build-client:
 	go build -o bin/neurondb-mcp-client ./cmd/neurondb-mcp-client
@@ -13,5 +13,5 @@ test:
 	go test ./...
 
 run: build
-	./bin/neurondb-mcp
+	./bin/neuronmcp
 
