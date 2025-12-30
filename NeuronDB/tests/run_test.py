@@ -117,10 +117,8 @@ def list_sql_files(category: str, module: Optional[str] = None) -> List[str]:
 				all_files.append(rel_path)
 	
 	# Sort files numerically by their prefix (001, 002, 003, etc.)
-	# First sort by directory path, then by numeric prefix within each directory
-	def sort_key(filepath: str) -> Tuple[str, int, str]:
-		# Split into directory and filename
-		dir_part = os.path.dirname(filepath)
+	# All basic test files are now in the basic/ directory with sequential numbering
+	def sort_key(filepath: str) -> Tuple[int, str]:
 		basename = os.path.basename(filepath)
 		# Extract numeric prefix
 		match = re.match(r'^(\d{3})_', basename)
@@ -128,20 +126,21 @@ def list_sql_files(category: str, module: Optional[str] = None) -> List[str]:
 			num = int(match.group(1))
 		else:
 			num = 999999  # Files without numeric prefix go to end
-		# Return (directory, number, full_path) for sorting
-		return (dir_part, num, filepath)
+		# Return (number, full_path) for sorting - files are now in flat structure
+		return (num, filepath)
 	
 	all_files.sort(key=sort_key)
 
 	# Filter by category
 	if category == "basic":
-		# Include files from basic/ subdirectory and its subdirectories (ml/, vector/, rag/, core/, gpu/, other/)
-		# or files without _advance/_negative in the root sql/ directory
+		# Include files from basic/ directory (all basic tests are now in basic/ with sequential numbering)
+		# Exclude files with _advance/_negative/_perf suffixes
 		result = []
 		for f in all_files:
-			if "/basic/" in f or (f.startswith("basic/") or os.path.dirname(f) == "basic"):
-				result.append(os.path.join(TESTS_SQL_DIR, f))
-			elif "/" not in f and "_advance.sql" not in f and "_negative.sql" not in f and "_perf.sql" not in f:
+			# Check if file is in basic/ directory (not in subdirectories)
+			dir_part = os.path.dirname(f)
+			basename = os.path.basename(f)
+			if dir_part == "basic" and "_advance.sql" not in basename and "_negative.sql" not in basename and "_perf.sql" not in basename:
 				result.append(os.path.join(TESTS_SQL_DIR, f))
 		files = result
 	elif category == "advance":
