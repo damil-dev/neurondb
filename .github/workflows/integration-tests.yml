@@ -182,11 +182,13 @@ jobs:
       - name: Start services with Docker Compose
         run: |
           # Modify docker-compose.yml to use specific PostgreSQL version
+          cd dockers
           docker compose up -d
           sleep 30  # Wait for services to be ready
       
       - name: Wait for services
         run: |
+          cd dockers
           for i in {1..60}; do
             if docker compose ps | grep -q "healthy\|Up"; then
               echo "Services are ready"
@@ -222,5 +224,6 @@ jobs:
       - name: Stop services
         if: always()
         run: |
+          cd dockers
           docker compose down -v
 
