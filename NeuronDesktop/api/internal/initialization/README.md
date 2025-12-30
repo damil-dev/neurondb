@@ -94,3 +94,7 @@ func (b *Bootstrap) initializeCustomFeature(ctx context.Context) error {
 
 Each initialization method can be tested independently by mocking the `queries` and `logger` dependencies.
 
+
+
+
+

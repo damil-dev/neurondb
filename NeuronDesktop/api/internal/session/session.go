@@ -15,11 +15,11 @@ import (
 
 // Session represents a user session
 type Session struct {
-	ID           string
-	UserID       string
-	CreatedAt    time.Time
-	LastSeenAt   time.Time
-	RevokedAt    *time.Time
+	ID            string
+	UserID        string
+	CreatedAt     time.Time
+	LastSeenAt    time.Time
+	RevokedAt     *time.Time
 	UserAgentHash string
 	IPHash        string
 }
@@ -37,11 +37,11 @@ type RefreshToken struct {
 
 // Manager manages sessions and refresh tokens
 type Manager struct {
-	db            *sql.DB
-	accessTTL     time.Duration
-	refreshTTL    time.Duration
-	cookieDomain  string
-	cookieSecure  bool
+	db             *sql.DB
+	accessTTL      time.Duration
+	refreshTTL     time.Duration
+	cookieDomain   string
+	cookieSecure   bool
 	cookieSameSite http.SameSite
 }
 
@@ -56,11 +56,11 @@ func NewManager(db *sql.DB, accessTTL, refreshTTL time.Duration, cookieDomain st
 	}
 
 	return &Manager{
-		db:            db,
-		accessTTL:     accessTTL,
-		refreshTTL:    refreshTTL,
-		cookieDomain:  cookieDomain,
-		cookieSecure:  cookieSecure,
+		db:             db,
+		accessTTL:      accessTTL,
+		refreshTTL:     refreshTTL,
+		cookieDomain:   cookieDomain,
+		cookieSecure:   cookieSecure,
 		cookieSameSite: sameSite,
 	}
 }
@@ -75,10 +75,10 @@ func (m *Manager) CreateSession(ctx context.Context, userID, userAgent, ip strin
 	now := time.Now()
 
 	session := &Session{
-		ID:           sessionID,
-		UserID:       userID,
-		CreatedAt:    now,
-		LastSeenAt:   now,
+		ID:            sessionID,
+		UserID:        userID,
+		CreatedAt:     now,
+		LastSeenAt:    now,
 		UserAgentHash: userAgentHash,
 		IPHash:        ipHash,
 	}
@@ -413,4 +413,3 @@ func GetUserIDFromContext(ctx context.Context) (string, bool) {
 	userID, ok := ctx.Value("user_id").(string)
 	return userID, ok
 }
-

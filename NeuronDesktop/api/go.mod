@@ -3,6 +3,7 @@ module github.com/neurondb/NeuronDesktop/api
 go 1.24.0
 
 require (
+	github.com/coreos/go-oidc/v3 v3.17.0
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
@@ -10,10 +11,10 @@ require (
 	github.com/jackc/pgx/v5 v5.5.5
 	github.com/shirou/gopsutil/v3 v3.24.5
 	golang.org/x/crypto v0.24.0
+	golang.org/x/oauth2 v0.34.0
 )
 
 require (
-	github.com/coreos/go-oidc/v3 v3.17.0 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.3 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
@@ -25,7 +26,6 @@ require (
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
-	golang.org/x/oauth2 v0.34.0 // indirect
 	golang.org/x/sync v0.7.0 // indirect
 	golang.org/x/sys v0.21.0 // indirect
 	golang.org/x/text v0.16.0 // indirect

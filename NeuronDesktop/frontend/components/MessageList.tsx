@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react'
 import { Message } from '@/lib/api'
 import ChatMessage from './ChatMessage'
+import MarkdownContent from './MarkdownContent'
 
 interface MessageListProps {
   messages: Message[]
@@ -40,10 +41,8 @@ export default function MessageList({ messages, streamingContent, isStreaming }:
         <div className="flex justify-start mb-4">
           <div className="max-w-[80%] order-1">
             <div className="rounded-lg px-4 py-3 bg-slate-800 text-slate-100 border border-slate-700">
-              <div className="whitespace-pre-wrap break-words">
-                {streamingContent}
-                <span className="inline-block w-2 h-4 bg-slate-400 ml-1 animate-pulse" />
-              </div>
+              <MarkdownContent content={streamingContent} />
+              <span className="inline-block w-2 h-4 bg-slate-400 ml-1 animate-pulse" />
             </div>
           </div>
           <div className="order-2 mr-3 flex-shrink-0">

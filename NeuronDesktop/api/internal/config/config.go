@@ -212,4 +212,3 @@ func (c *DatabaseConfig) DSN() string {
 	return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
 		c.Host, c.Port, c.User, c.Password, c.Name)
 }
-

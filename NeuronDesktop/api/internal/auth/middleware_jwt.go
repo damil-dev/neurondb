@@ -60,7 +60,7 @@ func JWTMiddleware() func(http.Handler) http.Handler {
 			// Add user info to context
 			ctx := context.WithValue(r.Context(), "user_id", claims.UserID)
 			ctx = context.WithValue(ctx, "username", claims.Username)
-	ctx = context.WithValue(ctx, "is_admin", claims.IsAdmin)
+			ctx = context.WithValue(ctx, "is_admin", claims.IsAdmin)
 			ctx = context.WithValue(ctx, "claims", claims)
 
 			next.ServeHTTP(w, r.WithContext(ctx))
@@ -91,4 +91,3 @@ func GetClaimsFromContext(ctx context.Context) (*Claims, bool) {
 	claims, ok := ctx.Value("claims").(*Claims)
 	return claims, ok
 }
-

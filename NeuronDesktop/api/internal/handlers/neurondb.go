@@ -16,9 +16,9 @@ import (
 
 // NeuronDBHandlers handles NeuronDB-related endpoints
 type NeuronDBHandlers struct {
-	queries         *db.Queries
-	clients         map[string]*neurondb.Client
-	mu              sync.RWMutex
+	queries          *db.Queries
+	clients          map[string]*neurondb.Client
+	mu               sync.RWMutex
 	enableSQLConsole bool
 }
 
@@ -36,27 +36,27 @@ func (h *NeuronDBHandlers) getClient(ctx context.Context, profileID string) (*ne
 	h.mu.RLock()
 	client, ok := h.clients[profileID]
 	h.mu.RUnlock()
-	
+
 	if ok {
 		return client, nil
 	}
-	
+
 	// Get profile
 	profile, err := h.queries.GetProfile(ctx, profileID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get profile: %w", err)
 	}
-	
+
 	// Create client
 	client, err = neurondb.NewClient(profile.NeuronDBDSN)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create NeuronDB client: %w", err)
 	}
-	
+
 	h.mu.Lock()
 	h.clients[profileID] = client
 	h.mu.Unlock()
-	
+
 	return client, nil
 }
 
@@ -64,19 +64,19 @@ func (h *NeuronDBHandlers) getClient(ctx context.Context, profileID string) (*ne
 func (h *NeuronDBHandlers) ListCollections(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	profileID := vars["profile_id"]
-	
+
 	client, err := h.getClient(r.Context(), profileID)
 	if err != nil {
 		WriteError(w, r, http.StatusInternalServerError, err, nil)
 		return
 	}
-	
+
 	collections, err := client.ListCollections(r.Context())
 	if err != nil {
 		WriteError(w, r, http.StatusInternalServerError, err, nil)
 		return
 	}
-	
+
 	WriteSuccess(w, collections, http.StatusOK)
 }
 
@@ -84,13 +84,13 @@ func (h *NeuronDBHandlers) ListCollections(w http.ResponseWriter, r *http.Reques
 func (h *NeuronDBHandlers) Search(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	profileID := vars["profile_id"]
-	
+
 	var req neurondb.SearchRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		WriteError(w, r, http.StatusBadRequest, fmt.Errorf("invalid request body"), nil)
 		return
 	}
-	
+
 	// Validate search request
 	if req.Limit == 0 {
 		req.Limit = 10
@@ -99,19 +99,19 @@ func (h *NeuronDBHandlers) Search(w http.ResponseWriter, r *http.Request) {
 		WriteValidationErrors(w, r, errors)
 		return
 	}
-	
+
 	client, err := h.getClient(r.Context(), profileID)
 	if err != nil {
 		WriteError(w, r, http.StatusInternalServerError, err, nil)
 		return
 	}
-	
+
 	results, err := client.Search(r.Context(), req)
 	if err != nil {
 		WriteError(w, r, http.StatusInternalServerError, err, nil)
 		return
 	}
-	
+
 	WriteSuccess(w, results, http.StatusOK)
 }
 
@@ -119,34 +119,34 @@ func (h *NeuronDBHandlers) Search(w http.ResponseWriter, r *http.Request) {
 func (h *NeuronDBHandlers) ExecuteSQL(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	profileID := vars["profile_id"]
-	
+
 	var req struct {
 		Query string `json:"query"`
 	}
-	
+
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		WriteError(w, r, http.StatusBadRequest, fmt.Errorf("invalid request body"), nil)
 		return
 	}
-	
+
 	// Validate SQL (only SELECT allowed)
 	if err := utils.ValidateSQL(req.Query); err != nil {
 		WriteError(w, r, http.StatusBadRequest, err, nil)
 		return
 	}
-	
+
 	client, err := h.getClient(r.Context(), profileID)
 	if err != nil {
 		WriteError(w, r, http.StatusInternalServerError, err, nil)
 		return
 	}
-	
+
 	results, err := client.ExecuteSQL(r.Context(), req.Query)
 	if err != nil {
 		WriteError(w, r, http.StatusBadRequest, err, nil)
 		return
 	}
-	
+
 	WriteSuccess(w, results, http.StatusOK)
 }
 
@@ -159,50 +159,49 @@ func (h *NeuronDBHandlers) ExecuteSQLFull(w http.ResponseWriter, r *http.Request
 		WriteError(w, r, http.StatusForbidden, fmt.Errorf("SQL console is disabled"), nil)
 		return
 	}
-	
+
 	// Check if user is admin (from context set by auth middleware)
 	userID, ok := r.Context().Value("user_id").(string)
 	if !ok {
 		WriteError(w, r, http.StatusUnauthorized, fmt.Errorf("unauthorized"), nil)
 		return
 	}
-	
+
 	// Get user to check admin status
 	user, err := h.queries.GetUserByID(r.Context(), userID)
 	if err != nil || !user.IsAdmin {
 		WriteError(w, r, http.StatusForbidden, fmt.Errorf("admin access required"), nil)
 		return
 	}
-	
+
 	vars := mux.Vars(r)
 	profileID := vars["profile_id"]
-	
+
 	var req struct {
 		Query string `json:"query"`
 	}
-	
+
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		WriteError(w, r, http.StatusBadRequest, fmt.Errorf("invalid request body"), nil)
 		return
 	}
-	
+
 	if strings.TrimSpace(req.Query) == "" {
 		WriteError(w, r, http.StatusBadRequest, fmt.Errorf("query cannot be empty"), nil)
 		return
 	}
-	
+
 	client, err := h.getClient(r.Context(), profileID)
 	if err != nil {
 		WriteError(w, r, http.StatusInternalServerError, err, nil)
 		return
 	}
-	
+
 	results, err := client.ExecuteSQLFull(r.Context(), req.Query)
 	if err != nil {
 		WriteError(w, r, http.StatusBadRequest, err, nil)
 		return
 	}
-	
+
 	WriteSuccess(w, results, http.StatusOK)
 }
-

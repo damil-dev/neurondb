@@ -19,7 +19,7 @@ type Logger struct {
 func NewLogger(level, format, output string) *Logger {
 	var file *os.File
 	var err error
-	
+
 	if output != "stdout" && output != "stderr" {
 		file, err = os.OpenFile(output, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
@@ -31,7 +31,7 @@ func NewLogger(level, format, output string) *Logger {
 	} else {
 		file = os.Stdout
 	}
-	
+
 	return &Logger{
 		level:  level,
 		format: format,
@@ -54,17 +54,17 @@ func (l *Logger) shouldLog(level string) bool {
 		"warn":  2,
 		"error": 3,
 	}
-	
+
 	currentLevel, ok := levels[l.level]
 	if !ok {
 		currentLevel = 1 // Default to info
 	}
-	
+
 	logLevel, ok := levels[level]
 	if !ok {
 		return true
 	}
-	
+
 	return logLevel >= currentLevel
 }
 
@@ -72,14 +72,14 @@ func (l *Logger) log(level, message string, fields map[string]interface{}) {
 	if !l.shouldLog(level) {
 		return
 	}
-	
+
 	entry := LogEntry{
 		Timestamp: time.Now().UTC().Format(time.RFC3339),
 		Level:     level,
 		Message:   message,
 		Fields:    fields,
 	}
-	
+
 	if l.format == "json" {
 		data, _ := json.Marshal(entry)
 		fmt.Fprintln(l.output, string(data))
@@ -117,4 +117,3 @@ func (l *Logger) Error(message string, err error, fields map[string]interface{})
 	}
 	l.log("error", message, fields)
 }
-

@@ -207,6 +207,11 @@ export default function MonitoringPage() {
         </div>
 
         {/* Metrics Grid */}
+        {!metrics ? (
+          <div className="text-center py-12">
+            <p className="text-gray-600 dark:text-slate-400">Waiting for metrics data...</p>
+          </div>
+        ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           {/* CPU Card */}
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 shadow-xl">
@@ -422,6 +427,7 @@ export default function MonitoringPage() {
             </div>
           </div>
         </div>
+        )}
       </div>
     </div>
   )

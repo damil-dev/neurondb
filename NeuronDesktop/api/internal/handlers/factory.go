@@ -31,20 +31,20 @@ func NewFactoryHandlers(queries *db.Queries) *FactoryHandlers {
 
 // FactoryStatusResponse represents the factory status
 type FactoryStatusResponse struct {
-	OS                  OSInfo                  `json:"os"`
-	Docker              DockerInfo              `json:"docker"`
-	NeuronDB            ComponentStatus         `json:"neurondb"`
-	NeuronAgent         ComponentStatus         `json:"neuronagent"`
-	NeuronMCP           ComponentStatus         `json:"neuronmcp"`
-	InstallCommands     InstallCommands         `json:"install_commands"`
+	OS              OSInfo          `json:"os"`
+	Docker          DockerInfo      `json:"docker"`
+	NeuronDB        ComponentStatus `json:"neurondb"`
+	NeuronAgent     ComponentStatus `json:"neuronagent"`
+	NeuronMCP       ComponentStatus `json:"neuronmcp"`
+	InstallCommands InstallCommands `json:"install_commands"`
 }
 
 // OSInfo represents OS information
 type OSInfo struct {
-	Type        string `json:"type"`        // "linux", "darwin", "windows"
-	Distro      string `json:"distro"`      // "ubuntu", "debian", "rhel", "rocky", "macos"
-	Version     string `json:"version"`     // OS version
-	Arch        string `json:"arch"`        // "amd64", "arm64"
+	Type    string `json:"type"`    // "linux", "darwin", "windows"
+	Distro  string `json:"distro"`  // "ubuntu", "debian", "rhel", "rocky", "macos"
+	Version string `json:"version"` // OS version
+	Arch    string `json:"arch"`    // "amd64", "arm64"
 }
 
 // DockerInfo represents Docker availability
@@ -55,20 +55,20 @@ type DockerInfo struct {
 
 // ComponentStatus represents the status of a component
 type ComponentStatus struct {
-	Installed    bool   `json:"installed"`
-	Running      bool   `json:"running"`
-	Reachable    bool   `json:"reachable"`
-	Status       string `json:"status"`       // "installed", "running", "reachable", "missing", "error"
-	ErrorMessage string `json:"error_message,omitempty"`
+	Installed    bool                   `json:"installed"`
+	Running      bool                   `json:"running"`
+	Reachable    bool                   `json:"reachable"`
+	Status       string                 `json:"status"` // "installed", "running", "reachable", "missing", "error"
+	ErrorMessage string                 `json:"error_message,omitempty"`
 	Details      map[string]interface{} `json:"details,omitempty"`
 }
 
 // InstallCommands provides OS-specific install commands
 type InstallCommands struct {
-	Docker    []string `json:"docker,omitempty"`
-	Deb       []string `json:"deb,omitempty"`
-	Rpm       []string `json:"rpm,omitempty"`
-	MacPkg    []string `json:"macpkg,omitempty"`
+	Docker []string `json:"docker,omitempty"`
+	Deb    []string `json:"deb,omitempty"`
+	Rpm    []string `json:"rpm,omitempty"`
+	MacPkg []string `json:"macpkg,omitempty"`
 }
 
 // GetSetupState returns the setup completion state
@@ -203,8 +203,8 @@ func checkDocker() DockerInfo {
 // checkNeuronDB checks NeuronDB installation and connectivity
 func (h *FactoryHandlers) checkNeuronDB(ctx context.Context) ComponentStatus {
 	status := ComponentStatus{
-		Status:    "missing",
-		Details:   make(map[string]interface{}),
+		Status:  "missing",
+		Details: make(map[string]interface{}),
 	}
 
 	// Try to get default profile to check DSN
@@ -381,11 +381,11 @@ func (h *FactoryHandlers) checkNeuronMCP(ctx context.Context) ComponentStatus {
 			if err == nil {
 				testDbCtx, cancelDb := context.WithTimeout(ctx, 3*time.Second)
 				defer cancelDb()
-				
+
 				if err := db.PingContext(testDbCtx); err == nil {
 					status.Reachable = true
 					status.Details["database_reachable"] = true
-					
+
 					// If binary is installed and database is reachable, mark as ready
 					if status.Status == "installed" {
 						status.Status = "reachable"
@@ -501,4 +501,3 @@ func maskDSN(dsn string) string {
 	}
 	return dsn
 }
-

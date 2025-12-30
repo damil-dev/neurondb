@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import AuthGuard from '@/components/AuthGuard'
 import ThemeProvider from '@/components/ThemeProvider'
 import './globals.css'
+import 'highlight.js/styles/github-dark.css'
 
 export const metadata: Metadata = {
   title: 'NeuronDesktop - NeuronDB PostgreSQL AI Factory',

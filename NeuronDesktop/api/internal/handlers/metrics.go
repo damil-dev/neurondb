@@ -29,4 +29,3 @@ func (h *MetricsHandlers) ResetMetrics(w http.ResponseWriter, r *http.Request) {
 	h.metrics.Reset()
 	WriteSuccess(w, map[string]string{"message": "Metrics reset"}, http.StatusOK)
 }
-

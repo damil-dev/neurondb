@@ -28,24 +28,23 @@ func RecoveryMiddleware(logger *logging.Logger) func(http.Handler) http.Handler 
 						"path":       r.URL.Path,
 						"request_id": requestID,
 					})
-					
+
 					// Use standardized error response (without importing handlers)
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(http.StatusInternalServerError)
-					
+
 					response := ErrorResponse{
 						Error:     "Internal Server Error",
 						Message:   "An internal server error occurred",
 						Code:      "INTERNAL_ERROR",
 						RequestID: requestID,
 					}
-					
+
 					json.NewEncoder(w).Encode(response)
 				}
 			}()
-			
+
 			next.ServeHTTP(w, r)
 		})
 	}
 }
-

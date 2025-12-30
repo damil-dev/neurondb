@@ -111,4 +111,3 @@ func ExtractToken(authHeader string) (string, error) {
 
 	return "", errors.New("invalid authorization header format")
 }
-

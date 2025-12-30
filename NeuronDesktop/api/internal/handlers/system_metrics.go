@@ -25,7 +25,7 @@ func NewSystemMetricsHandlers(logger *logging.Logger) *SystemMetricsHandlers {
 // GetSystemMetrics returns current system metrics
 func (h *SystemMetricsHandlers) GetSystemMetrics(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	
+
 	systemMetrics, err := metrics.CollectSystemMetrics(ctx)
 	if err != nil {
 		h.logger.Error("Failed to collect system metrics", err, nil)
@@ -44,7 +44,7 @@ func (h *SystemMetricsHandlers) SystemMetricsWebSocket(w http.ResponseWriter, r 
 			return true // Allow all origins in development
 		},
 	}
-	
+
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		h.logger.Error("Failed to upgrade WebSocket connection", err, nil)
@@ -83,4 +83,3 @@ func (h *SystemMetricsHandlers) SystemMetricsWebSocket(w http.ResponseWriter, r 
 		}
 	}
 }
-

@@ -49,19 +49,19 @@ func (h *ProfileHandlers) ListProfiles(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	
+
 	// If no profiles exist, create a default profile
 	if len(profiles) == 0 && !isAdmin(r.Context()) {
 		// Auto-detect NeuronMCP binary and create default config
 		mcpConfig := utils.GetDefaultMCPConfig()
-		
+
 		// Get default NeuronDB DSN from environment
 		neurondbDSN := utils.GetDefaultNeuronDBDSN()
-		
+
 		// Get agent endpoint from environment if available
 		agentEndpoint := os.Getenv("NEURONAGENT_ENDPOINT")
 		agentAPIKey := os.Getenv("NEURONAGENT_API_KEY")
-		
+
 		defaultProfile := &db.Profile{
 			UserID:        userID,
 			Name:          "Default",
@@ -71,13 +71,13 @@ func (h *ProfileHandlers) ListProfiles(w http.ResponseWriter, r *http.Request) {
 			AgentAPIKey:   agentAPIKey,
 			IsDefault:     true,
 		}
-		
+
 		// Initialize database schema for the default profile's database
 		if err := utils.InitSchema(r.Context(), neurondbDSN); err != nil {
 			// Log error but don't fail - schema might already be initialized
 			fmt.Printf("Warning: Failed to initialize schema for default profile: %v\n", err)
 		}
-		
+
 		if err := h.queries.CreateProfile(r.Context(), defaultProfile); err != nil {
 			// Log error but don't fail the request
 			fmt.Printf("Failed to create default profile: %v\n", err)
@@ -95,7 +95,7 @@ func (h *ProfileHandlers) ListProfiles(w http.ResponseWriter, r *http.Request) {
 			profiles, _ = h.queries.ListProfiles(r.Context(), userID)
 		}
 	}
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(profiles)
 }
@@ -122,7 +122,7 @@ func (h *ProfileHandlers) GetProfile(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Access denied", http.StatusForbidden)
 		return
 	}
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(profile)
 }
@@ -139,14 +139,14 @@ func (h *ProfileHandlers) CreateProfile(w http.ResponseWriter, r *http.Request) 
 func (h *ProfileHandlers) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	profileID := vars["id"]
-	
+
 	userID, ok := auth.GetUserIDFromContext(r.Context())
 	if !ok {
 		WriteError(w, r, http.StatusUnauthorized, fmt.Errorf("unauthorized"), nil)
 		return
 	}
 	admin := isAdmin(r.Context())
-	
+
 	var req struct {
 		db.Profile
 		ProfilePassword string `json:"profile_password"` // Plain password from request
@@ -155,19 +155,19 @@ func (h *ProfileHandlers) UpdateProfile(w http.ResponseWriter, r *http.Request) 
 		WriteError(w, r, http.StatusBadRequest, fmt.Errorf("invalid request body"), nil)
 		return
 	}
-	
+
 	// Verify profile belongs to user
 	existingProfile, err := h.queries.GetProfile(r.Context(), profileID)
 	if err != nil {
 		WriteError(w, r, http.StatusNotFound, fmt.Errorf("profile not found"), nil)
 		return
 	}
-	
+
 	if !admin && existingProfile.UserID != userID {
 		WriteError(w, r, http.StatusForbidden, fmt.Errorf("access denied"), nil)
 		return
 	}
-	
+
 	profile := req.Profile
 	profile.ID = profileID
 	if admin {
@@ -176,7 +176,7 @@ func (h *ProfileHandlers) UpdateProfile(w http.ResponseWriter, r *http.Request) 
 	} else {
 		profile.UserID = userID
 	}
-	
+
 	// Handle profile password update
 	if req.ProfilePassword != "" {
 		if profile.ProfileUsername == "" {
@@ -197,18 +197,18 @@ func (h *ProfileHandlers) UpdateProfile(w http.ResponseWriter, r *http.Request) 
 		// If clearing username, also clear password
 		profile.ProfilePassword = ""
 	}
-	
+
 	// Validate profile
 	if errors := utils.ValidateProfile(profile.Name, profile.NeuronDBDSN, profile.MCPConfig); len(errors) > 0 {
 		WriteValidationErrors(w, r, errors)
 		return
 	}
-	
+
 	if err := h.queries.UpdateProfile(r.Context(), &profile); err != nil {
 		WriteError(w, r, http.StatusInternalServerError, err, nil)
 		return
 	}
-	
+
 	WriteSuccess(w, profile, http.StatusOK)
 }
 
@@ -239,7 +239,6 @@ func (h *ProfileHandlers) DeleteProfile(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	
+
 	w.WriteHeader(http.StatusNoContent)
 }
-

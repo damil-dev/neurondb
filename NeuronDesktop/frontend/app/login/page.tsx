@@ -69,17 +69,10 @@ export default function LoginPage() {
       // Build DSN from PostgreSQL settings for signup
       let neurondbDSN = ''
       if (isSignup) {
-        const { user, password: pgPassword, host, port, database } = {
-          host: pgHost,
-          port: pgPort,
-          database: pgDatabase,
-          user: pgUser,
-          password: pgPassword,
-        }
         if (pgPassword) {
-          neurondbDSN = `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(pgPassword)}@${host}:${port}/${database}`
+          neurondbDSN = `postgresql://${encodeURIComponent(pgUser)}:${encodeURIComponent(pgPassword)}@${pgHost}:${pgPort}/${pgDatabase}`
         } else {
-          neurondbDSN = `postgresql://${encodeURIComponent(user)}@${host}:${port}/${database}`
+          neurondbDSN = `postgresql://${encodeURIComponent(pgUser)}@${pgHost}:${pgPort}/${pgDatabase}`
         }
       }
 
@@ -94,7 +87,7 @@ export default function LoginPage() {
 
       // For JWT mode, store token (for backward compatibility)
       // For cookie-based sessions, token is not needed but we store it for compatibility
-      const token = response.data?.token || response.data?.Token
+      const token = response.data?.token
       if (!token) {
         console.error('No token in response. Full response:', response)
         console.error('Response data keys:', Object.keys(response.data || {}))

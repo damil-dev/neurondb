@@ -4,10 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"os"
 	"path/filepath"
 	"strings"
-	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 // SchemaManager handles database schema initialization and management
@@ -145,12 +145,12 @@ func findSchemaFile() string {
 // splitSQL splits SQL into individual statements (package-level helper)
 func splitSQL(sql string) []string {
 	var statements []string
-	
+
 	// Remove comments
 	lines := strings.Split(sql, "\n")
 	var cleanLines []string
 	inBlockComment := false
-	
+
 	for _, line := range lines {
 		// Handle block comments
 		if strings.Contains(line, "/*") {
@@ -163,26 +163,25 @@ func splitSQL(sql string) []string {
 		if inBlockComment {
 			continue
 		}
-		
+
 		// Remove single-line comments
 		if commentIdx := strings.Index(line, "--"); commentIdx != -1 {
 			line = line[:commentIdx]
 		}
-		
+
 		cleanLines = append(cleanLines, line)
 	}
-	
+
 	// Join and split by semicolons
 	fullSQL := strings.Join(cleanLines, "\n")
 	parts := strings.Split(fullSQL, ";")
-	
+
 	for _, part := range parts {
 		stmt := strings.TrimSpace(part)
 		if stmt != "" {
 			statements = append(statements, stmt)
 		}
 	}
-	
+
 	return statements
 }
-

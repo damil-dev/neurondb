@@ -11,26 +11,42 @@ export async function checkAuth(): Promise<boolean> {
     console.log('checkAuth: Checking authentication at', apiUrl)
     
     const token = getAuthToken()
-    const response = await fetch(apiUrl, {
-      method: 'GET',
-      credentials: 'include', // Send cookies
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}), // JWT if present; otherwise cookie-only (OIDC mode)
-      },
-    })
     
-    console.log('checkAuth: Response status', response.status, response.statusText)
+    // Add timeout to prevent hanging
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout
     
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error('checkAuth: Authentication failed', response.status, errorText)
-      return false
+    try {
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        credentials: 'include', // Send cookies
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}), // JWT if present; otherwise cookie-only (OIDC mode)
+        },
+      })
+      
+      clearTimeout(timeoutId)
+      
+      console.log('checkAuth: Response status', response.status, response.statusText)
+      
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('checkAuth: Authentication failed', response.status, errorText)
+        return false
+      }
+      
+      const data = await response.json()
+      console.log('checkAuth: Authentication successful', data)
+      return true
+    } catch (fetchError: any) {
+      clearTimeout(timeoutId)
+      if (fetchError.name === 'AbortError') {
+        console.error('checkAuth: Request timeout - API server may not be responding')
+      }
+      throw fetchError
     }
-    
-    const data = await response.json()
-    console.log('checkAuth: Authentication successful', data)
-    return true
   } catch (error) {
     console.error('checkAuth: Error checking authentication', error)
     return false

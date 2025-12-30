@@ -23,9 +23,9 @@ func NewAuthHandlers(queries *db.Queries) *AuthHandlers {
 
 // RegisterRequest is the request to register a new user
 type RegisterRequest struct {
-	Username     string `json:"username"`
-	Password     string `json:"password"`
-	NeuronDBDSN  string `json:"neurondb_dsn,omitempty"` // Optional: if not provided, uses default from env
+	Username    string `json:"username"`
+	Password    string `json:"password"`
+	NeuronDBDSN string `json:"neurondb_dsn,omitempty"` // Optional: if not provided, uses default from env
 }
 
 // LoginRequest is the request to login
@@ -36,11 +36,11 @@ type LoginRequest struct {
 
 // AuthResponse is the response for auth operations
 type AuthResponse struct {
-	Token      string    `json:"token"`
-	UserID     string    `json:"user_id"`
-	Username   string    `json:"username"`
-	IsAdmin    bool      `json:"is_admin"`
-	ProfileID  *string   `json:"profile_id,omitempty"` // Profile ID if login matched a profile
+	Token     string  `json:"token"`
+	UserID    string  `json:"user_id"`
+	Username  string  `json:"username"`
+	IsAdmin   bool    `json:"is_admin"`
+	ProfileID *string `json:"profile_id,omitempty"` // Profile ID if login matched a profile
 }
 
 // Register registers a new user
@@ -176,7 +176,7 @@ func (h *AuthHandlers) Login(w http.ResponseWriter, r *http.Request) {
 				Token:     token,
 				UserID:    profile.UserID,
 				Username:  req.Username,
-			IsAdmin:   false,
+				IsAdmin:   false,
 				ProfileID: &profile.ID,
 			}
 			w.Header().Set("Content-Type", "application/json")
@@ -264,4 +264,3 @@ func (h *AuthHandlers) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
-

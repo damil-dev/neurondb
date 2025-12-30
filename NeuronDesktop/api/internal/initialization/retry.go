@@ -10,7 +10,7 @@ import (
 
 // RetryConfig defines retry behavior
 type RetryConfig struct {
-	MaxAttempts int
+	MaxAttempts  int
 	InitialDelay time.Duration
 	MaxDelay     time.Duration
 	Multiplier   float64
@@ -70,4 +70,3 @@ func Retry(ctx context.Context, logger *logging.Logger, config RetryConfig, oper
 func RetryWithBackoff(ctx context.Context, logger *logging.Logger, operation string, fn RetryableFunc) error {
 	return Retry(ctx, logger, DefaultRetryConfig(), operation, fn)
 }
-

@@ -10,9 +10,9 @@ type Metrics struct {
 	mu sync.RWMutex
 
 	// Request metrics
-	TotalRequests     int64
+	TotalRequests      int64
 	SuccessfulRequests int64
-	FailedRequests    int64
+	FailedRequests     int64
 
 	// Response time metrics
 	TotalResponseTime time.Duration
@@ -24,9 +24,9 @@ type Metrics struct {
 	EndpointErrors map[string]int64
 
 	// Connection metrics
-	ActiveMCPConnections     int
+	ActiveMCPConnections      int
 	ActiveNeuronDBConnections int
-	ActiveAgentConnections   int
+	ActiveAgentConnections    int
 
 	// Error metrics
 	ErrorCounts map[string]int64
@@ -37,9 +37,9 @@ var globalMetrics = NewMetrics()
 // NewMetrics creates a new metrics instance
 func NewMetrics() *Metrics {
 	return &Metrics{
-		EndpointCounts: make(map[string]int64),
-		EndpointErrors: make(map[string]int64),
-		ErrorCounts:    make(map[string]int64),
+		EndpointCounts:  make(map[string]int64),
+		EndpointErrors:  make(map[string]int64),
+		ErrorCounts:     make(map[string]int64),
 		MinResponseTime: time.Hour, // Initialize to large value
 	}
 }
@@ -101,9 +101,9 @@ func (m *Metrics) GetStats() map[string]interface{} {
 
 	return map[string]interface{}{
 		"requests": map[string]interface{}{
-			"total":     m.TotalRequests,
+			"total":      m.TotalRequests,
 			"successful": m.SuccessfulRequests,
-			"failed":    m.FailedRequests,
+			"failed":     m.FailedRequests,
 		},
 		"response_time": map[string]interface{}{
 			"avg_ms": avgResponseTime.Milliseconds(),
@@ -111,9 +111,9 @@ func (m *Metrics) GetStats() map[string]interface{} {
 			"max_ms": m.MaxResponseTime.Milliseconds(),
 		},
 		"connections": map[string]interface{}{
-			"mcp":       m.ActiveMCPConnections,
-			"neurondb":  m.ActiveNeuronDBConnections,
-			"agent":     m.ActiveAgentConnections,
+			"mcp":      m.ActiveMCPConnections,
+			"neurondb": m.ActiveNeuronDBConnections,
+			"agent":    m.ActiveAgentConnections,
 		},
 		"endpoints": m.EndpointCounts,
 		"errors":    m.ErrorCounts,
@@ -135,4 +135,3 @@ func (m *Metrics) Reset() {
 	m.EndpointErrors = make(map[string]int64)
 	m.ErrorCounts = make(map[string]int64)
 }
-

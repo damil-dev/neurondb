@@ -37,16 +37,16 @@ func (bm *BootstrapMetrics) Finish() {
 // LogMetrics logs the bootstrap metrics
 func (bm *BootstrapMetrics) LogMetrics(logger *logging.Logger) {
 	logger.Info("Bootstrap metrics", map[string]interface{}{
-		"total_duration":           bm.Duration.String(),
-		"admin_user_duration":      bm.AdminUserDuration.String(),
-		"profile_duration":         bm.ProfileDuration.String(),
-		"schema_duration":          bm.SchemaDuration.String(),
-		"validation_duration":      bm.ValidationDuration.String(),
-		"health_check_duration":    bm.HealthCheckDuration.String(),
-		"total_steps":              bm.TotalSteps,
-		"successful_steps":         bm.SuccessfulSteps,
-		"failed_steps":             bm.FailedSteps,
-		"success_rate":             float64(bm.SuccessfulSteps) / float64(bm.TotalSteps) * 100,
+		"total_duration":        bm.Duration.String(),
+		"admin_user_duration":   bm.AdminUserDuration.String(),
+		"profile_duration":      bm.ProfileDuration.String(),
+		"schema_duration":       bm.SchemaDuration.String(),
+		"validation_duration":   bm.ValidationDuration.String(),
+		"health_check_duration": bm.HealthCheckDuration.String(),
+		"total_steps":           bm.TotalSteps,
+		"successful_steps":      bm.SuccessfulSteps,
+		"failed_steps":          bm.FailedSteps,
+		"success_rate":          float64(bm.SuccessfulSteps) / float64(bm.TotalSteps) * 100,
 	})
 }
 
@@ -72,4 +72,3 @@ func (bm *BootstrapMetrics) TrackStep(name string, duration time.Duration, succe
 		bm.HealthCheckDuration = duration
 	}
 }
-

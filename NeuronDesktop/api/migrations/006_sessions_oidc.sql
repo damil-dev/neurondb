@@ -78,3 +78,7 @@ CREATE TABLE IF NOT EXISTS login_attempts (
 CREATE INDEX IF NOT EXISTS idx_login_attempts_state ON login_attempts(state);
 CREATE INDEX IF NOT EXISTS idx_login_attempts_expires_at ON login_attempts(expires_at);
 
+
+
+
+

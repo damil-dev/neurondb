@@ -82,9 +82,9 @@ type ListPromptsResponse struct {
 }
 
 type PromptDefinition struct {
-	Name        string                 `json:"name"`
-	Description string                 `json:"description,omitempty"`
-	Arguments   []PromptArgument       `json:"arguments,omitempty"`
+	Name        string           `json:"name"`
+	Description string           `json:"description,omitempty"`
+	Arguments   []PromptArgument `json:"arguments,omitempty"`
 }
 
 type PromptArgument struct {
@@ -99,8 +99,8 @@ type GetPromptRequest struct {
 }
 
 type GetPromptResponse struct {
-	Description string                 `json:"description,omitempty"`
-	Messages    []PromptMessage        `json:"messages"`
+	Description string          `json:"description,omitempty"`
+	Messages    []PromptMessage `json:"messages"`
 }
 
 type PromptMessage struct {
@@ -132,4 +132,3 @@ type InitializeResponse struct {
 }
 
 const ProtocolVersion = "2025-06-18"
-
