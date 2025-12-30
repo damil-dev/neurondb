@@ -33,3 +33,7 @@ else
     echo "[init]   Extension will be created automatically after container restart"
 fi
 
+
+
+
+
