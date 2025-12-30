@@ -1,8 +1,0 @@
-#!/bin/bash
-set -e
-
-# Pre-removal script for NeuronMCP
-
-echo "Removing NeuronMCP..."
-
-exit 0
