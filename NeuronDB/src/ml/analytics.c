@@ -75,8 +75,21 @@ feedback_loop_integrate(PG_FUNCTION_ARGS)
 
 	NDB_SPI_SESSION_BEGIN(spi_session, oldcontext);
 
+	/* PostgreSQL 18 B-tree deduplication bug workaround: create sequence separately */
+	tbl_def = "CREATE SEQUENCE IF NOT EXISTS neurondb_feedback_id_seq";
+	ret = ndb_spi_execute(spi_session, tbl_def, false, 0);
+	if (ret != SPI_OK_UTILITY)
+	{
+		NDB_SPI_SESSION_END(spi_session);
+		nfree(query_str);
+		nfree(result_str);
+		ereport(ERROR,
+				(errcode(ERRCODE_INTERNAL_ERROR),
+				 errmsg("failed to create feedback sequence")));
+	}
+
 	tbl_def = "CREATE TABLE IF NOT EXISTS neurondb_feedback ("
-		"id SERIAL PRIMARY KEY, "
+		"id INTEGER DEFAULT nextval('neurondb_feedback_id_seq') PRIMARY KEY, "
 		"query TEXT NOT NULL, "
 		"result TEXT NOT NULL, "
 		"rating REAL NOT NULL, "

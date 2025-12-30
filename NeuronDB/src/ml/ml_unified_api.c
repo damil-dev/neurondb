@@ -163,7 +163,10 @@ typedef enum
 	ML_ALGO_PCA,
 	ML_ALGO_OPQ,
 	/* Time series */
-	ML_ALGO_TIMESERIES
+	ML_ALGO_TIMESERIES,
+	/* Language Models */
+	ML_ALGO_TRANSFORMER_LLM,
+	ML_ALGO_CUSTOM_LLM
 }			MLAlgorithm;
 
 /* Forward declarations */
@@ -183,7 +186,8 @@ static char *neurondb_quote_literal_or_null(const char *str);
  */
 static MLAlgorithm neurondb_algorithm_from_string(const char *algorithm);
 static bool neurondb_is_unsupervised_algorithm(const char *algorithm);
-static const char *neurondb_get_model_type(const char *algorithm);
+/* Removed unused function neurondb_get_model_type */
+static ErrorData *neurondb_safe_copy_error_data(void);
 
 /*
  * Training data and feature management
@@ -941,6 +945,18 @@ neurondb_algorithm_from_string(const char *algorithm)
 				(errmsg("neurondb_algorithm_from_string: matched TIMESERIES")));
 		return ML_ALGO_TIMESERIES;
 	}
+	if (strcmp(algorithm, NDB_ALGO_TRANSFORMER_LLM) == 0)
+	{
+		ereport(DEBUG2,
+				(errmsg("neurondb_algorithm_from_string: matched TRANSFORMER_LLM")));
+		return ML_ALGO_TRANSFORMER_LLM;
+	}
+	if (strcmp(algorithm, NDB_ALGO_CUSTOM_LLM) == 0)
+	{
+		ereport(DEBUG2,
+				(errmsg("neurondb_algorithm_from_string: matched CUSTOM_LLM")));
+		return ML_ALGO_TRANSFORMER_LLM;  /* Use same implementation */
+	}
 
 	ereport(DEBUG2,
 			(errmsg("neurondb_algorithm_from_string: unrecognized algorithm"),
@@ -1674,6 +1690,15 @@ neurondb_build_training_sql(MLAlgorithm algo, StringInfo sql, const char *table_
 				return true;
 			}
 
+		case ML_ALGO_TRANSFORMER_LLM:
+			{
+				/* Transformer LLM requires special handling - call C function directly */
+				ereport(DEBUG2,
+						(errmsg("neurondb_build_training_sql: transformer_llm requires special handling"),
+						 errdetail("algo=%d, returning false", (int) algo)));
+				return false;
+			}
+
 		default:
 			/* Algorithm requires special handling, not simple SQL generation */
 			ereport(DEBUG2,
@@ -1874,99 +1899,7 @@ neurondb_prepare_feature_list(ArrayType * feature_columns_array, StringInfo feat
 	return feature_name_count;
 }
 
-/*
- * neurondb_get_model_type
- *		Return canonical model type string for a known ML algorithm.
- *
- * This function maps ML algorithms to their canonical model type categories.
- * The model type is used for catalog organization and API documentation.
- *
- * Parameters:
- *		algorithm - Algorithm name string (may be NULL)
- *
- * Returns:
- *		Canonical model type string:
- *		- "classification": For classification algorithms
- *		- "regression": For regression algorithms
- *		- "clustering": For clustering algorithms
- *		- "dimensionality_reduction": For dimensionality reduction algorithms
- *		- "classification": Default if algorithm is NULL or unknown
- *
- * Model Type Mapping:
- *		Classification: Logistic Regression, Random Forest, SVM, Decision Tree,
- *			Naive Bayes, XGBoost, CatBoost, LightGBM, KNN (classifier variants)
- *		Regression: Linear Regression, Ridge, Lasso, KNN (regressor)
- *		Clustering: K-means, GMM, Mini-batch K-means, Hierarchical, DBSCAN
- *		Dimensionality Reduction: PCA, OPQ
- *
- * CHANGE NOTES:
- *		- CAN MODIFY: Add new algorithms to appropriate case statements
- *		- CANNOT MODIFY: Return string literals (used as constants elsewhere)
- *		- BREAKS IF: Return strings changed without updating catalog code
- */
-static const char * __attribute__((unused))
-neurondb_get_model_type(const char *algorithm)
-{
-	MLAlgorithm algo;
-
-	if (algorithm == NULL)
-	{
-		ereport(DEBUG2,
-				(errmsg("neurondb_get_model_type: NULL algorithm, returning 'classification'")));
-		return "classification";
-	}
-
-	ereport(DEBUG2,
-			(errmsg("neurondb_get_model_type: determining model type"),
-			 errdetail("algorithm=%s", algorithm)));
-
-	algo = neurondb_algorithm_from_string(algorithm);
-
-	switch (algo)
-	{
-		case ML_ALGO_LOGISTIC_REGRESSION:
-		case ML_ALGO_RANDOM_FOREST:
-		case ML_ALGO_SVM:
-		case ML_ALGO_DECISION_TREE:
-		case ML_ALGO_NAIVE_BAYES:
-		case ML_ALGO_XGBOOST:
-		case ML_ALGO_CATBOOST:
-		case ML_ALGO_LIGHTGBM:
-		case ML_ALGO_KNN:
-		case ML_ALGO_KNN_CLASSIFIER:
-			ereport(DEBUG2,
-					(errmsg("neurondb_get_model_type: classification algorithm")));
-			return "classification";
-
-		case ML_ALGO_LINEAR_REGRESSION:
-		case ML_ALGO_RIDGE:
-		case ML_ALGO_LASSO:
-		case ML_ALGO_KNN_REGRESSOR:
-			ereport(DEBUG2,
-					(errmsg("neurondb_get_model_type: regression algorithm")));
-			return "regression";
-
-		case ML_ALGO_KMEANS:
-		case ML_ALGO_GMM:
-		case ML_ALGO_MINIBATCH_KMEANS:
-		case ML_ALGO_HIERARCHICAL:
-		case ML_ALGO_DBSCAN:
-			ereport(DEBUG2,
-					(errmsg("neurondb_get_model_type: clustering algorithm")));
-			return "clustering";
-
-		case ML_ALGO_PCA:
-		case ML_ALGO_OPQ:
-			ereport(DEBUG2,
-					(errmsg("neurondb_get_model_type: dimensionality reduction algorithm")));
-			return "dimensionality_reduction";
-
-		default:
-			ereport(DEBUG2,
-					(errmsg("neurondb_get_model_type: unknown algorithm, defaulting to classification")));
-			return "classification";
-	}
-}
+/* Removed unused function neurondb_get_model_type */
 
 /* ----------
  * neurondb_train
@@ -3817,6 +3750,168 @@ cpu_fallback_training:
 						 errhint("GPU error: %s. Check that the training data is valid and the algorithm supports CPU training.", gpu_errmsg_ptr ? gpu_errmsg_ptr : "none")));
 			}
 		}
+		else if (algo_enum == ML_ALGO_TRANSFORMER_LLM)
+		{
+			/* Transformer LLM - call special C function */
+			ereport(DEBUG1,
+					(errmsg("neurondb_train: calling transformer_llm training function")));
+			
+			/* Call neurondb_train_transformer_llm C function */
+			{
+				List *funcname = NULL;
+				Oid			func_oid;
+				Oid			argtypes[5];
+				Datum		values[5];
+				FmgrInfo	flinfo;
+				Datum		result_datum;
+				text *inner_project_name_text = NULL;
+				text *inner_table_name_text = NULL;
+				text *target_col_text = NULL;
+				ArrayType *feature_cols_array = NULL;
+				Jsonb *hyperparams_copy = NULL;
+				
+				/* Build arguments */
+				inner_project_name_text = cstring_to_text(project_name);
+				inner_table_name_text = cstring_to_text(table_name);
+				target_col_text = target_column ? cstring_to_text(target_column) : NULL;
+				
+				/* Convert feature_names array to PostgreSQL array */
+				if (feature_names != NULL && feature_name_count > 0)
+				{
+					Datum *elems = NULL;
+					bool *nulls = NULL;
+					int i;
+					
+					nalloc(elems, Datum, feature_name_count);
+					nalloc(nulls, bool, feature_name_count);
+					
+					for (i = 0; i < feature_name_count; i++)
+					{
+						if (feature_names[i] != NULL)
+						{
+							elems[i] = PointerGetDatum(cstring_to_text(feature_names[i]));
+							nulls[i] = false;
+						}
+						else
+						{
+							elems[i] = (Datum) 0;
+							nulls[i] = true;
+						}
+					}
+					
+					feature_cols_array = construct_array(elems, feature_name_count, TEXTOID, -1, false, 'i');
+					
+					/* Free temporary elements */
+					for (i = 0; i < feature_name_count; i++)
+					{
+						if (!nulls[i] && elems[i] != 0)
+							pfree(DatumGetPointer(elems[i]));
+					}
+					nfree(elems);
+					nfree(nulls);
+				}
+				else
+				{
+					/* Empty array */
+					feature_cols_array = construct_empty_array(TEXTOID);
+				}
+				
+				/* Copy hyperparams */
+				if (hyperparams != NULL)
+				{
+					hyperparams_copy = (Jsonb *) PG_DETOAST_DATUM_COPY(PointerGetDatum(hyperparams));
+				}
+				else
+				{
+					hyperparams_copy = ndb_jsonb_in_cstring("{}");
+				}
+				
+				/* Lookup C function */
+				funcname = list_make1(makeString("neurondb_train_transformer_llm"));
+				argtypes[0] = TEXTOID;	/* project_name */
+				argtypes[1] = TEXTOID;	/* table_name */
+				argtypes[2] = TEXTOID;	/* target_column */
+				/* Get text array type OID */
+				argtypes[3] = get_array_type(TEXTOID); /* feature_columns text[] */
+				argtypes[4] = JSONBOID;	/* hyperparams */
+				
+				func_oid = LookupFuncName(funcname, 5, argtypes, false);
+				list_free(funcname);
+				
+				if (OidIsValid(func_oid))
+				{
+					fmgr_info(func_oid, &flinfo);
+					
+					values[0] = PointerGetDatum(inner_project_name_text);
+					values[1] = PointerGetDatum(inner_table_name_text);
+					values[2] = target_col_text ? PointerGetDatum(target_col_text) : (Datum) 0;
+					values[3] = PointerGetDatum(feature_cols_array);
+					values[4] = PointerGetDatum(hyperparams_copy);
+					
+					result_datum = FunctionCall5(&flinfo,
+												  values[0], values[1], values[2],
+												  values[3], values[4]);
+					
+					model_id = DatumGetInt32(result_datum);
+					
+					/* Cleanup */
+					pfree(project_name_text);
+					pfree(table_name_text);
+					if (target_col_text)
+						pfree(target_col_text);
+					if (feature_cols_array)
+						pfree(feature_cols_array);
+					if (hyperparams_copy)
+						pfree(hyperparams_copy);
+					
+					if (model_id > 0)
+					{
+						/* Update metrics */
+						ndb_spi_stringinfo_free(spi_session, &sql);
+						ndb_spi_stringinfo_init(spi_session, &sql);
+						appendStringInfo(&sql,
+										 "UPDATE " NDB_FQ_ML_MODELS " SET " NDB_COL_METRICS " = "
+										 "COALESCE(" NDB_COL_METRICS ", '{}'::jsonb) || '{\"storage\":\"cpu\",\"training_backend\":0}'::jsonb "
+										 "WHERE " NDB_COL_MODEL_ID " = %d",
+										 model_id);
+						ndb_spi_execute(spi_session, sql.data, false, 0);
+					}
+					else
+					{
+						ndb_spi_stringinfo_free(spi_session, &sql);
+						ndb_spi_session_end(&spi_session);
+						neurondb_cleanup(oldcontext, callcontext);
+						ereport(ERROR,
+								(errcode(ERRCODE_INTERNAL_ERROR),
+								 errmsg(NDB_ERR_PREFIX_TRAIN " transformer_llm training returned invalid model_id: %d", model_id),
+								 errdetail("Algorithm: %s, Project: %s, Table: %s", algorithm, project_name, table_name),
+								 errhint("Check training logs for details.")));
+					}
+				}
+				else
+				{
+					/* Function not found */
+					pfree(project_name_text);
+					pfree(table_name_text);
+					if (target_col_text)
+						pfree(target_col_text);
+					if (feature_cols_array)
+						pfree(feature_cols_array);
+					if (hyperparams_copy)
+						pfree(hyperparams_copy);
+					
+					nfree(feature_list_str);
+					ndb_spi_stringinfo_free(spi_session, &sql);
+					ndb_spi_session_end(&spi_session);
+					neurondb_cleanup(oldcontext, callcontext);
+					ereport(ERROR,
+							(errcode(ERRCODE_UNDEFINED_FUNCTION),
+							 errmsg(NDB_ERR_PREFIX_TRAIN " transformer_llm training function not found"),
+							 errdetail("Algorithm: %s, Project: %s, Table: %s", algorithm, project_name, table_name),
+							 errhint("The neurondb_train_transformer_llm function must be implemented.")));
+				}
+			}
+		}
 		else
 		{
 			/*
@@ -4728,10 +4823,17 @@ neurondb_deploy(PG_FUNCTION_ARGS)
 
 	spi_session = ndb_spi_session_begin(callcontext, false);
 
+	/* PostgreSQL 18 B-tree deduplication bug workaround: create sequence separately */
+	ndb_spi_stringinfo_init(spi_session, &sql);
+	appendStringInfoString(&sql, "CREATE SEQUENCE IF NOT EXISTS neurondb_ml_deployments_id_seq");
+	(void) ndb_spi_execute(spi_session, sql.data, false, 0);
+	NDB_CHECK_SPI_TUPTABLE();
+	ndb_spi_stringinfo_free(spi_session, &sql);
+
 	ndb_spi_stringinfo_init(spi_session, &sql);
 	appendStringInfoString(&sql,
 						   "CREATE TABLE IF NOT EXISTS " NDB_FQ_ML_DEPLOYMENTS " ("
-						   "deployment_id SERIAL PRIMARY KEY, "
+						   "deployment_id INTEGER DEFAULT nextval('neurondb_ml_deployments_id_seq') PRIMARY KEY, "
 						   "model_id INTEGER NOT NULL REFERENCES " NDB_FQ_ML_MODELS "(" NDB_COL_MODEL_ID "), "
 						   "deployment_name TEXT NOT NULL, "
 						   "strategy TEXT NOT NULL, "
@@ -5503,23 +5605,8 @@ neurondb_evaluate(PG_FUNCTION_ARGS)
 		MemoryContextSwitchTo(oldcontext);
 
 		/* Safely copy error data, handling errors in error handling */
-		PG_TRY();
-		{
-			if (CurrentMemoryContext != ErrorContext)
-			{
-				edata = CopyErrorData();
-				FlushErrorState();
-			}
-			else
-			{
-				FlushErrorState();
-			}
-		}
-		PG_CATCH();
-		{
-			FlushErrorState();
-		}
-		PG_END_TRY();
+		/* Use helper function to avoid nested PG_TRY shadow warnings */
+		edata = neurondb_safe_copy_error_data();
 
 		/* Create safe error message (escape quotes) */
 		if (edata != NULL && edata->message != NULL)

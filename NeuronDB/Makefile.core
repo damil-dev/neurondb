@@ -112,6 +112,7 @@ OBJS += \
 # Machine learning (NEW supervised learning modules FIRST for better loading)
 OBJS += \
 	src/ml/ml_unified_api.o \
+	src/ml/ml_transformer_llm.o \
 	src/ml/ml_quantization_fp8.o \
 	src/ml/ml_reranking_flash.o \
 	src/ml/ml_multimodal.o \

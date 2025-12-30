@@ -548,10 +548,24 @@ sync_index_async(PG_FUNCTION_ARGS)
 				 errmsg("neurondb: failed to begin SPI session in "
 						"sync_index_async")));
 
+	/* PostgreSQL 18 B-tree deduplication bug workaround: create sequence separately */
+	initStringInfo(&sql);
+	appendStringInfo(&sql, "CREATE SEQUENCE IF NOT EXISTS neurondb_index_sync_state_id_seq");
+	ret = ndb_spi_execute(session, sql.data, false, 0);
+	if (ret != SPI_OK_UTILITY)
+	{
+		nfree(sql.data);
+		ndb_spi_session_end(&session);
+		ereport(ERROR,
+				(errcode(ERRCODE_INTERNAL_ERROR),
+				 errmsg("neurondb: failed to create sync state sequence")));
+	}
+	nfree(sql.data);
+
 	initStringInfo(&sql);
 	appendStringInfo(&sql,
 					 "CREATE TABLE IF NOT EXISTS neurondb_index_sync_state ("
-					 "sync_id SERIAL PRIMARY KEY,"
+					 "sync_id INTEGER DEFAULT nextval('neurondb_index_sync_state_id_seq') PRIMARY KEY,"
 					 "source_index_name TEXT NOT NULL,"
 					 "target_replica_name TEXT NOT NULL,"
 					 "slot_name TEXT NOT NULL,"
