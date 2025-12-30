@@ -798,15 +798,22 @@ dl_predict_batch(PG_FUNCTION_ARGS)
 		}
 
 		/* Create output table if it doesn't exist */
-		ndb_spi_stringinfo_init(spi_session, &sql);
+		/* PostgreSQL 18 B-tree deduplication bug workaround: create sequence separately */
 		{
 			const char *out_table_quoted = quote_identifier(out_table);
 
+			ndb_spi_stringinfo_init(spi_session, &sql);
+			appendStringInfo(&sql, "CREATE SEQUENCE IF NOT EXISTS %s_id_seq", out_table_quoted);
+			ret = ndb_spi_execute(spi_session, sql.data, false, 0);
+			ndb_spi_stringinfo_free(spi_session, &sql);
+
+			ndb_spi_stringinfo_init(spi_session, &sql);
 			appendStringInfo(&sql,
 							 "CREATE TABLE IF NOT EXISTS %s ("
-							 "id SERIAL PRIMARY KEY, "
+							 "id INTEGER DEFAULT nextval('%s_id_seq') PRIMARY KEY, "
 							 "prediction FLOAT[], "
 							 "created_at TIMESTAMPTZ DEFAULT NOW())",
+							 out_table_quoted,
 							 out_table_quoted);
 		}
 

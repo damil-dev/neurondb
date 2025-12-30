@@ -1466,3 +1466,16 @@ neurondb_gpu_register_xgboost_model(void)
 #endif /* HAVE_XGBOOST */
 }
 #endif /* HAVE_XGBOOST */
+
+/* Stub implementation when XGBoost is not available - must be outside #if HAVE_XGBOOST block */
+#if !HAVE_XGBOOST
+/* Forward declaration to match header */
+extern void neurondb_gpu_register_xgboost_model(void);
+
+void
+neurondb_gpu_register_xgboost_model(void)
+{
+	/* No-op when XGBoost is not available */
+	return;
+}
+#endif /* !HAVE_XGBOOST */

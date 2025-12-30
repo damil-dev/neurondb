@@ -1067,44 +1067,7 @@ catboost_gpu_release_state(CatBoostGpuModelState *state)
 	nfree(state);
 }
 
-static bytea * __attribute__((unused))
-catboost_model_serialize_to_bytea(int iterations, int depth, float learning_rate, int n_features, const char *loss_function, uint8 training_backend)
-{
-	StringInfoData buf;
-	int			total_size;
-	bytea *result = NULL;
-	char *result_raw = NULL;
-	int			loss_len;
-
-	/* Validate training_backend */
-	if (training_backend > 1)
-	{
-		ereport(ERROR,
-				(errcode(ERRCODE_INTERNAL_ERROR),
-				 errmsg("neurondb: catboost_model_serialize_to_bytea: invalid training_backend %d (must be 0 or 1)",
-						training_backend)));
-	}
-
-	initStringInfo(&buf);
-	/* Write training_backend first (0=CPU, 1=GPU) - unified storage format */
-	appendBinaryStringInfo(&buf, (char *) &training_backend, sizeof(uint8));
-	appendBinaryStringInfo(&buf, (char *) &iterations, sizeof(int));
-	appendBinaryStringInfo(&buf, (char *) &depth, sizeof(int));
-	appendBinaryStringInfo(&buf, (char *) &learning_rate, sizeof(float));
-	appendBinaryStringInfo(&buf, (char *) &n_features, sizeof(int));
-	loss_len = strlen(loss_function);
-	appendBinaryStringInfo(&buf, (char *) &loss_len, sizeof(int));
-	appendBinaryStringInfo(&buf, loss_function, loss_len);
-
-	total_size = VARHDRSZ + buf.len;
-	nalloc(result_raw, char, total_size);
-	result = (bytea *) result_raw;
-	SET_VARSIZE(result, total_size);
-	memcpy(VARDATA(result), buf.data, buf.len);
-	nfree(buf.data);
-
-	return result;
-}
+/* Removed unused function catboost_model_serialize_to_bytea */
 
 static int
 catboost_model_deserialize_from_bytea(const bytea * data, int *iterations_out, int *depth_out, float *learning_rate_out, int *n_features_out, char *loss_function_out, int loss_max, uint8 * training_backend_out)

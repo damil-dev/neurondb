@@ -228,6 +228,8 @@
 #define NDB_ALGO_PCA                        "pca"
 #define NDB_ALGO_OPQ                        "opq"
 #define NDB_ALGO_TIMESERIES                 "timeseries"
+#define NDB_ALGO_TRANSFORMER_LLM            "transformer_llm"
+#define NDB_ALGO_CUSTOM_LLM                 "custom_llm"
 
 /* ----------
  * SQL Function Names

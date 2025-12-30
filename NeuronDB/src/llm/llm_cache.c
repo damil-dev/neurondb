@@ -41,61 +41,7 @@
 #include "neurondb_constants.h"
 #include "neurondb_json.h"
 
-static char * __attribute__((unused))
-ndb_json_quote_string_OLD_REMOVED(const char *str)
-{
-	StringInfoData buf;
-	const char *p;
-	char *result = NULL;
-
-	if (str == NULL)
-		return pstrdup("null");
-
-	initStringInfo(&buf);
-	appendStringInfoChar(&buf, '"');
-
-	for (p = str; *p; p++)
-	{
-		switch (*p)
-		{
-			case '"':
-				appendStringInfoString(&buf, "\\\"");
-				break;
-			case '\\':
-				appendStringInfoString(&buf, "\\\\");
-				break;
-			case '\b':
-				appendStringInfoString(&buf, "\\b");
-				break;
-			case '\f':
-				appendStringInfoString(&buf, "\\f");
-				break;
-			case '\n':
-				appendStringInfoString(&buf, "\\n");
-				break;
-			case '\r':
-				appendStringInfoString(&buf, "\\r");
-				break;
-			case '\t':
-				appendStringInfoString(&buf, "\\t");
-				break;
-			default:
-				if ((unsigned char) *p < 0x20)
-				{
-					appendStringInfo(&buf, "\\u%04x", (unsigned char) *p);
-				} else
-				{
-					appendStringInfoChar(&buf, *p);
-				}
-				break;
-		}
-	}
-
-	appendStringInfoChar(&buf, '"');
-	result = pstrdup(buf.data);
-	nfree(buf.data);
-	return result;
-}
+/* Removed unused function ndb_json_quote_string_OLD_REMOVED */
 
 /*
  * Returns true if a non-stale cache entry is found for 'key' (and text value, if non-NULL), false otherwise.

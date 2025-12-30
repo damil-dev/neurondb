@@ -5655,6 +5655,9 @@ BEGIN
 			-- Hybrid search is a special algorithm that doesn't require traditional training
 			-- Return a placeholder model_id for compatibility
 			RETURN neurondb.train('default', 'hybrid_search', table_name, label_col, ARRAY[feature_col], params);
+		WHEN 'transformer_llm', 'custom_llm' THEN
+			-- Delegate to unified API C function for transformer LLM training
+			RETURN neurondb.train('default', 'transformer_llm', table_name, label_col, ARRAY[feature_col], params);
 		ELSE
 			RAISE EXCEPTION 'Unknown algorithm: %. Use neurondb.list_algorithms() to see supported algorithms', algorithm;
 	END CASE;
@@ -5673,6 +5676,27 @@ CREATE OR REPLACE FUNCTION neurondb.train(
 LANGUAGE c
 AS 'MODULE_PATHNAME', 'neurondb_train';
 COMMENT ON FUNCTION neurondb.train(text, text, text, text, text[], jsonb) IS 'Unified training function with project support: train(project, algorithm, table, label, feature_columns[], params)';
+
+-- Transformer LLM Training Function
+CREATE OR REPLACE FUNCTION neurondb_train_transformer_llm(
+	project_name text,
+	table_name text,
+	target_column text DEFAULT NULL,
+	feature_columns text[] DEFAULT ARRAY[]::text[],
+	hyperparams jsonb DEFAULT '{}'::jsonb
+) RETURNS integer
+LANGUAGE c
+AS 'MODULE_PATHNAME', 'neurondb_train_transformer_llm';
+COMMENT ON FUNCTION neurondb_train_transformer_llm IS 'Train a custom transformer LLM model for PostgreSQL operations';
+
+-- Transformer LLM Prediction Function
+CREATE OR REPLACE FUNCTION neurondb_predict_transformer_llm(
+	model_id integer,
+	input_text text
+) RETURNS text
+LANGUAGE c
+AS 'MODULE_PATHNAME', 'neurondb_predict_transformer_llm';
+COMMENT ON FUNCTION neurondb_predict_transformer_llm IS 'Predict using a trained transformer LLM model via ONNX Runtime';
 
 CREATE OR REPLACE FUNCTION neurondb.predict(
 	model_id integer,
@@ -5725,6 +5749,10 @@ BEGIN
 			RETURN neurondb_predict(model_id, vector_to_array(features));
 		WHEN 'timeseries' THEN
 			RETURN predict_timeseries_model_id(model_id, features);
+		WHEN 'transformer_llm', 'custom_llm' THEN
+			-- Transformer LLM prediction - convert vector to text for input
+			-- Note: For LLM, features should be text, not vector
+			RAISE EXCEPTION 'transformer_llm prediction requires text input, not vector. Use neurondb_predict_transformer_llm(model_id, text) directly.';
 		ELSE
 			RAISE EXCEPTION 'Prediction not implemented for algorithm: %', algo;
 	END CASE;

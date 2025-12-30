@@ -113,7 +113,7 @@ gpu_rf_safe_extract_n_trees(Datum n_trees_datum, int32 default_value)
  * Extracted to avoid shadow warnings from nested PG_TRY blocks
  */
 static int32
-gpu_rf_safe_parse_n_trees(Jsonb *hyperparams, int32 default_value)
+gpu_rf_safe_parse_n_trees(const Jsonb *hyperparams, int32 default_value)
 {
 	Datum		parse_n_trees_datum;
 	int32		result = default_value;

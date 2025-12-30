@@ -1854,7 +1854,7 @@ COMMENT ON FUNCTION evaluate_collaborative_filter_by_model_id IS 'Evaluate colla
 
 -- ARIMA models storage table
 CREATE TABLE IF NOT EXISTS neurondb.arima_models (
-    model_id serial PRIMARY KEY,
+    model_id SERIAL NOT NULL UNIQUE,
     p integer NOT NULL,
     d integer NOT NULL,
     q integer NOT NULL,
@@ -1867,7 +1867,7 @@ COMMENT ON TABLE neurondb.arima_models IS 'ARIMA time series model storage';
 
 -- ARIMA history table for forecasting
 CREATE TABLE IF NOT EXISTS neurondb.arima_history (
-    observed_id serial PRIMARY KEY,
+    observed_id SERIAL NOT NULL UNIQUE,
     model_id integer NOT NULL REFERENCES neurondb.arima_models(model_id),
     observed float8 NOT NULL,
     observed_at timestamptz DEFAULT now()
@@ -3454,8 +3454,7 @@ CREATE TABLE IF NOT EXISTS neurondb.tenant_usage (
     index_oid oid NOT NULL,
     vector_count bigint DEFAULT 0,
     storage_bytes bigint DEFAULT 0,
-    last_updated timestamptz DEFAULT now(),
-    PRIMARY KEY (tenant_id, index_oid)
+    last_updated timestamptz DEFAULT now(), UNIQUE(tenant_id, index_oid)
 );
 COMMENT ON TABLE neurondb.tenant_usage IS 'Per-tenant resource usage tracking';
 
@@ -3504,7 +3503,7 @@ COMMENT ON TABLE neurondb.tenant_quotas IS 'Per-tenant resource quota limits';
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS neurondb.rls_policies (
-    policy_id serial PRIMARY KEY,
+    policy_id SERIAL NOT NULL UNIQUE,
     table_name text NOT NULL,
     policy_name text NOT NULL,
     policy_expression text NOT NULL,
@@ -3622,7 +3621,7 @@ COMMENT ON FUNCTION neuranmon_sample IS 'Manually trigger tuner sampling';
 
 -- Queue worker job table
 CREATE TABLE IF NOT EXISTS neurondb.job_queue (
-    job_id bigserial PRIMARY KEY,
+    job_id BIGSERIAL NOT NULL UNIQUE,
     tenant_id integer DEFAULT 0,
     job_type text NOT NULL,
     payload jsonb NOT NULL,
@@ -3642,7 +3641,7 @@ CREATE INDEX IF NOT EXISTS idx_job_queue_tenant ON neurondb.job_queue(tenant_id,
 
 -- Query metrics table for tuner
 CREATE TABLE IF NOT EXISTS neurondb.query_metrics (
-    metric_id bigserial PRIMARY KEY,
+    metric_id BIGSERIAL NOT NULL UNIQUE,
     query_hash text,
     query_type text,
     latency_ms real,
@@ -3700,8 +3699,7 @@ CREATE TABLE IF NOT EXISTS neurondb.histograms (
     bucket_start real NOT NULL,
     bucket_end real NOT NULL,
     count bigint DEFAULT 0,
-    last_updated timestamptz DEFAULT now(),
-    PRIMARY KEY (metric_name, bucket_start)
+    last_updated timestamptz DEFAULT now(), UNIQUE(metric_name, bucket_start)
 );
 COMMENT ON TABLE neurondb.histograms IS 'Performance metric histograms for monitoring';
 
@@ -3731,7 +3729,7 @@ CREATE INDEX IF NOT EXISTS idx_llm_cache_created ON neurondb.llm_cache(created_a
 
 -- LLM job queue table
 CREATE TABLE IF NOT EXISTS neurondb.llm_jobs (
-    job_id bigserial PRIMARY KEY,
+    job_id BIGSERIAL NOT NULL UNIQUE,
     tenant_id text,
     operation text NOT NULL,
     model_name text NOT NULL,
@@ -3859,7 +3857,7 @@ END $$;
 
 -- Projects: Top-level organization for ML work
 CREATE TABLE IF NOT EXISTS neurondb.ml_projects (
-    project_id serial PRIMARY KEY,
+    project_id SERIAL NOT NULL UNIQUE,
     project_name text UNIQUE NOT NULL,
     model_type neurondb.ml_model_type NOT NULL,
     description text,
@@ -3874,7 +3872,7 @@ COMMENT ON TABLE neurondb.ml_projects IS 'ML project organization and metadata';
 
 -- Unified API Projects Table (simplified for unified API compatibility)
 CREATE TABLE IF NOT EXISTS neurondb.nb_catalog (
-    project_id SERIAL PRIMARY KEY,
+    project_id SERIAL NOT NULL UNIQUE,
     project_name TEXT NOT NULL UNIQUE,
     algorithm TEXT NOT NULL,
     table_name TEXT NOT NULL,
@@ -3886,7 +3884,7 @@ COMMENT ON TABLE neurondb.nb_catalog IS 'Simplified projects table for unified M
 
 -- Models: Trained models with versioning
 CREATE TABLE IF NOT EXISTS neurondb.ml_models (
-    model_id serial PRIMARY KEY,
+    model_id SERIAL NOT NULL UNIQUE,
     project_id integer NOT NULL REFERENCES neurondb.ml_projects(project_id) ON DELETE CASCADE,
     version integer NOT NULL,
     algorithm neurondb.ml_algorithm_type NOT NULL,
@@ -3923,7 +3921,7 @@ COMMENT ON TABLE neurondb.ml_models IS 'Trained models with versioning and metri
 
 -- Experiments: Track training runs and comparisons
 CREATE TABLE IF NOT EXISTS neurondb.ml_experiments (
-    experiment_id serial PRIMARY KEY,
+    experiment_id SERIAL NOT NULL UNIQUE,
     project_id integer NOT NULL REFERENCES neurondb.ml_projects(project_id) ON DELETE CASCADE,
     model_id integer REFERENCES neurondb.ml_models(model_id) ON DELETE CASCADE,
     experiment_name text,
@@ -4036,7 +4034,7 @@ COMMENT ON TABLE neurondb.llm_stats IS 'LLM usage statistics per model';
 
 -- LLM error tracking table
 CREATE TABLE IF NOT EXISTS neurondb.llm_errors (
-    error_id bigserial PRIMARY KEY,
+    error_id BIGSERIAL NOT NULL UNIQUE,
     model_name text NOT NULL,
     operation text NOT NULL,
     error_type text NOT NULL,
@@ -5860,7 +5858,7 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA neurondb GRANT SELECT ON TABLES TO PUBLIC;
 
 -- ML Projects table (similar to pgml.projects but NeurondB style)
 CREATE TABLE IF NOT EXISTS neurondb.ml_projects (
-    project_id SERIAL PRIMARY KEY,
+    project_id SERIAL NOT NULL UNIQUE,
     project_name TEXT UNIQUE NOT NULL,
     description TEXT,
     task_type TEXT CHECK (task_type IN ('classification', 'regression', 'clustering', 'embedding', 'rag')),
@@ -5871,7 +5869,7 @@ COMMENT ON TABLE neurondb.ml_projects IS 'ML Projects: organize models and exper
 
 -- ML Experiments table (track different approaches)
 CREATE TABLE IF NOT EXISTS neurondb.ml_experiments (
-    experiment_id SERIAL PRIMARY KEY,
+    experiment_id SERIAL NOT NULL UNIQUE,
     project_id INT REFERENCES neurondb.ml_projects(project_id) ON DELETE CASCADE,
     experiment_name TEXT NOT NULL,
     description TEXT,
@@ -5882,7 +5880,7 @@ COMMENT ON TABLE neurondb.ml_experiments IS 'ML Experiments: track different mod
 
 -- ML Models table (trained model versions)
 CREATE TABLE IF NOT EXISTS neurondb.ml_trained_models (
-    model_id SERIAL PRIMARY KEY,
+    model_id SERIAL NOT NULL UNIQUE,
     experiment_id INT REFERENCES neurondb.ml_experiments(experiment_id) ON DELETE CASCADE,
     project_id INT REFERENCES neurondb.ml_projects(project_id) ON DELETE CASCADE,
     algorithm TEXT NOT NULL,
@@ -5900,7 +5898,7 @@ COMMENT ON TABLE neurondb.ml_trained_models IS 'Trained ML models with versionin
 
 -- ML Predictions log (track predictions for monitoring)
 CREATE TABLE IF NOT EXISTS neurondb.ml_predictions (
-    prediction_id BIGSERIAL PRIMARY KEY,
+    prediction_id BIGSERIAL NOT NULL UNIQUE,
     model_id INT REFERENCES neurondb.ml_trained_models(model_id) ON DELETE CASCADE,
     project_id INT REFERENCES neurondb.ml_projects(project_id) ON DELETE CASCADE,
     input_features JSONB,
@@ -6015,6 +6013,9 @@ BEGIN
 			-- Hybrid search is a special algorithm that doesn't require traditional training
 			-- Return a placeholder model_id for compatibility
 			RETURN neurondb.train('default', 'hybrid_search', table_name, label_col, ARRAY[feature_col], params);
+		WHEN 'transformer_llm', 'custom_llm' THEN
+			-- Delegate to unified API C function for transformer LLM training
+			RETURN neurondb.train('default', 'transformer_llm', table_name, label_col, ARRAY[feature_col], params);
 		ELSE
 			RAISE EXCEPTION 'Unknown algorithm: %. Use neurondb.list_algorithms() to see supported algorithms', algorithm;
 	END CASE;
@@ -6033,6 +6034,27 @@ CREATE OR REPLACE FUNCTION neurondb.train(
 LANGUAGE c
 AS 'MODULE_PATHNAME', 'neurondb_train';
 COMMENT ON FUNCTION neurondb.train(text, text, text, text, text[], jsonb) IS 'Unified training function with project support: train(project, algorithm, table, label, feature_columns[], params)';
+
+-- Transformer LLM Training Function
+CREATE OR REPLACE FUNCTION neurondb_train_transformer_llm(
+	project_name text,
+	table_name text,
+	target_column text DEFAULT NULL,
+	feature_columns text[] DEFAULT ARRAY[]::text[],
+	hyperparams jsonb DEFAULT '{}'::jsonb
+) RETURNS integer
+LANGUAGE c
+AS 'MODULE_PATHNAME', 'neurondb_train_transformer_llm';
+COMMENT ON FUNCTION neurondb_train_transformer_llm IS 'Train a custom transformer LLM model for PostgreSQL operations';
+
+-- Transformer LLM Prediction Function
+CREATE OR REPLACE FUNCTION neurondb_predict_transformer_llm(
+	model_id integer,
+	input_text text
+) RETURNS text
+LANGUAGE c
+AS 'MODULE_PATHNAME', 'neurondb_predict_transformer_llm';
+COMMENT ON FUNCTION neurondb_predict_transformer_llm IS 'Predict using a trained transformer LLM model via ONNX Runtime';
 
 CREATE OR REPLACE FUNCTION neurondb.predict(
 	model_id integer,
@@ -6093,6 +6115,9 @@ BEGIN
 			RETURN neurondb_predict(model_id, vector_to_array(features));
 		WHEN 'timeseries' THEN
 			RETURN predict_timeseries_model_id(model_id, features);
+		WHEN 'transformer_llm', 'custom_llm' THEN
+			-- Transformer LLM prediction via ONNX Runtime
+			RETURN neurondb_predict_transformer_llm(model_id, features);
 		ELSE
 			RAISE EXCEPTION 'Prediction not implemented for algorithm: %', algo;
 	END CASE;
@@ -7557,7 +7582,7 @@ BEGIN
 	RETURN pipeline_id;
 EXCEPTION WHEN undefined_table THEN
 	CREATE TABLE IF NOT EXISTS neurondb.ml_pipelines (
-		pipeline_id SERIAL PRIMARY KEY,
+		pipeline_id SERIAL NOT NULL UNIQUE,
 		pipeline_name TEXT UNIQUE,
 		steps JSONB,
 		created_at TIMESTAMPTZ
@@ -8086,7 +8111,7 @@ GRANT EXECUTE ON FUNCTION cross_modal_search(text, text, text, text, text, int4)
 
 -- Projects Table (simplified for unified API)
 CREATE TABLE IF NOT EXISTS neurondb.nb_catalog (
-    project_id SERIAL PRIMARY KEY,
+    project_id SERIAL NOT NULL UNIQUE,
     project_name TEXT NOT NULL UNIQUE,
     algorithm TEXT NOT NULL,
     table_name TEXT NOT NULL,
@@ -8097,7 +8122,7 @@ CREATE TABLE IF NOT EXISTS neurondb.nb_catalog (
 
 -- Feature Stores Table
 CREATE TABLE IF NOT EXISTS neurondb.feature_stores (
-    store_id SERIAL PRIMARY KEY,
+    store_id SERIAL NOT NULL UNIQUE,
     store_name TEXT UNIQUE NOT NULL,
     entity_table TEXT NOT NULL,
     entity_key TEXT NOT NULL,
@@ -8108,7 +8133,7 @@ CREATE TABLE IF NOT EXISTS neurondb.feature_stores (
 
 -- Feature Definitions Table
 CREATE TABLE IF NOT EXISTS neurondb.features (
-    feature_id SERIAL PRIMARY KEY,
+    feature_id SERIAL NOT NULL UNIQUE,
     store_id INTEGER REFERENCES neurondb.feature_stores(store_id) ON DELETE CASCADE,
     feature_name TEXT NOT NULL,
     feature_type TEXT NOT NULL CHECK (feature_type IN ('numeric', 'categorical', 'vector', 'text')),
@@ -8120,7 +8145,7 @@ CREATE TABLE IF NOT EXISTS neurondb.features (
 
 -- Hyperparameter Tuning Results
 CREATE TABLE IF NOT EXISTS neurondb.hyperparameter_results (
-    result_id SERIAL PRIMARY KEY,
+    result_id SERIAL NOT NULL UNIQUE,
     project_id INTEGER REFERENCES neurondb.ml_projects(project_id) ON DELETE CASCADE,
     algorithm TEXT NOT NULL,
     parameters JSONB NOT NULL,
@@ -8135,7 +8160,7 @@ CREATE INDEX IF NOT EXISTS idx_hyperparam_score ON neurondb.hyperparameter_resul
 
 -- Text ML Models
 CREATE TABLE IF NOT EXISTS neurondb.text_models (
-    model_id SERIAL PRIMARY KEY,
+    model_id SERIAL NOT NULL UNIQUE,
     model_name TEXT UNIQUE NOT NULL,
     model_type TEXT NOT NULL CHECK (model_type IN ('classification', 'sentiment', 'ner', 'summarization')),
     model_path TEXT,
@@ -8147,7 +8172,7 @@ CREATE TABLE IF NOT EXISTS neurondb.text_models (
 
 -- RAG Pipeline Configurations
 CREATE TABLE IF NOT EXISTS neurondb.rag_pipelines (
-    pipeline_id SERIAL PRIMARY KEY,
+    pipeline_id SERIAL NOT NULL UNIQUE,
     pipeline_name TEXT UNIQUE NOT NULL,
     chunk_size INTEGER DEFAULT 512,
     chunk_overlap INTEGER DEFAULT 128,
