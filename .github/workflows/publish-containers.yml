@@ -24,7 +24,7 @@ jobs:
       matrix:
         component:
           - name: neurondb
-            dockerfile: NeuronDB/docker/Dockerfile
+            dockerfile: dockers/neurondb/Dockerfile
             context: .
             variants:
               - pg_version: "16"
@@ -34,13 +34,13 @@ jobs:
               - pg_version: "18"
                 tag_suffix: "pg18-cpu"
           - name: neuronagent
-            dockerfile: NeuronAgent/docker/Dockerfile
-            context: NeuronAgent
+            dockerfile: dockers/neuronagent/Dockerfile
+            context: .
             variants:
               - tag_suffix: "latest"
           - name: neuronmcp
-            dockerfile: NeuronMCP/docker/Dockerfile
-            context: NeuronMCP
+            dockerfile: dockers/neuronmcp/Dockerfile
+            context: .
             variants:
               - tag_suffix: "latest"
     
