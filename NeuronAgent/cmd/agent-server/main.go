@@ -15,6 +15,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"net/http"
 	"os"
@@ -35,12 +36,68 @@ import (
 	"github.com/neurondb/NeuronAgent/pkg/neurondb"
 )
 
+var (
+	version   = "dev"
+	buildDate = "unknown"
+	gitCommit = "unknown"
+)
+
 func main() {
+	var (
+		showVersion = flag.Bool("version", false, "Show version information")
+		showVersionShort = flag.Bool("v", false, "Show version information (short)")
+		configPath  = flag.String("c", "", "Path to configuration file")
+		configPathLong = flag.String("config", "", "Path to configuration file")
+		showHelp    = flag.Bool("help", false, "Show help message")
+		showHelpShort = flag.Bool("h", false, "Show help message (short)")
+	)
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: %s [OPTIONS]\n\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "NeuronAgent Server - AI Agent server for NeuronDB\n\n")
+		fmt.Fprintf(os.Stderr, "Options:\n")
+		flag.PrintDefaults()
+		fmt.Fprintf(os.Stderr, "\nExamples:\n")
+		fmt.Fprintf(os.Stderr, "  %s                    Start server with default configuration\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s -c config.yaml     Start server with custom config file\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s --version          Show version information\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s --help             Show this help message\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "\nConfiguration:\n")
+		fmt.Fprintf(os.Stderr, "  Configuration can be provided via:\n")
+		fmt.Fprintf(os.Stderr, "  - Command line flag: -c or --config\n")
+		fmt.Fprintf(os.Stderr, "  - Environment variable: CONFIG_PATH\n")
+		fmt.Fprintf(os.Stderr, "  - Environment variables (see config package for details)\n")
+	}
+	flag.Parse()
+
+	/* Handle version flag */
+	if *showVersion || *showVersionShort {
+		fmt.Printf("neuronagent version %s\n", version)
+		fmt.Printf("Build date: %s\n", buildDate)
+		fmt.Printf("Git commit: %s\n", gitCommit)
+		os.Exit(0)
+	}
+
+	/* Handle help flag */
+	if *showHelp || *showHelpShort {
+		flag.Usage()
+		os.Exit(0)
+	}
+
   /* Load configuration */
 	cfg := config.DefaultConfig()
-	if configPath := os.Getenv("CONFIG_PATH"); configPath != "" {
+	
+	/* Determine config path - command line flag takes precedence over environment variable */
+	cfgPath := *configPath
+	if cfgPath == "" {
+		cfgPath = *configPathLong
+	}
+	if cfgPath == "" {
+		cfgPath = os.Getenv("CONFIG_PATH")
+	}
+	
+	if cfgPath != "" {
 		var err error
-		cfg, err = config.LoadConfig(configPath)
+		cfg, err = config.LoadConfig(cfgPath)
 		if err != nil {
 			fmt.Printf("Failed to load config: %v, using defaults\n", err)
 		}
