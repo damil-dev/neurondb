@@ -13,6 +13,7 @@ NeuronDesktop is a comprehensive, production-ready web application that provides
 
 - **Unified Interface** - Single dashboard for all NeuronDB ecosystem components
 - **Real-time Communication** - WebSocket support for live updates
+- **Markdown Rendering** - Beautiful formatting for AI responses with syntax highlighting
 - **Secure Authentication** - API key-based authentication with rate limiting
 - **Professional UI** - Modern, responsive design with smooth animations
 - **Comprehensive Logging** - Request/response logging with detailed analytics

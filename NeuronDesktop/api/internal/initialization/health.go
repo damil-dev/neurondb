@@ -27,16 +27,16 @@ func NewHealthChecker(queries *db.Queries, logger *logging.Logger) *HealthChecke
 
 // HealthStatus represents the overall health status
 type HealthStatus struct {
-	Status      string                 `json:"status"`      // "healthy", "degraded", "unhealthy"
-	Timestamp   time.Time              `json:"timestamp"`
-	Checks      map[string]CheckResult `json:"checks"`
-	Overall     bool                   `json:"overall"`
-	Version     string                 `json:"version,omitempty"`
+	Status    string                 `json:"status"` // "healthy", "degraded", "unhealthy"
+	Timestamp time.Time              `json:"timestamp"`
+	Checks    map[string]CheckResult `json:"checks"`
+	Overall   bool                   `json:"overall"`
+	Version   string                 `json:"version,omitempty"`
 }
 
 // CheckResult represents the result of an individual health check
 type CheckResult struct {
-	Status      string        `json:"status"`      // "pass", "warn", "fail"
+	Status      string        `json:"status"` // "pass", "warn", "fail"
 	Message     string        `json:"message"`
 	Duration    time.Duration `json:"duration"`
 	LastChecked time.Time     `json:"last_checked"`
@@ -84,7 +84,7 @@ func (hc *HealthChecker) CheckAll(ctx context.Context) HealthStatus {
 // checkDatabase checks database connectivity
 func (hc *HealthChecker) checkDatabase(ctx context.Context) CheckResult {
 	start := time.Now()
-	
+
 	// This would require access to the database connection
 	// For now, we'll check if we can query the users table
 	_, err := hc.queries.GetUserByUsername(ctx, "admin")
@@ -191,4 +191,3 @@ func (hc *HealthChecker) checkProfileSchema(ctx context.Context, profile *db.Pro
 		LastChecked: time.Now(),
 	}
 }
-

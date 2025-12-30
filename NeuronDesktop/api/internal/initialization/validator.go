@@ -25,8 +25,8 @@ func NewValidator(logger *logging.Logger) *Validator {
 
 // ValidationResult represents the result of validation
 type ValidationResult struct {
-	Valid   bool
-	Errors  []string
+	Valid    bool
+	Errors   []string
 	Warnings []string
 }
 
@@ -228,4 +228,7 @@ func (v *Validator) ValidateAll(ctx context.Context, queries *db.Queries) Valida
 
 	return result
 }
+
+
+
 

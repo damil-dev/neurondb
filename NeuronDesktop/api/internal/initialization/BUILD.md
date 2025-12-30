@@ -169,3 +169,7 @@ func (b *Bootstrap) verifyConnections(ctx context.Context, profile *db.Profile) 
 4. **Configuration**: Make initialization steps configurable
 5. **Health Checks**: Periodic health checks after initialization
 
+
+
+
+

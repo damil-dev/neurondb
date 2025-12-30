@@ -17,7 +17,8 @@ build: build-api build-frontend ## Build both API backend and frontend
 
 build-api: deps-api ## Build the API backend (Go)
 	@echo "$(CYAN)Building NeuronDesktop API...$(NC)"
-	@cd api && go build -o bin/neurondesk-api ./cmd/server
+	@mkdir -p bin
+	@cd api && go build -o ../bin/neurondesktop ./cmd/server
 	@echo "$(GREEN)✓ API built$(NC)"
 
 build-frontend: deps-frontend ## Build the frontend (Next.js)
@@ -46,6 +47,45 @@ test-api: build-api ## Run API tests
 	@echo "$(CYAN)Running API tests...$(NC)"
 	@cd api && go test ./... || echo "$(YELLOW)⚠ Some tests may have failed$(NC)"
 
+test-api-unit: ## Run API unit tests only
+	@echo "$(CYAN)Running API unit tests...$(NC)"
+	@cd api && go test -v ./internal/handlers/... ./internal/db/...
+
+test-api-integration: ## Run API integration tests only
+	@echo "$(CYAN)Running API integration tests...$(NC)"
+	@cd api && go test -v ./internal/mcp/... ./internal/neurondb/... ./internal/agent/...
+
+test-api-e2e: ## Run end-to-end tests
+	@echo "$(CYAN)Running E2E tests...$(NC)"
+	@cd api && go test -v ../../tests/e2e/...
+
+test-api-all: ## Run all API tests with coverage
+	@echo "$(CYAN)Running comprehensive test suite...$(NC)"
+	@./tests/run_all_tests.sh
+
+test-api-coverage: ## Generate test coverage report
+	@echo "$(CYAN)Generating test coverage...$(NC)"
+	@cd api && go test -coverprofile=coverage.out ./...
+	@cd api && go tool cover -html=coverage.out -o coverage.html
+	@echo "$(GREEN)✓ Coverage report generated: api/coverage.html$(NC)"
+
+fix: fix-api fix-frontend ## Fix code formatting and dependencies
+
+fix-api: ## Fix Go code formatting and dependencies
+	@echo "$(CYAN)Fixing Go code formatting...$(NC)"
+	@cd api && go fmt ./...
+	@cd api && go mod tidy
+	@echo "$(GREEN)✓ Go code formatted and dependencies fixed$(NC)"
+
+fix-frontend: ## Fix frontend code formatting
+	@echo "$(CYAN)Fixing frontend code formatting...$(NC)"
+	@if command -v npm >/dev/null 2>&1; then \
+		cd frontend && npm run lint -- --fix 2>/dev/null || echo "$(YELLOW)⚠ Linting may not be configured$(NC)"; \
+	else \
+		echo "$(YELLOW)⚠ npm not found - skipping frontend formatting$(NC)"; \
+	fi
+	@echo "$(GREEN)✓ Frontend code formatted$(NC)"
+
 test-frontend: deps-frontend ## Run frontend tests
 	@echo "$(CYAN)Running frontend tests...$(NC)"
 	@cd frontend && npm test || echo "$(YELLOW)⚠ Frontend tests may not be configured$(NC)"
@@ -54,7 +94,7 @@ clean: clean-api clean-frontend ## Clean all build artifacts
 
 clean-api: ## Clean API build artifacts
 	@echo "$(CYAN)Cleaning API artifacts...$(NC)"
-	@rm -rf api/bin/
+	@rm -rf bin/ api/bin/
 	@echo "$(GREEN)✓ API cleaned$(NC)"
 
 clean-frontend: ## Clean frontend build artifacts
@@ -64,14 +104,14 @@ clean-frontend: ## Clean frontend build artifacts
 
 install: build ## Install the application (builds everything)
 	@echo "$(GREEN)✓ NeuronDesktop installed$(NC)"
-	@echo "$(CYAN)API binary: api/bin/neurondesk-api$(NC)"
+	@echo "$(CYAN)API binary: bin/neurondesktop$(NC)"
 	@echo "$(CYAN)Frontend: frontend/.next$(NC)"
 
 run: run-api ## Run the full application (API only, frontend needs separate process)
 
 run-api: build-api ## Run the API server
 	@echo "$(CYAN)Running NeuronDesktop API...$(NC)"
-	@cd api && ./bin/neurondesk-api || go run ./cmd/server
+	@./bin/neurondesktop || cd api && go run ./cmd/server
 
 run-frontend: deps-frontend ## Run the frontend dev server
 	@echo "$(CYAN)Running NeuronDesktop frontend...$(NC)"

@@ -119,7 +119,7 @@ func (q *Queries) ListProfiles(ctx context.Context, userID string) ([]Profile, e
 			&defaultCollection, &profile.IsDefault, &profile.CreatedAt, &profile.UpdatedAt); err != nil {
 			continue
 		}
-		
+
 		if profileUsername.Valid {
 			profile.ProfileUsername = profileUsername.String
 		}
@@ -1021,7 +1021,7 @@ func (q *Queries) ListMCPMessages(ctx context.Context, threadID string) ([]MCPMe
 // CreateMCPMessage creates a new message and updates thread's updated_at
 func (q *Queries) CreateMCPMessage(ctx context.Context, threadID, role, content, toolName string, data map[string]interface{}) (*MCPMessage, error) {
 	messageID := uuid.New().String()
-	
+
 	var dataJSON []byte
 	if data != nil {
 		dataJSON, _ = json.Marshal(data)
@@ -1071,4 +1071,3 @@ func (q *Queries) CreateMCPMessage(ctx context.Context, threadID, role, content,
 
 	return &msg, nil
 }
-

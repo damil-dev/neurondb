@@ -23,11 +23,11 @@ type DatabaseTestRequest struct {
 
 // DatabaseTestResponse represents the response from a database test
 type DatabaseTestResponse struct {
-	Success      bool     `json:"success"`
-	Message      string   `json:"message"`
-	SchemaExists bool     `json:"schema_exists"`
+	Success       bool     `json:"success"`
+	Message       string   `json:"message"`
+	SchemaExists  bool     `json:"schema_exists"`
 	MissingTables []string `json:"missing_tables,omitempty"`
-	DSN          string   `json:"dsn,omitempty"`
+	DSN           string   `json:"dsn,omitempty"`
 }
 
 // DatabaseTestHandlers handles database connection testing
@@ -76,10 +76,10 @@ func (h *DatabaseTestHandlers) TestConnection(w http.ResponseWriter, r *http.Req
 	schemaExists, missingTables := h.checkSchema(ctx, conn)
 
 	response := DatabaseTestResponse{
-		Success:      true,
-		SchemaExists: schemaExists,
+		Success:       true,
+		SchemaExists:  schemaExists,
 		MissingTables: missingTables,
-		DSN:          dsn,
+		DSN:           dsn,
 	}
 
 	if schemaExists {
@@ -147,4 +147,3 @@ func (h *DatabaseTestHandlers) checkSchema(ctx context.Context, conn *sql.DB) (b
 
 	return allExist, missingTables
 }
-

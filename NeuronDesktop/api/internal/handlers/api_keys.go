@@ -29,22 +29,22 @@ func (h *APIKeyHandlers) GenerateAPIKey(w http.ResponseWriter, r *http.Request) 
 		UserID    string `json:"user_id,omitempty"`
 		RateLimit int    `json:"rate_limit,omitempty"`
 	}
-	
+
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		WriteError(w, r, http.StatusBadRequest, err, nil)
 		return
 	}
-	
+
 	if req.RateLimit == 0 {
 		req.RateLimit = 100
 	}
-	
+
 	key, apiKey, err := h.keyManager.GenerateAPIKey(r.Context(), req.UserID, req.RateLimit)
 	if err != nil {
 		WriteError(w, r, http.StatusInternalServerError, err, nil)
 		return
 	}
-	
+
 	// Return the full key (only shown once)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -65,20 +65,20 @@ func (h *APIKeyHandlers) ListAPIKeys(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, r, http.StatusInternalServerError, err, nil)
 		return
 	}
-	
+
 	// Don't return full keys, only prefixes
 	var response []map[string]interface{}
 	for _, key := range keys {
 		response = append(response, map[string]interface{}{
-			"id":         key.ID,
-			"key_prefix": key.KeyPrefix,
-			"user_id":    key.UserID,
-			"rate_limit": key.RateLimit,
-			"created_at": key.CreatedAt,
+			"id":           key.ID,
+			"key_prefix":   key.KeyPrefix,
+			"user_id":      key.UserID,
+			"rate_limit":   key.RateLimit,
+			"created_at":   key.CreatedAt,
 			"last_used_at": key.LastUsedAt,
 		})
 	}
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
@@ -87,12 +87,11 @@ func (h *APIKeyHandlers) ListAPIKeys(w http.ResponseWriter, r *http.Request) {
 func (h *APIKeyHandlers) DeleteAPIKey(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	keyID := vars["id"]
-	
+
 	if err := h.keyManager.DeleteAPIKey(r.Context(), keyID); err != nil {
 		WriteError(w, r, http.StatusInternalServerError, err, nil)
 		return
 	}
-	
+
 	w.WriteHeader(http.StatusNoContent)
 }
-

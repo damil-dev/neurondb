@@ -371,4 +371,3 @@ func (b *Bootstrap) verifyMCPConnection(ctx context.Context, profile *db.Profile
 	})
 	// TODO: Implement MCP connection verification using MCPManager
 }
-

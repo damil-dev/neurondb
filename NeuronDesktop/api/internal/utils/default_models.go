@@ -108,9 +108,9 @@ func GetDefaultModels() []DefaultModelConfig {
 // CreateDefaultModelsForProfile creates default model configurations for a new profile
 func CreateDefaultModelsForProfile(ctx context.Context, queries *db.Queries, profileID string) error {
 	defaultModels := GetDefaultModels()
-	
+
 	var defaultModelID string
-	
+
 	for _, modelTemplate := range defaultModels {
 		modelConfig := &db.ModelConfig{
 			ID:            uuid.New().String(),
@@ -125,21 +125,21 @@ func CreateDefaultModelsForProfile(ctx context.Context, queries *db.Queries, pro
 			CreatedAt:     time.Now(),
 			UpdatedAt:     time.Now(),
 		}
-		
+
 		// Set default base URL for Ollama
 		if modelTemplate.ModelProvider == "ollama" {
 			modelConfig.BaseURL = "http://localhost:11434"
 		}
-		
+
 		if err := queries.CreateModelConfig(ctx, modelConfig); err != nil {
 			return fmt.Errorf("failed to create default model %s/%s: %w", modelTemplate.ModelProvider, modelTemplate.ModelName, err)
 		}
-		
+
 		if modelTemplate.IsDefault {
 			defaultModelID = modelConfig.ID
 		}
 	}
-	
+
 	// Set the first model (gpt-4o) as default if we created models
 	if defaultModelID != "" {
 		if err := queries.SetDefaultModelConfig(ctx, profileID, defaultModelID); err != nil {
@@ -147,7 +147,6 @@ func CreateDefaultModelsForProfile(ctx context.Context, queries *db.Queries, pro
 			fmt.Printf("Warning: Failed to set default model config: %v\n", err)
 		}
 	}
-	
+
 	return nil
 }
-

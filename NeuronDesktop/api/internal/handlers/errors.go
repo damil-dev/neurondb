@@ -57,7 +57,7 @@ func WriteError(w http.ResponseWriter, r *http.Request, statusCode int, err erro
 // WriteErrorWithContext writes an error response with context
 func WriteErrorWithContext(ctx context.Context, w http.ResponseWriter, statusCode int, err error, details map[string]interface{}) {
 	requestID := middleware.GetRequestID(ctx)
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
 
@@ -127,4 +127,3 @@ func HandlePanic(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, r, http.StatusInternalServerError, fmt.Errorf("internal server error: %v", err), nil)
 	}
 }
-

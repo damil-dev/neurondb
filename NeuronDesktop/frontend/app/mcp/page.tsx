@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
-import { mcpAPI, profilesAPI, modelConfigAPI, type Profile, type ToolDefinition, type ToolResult, type ModelConfig, type MCPThread, type MCPMessage } from '@/lib/api'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { mcpAPI, profilesAPI, modelConfigAPI, type Profile, type ToolDefinition, type ToolResult, type ModelConfig, type MCPThread, type MCPMessage, type MCPThreadWithMessages } from '@/lib/api'
 import StatusBadge from '@/components/StatusBadge'
 import JSONViewer from '@/components/JSONViewer'
+import MarkdownContent from '@/components/MarkdownContent'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { 
   PaperAirplaneIcon, 
@@ -34,6 +35,8 @@ interface Thread {
   messages: Message[]
 }
 
+// Main MCP Console component
+// This component is wrapped with ErrorBoundary for error handling
 function MCPPage() {
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [selectedProfile, setSelectedProfile] = useState<string>('')
@@ -61,6 +64,10 @@ function MCPPage() {
   const shouldAutoConnectRef = useRef<boolean>(true)
   const initializedRef = useRef<boolean>(false)
   const isMountedRef = useRef<boolean>(true)
+  const lastLoadedProfileRef = useRef<string>('')
+  const threadsLoadingRef = useRef<boolean>(false)
+  const lastConnectedProfileRef = useRef<string>('')
+  const conversationThreadRef = useRef<string>('') // Track thread ID for current conversation
 
   // Comprehensive error logging function - NEVER fails silently
   const logError = (context: string, error: any, additionalInfo?: Record<string, any>) => {
@@ -132,10 +139,40 @@ function MCPPage() {
   // Track component mount state to prevent state updates after unmount
   useEffect(() => {
     isMountedRef.current = true
+    
+    // Detect if we're in a reload loop (component mounting too frequently)
+    const mountTime = Date.now()
+    const lastMountTime = sessionStorage.getItem('mcp_page_last_mount')
+    if (lastMountTime) {
+      const timeSinceLastMount = mountTime - parseInt(lastMountTime, 10)
+      if (timeSinceLastMount < 1000) {
+        console.warn('[MCP Page] Component mounting too frequently - possible reload loop detected', {
+          timeSinceLastMount,
+          timestamp: new Date().toISOString()
+        })
+      }
+    }
+    sessionStorage.setItem('mcp_page_last_mount', mountTime.toString())
+    
+    // Restore activeThreadId from sessionStorage if available (helps survive Fast Refresh)
+    const savedThreadId = sessionStorage.getItem('mcp_active_thread_id')
+    if (savedThreadId && !activeThreadId) {
+      console.log('[MCP Page] Restoring active thread ID from sessionStorage:', savedThreadId)
+      setActiveThreadId(savedThreadId)
+    }
+    
     return () => {
       isMountedRef.current = false
     }
   }, [])
+
+  // Save activeThreadId to sessionStorage whenever it changes (survives Fast Refresh)
+  useEffect(() => {
+    if (activeThreadId) {
+      sessionStorage.setItem('mcp_active_thread_id', activeThreadId)
+      console.log('[MCP Page] Saved active thread ID to sessionStorage:', activeThreadId)
+    }
+  }, [activeThreadId])
 
   useEffect(() => {
     // Prevent double initialization in React StrictMode
@@ -186,9 +223,17 @@ function MCPPage() {
   // Load conversation threads from API when profile is selected
   useEffect(() => {
     if (!selectedProfile) return
+    // Prevent reloading if already loading or if it's the same profile
+    if (threadsLoadingRef.current || lastLoadedProfileRef.current === selectedProfile) return
+    
+    lastLoadedProfileRef.current = selectedProfile
+    threadsLoadingRef.current = true
     
     const loadThreads = async () => {
-      if (!isMountedRef.current || !selectedProfile) return
+      if (!isMountedRef.current || !selectedProfile) {
+        threadsLoadingRef.current = false
+        return
+      }
       
       setLoadingThreads(true)
       try {
@@ -255,6 +300,7 @@ function MCPPage() {
           logError('loadThreads - createThreadOnError', createError, { selectedProfile, originalError: error })
         }
       } finally {
+        threadsLoadingRef.current = false
         if (isMountedRef.current) {
           setLoadingThreads(false)
         }
@@ -265,15 +311,15 @@ function MCPPage() {
   }, [selectedProfile])
 
   // Convert API thread format to local format
-  const convertAPIThreadToLocal = (apiThread: { thread: MCPThread; messages: MCPMessage[] } | null | undefined): Thread | null => {
-    if (!apiThread || !apiThread.thread) {
+  const convertAPIThreadToLocal = (apiThread: MCPThreadWithMessages | null | undefined): Thread | null => {
+    if (!apiThread || !apiThread.id) {
       return null
     }
     return {
-      id: apiThread.thread.id,
-      title: apiThread.thread.title,
-      createdAt: new Date(apiThread.thread.created_at).getTime(),
-      updatedAt: new Date(apiThread.thread.updated_at).getTime(),
+      id: apiThread.id,
+      title: apiThread.title,
+      createdAt: new Date(apiThread.created_at).getTime(),
+      updatedAt: new Date(apiThread.updated_at).getTime(),
       messages: (apiThread.messages || []).map((msg) => ({
         id: msg.id,
         role: msg.role as Message['role'],
@@ -306,8 +352,26 @@ function MCPPage() {
   useEffect(() => {
     if (!selectedProfile || !shouldAutoConnectRef.current) return
     
+    // Prevent reconnecting if already connected to the same profile
+    if (lastConnectedProfileRef.current === selectedProfile && (connecting || connected)) return
+    
     // Prevent multiple simultaneous initializations
-    if (connecting || connected) return
+    if (connecting || connected) {
+      // If connected to a different profile, close and reconnect
+      if (lastConnectedProfileRef.current && lastConnectedProfileRef.current !== selectedProfile) {
+        if (wsRef.current) {
+          wsRef.current.close()
+          wsRef.current = null
+        }
+        lastConnectedProfileRef.current = ''
+        setConnected(false)
+        setConnecting(false)
+      } else {
+        return
+      }
+    }
+    
+    lastConnectedProfileRef.current = selectedProfile
     
     try {
       loadTools().catch((error) => {
@@ -346,16 +410,24 @@ function MCPPage() {
     }
   }, [selectedModel])
 
-  const activeThread = threads.find((t) => t.id === activeThreadId) || null
+  const activeThread = useMemo(() => 
+    threads.find((t) => t.id === activeThreadId) || null,
+    [threads, activeThreadId]
+  )
+  
   // Deduplicate messages by ID to prevent showing the same message multiple times
-  const messages = activeThread?.messages ? 
-    activeThread.messages.filter((msg, index, self) => 
+  const messages = useMemo(() => {
+    if (!activeThread?.messages) return []
+    return activeThread.messages.filter((msg, index, self) => 
       index === self.findIndex((m) => m.id === msg.id)
-    ) : []
+    )
+  }, [activeThread])
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+    if (messages.length > 0 && messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [messages.length, activeThreadId]) // Only depend on length and thread ID, not the full array
 
   const loadProfiles = async () => {
     if (!isMountedRef.current) return
@@ -684,13 +756,21 @@ function MCPPage() {
   const addMessage = async (role: Message['role'], content: string, toolName?: string, data?: any) => {
     if (!selectedProfile || !isMountedRef.current) return
     
+    // For assistant/tool messages, use the conversation thread if available to ensure they go to the right thread
+    const targetThreadId = (role === 'assistant' || role === 'tool') && conversationThreadRef.current 
+      ? conversationThreadRef.current 
+      : activeThreadId
+    
+    console.log('[addMessage]', { role, targetThreadId, activeThreadId, conversationThread: conversationThreadRef.current })
+    
     // If no active thread, create one
-    if (!activeThreadId) {
+    if (!targetThreadId) {
       try {
         const newThread = await createNewThreadInDB()
         if (!isMountedRef.current) return
         setThreads((prev) => [newThread, ...prev])
         setActiveThreadId(newThread.id)
+        conversationThreadRef.current = newThread.id
       } catch (error) {
         if (!isMountedRef.current) return
         logError('addMessage - createThread', error, { role, contentLength: content.length })
@@ -704,7 +784,9 @@ function MCPPage() {
         }
         setThreads((prev) => [tempThread, ...prev])
         setActiveThreadId(tempThread.id)
+        conversationThreadRef.current = tempThread.id
       }
+      return // Exit and let the function be called again with the new thread
     }
 
     // Create message with temp ID immediately (don't wait for DB)
@@ -722,7 +804,7 @@ function MCPPage() {
     if (!isMountedRef.current) return
     setThreads((prev) => {
       return prev.map((t) => {
-        if (t.id !== activeThreadId) return t
+        if (t.id !== targetThreadId) return t
         
         // Check if message already exists to prevent duplicates
         const messageExists = t.messages.some(m => m.content === content && m.role === role && m.timestamp > now - 1000)
@@ -740,9 +822,9 @@ function MCPPage() {
 
     // Try to save to DB in background (don't block UI)
     // Only save if thread ID is not a temp ID (starts with 'temp-')
-    if (activeThreadId && !activeThreadId.startsWith('temp-')) {
+    if (targetThreadId && !targetThreadId.startsWith('temp-')) {
       try {
-        const response = await mcpAPI.addMessage(selectedProfile, activeThreadId, role, content, toolName, data)
+        const response = await mcpAPI.addMessage(selectedProfile, targetThreadId, role, content, toolName, data)
         if (!isMountedRef.current) return
         
         const apiMessage = response.data
@@ -750,7 +832,7 @@ function MCPPage() {
         // Update with real ID from DB
         setThreads((prev) => {
           return prev.map((t) => {
-            if (t.id !== activeThreadId) return t
+            if (t.id !== targetThreadId) return t
             return {
               ...t,
               messages: t.messages.map((m) => 
@@ -764,7 +846,7 @@ function MCPPage() {
         logError('addMessage - saveToDB', error, { 
           role, 
           contentLength: content.length, 
-          threadId: activeThreadId,
+          threadId: targetThreadId,
           toolName,
           note: 'Message displayed in UI but not saved to DB - non-fatal'
         })
@@ -788,6 +870,11 @@ function MCPPage() {
     
     const userMessage = input.trim()
     setInput('')
+    
+    // Store the current thread ID for this conversation
+    conversationThreadRef.current = activeThreadId
+    console.log('[MCP] Starting conversation in thread:', conversationThreadRef.current)
+    
     await addMessage('user', userMessage)
     setLoading(true)
     setMcpError(null) // Clear any previous errors
@@ -1164,14 +1251,13 @@ function MCPPage() {
   )
 }
 
-// Wrap component with ErrorBoundary for comprehensive error handling
-function MCPPageWithErrorBoundary() {
-  return (
-    <ErrorBoundary>
-      <MCPPage />
-    </ErrorBoundary>
-  )
-}
+// Export wrapped component with ErrorBoundary
+// Using a stable export to prevent Fast Refresh issues
+const MCPPageWithErrorBoundary = () => (
+  <ErrorBoundary>
+    <MCPPage />
+  </ErrorBoundary>
+)
 
 export default MCPPageWithErrorBoundary
 
@@ -1268,12 +1354,42 @@ function MessageBubble({ message }: { message: Message }) {
   const isUser = message.role === 'user'
   const isSystem = message.role === 'system'
   const isTool = message.role === 'tool'
+  const isAssistant = message.role === 'assistant'
+  
+  // Check if content looks like an incomplete tool call
+  const isIncompleteToolCall = isAssistant && message.content && 
+    (message.content.includes('TOOL_CALL:') || message.content.startsWith('TOOL_CALL'))
 
   if (isSystem) {
     return (
       <div className="flex justify-center my-4">
         <div className="px-4 py-2 bg-blue-500/10 border border-blue-500/30 rounded-lg text-sm text-blue-300">
           {message.content}
+        </div>
+      </div>
+    )
+  }
+  
+  // Handle incomplete tool calls
+  if (isIncompleteToolCall) {
+    return (
+      <div className="flex justify-center my-4">
+        <div className="px-4 py-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg text-sm">
+          <div className="flex items-center gap-2 mb-2">
+            <WrenchScrewdriverIcon className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
+            <span className="font-semibold text-yellow-700 dark:text-yellow-300">Tool Call Incomplete</span>
+          </div>
+          <p className="text-yellow-600 dark:text-yellow-400 text-xs">
+            The AI started to call a tool but the response was truncated. Try asking again or being more specific.
+          </p>
+          <details className="mt-2">
+            <summary className="text-xs text-yellow-600 dark:text-yellow-400 cursor-pointer hover:underline">
+              Show raw output
+            </summary>
+            <pre className="mt-1 text-xs text-yellow-700 dark:text-yellow-300 whitespace-pre-wrap break-words">
+              {message.content}
+            </pre>
+          </details>
         </div>
       </div>
     )
@@ -1306,6 +1422,8 @@ function MessageBubble({ message }: { message: Message }) {
           )}
           {message.data ? (
             <JSONViewer data={message.data} defaultExpanded={!isSystem} />
+          ) : isAssistant ? (
+            <MarkdownContent content={message.content} />
           ) : (
             <div className="whitespace-pre-wrap leading-relaxed">{message.content}</div>
           )}

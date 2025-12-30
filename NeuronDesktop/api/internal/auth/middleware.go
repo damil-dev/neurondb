@@ -38,7 +38,7 @@ func Middleware(keyManager *APIKeyManager) func(http.Handler) http.Handler {
 			// Add API key info to context
 			ctx := context.WithValue(r.Context(), "api_key", apiKey)
 			ctx = context.WithValue(ctx, "user_id", apiKey.UserID)
-			
+
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
@@ -52,4 +52,3 @@ func GetAPIKeyFromContext(ctx context.Context) (*db.APIKey, bool) {
 
 // NOTE: GetUserIDFromContext is now in middleware_jwt.go for JWT authentication
 // This file is kept for API key functionality if needed for backwards compatibility
-

@@ -122,7 +122,11 @@ export default function SettingsPage() {
       models: [
         { name: 'llama2', displayName: 'Llama 2' },
         { name: 'llama2:13b', displayName: 'Llama 2 13B' },
+        { name: 'llama3:8b', displayName: 'Llama 3 8B' },
+        { name: 'llama3:70b', displayName: 'Llama 3 70B ⭐' },
         { name: 'mistral', displayName: 'Mistral' },
+        { name: 'mistral:7b', displayName: 'Mistral 7B' },
+        { name: 'mixtral:8x7b', displayName: 'Mixtral 8x7B' },
         { name: 'codellama', displayName: 'Code Llama' },
       ],
       requiresKey: false,

@@ -20,20 +20,39 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
       const isLoginPage = pathname === '/login'
       const isSetupPage = pathname === '/setup'
       
-      // Check authentication via API (cookie-based)
-      const isAuthenticated = await checkAuth()
+      // Add timeout to prevent infinite loading
+      const timeoutId = setTimeout(() => {
+        console.warn('AuthGuard: Authentication check timed out, allowing access')
+        setIsChecking(false)
+      }, 10000) // 10 second max wait
       
-      if (!isAuthenticated && !isLoginPage && !isSetupPage) {
-        router.push('/login')
-        return
+      try {
+        // Check authentication via API (cookie-based)
+        const isAuthenticated = await checkAuth()
+        
+        clearTimeout(timeoutId)
+        
+        if (!isAuthenticated && !isLoginPage && !isSetupPage) {
+          router.push('/login')
+          return
+        }
+        
+        if (isAuthenticated && isLoginPage) {
+          router.push('/')
+          return
+        }
+        
+        setIsChecking(false)
+      } catch (error) {
+        clearTimeout(timeoutId)
+        console.error('AuthGuard: Error during auth check', error)
+        // On error, allow access to login/setup pages, otherwise redirect to login
+        if (!isLoginPage && !isSetupPage) {
+          router.push('/login')
+        } else {
+          setIsChecking(false)
+        }
       }
-      
-      if (isAuthenticated && isLoginPage) {
-        router.push('/')
-        return
-      }
-      
-      setIsChecking(false)
     }
     
     checkAuthStatus()

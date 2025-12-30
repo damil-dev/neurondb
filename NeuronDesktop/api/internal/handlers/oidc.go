@@ -27,7 +27,7 @@ type OIDCHandlers struct {
 func NewOIDCHandlers(provider *oidc.Provider, sessionMgr *session.Manager, queries *db.Queries, issuer string) *OIDCHandlers {
 	return &OIDCHandlers{
 		provider:      provider,
-		sessionMgr:   sessionMgr,
+		sessionMgr:    sessionMgr,
 		queries:       queries,
 		issuer:        issuer,
 		loginAttempts: make(map[string]*oidc.LoginAttempt),
@@ -167,7 +167,7 @@ func (h *OIDCHandlers) OIDCCallback(w http.ResponseWriter, r *http.Request) {
 	if redirectURL == "" {
 		redirectURL = "/"
 	}
-	
+
 	// Add profile ID to redirect if available
 	if profileID != "" {
 		if strings.Contains(redirectURL, "?") {
@@ -176,7 +176,7 @@ func (h *OIDCHandlers) OIDCCallback(w http.ResponseWriter, r *http.Request) {
 			redirectURL += "?profile_id=" + profileID
 		}
 	}
-	
+
 	// For browser requests, redirect; for API clients, return JSON
 	acceptHeader := r.Header.Get("Accept")
 	if strings.Contains(acceptHeader, "text/html") || redirectURL != "/" {
@@ -331,4 +331,3 @@ func getClientIP(r *http.Request) string {
 	// Fall back to RemoteAddr
 	return r.RemoteAddr
 }
-

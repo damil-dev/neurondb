@@ -149,4 +149,3 @@ func GetDefaultNeuronDBDSN() string {
 	}
 	return fmt.Sprintf("postgresql://%s@%s:%s/%s", user, host, port, database)
 }
-

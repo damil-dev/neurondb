@@ -14,22 +14,22 @@ import (
 
 // SystemMetrics represents current system metrics
 type SystemMetrics struct {
-	Timestamp time.Time       `json:"timestamp"`
-	CPU       CPUMetrics      `json:"cpu"`
-	Memory    MemoryMetrics   `json:"memory"`
-	Disk      DiskMetrics     `json:"disk"`
-	Network   NetworkMetrics  `json:"network"`
-	Process   ProcessMetrics  `json:"process"`
-	GPU       GPUMetrics      `json:"gpu,omitempty"`
+	Timestamp time.Time      `json:"timestamp"`
+	CPU       CPUMetrics     `json:"cpu"`
+	Memory    MemoryMetrics  `json:"memory"`
+	Disk      DiskMetrics    `json:"disk"`
+	Network   NetworkMetrics `json:"network"`
+	Process   ProcessMetrics `json:"process"`
+	GPU       GPUMetrics     `json:"gpu,omitempty"`
 }
 
 // CPUMetrics contains CPU usage information
 type CPUMetrics struct {
-	UsagePercent    float64   `json:"usage_percent"`
-	UsagePerCore    []float64 `json:"usage_per_core,omitempty"`
-	Count           int       `json:"count"`
-	Frequency       float64   `json:"frequency,omitempty"`
-	Temperature     float64   `json:"temperature,omitempty"`
+	UsagePercent float64   `json:"usage_percent"`
+	UsagePerCore []float64 `json:"usage_per_core,omitempty"`
+	Count        int       `json:"count"`
+	Frequency    float64   `json:"frequency,omitempty"`
+	Temperature  float64   `json:"temperature,omitempty"`
 }
 
 // MemoryMetrics contains memory usage information
@@ -57,18 +57,18 @@ type DiskMetrics struct {
 
 // NetworkMetrics contains network usage information
 type NetworkMetrics struct {
-	BytesSent     uint64 `json:"bytes_sent"`
-	BytesRecv     uint64 `json:"bytes_recv"`
-	PacketsSent   uint64 `json:"packets_sent"`
-	PacketsRecv   uint64 `json:"packets_recv"`
+	BytesSent     uint64  `json:"bytes_sent"`
+	BytesRecv     uint64  `json:"bytes_recv"`
+	PacketsSent   uint64  `json:"packets_sent"`
+	PacketsRecv   uint64  `json:"packets_recv"`
 	BytesSentRate float64 `json:"bytes_sent_rate,omitempty"`
 	BytesRecvRate float64 `json:"bytes_recv_rate,omitempty"`
 }
 
 // ProcessMetrics contains process information
 type ProcessMetrics struct {
-	Count      int   `json:"count"`
-	GoRoutines int   `json:"go_routines"`
+	Count      int    `json:"count"`
+	GoRoutines int    `json:"go_routines"`
 	HeapAlloc  uint64 `json:"heap_alloc"`
 	HeapSys    uint64 `json:"heap_sys"`
 	HeapIdle   uint64 `json:"heap_idle"`
@@ -77,11 +77,11 @@ type ProcessMetrics struct {
 
 // GPUMetrics contains GPU usage information (if available)
 type GPUMetrics struct {
-	Available bool    `json:"available"`
-	Count     int     `json:"count,omitempty"`
-	Usage     []float64 `json:"usage,omitempty"`
-	Memory    []GPUMemory `json:"memory,omitempty"`
-	Temperature []float64 `json:"temperature,omitempty"`
+	Available   bool        `json:"available"`
+	Count       int         `json:"count,omitempty"`
+	Usage       []float64   `json:"usage,omitempty"`
+	Memory      []GPUMemory `json:"memory,omitempty"`
+	Temperature []float64   `json:"temperature,omitempty"`
 }
 
 // GPUMemory contains GPU memory information
@@ -209,4 +209,3 @@ func GetMetricsJSON(ctx context.Context) (string, error) {
 	}
 	return string(data), nil
 }
-

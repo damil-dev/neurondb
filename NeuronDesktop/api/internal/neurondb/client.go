@@ -23,16 +23,16 @@ func NewClient(dsn string) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
-	
+
 	// Test connection
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	
+
 	if err := db.PingContext(ctx); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
-	
+
 	return &Client{db: db}, nil
 }
 
@@ -77,13 +77,13 @@ func (c *Client) ListCollections(ctx context.Context) ([]CollectionInfo, error) 
 		     AND udt_name = 'vector') > 0
 		ORDER BY schemaname, tablename
 	`
-	
+
 	rows, err := c.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query collections: %w", err)
 	}
 	defer rows.Close()
-	
+
 	var collections []CollectionInfo
 	for rows.Next() {
 		var schema, table string
@@ -91,20 +91,20 @@ func (c *Client) ListCollections(ctx context.Context) ([]CollectionInfo, error) 
 		if err := rows.Scan(&schema, &table, &hasVector); err != nil {
 			continue
 		}
-		
+
 		if !hasVector {
 			continue
 		}
-		
+
 		// Get vector column name
 		vectorCol, err := c.getVectorColumn(ctx, schema, table)
 		if err != nil {
 			continue
 		}
-		
+
 		// Get indexes
 		indexes, _ := c.getIndexes(ctx, schema, table)
-		
+
 		// Get row count (schema and table are from system tables, safe)
 		var rowCount int64
 		if err := validateIdentifier(schema); err != nil {
@@ -113,10 +113,10 @@ func (c *Client) ListCollections(ctx context.Context) ([]CollectionInfo, error) 
 		if err := validateIdentifier(table); err != nil {
 			continue
 		}
-		countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM %s.%s`, 
+		countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM %s.%s`,
 			quoteIdentifier(schema), quoteIdentifier(table))
 		c.db.QueryRowContext(ctx, countQuery).Scan(&rowCount)
-		
+
 		collections = append(collections, CollectionInfo{
 			Name:      table,
 			Schema:    schema,
@@ -125,7 +125,7 @@ func (c *Client) ListCollections(ctx context.Context) ([]CollectionInfo, error) 
 			RowCount:  rowCount,
 		})
 	}
-	
+
 	return collections, nil
 }
 
@@ -139,7 +139,7 @@ func (c *Client) getVectorColumn(ctx context.Context, schema, table string) (str
 		AND udt_name = 'vector'
 		LIMIT 1
 	`
-	
+
 	var colName string
 	err := c.db.QueryRowContext(ctx, query, schema, table).Scan(&colName)
 	return colName, err
@@ -160,13 +160,13 @@ func (c *Client) getIndexes(ctx context.Context, schema, table string) ([]IndexI
 		AND i.tablename = $2
 		ORDER BY i.indexname
 	`
-	
+
 	rows, err := c.db.QueryContext(ctx, query, schema, table)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	
+
 	var indexes []IndexInfo
 	for rows.Next() {
 		var idx IndexInfo
@@ -175,26 +175,26 @@ func (c *Client) getIndexes(ctx context.Context, schema, table string) ([]IndexI
 		}
 		indexes = append(indexes, idx)
 	}
-	
+
 	return indexes, nil
 }
 
 // SearchRequest represents a vector search request
 type SearchRequest struct {
-	Collection    string                 `json:"collection"`
-	Schema        string                 `json:"schema,omitempty"`
-	QueryVector   []float32              `json:"query_vector"`
-	QueryText     string                 `json:"query_text,omitempty"` // For hybrid search
-	Limit         int                    `json:"limit,omitempty"`
-	Filter        map[string]interface{} `json:"filter,omitempty"`
-	DistanceType  string                 `json:"distance_type,omitempty"` // l2, cosine, inner_product
+	Collection   string                 `json:"collection"`
+	Schema       string                 `json:"schema,omitempty"`
+	QueryVector  []float32              `json:"query_vector"`
+	QueryText    string                 `json:"query_text,omitempty"` // For hybrid search
+	Limit        int                    `json:"limit,omitempty"`
+	Filter       map[string]interface{} `json:"filter,omitempty"`
+	DistanceType string                 `json:"distance_type,omitempty"` // l2, cosine, inner_product
 }
 
 // SearchResult represents a single search result
 type SearchResult struct {
 	ID       interface{}            `json:"id"`
-	Score    float64               `json:"score"`
-	Distance float64               `json:"distance"`
+	Score    float64                `json:"score"`
+	Distance float64                `json:"distance"`
 	Data     map[string]interface{} `json:"data"`
 }
 
@@ -209,7 +209,7 @@ func (c *Client) Search(ctx context.Context, req SearchRequest) ([]SearchResult,
 	if req.DistanceType == "" {
 		req.DistanceType = "cosine"
 	}
-	
+
 	// Validate identifiers (prevent SQL injection)
 	if err := validateIdentifier(req.Schema); err != nil {
 		return nil, fmt.Errorf("invalid schema name: %w", err)
@@ -217,21 +217,21 @@ func (c *Client) Search(ctx context.Context, req SearchRequest) ([]SearchResult,
 	if err := validateIdentifier(req.Collection); err != nil {
 		return nil, fmt.Errorf("invalid collection name: %w", err)
 	}
-	
+
 	// Get vector column (validates collection exists)
 	vectorCol, err := c.getVectorColumn(ctx, req.Schema, req.Collection)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find vector column: %w", err)
 	}
-	
+
 	// Validate vector column name
 	if err := validateIdentifier(vectorCol); err != nil {
 		return nil, fmt.Errorf("invalid vector column name: %w", err)
 	}
-	
+
 	// Convert query vector to SQL array format (safe - numeric array)
 	vectorStr := formatVector(req.QueryVector)
-	
+
 	// Build distance operator (safe - hardcoded values)
 	var distanceOp string
 	switch req.DistanceType {
@@ -244,7 +244,7 @@ func (c *Client) Search(ctx context.Context, req SearchRequest) ([]SearchResult,
 	default:
 		distanceOp = "<=>" // Default to cosine
 	}
-	
+
 	// Build query with validated identifiers
 	// Note: vectorStr is generated from numeric array, so safe to interpolate
 	// Identifiers are validated above, so safe to use in query
@@ -255,22 +255,22 @@ func (c *Client) Search(ctx context.Context, req SearchRequest) ([]SearchResult,
 		FROM %s
 		ORDER BY %s %s %s::vector
 		LIMIT $1
-	`, quoteIdentifier(vectorCol), distanceOp, vectorStr, tableName, 
+	`, quoteIdentifier(vectorCol), distanceOp, vectorStr, tableName,
 		quoteIdentifier(vectorCol), distanceOp, vectorStr)
-	
+
 	// Execute query (limit is parameterized, vector is safe numeric string)
 	rows, err := c.db.QueryContext(ctx, query, req.Limit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute search: %w", err)
 	}
 	defer rows.Close()
-	
+
 	// Get column names
 	columns, err := rows.Columns()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get columns: %w", err)
 	}
-	
+
 	var results []SearchResult
 	for rows.Next() {
 		// Create slice to hold values
@@ -279,19 +279,19 @@ func (c *Client) Search(ctx context.Context, req SearchRequest) ([]SearchResult,
 		for i := range values {
 			valuePtrs[i] = &values[i]
 		}
-		
+
 		if err := rows.Scan(valuePtrs...); err != nil {
 			continue
 		}
-		
+
 		// Build result map
 		result := SearchResult{
 			Data: make(map[string]interface{}),
 		}
-		
+
 		for i, col := range columns {
 			val := values[i]
-			
+
 			if col == "distance" {
 				if d, ok := val.(float64); ok {
 					result.Distance = d
@@ -318,10 +318,10 @@ func (c *Client) Search(ctx context.Context, req SearchRequest) ([]SearchResult,
 				}
 			}
 		}
-		
+
 		results = append(results, result)
 	}
-	
+
 	return results, nil
 }
 
@@ -330,29 +330,29 @@ func (c *Client) ExecuteSQL(ctx context.Context, query string) (interface{}, err
 	// Guardrails: prevent dangerous operations
 	queryUpper := strings.ToUpper(strings.TrimSpace(query))
 	dangerous := []string{"DROP", "TRUNCATE", "DELETE", "UPDATE", "ALTER", "CREATE", "GRANT", "REVOKE"}
-	
+
 	for _, keyword := range dangerous {
 		if strings.Contains(queryUpper, keyword) {
 			return nil, fmt.Errorf("dangerous SQL operation not allowed: %s", keyword)
 		}
 	}
-	
+
 	// Only allow SELECT statements
 	if !strings.HasPrefix(queryUpper, "SELECT") {
 		return nil, fmt.Errorf("only SELECT queries are allowed")
 	}
-	
+
 	rows, err := c.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("SQL execution failed: %w", err)
 	}
 	defer rows.Close()
-	
+
 	columns, err := rows.Columns()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get columns: %w", err)
 	}
-	
+
 	var results []map[string]interface{}
 	for rows.Next() {
 		values := make([]interface{}, len(columns))
@@ -360,11 +360,11 @@ func (c *Client) ExecuteSQL(ctx context.Context, query string) (interface{}, err
 		for i := range values {
 			valuePtrs[i] = &values[i]
 		}
-		
+
 		if err := rows.Scan(valuePtrs...); err != nil {
 			continue
 		}
-		
+
 		row := make(map[string]interface{})
 		for i, col := range columns {
 			val := values[i]
@@ -381,7 +381,7 @@ func (c *Client) ExecuteSQL(ctx context.Context, query string) (interface{}, err
 		}
 		results = append(results, row)
 	}
-	
+
 	return results, nil
 }
 
@@ -390,7 +390,7 @@ func (c *Client) ExecuteSQL(ctx context.Context, query string) (interface{}, err
 // Use with extreme caution - no safety checks are performed
 func (c *Client) ExecuteSQLFull(ctx context.Context, query string) (interface{}, error) {
 	queryUpper := strings.ToUpper(strings.TrimSpace(query))
-	
+
 	// Check if it's a SELECT query (return results)
 	if strings.HasPrefix(queryUpper, "SELECT") {
 		rows, err := c.db.QueryContext(ctx, query)
@@ -398,24 +398,25 @@ func (c *Client) ExecuteSQLFull(ctx context.Context, query string) (interface{},
 			return nil, fmt.Errorf("SQL execution failed: %w", err)
 		}
 		defer rows.Close()
-		
+
 		columns, err := rows.Columns()
 		if err != nil {
 			return nil, fmt.Errorf("failed to get columns: %w", err)
 		}
-		
-		var results []map[string]interface{}
+
+		// Initialize as empty array instead of nil to ensure JSON serialization as []
+		results := make([]map[string]interface{}, 0)
 		for rows.Next() {
 			values := make([]interface{}, len(columns))
 			valuePtrs := make([]interface{}, len(columns))
 			for i := range values {
 				valuePtrs[i] = &values[i]
 			}
-			
+
 			if err := rows.Scan(valuePtrs...); err != nil {
 				continue
 			}
-			
+
 			row := make(map[string]interface{})
 			for i, col := range columns {
 				val := values[i]
@@ -432,22 +433,22 @@ func (c *Client) ExecuteSQLFull(ctx context.Context, query string) (interface{},
 			}
 			results = append(results, row)
 		}
-		
+
 		return results, nil
 	}
-	
+
 	// For non-SELECT queries (INSERT, UPDATE, DELETE, CREATE, etc.)
 	// Execute the query and return affected rows count
 	result, err := c.db.ExecContext(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("SQL execution failed: %w", err)
 	}
-	
+
 	rowsAffected, _ := result.RowsAffected()
-	
+
 	return map[string]interface{}{
 		"rows_affected": rowsAffected,
-		"message": "Query executed successfully",
+		"message":       "Query executed successfully",
 	}, nil
 }
 
@@ -481,4 +482,3 @@ func formatVector(vec []float32) string {
 	}
 	return "[" + strings.Join(parts, ",") + "]"
 }
-

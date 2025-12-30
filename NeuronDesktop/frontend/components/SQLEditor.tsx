@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import CodeMirror from '@uiw/react-codemirror'
-import { sql } from '@codemirror/lang-sql'
+import { sql, PostgreSQL } from '@codemirror/lang-sql'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { EditorView } from '@codemirror/view'
 
@@ -44,7 +44,7 @@ export default function SQLEditor({
   // PostgreSQL-specific SQL configuration
   const extensions = [
     sql({
-      dialect: 'postgresql', // Use PostgreSQL dialect for proper syntax highlighting
+      dialect: PostgreSQL, // Use PostgreSQL dialect for proper syntax highlighting
       upperCaseKeywords: false, // Keep keywords in their original case
     }),
     EditorView.lineWrapping, // Enable line wrapping

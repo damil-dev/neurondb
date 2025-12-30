@@ -125,11 +125,20 @@ export default function NeuronDBPage() {
       console.log('SQL execution response:', response)
       console.log('SQL execution data:', response.data)
       
-      if (response.data !== undefined && response.data !== null) {
-        setSqlResults(response.data)
-      } else {
-        throw new Error('Invalid response: data is undefined or null')
+      // Handle the response properly
+      let resultData = response.data
+      
+      // If data is null or undefined, check if response itself has the data
+      if (resultData === null || resultData === undefined) {
+        // For empty SELECT results, show empty array
+        if (sqlQuery.trim().toUpperCase().startsWith('SELECT')) {
+          resultData = []
+        } else {
+          throw new Error('No data returned from server')
+        }
       }
+      
+      setSqlResults(resultData)
       
       // Add to history (keep last 20)
       setSqlHistory(prev => {

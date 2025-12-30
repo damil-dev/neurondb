@@ -37,18 +37,18 @@ func keys(m map[string]interface{}) []string {
 func (h *MCPHandlers) MCPWebSocket(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	profileID := vars["profile_id"]
-	
+
 	log.Printf("WebSocket upgrade attempt for profile: %s", profileID)
-	
+
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Printf("WebSocket upgrade failed: %v", err)
 		return
 	}
 	defer conn.Close()
-	
+
 	log.Printf("WebSocket connection established for profile: %s", profileID)
-	
+
 	// Get MCP client with detailed error handling
 	client, err := h.GetMCPManager().GetClient(r.Context(), profileID)
 	if err != nil {
@@ -59,7 +59,7 @@ func (h *MCPHandlers) MCPWebSocket(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	
+
 	// Verify client is alive
 	if !client.IsAlive() {
 		conn.WriteJSON(map[string]interface{}{
@@ -68,13 +68,13 @@ func (h *MCPHandlers) MCPWebSocket(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	
+
 	// Send connection confirmation
 	conn.WriteJSON(map[string]interface{}{
 		"type":    "connected",
 		"message": "Connected to MCP server successfully",
 	})
-	
+
 	// Read messages from WebSocket and forward to MCP
 	go func() {
 		for {
@@ -85,16 +85,16 @@ func (h *MCPHandlers) MCPWebSocket(w http.ResponseWriter, r *http.Request) {
 				}
 				break
 			}
-			
+
 			log.Printf("WebSocket received message: type=%v", msg["type"])
-			
+
 			// Handle different message types (MCP protocol like Claude Desktop)
 			msgType, _ := msg["type"].(string)
 			switch msgType {
 			case "tool_call":
 				name, _ := msg["name"].(string)
 				args, _ := msg["arguments"].(map[string]interface{})
-				
+
 				result, err := client.CallTool(name, args)
 				if err != nil {
 					conn.WriteJSON(map[string]interface{}{
@@ -193,9 +193,9 @@ func (h *MCPHandlers) MCPWebSocket(w http.ResponseWriter, r *http.Request) {
 				// Chat messages using MCP sampling/createMessage (like Claude Desktop)
 				content, _ := msg["content"].(string)
 				modelID, _ := msg["model_id"].(string)
-				
+
 				log.Printf("Chat request: content=%q, modelID=%s", content, modelID)
-				
+
 				if content == "" {
 					log.Printf("Error: Empty content")
 					conn.WriteJSON(map[string]interface{}{
@@ -204,7 +204,7 @@ func (h *MCPHandlers) MCPWebSocket(w http.ResponseWriter, r *http.Request) {
 					})
 					continue
 				}
-				
+
 				if modelID == "" {
 					log.Printf("Error: Empty modelID")
 					conn.WriteJSON(map[string]interface{}{
@@ -213,7 +213,7 @@ func (h *MCPHandlers) MCPWebSocket(w http.ResponseWriter, r *http.Request) {
 					})
 					continue
 				}
-				
+
 				// Get model configuration to extract model name
 				log.Printf("Getting model config for ID: %s", modelID)
 				modelConfig, err := h.mcpManager.queries.GetModelConfig(r.Context(), modelID, false)
@@ -225,9 +225,9 @@ func (h *MCPHandlers) MCPWebSocket(w http.ResponseWriter, r *http.Request) {
 					})
 					continue
 				}
-				
+
 				log.Printf("Model config retrieved: name=%s", modelConfig.ModelName)
-				
+
 				// Build messages array for MCP protocol
 				messages := []map[string]interface{}{
 					{
@@ -235,7 +235,7 @@ func (h *MCPHandlers) MCPWebSocket(w http.ResponseWriter, r *http.Request) {
 						"content": content,
 					},
 				}
-				
+
 				// Call MCP sampling/createMessage with model name (not ID)
 				log.Printf("Calling MCP CreateMessage with model=%s", modelConfig.ModelName)
 				result, err := client.CreateMessage(messages, modelConfig.ModelName, 0.7)
@@ -247,9 +247,9 @@ func (h *MCPHandlers) MCPWebSocket(w http.ResponseWriter, r *http.Request) {
 					})
 					continue
 				}
-				
+
 				log.Printf("MCP CreateMessage result type: %T, value: %+v", result, result)
-				
+
 				// Parse MCP response and forward to client
 				// The response can be in multiple formats:
 				// 1. Direct CreateMessageResponse with "content" as string
@@ -264,9 +264,9 @@ func (h *MCPHandlers) MCPWebSocket(w http.ResponseWriter, r *http.Request) {
 					})
 					continue
 				}
-				
+
 				var responseText string
-				
+
 				// Try content as array of content blocks (middleware format)
 				if contentBlocks, ok := resultMap["content"].([]interface{}); ok {
 					for _, block := range contentBlocks {
@@ -311,7 +311,7 @@ func (h *MCPHandlers) MCPWebSocket(w http.ResponseWriter, r *http.Request) {
 						responseText = fmt.Sprintf("%v", result)
 					}
 				}
-				
+
 				if responseText == "" {
 					log.Printf("Empty response text from result: %+v", resultMap)
 					conn.WriteJSON(map[string]interface{}{
@@ -320,7 +320,7 @@ func (h *MCPHandlers) MCPWebSocket(w http.ResponseWriter, r *http.Request) {
 					})
 					continue
 				}
-				
+
 				log.Printf("Sending assistant response: %s", responseText[:min(100, len(responseText))])
 				conn.WriteJSON(map[string]interface{}{
 					"type":    "assistant",
@@ -337,11 +337,11 @@ func (h *MCPHandlers) MCPWebSocket(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}()
-	
+
 	// Keep connection alive
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-ticker.C:
@@ -359,19 +359,19 @@ func (h *AgentHandlers) AgentWebSocket(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	profileID := vars["profile_id"]
 	sessionID := r.URL.Query().Get("session_id")
-	
+
 	if sessionID == "" {
 		http.Error(w, "session_id required", http.StatusBadRequest)
 		return
 	}
-	
+
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Printf("WebSocket upgrade failed: %v", err)
 		return
 	}
 	defer conn.Close()
-	
+
 	// Get profile to construct URL
 	profile, err := h.GetQueries().GetProfile(r.Context(), profileID)
 	if err != nil {
@@ -388,7 +388,7 @@ func (h *AgentHandlers) AgentWebSocket(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	
+
 	agentWSURL := profile.AgentEndpoint + "/ws?session_id=" + sessionID
 	agentConn, _, err := websocket.DefaultDialer.Dial(agentWSURL, http.Header{
 		"Authorization": []string{"Bearer " + profile.AgentAPIKey},
@@ -401,7 +401,7 @@ func (h *AgentHandlers) AgentWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer agentConn.Close()
-	
+
 	// Proxy messages both ways
 	go func() {
 		for {
@@ -412,7 +412,7 @@ func (h *AgentHandlers) AgentWebSocket(w http.ResponseWriter, r *http.Request) {
 			agentConn.WriteJSON(msg)
 		}
 	}()
-	
+
 	for {
 		var msg map[string]interface{}
 		if err := agentConn.ReadJSON(&msg); err != nil {
@@ -421,4 +421,3 @@ func (h *AgentHandlers) AgentWebSocket(w http.ResponseWriter, r *http.Request) {
 		conn.WriteJSON(msg)
 	}
 }
-

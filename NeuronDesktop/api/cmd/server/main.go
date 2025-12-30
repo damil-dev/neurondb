@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"net/http"
 	"os"
@@ -24,14 +25,63 @@ import (
 	"github.com/neurondb/NeuronDesktop/api/internal/session"
 )
 
+var (
+	version   = "dev"
+	buildDate = "unknown"
+	gitCommit = "unknown"
+)
+
 func main() {
+	var (
+		showVersion = flag.Bool("version", false, "Show version information")
+		showVersionShort = flag.Bool("v", false, "Show version information (short)")
+		configPath  = flag.String("c", "", "Path to configuration file (currently configuration is loaded from environment variables)")
+		configPathLong = flag.String("config", "", "Path to configuration file (currently configuration is loaded from environment variables)")
+		showHelp    = flag.Bool("help", false, "Show help message")
+		showHelpShort = flag.Bool("h", false, "Show help message (short)")
+	)
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: %s [OPTIONS]\n\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "NeuronDesktop API Server - Desktop application API server for NeuronDB\n\n")
+		fmt.Fprintf(os.Stderr, "Options:\n")
+		flag.PrintDefaults()
+		fmt.Fprintf(os.Stderr, "\nExamples:\n")
+		fmt.Fprintf(os.Stderr, "  %s                    Start server with default configuration\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s --version          Show version information\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s --help             Show this help message\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "\nConfiguration:\n")
+		fmt.Fprintf(os.Stderr, "  Configuration is currently loaded from environment variables.\n")
+		fmt.Fprintf(os.Stderr, "  See the config package for available environment variables.\n")
+		fmt.Fprintf(os.Stderr, "  Note: Config file support is planned for a future release.\n")
+	}
+	flag.Parse()
+
+	/* Handle version flag */
+	if *showVersion || *showVersionShort {
+		fmt.Printf("neurondesktop version %s\n", version)
+		fmt.Printf("Build date: %s\n", buildDate)
+		fmt.Printf("Git commit: %s\n", gitCommit)
+		os.Exit(0)
+	}
+
+	/* Handle help flag */
+	if *showHelp || *showHelpShort {
+		flag.Usage()
+		os.Exit(0)
+	}
+
+	/* Note: Config file path is accepted but not yet implemented */
+	if *configPath != "" || *configPathLong != "" {
+		fmt.Fprintf(os.Stderr, "Warning: Config file support is not yet implemented. Using environment variables for configuration.\n")
+	}
+
 	// Load configuration
 	cfg := config.Load()
-	
+
 	// Initialize logger
 	logger := logging.NewLogger(cfg.Logging.Level, cfg.Logging.Format, cfg.Logging.Output)
 	logger.Info("Starting NeuronDesktop API server", nil)
-	
+
 	// Connect to database
 	database, err := sql.Open("pgx", cfg.Database.DSN())
 	if err != nil {
@@ -39,31 +89,31 @@ func main() {
 		os.Exit(1)
 	}
 	defer database.Close()
-	
+
 	// Configure connection pool
 	database.SetMaxOpenConns(cfg.Database.MaxOpenConns)
 	database.SetMaxIdleConns(cfg.Database.MaxIdleConns)
 	database.SetConnMaxLifetime(cfg.Database.ConnMaxLifetime)
-	
+
 	// Test connection
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	
+
 	if err := database.PingContext(ctx); err != nil {
 		logger.Error("Failed to ping database", err, nil)
 		os.Exit(1)
 	}
-	
+
 	logger.Info("Connected to database", map[string]interface{}{
 		"host": cfg.Database.Host,
 		"port": cfg.Database.Port,
 		"name": cfg.Database.Name,
 	})
-	
+
 	// Initialize components
 	queries := db.NewQueries(database)
 	keyManager := auth.NewAPIKeyManager(queries) // Keep for backwards compatibility if needed
-	
+
 	// Validate JWT secret if JWT mode is enabled
 	if cfg.Auth.Mode == "jwt" || cfg.Auth.Mode == "hybrid" {
 		if cfg.Auth.JWTSecret == "" {
@@ -71,7 +121,7 @@ func main() {
 			os.Exit(1)
 		}
 	}
-	
+
 	// Initialize session manager
 	sessionMgr := session.NewManager(
 		database,
@@ -81,7 +131,7 @@ func main() {
 		cfg.Session.CookieSecure,
 		cfg.Session.CookieSameSite,
 	)
-	
+
 	// Initialize OIDC provider if configured
 	var oidcProvider *oidc.Provider
 	var oidcHandlers *handlers.OIDCHandlers
@@ -107,17 +157,17 @@ func main() {
 			}
 		}
 	}
-	
+
 	// Bootstrap application (admin user, default profile, schema, connections)
 	initCtx, initCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer initCancel()
-	
+
 	bootstrap := initialization.NewBootstrap(queries, logger)
 	if err := bootstrap.Initialize(initCtx); err != nil {
 		logger.Error("Failed to bootstrap application", err, nil)
 		// Continue anyway - some features may still work
 	}
-	
+
 	// Initialize handlers
 	authHandlers := handlers.NewAuthHandlers(queries)
 	mcpManager := handlers.NewMCPManager(queries)
@@ -128,36 +178,36 @@ func main() {
 	metricsHandlers := handlers.NewMetricsHandlers()
 	factoryHandlers := handlers.NewFactoryHandlers(queries)
 	systemMetricsHandlers := handlers.NewSystemMetricsHandlers(logger)
-	
+
 	// Initialize rate limiter (increased for development - 10000 requests per minute)
 	rateLimiter := middleware.NewRateLimiter(10000, 1*time.Minute)
-	
+
 	// Setup router
 	router := mux.NewRouter()
-	
+
 	// Apply middleware (order matters)
 	router.Use(middleware.RequestIDMiddleware())
 	router.Use(middleware.RecoveryMiddleware(logger))
 	router.Use(middleware.LoggingMiddleware(logger))
-	
+
 	// Health check (no auth)
 	router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
-			"status": "ok",
-			"service": "neurondesk-api",
+			"status":    "ok",
+			"service":   "neurondesk-api",
 			"timestamp": time.Now().UTC().Format(time.RFC3339),
 		})
 	}).Methods("GET")
-	
+
 	// System metrics endpoints (no auth, public)
 	systemMetricsRouter := router.PathPrefix("/api/v1/system-metrics").Subrouter()
 	systemMetricsRouter.HandleFunc("", systemMetricsHandlers.GetSystemMetrics).Methods("GET")
 	systemMetricsRouter.HandleFunc("/ws", systemMetricsHandlers.SystemMetricsWebSocket).Methods("GET")
-	
+
 	// Database test handler (no auth required)
 	databaseTestHandlers := handlers.NewDatabaseTestHandlers()
-	
+
 	// Auth routes (no auth required)
 	authRouter := router.PathPrefix("/api/v1/auth").Subrouter()
 	// Handle OPTIONS for CORS preflight on auth routes
@@ -177,14 +227,14 @@ func main() {
 			authHandlers.Login(w, r)
 		}).Methods("POST", "OPTIONS")
 	}
-	
+
 	// OIDC routes
 	if oidcHandlers != nil {
 		authRouter.HandleFunc("/oidc/start", oidcHandlers.StartOIDCFlow).Methods("GET")
 		authRouter.HandleFunc("/oidc/callback", oidcHandlers.OIDCCallback).Methods("GET")
 		authRouter.HandleFunc("/refresh", oidcHandlers.RefreshToken).Methods("POST")
 	}
-	
+
 	// Logout route (requires auth)
 	authRouter.HandleFunc("/logout", func(w http.ResponseWriter, r *http.Request) {
 		if oidcHandlers != nil {
@@ -194,7 +244,7 @@ func main() {
 			handlers.WriteSuccess(w, map[string]interface{}{"message": "logged out"}, http.StatusOK)
 		}
 	}).Methods("POST")
-	
+
 	// Database test route (no auth required)
 	// Handle OPTIONS for CORS preflight
 	router.HandleFunc("/api/v1/database/test", func(w http.ResponseWriter, r *http.Request) {
@@ -204,10 +254,10 @@ func main() {
 		}
 		databaseTestHandlers.TestConnection(w, r)
 	}).Methods("POST", "OPTIONS")
-	
+
 	// API routes (with auth and rate limiting)
 	apiRouter := router.PathPrefix("/api/v1").Subrouter()
-	
+
 	// Use session middleware if OIDC is enabled, otherwise JWT
 	if cfg.Auth.Mode == "oidc" && oidcHandlers != nil {
 		apiRouter.Use(sessionMgr.SessionMiddleware())
@@ -228,18 +278,18 @@ func main() {
 		// JWT only mode
 		apiRouter.Use(auth.JWTMiddleware())
 	}
-	
+
 	apiRouter.Use(middleware.RateLimitMiddleware(rateLimiter))
-	
+
 	// Current user endpoint
 	apiRouter.HandleFunc("/auth/me", authHandlers.GetCurrentUser).Methods("GET")
-	
+
 	// API Key routes
 	apiKeyHandlers := handlers.NewAPIKeyHandlers(keyManager, queries)
 	apiRouter.HandleFunc("/api-keys", apiKeyHandlers.GenerateAPIKey).Methods("POST")
 	apiRouter.HandleFunc("/api-keys", apiKeyHandlers.ListAPIKeys).Methods("GET")
 	apiRouter.HandleFunc("/api-keys/{id}", apiKeyHandlers.DeleteAPIKey).Methods("DELETE")
-	
+
 	// Profile routes (with OPTIONS support for CORS)
 	apiRouter.HandleFunc("/profiles", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "OPTIONS" {
@@ -265,14 +315,14 @@ func main() {
 			profileHandlers.DeleteProfile(w, r)
 		}
 	}).Methods("GET", "PUT", "DELETE", "OPTIONS")
-	
+
 	// MCP routes
 	apiRouter.HandleFunc("/mcp/connections", mcpHandlers.ListConnections).Methods("GET")
 	apiRouter.HandleFunc("/mcp/test", mcpHandlers.TestMCPConfig).Methods("POST")
 	apiRouter.HandleFunc("/profiles/{profile_id}/mcp/tools", mcpHandlers.ListTools).Methods("GET")
 	apiRouter.HandleFunc("/profiles/{profile_id}/mcp/tools/call", mcpHandlers.CallTool).Methods("POST")
 	apiRouter.HandleFunc("/profiles/{profile_id}/mcp/ws", mcpHandlers.MCPWebSocket).Methods("GET")
-	
+
 	// MCP Chat Thread routes
 	apiRouter.HandleFunc("/profiles/{profile_id}/mcp/threads", mcpHandlers.ListThreads).Methods("GET")
 	apiRouter.HandleFunc("/profiles/{profile_id}/mcp/threads", mcpHandlers.CreateThread).Methods("POST")
@@ -280,7 +330,7 @@ func main() {
 	apiRouter.HandleFunc("/profiles/{profile_id}/mcp/threads/{thread_id}", mcpHandlers.UpdateThread).Methods("PUT")
 	apiRouter.HandleFunc("/profiles/{profile_id}/mcp/threads/{thread_id}", mcpHandlers.DeleteThread).Methods("DELETE")
 	apiRouter.HandleFunc("/profiles/{profile_id}/mcp/threads/{thread_id}/messages", mcpHandlers.AddMessage).Methods("POST")
-	
+
 	// NeuronDB routes
 	apiRouter.HandleFunc("/profiles/{profile_id}/neurondb/collections", neurondbHandlers.ListCollections).Methods("GET")
 	apiRouter.HandleFunc("/profiles/{profile_id}/neurondb/search", neurondbHandlers.Search).Methods("POST")
@@ -292,7 +342,7 @@ func main() {
 		}
 		neurondbHandlers.ExecuteSQLFull(w, r)
 	}).Methods("POST", "OPTIONS")
-	
+
 	// Agent routes
 	apiRouter.HandleFunc("/agent/test", agentHandlers.TestAgentConfig).Methods("POST")
 	apiRouter.HandleFunc("/profiles/{profile_id}/agent/agents", agentHandlers.ListAgents).Methods("GET")
@@ -305,7 +355,7 @@ func main() {
 	apiRouter.HandleFunc("/profiles/{profile_id}/agent/sessions/{session_id}/messages", agentHandlers.SendMessage).Methods("POST")
 	apiRouter.HandleFunc("/profiles/{profile_id}/agent/sessions/{session_id}/messages", agentHandlers.GetMessages).Methods("GET")
 	apiRouter.HandleFunc("/profiles/{profile_id}/agent/ws", agentHandlers.AgentWebSocket).Methods("GET")
-	
+
 	// Model configuration routes
 	modelConfigHandlers := handlers.NewModelConfigHandlers(queries)
 	apiRouter.HandleFunc("/profiles/{profile_id}/models", modelConfigHandlers.ListModelConfigs).Methods("GET")
@@ -314,16 +364,16 @@ func main() {
 	apiRouter.HandleFunc("/profiles/{profile_id}/models/{id}", modelConfigHandlers.DeleteModelConfig).Methods("DELETE")
 	apiRouter.HandleFunc("/profiles/{profile_id}/models/default", modelConfigHandlers.GetDefaultModelConfig).Methods("GET")
 	apiRouter.HandleFunc("/profiles/{profile_id}/models/{id}/set-default", modelConfigHandlers.SetDefaultModelConfig).Methods("POST")
-	
+
 	// Metrics endpoints (no rate limit)
 	apiRouter.HandleFunc("/metrics", metricsHandlers.GetMetrics).Methods("GET")
 	apiRouter.HandleFunc("/metrics/reset", metricsHandlers.ResetMetrics).Methods("POST")
-	
+
 	// Factory endpoints
 	apiRouter.HandleFunc("/factory/status", factoryHandlers.GetFactoryStatus).Methods("GET")
 	apiRouter.HandleFunc("/factory/setup-state", factoryHandlers.GetSetupState).Methods("GET")
 	apiRouter.HandleFunc("/factory/setup-state", factoryHandlers.SetSetupState).Methods("POST")
-	
+
 	// CORS handler wrapper
 	//
 	// Important: we wrap the router at the HTTP handler level (instead of router.Use),
@@ -384,7 +434,7 @@ func main() {
 
 		router.ServeHTTP(w, r)
 	})
-	
+
 	// Create HTTP server
 	addr := cfg.Server.Host + ":" + cfg.Server.Port
 	srv := &http.Server{
@@ -393,7 +443,7 @@ func main() {
 		ReadTimeout:  cfg.Server.ReadTimeout,
 		WriteTimeout: cfg.Server.WriteTimeout,
 	}
-	
+
 	// Start server in goroutine
 	go func() {
 		logger.Info("Server starting", map[string]interface{}{
@@ -404,22 +454,22 @@ func main() {
 			os.Exit(1)
 		}
 	}()
-	
+
 	// Wait for interrupt signal
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	
+
 	logger.Info("Shutting down server", nil)
-	
+
 	// Graceful shutdown
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer shutdownCancel()
-	
+
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		logger.Error("Server shutdown failed", err, nil)
 	}
-	
+
 	logger.Info("Server stopped", nil)
 }
 
@@ -433,4 +483,3 @@ func joinStrings(strs []string, sep string) string {
 	}
 	return result
 }
-

@@ -1,6 +1,7 @@
 'use client'
 
 import { Message } from '@/lib/api'
+import MarkdownContent from './MarkdownContent'
 
 interface ChatMessageProps {
   message: Message
@@ -25,7 +26,11 @@ export default function ChatMessage({ message }: ChatMessageProps) {
               : 'bg-slate-800 text-slate-100 border border-slate-700'
           }`}
         >
-          <div className="whitespace-pre-wrap break-words">{message.content}</div>
+          {isUser ? (
+            <div className="whitespace-pre-wrap break-words">{message.content}</div>
+          ) : (
+            <MarkdownContent content={message.content} />
+          )}
         </div>
         <div className={`text-xs text-slate-400 mt-1 ${isUser ? 'text-right' : 'text-left'}`}>
           {timeString}

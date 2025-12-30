@@ -169,5 +169,5 @@ In a profile:
 ✅ **NeuronAgent**: Fully integrated via HTTP REST API and WebSocket proxy  
 ✅ **NeuronDB**: Fully integrated via direct Postgres connection  
 
-All three components are seamlessly integrated and accessible through the unified NeuronDesktop interface.
+All four components (NeuronDB, NeuronAgent, NeuronMCP, and NeuronDesktop) are seamlessly integrated and accessible through the unified NeuronDesktop interface.
 

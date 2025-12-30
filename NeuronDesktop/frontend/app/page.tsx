@@ -64,17 +64,26 @@ export default function Home() {
   const [checking, setChecking] = useState(true)
 
   useEffect(() => {
+    // Add timeout to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      console.warn('Home: Setup check timed out, showing homepage')
+      setChecking(false)
+    }, 10000) // 10 second max wait
+    
     // Check if setup is complete
     factoryAPI.getSetupState()
       .then((response) => {
+        clearTimeout(timeoutId)
         if (!response.data.setup_complete) {
           router.push('/setup')
         } else {
           setChecking(false)
         }
       })
-      .catch(() => {
+      .catch((error) => {
+        clearTimeout(timeoutId)
         // If API call fails, show homepage (might be first run)
+        console.warn('Home: Setup check failed, showing homepage', error)
         setChecking(false)
       })
   }, [router])

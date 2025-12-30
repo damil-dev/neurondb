@@ -158,6 +158,3 @@ func (h *ModelConfigHandlers) SetDefaultModelConfig(w http.ResponseWriter, r *ht
 
 	w.WriteHeader(http.StatusNoContent)
 }
-
-
-

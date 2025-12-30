@@ -42,11 +42,11 @@ type Agent struct {
 
 // Session represents a session in NeuronAgent
 type Session struct {
-	ID            string                 `json:"id"`
-	AgentID       string                 `json:"agent_id"`
-	ExternalUserID string                `json:"external_user_id,omitempty"`
-	Metadata      map[string]interface{} `json:"metadata,omitempty"`
-	CreatedAt     string                 `json:"created_at,omitempty"`
+	ID             string                 `json:"id"`
+	AgentID        string                 `json:"agent_id"`
+	ExternalUserID string                 `json:"external_user_id,omitempty"`
+	Metadata       map[string]interface{} `json:"metadata,omitempty"`
+	CreatedAt      string                 `json:"created_at,omitempty"`
 }
 
 // Message represents a message in a session
@@ -71,16 +71,16 @@ type CreateAgentRequest struct {
 
 // CreateSessionRequest is the request to create a session
 type CreateSessionRequest struct {
-	AgentID       string                 `json:"agent_id"`
-	ExternalUserID string                `json:"external_user_id,omitempty"`
-	Metadata      map[string]interface{} `json:"metadata,omitempty"`
+	AgentID        string                 `json:"agent_id"`
+	ExternalUserID string                 `json:"external_user_id,omitempty"`
+	Metadata       map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // SendMessageRequest is the request to send a message
 type SendMessageRequest struct {
-	Role    string                 `json:"role"`
-	Content string                 `json:"content"`
-	Stream  bool                   `json:"stream,omitempty"`
+	Role     string                 `json:"role"`
+	Content  string                 `json:"content"`
+	Stream   bool                   `json:"stream,omitempty"`
 	Metadata map[string]interface{} `json:"metadata,omitempty"`
 }
 
@@ -90,12 +90,12 @@ func (c *Client) ListAgents(ctx context.Context) ([]Agent, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var agents []Agent
 	if err := c.doRequest(req, &agents); err != nil {
 		return nil, err
 	}
-	
+
 	return agents, nil
 }
 
@@ -105,12 +105,12 @@ func (c *Client) GetAgent(ctx context.Context, id string) (*Agent, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var agent Agent
 	if err := c.doRequest(req, &agent); err != nil {
 		return nil, err
 	}
-	
+
 	return &agent, nil
 }
 
@@ -120,12 +120,12 @@ func (c *Client) CreateAgent(ctx context.Context, req CreateAgentRequest) (*Agen
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var agent Agent
 	if err := c.doRequest(httpReq, &agent); err != nil {
 		return nil, err
 	}
-	
+
 	return &agent, nil
 }
 
@@ -135,12 +135,12 @@ func (c *Client) CreateSession(ctx context.Context, req CreateSessionRequest) (*
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var session Session
 	if err := c.doRequest(httpReq, &session); err != nil {
 		return nil, err
 	}
-	
+
 	return &session, nil
 }
 
@@ -150,12 +150,12 @@ func (c *Client) GetSession(ctx context.Context, id string) (*Session, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var session Session
 	if err := c.doRequest(req, &session); err != nil {
 		return nil, err
 	}
-	
+
 	return &session, nil
 }
 
@@ -165,12 +165,12 @@ func (c *Client) SendMessage(ctx context.Context, sessionID string, req SendMess
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var message Message
 	if err := c.doRequest(httpReq, &message); err != nil {
 		return nil, err
 	}
-	
+
 	return &message, nil
 }
 
@@ -180,12 +180,12 @@ func (c *Client) GetMessages(ctx context.Context, sessionID string) ([]Message, 
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var messages []Message
 	if err := c.doRequest(req, &messages); err != nil {
 		return nil, err
 	}
-	
+
 	return messages, nil
 }
 
@@ -195,12 +195,12 @@ func (c *Client) ListSessions(ctx context.Context, agentID string) ([]Session, e
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var sessions []Session
 	if err := c.doRequest(req, &sessions); err != nil {
 		return nil, err
 	}
-	
+
 	return sessions, nil
 }
 
@@ -215,16 +215,16 @@ func (c *Client) newRequest(ctx context.Context, method, path string, body inter
 		}
 		bodyReader = bytes.NewReader(bodyBytes)
 	}
-	
+
 	url := c.baseURL + path
 	req, err := http.NewRequestWithContext(ctx, method, url, bodyReader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
-	
+
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+c.apiKey)
-	
+
 	return req, nil
 }
 
@@ -234,22 +234,21 @@ func (c *Client) doRequest(req *http.Request, result interface{}) error {
 		return fmt.Errorf("request failed: %w", err)
 	}
 	defer resp.Body.Close()
-	
+
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return fmt.Errorf("failed to read response: %w", err)
 	}
-	
+
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("API error: %s (status: %d)", string(body), resp.StatusCode)
 	}
-	
+
 	if result != nil {
 		if err := json.Unmarshal(body, result); err != nil {
 			return fmt.Errorf("failed to unmarshal response: %w", err)
 		}
 	}
-	
+
 	return nil
 }
-

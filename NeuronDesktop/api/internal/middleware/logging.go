@@ -23,23 +23,23 @@ func LoggingMiddleware(logger *logging.Logger) func(http.Handler) http.Handler {
 			}
 
 			start := time.Now()
-			
+
 			// Read request body
 			var requestBody []byte
 			if r.Body != nil {
 				requestBody, _ = io.ReadAll(r.Body)
 				r.Body = io.NopCloser(bytes.NewBuffer(requestBody))
 			}
-			
+
 			// Wrap response writer to capture status code
 			recorder := &responseRecorder{
 				ResponseWriter: w,
 				statusCode:     http.StatusOK,
 			}
-			
+
 			// Process request
 			next.ServeHTTP(recorder, r)
-			
+
 			// Log request
 			duration := time.Since(start)
 			logger.Info("HTTP request", map[string]interface{}{
@@ -71,4 +71,3 @@ func (r *responseRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	}
 	return nil, nil, http.ErrHijacked
 }
-

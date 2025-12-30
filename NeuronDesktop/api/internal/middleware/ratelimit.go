@@ -133,7 +133,7 @@ func RateLimitMiddleware(limiter *RateLimiter) func(http.Handler) http.Handler {
 
 			// Get rate limit key (user ID from context, session ID, or IP)
 			key := r.RemoteAddr
-			
+
 			// Try to get user ID from context (set by session or JWT middleware)
 			// This is set by both session middleware and JWT middleware
 			if userID, ok := r.Context().Value("user_id").(string); ok && userID != "" {
@@ -179,4 +179,3 @@ func min(a, b int) int {
 	}
 	return b
 }
-
