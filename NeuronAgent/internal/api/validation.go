@@ -45,7 +45,7 @@ func ValidateCreateAgentRequest(req *CreateAgentRequest) error {
 
 /* ValidateCreateSessionRequest validates CreateSessionRequest */
 func ValidateCreateSessionRequest(req *CreateSessionRequest) error {
-  /* AgentID is required (UUID validation happens in handler) */
+	/* AgentID is required (UUID validation happens in handler) */
 	return nil
 }
 
@@ -71,4 +71,3 @@ func ValidateAndRespond(w http.ResponseWriter, validator func() error) bool {
 	}
 	return true
 }
-

@@ -570,4 +570,3 @@ func (q *Queries) ListAuditLogs(ctx context.Context, principalID, apiKeyID, agen
 	}
 	return auditLogs, nil
 }
-

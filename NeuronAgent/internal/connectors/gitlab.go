@@ -156,4 +156,3 @@ func (g *GitLabConnector) List(ctx context.Context, path string) ([]string, erro
 	/* TODO: Parse JSON response */
 	return nil, fmt.Errorf("GitLab list parsing not fully implemented")
 }
-

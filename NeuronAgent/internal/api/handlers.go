@@ -49,7 +49,7 @@ func (h *Handlers) CreateAgent(w http.ResponseWriter, r *http.Request) {
 	requestID := GetRequestID(r.Context())
 	endpoint := r.URL.Path
 	method := r.Method
-	
+
 	// Validate request body size (max 1MB)
 	const maxBodySize = 1024 * 1024
 	bodyBytes, err := validation.ReadAndValidateBody(r, maxBodySize)
@@ -58,7 +58,7 @@ func (h *Handlers) CreateAgent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
-	
+
 	var req CreateAgentRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondError(w, NewErrorWithContext(http.StatusBadRequest, "agent creation failed: request body parsing error", err, requestID, endpoint, method, "agent", "", map[string]interface{}{
@@ -67,7 +67,7 @@ func (h *Handlers) CreateAgent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-  /* Validate request */
+	/* Validate request */
 	if !ValidateAndRespond(w, func() error { return ValidateCreateAgentRequest(&req) }) {
 		return
 	}
@@ -84,9 +84,9 @@ func (h *Handlers) CreateAgent(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.queries.CreateAgent(r.Context(), agent); err != nil {
 		respondError(w, NewErrorWithContext(http.StatusInternalServerError, "agent creation failed", err, requestID, endpoint, method, "agent", "", map[string]interface{}{
-			"agent_name":      req.Name,
-			"model_name":      req.ModelName,
-			"enabled_tools":   req.EnabledTools,
+			"agent_name":           req.Name,
+			"model_name":           req.ModelName,
+			"enabled_tools":        req.EnabledTools,
 			"system_prompt_length": len(req.SystemPrompt),
 		}))
 		return
@@ -98,13 +98,13 @@ func (h *Handlers) CreateAgent(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) GetAgent(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	requestID := GetRequestID(r.Context())
-	
+
 	// Validate UUID
 	if err := validation.ValidateUUIDRequired(vars["id"], "agent_id"); err != nil {
 		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid agent ID", err, requestID, r.URL.Path, r.Method, "agent", "", nil))
 		return
 	}
-	
+
 	id, err := uuid.Parse(vars["id"])
 	if err != nil {
 		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid agent ID format", err, requestID, r.URL.Path, r.Method, "agent", "", nil))
@@ -124,14 +124,14 @@ func (h *Handlers) GetAgent(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) ListAgents(w http.ResponseWriter, r *http.Request) {
 	var agents []db.Agent
 	var err error
-	
+
 	search := r.URL.Query().Get("search")
 	if search != "" {
 		agents, err = h.queries.ListAgentsWithFilter(r.Context(), &search)
 	} else {
 		agents, err = h.queries.ListAgents(r.Context())
 	}
-	
+
 	if err != nil {
 		requestID := GetRequestID(r.Context())
 		respondError(w, WrapError(NewError(http.StatusInternalServerError, "failed to list agents", err), requestID))
@@ -149,13 +149,13 @@ func (h *Handlers) ListAgents(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) UpdateAgent(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	requestID := GetRequestID(r.Context())
-	
+
 	// Validate UUID
 	if err := validation.ValidateUUIDRequired(vars["id"], "agent_id"); err != nil {
 		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid agent ID", err, requestID, r.URL.Path, r.Method, "agent", "", nil))
 		return
 	}
-	
+
 	id, err := uuid.Parse(vars["id"])
 	if err != nil {
 		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid agent ID format", err, requestID, r.URL.Path, r.Method, "agent", "", nil))
@@ -177,7 +177,7 @@ func (h *Handlers) UpdateAgent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-  /* Validate request */
+	/* Validate request */
 	if !ValidateAndRespond(w, func() error { return ValidateCreateAgentRequest(&req) }) {
 		return
 	}
@@ -189,7 +189,7 @@ func (h *Handlers) UpdateAgent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-  /* Update fields */
+	/* Update fields */
 	agent.Name = req.Name
 	agent.Description = req.Description
 	agent.SystemPrompt = req.SystemPrompt
@@ -210,13 +210,13 @@ func (h *Handlers) UpdateAgent(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) DeleteAgent(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	requestID := GetRequestID(r.Context())
-	
+
 	// Validate UUID
 	if err := validation.ValidateUUIDRequired(vars["id"], "agent_id"); err != nil {
 		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid agent ID", err, requestID, r.URL.Path, r.Method, "agent", "", nil))
 		return
 	}
-	
+
 	id, err := uuid.Parse(vars["id"])
 	if err != nil {
 		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid agent ID format", err, requestID, r.URL.Path, r.Method, "agent", "", nil))
@@ -236,7 +236,7 @@ func (h *Handlers) DeleteAgent(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handlers) CreateSession(w http.ResponseWriter, r *http.Request) {
 	requestID := GetRequestID(r.Context())
-	
+
 	// Validate request body size (max 1MB)
 	const maxBodySize = 1024 * 1024
 	bodyBytes, err := validation.ReadAndValidateBody(r, maxBodySize)
@@ -245,7 +245,7 @@ func (h *Handlers) CreateSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
-	
+
 	var req CreateSessionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondError(w, NewErrorWithContext(http.StatusBadRequest, "request body parsing error", err, requestID, r.URL.Path, r.Method, "session", "", nil))
@@ -258,7 +258,7 @@ func (h *Handlers) CreateSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-  /* Validate request */
+	/* Validate request */
 	if !ValidateAndRespond(w, func() error { return ValidateCreateSessionRequest(&req) }) {
 		return
 	}
@@ -268,9 +268,9 @@ func (h *Handlers) CreateSession(w http.ResponseWriter, r *http.Request) {
 		metadata = make(db.JSONBMap)
 	}
 	session := &db.Session{
-		AgentID:       req.AgentID,
+		AgentID:        req.AgentID,
 		ExternalUserID: req.ExternalUserID,
-		Metadata:      metadata,
+		Metadata:       metadata,
 	}
 
 	if err := h.queries.CreateSession(r.Context(), session); err != nil {
@@ -285,13 +285,13 @@ func (h *Handlers) CreateSession(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) GetSession(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	requestID := GetRequestID(r.Context())
-	
+
 	// Validate UUID
 	if err := validation.ValidateUUIDRequired(vars["id"], "session_id"); err != nil {
 		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid session ID", err, requestID, r.URL.Path, r.Method, "session", "", nil))
 		return
 	}
-	
+
 	id, err := uuid.Parse(vars["id"])
 	if err != nil {
 		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid session ID format", err, requestID, r.URL.Path, r.Method, "session", "", nil))
@@ -311,13 +311,13 @@ func (h *Handlers) GetSession(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) ListSessions(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	requestID := GetRequestID(r.Context())
-	
+
 	// Validate UUID
 	if err := validation.ValidateUUIDRequired(vars["agent_id"], "agent_id"); err != nil {
 		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid agent ID", err, requestID, r.URL.Path, r.Method, "session", "", nil))
 		return
 	}
-	
+
 	agentID, err := uuid.Parse(vars["agent_id"])
 	if err != nil {
 		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid agent ID format", err, requestID, r.URL.Path, r.Method, "session", "", nil))
@@ -326,7 +326,7 @@ func (h *Handlers) ListSessions(w http.ResponseWriter, r *http.Request) {
 
 	limit := 50
 	offset := 0
-  /* Parse query parameters for pagination */
+	/* Parse query parameters for pagination */
 	if l := r.URL.Query().Get("limit"); l != "" {
 		if _, err := fmt.Sscanf(l, "%d", &limit); err != nil {
 			respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid limit parameter", err, requestID, r.URL.Path, r.Method, "session", "", nil))
@@ -352,7 +352,7 @@ func (h *Handlers) ListSessions(w http.ResponseWriter, r *http.Request) {
 	externalUserID := r.URL.Query().Get("external_user_id")
 	startDate := r.URL.Query().Get("start_date")
 	endDate := r.URL.Query().Get("end_date")
-	
+
 	if externalUserID != "" || startDate != "" || endDate != "" {
 		var externalUserIDPtr *string
 		if externalUserID != "" {
@@ -369,7 +369,7 @@ func (h *Handlers) ListSessions(w http.ResponseWriter, r *http.Request) {
 	} else {
 		sessions, err = h.queries.ListSessions(r.Context(), agentID, limit, offset)
 	}
-	
+
 	if err != nil {
 		requestID := GetRequestID(r.Context())
 		respondError(w, WrapError(NewError(http.StatusInternalServerError, "failed to list sessions", err), requestID))
@@ -387,13 +387,13 @@ func (h *Handlers) ListSessions(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) UpdateSession(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	requestID := GetRequestID(r.Context())
-	
+
 	// Validate UUID
 	if err := validation.ValidateUUIDRequired(vars["id"], "session_id"); err != nil {
 		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid session ID", err, requestID, r.URL.Path, r.Method, "session", "", nil))
 		return
 	}
-	
+
 	id, err := uuid.Parse(vars["id"])
 	if err != nil {
 		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid session ID format", err, requestID, r.URL.Path, r.Method, "session", "", nil))
@@ -446,13 +446,13 @@ func (h *Handlers) UpdateSession(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) DeleteSession(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	requestID := GetRequestID(r.Context())
-	
+
 	// Validate UUID
 	if err := validation.ValidateUUIDRequired(vars["id"], "session_id"); err != nil {
 		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid session ID", err, requestID, r.URL.Path, r.Method, "session", "", nil))
 		return
 	}
-	
+
 	id, err := uuid.Parse(vars["id"])
 	if err != nil {
 		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid session ID format", err, requestID, r.URL.Path, r.Method, "session", "", nil))
@@ -474,13 +474,13 @@ func (h *Handlers) SendMessage(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 	vars := mux.Vars(r)
 	requestID := GetRequestID(r.Context())
-	
+
 	// Validate UUID
 	if err := validation.ValidateUUIDRequired(vars["session_id"], "session_id"); err != nil {
 		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid session ID", err, requestID, r.URL.Path, r.Method, "message", "", nil))
 		return
 	}
-	
+
 	sessionID, err := uuid.Parse(vars["session_id"])
 	if err != nil {
 		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid session ID format", err, requestID, r.URL.Path, r.Method, "message", "", nil))
@@ -502,12 +502,12 @@ func (h *Handlers) SendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-  /* Validate request */
+	/* Validate request */
 	if !ValidateAndRespond(w, func() error { return ValidateSendMessageRequest(&req) }) {
 		return
 	}
 
-  /* Check if streaming is requested */
+	/* Check if streaming is requested */
 	if req.Stream {
 		StreamResponse(w, r, h.runtime, sessionID.String(), req.Content)
 		return
@@ -521,7 +521,7 @@ func (h *Handlers) SendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-  /* Record metrics */
+	/* Record metrics */
 	duration := time.Since(start)
 	metrics.RecordAgentExecution(state.AgentID.String(), "success", duration)
 
@@ -548,7 +548,7 @@ func (h *Handlers) GetMessages(w http.ResponseWriter, r *http.Request) {
 
 	limit := 100
 	offset := 0
-  /* Parse query parameters */
+	/* Parse query parameters */
 	if l := r.URL.Query().Get("limit"); l != "" {
 		_, _ = fmt.Sscanf(l, "%d", &limit)
 	}
@@ -561,7 +561,7 @@ func (h *Handlers) GetMessages(w http.ResponseWriter, r *http.Request) {
 	contentSearch := r.URL.Query().Get("search")
 	startDate := r.URL.Query().Get("start_date")
 	endDate := r.URL.Query().Get("end_date")
-	
+
 	if role != "" || contentSearch != "" || startDate != "" || endDate != "" {
 		var rolePtr, contentSearchPtr *string
 		if role != "" {
@@ -581,7 +581,7 @@ func (h *Handlers) GetMessages(w http.ResponseWriter, r *http.Request) {
 	} else {
 		messages, err = h.queries.GetMessages(r.Context(), sessionID, limit, offset)
 	}
-	
+
 	if err != nil {
 		requestID := GetRequestID(r.Context())
 		respondError(w, WrapError(NewError(http.StatusInternalServerError, "failed to get messages", err), requestID))

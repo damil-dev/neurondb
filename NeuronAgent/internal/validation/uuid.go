@@ -27,13 +27,13 @@ func ValidateUUID(s, fieldName string) error {
 	if s == "" {
 		return fmt.Errorf("%s cannot be empty", fieldName)
 	}
-	
+
 	s = strings.ToLower(strings.TrimSpace(s))
 	_, err := uuid.Parse(s)
 	if err != nil {
 		return fmt.Errorf("%s has invalid UUID format: %w", fieldName, err)
 	}
-	
+
 	return nil
 }
 
@@ -52,4 +52,3 @@ func ParseUUID(s, fieldName string) (uuid.UUID, error) {
 	}
 	return uuid.Parse(s)
 }
-

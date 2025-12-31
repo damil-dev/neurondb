@@ -39,22 +39,22 @@ func NewExecutor(registry *Registry, timeout time.Duration) *Executor {
 /* Execute executes a tool with timeout */
 func (e *Executor) Execute(ctx context.Context, tool *db.Tool, args map[string]interface{}) (string, error) {
 	start := time.Now()
-	
-  /* Create context with timeout */
+
+	/* Create context with timeout */
 	ctx, cancel := context.WithTimeout(ctx, e.timeout)
 	defer cancel()
 
-  /* Execute tool */
+	/* Execute tool */
 	result, err := e.registry.Execute(ctx, tool, args)
 	duration := time.Since(start)
-	
-  /* Record metrics */
+
+	/* Record metrics */
 	status := "success"
 	if err != nil {
 		status = "error"
 	}
 	metrics.RecordToolExecution(tool.Name, status, duration)
-	
+
 	if err != nil {
 		argKeys := make([]string, 0, len(args))
 		for k := range args {
@@ -81,4 +81,3 @@ func (e *Executor) ExecuteByName(ctx context.Context, toolName string, args map[
 
 	return e.Execute(ctx, tool, args)
 }
-

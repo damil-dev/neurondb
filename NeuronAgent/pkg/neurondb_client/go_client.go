@@ -68,11 +68,11 @@ type Session struct {
 
 /* Message represents a message */
 type Message struct {
-	ID         int64                  `json:"id"`
-	SessionID  uuid.UUID              `json:"session_id"`
-	Role       string                 `json:"role"`
-	Content    string                 `json:"content"`
-	TokenCount *int                   `json:"token_count"`
+	ID         int64     `json:"id"`
+	SessionID  uuid.UUID `json:"session_id"`
+	Role       string    `json:"role"`
+	Content    string    `json:"content"`
+	TokenCount *int      `json:"token_count"`
 }
 
 /* CreateAgentRequest represents a request to create an agent */
@@ -244,4 +244,3 @@ func (c *Client) GetMessages(ctx context.Context, sessionID uuid.UUID) ([]Messag
 
 	return messages, nil
 }
-

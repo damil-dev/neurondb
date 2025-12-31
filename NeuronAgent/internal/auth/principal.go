@@ -33,7 +33,7 @@ func NewPrincipalManager(queries *db.Queries) *PrincipalManager {
 
 /* GetOrCreatePrincipalForAPIKey gets or creates a principal for an API key */
 func (m *PrincipalManager) GetOrCreatePrincipalForAPIKey(ctx context.Context, apiKey *db.APIKey) (*db.Principal, error) {
-  /* If principal_id is already set, return that principal */
+	/* If principal_id is already set, return that principal */
 	if apiKey.PrincipalID != nil {
 		principal, err := m.queries.GetPrincipalByID(ctx, *apiKey.PrincipalID)
 		if err == nil {
@@ -42,7 +42,7 @@ func (m *PrincipalManager) GetOrCreatePrincipalForAPIKey(ctx context.Context, ap
 		/* If principal not found, continue to create new one */
 	}
 
-  /* Determine principal type and name from API key */
+	/* Determine principal type and name from API key */
 	principalType := "user"
 	principalName := "api_key_" + apiKey.ID.String()
 
@@ -54,13 +54,13 @@ func (m *PrincipalManager) GetOrCreatePrincipalForAPIKey(ctx context.Context, ap
 		principalName = "org_" + *apiKey.OrganizationID
 	}
 
-  /* Try to get existing principal */
+	/* Try to get existing principal */
 	principal, err := m.queries.GetPrincipalByTypeAndName(ctx, principalType, principalName)
 	if err == nil {
 		return principal, nil
 	}
 
-  /* Create new principal */
+	/* Create new principal */
 	principal = &db.Principal{
 		Type:     principalType,
 		Name:     principalName,
@@ -74,7 +74,7 @@ func (m *PrincipalManager) GetOrCreatePrincipalForAPIKey(ctx context.Context, ap
 		return nil, fmt.Errorf("failed to create principal: %w", err)
 	}
 
-  /* Link API key to principal */
+	/* Link API key to principal */
 	if apiKey.PrincipalID == nil {
 		apiKey.PrincipalID = &principal.ID
 		/* Note: This would require an UpdateAPIKey method that includes principal_id */
@@ -123,4 +123,3 @@ func (m *PrincipalManager) GetPrincipalByID(ctx context.Context, id uuid.UUID) (
 func (m *PrincipalManager) GetPrincipalByTypeAndName(ctx context.Context, principalType, name string) (*db.Principal, error) {
 	return m.queries.GetPrincipalByTypeAndName(ctx, principalType, name)
 }
-

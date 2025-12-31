@@ -186,4 +186,3 @@ func (t *HybridSearchTool) multiVectorSearch(ctx context.Context, args map[strin
 	resultJSON, _ := json.Marshal(results)
 	return string(resultJSON), nil
 }
-

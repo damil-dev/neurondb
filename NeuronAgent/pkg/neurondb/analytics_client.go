@@ -41,7 +41,7 @@ func (c *AnalyticsClient) ClusterData(ctx context.Context, tableName, featureCol
 
 	var resultsJSON string
 	query := `SELECT neurondb_cluster($1, $2, $3, $4::jsonb) AS clusters`
-	
+
 	err = c.db.GetContext(ctx, &resultsJSON, query, tableName, featureCol, algorithm, paramsJSON)
 	if err != nil {
 		return nil, fmt.Errorf("clustering failed via NeuronDB: table_name='%s', feature_col='%s', algorithm='%s', function='neurondb_cluster', error=%w",
@@ -67,7 +67,7 @@ func (c *AnalyticsClient) DetectOutliers(ctx context.Context, tableName, feature
 
 	var resultsJSON string
 	query := `SELECT neurondb_detect_outliers($1, $2, $3, $4::jsonb) AS outliers`
-	
+
 	err = c.db.GetContext(ctx, &resultsJSON, query, tableName, featureCol, method, paramsJSON)
 	if err != nil {
 		return nil, fmt.Errorf("outlier detection failed via NeuronDB: table_name='%s', feature_col='%s', method='%s', function='neurondb_detect_outliers', error=%w",
@@ -93,7 +93,7 @@ func (c *AnalyticsClient) ReduceDimensionality(ctx context.Context, tableName, f
 
 	var resultsJSON string
 	query := `SELECT neurondb_reduce_dimensionality($1, $2, $3, $4, $5::jsonb) AS reduced`
-	
+
 	err = c.db.GetContext(ctx, &resultsJSON, query, tableName, featureCol, method, targetDim, paramsJSON)
 	if err != nil {
 		return nil, fmt.Errorf("dimensionality reduction failed via NeuronDB: table_name='%s', feature_col='%s', method='%s', target_dim=%d, function='neurondb_reduce_dimensionality', error=%w",
@@ -113,7 +113,7 @@ func (c *AnalyticsClient) ReduceDimensionality(ctx context.Context, tableName, f
 func (c *AnalyticsClient) AnalyzeData(ctx context.Context, tableName string, columns []string) (map[string]interface{}, error) {
 	var resultsJSON string
 	query := `SELECT neurondb_analyze_data($1, $2::text[]) AS analysis`
-	
+
 	err := c.db.GetContext(ctx, &resultsJSON, query, tableName, columns)
 	if err != nil {
 		return nil, fmt.Errorf("data analysis failed via NeuronDB: table_name='%s', columns_count=%d, function='neurondb_analyze_data', error=%w",
@@ -138,9 +138,9 @@ type ClusterResult struct {
 
 /* OutlierResult represents an outlier detection result */
 type OutlierResult struct {
-	ID      interface{} `json:"id"`
-	IsOutlier bool      `json:"is_outlier"`
-	Score   float64     `json:"score"`
+	ID        interface{} `json:"id"`
+	IsOutlier bool        `json:"is_outlier"`
+	Score     float64     `json:"score"`
 }
 
 /* DimensionalityResult represents a dimensionality reduction result */
@@ -148,9 +148,3 @@ type DimensionalityResult struct {
 	ID      interface{} `json:"id"`
 	Reduced Vector      `json:"reduced"`
 }
-
-
-
-
-
-

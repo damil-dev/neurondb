@@ -26,8 +26,8 @@ import (
 
 /* TraceContext holds trace and span information */
 type TraceContext struct {
-	TraceID    string
-	SpanID     string
+	TraceID      string
+	SpanID       string
 	ParentSpanID string
 }
 
@@ -53,7 +53,7 @@ func (t *Tracer) StartSpan(ctx context.Context, name string) (context.Context, s
 
 	traceID := t.getOrCreateTraceID(ctx)
 	spanID := uuid.New().String()
-	
+
 	traceCtx := &TraceContext{
 		TraceID:      traceID,
 		SpanID:       spanID,

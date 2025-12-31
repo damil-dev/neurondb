@@ -51,7 +51,7 @@ func (t *Tracer) StartSpan(ctx context.Context, name string) (context.Context, s
 	spanID := uuid.New().String()
 	traceID := TraceID(uuid.New().String())
 
-  /* Try to get trace ID from context */
+	/* Try to get trace ID from context */
 	if existingTraceID := ctx.Value("trace_id"); existingTraceID != nil {
 		traceID = existingTraceID.(TraceID)
 	}
@@ -64,14 +64,14 @@ func (t *Tracer) StartSpan(ctx context.Context, name string) (context.Context, s
 		Attributes: make(map[string]interface{}),
 	}
 
-  /* Get parent span ID if exists */
+	/* Get parent span ID if exists */
 	if parentSpanID := ctx.Value("span_id"); parentSpanID != nil {
 		span.ParentID = parentSpanID.(string)
 	}
 
 	t.spans[spanID] = span
 
-  /* Add to context */
+	/* Add to context */
 	ctx = context.WithValue(ctx, "trace_id", traceID)
 	ctx = context.WithValue(ctx, "span_id", spanID)
 
@@ -82,7 +82,7 @@ func (t *Tracer) StartSpan(ctx context.Context, name string) (context.Context, s
 func (t *Tracer) EndSpan(spanID string) {
 	if span, exists := t.spans[spanID]; exists {
 		span.EndTime = time.Now()
-   /* In production, send to tracing backend */
+		/* In production, send to tracing backend */
 		delete(t.spans, spanID)
 	}
 }
@@ -119,4 +119,3 @@ func GetSpanIDFromContext(ctx context.Context) (string, bool) {
 func (t TraceID) String() string {
 	return string(t)
 }
-

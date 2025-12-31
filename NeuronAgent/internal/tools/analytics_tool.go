@@ -137,9 +137,3 @@ func (t *AnalyticsTool) analyzeData(ctx context.Context, args map[string]interfa
 	resultJSON, _ := json.Marshal(analysis)
 	return string(resultJSON), nil
 }
-
-
-
-
-
-

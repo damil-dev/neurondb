@@ -67,4 +67,3 @@ func ProductionConfig() *Config {
 	cfg.Database.ConnMaxLifetime = 15 * time.Minute
 	return cfg
 }
-

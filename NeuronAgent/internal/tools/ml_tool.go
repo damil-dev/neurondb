@@ -71,7 +71,7 @@ func (t *MLTool) train(ctx context.Context, args map[string]interface{}) (string
 	algorithm := getString(args, "algorithm", "")
 	tableName := getString(args, "table_name", "")
 	labelCol := getString(args, "label_col", "")
-	
+
 	/* Validate required fields */
 	if algorithm == "" {
 		return "", fmt.Errorf("ML training failed: algorithm_required=true")
@@ -82,7 +82,7 @@ func (t *MLTool) train(ctx context.Context, args map[string]interface{}) (string
 	if labelCol == "" {
 		return "", fmt.Errorf("ML training failed: label_col_required=true")
 	}
-	
+
 	featureColsInterface, ok := args["feature_cols"].([]interface{})
 	if !ok {
 		return "", fmt.Errorf("ML training failed: feature_cols_missing_or_invalid=true")
@@ -90,7 +90,7 @@ func (t *MLTool) train(ctx context.Context, args map[string]interface{}) (string
 	if len(featureColsInterface) == 0 {
 		return "", fmt.Errorf("ML training failed: feature_cols_empty=true")
 	}
-	
+
 	featureCols := make([]string, len(featureColsInterface))
 	for i, col := range featureColsInterface {
 		featureCols[i] = fmt.Sprintf("%v", col)
@@ -110,7 +110,7 @@ func (t *MLTool) train(ctx context.Context, args map[string]interface{}) (string
 		"model_id": modelID,
 		"status":   "trained",
 	}
-	
+
 	resultJSON, _ := json.Marshal(result)
 	return string(resultJSON), nil
 }
@@ -143,7 +143,7 @@ func (t *MLTool) predict(ctx context.Context, args map[string]interface{}) (stri
 	result := map[string]interface{}{
 		"prediction": prediction,
 	}
-	
+
 	resultJSON, _ := json.Marshal(result)
 	return string(resultJSON), nil
 }
@@ -183,7 +183,7 @@ func (t *MLTool) predictBatch(ctx context.Context, args map[string]interface{}) 
 	result := map[string]interface{}{
 		"predictions": predictions,
 	}
-	
+
 	resultJSON, _ := json.Marshal(result)
 	return string(resultJSON), nil
 }
@@ -196,12 +196,12 @@ func (t *MLTool) evaluate(ctx context.Context, args map[string]interface{}) (str
 
 	testTable := getString(args, "test_table", "")
 	labelCol := getString(args, "label_col", "")
-	
+
 	featureColsInterface, ok := args["feature_cols"].([]interface{})
 	if !ok {
 		return "", fmt.Errorf("ML evaluation failed: feature_cols_missing_or_invalid=true")
 	}
-	
+
 	featureCols := make([]string, len(featureColsInterface))
 	for i, col := range featureColsInterface {
 		featureCols[i] = fmt.Sprintf("%v", col)
@@ -255,10 +255,10 @@ func (t *MLTool) deleteModel(ctx context.Context, args map[string]interface{}) (
 	}
 
 	result := map[string]interface{}{
-		"status": "deleted",
+		"status":   "deleted",
 		"model_id": modelID,
 	}
-	
+
 	resultJSON, _ := json.Marshal(result)
 	return string(resultJSON), nil
 }
@@ -283,4 +283,3 @@ func getInt(args map[string]interface{}, key string) (int, error) {
 	}
 	return 0, fmt.Errorf("invalid int value for key: %s", key)
 }
-

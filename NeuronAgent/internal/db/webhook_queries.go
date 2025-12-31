@@ -51,16 +51,16 @@ const (
 
 /* Webhook represents a webhook configuration */
 type Webhook struct {
-	ID            uuid.UUID      `db:"id"`
-	URL           string         `db:"url"`
-	Events        pq.StringArray `db:"events"`
-	Secret        *string        `db:"secret"`
-	Enabled       bool           `db:"enabled"`
-	TimeoutSeconds int           `db:"timeout_seconds"`
-	RetryCount    int            `db:"retry_count"`
-	Metadata      JSONBMap       `db:"metadata"`
-	CreatedAt     string         `db:"created_at"`
-	UpdatedAt     string         `db:"updated_at"`
+	ID             uuid.UUID      `db:"id"`
+	URL            string         `db:"url"`
+	Events         pq.StringArray `db:"events"`
+	Secret         *string        `db:"secret"`
+	Enabled        bool           `db:"enabled"`
+	TimeoutSeconds int            `db:"timeout_seconds"`
+	RetryCount     int            `db:"retry_count"`
+	Metadata       JSONBMap       `db:"metadata"`
+	CreatedAt      string         `db:"created_at"`
+	UpdatedAt      string         `db:"updated_at"`
 }
 
 /* WebhookDelivery represents a webhook delivery */
@@ -161,4 +161,3 @@ func (q *Queries) ListWebhookDeliveries(ctx context.Context, webhookID uuid.UUID
 	}
 	return deliveries, nil
 }
-

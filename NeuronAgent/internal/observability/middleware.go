@@ -25,7 +25,6 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-
 /* TracingMiddleware adds OpenTelemetry tracing to HTTP handlers */
 func TracingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -88,4 +87,3 @@ func (rw *responseWriter) Write(b []byte) (int, error) {
 	}
 	return rw.ResponseWriter.Write(b)
 }
-

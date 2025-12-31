@@ -47,4 +47,3 @@ func GetKeyPrefix(key string) string {
 	}
 	return key[:8]
 }
-

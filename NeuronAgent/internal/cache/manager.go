@@ -25,10 +25,10 @@ import (
 
 /* CacheManager manages caching for various data types */
 type CacheManager struct {
-	responses    *TTLCache
-	embeddings   *TTLCache
-	toolResults  *TTLCache
-	mu           sync.RWMutex
+	responses   *TTLCache
+	embeddings  *TTLCache
+	toolResults *TTLCache
+	mu          sync.RWMutex
 }
 
 /* TTLCache is a time-to-live cache */
@@ -41,10 +41,10 @@ type TTLCache struct {
 
 /* CacheItem represents a cached item */
 type CacheItem struct {
-	Value     interface{}
-	ExpiresAt time.Time
+	Value       interface{}
+	ExpiresAt   time.Time
 	AccessCount int64
-	LastAccess time.Time
+	LastAccess  time.Time
 }
 
 /* NewCacheManager creates a new cache manager */

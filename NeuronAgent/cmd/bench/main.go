@@ -143,11 +143,11 @@ func main() {
 		/* Collect diff if failed */
 		if !result.Passed {
 			diff := map[string]interface{}{
-				"task_id":      task.ID.String(),
-				"input":        task.Input,
-				"expected":     task.ExpectedOutput,
-				"actual":       result.ActualOutput,
-				"error":        result.ErrorMessage,
+				"task_id":  task.ID.String(),
+				"input":    task.Input,
+				"expected": task.ExpectedOutput,
+				"actual":   result.ActualOutput,
+				"error":    result.ErrorMessage,
 			}
 			diffs = append(diffs, diff)
 		}
@@ -167,13 +167,13 @@ func main() {
 
 	/* Output results */
 	output := map[string]interface{}{
-		"score":       finalScore,
-		"total_tasks": len(tasks),
-		"passed":      passed,
-		"failed":      failed,
+		"score":           finalScore,
+		"total_tasks":     len(tasks),
+		"passed":          passed,
+		"failed":          failed,
 		"dataset_version": datasetVersion,
-		"agent_id":    agentID.String(),
-		"diffs":       diffs,
+		"agent_id":        agentID.String(),
+		"diffs":           diffs,
 	}
 
 	outputJSON, err := json.MarshalIndent(output, "", "  ")
@@ -184,4 +184,3 @@ func main() {
 
 	fmt.Println(string(outputJSON))
 }
-

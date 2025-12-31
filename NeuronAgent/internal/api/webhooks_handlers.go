@@ -230,13 +230,3 @@ func (h *Handlers) ListWebhookDeliveries(w http.ResponseWriter, r *http.Request)
 
 	respondJSON(w, http.StatusOK, deliveries)
 }
-
-
-
-
-
-
-
-
-
-

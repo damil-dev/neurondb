@@ -28,14 +28,14 @@ import (
 
 /* SandboxConfig defines sandbox configuration */
 type SandboxConfig struct {
-	MaxMemory    int64             `json:"max_memory"`     // Bytes
-	MaxCPU       float64           `json:"max_cpu"`        // CPU percentage (0-100)
-	MaxDisk      int64             `json:"max_disk"`       // Bytes
-	Timeout      time.Duration     `json:"timeout"`        // Execution timeout
-	AllowedDirs  []string          `json:"allowed_dirs"`   // Allowed directories
-	AllowedFiles []string          `json:"allowed_files"`  // Allowed specific files
-	NetworkRules NetworkRules      `json:"network_rules"`  // Network egress rules
-	Isolation    IsolationType     `json:"isolation"`      // Isolation type
+	MaxMemory    int64         `json:"max_memory"`    // Bytes
+	MaxCPU       float64       `json:"max_cpu"`       // CPU percentage (0-100)
+	MaxDisk      int64         `json:"max_disk"`      // Bytes
+	Timeout      time.Duration `json:"timeout"`       // Execution timeout
+	AllowedDirs  []string      `json:"allowed_dirs"`  // Allowed directories
+	AllowedFiles []string      `json:"allowed_files"` // Allowed specific files
+	NetworkRules NetworkRules  `json:"network_rules"` // Network egress rules
+	Isolation    IsolationType `json:"isolation"`     // Isolation type
 }
 
 /* NetworkRules defines network egress rules */
@@ -221,17 +221,13 @@ func (s *EnhancedSandbox) ApplyFileAllowlist(cmd *exec.Cmd) error {
 /* DefaultSandboxConfig returns default sandbox configuration */
 func DefaultSandboxConfig() SandboxConfig {
 	return SandboxConfig{
-		MaxMemory:   512 * 1024 * 1024, /* 512 MB */
-		MaxCPU:      50.0,               /* 50% CPU */
-		MaxDisk:     1 * 1024 * 1024 * 1024, /* 1 GB */
-		Timeout:     5 * time.Minute,
-		Isolation:   IsolationNone,
+		MaxMemory: 512 * 1024 * 1024,      /* 512 MB */
+		MaxCPU:    50.0,                   /* 50% CPU */
+		MaxDisk:   1 * 1024 * 1024 * 1024, /* 1 GB */
+		Timeout:   5 * time.Minute,
+		Isolation: IsolationNone,
 		NetworkRules: NetworkRules{
 			BlockAll: true, /* Block all by default */
 		},
 	}
 }
-
-
-
-

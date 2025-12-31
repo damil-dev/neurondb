@@ -28,14 +28,14 @@ import (
 )
 
 type SQLTool struct {
-	db                  *db.DB
-	queries             *db.Queries
-	auditLogger         *auth.AuditLogger
-	dataPermChecker     *auth.DataPermissionChecker
+	db              *db.DB
+	queries         *db.Queries
+	auditLogger     *auth.AuditLogger
+	dataPermChecker *auth.DataPermissionChecker
 }
 
 func NewSQLTool(queries *db.Queries) *SQLTool {
-  /* DB will be set by the registry during initialization */
+	/* DB will be set by the registry during initialization */
 	return &SQLTool{
 		db:              nil,
 		queries:         queries,
@@ -55,7 +55,7 @@ func (t *SQLTool) Execute(ctx context.Context, tool *db.Tool, args map[string]in
 			tool.Name, len(args), argKeys)
 	}
 
-  /* Security: Only allow SELECT, EXPLAIN, and schema introspection queries */
+	/* Security: Only allow SELECT, EXPLAIN, and schema introspection queries */
 	queryUpper := strings.TrimSpace(strings.ToUpper(query))
 	queryType := "UNKNOWN"
 	if strings.HasPrefix(queryUpper, "SELECT") {
@@ -69,7 +69,7 @@ func (t *SQLTool) Execute(ctx context.Context, tool *db.Tool, args map[string]in
 	} else if strings.HasPrefix(queryUpper, "\\d") {
 		queryType = "DESCRIBE"
 	}
-	
+
 	if queryType == "UNKNOWN" {
 		queryPreview := query
 		if len(queryPreview) > 100 {
@@ -79,7 +79,7 @@ func (t *SQLTool) Execute(ctx context.Context, tool *db.Tool, args map[string]in
 			tool.Name, queryType, queryPreview, len(query))
 	}
 
-  /* Check for dangerous keywords - comprehensive list to prevent bypasses */
+	/* Check for dangerous keywords - comprehensive list to prevent bypasses */
 	// Include variations and subqueries that could be used to bypass restrictions
 	dangerous := []string{
 		"DROP", "DELETE", "UPDATE", "INSERT", "ALTER", "CREATE", "TRUNCATE",
@@ -105,41 +105,41 @@ func (t *SQLTool) Execute(ctx context.Context, tool *db.Tool, args map[string]in
 			tool.Name, queryType, queryPreview, len(query), foundKeywords)
 	}
 
-  /* Execute query (read-only) */
+	/* Execute query (read-only) */
 	if t.db == nil {
 		return "", fmt.Errorf("SQL tool execution failed: tool_name='%s', handler_type='sql', query_type='%s', query_length=%d, database_connection='not_initialized'",
 			tool.Name, queryType, len(query))
 	}
-	
+
 	connInfo := "unknown"
 	if t.db != nil {
 		connInfo = t.db.GetConnInfoString()
 	}
 
-  /* Apply data permissions: row filters and check permissions */
+	/* Apply data permissions: row filters and check permissions */
 	agentID, _ := agent.GetAgentIDFromContext(ctx)
 	sessionID, _ := agent.GetSessionIDFromContext(ctx)
-	
+
 	/* Try to extract schema and table name from query (simple case) */
 	schemaName, tableName := extractTableFromQuery(query)
-	
+
 	/* Get principal ID from context if available */
 	/* For now, we'll skip row filter application for complex queries */
 	/* In production, use a SQL parser to extract table names */
 	var rowFilter string
 	var columnMask map[string]string
-	
+
 	if schemaName != "" || tableName != "" {
 		/* TODO: Get principal from context - for now skip if not available */
 		/* This would require passing principal through context from API layer */
 	}
 
-  /* Apply row filter if available */
+	/* Apply row filter if available */
 	finalQuery := query
 	if rowFilter != "" {
 		finalQuery = t.dataPermChecker.ApplyRowFilter(query, rowFilter)
 	}
-	
+
 	rows, err := t.db.QueryContext(ctx, finalQuery)
 	if err != nil {
 		queryPreview := query
@@ -151,7 +151,7 @@ func (t *SQLTool) Execute(ctx context.Context, tool *db.Tool, args map[string]in
 	}
 	defer rows.Close()
 
-  /* Convert results to JSON */
+	/* Convert results to JSON */
 	var results []map[string]interface{}
 	columns, err := rows.Columns()
 	if err != nil {
@@ -203,7 +203,7 @@ func (t *SQLTool) Execute(ctx context.Context, tool *db.Tool, args map[string]in
 			tool.Name, queryType, rowCount, len(columns), err)
 	}
 
-  /* Apply column masking if available */
+	/* Apply column masking if available */
 	if columnMask != nil && len(columnMask) > 0 {
 		results = t.dataPermChecker.MaskColumns(results, columnMask)
 		jsonResult, err = json.Marshal(results)
@@ -215,22 +215,22 @@ func (t *SQLTool) Execute(ctx context.Context, tool *db.Tool, args map[string]in
 
 	resultStr := string(jsonResult)
 
-  /* Audit log SQL statement */
+	/* Audit log SQL statement */
 	agentID, _ = agent.GetAgentIDFromContext(ctx)
 	sessionID, _ = agent.GetSessionIDFromContext(ctx)
-	
+
 	outputs := map[string]interface{}{
 		"row_count":     rowCount,
 		"column_count":  len(columns),
 		"success":       true,
 		"result_length": len(resultStr),
 	}
-	
+
 	/* Log audit trail (async, don't block on errors) */
 	go func() {
 		bgCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		
+
 		var agentIDPtr, sessionIDPtr *uuid.UUID
 		if agentID != uuid.Nil {
 			agentIDPtr = &agentID
@@ -238,7 +238,7 @@ func (t *SQLTool) Execute(ctx context.Context, tool *db.Tool, args map[string]in
 		if sessionID != uuid.Nil {
 			sessionIDPtr = &sessionID
 		}
-		
+
 		_ = t.auditLogger.LogSQLStatement(bgCtx, nil, nil, agentIDPtr, sessionIDPtr, query, args, outputs)
 	}()
 
@@ -253,28 +253,28 @@ func (t *SQLTool) Validate(args map[string]interface{}, schema map[string]interf
 /* This is a basic implementation - for complex queries, use a proper SQL parser */
 func extractTableFromQuery(query string) (schemaName, tableName string) {
 	queryUpper := strings.ToUpper(strings.TrimSpace(query))
-	
+
 	/* Look for FROM clause */
 	fromIndex := strings.Index(queryUpper, " FROM ")
 	if fromIndex < 0 {
 		return "", ""
 	}
-	
+
 	/* Extract table name after FROM */
 	fromPart := query[fromIndex+6:]
-	
+
 	/* Remove WHERE, ORDER BY, GROUP BY, LIMIT, OFFSET */
 	for _, keyword := range []string{" WHERE ", " ORDER BY ", " GROUP BY ", " LIMIT ", " OFFSET "} {
 		if idx := strings.Index(strings.ToUpper(fromPart), keyword); idx > 0 {
 			fromPart = fromPart[:idx]
 		}
 	}
-	
+
 	fromPart = strings.TrimSpace(fromPart)
 	if fromPart == "" {
 		return "", ""
 	}
-	
+
 	/* Check for schema.table format */
 	parts := strings.Split(fromPart, ".")
 	if len(parts) == 2 {
@@ -282,7 +282,6 @@ func extractTableFromQuery(query string) (schemaName, tableName string) {
 	} else if len(parts) == 1 {
 		return "", strings.TrimSpace(parts[0])
 	}
-	
+
 	return "", ""
 }
-

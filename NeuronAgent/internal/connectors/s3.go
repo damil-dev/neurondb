@@ -23,9 +23,9 @@ import (
 
 /* S3Connector implements ReadWriteConnector for S3 */
 type S3Connector struct {
-	endpoint string
-	region   string
-	bucket   string
+	endpoint  string
+	region    string
+	bucket    string
 	accessKey string
 	secretKey string
 }
@@ -104,4 +104,3 @@ func (s *S3Connector) List(ctx context.Context, path string) ([]string, error) {
 	/* TODO: Use S3 SDK to list objects */
 	return nil, fmt.Errorf("S3 list not fully implemented - requires S3 SDK")
 }
-

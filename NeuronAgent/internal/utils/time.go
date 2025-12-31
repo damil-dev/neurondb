@@ -22,11 +22,11 @@ import (
 )
 
 const (
-	ISO8601Format     = "2006-01-02T15:04:05Z07:00"
-	RFC3339Format     = time.RFC3339
-	DateOnlyFormat    = "2006-01-02"
-	TimeOnlyFormat    = "15:04:05"
-	DateTimeFormat    = "2006-01-02 15:04:05"
+	ISO8601Format  = "2006-01-02T15:04:05Z07:00"
+	RFC3339Format  = time.RFC3339
+	DateOnlyFormat = "2006-01-02"
+	TimeOnlyFormat = "15:04:05"
+	DateTimeFormat = "2006-01-02 15:04:05"
 )
 
 /* FormatTime formats time using ISO8601 format */
@@ -81,7 +81,7 @@ func IsExpired(t time.Time) bool {
 /* TimeAgo returns human-readable time ago string */
 func TimeAgo(t time.Time) string {
 	duration := time.Since(t)
-	
+
 	if duration < time.Minute {
 		return "just now"
 	}
@@ -99,7 +99,7 @@ func TimeAgo(t time.Time) string {
 		}
 		return fmt.Sprintf("%d hours ago", hours)
 	}
-	
+
 	days := int(duration.Hours() / 24)
 	if days == 1 {
 		return "1 day ago"
@@ -107,7 +107,7 @@ func TimeAgo(t time.Time) string {
 	if days < 7 {
 		return fmt.Sprintf("%d days ago", days)
 	}
-	
+
 	weeks := days / 7
 	if weeks == 1 {
 		return "1 week ago"
@@ -115,7 +115,7 @@ func TimeAgo(t time.Time) string {
 	if weeks < 4 {
 		return fmt.Sprintf("%d weeks ago", weeks)
 	}
-	
+
 	months := days / 30
 	if months == 1 {
 		return "1 month ago"
@@ -123,11 +123,10 @@ func TimeAgo(t time.Time) string {
 	if months < 12 {
 		return fmt.Sprintf("%d months ago", months)
 	}
-	
+
 	years := days / 365
 	if years == 1 {
 		return "1 year ago"
 	}
 	return fmt.Sprintf("%d years ago", years)
 }
-

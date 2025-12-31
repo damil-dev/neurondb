@@ -100,7 +100,7 @@ func (p *basicImageProcessor) Process(ctx context.Context, file *MediaFile) (*Im
 	return &ImageAnalysis{
 		Description: "Image analysis not yet implemented. Integrate with vision models like GPT-4 Vision, CLIP, etc.",
 		Metadata: map[string]interface{}{
-			"size": file.Size,
+			"size":      file.Size,
 			"mime_type": file.MimeType,
 		},
 	}, nil
@@ -113,7 +113,7 @@ func (p *basicDocumentProcessor) Process(ctx context.Context, file *MediaFile) (
 	return &DocumentAnalysis{
 		Text: "Document processing not yet implemented. Integrate with OCR libraries like Tesseract, document parsers, etc.",
 		Metadata: map[string]interface{}{
-			"size": file.Size,
+			"size":      file.Size,
 			"mime_type": file.MimeType,
 		},
 	}, nil
@@ -126,7 +126,7 @@ func (p *basicAudioProcessor) Process(ctx context.Context, file *MediaFile) (*Au
 	return &AudioAnalysis{
 		Transcript: "Audio transcription not yet implemented. Integrate with Whisper, Google Speech-to-Text, etc.",
 		Metadata: map[string]interface{}{
-			"size": file.Size,
+			"size":      file.Size,
 			"mime_type": file.MimeType,
 		},
 	}, nil
@@ -139,9 +139,8 @@ func (p *basicVideoProcessor) Process(ctx context.Context, file *MediaFile) (*Vi
 	return &VideoAnalysis{
 		Description: "Video analysis not yet implemented. Integrate with video analysis models.",
 		Metadata: map[string]interface{}{
-			"size": file.Size,
+			"size":      file.Size,
 			"mime_type": file.MimeType,
 		},
 	}, nil
 }
-

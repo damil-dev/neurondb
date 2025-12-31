@@ -86,7 +86,7 @@ func RetryWithBackoff(ctx context.Context, maxRetries int, fn func() error) erro
 			case <-ctx.Done():
 				return ctx.Err()
 			case <-time.After(backoff):
-    				backoff *= 2 /* Exponential backoff */
+				backoff *= 2 /* Exponential backoff */
 			}
 		}
 	}
@@ -125,4 +125,3 @@ func (d *DB) WithTransaction(ctx context.Context, fn func(*Transaction) error) e
 	err = fn(tx)
 	return err
 }
-

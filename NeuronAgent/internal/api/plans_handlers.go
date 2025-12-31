@@ -128,13 +128,3 @@ func (h *Handlers) UpdatePlanStatus(w http.ResponseWriter, r *http.Request) {
 
 	respondJSON(w, http.StatusOK, plan)
 }
-
-
-
-
-
-
-
-
-
-

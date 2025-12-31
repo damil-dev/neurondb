@@ -34,7 +34,7 @@ func NewRAGClient(db *sqlx.DB) *RAGClient {
 /* ChunkDocument chunks a document into smaller pieces */
 func (c *RAGClient) ChunkDocument(ctx context.Context, text string, chunkSize, overlap int) ([]string, error) {
 	query := `SELECT neurondb_chunk_text($1, $2, $3) AS chunks`
-	
+
 	var chunksJSON string
 	err := c.db.GetContext(ctx, &chunksJSON, query, text, chunkSize, overlap)
 	if err != nil {
@@ -73,7 +73,7 @@ func (c *RAGClient) RetrieveContext(ctx context.Context, queryEmbedding Vector, 
 /* RerankResults reranks search results using a reranking model */
 func (c *RAGClient) RerankResults(ctx context.Context, query string, documents []string, model string, topK int) ([]RerankResult, error) {
 	querySQL := `SELECT neurondb_rerank_results($1, $2::text[], $3, $4) AS reranked`
-	
+
 	var resultsJSON string
 	err := c.db.GetContext(ctx, &resultsJSON, querySQL, query, documents, model, topK)
 	if err != nil {
@@ -100,7 +100,7 @@ func (c *RAGClient) GenerateAnswer(ctx context.Context, query string, context []
 
 	var answer string
 	querySQL := `SELECT neurondb_generate_answer($1, $2::text[], $3, $4::jsonb) AS answer`
-	
+
 	err = c.db.GetContext(ctx, &answer, querySQL, query, context, model, paramsJSON)
 	if err != nil {
 		return "", fmt.Errorf("RAG answer generation failed via NeuronDB: query_length=%d, context_count=%d, model='%s', function='neurondb_generate_answer', error=%w",
@@ -112,21 +112,15 @@ func (c *RAGClient) GenerateAnswer(ctx context.Context, query string, context []
 
 /* RAGContext represents retrieved context for RAG */
 type RAGContext struct {
-	ID        interface{}            `db:"id"`
-	Content   string                 `db:"content"`
-	Metadata  map[string]interface{} `db:"metadata"`
-	Similarity float64               `db:"similarity"`
+	ID         interface{}            `db:"id"`
+	Content    string                 `db:"content"`
+	Metadata   map[string]interface{} `db:"metadata"`
+	Similarity float64                `db:"similarity"`
 }
 
 /* RerankResult represents a reranked result */
 type RerankResult struct {
-	Document  string  `json:"document"`
-	Score     float64 `json:"score"`
-	Rank      int     `json:"rank"`
+	Document string  `json:"document"`
+	Score    float64 `json:"score"`
+	Rank     int     `json:"rank"`
 }
-
-
-
-
-
-

@@ -156,11 +156,11 @@ func LoggerFromContext(ctx context.Context) zerolog.Logger {
 func LogWithContext(ctx context.Context, level zerolog.Level, message string, fields map[string]interface{}) {
 	logger := LoggerFromContext(ctx)
 	event := logger.WithLevel(level)
-	
+
 	for key, value := range fields {
 		event = event.Interface(key, value)
 	}
-	
+
 	event.Msg(message)
 }
 
@@ -189,4 +189,3 @@ func ErrorWithContext(ctx context.Context, message string, err error, fields map
 	}
 	LogWithContext(ctx, zerolog.ErrorLevel, message, fields)
 }
-

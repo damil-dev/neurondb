@@ -94,4 +94,3 @@ func (q *Queries) ListExecutionSnapshotsByAgent(ctx context.Context, agentID uui
 	}
 	return snapshots, nil
 }
-

@@ -22,26 +22,26 @@ import (
 
 /* AdvancedMetrics collects detailed metrics */
 type AdvancedMetrics struct {
-	agentMetrics     map[string]*AgentMetrics
-	toolMetrics      map[string]*ToolMetrics
-	costMetrics      *CostMetrics
-	qualityMetrics   *QualityMetrics
-	mu               sync.RWMutex
+	agentMetrics   map[string]*AgentMetrics
+	toolMetrics    map[string]*ToolMetrics
+	costMetrics    *CostMetrics
+	qualityMetrics *QualityMetrics
+	mu             sync.RWMutex
 }
 
 /* AgentMetrics tracks metrics for an agent */
 type AgentMetrics struct {
-	AgentID              uuid.UUID
-	TotalExecutions      int64
-	SuccessfulExecutions int64
-	FailedExecutions     int64
-	TotalTokens          int64
-	TotalCost            float64
-	AvgExecutionTime     time.Duration
+	AgentID               uuid.UUID
+	TotalExecutions       int64
+	SuccessfulExecutions  int64
+	FailedExecutions      int64
+	TotalTokens           int64
+	TotalCost             float64
+	AvgExecutionTime      time.Duration
 	AvgTokensPerExecution int64
-	LastExecutionTime    time.Time
-	ExecutionTimes       []time.Duration
-	mu                   sync.RWMutex
+	LastExecutionTime     time.Time
+	ExecutionTimes        []time.Duration
+	mu                    sync.RWMutex
 }
 
 /* ToolMetrics tracks metrics for a tool */
@@ -58,29 +58,29 @@ type ToolMetrics struct {
 
 /* CostMetrics tracks cost patterns */
 type CostMetrics struct {
-	TotalCost      float64
-	CostByAgent    map[uuid.UUID]float64
-	CostByModel    map[string]float64
-	CostByType     map[string]float64
-	DailyCosts     map[string]float64
-	mu             sync.RWMutex
+	TotalCost   float64
+	CostByAgent map[uuid.UUID]float64
+	CostByModel map[string]float64
+	CostByType  map[string]float64
+	DailyCosts  map[string]float64
+	mu          sync.RWMutex
 }
 
 /* QualityMetrics tracks quality scores */
 type QualityMetrics struct {
-	TotalScores    int64
-	AvgScore       float64
-	ScoreHistory   []float64
-	ScoreByAgent   map[uuid.UUID][]float64
-	mu             sync.RWMutex
+	TotalScores  int64
+	AvgScore     float64
+	ScoreHistory []float64
+	ScoreByAgent map[uuid.UUID][]float64
+	mu           sync.RWMutex
 }
 
 /* NewAdvancedMetrics creates a new advanced metrics collector */
 func NewAdvancedMetrics() *AdvancedMetrics {
 	return &AdvancedMetrics{
-		agentMetrics:   make(map[string]*AgentMetrics),
-		toolMetrics:    make(map[string]*ToolMetrics),
-		costMetrics:    &CostMetrics{
+		agentMetrics: make(map[string]*AgentMetrics),
+		toolMetrics:  make(map[string]*ToolMetrics),
+		costMetrics: &CostMetrics{
 			CostByAgent: make(map[uuid.UUID]float64),
 			CostByModel: make(map[string]float64),
 			CostByType:  make(map[string]float64),
@@ -239,15 +239,15 @@ func (am *AdvancedMetrics) GetAgentMetrics(agentID uuid.UUID) *AgentMetrics {
 	defer metrics.mu.RUnlock()
 
 	return &AgentMetrics{
-		AgentID:              metrics.AgentID,
-		TotalExecutions:      metrics.TotalExecutions,
-		SuccessfulExecutions: metrics.SuccessfulExecutions,
-		FailedExecutions:     metrics.FailedExecutions,
-		TotalTokens:          metrics.TotalTokens,
-		TotalCost:            metrics.TotalCost,
-		AvgExecutionTime:     metrics.AvgExecutionTime,
+		AgentID:               metrics.AgentID,
+		TotalExecutions:       metrics.TotalExecutions,
+		SuccessfulExecutions:  metrics.SuccessfulExecutions,
+		FailedExecutions:      metrics.FailedExecutions,
+		TotalTokens:           metrics.TotalTokens,
+		TotalCost:             metrics.TotalCost,
+		AvgExecutionTime:      metrics.AvgExecutionTime,
 		AvgTokensPerExecution: metrics.AvgTokensPerExecution,
-		LastExecutionTime:    metrics.LastExecutionTime,
+		LastExecutionTime:     metrics.LastExecutionTime,
 	}
 }
 
@@ -358,4 +358,3 @@ func GetAdvancedMetrics() *AdvancedMetrics {
 	})
 	return globalAdvancedMetrics
 }
-

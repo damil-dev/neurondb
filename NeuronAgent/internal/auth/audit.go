@@ -155,4 +155,3 @@ func (a *AuditLogger) hashString(s string) string {
 func stringPtr(s string) *string {
 	return &s
 }
-

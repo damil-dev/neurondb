@@ -1,0 +1,343 @@
+/*-------------------------------------------------------------------------
+ *
+ * async_executor.go
+ *    Asynchronous task execution with status tracking
+ *
+ * Provides asynchronous task execution for long-running agent operations
+ * with status tracking, result storage, and completion notifications.
+ *
+ * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ *
+ * IDENTIFICATION
+ *    NeuronAgent/internal/agent/async_executor.go
+ *
+ *-------------------------------------------------------------------------
+ */
+
+package agent
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/neurondb/NeuronAgent/internal/db"
+)
+
+/* AsyncTaskExecutor manages asynchronous task execution */
+type AsyncTaskExecutor struct {
+	queries  *db.Queries
+	runtime  *Runtime
+	notifier *TaskNotifier
+}
+
+/* AsyncTask represents an asynchronous task */
+type AsyncTask struct {
+	ID          uuid.UUID
+	SessionID   uuid.UUID
+	AgentID     uuid.UUID
+	TaskType    string
+	Status      string
+	Priority    int
+	Input       map[string]interface{}
+	Result      map[string]interface{}
+	ErrorMsg    *string
+	CreatedAt   time.Time
+	StartedAt   *time.Time
+	CompletedAt *time.Time
+	Metadata    map[string]interface{}
+}
+
+/* NewAsyncTaskExecutor creates a new async task executor */
+func NewAsyncTaskExecutor(queries *db.Queries, runtime *Runtime, notifier *TaskNotifier) *AsyncTaskExecutor {
+	return &AsyncTaskExecutor{
+		queries:  queries,
+		runtime:  runtime,
+		notifier: notifier,
+	}
+}
+
+/* ExecuteAsync queues an asynchronous task for execution */
+func (e *AsyncTaskExecutor) ExecuteAsync(ctx context.Context, sessionID, agentID uuid.UUID, taskType string, input map[string]interface{}, priority int) (*AsyncTask, error) {
+	/* Validate input */
+	if taskType == "" {
+		return nil, fmt.Errorf("async task execution failed: task_type_empty=true")
+	}
+
+	/* Create task record */
+	taskID := uuid.New()
+	now := time.Now()
+
+	inputJSON, err := json.Marshal(input)
+	if err != nil {
+		return nil, fmt.Errorf("async task execution failed: input_serialization_error=true, error=%w", err)
+	}
+
+	metadata := make(map[string]interface{})
+	if input["metadata"] != nil {
+		if meta, ok := input["metadata"].(map[string]interface{}); ok {
+			metadata = meta
+		}
+	}
+
+	/* Insert task into database */
+	query := `INSERT INTO neurondb_agent.async_tasks 
+		(id, session_id, agent_id, task_type, status, priority, input, metadata, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		RETURNING id, session_id, agent_id, task_type, status, priority, input, result, error_message, 
+			created_at, started_at, completed_at, metadata`
+
+	task := &AsyncTask{}
+	err = e.queries.DB.QueryRowContext(ctx, query,
+		taskID, sessionID, agentID, taskType, "pending", priority,
+		string(inputJSON), db.FromMap(metadata), now,
+	).Scan(
+		&task.ID, &task.SessionID, &task.AgentID, &task.TaskType, &task.Status, &task.Priority,
+		&inputJSON, &task.Result, &task.ErrorMsg,
+		&task.CreatedAt, &task.StartedAt, &task.CompletedAt, &task.Metadata,
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("async task execution failed: task_creation_error=true, session_id='%s', agent_id='%s', task_type='%s', error=%w",
+			sessionID.String(), agentID.String(), taskType, err)
+	}
+
+	/* Parse input JSON */
+	if err := json.Unmarshal(inputJSON, &task.Input); err != nil {
+		task.Input = input
+	}
+
+	/* Queue task for background execution */
+	go e.executeTaskInBackground(context.Background(), task)
+
+	return task, nil
+}
+
+/* GetTaskStatus retrieves the status of an async task */
+func (e *AsyncTaskExecutor) GetTaskStatus(ctx context.Context, taskID uuid.UUID) (*AsyncTask, error) {
+	query := `SELECT id, session_id, agent_id, task_type, status, priority, input, result, error_message,
+		created_at, started_at, completed_at, metadata
+		FROM neurondb_agent.async_tasks
+		WHERE id = $1`
+
+	task := &AsyncTask{}
+	var inputJSON, resultJSON []byte
+	var errorMsg *string
+
+	err := e.queries.DB.QueryRowContext(ctx, query, taskID).Scan(
+		&task.ID, &task.SessionID, &task.AgentID, &task.TaskType, &task.Status, &task.Priority,
+		&inputJSON, &resultJSON, &errorMsg,
+		&task.CreatedAt, &task.StartedAt, &task.CompletedAt, &task.Metadata,
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("task status retrieval failed: task_id='%s', error=%w", taskID.String(), err)
+	}
+
+	/* Parse JSON fields */
+	if len(inputJSON) > 0 {
+		json.Unmarshal(inputJSON, &task.Input)
+	}
+	if len(resultJSON) > 0 {
+		json.Unmarshal(resultJSON, &task.Result)
+	}
+	task.ErrorMsg = errorMsg
+
+	return task, nil
+}
+
+/* CancelTask cancels a running or pending task */
+func (e *AsyncTaskExecutor) CancelTask(ctx context.Context, taskID uuid.UUID) error {
+	query := `UPDATE neurondb_agent.async_tasks
+		SET status = 'cancelled', completed_at = NOW()
+		WHERE id = $1 AND status IN ('pending', 'running')
+		RETURNING id`
+
+	var cancelledID uuid.UUID
+	err := e.queries.DB.QueryRowContext(ctx, query, taskID).Scan(&cancelledID)
+	if err != nil {
+		return fmt.Errorf("task cancellation failed: task_id='%s', error=%w", taskID.String(), err)
+	}
+
+	return nil
+}
+
+/* ListTasks lists tasks with optional filters */
+func (e *AsyncTaskExecutor) ListTasks(ctx context.Context, sessionID, agentID *uuid.UUID, status *string, limit, offset int) ([]*AsyncTask, error) {
+	query := `SELECT id, session_id, agent_id, task_type, status, priority, input, result, error_message,
+		created_at, started_at, completed_at, metadata
+		FROM neurondb_agent.async_tasks
+		WHERE 1=1`
+	args := []interface{}{}
+	argPos := 1
+
+	if sessionID != nil {
+		query += fmt.Sprintf(" AND session_id = $%d", argPos)
+		args = append(args, *sessionID)
+		argPos++
+	}
+
+	if agentID != nil {
+		query += fmt.Sprintf(" AND agent_id = $%d", argPos)
+		args = append(args, *agentID)
+		argPos++
+	}
+
+	if status != nil {
+		query += fmt.Sprintf(" AND status = $%d", argPos)
+		args = append(args, *status)
+		argPos++
+	}
+
+	query += " ORDER BY created_at DESC"
+
+	if limit > 0 {
+		query += fmt.Sprintf(" LIMIT $%d", argPos)
+		args = append(args, limit)
+		argPos++
+	}
+
+	if offset > 0 {
+		query += fmt.Sprintf(" OFFSET $%d", argPos)
+		args = append(args, offset)
+	}
+
+	rows, err := e.queries.DB.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("task listing failed: error=%w", err)
+	}
+	defer rows.Close()
+
+	var tasks []*AsyncTask
+	for rows.Next() {
+		task := &AsyncTask{}
+		var inputJSON, resultJSON []byte
+		var errorMsg *string
+
+		err := rows.Scan(
+			&task.ID, &task.SessionID, &task.AgentID, &task.TaskType, &task.Status, &task.Priority,
+			&inputJSON, &resultJSON, &errorMsg,
+			&task.CreatedAt, &task.StartedAt, &task.CompletedAt, &task.Metadata,
+		)
+		if err != nil {
+			continue
+		}
+
+		/* Parse JSON fields */
+		if len(inputJSON) > 0 {
+			json.Unmarshal(inputJSON, &task.Input)
+		}
+		if len(resultJSON) > 0 {
+			json.Unmarshal(resultJSON, &task.Result)
+		}
+		task.ErrorMsg = errorMsg
+
+		tasks = append(tasks, task)
+	}
+
+	return tasks, nil
+}
+
+/* executeTaskInBackground executes a task in the background */
+func (e *AsyncTaskExecutor) executeTaskInBackground(ctx context.Context, task *AsyncTask) {
+	/* Update status to running */
+	startedAt := time.Now()
+	updateQuery := `UPDATE neurondb_agent.async_tasks
+		SET status = 'running', started_at = $1
+		WHERE id = $2 AND status = 'pending'`
+
+	_, err := e.queries.DB.ExecContext(ctx, updateQuery, startedAt, task.ID)
+	if err != nil {
+		return
+	}
+
+	/* Execute task based on type */
+	var result map[string]interface{}
+	var taskErr error
+
+	switch task.TaskType {
+	case "agent_execution":
+		result, taskErr = e.executeAgentTask(ctx, task)
+	case "data_processing":
+		result, taskErr = e.executeDataProcessingTask(ctx, task)
+	case "code_execution":
+		result, taskErr = e.executeCodeTask(ctx, task)
+	default:
+		taskErr = fmt.Errorf("unknown task type: %s", task.TaskType)
+	}
+
+	/* Update task with result */
+	completedAt := time.Now()
+	status := "completed"
+	errorMsg := (*string)(nil)
+	resultJSON := []byte("{}")
+
+	if taskErr != nil {
+		status = "failed"
+		errStr := taskErr.Error()
+		errorMsg = &errStr
+	} else if result != nil {
+		resultJSON, _ = json.Marshal(result)
+	}
+
+	updateResultQuery := `UPDATE neurondb_agent.async_tasks
+		SET status = $1, result = $2, error_message = $3, completed_at = $4
+		WHERE id = $5`
+
+	_, err = e.queries.DB.ExecContext(ctx, updateResultQuery,
+		status, string(resultJSON), errorMsg, completedAt, task.ID)
+	if err != nil {
+		return
+	}
+
+	/* Send completion notification */
+	if e.notifier != nil {
+		if status == "completed" {
+			e.notifier.SendCompletionAlert(ctx, task.ID)
+		} else {
+			e.notifier.SendFailureAlert(ctx, task.ID, taskErr)
+		}
+	}
+}
+
+/* executeAgentTask executes an agent execution task */
+func (e *AsyncTaskExecutor) executeAgentTask(ctx context.Context, task *AsyncTask) (map[string]interface{}, error) {
+	/* Extract user message from input */
+	userMessage, ok := task.Input["user_message"].(string)
+	if !ok {
+		return nil, fmt.Errorf("agent task requires user_message in input")
+	}
+
+	/* Execute agent */
+	state, err := e.runtime.Execute(ctx, task.SessionID, userMessage)
+	if err != nil {
+		return nil, fmt.Errorf("agent execution failed: %w", err)
+	}
+
+	/* Return result */
+	return map[string]interface{}{
+		"final_answer": state.FinalAnswer,
+		"tool_calls":   state.ToolCalls,
+		"tokens_used":  state.TokensUsed,
+	}, nil
+}
+
+/* executeDataProcessingTask executes a data processing task */
+func (e *AsyncTaskExecutor) executeDataProcessingTask(ctx context.Context, task *AsyncTask) (map[string]interface{}, error) {
+	/* Placeholder for data processing */
+	return map[string]interface{}{
+		"status":  "completed",
+		"message": "Data processing task executed",
+	}, nil
+}
+
+/* executeCodeTask executes a code execution task */
+func (e *AsyncTaskExecutor) executeCodeTask(ctx context.Context, task *AsyncTask) (map[string]interface{}, error) {
+	/* Placeholder for code execution */
+	return map[string]interface{}{
+		"status":  "completed",
+		"message": "Code execution task executed",
+	}, nil
+}

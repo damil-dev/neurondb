@@ -35,7 +35,7 @@ type APIError struct {
 
 func (e *APIError) Error() string {
 	parts := []string{e.Message}
-	
+
 	if e.Endpoint != "" {
 		parts = append(parts, fmt.Sprintf("endpoint='%s'", e.Endpoint))
 	}
@@ -52,11 +52,11 @@ func (e *APIError) Error() string {
 		}
 		parts = append(parts, part)
 	}
-	
+
 	if e.Err != nil {
 		parts = append(parts, fmt.Sprintf("error=%v", e.Err))
 	}
-	
+
 	return fmt.Sprintf("%s", fmt.Sprintf("%s: %s", parts[0], fmt.Sprintf("%v", parts[1:])))
 }
 

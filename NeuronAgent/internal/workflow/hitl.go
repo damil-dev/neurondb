@@ -201,20 +201,10 @@ func (h *HITLManager) ExecuteApprovalStep(ctx context.Context, workflowExecution
 
 	/* Return approval result */
 	outputs := map[string]interface{}{
-		"approved":     true,
-		"approval_id":  approvalID.String(),
-		"approved_at":  time.Now(),
+		"approved":    true,
+		"approval_id": approvalID.String(),
+		"approved_at": time.Now(),
 	}
 
 	return outputs, nil
 }
-
-
-
-
-
-
-
-
-
-

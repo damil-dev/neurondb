@@ -85,4 +85,3 @@ func CanDelete(apiKey *db.APIKey) bool {
 func CanRead(apiKey *db.APIKey) bool {
 	return HasRole(apiKey, RoleAdmin) || HasRole(apiKey, RoleUser) || HasRole(apiKey, RoleReadOnly)
 }
-

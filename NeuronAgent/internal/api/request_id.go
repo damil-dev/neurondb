@@ -34,13 +34,13 @@ func RequestIDMiddleware(next http.Handler) http.Handler {
 			requestID = uuid.New().String()
 		}
 
-   /* Add to context */
+		/* Add to context */
 		ctx := context.WithValue(r.Context(), requestIDKey, requestID)
 		/* Also add to metrics log context */
 		ctx = metrics.WithLogContext(ctx, requestID, "", "", "", "")
 		r = r.WithContext(ctx)
 
-   /* Add to response header */
+		/* Add to response header */
 		w.Header().Set("X-Request-ID", requestID)
 
 		next.ServeHTTP(w, r)
@@ -54,4 +54,3 @@ func GetRequestID(ctx context.Context) string {
 	}
 	return ""
 }
-

@@ -38,13 +38,13 @@ func (q *QualityScorer) ScoreResponse(ctx context.Context, userMessage, response
 	}
 
 	return &QualityScore{
-		Overall:     reflection.QualityScore,
-		Accuracy:    reflection.Accuracy,
+		Overall:      reflection.QualityScore,
+		Accuracy:     reflection.Accuracy,
 		Completeness: reflection.Completeness,
-		Clarity:     reflection.Clarity,
-		Relevance:   reflection.Relevance,
-		Confidence:  reflection.Confidence,
-		Issues:      reflection.Issues,
+		Clarity:      reflection.Clarity,
+		Relevance:    reflection.Relevance,
+		Confidence:   reflection.Confidence,
+		Issues:       reflection.Issues,
 	}, nil
 }
 
@@ -91,17 +91,11 @@ func (q *QualityScorer) QuickScore(response string) float64 {
 
 /* QualityScore represents a quality score */
 type QualityScore struct {
-	Overall     float64  `json:"overall"`
-	Accuracy    float64  `json:"accuracy"`
+	Overall      float64  `json:"overall"`
+	Accuracy     float64  `json:"accuracy"`
 	Completeness float64  `json:"completeness"`
-	Clarity     float64  `json:"clarity"`
-	Relevance   float64  `json:"relevance"`
-	Confidence  float64  `json:"confidence"`
-	Issues      []string `json:"issues"`
+	Clarity      float64  `json:"clarity"`
+	Relevance    float64  `json:"relevance"`
+	Confidence   float64  `json:"confidence"`
+	Issues       []string `json:"issues"`
 }
-
-
-
-
-
-

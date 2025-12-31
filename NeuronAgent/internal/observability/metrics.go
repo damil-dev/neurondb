@@ -184,13 +184,3 @@ func RecordContextMetrics(ctx context.Context, agentID string, tokensUsed, maxTo
 		memoryChunksRetrieved.WithLabelValues(agentID).Observe(float64(memoryChunks))
 	}
 }
-
-
-
-
-
-
-
-
-
-

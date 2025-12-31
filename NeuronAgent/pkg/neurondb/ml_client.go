@@ -58,7 +58,7 @@ func (c *MLClient) TrainModel(ctx context.Context, project, algorithm, tableName
 
 	var modelID int
 	query := `SELECT neurondb.train($1, $2, $3, $4, $5::text[], $6::jsonb) AS model_id`
-	
+
 	err = c.db.GetContext(ctx, &modelID, query, project, algorithm, tableName, labelCol, featureCols, paramsJSON)
 	if err != nil {
 		return 0, fmt.Errorf("ML training failed via NeuronDB: project='%s', algorithm='%s', table_name='%s', label_col='%s', feature_cols_count=%d, function='neurondb.train', error=%w",
@@ -72,7 +72,7 @@ func (c *MLClient) TrainModel(ctx context.Context, project, algorithm, tableName
 func (c *MLClient) Predict(ctx context.Context, modelID int, features []float32) (float64, error) {
 	var prediction float64
 	query := `SELECT neurondb.predict($1, $2::real[]) AS prediction`
-	
+
 	err := c.db.GetContext(ctx, &prediction, query, modelID, features)
 	if err != nil {
 		return 0, fmt.Errorf("ML prediction failed via NeuronDB: model_id=%d, features_dimension=%d, function='neurondb.predict', error=%w",
@@ -89,7 +89,7 @@ func (c *MLClient) PredictBatch(ctx context.Context, modelID int, features [][]f
 		FROM (
 			SELECT neurondb.predict($1, unnest($2::real[][])::real[]) AS prediction
 		) sub`
-	
+
 	var predictions []float64
 	err := c.db.GetContext(ctx, &predictions, query, modelID, features)
 	if err != nil {
@@ -103,7 +103,7 @@ func (c *MLClient) PredictBatch(ctx context.Context, modelID int, features [][]f
 /* EvaluateModel evaluates a model's performance */
 func (c *MLClient) EvaluateModel(ctx context.Context, modelID int, testTable, labelCol string, featureCols []string) (map[string]interface{}, error) {
 	query := `SELECT neurondb.evaluate($1, $2, $3, $4::text[]) AS metrics`
-	
+
 	var metricsJSON string
 	err := c.db.GetContext(ctx, &metricsJSON, query, modelID, testTable, labelCol, featureCols)
 	if err != nil {
@@ -127,7 +127,7 @@ func (c *MLClient) ListModels(ctx context.Context, project string) ([]ModelInfo,
 		FROM neurondb.ml_models
 		WHERE project_name = $1
 		ORDER BY created_at DESC`
-	
+
 	var models []ModelInfo
 	err := c.db.SelectContext(ctx, &models, query, project)
 	if err != nil {
@@ -143,7 +143,7 @@ func (c *MLClient) GetModelInfo(ctx context.Context, modelID int) (*ModelInfo, e
 		created_at, updated_at, status
 		FROM neurondb.ml_models
 		WHERE model_id = $1`
-	
+
 	var model ModelInfo
 	err := c.db.GetContext(ctx, &model, query, modelID)
 	if err != nil {
@@ -156,7 +156,7 @@ func (c *MLClient) GetModelInfo(ctx context.Context, modelID int) (*ModelInfo, e
 /* DeleteModel deletes a trained model */
 func (c *MLClient) DeleteModel(ctx context.Context, modelID int) error {
 	query := `DELETE FROM neurondb.ml_models WHERE model_id = $1`
-	
+
 	result, err := c.db.ExecContext(ctx, query, modelID)
 	if err != nil {
 		return fmt.Errorf("ML model deletion failed via NeuronDB: model_id=%d, error=%w", modelID, err)
@@ -186,4 +186,3 @@ type ModelInfo struct {
 	UpdatedAt   string   `db:"updated_at"`
 	Status      string   `db:"status"`
 }
-

@@ -47,16 +47,16 @@ func (e *Engine) ExecuteWorkflow(ctx context.Context, workflowID uuid.UUID, trig
 
 	/* Save execution */
 	/* TODO: Implement CreateWorkflowExecution query */
-	
+
 	/* Load workflow and steps */
 	/* TODO: Load workflow and steps from database */
-	
+
 	/* Build dependency graph */
 	/* TODO: Build DAG from steps */
-	
+
 	/* Execute steps in topological order */
 	/* TODO: Execute steps respecting dependencies */
-	
+
 	return execution, nil
 }
 
@@ -109,7 +109,7 @@ func (e *Engine) ExecuteStep(ctx context.Context, executionID uuid.UUID, step *d
 		stepExecution.Status = "failed"
 		errorMsg := err.Error()
 		stepExecution.ErrorMessage = &errorMsg
-		
+
 		retryConfig := step.RetryConfig
 		if retryConfig != nil && stepExecution.RetryCount < getMaxRetries(retryConfig) {
 			/* Retry with backoff */
@@ -117,11 +117,11 @@ func (e *Engine) ExecuteStep(ctx context.Context, executionID uuid.UUID, step *d
 			if updateErr := e.queries.UpdateWorkflowStepExecution(ctx, stepExecution); updateErr != nil {
 				return nil, fmt.Errorf("failed to update step execution for retry: %w", updateErr)
 			}
-			
+
 			/* Schedule retry - for now just return error, would need retry scheduler */
 			return nil, fmt.Errorf("step failed, retry %d/%d: %w", stepExecution.RetryCount, getMaxRetries(retryConfig), err)
 		}
-		
+
 		/* Max retries reached or no retry config */
 		if updateErr := e.queries.UpdateWorkflowStepExecution(ctx, stepExecution); updateErr != nil {
 			return nil, fmt.Errorf("failed to update failed step execution: %w", updateErr)
@@ -215,4 +215,3 @@ func getMaxRetries(retryConfig db.JSONBMap) int {
 	}
 	return 3 /* Default */
 }
-

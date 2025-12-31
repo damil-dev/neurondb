@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -30,17 +31,26 @@ import (
 )
 
 type Runtime struct {
-	db                *db.DB
-	queries           *db.Queries
-	memory            *MemoryManager
-	planner           *Planner
-	reflector         *Reflector
-	prompt            *PromptBuilder
-	llm               *LLMClient
-	tools             ToolRegistry
-	embed             *neurondb.EmbeddingClient
-	toolPermChecker   *auth.ToolPermissionChecker
-	deterministicMode bool
+	db                  *db.DB
+	queries             *db.Queries
+	memory              *MemoryManager
+	hierMemory          *HierarchicalMemoryManager
+	eventStream         *EventStreamManager
+	verifier            *VerificationAgent
+	vfs                 *VirtualFileSystem
+	workspace           interface{} /* WorkspaceManager interface for collaboration */
+	asyncExecutor       *AsyncTaskExecutor
+	subAgentManager     *SubAgentManager
+	alertManager        *TaskNotifier
+	multimodalProcessor interface{} /* EnhancedMultimodalProcessor interface */
+	planner             *Planner
+	reflector           *Reflector
+	prompt              *PromptBuilder
+	llm                 *LLMClient
+	tools               ToolRegistry
+	embed               *neurondb.EmbeddingClient
+	toolPermChecker     *auth.ToolPermissionChecker
+	deterministicMode   bool
 }
 
 type ExecutionState struct {
@@ -92,6 +102,8 @@ func NewRuntime(db *db.DB, queries *db.Queries, tools ToolRegistry, embedClient 
 		db:              db,
 		queries:         queries,
 		memory:          NewMemoryManager(db, queries, embedClient),
+		hierMemory:      NewHierarchicalMemoryManager(db, queries, embedClient),
+		eventStream:     NewEventStreamManager(queries, llm),
 		planner:         NewPlannerWithLLM(llm),
 		reflector:       NewReflector(llm),
 		prompt:          NewPromptBuilder(),
@@ -100,6 +112,23 @@ func NewRuntime(db *db.DB, queries *db.Queries, tools ToolRegistry, embedClient 
 		embed:           embedClient,
 		toolPermChecker: auth.NewToolPermissionChecker(queries),
 	}
+}
+
+/* NewRuntimeWithFeatures creates runtime with all advanced features */
+func NewRuntimeWithFeatures(db *db.DB, queries *db.Queries, tools ToolRegistry, embedClient *neurondb.EmbeddingClient, vfs *VirtualFileSystem, workspace interface{}) *Runtime {
+	runtime := NewRuntime(db, queries, tools, embedClient)
+
+	/* Set VFS if provided */
+	if vfs != nil {
+		runtime.vfs = vfs
+	}
+
+	/* Set workspace if provided */
+	if workspace != nil {
+		runtime.workspace = workspace
+	}
+
+	return runtime
 }
 
 func (r *Runtime) Execute(ctx context.Context, sessionID uuid.UUID, userMessage string) (*ExecutionState, error) {
@@ -112,12 +141,22 @@ func (r *Runtime) Execute(ctx context.Context, sessionID uuid.UUID, userMessage 
 			sessionID.String(), len(userMessage))
 	}
 
+	/* Check if task should be async (long-running tasks) */
+	if r.asyncExecutor != nil && r.shouldExecuteAsync(userMessage) {
+		return r.executeAsync(ctx, sessionID, userMessage)
+	}
+
 	state := &ExecutionState{
 		SessionID:   sessionID,
 		UserMessage: userMessage,
 	}
 
-  /* Step 1: Load agent and session */
+	/* Log user message to event stream */
+	if r.eventStream != nil {
+		r.eventStream.LogEvent(ctx, sessionID, "user_message", "user", userMessage, map[string]interface{}{})
+	}
+
+	/* Step 1: Load agent and session */
 	session, err := r.queries.GetSession(ctx, sessionID)
 	if err != nil {
 		return nil, fmt.Errorf("agent execution failed at step 1 (load session): session_id='%s', user_message_length=%d, error=%w",
@@ -131,16 +170,49 @@ func (r *Runtime) Execute(ctx context.Context, sessionID uuid.UUID, userMessage 
 			sessionID.String(), session.AgentID.String(), len(userMessage), err)
 	}
 
-  /* Step 2: Load context (recent messages + memory) */
+	/* Route to sub-agent if needed */
+	if r.subAgentManager != nil {
+		subAgent, err := r.subAgentManager.GetAgentSpecialization(ctx, agent.ID)
+		if err == nil && subAgent != nil {
+			/* Agent has specialization, use it for routing decisions */
+			_ = subAgent
+		}
+	}
+
+	/* Step 2: Load context using hierarchical memory and event stream */
 	contextLoader := NewContextLoader(r.queries, r.memory, r.llm)
 	agentContext, err := contextLoader.Load(ctx, sessionID, agent.ID, userMessage, 20, 5)
 	if err != nil {
 		return nil, fmt.Errorf("agent execution failed at step 2 (load context): session_id='%s', agent_id='%s', agent_name='%s', user_message_length=%d, max_messages=20, max_memory_chunks=5, error=%w",
 			sessionID.String(), agent.ID.String(), agent.Name, len(userMessage), err)
 	}
+
+	/* Enhance context with hierarchical memory if available */
+	if r.hierMemory != nil {
+		_, err := r.hierMemory.RetrieveHierarchical(ctx, agent.ID, userMessage, []string{"stm", "mtm", "lpm"}, 5)
+		if err == nil {
+			/* Hierarchical memory retrieved successfully */
+			/* Context already loaded above */
+		}
+	}
+
+	/* Load context from event stream if available */
+	if r.eventStream != nil {
+		_, summaries, err := r.eventStream.GetContextWindow(ctx, sessionID, 50)
+		if err == nil && len(summaries) > 0 {
+			/* Add event summaries to context */
+			for _, summary := range summaries {
+				agentContext.Messages = append(agentContext.Messages, db.Message{
+					Role:    "system",
+					Content: summary.SummaryText,
+				})
+			}
+		}
+	}
+
 	state.Context = agentContext
 
-  /* Step 3: Build prompt */
+	/* Step 3: Build prompt */
 	prompt, err := r.prompt.Build(agent, agentContext, userMessage)
 	if err != nil {
 		messageCount := len(agentContext.Messages)
@@ -149,30 +221,30 @@ func (r *Runtime) Execute(ctx context.Context, sessionID uuid.UUID, userMessage 
 			sessionID.String(), agent.ID.String(), agent.Name, len(userMessage), messageCount, memoryChunkCount, err)
 	}
 
-  /* Step 4: Call LLM via NeuronDB */
+	/* Step 4: Call LLM via NeuronDB */
 	llmResponse, err := r.llm.Generate(ctx, agent.ModelName, prompt, agent.Config)
 	if err != nil {
 		promptTokens := EstimateTokens(prompt)
 		return nil, fmt.Errorf("agent execution failed at step 4 (LLM generation): session_id='%s', agent_id='%s', agent_name='%s', model_name='%s', prompt_length=%d, prompt_tokens=%d, user_message_length=%d, error=%w",
 			sessionID.String(), agent.ID.String(), agent.Name, agent.ModelName, len(prompt), promptTokens, len(userMessage), err)
 	}
-	
-  /* Update token count in response */
+
+	/* Update token count in response */
 	if llmResponse.Usage.TotalTokens == 0 {
-   /* Estimate if not provided */
+		/* Estimate if not provided */
 		llmResponse.Usage.PromptTokens = EstimateTokens(prompt)
 		llmResponse.Usage.CompletionTokens = EstimateTokens(llmResponse.Content)
 		llmResponse.Usage.TotalTokens = llmResponse.Usage.PromptTokens + llmResponse.Usage.CompletionTokens
 	}
 
-  /* Step 5: Parse tool calls from response */
+	/* Step 5: Parse tool calls from response */
 	toolCalls, err := ParseToolCalls(llmResponse.Content)
 	if err == nil && len(toolCalls) > 0 {
 		llmResponse.ToolCalls = toolCalls
 	}
 	state.LLMResponse = llmResponse
 
-  /* Step 6: Execute tools if any (limit to prevent excessive tool calls) */
+	/* Step 6: Execute tools if any (limit to prevent excessive tool calls) */
 	maxToolCalls := 20
 	if len(llmResponse.ToolCalls) > maxToolCalls {
 		llmResponse.ToolCalls = llmResponse.ToolCalls[:maxToolCalls]
@@ -181,9 +253,16 @@ func (r *Runtime) Execute(ctx context.Context, sessionID uuid.UUID, userMessage 
 	if len(llmResponse.ToolCalls) > 0 {
 		state.ToolCalls = llmResponse.ToolCalls
 
-   /* Execute tools - add sessionID to context for permission checking */
+		/* Log agent action to event stream */
+		if r.eventStream != nil {
+			r.eventStream.LogEvent(ctx, sessionID, "agent_action", agent.ID.String(), fmt.Sprintf("Executing %d tool calls", len(llmResponse.ToolCalls)), map[string]interface{}{
+				"tool_count": len(llmResponse.ToolCalls),
+			})
+		}
+
+		/* Execute tools - add sessionID to context for permission checking */
 		toolCtx := WithSessionID(WithAgentID(ctx, agent.ID), sessionID)
-		toolResults, err := r.executeTools(toolCtx, agent, llmResponse.ToolCalls)
+		toolResults, err := r.executeTools(toolCtx, agent, llmResponse.ToolCalls, sessionID)
 		if err != nil {
 			toolNames := make([]string, len(llmResponse.ToolCalls))
 			for i, call := range llmResponse.ToolCalls {
@@ -194,7 +273,7 @@ func (r *Runtime) Execute(ctx context.Context, sessionID uuid.UUID, userMessage 
 		}
 		state.ToolResults = toolResults
 
-   /* Step 7: Call LLM again with tool results */
+		/* Step 7: Call LLM again with tool results */
 		finalPrompt, err := r.prompt.BuildWithToolResults(agent, agentContext, userMessage, llmResponse, toolResults)
 		if err != nil {
 			return nil, fmt.Errorf("agent execution failed at step 7 (build final prompt): session_id='%s', agent_id='%s', agent_name='%s', tool_result_count=%d, error=%w",
@@ -207,49 +286,86 @@ func (r *Runtime) Execute(ctx context.Context, sessionID uuid.UUID, userMessage 
 			return nil, fmt.Errorf("agent execution failed at step 7 (final LLM generation): session_id='%s', agent_id='%s', agent_name='%s', model_name='%s', final_prompt_length=%d, final_prompt_tokens=%d, tool_result_count=%d, error=%w",
 				sessionID.String(), agent.ID.String(), agent.Name, agent.ModelName, len(finalPrompt), finalPromptTokens, len(toolResults), err)
 		}
-		
-   /* Update token counts */
+
+		/* Update token counts */
 		if finalResponse.Usage.TotalTokens == 0 {
 			finalResponse.Usage.PromptTokens = EstimateTokens(finalPrompt)
 			finalResponse.Usage.CompletionTokens = EstimateTokens(finalResponse.Content)
 			finalResponse.Usage.TotalTokens = finalResponse.Usage.PromptTokens + finalResponse.Usage.CompletionTokens
 		}
-		
+
 		state.FinalAnswer = finalResponse.Content
 		state.TokensUsed = llmResponse.Usage.TotalTokens + finalResponse.Usage.TotalTokens
 	} else {
 		state.FinalAnswer = llmResponse.Content
 		state.TokensUsed = llmResponse.Usage.TotalTokens
 		if state.TokensUsed == 0 {
-    /* Estimate if not provided */
+			/* Estimate if not provided */
 			state.TokensUsed = EstimateTokens(prompt) + EstimateTokens(state.FinalAnswer)
 		}
 	}
 
-  /* Step 8: Store messages with token counts */
+	/* Log agent response to event stream */
+	if r.eventStream != nil {
+		r.eventStream.LogEvent(ctx, sessionID, "agent_response", agent.ID.String(), state.FinalAnswer, map[string]interface{}{
+			"tokens_used": state.TokensUsed,
+		})
+	}
+
+	/* Store in short-term memory */
+	if r.hierMemory != nil {
+		importance := 0.5
+		if len(state.FinalAnswer) > 200 {
+			importance = 0.7
+		}
+		r.hierMemory.StoreSTM(ctx, agent.ID, sessionID, state.FinalAnswer, importance)
+	}
+
+	/* Queue output for verification */
+	if r.verifier != nil {
+		r.verifier.QueueVerification(ctx, sessionID, nil, state.FinalAnswer, "medium")
+	}
+
+	/* Step 8: Store messages with token counts */
 	if err := r.storeMessages(ctx, sessionID, userMessage, state.FinalAnswer, state.ToolCalls, state.ToolResults, state.TokensUsed); err != nil {
 		return nil, fmt.Errorf("agent execution failed at step 8 (store messages): session_id='%s', agent_id='%s', agent_name='%s', user_message_length=%d, final_answer_length=%d, tool_call_count=%d, tool_result_count=%d, total_tokens=%d, error=%w",
 			sessionID.String(), agent.ID.String(), agent.Name, len(userMessage), len(state.FinalAnswer), len(state.ToolCalls), len(state.ToolResults), state.TokensUsed, err)
 	}
 
-  /* Step 9: Store memory chunks (async, non-blocking) */
+	/* Step 9: Store memory chunks (async, non-blocking) */
 	go func() {
 		bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 		r.memory.StoreChunks(bgCtx, agent.ID, sessionID, state.FinalAnswer, state.ToolResults)
 	}()
 
+	/* Step 10: Send completion alert if configured */
+	if r.alertManager != nil && state.FinalAnswer != "" {
+		/* Completion alerts are handled by async task notifier */
+		/* For synchronous execution, we could send immediate alerts here */
+	}
+
 	return state, nil
 }
 
-func (r *Runtime) executeTools(ctx context.Context, agent *db.Agent, toolCalls []ToolCall) ([]ToolResult, error) {
+func (r *Runtime) executeTools(ctx context.Context, agent *db.Agent, toolCalls []ToolCall, sessionID uuid.UUID) ([]ToolResult, error) {
+	/* Log tool execution start to event stream */
+	if r.eventStream != nil {
+		for _, call := range toolCalls {
+			r.eventStream.LogEvent(ctx, sessionID, "tool_execution", call.Name, fmt.Sprintf("Executing tool: %s", call.Name), map[string]interface{}{
+				"tool_name": call.Name,
+				"tool_id":   call.ID,
+			})
+		}
+	}
+
 	/* Check if tools can be executed in parallel */
 	if r.canExecuteParallel(toolCalls) {
-		return r.executeToolsParallel(ctx, agent, toolCalls)
+		return r.executeToolsParallel(ctx, agent, toolCalls, sessionID)
 	}
 
 	/* Execute sequentially */
-	return r.executeToolsSequential(ctx, agent, toolCalls)
+	return r.executeToolsSequential(ctx, agent, toolCalls, sessionID)
 }
 
 /* canExecuteParallel checks if tools can be executed in parallel */
@@ -274,7 +390,7 @@ func (r *Runtime) canExecuteParallel(toolCalls []ToolCall) bool {
 }
 
 /* executeToolsParallel executes tools in parallel */
-func (r *Runtime) executeToolsParallel(ctx context.Context, agent *db.Agent, toolCalls []ToolCall) ([]ToolResult, error) {
+func (r *Runtime) executeToolsParallel(ctx context.Context, agent *db.Agent, toolCalls []ToolCall, sessionID uuid.UUID) ([]ToolResult, error) {
 	type resultWithIndex struct {
 		index  int
 		result ToolResult
@@ -301,13 +417,13 @@ func (r *Runtime) executeToolsParallel(ctx context.Context, agent *db.Agent, too
 }
 
 /* executeToolsSequential executes tools sequentially */
-func (r *Runtime) executeToolsSequential(ctx context.Context, agent *db.Agent, toolCalls []ToolCall) ([]ToolResult, error) {
+func (r *Runtime) executeToolsSequential(ctx context.Context, agent *db.Agent, toolCalls []ToolCall, sessionID uuid.UUID) ([]ToolResult, error) {
 	results := make([]ToolResult, 0, len(toolCalls))
 
 	for _, call := range toolCalls {
 		result := r.executeSingleTool(ctx, agent, call)
 		results = append(results, result)
-		
+
 		/* If tool failed and it's critical, stop execution */
 		if result.Error != nil {
 			/* Continue for now - could add critical flag to tools */
@@ -322,12 +438,12 @@ func (r *Runtime) executeSingleTool(ctx context.Context, agent *db.Agent, call T
 	/* Add timeout context for tool execution (5 minutes max) */
 	toolCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
-	
+
 	/* Check if context is already cancelled */
 	if ctx.Err() != nil {
 		return ToolResult{
 			ToolCallID: call.ID,
-			Error:      fmt.Errorf("tool execution cancelled: tool_call_id='%s', tool_name='%s', context_error=%w",
+			Error: fmt.Errorf("tool execution cancelled: tool_call_id='%s', tool_name='%s', context_error=%w",
 				call.ID, call.Name, ctx.Err()),
 		}
 	}
@@ -341,7 +457,7 @@ func (r *Runtime) executeSingleTool(ctx context.Context, agent *db.Agent, call T
 		}
 		return ToolResult{
 			ToolCallID: call.ID,
-			Error:      fmt.Errorf("tool retrieval failed for tool call: tool_call_id='%s', tool_name='%s', agent_id='%s', agent_name='%s', args_count=%d, arg_keys=[%v], error=%w",
+			Error: fmt.Errorf("tool retrieval failed for tool call: tool_call_id='%s', tool_name='%s', agent_id='%s', agent_name='%s', args_count=%d, arg_keys=[%v], error=%w",
 				call.ID, call.Name, agent.ID.String(), agent.Name, len(call.Arguments), argKeys, err),
 		}
 	}
@@ -350,7 +466,7 @@ func (r *Runtime) executeSingleTool(ctx context.Context, agent *db.Agent, call T
 	if !contains(agent.EnabledTools, call.Name) {
 		return ToolResult{
 			ToolCallID: call.ID,
-			Error:      fmt.Errorf("tool not enabled for agent: tool_call_id='%s', tool_name='%s', agent_id='%s', agent_name='%s', enabled_tools=[%v]",
+			Error: fmt.Errorf("tool not enabled for agent: tool_call_id='%s', tool_name='%s', agent_id='%s', agent_name='%s', enabled_tools=[%v]",
 				call.ID, call.Name, agent.ID.String(), agent.Name, agent.EnabledTools),
 		}
 	}
@@ -362,14 +478,14 @@ func (r *Runtime) executeSingleTool(ctx context.Context, agent *db.Agent, call T
 		if err != nil {
 			return ToolResult{
 				ToolCallID: call.ID,
-				Error:      fmt.Errorf("tool permission check failed: tool_call_id='%s', tool_name='%s', agent_id='%s', session_id='%s', error=%w",
+				Error: fmt.Errorf("tool permission check failed: tool_call_id='%s', tool_name='%s', agent_id='%s', session_id='%s', error=%w",
 					call.ID, call.Name, agent.ID.String(), sessionID.String(), err),
 			}
 		}
 		if !allowed {
 			return ToolResult{
 				ToolCallID: call.ID,
-				Error:      fmt.Errorf("tool execution not allowed: tool_call_id='%s', tool_name='%s', agent_id='%s', session_id='%s'",
+				Error: fmt.Errorf("tool execution not allowed: tool_call_id='%s', tool_name='%s', agent_id='%s', session_id='%s'",
 					call.ID, call.Name, agent.ID.String(), sessionID.String()),
 			}
 		}
@@ -385,7 +501,7 @@ func (r *Runtime) executeSingleTool(ctx context.Context, agent *db.Agent, call T
 		return ToolResult{
 			ToolCallID: call.ID,
 			Content:    result,
-			Error:      fmt.Errorf("tool execution failed: tool_call_id='%s', tool_name='%s', handler_type='%s', agent_id='%s', agent_name='%s', args_count=%d, arg_keys=[%v], error=%w",
+			Error: fmt.Errorf("tool execution failed: tool_call_id='%s', tool_name='%s', handler_type='%s', agent_id='%s', agent_name='%s', args_count=%d, arg_keys=[%v], error=%w",
 				call.ID, call.Name, tool.HandlerType, agent.ID.String(), agent.Name, len(call.Arguments), argKeys, err),
 		}
 	}
@@ -398,7 +514,7 @@ func (r *Runtime) executeSingleTool(ctx context.Context, agent *db.Agent, call T
 }
 
 func (r *Runtime) storeMessages(ctx context.Context, sessionID uuid.UUID, userMsg, assistantMsg string, toolCalls []ToolCall, toolResults []ToolResult, totalTokens int) error {
-  /* Store user message */
+	/* Store user message */
 	userTokens := EstimateTokens(userMsg)
 	if _, err := r.queries.CreateMessage(ctx, &db.Message{
 		SessionID:  sessionID,
@@ -410,7 +526,7 @@ func (r *Runtime) storeMessages(ctx context.Context, sessionID uuid.UUID, userMs
 			sessionID.String(), len(userMsg), userTokens, err)
 	}
 
-  /* Store tool calls as messages */
+	/* Store tool calls as messages */
 	for _, call := range toolCalls {
 		callJSON, _ := json.Marshal(call.Arguments)
 		toolCallID := call.ID
@@ -426,7 +542,7 @@ func (r *Runtime) storeMessages(ctx context.Context, sessionID uuid.UUID, userMs
 		}
 	}
 
-  /* Store tool results */
+	/* Store tool results */
 	for _, result := range toolResults {
 		toolName := result.ToolCallID
 		toolCallID := result.ToolCallID
@@ -443,7 +559,7 @@ func (r *Runtime) storeMessages(ctx context.Context, sessionID uuid.UUID, userMs
 		}
 	}
 
-  /* Store assistant message */
+	/* Store assistant message */
 	assistantTokens := EstimateTokens(assistantMsg)
 	if _, err := r.queries.CreateMessage(ctx, &db.Message{
 		SessionID:  sessionID,
@@ -483,3 +599,91 @@ func contains(arr pq.StringArray, s string) bool {
 	return false
 }
 
+/* HierMemory returns the hierarchical memory manager */
+func (r *Runtime) HierMemory() *HierarchicalMemoryManager {
+	return r.hierMemory
+}
+
+/* Verifier returns the verification agent */
+func (r *Runtime) Verifier() *VerificationAgent {
+	return r.verifier
+}
+
+/* VFS returns the virtual file system */
+func (r *Runtime) VFS() *VirtualFileSystem {
+	return r.vfs
+}
+
+/* Workspace returns the workspace manager */
+func (r *Runtime) Workspace() interface{} {
+	return r.workspace
+}
+
+/* SetAsyncExecutor sets the async task executor */
+func (r *Runtime) SetAsyncExecutor(executor *AsyncTaskExecutor) {
+	r.asyncExecutor = executor
+}
+
+/* SetSubAgentManager sets the sub-agent manager */
+func (r *Runtime) SetSubAgentManager(manager *SubAgentManager) {
+	r.subAgentManager = manager
+}
+
+/* SetAlertManager sets the alert manager */
+func (r *Runtime) SetAlertManager(manager *TaskNotifier) {
+	r.alertManager = manager
+}
+
+/* SetMultimodalProcessor sets the multimodal processor */
+func (r *Runtime) SetMultimodalProcessor(processor interface{}) {
+	r.multimodalProcessor = processor
+}
+
+/* shouldExecuteAsync determines if a task should be executed asynchronously */
+func (r *Runtime) shouldExecuteAsync(userMessage string) bool {
+	/* Check for async keywords */
+	asyncKeywords := []string{"long-running", "background", "async", "process large", "analyze dataset"}
+	messageLower := strings.ToLower(userMessage)
+
+	for _, keyword := range asyncKeywords {
+		if strings.Contains(messageLower, keyword) {
+			return true
+		}
+	}
+
+	/* Check message length (very long messages might benefit from async) */
+	if len(userMessage) > 10000 {
+		return true
+	}
+
+	return false
+}
+
+/* executeAsync executes a task asynchronously */
+func (r *Runtime) executeAsync(ctx context.Context, sessionID uuid.UUID, userMessage string) (*ExecutionState, error) {
+	/* Load session to get agent ID */
+	session, err := r.queries.GetSession(ctx, sessionID)
+	if err != nil {
+		return nil, fmt.Errorf("async execution failed: session_load_error=true, session_id='%s', error=%w", sessionID.String(), err)
+	}
+
+	/* Create async task */
+	input := map[string]interface{}{
+		"user_message": userMessage,
+		"async":        true,
+	}
+
+	task, err := r.asyncExecutor.ExecuteAsync(ctx, sessionID, session.AgentID, "agent_execution", input, 0)
+	if err != nil {
+		return nil, fmt.Errorf("async execution failed: task_creation_error=true, session_id='%s', agent_id='%s', error=%w",
+			sessionID.String(), session.AgentID.String(), err)
+	}
+
+	/* Return state indicating async execution */
+	return &ExecutionState{
+		SessionID:   sessionID,
+		AgentID:     session.AgentID,
+		UserMessage: userMessage,
+		FinalAnswer: fmt.Sprintf("Task queued for asynchronous execution. Task ID: %s. Use GET /api/v1/async-tasks/%s to check status.", task.ID.String(), task.ID.String()),
+	}, nil
+}

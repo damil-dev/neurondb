@@ -51,7 +51,7 @@ func NewMemoryManager(db *db.DB, queries *db.Queries, embedClient *neurondb.Embe
 }
 
 func (m *MemoryManager) Retrieve(ctx context.Context, agentID uuid.UUID, queryEmbedding []float32, topK int) ([]MemoryChunk, error) {
-  /* Record metrics */
+	/* Record metrics */
 	defer func() {
 		metrics.RecordMemoryRetrieval(agentID.String())
 	}()
@@ -85,24 +85,24 @@ func (m *MemoryManager) StoreChunks(ctx context.Context, agentID, sessionID uuid
 		return /* Don't store extremely large content */
 	}
 
-  /* Compute importance score (heuristic: length, user flags, etc.) */
+	/* Compute importance score (heuristic: length, user flags, etc.) */
 	importance := m.computeImportance(content, toolResults)
 
-  /* Only store if importance > threshold */
+	/* Only store if importance > threshold */
 	if importance < 0.3 {
 		return
 	}
 
-  /* Compute embedding */
+	/* Compute embedding */
 	embeddingModel := "all-MiniLM-L6-v2"
 	embedding, err := m.embed.Embed(ctx, content, embeddingModel)
 	if err != nil {
-   /* Log error but don't fail (async operation) */
-   /* Error is already detailed in embedding client */
+		/* Log error but don't fail (async operation) */
+		/* Error is already detailed in embedding client */
 		return
 	}
 
-  /* Store chunk */
+	/* Store chunk */
 	_, err = m.queries.CreateMemoryChunk(ctx, &db.MemoryChunk{
 		AgentID:         agentID,
 		SessionID:       &sessionID,
@@ -111,12 +111,12 @@ func (m *MemoryManager) StoreChunks(ctx context.Context, agentID, sessionID uuid
 		ImportanceScore: importance,
 	})
 	if err != nil {
-   /* Log error but don't fail (async operation) */
-   /* Error is already detailed in queries.CreateMemoryChunk */
+		/* Log error but don't fail (async operation) */
+		/* Error is already detailed in queries.CreateMemoryChunk */
 		return
 	}
 
-  /* Record metrics */
+	/* Record metrics */
 	metrics.RecordMemoryChunkStored(agentID.String())
 }
 
@@ -161,13 +161,13 @@ func (m *MemoryManager) SummarizeMemory(ctx context.Context, agentID uuid.UUID, 
 		WHERE agent_id = $1
 		ORDER BY created_at ASC
 		LIMIT $2`
-	
+
 	type MemoryChunkRow struct {
 		ID        int64     `db:"id"`
 		Content   string    `db:"content"`
 		CreatedAt time.Time `db:"created_at"`
 	}
-	
+
 	var chunks []MemoryChunkRow
 	err := m.db.DB.SelectContext(ctx, &chunks, query, agentID, maxChunks)
 	if err != nil {
@@ -214,8 +214,8 @@ func (m *MemoryManager) SummarizeMemory(ctx context.Context, agentID uuid.UUID, 
 		Embedding:       embedding,
 		ImportanceScore: 0.8, /* Summaries are important */
 		Metadata: map[string]interface{}{
-			"type":        "summary",
-			"source_ids":  chunks,
+			"type":       "summary",
+			"source_ids": chunks,
 		},
 	})
 	if err != nil {
@@ -245,7 +245,7 @@ func (m *MemoryManager) ApplyTemporalDecay(ctx context.Context, agentID uuid.UUI
 	query := `UPDATE neurondb_agent.memory_chunks
 		SET importance_score = GREATEST(0.1, importance_score * POWER($1, EXTRACT(EPOCH FROM (NOW() - created_at)) / 86400.0))
 		WHERE agent_id = $2 AND created_at < NOW() - INTERVAL '7 days'`
-	
+
 	_, err := m.db.DB.ExecContext(ctx, query, decayRate, agentID)
 	if err != nil {
 		return fmt.Errorf("temporal decay application failed: agent_id='%s', decay_rate=%.2f, error=%w",

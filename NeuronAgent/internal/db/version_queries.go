@@ -50,17 +50,17 @@ const (
 
 /* AgentVersion represents an agent version */
 type AgentVersion struct {
-	ID           uuid.UUID              `db:"id"`
-	AgentID      uuid.UUID              `db:"agent_id"`
-	VersionNumber int                   `db:"version_number"`
-	Name         *string                `db:"name"`
-	Description  *string                `db:"description"`
-	SystemPrompt string                 `db:"system_prompt"`
-	ModelName    string                 `db:"model_name"`
-	EnabledTools []string               `db:"enabled_tools"`
-	Config       JSONBMap               `db:"config"`
-	IsActive     bool                   `db:"is_active"`
-	CreatedAt    string                 `db:"created_at"`
+	ID            uuid.UUID `db:"id"`
+	AgentID       uuid.UUID `db:"agent_id"`
+	VersionNumber int       `db:"version_number"`
+	Name          *string   `db:"name"`
+	Description   *string   `db:"description"`
+	SystemPrompt  string    `db:"system_prompt"`
+	ModelName     string    `db:"model_name"`
+	EnabledTools  []string  `db:"enabled_tools"`
+	Config        JSONBMap  `db:"config"`
+	IsActive      bool      `db:"is_active"`
+	CreatedAt     string    `db:"created_at"`
 }
 
 /* CreateAgentVersion creates a new agent version */
@@ -122,4 +122,3 @@ func (q *Queries) ActivateAgentVersion(ctx context.Context, agentID uuid.UUID, v
 	}
 	return nil
 }
-

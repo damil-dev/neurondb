@@ -30,13 +30,13 @@ import (
 func (h *Handlers) ListMemoryChunks(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	requestID := GetRequestID(r.Context())
-	
+
 	// Validate UUID
 	if err := validation.ValidateUUIDRequired(vars["id"], "agent_id"); err != nil {
 		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid agent ID", err, requestID, r.URL.Path, r.Method, "memory", "", nil))
 		return
 	}
-	
+
 	agentID, err := uuid.Parse(vars["id"])
 	if err != nil {
 		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid agent id format", err, requestID, r.URL.Path, r.Method, "memory", "", nil))
@@ -115,13 +115,13 @@ func (h *Handlers) DeleteMemoryChunk(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) SearchMemory(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	requestID := GetRequestID(r.Context())
-	
+
 	// Validate UUID
 	if err := validation.ValidateUUIDRequired(vars["id"], "agent_id"); err != nil {
 		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid agent ID", err, requestID, r.URL.Path, r.Method, "memory", "", nil))
 		return
 	}
-	
+
 	agentID, err := uuid.Parse(vars["id"])
 	if err != nil {
 		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid agent id format", err, requestID, r.URL.Path, r.Method, "memory", "", nil))
@@ -184,4 +184,3 @@ func (h *Handlers) SearchMemory(w http.ResponseWriter, r *http.Request) {
 
 	respondJSON(w, http.StatusOK, chunks)
 }
-

@@ -25,7 +25,7 @@ import (
 func InitLogging(level string, format string) {
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 
-  /* Set log level */
+	/* Set log level */
 	switch level {
 	case "debug":
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
@@ -39,7 +39,7 @@ func InitLogging(level string, format string) {
 		zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	}
 
-  /* Set format */
+	/* Set format */
 	if format == "console" {
 		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 	} else {
@@ -50,4 +50,3 @@ func InitLogging(level string, format string) {
 func Logger() *zerolog.Logger {
 	return &log.Logger
 }
-

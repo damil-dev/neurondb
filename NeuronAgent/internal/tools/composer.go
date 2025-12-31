@@ -171,13 +171,12 @@ func (c *ToolComposer) evaluateCondition(condition map[string]interface{}, previ
 }
 
 func containsString(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(substr) == 0 || 
-		(len(s) > len(substr) && (s[:len(substr)] == substr || s[len(s)-len(substr):] == substr || 
-		containsString(s[1:], substr))))
+	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
+		(len(s) > len(substr) && (s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||
+			containsString(s[1:], substr))))
 }
 
 type ConditionalToolCall struct {
 	ToolCall  agent.ToolCall
 	Condition map[string]interface{}
 }
-

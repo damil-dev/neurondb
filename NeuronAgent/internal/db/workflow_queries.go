@@ -273,4 +273,3 @@ func (q *Queries) GetWorkflowStepExecutionByIdempotencyKey(ctx context.Context, 
 	}
 	return &stepExecution, nil
 }
-

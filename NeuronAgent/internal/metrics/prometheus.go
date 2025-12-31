@@ -23,7 +23,7 @@ import (
 )
 
 var (
-  /* Request metrics */
+	/* Request metrics */
 	httpRequestsTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "neurondb_agent_http_requests_total",
@@ -41,7 +41,7 @@ var (
 		[]string{"method", "endpoint"},
 	)
 
-  /* Agent metrics */
+	/* Agent metrics */
 	agentExecutionsTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "neurondb_agent_executions_total",
@@ -59,7 +59,7 @@ var (
 		[]string{"agent_id"},
 	)
 
-  /* LLM metrics */
+	/* LLM metrics */
 	llmCallsTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "neurondb_agent_llm_calls_total",
@@ -76,7 +76,7 @@ var (
 		[]string{"model", "type"},
 	)
 
-  /* Memory metrics */
+	/* Memory metrics */
 	memoryChunksStored = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "neurondb_agent_memory_chunks_stored_total",
@@ -93,7 +93,7 @@ var (
 		[]string{"agent_id"},
 	)
 
-  /* Tool metrics */
+	/* Tool metrics */
 	toolExecutionsTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "neurondb_agent_tool_executions_total",
@@ -111,7 +111,7 @@ var (
 		[]string{"tool_name"},
 	)
 
-  /* Job metrics */
+	/* Job metrics */
 	jobsQueued = promauto.NewGauge(
 		prometheus.GaugeOpts{
 			Name: "neurondb_agent_jobs_queued",
@@ -178,4 +178,3 @@ func RecordJobProcessed(jobType, status string) {
 func Handler() http.Handler {
 	return promhttp.Handler()
 }
-
