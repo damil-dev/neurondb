@@ -67,7 +67,7 @@ func LoadConfig(path string) (*Config, error) {
 		return nil, fmt.Errorf("failed to parse config: %w", err)
 	}
 
-  /* Override with environment variables */
+	/* Override with environment variables */
 	if err := LoadFromEnv(&config); err != nil {
 		return nil, fmt.Errorf("failed to load from env: %w", err)
 	}
@@ -75,6 +75,4 @@ func LoadConfig(path string) (*Config, error) {
 	return &config, nil
 }
 
-
 /* DefaultConfig is now in defaults.go */
-

@@ -27,7 +27,7 @@ import (
 
 /* StreamResponse streams agent responses chunk by chunk */
 func StreamResponse(w http.ResponseWriter, r *http.Request, runtime *agent.Runtime, sessionIDStr string, userMessage string) {
-  /* Set headers for streaming */
+	/* Set headers for streaming */
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
@@ -39,7 +39,7 @@ func StreamResponse(w http.ResponseWriter, r *http.Request, runtime *agent.Runti
 		return
 	}
 
-  /* Parse session ID */
+	/* Parse session ID */
 	sessionID, err := uuid.Parse(sessionIDStr)
 	if err != nil {
 		sendSSE(w, flusher, "error", map[string]interface{}{
@@ -48,8 +48,8 @@ func StreamResponse(w http.ResponseWriter, r *http.Request, runtime *agent.Runti
 		return
 	}
 
-  /* Execute agent with streaming */
-  /* Note: This is a simplified version - full implementation would stream LLM output */
+	/* Execute agent with streaming */
+	/* Note: This is a simplified version - full implementation would stream LLM output */
 	state, err := runtime.Execute(r.Context(), sessionID, userMessage)
 	if err != nil {
 		sendSSE(w, flusher, "error", map[string]interface{}{
@@ -58,9 +58,9 @@ func StreamResponse(w http.ResponseWriter, r *http.Request, runtime *agent.Runti
 		return
 	}
 
-  /* Stream response in chunks */
+	/* Stream response in chunks */
 	response := state.FinalAnswer
- 	chunkSize := 50 /* Characters per chunk */
+	chunkSize := 50 /* Characters per chunk */
 
 	for i := 0; i < len(response); i += chunkSize {
 		end := i + chunkSize
@@ -73,13 +73,13 @@ func StreamResponse(w http.ResponseWriter, r *http.Request, runtime *agent.Runti
 			"content": chunk,
 		})
 
-   /* Check if client disconnected */
+		/* Check if client disconnected */
 		if r.Context().Err() != nil {
 			return
 		}
 	}
 
-  /* Send completion */
+	/* Send completion */
 	sendSSE(w, flusher, "done", map[string]interface{}{
 		"tokens_used":  state.TokensUsed,
 		"tool_calls":   state.ToolCalls,
@@ -97,5 +97,3 @@ func sendSSE(w http.ResponseWriter, flusher http.Flusher, event string, data int
 	fmt.Fprintf(w, "data: %s\n\n", jsonData)
 	flusher.Flush()
 }
-
-

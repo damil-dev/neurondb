@@ -42,22 +42,22 @@ const (
 
 /* Reflection represents a reflection record */
 type Reflection struct {
-	ID              int64                  `db:"id"`
-	AgentID         *uuid.UUID             `db:"agent_id"`
-	SessionID       *uuid.UUID             `db:"session_id"`
-	MessageID       *int64                 `db:"message_id"`
-	UserMessage     string                 `db:"user_message"`
-	AgentResponse   string                 `db:"agent_response"`
-	QualityScore    *float64               `db:"quality_score"`
-	AccuracyScore   *float64               `db:"accuracy_score"`
-	CompletenessScore *float64             `db:"completeness_score"`
-	ClarityScore    *float64               `db:"clarity_score"`
-	RelevanceScore  *float64               `db:"relevance_score"`
-	Confidence      *float64               `db:"confidence"`
-	Issues          JSONBMap               `db:"issues"`
-	Suggestions     JSONBMap               `db:"suggestions"`
-	WasRetried      bool                   `db:"was_retried"`
-	CreatedAt       string                 `db:"created_at"`
+	ID                int64      `db:"id"`
+	AgentID           *uuid.UUID `db:"agent_id"`
+	SessionID         *uuid.UUID `db:"session_id"`
+	MessageID         *int64     `db:"message_id"`
+	UserMessage       string     `db:"user_message"`
+	AgentResponse     string     `db:"agent_response"`
+	QualityScore      *float64   `db:"quality_score"`
+	AccuracyScore     *float64   `db:"accuracy_score"`
+	CompletenessScore *float64   `db:"completeness_score"`
+	ClarityScore      *float64   `db:"clarity_score"`
+	RelevanceScore    *float64   `db:"relevance_score"`
+	Confidence        *float64   `db:"confidence"`
+	Issues            JSONBMap   `db:"issues"`
+	Suggestions       JSONBMap   `db:"suggestions"`
+	WasRetried        bool       `db:"was_retried"`
+	CreatedAt         string     `db:"created_at"`
 }
 
 /* CreateReflection creates a new reflection */
@@ -100,4 +100,3 @@ func (q *Queries) ListReflections(ctx context.Context, agentID, sessionID *uuid.
 	}
 	return reflections, nil
 }
-

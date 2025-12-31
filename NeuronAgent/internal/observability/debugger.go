@@ -25,34 +25,34 @@ import (
 
 /* ExecutionStep represents a step in agent execution */
 type ExecutionStep struct {
-	ID          string                 `json:"id"`
-	StepType    string                 `json:"step_type"` // "load", "context", "prompt", "llm", "tool", "memory", "store"
-	Timestamp   time.Time              `json:"timestamp"`
-	Duration    time.Duration          `json:"duration"`
-	Input       map[string]interface{} `json:"input,omitempty"`
-	Output      map[string]interface{} `json:"output,omitempty"`
-	Error       *string                `json:"error,omitempty"`
-	Metadata    map[string]interface{} `json:"metadata,omitempty"`
+	ID        string                 `json:"id"`
+	StepType  string                 `json:"step_type"` // "load", "context", "prompt", "llm", "tool", "memory", "store"
+	Timestamp time.Time              `json:"timestamp"`
+	Duration  time.Duration          `json:"duration"`
+	Input     map[string]interface{} `json:"input,omitempty"`
+	Output    map[string]interface{} `json:"output,omitempty"`
+	Error     *string                `json:"error,omitempty"`
+	Metadata  map[string]interface{} `json:"metadata,omitempty"`
 }
 
 /* ExecutionTrace represents a complete execution trace */
 type ExecutionTrace struct {
-	ID          uuid.UUID       `json:"id"`
-	SessionID   uuid.UUID       `json:"session_id"`
-	AgentID     uuid.UUID       `json:"agent_id"`
-	UserMessage string          `json:"user_message"`
-	Steps       []ExecutionStep `json:"steps"`
-	StartTime   time.Time       `json:"start_time"`
-	EndTime     *time.Time      `json:"end_time,omitempty"`
-	Duration    time.Duration   `json:"duration"`
-	Success     bool            `json:"success"`
+	ID          uuid.UUID              `json:"id"`
+	SessionID   uuid.UUID              `json:"session_id"`
+	AgentID     uuid.UUID              `json:"agent_id"`
+	UserMessage string                 `json:"user_message"`
+	Steps       []ExecutionStep        `json:"steps"`
+	StartTime   time.Time              `json:"start_time"`
+	EndTime     *time.Time             `json:"end_time,omitempty"`
+	Duration    time.Duration          `json:"duration"`
+	Success     bool                   `json:"success"`
 	Metadata    map[string]interface{} `json:"metadata,omitempty"`
 }
 
 /* Debugger manages execution traces for debugging */
 type Debugger struct {
-	traces map[uuid.UUID]*ExecutionTrace
-	mu     sync.RWMutex
+	traces    map[uuid.UUID]*ExecutionTrace
+	mu        sync.RWMutex
 	maxTraces int
 }
 
@@ -62,7 +62,7 @@ func NewDebugger(maxTraces int) *Debugger {
 		maxTraces = 1000
 	}
 	return &Debugger{
-		traces: make(map[uuid.UUID]*ExecutionTrace),
+		traces:    make(map[uuid.UUID]*ExecutionTrace),
 		maxTraces: maxTraces,
 	}
 }
@@ -84,7 +84,7 @@ func (d *Debugger) StartTrace(sessionID, agentID uuid.UUID, userMessage string) 
 	}
 
 	d.traces[traceID] = trace
-	
+
 	/* Cleanup old traces if needed */
 	if len(d.traces) > d.maxTraces {
 		d.cleanupOldTraces()
@@ -195,7 +195,7 @@ func (d *Debugger) cleanupOldTraces() {
 		id    uuid.UUID
 		start time.Time
 	}
-	
+
 	traces := make([]traceWithTime, 0, len(d.traces))
 	for id, trace := range d.traces {
 		traces = append(traces, traceWithTime{id: id, start: trace.StartTime})
@@ -258,4 +258,3 @@ func TraceIDFromContext(ctx context.Context) (uuid.UUID, bool) {
 	traceID, ok := ctx.Value(traceIDKey).(uuid.UUID)
 	return traceID, ok
 }
-

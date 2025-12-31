@@ -22,15 +22,15 @@ import (
 )
 
 type MigrationRunner struct {
-	db         *sqlx.DB
-	schemaMgr  *SchemaManager
+	db            *sqlx.DB
+	schemaMgr     *SchemaManager
 	migrationsDir string
 }
 
 func NewMigrationRunner(db *sqlx.DB, migrationsDir string) (*MigrationRunner, error) {
 	schemaMgr := NewSchemaManager(db)
-	
-  /* Get absolute path */
+
+	/* Get absolute path */
 	absPath, err := filepath.Abs(migrationsDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get absolute path: %w", err)
@@ -42,7 +42,7 @@ func NewMigrationRunner(db *sqlx.DB, migrationsDir string) (*MigrationRunner, er
 		migrationsDir: absPath,
 	}
 
-  /* Load migrations */
+	/* Load migrations */
 	if err := schemaMgr.LoadMigrations(absPath); err != nil {
 		return nil, fmt.Errorf("failed to load migrations: %w", err)
 	}
@@ -69,4 +69,3 @@ func (mr *MigrationRunner) Status(ctx context.Context) (int, int, error) {
 func (mr *MigrationRunner) Rollback(ctx context.Context) error {
 	return mr.schemaMgr.Rollback(ctx)
 }
-

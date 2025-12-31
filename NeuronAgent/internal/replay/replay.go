@@ -40,19 +40,19 @@ func NewReplayManager(queries *db.Queries, runtime *agent.Runtime) *ReplayManage
 /* StoreExecutionSnapshot stores a complete execution snapshot for replay */
 func (r *ReplayManager) StoreExecutionSnapshot(ctx context.Context, state *agent.ExecutionState, deterministicMode bool) error {
 	executionState := map[string]interface{}{
-		"user_message":   state.UserMessage,
-		"final_answer":   state.FinalAnswer,
-		"tokens_used":    state.TokensUsed,
-		"tool_calls":     state.ToolCalls,
-		"tool_results":   r.serializeToolResults(state.ToolResults),
-		"llm_response":   r.serializeLLMResponse(state.LLMResponse),
+		"user_message": state.UserMessage,
+		"final_answer": state.FinalAnswer,
+		"tokens_used":  state.TokensUsed,
+		"tool_calls":   state.ToolCalls,
+		"tool_results": r.serializeToolResults(state.ToolResults),
+		"llm_response": r.serializeLLMResponse(state.LLMResponse),
 	}
 
 	snapshot := &db.ExecutionSnapshot{
-		SessionID:        state.SessionID,
-		AgentID:          state.AgentID,
-		UserMessage:      state.UserMessage,
-		ExecutionState:   executionState,
+		SessionID:         state.SessionID,
+		AgentID:           state.AgentID,
+		UserMessage:       state.UserMessage,
+		ExecutionState:    executionState,
 		DeterministicMode: deterministicMode,
 	}
 
@@ -101,7 +101,7 @@ func (r *ReplayManager) serializeLLMResponse(resp *agent.LLMResponse) map[string
 		return nil
 	}
 	return map[string]interface{}{
-		"content":   resp.Content,
+		"content":    resp.Content,
 		"tool_calls": resp.ToolCalls,
 		"usage": map[string]interface{}{
 			"prompt_tokens":     resp.Usage.PromptTokens,
@@ -192,4 +192,3 @@ func getMap(m map[string]interface{}, key string) map[string]interface{} {
 	}
 	return make(map[string]interface{})
 }
-

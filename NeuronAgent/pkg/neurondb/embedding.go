@@ -38,14 +38,14 @@ func NewEmbeddingClient(db *sqlx.DB) *EmbeddingClient {
 func (c *EmbeddingClient) Embed(ctx context.Context, text string, model string) (Vector, error) {
 	var embeddingStr string
 	query := `SELECT neurondb_embed($1, $2)::text AS embedding`
-	
+
 	err := c.db.GetContext(ctx, &embeddingStr, query, text, model)
 	if err != nil {
 		return nil, fmt.Errorf("embedding generation failed via NeuronDB: model_name='%s', text_length=%d, function='neurondb_embed', error=%w",
 			model, len(text), err)
 	}
 
-  /* Parse vector string format [1.0, 2.0, 3.0] to []float32 */
+	/* Parse vector string format [1.0, 2.0, 3.0] to []float32 */
 	embedding, err := parseVector(embeddingStr)
 	if err != nil {
 		embeddingStrPreview := embeddingStr
@@ -61,17 +61,17 @@ func (c *EmbeddingClient) Embed(ctx context.Context, text string, model string) 
 
 /* EmbedBatch generates embeddings for multiple texts */
 func (c *EmbeddingClient) EmbedBatch(ctx context.Context, texts []string, model string) ([]Vector, error) {
-  /* Use array format for batch embedding if available */
+	/* Use array format for batch embedding if available */
 	query := `SELECT neurondb_embed_batch($1::text[], $2) AS embeddings`
-	
+
 	var embeddingsStr string
 	err := c.db.GetContext(ctx, &embeddingsStr, query, texts, model)
 	if err != nil {
-   /* Fallback to individual embeddings if batch function not available */
+		/* Fallback to individual embeddings if batch function not available */
 		return c.embedBatchFallback(ctx, texts, model)
 	}
 
-  /* Parse array of vectors */
+	/* Parse array of vectors */
 	embeddings, err := parseVectorArray(embeddingsStr)
 	if err != nil {
 		embeddingsStrPreview := embeddingsStr
@@ -101,13 +101,13 @@ func (c *EmbeddingClient) embedBatchFallback(ctx context.Context, texts []string
 
 /* parseVector parses a vector string like "[1.0, 2.0, 3.0]" into a Vector */
 func parseVector(s string) (Vector, error) {
-  /* Remove brackets */
+	/* Remove brackets */
 	if len(s) < 2 || s[0] != '[' || s[len(s)-1] != ']' {
 		return nil, fmt.Errorf("invalid vector format: %s", s)
 	}
 	s = s[1 : len(s)-1]
 
-  /* Split by comma */
+	/* Split by comma */
 	var values []float32
 	start := 0
 	for i := 0; i <= len(s); i++ {
@@ -131,38 +131,38 @@ func parseVector(s string) (Vector, error) {
 /* Format: "{[1.0,2.0],[3.0,4.0]}" or "[1.0,2.0],[3.0,4.0]" */
 func parseVectorArray(s string) ([]Vector, error) {
 	s = strings.TrimSpace(s)
-	
-  /* Remove outer braces if present */
+
+	/* Remove outer braces if present */
 	if len(s) > 0 && s[0] == '{' && s[len(s)-1] == '}' {
 		s = s[1 : len(s)-1]
 	}
-	
+
 	if len(s) == 0 {
 		return []Vector{}, nil
 	}
-	
-  /* Split by "],[" to separate vectors */
-  /* Handle both "],[ and ], [" patterns */
+
+	/* Split by "],[" to separate vectors */
+	/* Handle both "],[ and ], [" patterns */
 	parts := strings.Split(s, "],[")
 	var vectors []Vector
-	
+
 	for _, part := range parts {
-   /* Clean up brackets */
+		/* Clean up brackets */
 		part = strings.TrimSpace(part)
 		if len(part) == 0 {
 			continue
 		}
-		
-   /* Remove leading [ if present */
+
+		/* Remove leading [ if present */
 		if len(part) > 0 && part[0] == '[' {
 			part = part[1:]
 		}
-   /* Remove trailing ] if present */
+		/* Remove trailing ] if present */
 		if len(part) > 0 && part[len(part)-1] == ']' {
 			part = part[:len(part)-1]
 		}
-		
-   /* Add brackets back for parseVector */
+
+		/* Add brackets back for parseVector */
 		vectorStr := "[" + part + "]"
 		vec, err := parseVector(vectorStr)
 		if err != nil {
@@ -170,7 +170,6 @@ func parseVectorArray(s string) ([]Vector, error) {
 		}
 		vectors = append(vectors, vec)
 	}
-	
+
 	return vectors, nil
 }
-

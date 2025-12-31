@@ -111,15 +111,15 @@ func (h *Handlers) GetBudget(w http.ResponseWriter, r *http.Request) {
 	}
 
 	status := map[string]interface{}{
-		"agent_id":       agentID,
-		"period_type":    periodType,
-		"budget_amount":  budget.BudgetAmount,
-		"total_cost":     costSummary.TotalCost,
-		"remaining":      remaining,
-		"within_budget":  costSummary.TotalCost < budget.BudgetAmount,
-		"budget_set":     true,
-		"start_date":     startDate,
-		"end_date":       endDate,
+		"agent_id":      agentID,
+		"period_type":   periodType,
+		"budget_amount": budget.BudgetAmount,
+		"total_cost":    costSummary.TotalCost,
+		"remaining":     remaining,
+		"within_budget": costSummary.TotalCost < budget.BudgetAmount,
+		"budget_set":    true,
+		"start_date":    startDate,
+		"end_date":      endDate,
 	}
 
 	respondJSON(w, http.StatusOK, status)
@@ -144,10 +144,10 @@ func (h *Handlers) SetBudget(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		BudgetAmount float64              `json:"budget_amount"`
-		PeriodType   string               `json:"period_type"`
-		StartDate    *time.Time           `json:"start_date"`
-		EndDate      *time.Time           `json:"end_date"`
+		BudgetAmount float64                `json:"budget_amount"`
+		PeriodType   string                 `json:"period_type"`
+		StartDate    *time.Time             `json:"start_date"`
+		EndDate      *time.Time             `json:"end_date"`
 		Metadata     map[string]interface{} `json:"metadata"`
 	}
 
@@ -231,9 +231,9 @@ func (h *Handlers) UpdateBudget(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		BudgetAmount *float64             `json:"budget_amount"`
-		StartDate    *time.Time           `json:"start_date"`
-		EndDate      *time.Time           `json:"end_date"`
+		BudgetAmount *float64               `json:"budget_amount"`
+		StartDate    *time.Time             `json:"start_date"`
+		EndDate      *time.Time             `json:"end_date"`
 		Metadata     map[string]interface{} `json:"metadata"`
 	}
 
@@ -270,13 +270,3 @@ func (h *Handlers) UpdateBudget(w http.ResponseWriter, r *http.Request) {
 
 	respondJSON(w, http.StatusOK, budget)
 }
-
-
-
-
-
-
-
-
-
-

@@ -49,4 +49,3 @@ func GetSessionIDFromContext(ctx context.Context) (uuid.UUID, bool) {
 	sessionID, ok := ctx.Value(sessionIDContextKey).(uuid.UUID)
 	return sessionID, ok
 }
-

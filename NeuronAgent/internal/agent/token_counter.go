@@ -21,15 +21,15 @@ import (
 /* EstimateTokens estimates token count for text (rough approximation) */
 /* For GPT models, ~4 characters = 1 token, but this varies */
 func EstimateTokens(text string) int {
-  /* Simple approximation: count words and add some overhead */
+	/* Simple approximation: count words and add some overhead */
 	words := strings.Fields(text)
 	baseTokens := len(words)
-	
-  /* Add tokens for punctuation and special characters */
+
+	/* Add tokens for punctuation and special characters */
 	charCount := utf8.RuneCountInString(text)
 	charTokens := charCount / 4
-	
-  /* Use the larger estimate */
+
+	/* Use the larger estimate */
 	if charTokens > baseTokens {
 		return charTokens
 	}
@@ -57,21 +57,20 @@ func TruncateToMaxTokens(text string, maxTokens int) string {
 	if tokens <= maxTokens {
 		return text
 	}
-	
-  /* Rough truncation - remove from end */
+
+	/* Rough truncation - remove from end */
 	charsPerToken := len(text) / tokens
 	maxChars := maxTokens * charsPerToken
-	
+
 	if maxChars >= len(text) {
 		return text
 	}
-	
-  /* Truncate and add ellipsis */
+
+	/* Truncate and add ellipsis */
 	truncated := text[:maxChars]
-  /* Try to cut at word boundary */
+	/* Try to cut at word boundary */
 	if lastSpace := strings.LastIndex(truncated, " "); lastSpace > maxChars*3/4 {
 		truncated = truncated[:lastSpace]
 	}
 	return truncated + "..."
 }
-

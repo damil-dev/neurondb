@@ -69,7 +69,7 @@ func (c *VectorClient) VectorSearch(ctx context.Context, tableName, vectorCol st
 		ORDER BY %s %s
 		LIMIT $1`,
 		distanceOp, distanceOp, tableName, vectorCol, distanceOp)
-	
+
 	/* Note: tableName and vectorCol should be validated/whitelisted in production */
 
 	var results []VectorSearchResult
@@ -133,7 +133,7 @@ func (c *VectorClient) CreateIVFIndex(ctx context.Context, indexName, tableName,
 /* DropIndex drops a vector index */
 func (c *VectorClient) DropIndex(ctx context.Context, indexName string) error {
 	query := fmt.Sprintf("DROP INDEX IF EXISTS %s", indexName)
-	
+
 	_, err := c.db.ExecContext(ctx, query)
 	if err != nil {
 		return fmt.Errorf("index deletion failed via NeuronDB: index_name='%s', error=%w", indexName, err)
@@ -146,7 +146,7 @@ func (c *VectorClient) DropIndex(ctx context.Context, indexName string) error {
 func (c *VectorClient) QuantizeVector(ctx context.Context, vector Vector, method string) (Vector, error) {
 	var quantizedStr string
 	query := `SELECT neurondb_quantize_vector($1::vector, $2)::text AS quantized`
-	
+
 	err := c.db.GetContext(ctx, &quantizedStr, query, vector, method)
 	if err != nil {
 		return nil, fmt.Errorf("vector quantization failed via NeuronDB: vector_dimension=%d, method='%s', function='neurondb_quantize_vector', error=%w",
@@ -164,8 +164,7 @@ func (c *VectorClient) QuantizeVector(ctx context.Context, vector Vector, method
 
 /* VectorSearchResult represents a vector search result */
 type VectorSearchResult struct {
-	ID        interface{} `db:"id"`
-	Distance  float64     `db:"distance"`
+	ID         interface{} `db:"id"`
+	Distance   float64     `db:"distance"`
 	Similarity float64     `db:"similarity"`
 }
-

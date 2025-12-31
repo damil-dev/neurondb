@@ -48,16 +48,16 @@ const (
 
 /* AgentBudget represents a budget for an agent */
 type AgentBudget struct {
-	ID          uuid.UUID              `db:"id"`
-	AgentID     uuid.UUID              `db:"agent_id"`
-	BudgetAmount float64               `db:"budget_amount"`
-	PeriodType  string                 `db:"period_type"`
-	StartDate   time.Time              `db:"start_date"`
-	EndDate     *time.Time             `db:"end_date"`
-	IsActive    bool                   `db:"is_active"`
-	Metadata    JSONBMap               `db:"metadata"`
-	CreatedAt   time.Time              `db:"created_at"`
-	UpdatedAt   time.Time              `db:"updated_at"`
+	ID           uuid.UUID  `db:"id"`
+	AgentID      uuid.UUID  `db:"agent_id"`
+	BudgetAmount float64    `db:"budget_amount"`
+	PeriodType   string     `db:"period_type"`
+	StartDate    time.Time  `db:"start_date"`
+	EndDate      *time.Time `db:"end_date"`
+	IsActive     bool       `db:"is_active"`
+	Metadata     JSONBMap   `db:"metadata"`
+	CreatedAt    time.Time  `db:"created_at"`
+	UpdatedAt    time.Time  `db:"updated_at"`
 }
 
 /* CreateBudget creates or updates a budget for an agent */
@@ -106,4 +106,3 @@ func (q *Queries) UpdateBudget(ctx context.Context, budget *AgentBudget) error {
 	}
 	return nil
 }
-

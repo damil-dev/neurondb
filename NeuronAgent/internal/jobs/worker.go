@@ -78,7 +78,7 @@ func (w *Worker) work() {
 
 func (w *Worker) processJob(job *db.Job) {
 	result, err := w.processor.Process(w.ctx, job)
-	
+
 	status := "done"
 	errorMsg := (*string)(nil)
 	retryCount := job.RetryCount
@@ -94,18 +94,18 @@ func (w *Worker) processJob(job *db.Job) {
 			completedAt = &now
 		} else {
 			status = "queued" // Retry - will be picked up again
-    /* Don't set completedAt for retries */
+			/* Don't set completedAt for retries */
 		}
 	} else {
-   /* Success */
+		/* Success */
 		now := time.Now()
 		completedAt = &now
 	}
 
-  /* Record metrics */
+	/* Record metrics */
 	metrics.RecordJobProcessed(job.Type, status)
 
-  /* Use proper time handling for UpdateJob */
+	/* Use proper time handling for UpdateJob */
 	var completedAtVal *sql.NullTime
 	if completedAt != nil {
 		completedAtVal = &sql.NullTime{
@@ -121,4 +121,3 @@ func (w *Worker) Stop() {
 	w.cancel()
 	w.wg.Wait()
 }
-

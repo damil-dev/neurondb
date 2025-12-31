@@ -23,9 +23,9 @@ type JSONBMap map[string]interface{}
 
 /* Scan implements the sql.Scanner interface for JSONBMap */
 func (m *JSONBMap) Scan(value interface{}) error {
-  /* Always initialize to empty map first */
+	/* Always initialize to empty map first */
 	*m = make(JSONBMap)
-	
+
 	if value == nil {
 		return nil
 	}
@@ -37,7 +37,7 @@ func (m *JSONBMap) Scan(value interface{}) error {
 	case string:
 		bytes = []byte(v)
 	default:
-   /* For unknown types, just return empty map (don't error) */
+		/* For unknown types, just return empty map (don't error) */
 		return nil
 	}
 
@@ -47,8 +47,8 @@ func (m *JSONBMap) Scan(value interface{}) error {
 
 	var result map[string]interface{}
 	if err := json.Unmarshal(bytes, &result); err != nil {
-   /* If unmarshal fails, return empty map instead of error */
-   /* This handles cases where the JSONB might be malformed */
+		/* If unmarshal fails, return empty map instead of error */
+		/* This handles cases where the JSONB might be malformed */
 		return nil
 	}
 
@@ -79,4 +79,3 @@ func FromMap(m map[string]interface{}) JSONBMap {
 	}
 	return JSONBMap(m)
 }
-

@@ -27,7 +27,7 @@ func ValidateArgs(args map[string]interface{}, schema map[string]interface{}) er
 
 	required, _ := schema["required"].([]interface{})
 
-  /* Check required fields */
+	/* Check required fields */
 	for _, req := range required {
 		reqStr, ok := req.(string)
 		if !ok {
@@ -38,11 +38,11 @@ func ValidateArgs(args map[string]interface{}, schema map[string]interface{}) er
 		}
 	}
 
-  /* Validate each argument */
+	/* Validate each argument */
 	for key, value := range args {
 		propSchema, exists := properties[key]
 		if !exists {
-    /* Allow extra fields (could be strict mode later) */
+			/* Allow extra fields (could be strict mode later) */
 			continue
 		}
 
@@ -62,7 +62,7 @@ func ValidateArgs(args map[string]interface{}, schema map[string]interface{}) er
 func validateType(value interface{}, schema map[string]interface{}) error {
 	expectedType, ok := schema["type"].(string)
 	if !ok {
-  		return nil /* No type constraint */
+		return nil /* No type constraint */
 	}
 
 	actualType := reflect.TypeOf(value).Kind()
@@ -89,9 +89,8 @@ func validateType(value interface{}, schema map[string]interface{}) error {
 			return fmt.Errorf("expected object, got %v", actualType)
 		}
 	default:
-   /* Unknown type, skip validation */
+		/* Unknown type, skip validation */
 	}
 
 	return nil
 }
-

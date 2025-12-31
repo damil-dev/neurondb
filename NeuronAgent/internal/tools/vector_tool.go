@@ -108,7 +108,7 @@ func (t *VectorTool) createHNSWIndex(ctx context.Context, args map[string]interf
 		"status":     "created",
 		"index_name": indexName,
 	}
-	
+
 	resultJSON, _ := json.Marshal(result)
 	return string(resultJSON), nil
 }
@@ -132,7 +132,7 @@ func (t *VectorTool) createIVFIndex(ctx context.Context, args map[string]interfa
 		"status":     "created",
 		"index_name": indexName,
 	}
-	
+
 	resultJSON, _ := json.Marshal(result)
 	return string(resultJSON), nil
 }
@@ -149,7 +149,7 @@ func (t *VectorTool) dropIndex(ctx context.Context, args map[string]interface{})
 		"status":     "deleted",
 		"index_name": indexName,
 	}
-	
+
 	resultJSON, _ := json.Marshal(result)
 	return string(resultJSON), nil
 }
@@ -180,7 +180,7 @@ func (t *VectorTool) quantize(ctx context.Context, args map[string]interface{}) 
 		"quantized": quantized,
 		"method":    method,
 	}
-	
+
 	resultJSON, _ := json.Marshal(result)
 	return string(resultJSON), nil
 }
@@ -194,9 +194,3 @@ func getIntDefault(args map[string]interface{}, key string, defaultValue int) in
 	}
 	return defaultValue
 }
-
-
-
-
-
-

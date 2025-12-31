@@ -58,4 +58,3 @@ func GetAuthFromContext(ctx context.Context) (*db.APIKey, *db.Principal) {
 	principal, _ := GetPrincipalFromContext(ctx)
 	return apiKey, principal
 }
-

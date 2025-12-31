@@ -59,17 +59,17 @@ func ValidateJSON(s string) error {
 /* MergeJSON merges two JSON objects */
 func MergeJSON(dst, src map[string]interface{}) map[string]interface{} {
 	result := make(map[string]interface{})
-	
-  /* Copy dst */
+
+	/* Copy dst */
 	for k, v := range dst {
 		result[k] = v
 	}
-	
-  /* Merge src (overwrites dst values) */
+
+	/* Merge src (overwrites dst values) */
 	for k, v := range src {
 		result[k] = v
 	}
-	
+
 	return result
 }
 
@@ -83,14 +83,13 @@ func GetJSONField(data map[string]interface{}, path ...string) (interface{}, err
 			}
 			return nil, fmt.Errorf("field not found: %s", key)
 		}
-		
+
 		if next, ok := current[key].(map[string]interface{}); ok {
 			current = next
 		} else {
 			return nil, fmt.Errorf("invalid path at: %s", key)
 		}
 	}
-	
+
 	return nil, fmt.Errorf("empty path")
 }
-

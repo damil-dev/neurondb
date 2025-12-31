@@ -37,7 +37,7 @@ const (
 	getAgentByIDQuery = `SELECT * FROM neurondb_agent.agents WHERE id = $1`
 
 	listAgentsQuery = `SELECT * FROM neurondb_agent.agents ORDER BY created_at DESC`
-	
+
 	listAgentsWithFilterQuery = `
 		SELECT * FROM neurondb_agent.agents 
 		WHERE ($1::text IS NULL OR name ILIKE $1 OR description ILIKE $1)
@@ -67,7 +67,7 @@ const (
 		WHERE agent_id = $1 
 		ORDER BY last_activity_at DESC 
 		LIMIT $2 OFFSET $3`
-	
+
 	listSessionsWithFilterQuery = `
 		SELECT * FROM neurondb_agent.sessions 
 		WHERE agent_id = $1 
@@ -99,7 +99,7 @@ const (
 		WHERE session_id = $1 
 		ORDER BY created_at ASC 
 		LIMIT $2 OFFSET $3`
-	
+
 	getMessagesWithFilterQuery = `
 		SELECT * FROM neurondb_agent.messages 
 		WHERE session_id = $1 
@@ -166,7 +166,7 @@ const (
 	getToolQuery = `SELECT * FROM neurondb_agent.tools WHERE name = $1`
 
 	listToolsQuery = `SELECT * FROM neurondb_agent.tools WHERE enabled = true ORDER BY name`
-	
+
 	listToolsWithFilterQuery = `
 		SELECT * FROM neurondb_agent.tools 
 		WHERE ($1::boolean IS NULL OR enabled = $1)
@@ -719,9 +719,9 @@ func (q *Queries) GetJob(ctx context.Context, id int64) (*Job, error) {
 func (q *Queries) ClaimJob(ctx context.Context) (*Job, error) {
 	var job Job
 	err := q.DB.GetContext(ctx, &job, claimJobQuery)
-		if err == sql.ErrNoRows {
-			return nil, nil
-		}
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, q.formatQueryError("UPDATE", claimJobQuery, 0, "neurondb_agent.jobs", err)
 	}
@@ -761,7 +761,7 @@ func (q *Queries) CreateAPIKey(ctx context.Context, apiKey *APIKey) error {
 	if err != nil {
 		return fmt.Errorf("failed to convert metadata: %w", err)
 	}
-	
+
 	params := []interface{}{apiKey.KeyHash, apiKey.KeyPrefix, apiKey.OrganizationID, apiKey.UserID,
 		apiKey.PrincipalID, apiKey.RateLimitPerMin, apiKey.Roles, metadataValue, apiKey.ExpiresAt}
 	err = q.DB.GetContext(ctx, apiKey, createAPIKeyQuery, params...)
@@ -849,4 +849,3 @@ func formatVector(vec []float32) string {
 	result += "]"
 	return result
 }
-

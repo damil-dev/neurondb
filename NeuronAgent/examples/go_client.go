@@ -67,20 +67,20 @@ type Agent struct {
 type Session struct {
 	ID             uuid.UUID              `json:"id"`
 	AgentID        uuid.UUID              `json:"agent_id"`
-	ExternalUserID *string                 `json:"external_user_id"`
-	Metadata       map[string]interface{}  `json:"metadata"`
+	ExternalUserID *string                `json:"external_user_id"`
+	Metadata       map[string]interface{} `json:"metadata"`
 	CreatedAt      time.Time              `json:"created_at"`
 	LastActivityAt time.Time              `json:"last_activity_at"`
 }
 
 /* Message represents a message in a conversation */
 type Message struct {
-	ID         int64                  `json:"id"`
-	SessionID  uuid.UUID              `json:"session_id"`
-	Role       string                 `json:"role"`
-	Content    string                 `json:"content"`
-	TokenCount *int                   `json:"token_count"`
-	CreatedAt  time.Time              `json:"created_at"`
+	ID         int64     `json:"id"`
+	SessionID  uuid.UUID `json:"session_id"`
+	Role       string    `json:"role"`
+	Content    string    `json:"content"`
+	TokenCount *int      `json:"token_count"`
+	CreatedAt  time.Time `json:"created_at"`
 }
 
 /* CreateAgentRequest is the request to create an agent */
@@ -95,9 +95,9 @@ type CreateAgentRequest struct {
 
 /* CreateSessionRequest is the request to create a session */
 type CreateSessionRequest struct {
-	AgentID       uuid.UUID              `json:"agent_id"`
+	AgentID        uuid.UUID              `json:"agent_id"`
 	ExternalUserID *string                `json:"external_user_id,omitempty"`
-	Metadata      map[string]interface{}  `json:"metadata,omitempty"`
+	Metadata       map[string]interface{} `json:"metadata,omitempty"`
 }
 
 /* SendMessageRequest is the request to send a message */
@@ -110,10 +110,10 @@ type SendMessageRequest struct {
 
 /* SendMessageResponse is the response from sending a message */
 type SendMessageResponse struct {
-	SessionID   uuid.UUID `json:"session_id"`
-	AgentID     uuid.UUID `json:"agent_id"`
-	Response    string    `json:"response"`
-	TokensUsed  int       `json:"tokens_used"`
+	SessionID   uuid.UUID     `json:"session_id"`
+	AgentID     uuid.UUID     `json:"agent_id"`
+	Response    string        `json:"response"`
+	TokensUsed  int           `json:"tokens_used"`
 	ToolCalls   []interface{} `json:"tool_calls"`
 	ToolResults []interface{} `json:"tool_results"`
 }
@@ -273,7 +273,7 @@ func main() {
 
 	client := NewNeuronAgentClient("http://localhost:8080", apiKey)
 
-  /* Health check */
+	/* Health check */
 	fmt.Println("Checking server health...")
 	if err := client.HealthCheck(); err != nil {
 		fmt.Printf("❌ Server health check failed: %v\n", err)
@@ -281,7 +281,7 @@ func main() {
 	}
 	fmt.Println("✅ Server is healthy")
 
-  /* Create an agent */
+	/* Create an agent */
 	fmt.Println("\nCreating agent...")
 	agent, err := client.CreateAgent(CreateAgentRequest{
 		Name:         "go-example-agent",
@@ -300,10 +300,10 @@ func main() {
 	}
 	fmt.Printf("✅ Agent created: %s (%s)\n", agent.Name, agent.ID)
 
-  /* Create a session */
+	/* Create a session */
 	fmt.Println("\nCreating session...")
 	session, err := client.CreateSession(CreateSessionRequest{
-		AgentID:       agent.ID,
+		AgentID:        agent.ID,
 		ExternalUserID: stringPtr("go-user-123"),
 		Metadata: map[string]interface{}{
 			"source": "go-example",
@@ -315,7 +315,7 @@ func main() {
 	}
 	fmt.Printf("✅ Session created: %s\n", session.ID)
 
-  /* Send messages */
+	/* Send messages */
 	messages := []string{
 		"Hello! Can you introduce yourself?",
 		"What can you help me with?",
@@ -337,7 +337,7 @@ func main() {
 		time.Sleep(1 * time.Second)
 	}
 
-  /* Get conversation history */
+	/* Get conversation history */
 	fmt.Println("\n📜 Retrieving conversation history...")
 	history, err := client.GetMessages(session.ID, 10, 0)
 	if err != nil {
@@ -363,12 +363,3 @@ func truncateString(s string, maxLen int) string {
 	}
 	return s[:maxLen] + "..."
 }
-
-
-
-
-
-
-
-
-

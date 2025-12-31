@@ -27,8 +27,8 @@ import (
 )
 
 var (
-	apiURL    string
-	apiKey    string
+	apiURL       string
+	apiKey       string
 	outputFormat string
 )
 
@@ -272,4 +272,3 @@ func printJSON(r io.Reader) error {
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(data)
 }
-

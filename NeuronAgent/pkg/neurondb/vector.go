@@ -24,7 +24,7 @@ import (
 /* Distance calculates the distance between two vectors */
 func Distance(a, b Vector, metric string) float64 {
 	if len(a) != len(b) {
-  		return math.Inf(1) /* Return infinity for mismatched dimensions */
+		return math.Inf(1) /* Return infinity for mismatched dimensions */
 	}
 
 	switch metric {
@@ -35,7 +35,7 @@ func Distance(a, b Vector, metric string) float64 {
 	case "inner_product", "dot":
 		return InnerProduct(a, b)
 	default:
-  		return L2Distance(a, b) /* Default to L2 */
+		return L2Distance(a, b) /* Default to L2 */
 	}
 }
 
@@ -54,7 +54,7 @@ func DistanceWithError(a, b Vector, metric string) (float64, error) {
 	case "inner_product", "dot":
 		return InnerProduct(a, b), nil
 	default:
-  		return L2Distance(a, b), nil /* Default to L2 */
+		return L2Distance(a, b), nil /* Default to L2 */
 	}
 }
 
@@ -106,7 +106,7 @@ func Normalize(v Vector) Vector {
 	norm = math.Sqrt(norm)
 
 	if norm == 0 {
-  		return v /* Return original if zero vector */
+		return v /* Return original if zero vector */
 	}
 
 	normalized := make(Vector, len(v))
@@ -121,7 +121,7 @@ func NormalizeWithError(v Vector) (Vector, error) {
 	if len(v) == 0 {
 		return nil, fmt.Errorf("vector normalization failed: vector_dimension=0, error='empty vector'")
 	}
-	
+
 	norm := 0.0
 	for _, val := range v {
 		norm += float64(val * val)
@@ -129,7 +129,7 @@ func NormalizeWithError(v Vector) (Vector, error) {
 	norm = math.Sqrt(norm)
 
 	if norm == 0 {
-  		return v, nil /* Return original if zero vector */
+		return v, nil /* Return original if zero vector */
 	}
 
 	normalized := make(Vector, len(v))
@@ -138,4 +138,3 @@ func NormalizeWithError(v Vector) (Vector, error) {
 	}
 	return normalized, nil
 }
-

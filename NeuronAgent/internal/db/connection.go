@@ -57,10 +57,10 @@ func NewDB(connStr string, poolConfig PoolConfig) (*DB, error) {
 /* NewDBWithRetry creates a new database instance with retry logic */
 func NewDBWithRetry(connStr string, poolConfig PoolConfig, maxRetries int, retryDelay time.Duration) (*DB, error) {
 	connInfo := parseConnectionInfo(connStr)
-	
+
 	var db *sqlx.DB
 	var err error
-	
+
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		db, err = sqlx.Connect("postgres", connStr)
 		if err == nil {
@@ -72,7 +72,7 @@ func NewDBWithRetry(connStr string, poolConfig PoolConfig, maxRetries int, retry
 				db.SetMaxIdleConns(poolConfig.MaxIdleConns)
 				db.SetConnMaxLifetime(poolConfig.ConnMaxLifetime)
 				db.SetConnMaxIdleTime(poolConfig.ConnMaxIdleTime)
-				
+
 				return &DB{
 					DB:         db,
 					poolConfig: poolConfig,
@@ -82,13 +82,13 @@ func NewDBWithRetry(connStr string, poolConfig PoolConfig, maxRetries int, retry
 			db.Close()
 			err = pingErr
 		}
-		
+
 		if attempt < maxRetries-1 {
 			time.Sleep(retryDelay)
 			retryDelay *= 2
 		}
 	}
-	
+
 	connInfoStr := utils.FormatConnectionInfo(connInfo.Host, connInfo.Port, connInfo.Database, connInfo.User)
 	return nil, fmt.Errorf("failed to connect to %s after %d attempts (last error: %w)", connInfoStr, maxRetries, err)
 }
@@ -101,7 +101,7 @@ func parseConnectionInfo(connStr string) *ConnectionInfo {
 		Database: "unknown",
 		User:     "unknown",
 	}
-	
+
 	parts := strings.Split(connStr, " ")
 	for _, part := range parts {
 		if strings.HasPrefix(part, "host=") {
@@ -114,7 +114,7 @@ func parseConnectionInfo(connStr string) *ConnectionInfo {
 			info.User = strings.TrimPrefix(part, "user=")
 		}
 	}
-	
+
 	return info
 }
 
@@ -131,7 +131,7 @@ func (d *DB) HealthCheck(ctx context.Context) error {
 	if d.DB == nil {
 		return fmt.Errorf("database connection not established: %s (connection pool is nil, ensure NewDB() was called successfully)", d.GetConnInfoString())
 	}
-	
+
 	var result int
 	err := d.DB.GetContext(ctx, &result, "SELECT 1")
 	if err != nil {

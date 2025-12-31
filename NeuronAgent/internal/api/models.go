@@ -35,9 +35,9 @@ type CreateAgentRequest struct {
 }
 
 type CreateSessionRequest struct {
-	AgentID       uuid.UUID              `json:"agent_id"`
+	AgentID        uuid.UUID              `json:"agent_id"`
 	ExternalUserID *string                `json:"external_user_id"`
-	Metadata      map[string]interface{} `json:"metadata"`
+	Metadata       map[string]interface{} `json:"metadata"`
 }
 
 type SendMessageRequest struct {
@@ -67,7 +67,7 @@ type SessionResponse struct {
 	AgentID        uuid.UUID              `json:"agent_id"`
 	ExternalUserID *string                `json:"external_user_id"`
 	Metadata       map[string]interface{} `json:"metadata"`
-	CreatedAt      time.Time             `json:"created_at"`
+	CreatedAt      time.Time              `json:"created_at"`
 	LastActivityAt time.Time              `json:"last_activity_at"`
 }
 
@@ -88,4 +88,3 @@ type ErrorResponse struct {
 	Message string `json:"message,omitempty"`
 	Code    int    `json:"code"`
 }
-

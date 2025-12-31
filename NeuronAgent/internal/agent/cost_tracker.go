@@ -36,7 +36,7 @@ func (c *CostTracker) RecordCost(ctx context.Context, agentID, sessionID uuid.UU
 	query := `INSERT INTO neurondb_agent.cost_logs 
 		(agent_id, session_id, cost_type, tokens_used, cost, created_at)
 		VALUES ($1, $2, $3, $4, $5, NOW())`
-	
+
 	_, err := c.queries.DB.ExecContext(ctx, query, agentID, sessionID, costType, tokens, cost)
 	if err != nil {
 		return fmt.Errorf("cost recording failed: agent_id='%s', session_id='%s', cost_type='%s', tokens=%d, cost=%.4f, error=%w",
@@ -54,7 +54,7 @@ func (c *CostTracker) GetCostSummary(ctx context.Context, agentID uuid.UUID, sta
 		COUNT(*) AS request_count
 		FROM neurondb_agent.cost_logs
 		WHERE agent_id = $1 AND created_at BETWEEN $2 AND $3`
-	
+
 	var summary CostSummary
 	err := c.queries.DB.GetContext(ctx, &summary, query, agentID, startDate, endDate)
 	if err != nil {
@@ -94,8 +94,8 @@ func (c *CostTracker) EstimateCost(model string, promptTokens, completionTokens 
 	/* Simple cost estimation based on model */
 	/* In production, this would use actual pricing data */
 	costPer1KTokens := map[string]float64{
-		"gpt-4":        0.03,
-		"gpt-4-turbo":  0.01,
+		"gpt-4":         0.03,
+		"gpt-4-turbo":   0.01,
 		"gpt-3.5-turbo": 0.002,
 		"default":       0.01,
 	}
@@ -113,16 +113,10 @@ func (c *CostTracker) EstimateCost(model string, promptTokens, completionTokens 
 
 /* CostSummary represents a cost summary */
 type CostSummary struct {
-	AgentID     uuid.UUID `db:"agent_id"`
-	TotalTokens int       `db:"total_tokens"`
-	TotalCost   float64   `db:"total_cost"`
-	RequestCount int      `db:"request_count"`
-	StartDate   time.Time
-	EndDate     time.Time
+	AgentID      uuid.UUID `db:"agent_id"`
+	TotalTokens  int       `db:"total_tokens"`
+	TotalCost    float64   `db:"total_cost"`
+	RequestCount int       `db:"request_count"`
+	StartDate    time.Time
+	EndDate      time.Time
 }
-
-
-
-
-
-

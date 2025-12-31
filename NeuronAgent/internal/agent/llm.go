@@ -43,7 +43,7 @@ func (c *LLMClient) Generate(ctx context.Context, modelName string, prompt strin
 		Model: modelName,
 	}
 
-  /* Extract config values */
+	/* Extract config values */
 	if temp, ok := config["temperature"].(float64); ok {
 		llmConfig.Temperature = &temp
 	}
@@ -56,14 +56,14 @@ func (c *LLMClient) Generate(ctx context.Context, modelName string, prompt strin
 	}
 
 	result, err := c.llmClient.Generate(ctx, prompt, llmConfig)
-	
-  /* Record metrics */
+
+	/* Record metrics */
 	status := "success"
 	if err != nil {
 		status = "error"
 	}
- 	metrics.RecordLLMCall(modelName, status, result.TokensUsed, 0) /* Completion tokens not available */
-	
+	metrics.RecordLLMCall(modelName, status, result.TokensUsed, 0) /* Completion tokens not available */
+
 	if err != nil {
 		promptTokens := EstimateTokens(prompt)
 		temperature := "default"
@@ -82,7 +82,7 @@ func (c *LLMClient) Generate(ctx context.Context, modelName string, prompt strin
 			modelName, len(prompt), promptTokens, temperature, maxTokens, topP, err)
 	}
 
-  /* Estimate completion tokens if not provided */
+	/* Estimate completion tokens if not provided */
 	completionTokens := EstimateTokens(result.Output)
 	promptTokens := EstimateTokens(prompt)
 	if result.TokensUsed == 0 {
@@ -91,7 +91,7 @@ func (c *LLMClient) Generate(ctx context.Context, modelName string, prompt strin
 
 	return &LLMResponse{
 		Content:   result.Output,
-  		ToolCalls: []ToolCall{}, /* Will be parsed separately */
+		ToolCalls: []ToolCall{}, /* Will be parsed separately */
 		Usage: TokenUsage{
 			PromptTokens:     promptTokens,
 			CompletionTokens: completionTokens,
@@ -106,7 +106,7 @@ func (c *LLMClient) GenerateStream(ctx context.Context, modelName string, prompt
 		Stream: true,
 	}
 
-  /* Extract config values */
+	/* Extract config values */
 	if temp, ok := config["temperature"].(float64); ok {
 		llmConfig.Temperature = &temp
 	}
@@ -150,4 +150,3 @@ func (c *LLMClient) Embed(ctx context.Context, model string, text string) ([]flo
 	}
 	return embedding, nil
 }
-

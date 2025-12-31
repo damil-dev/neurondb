@@ -174,9 +174,9 @@ func (h *Handlers) SubmitFeedback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	validTypes := map[string]bool{
-		"positive":  true,
-		"negative":  true,
-		"neutral":   true,
+		"positive":   true,
+		"negative":   true,
+		"neutral":    true,
 		"correction": true,
 	}
 	if !validTypes[req.FeedbackType] {
@@ -196,7 +196,7 @@ func (h *Handlers) SubmitFeedback(w http.ResponseWriter, r *http.Request) {
 	if metadataJSON == nil {
 		metadataJSON = make(db.JSONBMap)
 	}
-	
+
 	feedback := &humanloop.UserFeedback{
 		AgentID:      req.AgentID,
 		SessionID:    req.SessionID,
@@ -281,4 +281,3 @@ func (h *Handlers) GetFeedbackStats(w http.ResponseWriter, r *http.Request) {
 
 	respondJSON(w, http.StatusOK, stats)
 }
-

@@ -45,7 +45,7 @@ func (r *RateLimiter) CheckLimit(keyID string, limitPerMin int) bool {
 	rl, exists := r.limits[keyID]
 
 	if !exists || now.After(rl.resetTime) {
-   /* Reset or create */
+		/* Reset or create */
 		r.limits[keyID] = &rateLimit{
 			count:     1,
 			resetTime: now.Add(1 * time.Minute),
@@ -62,4 +62,3 @@ func (r *RateLimiter) CheckLimit(keyID string, limitPerMin int) bool {
 }
 
 /* HasRole and RequireRole are now in roles.go */
-

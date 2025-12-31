@@ -26,7 +26,7 @@ import (
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
-  		return true /* Allow all origins in development */
+		return true /* Allow all origins in development */
 	},
 }
 
@@ -39,7 +39,7 @@ func HandleWebSocket(runtime *agent.Runtime) http.HandlerFunc {
 		}
 		defer conn.Close()
 
-   /* Get session ID from query parameter */
+		/* Get session ID from query parameter */
 		sessionIDStr := r.URL.Query().Get("session_id")
 		sessionID, err := uuid.Parse(sessionIDStr)
 		if err != nil {
@@ -47,7 +47,7 @@ func HandleWebSocket(runtime *agent.Runtime) http.HandlerFunc {
 			return
 		}
 
-   /* Read messages from client */
+		/* Read messages from client */
 		for {
 			var msg map[string]interface{}
 			if err := conn.ReadJSON(&msg); err != nil {
@@ -60,14 +60,14 @@ func HandleWebSocket(runtime *agent.Runtime) http.HandlerFunc {
 				continue
 			}
 
-    /* Execute agent */
+			/* Execute agent */
 			state, err := runtime.Execute(r.Context(), sessionID, content)
 			if err != nil {
 				conn.WriteJSON(map[string]string{"error": err.Error()})
 				continue
 			}
 
-    /* Stream response */
+			/* Stream response */
 			response := map[string]interface{}{
 				"type":     "response",
 				"content":  state.FinalAnswer,
@@ -80,4 +80,3 @@ func HandleWebSocket(runtime *agent.Runtime) http.HandlerFunc {
 		}
 	}
 }
-

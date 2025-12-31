@@ -130,4 +130,3 @@ func ValidateRequiredWithError(s, fieldName string) error {
 	}
 	return nil
 }
-

@@ -228,4 +228,3 @@ func (q *Queries) CreateEvalRetrievalResult(ctx context.Context, result *EvalRet
 	}
 	return nil
 }
-

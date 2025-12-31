@@ -47,16 +47,16 @@ const (
 
 /* Plan represents a stored plan */
 type Plan struct {
-	ID              uuid.UUID              `db:"id"`
-	AgentID         *uuid.UUID             `db:"agent_id"`
-	SessionID       *uuid.UUID             `db:"session_id"`
-	TaskDescription string                 `db:"task_description"`
-	Steps           JSONBMap               `db:"steps"`
-	Status          string                 `db:"status"`
-	Result          JSONBMap               `db:"result"`
-	CreatedAt       string                 `db:"created_at"`
-	UpdatedAt       string                 `db:"updated_at"`
-	CompletedAt     *string                `db:"completed_at"`
+	ID              uuid.UUID  `db:"id"`
+	AgentID         *uuid.UUID `db:"agent_id"`
+	SessionID       *uuid.UUID `db:"session_id"`
+	TaskDescription string     `db:"task_description"`
+	Steps           JSONBMap   `db:"steps"`
+	Status          string     `db:"status"`
+	Result          JSONBMap   `db:"result"`
+	CreatedAt       string     `db:"created_at"`
+	UpdatedAt       string     `db:"updated_at"`
+	CompletedAt     *string    `db:"completed_at"`
 }
 
 /* CreatePlan creates a new plan */
@@ -110,4 +110,3 @@ func (q *Queries) UpdatePlanStatus(ctx context.Context, id uuid.UUID, status str
 	}
 	return &plan, nil
 }
-

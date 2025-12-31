@@ -22,14 +22,14 @@ import (
 
 /* Client provides a unified interface to NeuronDB functions */
 type Client struct {
-	Embedding     *EmbeddingClient
-	LLM           *LLMClient
-	ML            *MLClient
-	Vector        *VectorClient
-	RAG           *RAGClient
-	Analytics     *AnalyticsClient
-	HybridSearch  *HybridSearchClient
-	Reranking     *RerankingClient
+	Embedding    *EmbeddingClient
+	LLM          *LLMClient
+	ML           *MLClient
+	Vector       *VectorClient
+	RAG          *RAGClient
+	Analytics    *AnalyticsClient
+	HybridSearch *HybridSearchClient
+	Reranking    *RerankingClient
 }
 
 /* NewClient creates a new NeuronDB client */
@@ -45,4 +45,3 @@ func NewClient(db *sqlx.DB) *Client {
 		Reranking:    NewRerankingClient(db),
 	}
 }
-

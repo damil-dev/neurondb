@@ -39,10 +39,10 @@ type Connector interface {
 /* ReadConnector defines interface for read-only connectors */
 type ReadConnector interface {
 	Connector
-	
+
 	/* Read reads data from the source */
 	Read(ctx context.Context, path string) (io.Reader, error)
-	
+
 	/* List lists items in the source */
 	List(ctx context.Context, path string) ([]string, error)
 }
@@ -50,7 +50,7 @@ type ReadConnector interface {
 /* WriteConnector defines interface for write-only connectors */
 type WriteConnector interface {
 	Connector
-	
+
 	/* Write writes data to the destination */
 	Write(ctx context.Context, path string, data io.Reader) error
 }
@@ -88,7 +88,3 @@ func NewConnector(config Config) (Connector, error) {
 		return nil, fmt.Errorf("unknown connector type: %s", config.Type)
 	}
 }
-
-
-
-

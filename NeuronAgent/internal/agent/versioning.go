@@ -43,7 +43,7 @@ func (v *VersionManager) CreateVersion(ctx context.Context, agentID uuid.UUID) (
 	query := `SELECT COALESCE(MAX(version_number), 0) + 1 AS next_version
 		FROM neurondb_agent.agent_versions
 		WHERE agent_id = $1`
-	
+
 	var nextVersion int
 	err = v.queries.DB.GetContext(ctx, &nextVersion, query, agentID)
 	if err != nil {
@@ -56,7 +56,7 @@ func (v *VersionManager) CreateVersion(ctx context.Context, agentID uuid.UUID) (
 		(agent_id, version_number, name, description, system_prompt, model_name, enabled_tools, config, is_active)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, false)
 		RETURNING id, created_at`
-	
+
 	var version AgentVersion
 	err = v.queries.DB.GetContext(ctx, &version, versionQuery,
 		agentID, nextVersion, agent.Name, agent.Description, agent.SystemPrompt,
@@ -85,7 +85,7 @@ func (v *VersionManager) ActivateVersion(ctx context.Context, agentID uuid.UUID,
 	deactivateQuery := `UPDATE neurondb_agent.agent_versions
 		SET is_active = false
 		WHERE agent_id = $1`
-	
+
 	_, err := v.queries.DB.ExecContext(ctx, deactivateQuery, agentID)
 	if err != nil {
 		return fmt.Errorf("agent version activation failed: agent_id='%s', version_number=%d, deactivation_failed=true, error=%w",
@@ -96,7 +96,7 @@ func (v *VersionManager) ActivateVersion(ctx context.Context, agentID uuid.UUID,
 	activateQuery := `UPDATE neurondb_agent.agent_versions
 		SET is_active = true
 		WHERE agent_id = $1 AND version_number = $2`
-	
+
 	result, err := v.queries.DB.ExecContext(ctx, activateQuery, agentID, versionNumber)
 	if err != nil {
 		return fmt.Errorf("agent version activation failed: agent_id='%s', version_number=%d, activation_failed=true, error=%w",
@@ -124,7 +124,7 @@ func (v *VersionManager) ListVersions(ctx context.Context, agentID uuid.UUID) ([
 		FROM neurondb_agent.agent_versions
 		WHERE agent_id = $1
 		ORDER BY version_number DESC`
-	
+
 	var versions []AgentVersion
 	err := v.queries.DB.SelectContext(ctx, &versions, query, agentID)
 	if err != nil {
@@ -140,7 +140,7 @@ func (v *VersionManager) GetVersion(ctx context.Context, agentID uuid.UUID, vers
 		enabled_tools, config, is_active, created_at
 		FROM neurondb_agent.agent_versions
 		WHERE agent_id = $1 AND version_number = $2`
-	
+
 	var version AgentVersion
 	err := v.queries.DB.GetContext(ctx, &version, query, agentID, versionNumber)
 	if err != nil {
@@ -153,21 +153,15 @@ func (v *VersionManager) GetVersion(ctx context.Context, agentID uuid.UUID, vers
 
 /* AgentVersion represents an agent version */
 type AgentVersion struct {
-	ID           uuid.UUID              `db:"id"`
-	AgentID      uuid.UUID              `db:"agent_id"`
-	VersionNumber int                   `db:"version_number"`
-	Name         string                 `db:"name"`
-	Description  *string                `db:"description"`
-	SystemPrompt string                 `db:"system_prompt"`
-	ModelName    string                 `db:"model_name"`
-	EnabledTools []string               `db:"enabled_tools"`
-	Config       map[string]interface{} `db:"config"`
-	IsActive     bool                   `db:"is_active"`
-	CreatedAt    string                 `db:"created_at"`
+	ID            uuid.UUID              `db:"id"`
+	AgentID       uuid.UUID              `db:"agent_id"`
+	VersionNumber int                    `db:"version_number"`
+	Name          string                 `db:"name"`
+	Description   *string                `db:"description"`
+	SystemPrompt  string                 `db:"system_prompt"`
+	ModelName     string                 `db:"model_name"`
+	EnabledTools  []string               `db:"enabled_tools"`
+	Config        map[string]interface{} `db:"config"`
+	IsActive      bool                   `db:"is_active"`
+	CreatedAt     string                 `db:"created_at"`
 }
-
-
-
-
-
-

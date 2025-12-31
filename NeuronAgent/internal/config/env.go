@@ -22,7 +22,7 @@ import (
 
 /* LoadFromEnv loads configuration from environment variables */
 func LoadFromEnv(cfg *Config) error {
-  /* Server config */
+	/* Server config */
 	if host := os.Getenv("SERVER_HOST"); host != "" {
 		cfg.Server.Host = host
 	}
@@ -42,7 +42,7 @@ func LoadFromEnv(cfg *Config) error {
 		}
 	}
 
-  /* Database config */
+	/* Database config */
 	if host := os.Getenv("DB_HOST"); host != "" {
 		cfg.Database.Host = host
 	}
@@ -76,12 +76,12 @@ func LoadFromEnv(cfg *Config) error {
 		}
 	}
 
-  /* Auth config */
+	/* Auth config */
 	if header := os.Getenv("AUTH_API_KEY_HEADER"); header != "" {
 		cfg.Auth.APIKeyHeader = header
 	}
 
-  /* Logging config */
+	/* Logging config */
 	if level := os.Getenv("LOG_LEVEL"); level != "" {
 		cfg.Logging.Level = level
 	}
@@ -130,4 +130,3 @@ func ValidateEnv() error {
 	}
 	return nil
 }
-

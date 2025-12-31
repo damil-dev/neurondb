@@ -72,7 +72,7 @@ func (t *RAGTool) chunkDocument(ctx context.Context, args map[string]interface{}
 		"chunks": chunks,
 		"count":  len(chunks),
 	}
-	
+
 	resultJSON, _ := json.Marshal(result)
 	return string(resultJSON), nil
 }
@@ -156,13 +156,7 @@ func (t *RAGTool) generateAnswer(ctx context.Context, args map[string]interface{
 	result := map[string]interface{}{
 		"answer": answer,
 	}
-	
+
 	resultJSON, _ := json.Marshal(result)
 	return string(resultJSON), nil
 }
-
-
-
-
-
-

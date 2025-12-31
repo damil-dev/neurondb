@@ -24,8 +24,8 @@ import (
 	"strings"
 
 	"github.com/neurondb/NeuronAgent/internal/auth"
-	"github.com/neurondb/NeuronAgent/internal/db"
 	"github.com/neurondb/NeuronAgent/internal/config"
+	"github.com/neurondb/NeuronAgent/internal/db"
 )
 
 func main() {
@@ -42,7 +42,7 @@ func main() {
 	)
 	flag.Parse()
 
-  /* Parse roles */
+	/* Parse roles */
 	roleList := []string{}
 	if *roles != "" {
 		roleList = strings.Split(*roles, ",")
@@ -51,7 +51,7 @@ func main() {
 		}
 	}
 
-  /* Connect to database */
+	/* Connect to database */
 	cfg := config.DefaultConfig()
 	cfg.Database.Host = *dbHost
 	cfg.Database.Port = *dbPort
@@ -77,7 +77,7 @@ func main() {
 	queries := db.NewQueries(database.DB)
 	keyManager := auth.NewAPIKeyManager(queries)
 
-  /* Generate key */
+	/* Generate key */
 	ctx := context.Background()
 	var orgIDPtr, userIDPtr *string
 	if *orgID != "" {
@@ -98,4 +98,3 @@ func main() {
 	fmt.Printf("Prefix: %s\n", apiKey.KeyPrefix)
 	fmt.Fprintf(os.Stderr, "\nWarning: Save this key securely - it cannot be retrieved again after generation.\n")
 }
-

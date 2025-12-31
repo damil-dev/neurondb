@@ -21,9 +21,9 @@ import (
 
 /* BudgetLimits represents budget constraints */
 type BudgetLimits struct {
-	MaxCostUSD      float64
-	MaxTokens       int64
-	MaxRequests     int64
+	MaxCostUSD        float64
+	MaxTokens         int64
+	MaxRequests       int64
 	MaxRequestsPerDay int64
 }
 
@@ -62,12 +62,11 @@ func EstimateCost(tokens int64, modelName string) float64 {
 		"claude-3-sonnet": 0.003,
 		"claude-3-haiku":  0.00025,
 	}
-	
+
 	cost, ok := costPer1K[modelName]
 	if !ok {
 		cost = 0.002 // Default to gpt-3.5-turbo pricing
 	}
-	
+
 	return float64(tokens) / 1000.0 * cost
 }
-

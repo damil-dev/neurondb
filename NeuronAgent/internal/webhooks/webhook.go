@@ -34,29 +34,29 @@ import (
 type EventType string
 
 const (
-	EventAgentCreated      EventType = "agent.created"
-	EventAgentUpdated      EventType = "agent.updated"
-	EventAgentDeleted      EventType = "agent.deleted"
-	EventSessionCreated    EventType = "session.created"
-	EventMessageSent       EventType = "message.sent"
-	EventToolExecuted      EventType = "tool.executed"
-	EventJobCompleted      EventType = "job.completed"
-	EventJobFailed         EventType = "job.failed"
-	EventBudgetExceeded    EventType = "budget.exceeded"
+	EventAgentCreated   EventType = "agent.created"
+	EventAgentUpdated   EventType = "agent.updated"
+	EventAgentDeleted   EventType = "agent.deleted"
+	EventSessionCreated EventType = "session.created"
+	EventMessageSent    EventType = "message.sent"
+	EventToolExecuted   EventType = "tool.executed"
+	EventJobCompleted   EventType = "job.completed"
+	EventJobFailed      EventType = "job.failed"
+	EventBudgetExceeded EventType = "budget.exceeded"
 )
 
 /* Webhook represents a webhook configuration */
 type Webhook struct {
-	ID            uuid.UUID              `db:"id"`
-	URL           string                 `db:"url"`
-	Events        []string               `db:"events"`
-	Secret        *string                `db:"secret"`
-	Enabled       bool                   `db:"enabled"`
-	TimeoutSeconds int                   `db:"timeout_seconds"`
-	RetryCount    int                    `db:"retry_count"`
-	Metadata      map[string]interface{} `db:"metadata"`
-	CreatedAt     time.Time              `db:"created_at"`
-	UpdatedAt     time.Time              `db:"updated_at"`
+	ID             uuid.UUID              `db:"id"`
+	URL            string                 `db:"url"`
+	Events         []string               `db:"events"`
+	Secret         *string                `db:"secret"`
+	Enabled        bool                   `db:"enabled"`
+	TimeoutSeconds int                    `db:"timeout_seconds"`
+	RetryCount     int                    `db:"retry_count"`
+	Metadata       map[string]interface{} `db:"metadata"`
+	CreatedAt      time.Time              `db:"created_at"`
+	UpdatedAt      time.Time              `db:"updated_at"`
 }
 
 /* WebhookDelivery represents a webhook delivery attempt */
@@ -129,7 +129,7 @@ func (wm *WebhookManager) Trigger(ctx context.Context, eventType EventType, payl
 	/* Get enabled webhooks for this event */
 	query := `SELECT * FROM neurondb_agent.webhooks 
 		WHERE enabled = true AND $1 = ANY(events)`
-	
+
 	var webhooks []Webhook
 	err := wm.db.SelectContext(ctx, &webhooks, query, string(eventType))
 	if err != nil {
@@ -286,4 +286,3 @@ func VerifySignature(payload []byte, signature, secret string) bool {
 	expected := "sha256=" + hex.EncodeToString(h.Sum(nil))
 	return hmac.Equal([]byte(signature), []byte(expected))
 }
-

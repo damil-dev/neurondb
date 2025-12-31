@@ -19,22 +19,22 @@ import "time"
 type MediaType string
 
 const (
-	MediaTypeImage MediaType = "image"
-	MediaTypeAudio MediaType = "audio"
-	MediaTypeVideo MediaType = "video"
+	MediaTypeImage    MediaType = "image"
+	MediaTypeAudio    MediaType = "audio"
+	MediaTypeVideo    MediaType = "video"
 	MediaTypeDocument MediaType = "document"
 )
 
 /* MediaFile represents a media file */
 type MediaFile struct {
-	ID          string                 `json:"id"`
-	Type        MediaType              `json:"type"`
-	MimeType    string                 `json:"mime_type"`
-	Size        int64                  `json:"size"`
-	URL         string                 `json:"url,omitempty"`
-	Data        []byte                 `json:"data,omitempty"`
-	Metadata    map[string]interface{} `json:"metadata,omitempty"`
-	UploadedAt  time.Time              `json:"uploaded_at"`
+	ID         string                 `json:"id"`
+	Type       MediaType              `json:"type"`
+	MimeType   string                 `json:"mime_type"`
+	Size       int64                  `json:"size"`
+	URL        string                 `json:"url,omitempty"`
+	Data       []byte                 `json:"data,omitempty"`
+	Metadata   map[string]interface{} `json:"metadata,omitempty"`
+	UploadedAt time.Time              `json:"uploaded_at"`
 }
 
 /* ImageAnalysis represents image analysis results */
@@ -54,9 +54,9 @@ type DetectedObject struct {
 
 /* ExtractedText represents extracted text from an image */
 type ExtractedText struct {
-	Text      string  `json:"text"`
+	Text       string  `json:"text"`
 	Confidence float64 `json:"confidence"`
-	Bounds    Bounds  `json:"bounds,omitempty"`
+	Bounds     Bounds  `json:"bounds,omitempty"`
 }
 
 /* Bounds represents bounding box coordinates */
@@ -69,10 +69,10 @@ type Bounds struct {
 
 /* DocumentAnalysis represents document analysis results */
 type DocumentAnalysis struct {
-	Text        string                 `json:"text"`
-	Pages       int                    `json:"pages,omitempty"`
-	Language    string                 `json:"language,omitempty"`
-	Metadata    map[string]interface{} `json:"metadata,omitempty"`
+	Text     string                 `json:"text"`
+	Pages    int                    `json:"pages,omitempty"`
+	Language string                 `json:"language,omitempty"`
+	Metadata map[string]interface{} `json:"metadata,omitempty"`
 }
 
 /* AudioAnalysis represents audio analysis results */
@@ -93,7 +93,6 @@ type VideoAnalysis struct {
 
 /* FrameAnalysis represents analysis of a video frame */
 type FrameAnalysis struct {
-	Timestamp float64           `json:"timestamp"`
-	Analysis  ImageAnalysis     `json:"analysis"`
+	Timestamp float64       `json:"timestamp"`
+	Analysis  ImageAnalysis `json:"analysis"`
 }
-

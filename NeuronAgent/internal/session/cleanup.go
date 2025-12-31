@@ -24,12 +24,12 @@ import (
 )
 
 type CleanupService struct {
-	queries   *db.Queries
-	interval  time.Duration
-	maxAge    time.Duration
-	ctx       context.Context
-	cancel    context.CancelFunc
-	done      chan struct{}
+	queries  *db.Queries
+	interval time.Duration
+	maxAge   time.Duration
+	ctx      context.Context
+	cancel   context.CancelFunc
+	done     chan struct{}
 }
 
 func NewCleanupService(queries *db.Queries, interval, maxAge time.Duration) *CleanupService {
@@ -61,7 +61,7 @@ func (s *CleanupService) run() {
 	ticker := time.NewTicker(s.interval)
 	defer ticker.Stop()
 
-  /* Run immediately on start */
+	/* Run immediately on start */
 	s.cleanup()
 
 	for {
@@ -78,10 +78,10 @@ func (s *CleanupService) cleanup() {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-  /* Delete sessions older than maxAge */
+	/* Delete sessions older than maxAge */
 	cutoffTime := time.Now().Add(-s.maxAge)
-	
-  /* Get all agents to check their sessions */
+
+	/* Get all agents to check their sessions */
 	agents, err := s.queries.ListAgents(ctx)
 	if err != nil {
 		return
@@ -100,4 +100,3 @@ func (s *CleanupService) cleanup() {
 		}
 	}
 }
-

@@ -78,4 +78,3 @@ func (s *SlackConnector) List(ctx context.Context, path string) ([]string, error
 	/* TODO: Use Slack API to list channels */
 	return nil, fmt.Errorf("Slack list not fully implemented - requires Slack SDK")
 }
-

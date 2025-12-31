@@ -31,13 +31,13 @@ import (
 func (h *Handlers) CloneAgent(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	requestID := GetRequestID(r.Context())
-	
+
 	// Validate UUID
 	if err := validation.ValidateUUIDRequired(vars["id"], "agent_id"); err != nil {
 		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid agent ID", err, requestID, r.URL.Path, r.Method, "agent", "", nil))
 		return
 	}
-	
+
 	id, err := uuid.Parse(vars["id"])
 	if err != nil {
 		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid agent ID format", err, requestID, r.URL.Path, r.Method, "agent", "", nil))
@@ -76,13 +76,13 @@ func (h *Handlers) CloneAgent(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) GeneratePlan(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	requestID := GetRequestID(r.Context())
-	
+
 	// Validate UUID
 	if err := validation.ValidateUUIDRequired(vars["id"], "agent_id"); err != nil {
 		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid agent ID", err, requestID, r.URL.Path, r.Method, "agent", "", nil))
 		return
 	}
-	
+
 	id, err := uuid.Parse(vars["id"])
 	if err != nil {
 		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid agent ID format", err, requestID, r.URL.Path, r.Method, "agent", "", nil))
@@ -155,10 +155,10 @@ func (h *Handlers) ReflectOnResponse(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		UserMessage string                `json:"user_message"`
-		Response    string                `json:"response"`
-		ToolCalls   []agent.ToolCall      `json:"tool_calls"`
-		ToolResults []agent.ToolResult   `json:"tool_results"`
+		UserMessage string             `json:"user_message"`
+		Response    string             `json:"response"`
+		ToolCalls   []agent.ToolCall   `json:"tool_calls"`
+		ToolResults []agent.ToolResult `json:"tool_results"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -242,8 +242,8 @@ func (h *Handlers) GetAgentMetrics(w http.ResponseWriter, r *http.Request) {
 		GROUP BY a.id`
 
 	var metrics struct {
-		SessionCount      int     `db:"session_count"`
-		MessageCount      int     `db:"message_count"`
+		SessionCount        int      `db:"session_count"`
+		MessageCount        int      `db:"message_count"`
 		AvgTokensPerMessage *float64 `db:"avg_tokens_per_message"`
 	}
 
@@ -356,11 +356,11 @@ func (h *Handlers) CreateTool(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) ListTools(w http.ResponseWriter, r *http.Request) {
 	var tools []db.Tool
 	var err error
-	
+
 	enabledStr := r.URL.Query().Get("enabled")
 	search := r.URL.Query().Get("search")
 	handlerType := r.URL.Query().Get("handler_type")
-	
+
 	if enabledStr != "" || search != "" || handlerType != "" {
 		var enabled *bool
 		if enabledStr != "" {
@@ -378,7 +378,7 @@ func (h *Handlers) ListTools(w http.ResponseWriter, r *http.Request) {
 	} else {
 		tools, err = h.queries.ListTools(r.Context())
 	}
-	
+
 	if err != nil {
 		requestID := GetRequestID(r.Context())
 		respondError(w, NewErrorWithContext(http.StatusInternalServerError, "failed to list tools", err, requestID, r.URL.Path, r.Method, "tool", "", nil))
@@ -558,7 +558,7 @@ func (h *Handlers) SummarizeMemory(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondJSON(w, http.StatusOK, map[string]interface{}{
-		"status": "summarized",
+		"status":     "summarized",
 		"max_chunks": req.MaxChunks,
 	})
 }
@@ -573,10 +573,10 @@ func (h *Handlers) GetAnalyticsOverview(w http.ResponseWriter, r *http.Request) 
 		(SELECT SUM(cost) FROM neurondb_agent.cost_logs WHERE created_at > NOW() - INTERVAL '30 days') AS total_cost_30d`
 
 	var overview struct {
-		TotalAgents    int     `db:"total_agents"`
-		TotalSessions  int     `db:"total_sessions"`
-		TotalMessages  int     `db:"total_messages"`
-		TotalCost30d   *float64 `db:"total_cost_30d"`
+		TotalAgents   int      `db:"total_agents"`
+		TotalSessions int      `db:"total_sessions"`
+		TotalMessages int      `db:"total_messages"`
+		TotalCost30d  *float64 `db:"total_cost_30d"`
 	}
 
 	err := h.queries.GetDB().GetContext(r.Context(), &overview, query)
@@ -588,4 +588,3 @@ func (h *Handlers) GetAnalyticsOverview(w http.ResponseWriter, r *http.Request) 
 
 	respondJSON(w, http.StatusOK, overview)
 }
-

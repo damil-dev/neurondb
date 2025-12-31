@@ -27,7 +27,7 @@ type Planner struct {
 
 func NewPlanner() *Planner {
 	return &Planner{
-		maxIterations: 10, /* Prevent infinite loops */
+		maxIterations: 10,  /* Prevent infinite loops */
 		llm:           nil, /* Will be set by runtime */
 	}
 }
@@ -55,13 +55,15 @@ func (p *Planner) Plan(ctx context.Context, userMessage string, availableTools [
 		return p.simplePlan(userMessage), nil
 	}
 
-	/* Build planning prompt */
+	/* Build planning prompt with recursive decomposition support */
 	toolsList := strings.Join(availableTools, ", ")
 	prompt := fmt.Sprintf(`You are a task planning assistant. Break down the following task into a series of steps.
 Each step should specify:
 1. The action to take
 2. Which tool to use (if any) from: %s
 3. The parameters for that tool
+4. Dependencies on other steps (step indices that must complete first)
+5. Whether this step can run in parallel with others
 
 Task: %s
 
@@ -69,11 +71,14 @@ Respond with a JSON array of steps, each with:
 - "action": description of what to do
 - "tool": tool name to use (or empty string if no tool)
 - "payload": object with tool parameters
+- "dependencies": array of step indices (0-based) that must complete before this step
+- "can_parallel": boolean indicating if this can run in parallel
+- "retry_strategy": optional strategy if step fails ("retry", "skip", "abort")
 
 Example format:
 [
-  {"action": "Search for information", "tool": "sql", "payload": {"query": "SELECT * FROM table"}},
-  {"action": "Process results", "tool": "", "payload": {}}
+  {"action": "Search for information", "tool": "sql", "payload": {"query": "SELECT * FROM table"}, "dependencies": [], "can_parallel": true},
+  {"action": "Process results", "tool": "", "payload": {}, "dependencies": [0], "can_parallel": false}
 ]`, toolsList, userMessage)
 
 	/* Generate plan using LLM */
@@ -98,7 +103,120 @@ Example format:
 	/* Validate and optimize plan */
 	steps = p.validatePlan(steps, availableTools)
 
+	/* Enhance plan with recursive decomposition if needed */
+	if p.needsRecursiveDecomposition(steps) {
+		enhancedSteps, err := p.recursiveDecompose(ctx, steps, availableTools)
+		if err == nil && len(enhancedSteps) > 0 {
+			steps = enhancedSteps
+		}
+	}
+
+	/* Add dependency tracking */
+	steps = p.addDependencyTracking(steps)
+
 	return steps, nil
+}
+
+/* needsRecursiveDecomposition checks if plan needs further decomposition */
+func (p *Planner) needsRecursiveDecomposition(steps []PlanStep) bool {
+	if len(steps) == 0 {
+		return false
+	}
+
+	for _, step := range steps {
+		if len(step.Action) > 200 {
+			return true
+		}
+		if strings.Contains(strings.ToLower(step.Action), "and then") ||
+			strings.Contains(strings.ToLower(step.Action), "multiple") {
+			return true
+		}
+	}
+
+	return false
+}
+
+/* recursiveDecompose breaks down complex steps into sub-steps */
+func (p *Planner) recursiveDecompose(ctx context.Context, steps []PlanStep, availableTools []string) ([]PlanStep, error) {
+	if p.llm == nil {
+		return steps, nil
+	}
+
+	var decomposedSteps []PlanStep
+	toolsList := strings.Join(availableTools, ", ")
+
+	for i, step := range steps {
+		if !p.needsRecursiveDecomposition([]PlanStep{step}) {
+			step.Dependencies = []int{}
+			if i > 0 {
+				step.Dependencies = []int{i - 1}
+			}
+			decomposedSteps = append(decomposedSteps, step)
+			continue
+		}
+
+		prompt := fmt.Sprintf(`Break down this complex step into smaller sub-steps:
+Step: %s
+Tool: %s
+
+Available tools: %s
+
+Respond with JSON array of sub-steps, each with action, tool, payload, dependencies, can_parallel.`, step.Action, step.Tool, toolsList)
+
+		llmConfig := map[string]interface{}{
+			"temperature": 0.3,
+			"max_tokens":  1500,
+		}
+
+		response, err := p.llm.Generate(ctx, "gpt-4", prompt, llmConfig)
+		if err != nil {
+			step.Dependencies = []int{}
+			if i > 0 {
+				step.Dependencies = []int{len(decomposedSteps) - 1}
+			}
+			decomposedSteps = append(decomposedSteps, step)
+			continue
+		}
+
+		subSteps, err := p.parsePlanResponse(response.Content)
+		if err != nil {
+			step.Dependencies = []int{}
+			if i > 0 {
+				step.Dependencies = []int{len(decomposedSteps) - 1}
+			}
+			decomposedSteps = append(decomposedSteps, step)
+			continue
+		}
+
+		for j, subStep := range subSteps {
+			subStep.Dependencies = []int{}
+			if i > 0 && j == 0 {
+				subStep.Dependencies = []int{len(decomposedSteps) - 1}
+			}
+			if j > 0 {
+				subStep.Dependencies = []int{len(decomposedSteps) - 1}
+			}
+			decomposedSteps = append(decomposedSteps, subStep)
+		}
+	}
+
+	return decomposedSteps, nil
+}
+
+/* addDependencyTracking ensures all steps have proper dependency arrays */
+func (p *Planner) addDependencyTracking(steps []PlanStep) []PlanStep {
+	for i := range steps {
+		if steps[i].Dependencies == nil {
+			steps[i].Dependencies = []int{}
+		}
+		if i > 0 && len(steps[i].Dependencies) == 0 {
+			steps[i].Dependencies = []int{i - 1}
+		}
+		if steps[i].RetryStrategy == "" {
+			steps[i].RetryStrategy = "retry"
+		}
+	}
+	return steps
 }
 
 /* simplePlan creates a simple single-step plan */
@@ -116,7 +234,7 @@ func (p *Planner) simplePlan(userMessage string) []PlanStep {
 func (p *Planner) parsePlanResponse(response string) ([]PlanStep, error) {
 	/* Try to extract JSON from response */
 	response = strings.TrimSpace(response)
-	
+
 	/* Find JSON array in response */
 	start := strings.Index(response, "[")
 	end := strings.LastIndex(response, "]")
@@ -125,7 +243,7 @@ func (p *Planner) parsePlanResponse(response string) ([]PlanStep, error) {
 	}
 
 	jsonStr := response[start : end+1]
-	
+
 	var steps []PlanStep
 	if err := json.Unmarshal([]byte(jsonStr), &steps); err != nil {
 		return nil, fmt.Errorf("plan parsing failed: json_unmarshal_error=true, error=%w", err)
@@ -186,9 +304,12 @@ func (p *Planner) validatePlan(steps []PlanStep, availableTools []string) []Plan
 }
 
 type PlanStep struct {
-	Action  string                 `json:"action"`
-	Tool    string                 `json:"tool"`
-	Payload map[string]interface{} `json:"payload"`
+	Action        string                 `json:"action"`
+	Tool          string                 `json:"tool"`
+	Payload       map[string]interface{} `json:"payload"`
+	Dependencies  []int                  `json:"dependencies,omitempty"`
+	CanParallel   bool                   `json:"can_parallel,omitempty"`
+	RetryStrategy string                 `json:"retry_strategy,omitempty"`
 }
 
 /* ExecutePlan executes a multi-step plan */
@@ -221,4 +342,3 @@ func floatPtr(f float64) *float64 {
 func intPtr(i int) *int {
 	return &i
 }
-

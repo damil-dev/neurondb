@@ -36,12 +36,12 @@ func NewQueue(queries *db.Queries) *Queue {
 /* Enqueue adds a job to the queue */
 func (q *Queue) Enqueue(ctx context.Context, jobType string, agentID, sessionID *uuid.UUID, payload map[string]interface{}, priority int) (*db.Job, error) {
 	job := &db.Job{
-		Type:     jobType,
-		Status:   "queued",
-		Priority: priority,
-		Payload:  payload,
-		AgentID:  agentID,
-		SessionID: sessionID,
+		Type:       jobType,
+		Status:     "queued",
+		Priority:   priority,
+		Payload:    payload,
+		AgentID:    agentID,
+		SessionID:  sessionID,
 		MaxRetries: 3,
 	}
 
@@ -61,4 +61,3 @@ func (q *Queue) ClaimJob(ctx context.Context) (*db.Job, error) {
 func (q *Queue) UpdateJob(ctx context.Context, id int64, status string, result map[string]interface{}, errorMsg *string, retryCount int, completedAt *sql.NullTime) error {
 	return q.queries.UpdateJob(ctx, id, status, result, errorMsg, retryCount, completedAt)
 }
-

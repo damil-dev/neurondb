@@ -52,7 +52,7 @@ func (ms *MediaStorage) Store(ctx context.Context, file *MediaFile) (string, err
 
 	/* Create subdirectory by type */
 	filePath := filepath.Join(ms.basePath, string(file.Type), file.ID)
-	
+
 	/* Create type directory */
 	dir := filepath.Dir(filePath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -70,7 +70,7 @@ func (ms *MediaStorage) Store(ctx context.Context, file *MediaFile) (string, err
 /* Retrieve retrieves a media file */
 func (ms *MediaStorage) Retrieve(ctx context.Context, mediaType MediaType, fileID string) (*MediaFile, error) {
 	filePath := filepath.Join(ms.basePath, string(mediaType), fileID)
-	
+
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -96,7 +96,7 @@ func (ms *MediaStorage) Retrieve(ctx context.Context, mediaType MediaType, fileI
 /* Delete deletes a media file */
 func (ms *MediaStorage) Delete(ctx context.Context, mediaType MediaType, fileID string) error {
 	filePath := filepath.Join(ms.basePath, string(mediaType), fileID)
-	
+
 	if err := os.Remove(filePath); err != nil {
 		if os.IsNotExist(err) {
 			return nil /* Already deleted */
@@ -116,4 +116,3 @@ func generateFileID() string {
 	}
 	return hex.EncodeToString(bytes)
 }
-

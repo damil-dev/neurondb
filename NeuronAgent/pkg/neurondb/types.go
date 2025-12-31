@@ -27,8 +27,8 @@ type EmbeddingResult struct {
 
 /* LLMGenerateResult contains the result of an LLM generation */
 type LLMGenerateResult struct {
-	Output      string
-	TokensUsed  int
+	Output       string
+	TokensUsed   int
 	FinishReason string
 }
 
@@ -40,4 +40,3 @@ type LLMConfig struct {
 	TopP        *float64
 	Stream      bool
 }
-

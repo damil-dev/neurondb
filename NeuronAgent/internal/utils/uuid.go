@@ -45,4 +45,3 @@ func IsValidUUID(s string) bool {
 func MustParseUUID(s string) uuid.UUID {
 	return uuid.MustParse(s)
 }
-

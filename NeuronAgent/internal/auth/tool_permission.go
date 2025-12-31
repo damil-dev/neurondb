@@ -33,7 +33,7 @@ func NewToolPermissionChecker(queries *db.Queries) *ToolPermissionChecker {
 
 /* CheckToolPermission checks if a tool can be executed for an agent and session */
 func (c *ToolPermissionChecker) CheckToolPermission(ctx context.Context, agentID, sessionID uuid.UUID, toolName string) (bool, error) {
-  /* First check session-level permission (takes precedence) */
+	/* First check session-level permission (takes precedence) */
 	sessionPerm, err := c.queries.GetSessionToolPermission(ctx, sessionID, toolName)
 	if err != nil {
 		return false, fmt.Errorf("failed to check session tool permission: %w", err)
@@ -43,7 +43,7 @@ func (c *ToolPermissionChecker) CheckToolPermission(ctx context.Context, agentID
 		return sessionPerm.Allowed, nil
 	}
 
-  /* Then check agent-level permission */
+	/* Then check agent-level permission */
 	agentPerm, err := c.queries.GetToolPermission(ctx, agentID, toolName)
 	if err != nil {
 		return false, fmt.Errorf("failed to check agent tool permission: %w", err)
@@ -53,7 +53,7 @@ func (c *ToolPermissionChecker) CheckToolPermission(ctx context.Context, agentID
 		return agentPerm.Allowed, nil
 	}
 
-  /* Default: allow if no explicit permission is set */
+	/* Default: allow if no explicit permission is set */
 	return true, nil
 }
 
@@ -61,7 +61,7 @@ func (c *ToolPermissionChecker) CheckToolPermission(ctx context.Context, agentID
 func (c *ToolPermissionChecker) GetAllowedTools(ctx context.Context, agentID, sessionID uuid.UUID) (map[string]bool, error) {
 	allowedTools := make(map[string]bool)
 
-  /* Get all agent-level permissions */
+	/* Get all agent-level permissions */
 	agentPerms, err := c.queries.ListToolPermissionsByAgent(ctx, agentID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list agent tool permissions: %w", err)
@@ -71,7 +71,7 @@ func (c *ToolPermissionChecker) GetAllowedTools(ctx context.Context, agentID, se
 		allowedTools[perm.ToolName] = perm.Allowed
 	}
 
-  /* Override with session-level permissions */
+	/* Override with session-level permissions */
 	sessionPerms, err := c.queries.ListSessionToolPermissions(ctx, sessionID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list session tool permissions: %w", err)
@@ -83,4 +83,3 @@ func (c *ToolPermissionChecker) GetAllowedTools(ctx context.Context, agentID, se
 
 	return allowedTools, nil
 }
-

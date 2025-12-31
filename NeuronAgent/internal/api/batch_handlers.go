@@ -34,9 +34,9 @@ func (h *Handlers) BatchCreateAgents(w http.ResponseWriter, r *http.Request) {
 	for i, req := range reqs {
 		if err := ValidateCreateAgentRequest(&req); err != nil {
 			results = append(results, BatchResult{
-				Index: i,
+				Index:   i,
 				Success: false,
-				Error: err.Error(),
+				Error:   err.Error(),
 			})
 			continue
 		}
@@ -53,25 +53,25 @@ func (h *Handlers) BatchCreateAgents(w http.ResponseWriter, r *http.Request) {
 
 		if err := h.queries.CreateAgent(r.Context(), agent); err != nil {
 			results = append(results, BatchResult{
-				Index: i,
+				Index:   i,
 				Success: false,
-				Error: err.Error(),
+				Error:   err.Error(),
 			})
 			continue
 		}
 
 		results = append(results, BatchResult{
-			Index: i,
+			Index:   i,
 			Success: true,
-			Data: toAgentResponse(agent),
+			Data:    toAgentResponse(agent),
 		})
 	}
 
 	respondJSON(w, http.StatusOK, map[string]interface{}{
 		"results": results,
-		"total": len(reqs),
+		"total":   len(reqs),
 		"success": countSuccess(results),
-		"failed": countFailed(results),
+		"failed":  countFailed(results),
 	})
 }
 
@@ -90,24 +90,24 @@ func (h *Handlers) BatchDeleteAgents(w http.ResponseWriter, r *http.Request) {
 	for i, id := range req.IDs {
 		if err := h.queries.DeleteAgent(r.Context(), id); err != nil {
 			results = append(results, BatchResult{
-				Index: i,
+				Index:   i,
 				Success: false,
-				Error: err.Error(),
+				Error:   err.Error(),
 			})
 			continue
 		}
 
 		results = append(results, BatchResult{
-			Index: i,
+			Index:   i,
 			Success: true,
 		})
 	}
 
 	respondJSON(w, http.StatusOK, map[string]interface{}{
 		"results": results,
-		"total": len(req.IDs),
+		"total":   len(req.IDs),
 		"success": countSuccess(results),
-		"failed": countFailed(results),
+		"failed":  countFailed(results),
 	})
 }
 
@@ -126,24 +126,24 @@ func (h *Handlers) BatchDeleteMessages(w http.ResponseWriter, r *http.Request) {
 	for i, id := range req.IDs {
 		if err := h.queries.DeleteMessage(r.Context(), id); err != nil {
 			results = append(results, BatchResult{
-				Index: i,
+				Index:   i,
 				Success: false,
-				Error: err.Error(),
+				Error:   err.Error(),
 			})
 			continue
 		}
 
 		results = append(results, BatchResult{
-			Index: i,
+			Index:   i,
 			Success: true,
 		})
 	}
 
 	respondJSON(w, http.StatusOK, map[string]interface{}{
 		"results": results,
-		"total": len(req.IDs),
+		"total":   len(req.IDs),
 		"success": countSuccess(results),
-		"failed": countFailed(results),
+		"failed":  countFailed(results),
 	})
 }
 
@@ -162,24 +162,24 @@ func (h *Handlers) BatchDeleteTools(w http.ResponseWriter, r *http.Request) {
 	for i, name := range req.Names {
 		if err := h.queries.DeleteTool(r.Context(), name); err != nil {
 			results = append(results, BatchResult{
-				Index: i,
+				Index:   i,
 				Success: false,
-				Error: err.Error(),
+				Error:   err.Error(),
 			})
 			continue
 		}
 
 		results = append(results, BatchResult{
-			Index: i,
+			Index:   i,
 			Success: true,
 		})
 	}
 
 	respondJSON(w, http.StatusOK, map[string]interface{}{
 		"results": results,
-		"total": len(req.Names),
+		"total":   len(req.Names),
 		"success": countSuccess(results),
-		"failed": countFailed(results),
+		"failed":  countFailed(results),
 	})
 }
 
@@ -210,4 +210,3 @@ func countFailed(results []BatchResult) int {
 	}
 	return count
 }
-

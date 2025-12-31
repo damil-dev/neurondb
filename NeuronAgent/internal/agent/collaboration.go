@@ -92,7 +92,7 @@ func (c *CollaborationManager) DelegateTask(ctx context.Context, fromAgentID, to
 func (c *CollaborationManager) SendMessage(ctx context.Context, fromAgentID, toAgentID uuid.UUID, message string, sessionID uuid.UUID) error {
 	/* Store inter-agent message */
 	interAgentMessage := fmt.Sprintf("[From Agent %s] %s", fromAgentID.String()[:8], message)
-	
+
 	_, err := c.queries.CreateMessage(ctx, &db.Message{
 		SessionID: sessionID,
 		Role:      "system",
@@ -118,7 +118,7 @@ func (c *CollaborationManager) GetAgentRelationships(ctx context.Context, agentI
 		FROM neurondb_agent.agent_relationships
 		WHERE from_agent_id = $1 OR to_agent_id = $1
 		ORDER BY created_at DESC`
-	
+
 	var relationships []AgentRelationship
 	/* Access DB directly - Queries struct has db field */
 	err := c.queries.GetDB().SelectContext(ctx, &relationships, query, agentID)
@@ -134,7 +134,7 @@ func (c *CollaborationManager) CreateRelationship(ctx context.Context, fromAgent
 	query := `INSERT INTO neurondb_agent.agent_relationships
 		(from_agent_id, to_agent_id, relationship_type, metadata)
 		VALUES ($1, $2, $3, $4::jsonb)`
-	
+
 	_, err := c.queries.DB.ExecContext(ctx, query, fromAgentID, toAgentID, relationshipType, metadata)
 	if err != nil {
 		return fmt.Errorf("agent relationship creation failed: from_agent_id='%s', to_agent_id='%s', relationship_type='%s', error=%w",
@@ -146,11 +146,10 @@ func (c *CollaborationManager) CreateRelationship(ctx context.Context, fromAgent
 
 /* AgentRelationship represents a relationship between agents */
 type AgentRelationship struct {
-	ID             uuid.UUID              `db:"id"`
-	FromAgentID    uuid.UUID              `db:"from_agent_id"`
-	ToAgentID      uuid.UUID              `db:"to_agent_id"`
-	RelationshipType string               `db:"relationship_type"`
-	Metadata       map[string]interface{} `db:"metadata"`
-	CreatedAt      string                 `db:"created_at"`
+	ID               uuid.UUID              `db:"id"`
+	FromAgentID      uuid.UUID              `db:"from_agent_id"`
+	ToAgentID        uuid.UUID              `db:"to_agent_id"`
+	RelationshipType string                 `db:"relationship_type"`
+	Metadata         map[string]interface{} `db:"metadata"`
+	CreatedAt        string                 `db:"created_at"`
 }
-

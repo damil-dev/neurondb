@@ -83,7 +83,7 @@ func (e *Evaluator) EvaluateTask(ctx context.Context, task *db.EvalTask, agentID
 	if task.ExpectedToolSequence != nil && len(task.ExpectedToolSequence) > 0 {
 		actualSequence := e.serializeToolCalls(state.ToolCalls)
 		result.ActualToolSequence = actualSequence
-		
+
 		toolSequencePassed := e.compareToolSequences(task.ExpectedToolSequence, actualSequence)
 		if !toolSequencePassed {
 			result.Passed = false
@@ -169,7 +169,7 @@ func (e *Evaluator) serializeToolCalls(calls []agent.ToolCall) map[string]interf
 func (e *Evaluator) compareToolSequences(expected, actual map[string]interface{}) bool {
 	expectedTools, ok1 := expected["tools"].([]interface{})
 	actualTools, ok2 := actual["tools"].([]interface{})
-	
+
 	if !ok1 || !ok2 {
 		return false
 	}
@@ -245,4 +245,3 @@ func CalculateMRR(retrieved, relevant []string) float64 {
 
 	return 0.0
 }
-

@@ -40,14 +40,14 @@ func (c *DataPermissionChecker) GetRowFilterForTable(ctx context.Context, princi
 		return "", fmt.Errorf("failed to list data permissions: %w", err)
 	}
 
-  /* Find permission for this principal */
+	/* Find permission for this principal */
 	for _, perm := range permissions {
 		if perm.PrincipalID == principalID && perm.RowFilter != nil {
 			return *perm.RowFilter, nil
 		}
 	}
 
-  /* Check for schema-level permission */
+	/* Check for schema-level permission */
 	if schemaName != "" {
 		schemaPerms, err := c.queries.ListDataPermissionsByResource(ctx, &schemaName, nil)
 		if err == nil {
@@ -69,7 +69,7 @@ func (c *DataPermissionChecker) GetColumnMaskForTable(ctx context.Context, princ
 		return nil, fmt.Errorf("failed to list data permissions: %w", err)
 	}
 
-  /* Find permission for this principal */
+	/* Find permission for this principal */
 	for _, perm := range permissions {
 		if perm.PrincipalID == principalID && perm.ColumnMask != nil {
 			maskRules := make(map[string]string)
@@ -91,9 +91,9 @@ func (c *DataPermissionChecker) ApplyRowFilter(query, rowFilter string) string {
 		return query
 	}
 
-  /* Simple approach: add WHERE clause if not present, or AND if WHERE exists */
+	/* Simple approach: add WHERE clause if not present, or AND if WHERE exists */
 	queryUpper := strings.ToUpper(strings.TrimSpace(query))
-	
+
 	if strings.Contains(queryUpper, "WHERE") {
 		/* Add AND condition */
 		whereIndex := strings.Index(strings.ToUpper(query), "WHERE")
@@ -166,7 +166,7 @@ func (c *DataPermissionChecker) CheckDataPermission(ctx context.Context, princip
 		return false, fmt.Errorf("failed to list data permissions: %w", err)
 	}
 
-  /* Check permissions for this principal */
+	/* Check permissions for this principal */
 	for _, perm := range permissions {
 		if perm.PrincipalID == principalID {
 			for _, p := range perm.Permissions {
@@ -177,7 +177,7 @@ func (c *DataPermissionChecker) CheckDataPermission(ctx context.Context, princip
 		}
 	}
 
-  /* Check schema-level permissions */
+	/* Check schema-level permissions */
 	if schemaName != "" {
 		schemaPerms, err := c.queries.ListDataPermissionsByResource(ctx, &schemaName, nil)
 		if err == nil {
@@ -195,4 +195,3 @@ func (c *DataPermissionChecker) CheckDataPermission(ctx context.Context, princip
 
 	return false, nil
 }
-

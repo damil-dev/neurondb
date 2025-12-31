@@ -190,9 +190,3 @@ func (t *RerankingTool) rerankEnsembleWithWeights(ctx context.Context, query str
 	resultJSON, _ := json.Marshal(results)
 	return string(resultJSON), nil
 }
-
-
-
-
-
-

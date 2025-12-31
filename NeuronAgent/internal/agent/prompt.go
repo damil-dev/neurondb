@@ -26,7 +26,7 @@ type PromptBuilder struct {
 
 func NewPromptBuilder() *PromptBuilder {
 	return &PromptBuilder{
-  		maxTokens: 4000, /* Default max tokens */
+		maxTokens: 4000, /* Default max tokens */
 	}
 }
 
@@ -37,10 +37,10 @@ func (p *PromptBuilder) SetMaxTokens(maxTokens int) {
 func (p *PromptBuilder) Build(agent *db.Agent, context *Context, userMessage string) (string, error) {
 	var parts []string
 
-  /* System prompt */
+	/* System prompt */
 	parts = append(parts, agent.SystemPrompt)
 
-  /* Memory chunks */
+	/* Memory chunks */
 	if len(context.MemoryChunks) > 0 {
 		parts = append(parts, "\n\n## Relevant Context:")
 		for i, chunk := range context.MemoryChunks {
@@ -48,7 +48,7 @@ func (p *PromptBuilder) Build(agent *db.Agent, context *Context, userMessage str
 		}
 	}
 
-  /* Conversation history */
+	/* Conversation history */
 	if len(context.Messages) > 0 {
 		parts = append(parts, "\n\n## Conversation History:")
 		for _, msg := range context.Messages {
@@ -57,7 +57,7 @@ func (p *PromptBuilder) Build(agent *db.Agent, context *Context, userMessage str
 		}
 	}
 
-  /* Current user message */
+	/* Current user message */
 	parts = append(parts, fmt.Sprintf("\n\n## Current Request:\nUser: %s", userMessage))
 	parts = append(parts, "\n\nAssistant:")
 
@@ -67,10 +67,10 @@ func (p *PromptBuilder) Build(agent *db.Agent, context *Context, userMessage str
 func (p *PromptBuilder) BuildWithToolResults(agent *db.Agent, context *Context, userMessage string, llmResponse *LLMResponse, toolResults []ToolResult) (string, error) {
 	var parts []string
 
-  /* System prompt */
+	/* System prompt */
 	parts = append(parts, agent.SystemPrompt)
 
-  /* Memory chunks */
+	/* Memory chunks */
 	if len(context.MemoryChunks) > 0 {
 		parts = append(parts, "\n\n## Relevant Context:")
 		for i, chunk := range context.MemoryChunks {
@@ -78,7 +78,7 @@ func (p *PromptBuilder) BuildWithToolResults(agent *db.Agent, context *Context, 
 		}
 	}
 
-  /* Conversation history */
+	/* Conversation history */
 	if len(context.Messages) > 0 {
 		parts = append(parts, "\n\n## Conversation History:")
 		for _, msg := range context.Messages {
@@ -87,10 +87,10 @@ func (p *PromptBuilder) BuildWithToolResults(agent *db.Agent, context *Context, 
 		}
 	}
 
-  /* Current user message */
+	/* Current user message */
 	parts = append(parts, fmt.Sprintf("\n\n## Current Request:\nUser: %s", userMessage))
 
-  /* Tool calls and results */
+	/* Tool calls and results */
 	if len(llmResponse.ToolCalls) > 0 {
 		parts = append(parts, "\n\n## Tool Calls:")
 		for _, call := range llmResponse.ToolCalls {
