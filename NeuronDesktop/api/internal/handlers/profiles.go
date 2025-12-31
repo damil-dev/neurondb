@@ -11,6 +11,7 @@ import (
 	"github.com/neurondb/NeuronDesktop/api/internal/auth"
 	"github.com/neurondb/NeuronDesktop/api/internal/db"
 	"github.com/neurondb/NeuronDesktop/api/internal/utils"
+	"github.com/neurondb/NeuronDesktop/api/internal/validation"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -111,6 +112,12 @@ func (h *ProfileHandlers) GetProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate profile ID (UUID)
+	if err := validation.ValidateUUIDRequired(profileID, "profile_id"); err != nil {
+		http.Error(w, fmt.Sprintf("Invalid profile ID: %v", err), http.StatusBadRequest)
+		return
+	}
+
 	profile, err := h.queries.GetProfile(r.Context(), profileID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
@@ -145,6 +152,13 @@ func (h *ProfileHandlers) UpdateProfile(w http.ResponseWriter, r *http.Request) 
 		WriteError(w, r, http.StatusUnauthorized, fmt.Errorf("unauthorized"), nil)
 		return
 	}
+
+	// Validate profile ID (UUID)
+	if err := validation.ValidateUUIDRequired(profileID, "profile_id"); err != nil {
+		WriteError(w, r, http.StatusBadRequest, fmt.Errorf("invalid profile ID: %w", err), nil)
+		return
+	}
+
 	admin := isAdmin(r.Context())
 
 	var req struct {
@@ -198,6 +212,14 @@ func (h *ProfileHandlers) UpdateProfile(w http.ResponseWriter, r *http.Request) 
 		profile.ProfilePassword = ""
 	}
 
+	// Validate DSN if provided
+	if profile.NeuronDBDSN != "" {
+		if err := validation.ValidateDSNRequired(profile.NeuronDBDSN, "neurondb_dsn"); err != nil {
+			WriteError(w, r, http.StatusBadRequest, fmt.Errorf("invalid DSN: %w", err), nil)
+			return
+		}
+	}
+
 	// Validate profile
 	if errors := utils.ValidateProfile(profile.Name, profile.NeuronDBDSN, profile.MCPConfig); len(errors) > 0 {
 		WriteValidationErrors(w, r, errors)
@@ -220,6 +242,12 @@ func (h *ProfileHandlers) DeleteProfile(w http.ResponseWriter, r *http.Request) 
 	userID, ok := auth.GetUserIDFromContext(r.Context())
 	if !ok {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Validate profile ID (UUID)
+	if err := validation.ValidateUUIDRequired(profileID, "profile_id"); err != nil {
+		http.Error(w, fmt.Sprintf("Invalid profile ID: %v", err), http.StatusBadRequest)
 		return
 	}
 
