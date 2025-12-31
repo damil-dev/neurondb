@@ -70,10 +70,11 @@ WORKDIR /build/Neurondb
 
 COPY . .
 
-# Build and install NeuronDB into the builder image
-# Note: Architecture is automatically detected and handled by the build system
-# Disable GPU backends for CPU-only build
-RUN GPU_BACKENDS=none make clean && \
+# Build and install ONLY the NeuronDB PostgreSQL extension into the builder image.
+# (Do not call the repo-root Makefile here: it builds the whole ecosystem and
+# requires Go/Node which are intentionally not part of this image.)
+RUN cd NeuronDB && \
+    GPU_BACKENDS=none make clean && \
     GPU_BACKENDS=none make && \
     GPU_BACKENDS=none make install
 
@@ -121,7 +122,12 @@ COPY --from=builder /usr/share/postgresql/${PG_MAJOR}/extension/neurondb* /usr/s
 COPY --from=builder /usr/local/onnxruntime ${ONNX_PATH}
 
 # Ship helper init scripts
-COPY docker/docker-entrypoint-initdb.d/ /docker-entrypoint-initdb.d/
+COPY dockers/neurondb/docker-entrypoint-initdb.d/ /docker-entrypoint-initdb.d/
+
+# Ship custom entrypoint wrapper (ensures extension exists after PostgreSQL starts)
+COPY dockers/neurondb/docker-entrypoint-neurondb.sh /usr/local/bin/docker-entrypoint-neurondb.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint-neurondb.sh && \
+    chown root:root /usr/local/bin/docker-entrypoint-neurondb.sh
 
 # Copy NeuronMCP SQL files for auto-setup
 COPY NeuronMCP/sql/ /docker-entrypoint-initdb.d/neurondb_mcp/

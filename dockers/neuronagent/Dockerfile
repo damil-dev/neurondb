@@ -1,6 +1,6 @@
 # Multi-stage build for NeuronAgent
 # Build arguments
-ARG GO_VERSION=1.23
+ARG GO_VERSION=1.24
 ARG VERSION=latest
 ARG BUILD_DATE
 ARG VCS_REF
