@@ -22,7 +22,7 @@ NeuronMCP Docker container runs the MCP server service. Connects to an external 
 
 ## Quick Start
 
-**Prerequisites**: NeuronDB container must be running first. See [NeuronDB Docker README](../../NeuronDB/docker/README.md).
+**Prerequisites**: NeuronDB container must be running first. See [NeuronDB Docker README](../../NeuronDB/docker/readme.md).
 
 ### Step 1: Navigate to Directory
 
@@ -94,7 +94,7 @@ Test stdio communication (MCP protocol):
 sudo docker exec -i neuronmcp ./neurondb-mcp
 ```
 
-For MCP client configuration, see [Claude Desktop Configuration](../README.md#claude-desktop-configuration).
+For MCP client configuration, see [Claude Desktop Configuration](../readme.md#claude-desktop-configuration).
 
 ## Configuration
 
@@ -842,7 +842,7 @@ Before deploying to production:
 
 ### Setup Instructions
 
-See [NeuronDB Docker README](../../NeuronDB/docker/README.md) for NeuronDB setup.
+See [NeuronDB Docker README](../../NeuronDB/docker/readme.md) for NeuronDB setup.
 
 ## MCP Tools and Resources
 
@@ -863,7 +863,7 @@ NeuronMCP exposes:
 - Worker status
 - Database statistics
 
-See [NeuronMCP README](../README.md) for complete documentation.
+See [NeuronMCP README](../readme.md) for complete documentation.
 
 ## Production Deployment
 
@@ -1186,7 +1186,7 @@ Create dashboards for:
 
 ## Support
 
-- **Documentation**: [NeuronMCP README](../README.md)
+- **Documentation**: [NeuronMCP README](../readme.md)
 - **GitHub Issues**: [Report Issues](https://github.com/neurondb/NeurondB/issues)
 - **Email**: support@neurondb.ai
 

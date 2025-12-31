@@ -94,9 +94,9 @@ echo -e "${BLUE}2. Dockerfile Verification${NC}"
 echo "----------------------------------------"
 
 DOCKERFILES=(
-    "NeuronDB/docker/Dockerfile.package"
-    "NeuronDB/docker/Dockerfile.package.cuda"
-    "NeuronDB/docker/Dockerfile"
+    "dockers/neurondb/Dockerfile.package"
+    "dockers/neurondb/Dockerfile.package.cuda"
+    "dockers/neurondb/Dockerfile"
 )
 
 for dockerfile in "${DOCKERFILES[@]}"; do
@@ -107,7 +107,7 @@ for dockerfile in "${DOCKERFILES[@]}"; do
     fi
 done
 
-# Check docker-compose.yml
+# Check repo-root docker-compose.yml
 if [ -f "docker-compose.yml" ]; then
     print_test "docker-compose.yml exists" "PASS"
 else
@@ -120,38 +120,38 @@ echo ""
 echo -e "${BLUE}3. Dockerfile Dependency Analysis${NC}"
 echo "----------------------------------------"
 
-if [ -f "NeuronDB/docker/Dockerfile.package" ]; then
-    echo "Analyzing Dockerfile.package dependencies..."
+if [ -f "dockers/neurondb/Dockerfile.package" ]; then
+    echo "Analyzing dockers/neurondb/Dockerfile.package dependencies..."
     
     # Check for PostgreSQL
-    if grep -q "postgres:" "NeuronDB/docker/Dockerfile.package"; then
-        PG_VERSION=$(grep -oP "postgres:\K[0-9]+" "NeuronDB/docker/Dockerfile.package" | head -1 || echo "17")
+    if grep -q "postgres:" "dockers/neurondb/Dockerfile.package"; then
+        PG_VERSION=$(grep -oP "postgres:\K[0-9]+" "dockers/neurondb/Dockerfile.package" | head -1 || echo "17")
         print_test "PostgreSQL base image" "PASS" "Version: ${PG_VERSION}"
     fi
     
     # Check for ONNX Runtime
-    if grep -q "ONNX_VERSION" "NeuronDB/docker/Dockerfile.package"; then
-        ONNX_VERSION=$(grep -oP "ONNX_VERSION=\K[0-9.]+" "NeuronDB/docker/Dockerfile.package" | head -1 || echo "1.17.0")
+    if grep -q "ONNX_VERSION" "dockers/neurondb/Dockerfile.package"; then
+        ONNX_VERSION=$(grep -oP "ONNX_VERSION=\K[0-9.]+" "dockers/neurondb/Dockerfile.package" | head -1 || echo "1.17.0")
         print_test "ONNX Runtime dependency" "PASS" "Version: ${ONNX_VERSION}"
     fi
     
     # Check for ML libraries
-    if grep -q "XGBoost" "NeuronDB/docker/Dockerfile.package"; then
+    if grep -q "XGBoost" "dockers/neurondb/Dockerfile.package"; then
         print_test "XGBoost ML library" "PASS" "Included in Dockerfile"
     fi
     
-    if grep -q "LightGBM" "NeuronDB/docker/Dockerfile.package"; then
+    if grep -q "LightGBM" "dockers/neurondb/Dockerfile.package"; then
         print_test "LightGBM ML library" "PASS" "Included in Dockerfile"
     fi
     
-    if grep -q "CatBoost" "NeuronDB/docker/Dockerfile.package"; then
+    if grep -q "CatBoost" "dockers/neurondb/Dockerfile.package"; then
         print_test "CatBoost ML library" "PASS" "Included in Dockerfile"
     fi
     
     # Check for build dependencies
     BUILD_DEPS=("build-essential" "cmake" "git" "libcurl4-openssl-dev" "libssl-dev" "zlib1g-dev" "libomp-dev" "libeigen3-dev")
     for dep in "${BUILD_DEPS[@]}"; do
-        if grep -q "$dep" "NeuronDB/docker/Dockerfile.package"; then
+        if grep -q "$dep" "dockers/neurondb/Dockerfile.package"; then
             print_test "Build dependency: $dep" "PASS"
         else
             print_test "Build dependency: $dep" "WARN" "Not explicitly listed (may be in base image)"
@@ -307,10 +307,9 @@ echo -e "${BLUE}8. Required Files and Scripts${NC}"
 echo "----------------------------------------"
 
 REQUIRED_FILES=(
-    "NeuronDB/docker/docker-entrypoint-initdb.d/10_configure_neurondb.sh"
-    "NeuronDB/docker/docker-entrypoint-initdb.d/30_ensure_neurondb_extension.sh"
-    "NeuronDB/docker/docker-entrypoint-neurondb.sh"
-    "packaging/deb/neurondb/build.sh"
+    "dockers/neurondb/docker-entrypoint-initdb.d/10_configure_neurondb.sh"
+    "dockers/neurondb/docker-entrypoint-initdb.d/30_ensure_neurondb_extension.sh"
+    "dockers/neurondb/docker-entrypoint-neurondb.sh"
 )
 
 for file in "${REQUIRED_FILES[@]}"; do
@@ -349,6 +348,7 @@ else
     echo -e "${RED}✗ Some checks failed. Please review the errors above.${NC}"
     exit 1
 fi
+
 
 
 

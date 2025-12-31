@@ -56,9 +56,12 @@ ensure_neurondb_extension() {
     fi
 }
 
-# Check if this is the first argument and if it's 'postgres'
-# If so, we need to start PostgreSQL and then ensure the extension
-if [ "$1" = 'postgres' ]; then
+# Check if this is the first argument and if it's 'postgres'.
+# If so, we need to start PostgreSQL and then ensure the extension.
+#
+# When running under docker-compose, the container may start with no explicit
+# CMD args; guard against set -u.
+if [ "${1:-}" = 'postgres' ]; then
     # Start PostgreSQL in the background
     /usr/local/bin/docker-entrypoint.sh "$@" &
     POSTGRES_PID=$!
