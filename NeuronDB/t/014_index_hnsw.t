@@ -8,10 +8,11 @@ use lib "$FindBin::Bin";
 use PostgresNode;
 use TapTest;
 use NeuronDB;
+use IndexHelpers;
 
 =head1 NAME
 
-010_indexes_comprehensive.t - Comprehensive index operation tests
+014_index_hnsw.t - HNSW index comprehensive tests - Comprehensive index operation tests
 
 =head1 DESCRIPTION
 

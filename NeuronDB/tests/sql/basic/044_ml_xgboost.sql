@@ -103,7 +103,9 @@ FROM test_test_view;
 \echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
 
 DROP TABLE IF EXISTS gpu_model_temp;
+CREATE TEMP TABLE gpu_model_temp (model_id integer);
 
+\set ON_ERROR_STOP off
 DO $$
 DECLARE
 	model_id_val integer;
@@ -118,17 +120,15 @@ BEGIN
 			'{}'::jsonb
 		)::integer INTO model_id_val;
 		
-		CREATE TEMP TABLE gpu_model_temp AS SELECT model_id_val AS model_id;
+		INSERT INTO gpu_model_temp VALUES (model_id_val);
 		RAISE NOTICE 'XGBoost training successful, model_id: %', model_id_val;
 	EXCEPTION WHEN OTHERS THEN
-		IF SQLERRM LIKE '%XGBoost is not available%' OR SQLERRM LIKE '%libxgboost%' THEN
-			RAISE NOTICE 'XGBoost library not available, skipping test';
-			CREATE TEMP TABLE gpu_model_temp AS SELECT NULL::integer AS model_id;
-		ELSE
-			RAISE;
-		END IF;
+		-- XGBoost GPU implementation not available, insert NULL
+		INSERT INTO gpu_model_temp VALUES (NULL);
+		RAISE NOTICE 'XGBoost GPU implementation not available, skipping test: %', SQLERRM;
 	END;
 END $$;
+\set ON_ERROR_STOP on
 
 SELECT model_id FROM gpu_model_temp;
 

@@ -16,6 +16,12 @@ our @EXPORT = qw(
 	test_vector_operations
 	test_distance_metrics
 	test_aggregates
+	cleanup_test_objects
+	setup_test_data
+	check_feature_availability
+	get_neurondb_version
+	enable_gpu_mode
+	disable_gpu_mode
 );
 
 =head1 NAME
@@ -523,6 +529,264 @@ sub test_indexes {
 	$node->psql($dbname, "DROP TABLE $table CASCADE;");
 	
 	return (1, "Indexes OK");
+}
+
+=head2 cleanup_test_objects
+
+Comprehensive cleanup of test objects (tables, indexes, models, etc.).
+
+=cut
+
+sub cleanup_test_objects {
+	my ($node, $dbname, %params) = @_;
+	$dbname ||= 'postgres';
+	
+	my @objects = @{$params{objects} || []};
+	my $prefix = $params{prefix} || 'test_';
+	
+	# If no specific objects, clean up all test_* tables
+	if (@objects == 0) {
+		my $result = $node->psql($dbname,
+			"SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename LIKE '${prefix}%';",
+			tuples_only => 1
+		);
+		
+		if ($result->{success} && $result->{stdout}) {
+			my @tables = split(/\n/, $result->{stdout});
+			for my $table (@tables) {
+				$table =~ s/^\s+|\s+$//g;
+				next unless $table;
+				$node->psql($dbname, "DROP TABLE IF EXISTS $table CASCADE;");
+			}
+		}
+		
+		# Clean up test models
+		$node->psql($dbname,
+			"DELETE FROM neurondb.model_catalog WHERE model_name LIKE '${prefix}%';"
+		);
+		
+		# Clean up test indexes
+		my $idx_result = $node->psql($dbname,
+			"SELECT indexname FROM pg_indexes WHERE schemaname = 'public' AND indexname LIKE '${prefix}%';",
+			tuples_only => 1
+		);
+		
+		if ($idx_result->{success} && $idx_result->{stdout}) {
+			my @indexes = split(/\n/, $idx_result->{stdout});
+			for my $idx (@indexes) {
+				$idx =~ s/^\s+|\s+$//g;
+				next unless $idx;
+				$node->psql($dbname, "DROP INDEX IF EXISTS $idx CASCADE;");
+			}
+		}
+	} else {
+		# Clean up specific objects
+		for my $obj (@objects) {
+			$node->psql($dbname, "DROP TABLE IF EXISTS $obj CASCADE;");
+			$node->psql($dbname, "DROP INDEX IF EXISTS $obj CASCADE;");
+		}
+	}
+	
+	return 1;
+}
+
+=head2 setup_test_data
+
+Create configurable test data for various scenarios.
+
+=cut
+
+sub setup_test_data {
+	my ($node, $dbname, %params) = @_;
+	$dbname ||= 'postgres';
+	
+	my $table = $params{table} || 'test_data';
+	my $num_rows = $params{num_rows} || 100;
+	my $dim = $params{dim} || 128;
+	my $distribution = $params{distribution} || 'uniform';
+	my $seed = $params{seed} || 42;
+	
+	# Drop existing table
+	$node->psql($dbname, "DROP TABLE IF EXISTS $table CASCADE;");
+	
+	# Create table
+	my $create_sql = qq{
+		CREATE TABLE $table (
+			id SERIAL PRIMARY KEY,
+			embedding vector($dim),
+			label TEXT,
+			metadata JSONB
+		);
+	};
+	
+	my $result = $node->psql($dbname, $create_sql);
+	unless ($result->{success}) {
+		die "Failed to create test data table: $result->{stderr}\n";
+	}
+	
+	# Generate data based on distribution
+	if ($distribution eq 'uniform') {
+		# Uniform random vectors
+		my @values;
+		for my $i (1..$num_rows) {
+			my @coords;
+			for my $j (1..$dim) {
+				# Simple deterministic "random" based on seed
+				my $val = sin($seed + $i * 0.1 + $j * 0.01) * 10;
+				push @coords, sprintf("%.6f", $val);
+			}
+			my $vec = '[' . join(',', @coords) . ']';
+			push @values, "('$vec'::vector($dim), 'label$i', '{\"id\": $i}'::jsonb)";
+		}
+		
+		my $insert_sql = "INSERT INTO $table (embedding, label, metadata) VALUES " 
+			. join(', ', @values) . ';';
+		$result = $node->psql($dbname, $insert_sql);
+	} elsif ($distribution eq 'clustered') {
+		# Clustered data (for clustering tests)
+		my $num_clusters = $params{num_clusters} || 3;
+		my @values;
+		for my $i (1..$num_rows) {
+			my $cluster = ($i - 1) % $num_clusters;
+			my @coords;
+			for my $j (1..$dim) {
+				# Center each cluster at different points
+				my $center = $cluster * 10.0;
+				my $val = $center + sin($seed + $i * 0.1 + $j * 0.01) * 2;
+				push @coords, sprintf("%.6f", $val);
+			}
+			my $vec = '[' . join(',', @coords) . ']';
+			push @values, "('$vec'::vector($dim), 'cluster$cluster', '{\"cluster\": $cluster, \"id\": $i}'::jsonb)";
+		}
+		
+		my $insert_sql = "INSERT INTO $table (embedding, label, metadata) VALUES " 
+			. join(', ', @values) . ';';
+		$result = $node->psql($dbname, $insert_sql);
+	} else {
+		# Default: simple sequential
+		create_test_vectors($node, $dbname, $num_rows, table => $table, dim => $dim);
+		return 1;
+	}
+	
+	unless ($result->{success}) {
+		die "Failed to insert test data: $result->{stderr}\n";
+	}
+	
+	return 1;
+}
+
+=head2 check_feature_availability
+
+Check if a specific feature is available (GPU, workers, etc.).
+
+=cut
+
+sub check_feature_availability {
+	my ($node, $dbname, $feature) = @_;
+	$dbname ||= 'postgres';
+	
+	if ($feature eq 'gpu') {
+		my $result = $node->psql($dbname, q{
+			SELECT current_setting('neurondb.compute_mode', true) AS compute_mode;
+		}, tuples_only => 1);
+		
+		if ($result->{success}) {
+			my $mode = $result->{stdout};
+			chomp $mode;
+			return $mode eq '1' || $mode eq '2';  # GPU or AUTO mode
+		}
+		
+		# Also check if gpu_info function exists
+		$result = $node->psql($dbname, q{
+			SELECT COUNT(*) FROM pg_proc p
+			JOIN pg_namespace n ON p.pronamespace = n.oid
+			WHERE n.nspname = 'neurondb' AND p.proname = 'gpu_info';
+		}, tuples_only => 1);
+		
+		return $result->{success} && $result->{stdout} =~ /1/;
+	} elsif ($feature eq 'workers') {
+		my $result = $node->psql($dbname, q{
+			SELECT COUNT(*) FROM pg_tables 
+			WHERE schemaname = 'neurondb' AND tablename = 'job_queue';
+		}, tuples_only => 1);
+		
+		return $result->{success} && $result->{stdout} =~ /1/;
+	} elsif ($feature eq 'sparse_vectors') {
+		my $result = $node->psql($dbname, q{
+			SELECT COUNT(*) FROM pg_type WHERE typname = 'sparse_vector';
+		}, tuples_only => 1);
+		
+		return $result->{success} && $result->{stdout} =~ /1/;
+	} elsif ($feature eq 'quantization') {
+		my $result = $node->psql($dbname, q{
+			SELECT COUNT(*) FROM pg_proc p
+			JOIN pg_namespace n ON p.pronamespace = n.oid
+			WHERE n.nspname = 'neurondb' AND p.proname LIKE '%quant%';
+		}, tuples_only => 1);
+		
+		return $result->{success} && $result->{stdout} =~ /\d+/ && $result->{stdout} > 0;
+	}
+	
+	return 0;
+}
+
+=head2 get_neurondb_version
+
+Get the installed NeuronDB extension version.
+
+=cut
+
+sub get_neurondb_version {
+	my ($node, $dbname) = @_;
+	$dbname ||= 'postgres';
+	
+	my $result = $node->psql($dbname,
+		"SELECT extversion FROM pg_extension WHERE extname = 'neurondb';",
+		tuples_only => 1
+	);
+	
+	if ($result->{success} && $result->{stdout}) {
+		my $version = $result->{stdout};
+		chomp $version;
+		$version =~ s/^\s+|\s+$//g;
+		return $version;
+	}
+	
+	return undef;
+}
+
+=head2 enable_gpu_mode
+
+Enable GPU compute mode.
+
+=cut
+
+sub enable_gpu_mode {
+	my ($node, $dbname) = @_;
+	$dbname ||= 'postgres';
+	
+	my $result = $node->psql($dbname,
+		"SET neurondb.compute_mode = '1';"
+	);
+	
+	return $result->{success};
+}
+
+=head2 disable_gpu_mode
+
+Disable GPU compute mode (use CPU).
+
+=cut
+
+sub disable_gpu_mode {
+	my ($node, $dbname) = @_;
+	$dbname ||= 'postgres';
+	
+	my $result = $node->psql($dbname,
+		"SET neurondb.compute_mode = '0';"
+	);
+	
+	return $result->{success};
 }
 
 1;

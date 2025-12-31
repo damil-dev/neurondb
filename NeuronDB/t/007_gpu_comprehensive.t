@@ -8,6 +8,7 @@ use lib "$FindBin::Bin";
 use PostgresNode;
 use TapTest;
 use NeuronDB;
+use GPUHelpers;
 
 =head1 NAME
 

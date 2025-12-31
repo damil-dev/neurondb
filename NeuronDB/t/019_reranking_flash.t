@@ -11,7 +11,7 @@ use NeuronDB;
 
 =head1 NAME
 
-042_reranking_flash.t - Flash Attention reranking tests
+019_reranking_flash.t - Flash attention reranking tests - Flash Attention reranking tests
 
 =head1 DESCRIPTION
 
