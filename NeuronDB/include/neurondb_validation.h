@@ -28,6 +28,7 @@
 #include "neurondb_safe_memory.h"
 #include "neurondb_macros.h"
 #include "neurondb_constants.h"
+#include "neurondb.h"		/* For VECTOR_MAX_DIM and Vector struct */
 
 /*-------------------------------------------------------------------------
  * NULL Parameter Validation Macros
@@ -339,6 +340,11 @@
 /*
  * NDB_CHECK_VECTOR_VALID - Validate vector structure
  *
+ * Validates:
+ * - Pointer is not NULL
+ * - Dimension is within valid range (1 to VECTOR_MAX_DIM)
+ * - Varlena size matches expected size for the dimension
+ *
  * Usage:
  *   NDB_CHECK_VECTOR_VALID(vec);
  */
@@ -348,11 +354,20 @@
 			ereport(ERROR, \
 				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED), \
 				 errmsg(NDB_ERR_MSG("vector is NULL")))); \
-		if ((vec)->dim <= 0 || (vec)->dim > 32767) \
+		if ((vec)->dim <= 0 || (vec)->dim > VECTOR_MAX_DIM) \
 			ereport(ERROR, \
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE), \
-				 errmsg(NDB_ERR_MSG("invalid vector dimension %d"), \
-					(vec)->dim))); \
+				 errmsg(NDB_ERR_MSG("invalid vector dimension %d (max: %d)"), \
+					(vec)->dim, VECTOR_MAX_DIM))); \
+		{ \
+			int32		expected_size = offsetof(Vector, data) + sizeof(float4) * (vec)->dim; \
+			int32		actual_size = VARSIZE_ANY((vec)); \
+			if (actual_size < expected_size) \
+				ereport(ERROR, \
+					(errcode(ERRCODE_DATA_CORRUPTED), \
+					 errmsg(NDB_ERR_MSG("vector varlena size mismatch: expected at least %d bytes, got %d"), \
+						expected_size, actual_size))); \
+		} \
 	} while (0)
 
 /*-------------------------------------------------------------------------

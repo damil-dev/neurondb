@@ -116,6 +116,17 @@ vector_avg_finalfn(PG_FUNCTION_ARGS)
 }
 
 /*
+ * Vector SUM aggregate - transition function (reuses vector_avg_transfn logic)
+ */
+PG_FUNCTION_INFO_V1(vector_sum_transfn);
+Datum
+vector_sum_transfn(PG_FUNCTION_ARGS)
+{
+	/* Reuse the same transition function as vector_avg */
+	return vector_avg_transfn(fcinfo);
+}
+
+/*
  * Vector SUM aggregate - final function
  */
 PG_FUNCTION_INFO_V1(vector_sum_finalfn);

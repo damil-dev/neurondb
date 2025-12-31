@@ -63,6 +63,46 @@ to_sql_literal(const char *val)
 	return buf.data;
 }
 
+static inline char *
+plain_to_tsquery_format(const char *text)
+{
+	StringInfoData buf;
+	const char *p = text;
+	bool first = true;
+
+	initStringInfo(&buf);
+	
+	/* Convert plain text to tsquery format: "word1 & word2 & word3" */
+	while (*p)
+	{
+		/* Skip whitespace */
+		while (*p && isspace((unsigned char) *p))
+			p++;
+		
+		if (!*p)
+			break;
+		
+		/* Add & operator between words */
+		if (!first)
+			appendStringInfoString(&buf, " & ");
+		
+		/* Add word (escape special tsquery chars) */
+		while (*p && !isspace((unsigned char) *p))
+		{
+			char c = *p;
+			/* Escape special tsquery characters: & | ! ( ) */
+			if (c == '&' || c == '|' || c == '!' || c == '(' || c == ')')
+				appendStringInfoChar(&buf, '\\');
+			appendStringInfoChar(&buf, c);
+			p++;
+		}
+		
+		first = false;
+	}
+	
+	return buf.data;
+}
+
 static void
 __attribute__((unused))
 vector_to_float_array(const Vector *vec, float *arr, int dim)
@@ -202,11 +242,26 @@ hybrid_search(PG_FUNCTION_ARGS)
 
 		/* Determine query function based on query_type */
 		query_func = "plainto_tsquery";
+		char *query_text_formatted = NULL;
+		
 		if (strcmp(qtype_str, "to") == 0 || strcmp(qtype_str, "to_tsquery") == 0)
+		{
 			query_func = "to_tsquery";
+			/* Convert plain text to tsquery format (space-separated words -> word1 & word2) */
+			query_text_formatted = plain_to_tsquery_format(txt_str);
+		}
 		else if (strcmp(qtype_str, "phrase") == 0 || strcmp(qtype_str, "phraseto_tsquery") == 0)
+		{
 			query_func = "phraseto_tsquery";
-		/* else default to plainto_tsquery */
+			query_text_formatted = NULL; /* Use original text */
+		}
+		else
+		{
+			query_text_formatted = NULL; /* Use original text for plainto_tsquery */
+		}
+
+		/* Use formatted text if available, otherwise use original */
+		char *query_text_to_use = query_text_formatted ? query_text_formatted : txt_str;
 
 		initStringInfo(&sql);
 
@@ -214,7 +269,7 @@ hybrid_search(PG_FUNCTION_ARGS)
 						 "WITH _hybrid_scores AS ("
 						 " SELECT id,"
 						 "        (1 - (embedding <-> '%s'::vector)) AS vector_score,"
-						 "        ts_rank(fts_vector, %s(%s)) AS fts_score,"
+						 "        ts_rank(fts_vector, %s('english', %s)) AS fts_score,"
 						 "        metadata "
 						 "   FROM %s "
 						 "  WHERE metadata @> %s "
@@ -228,7 +283,7 @@ hybrid_search(PG_FUNCTION_ARGS)
 						 " LIMIT %d;",
 						 vec_lit.data,
 						 query_func,
-						 to_sql_literal(txt_str),
+						 to_sql_literal(query_text_to_use),
 						 tbl_str,
 						 to_sql_literal(filter_str),
 						 vector_weight,
@@ -244,8 +299,15 @@ hybrid_search(PG_FUNCTION_ARGS)
 			pfree(tbl_str);
 			pfree(txt_str);
 			pfree(filter_str);
+			if (query_text_formatted)
+				pfree(query_text_formatted);
+			pfree(qtype_str);
 			ereport(ERROR, (errmsg("Failed to execute hybrid search SQL")));
 		}
+		
+		/* Clean up formatted text if it was allocated */
+		if (query_text_formatted)
+			pfree(query_text_formatted);
 
 		proc = SPI_processed;
 
@@ -328,6 +390,8 @@ hybrid_search(PG_FUNCTION_ARGS)
 		pfree(tbl_str);
 		pfree(txt_str);
 		pfree(filter_str);
+		if (query_text_formatted)
+			pfree(query_text_formatted);
 		pfree(qtype_str);
 		ndb_spi_session_end(&session);
 		MemoryContextSwitchTo(oldcontext);

@@ -684,7 +684,11 @@ vector_eq(PG_FUNCTION_ARGS)
 	int			i;
 
 	if (a->dim != b->dim)
-		PG_RETURN_BOOL(false);
+		ereport(ERROR,
+				(errcode(ERRCODE_DATA_EXCEPTION),
+				 errmsg("cannot compare vectors of different dimensions: %d vs %d",
+						a->dim,
+						b->dim)));
 
 	for (i = 0; i < a->dim; i++)
 		if (a->data[i] != b->data[i])
@@ -697,10 +701,9 @@ PG_FUNCTION_INFO_V1(vector_ne);
 Datum
 vector_ne(PG_FUNCTION_ARGS)
 {
-	return DirectFunctionCall2(
-							   vector_eq, PG_GETARG_DATUM(0), PG_GETARG_DATUM(1))
-		? BoolGetDatum(false)
-		: BoolGetDatum(true);
+	Datum eq_result = DirectFunctionCall2(vector_eq, PG_GETARG_DATUM(0), PG_GETARG_DATUM(1));
+	/* vector_eq will throw ERROR if dimensions don't match, so we just invert */
+	return BoolGetDatum(!DatumGetBool(eq_result));
 }
 
 /*
