@@ -77,7 +77,7 @@ func (m *AuthMiddleware) Enabled() bool {
 /* Execute handles authentication */
 func (m *AuthMiddleware) Execute(ctx context.Context, req *middleware.MCPRequest, next middleware.Handler) (*middleware.MCPResponse, error) {
 	if !m.config.Enabled {
-		return next(ctx)
+		return next(ctx, req)
 	}
 
 	/* Extract token from request */
@@ -96,7 +96,7 @@ func (m *AuthMiddleware) Execute(ctx context.Context, req *middleware.MCPRequest
 		if user, ok := m.config.APIKeys[token]; ok {
 			/* Add user to context */
 			ctx = context.WithValue(ctx, "user", user)
-			return next(ctx)
+			return next(ctx, req)
 		}
 	}
 
@@ -105,7 +105,7 @@ func (m *AuthMiddleware) Execute(ctx context.Context, req *middleware.MCPRequest
 		user, err := m.validateJWT(token)
 		if err == nil {
 			ctx = context.WithValue(ctx, "user", user)
-			return next(ctx)
+			return next(ctx, req)
 		}
 		m.logger.Debug("JWT validation failed", map[string]interface{}{
 			"error": err.Error(),

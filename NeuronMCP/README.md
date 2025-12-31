@@ -174,7 +174,7 @@ cd docker
 docker compose up -d
 ```
 
-See [Docker Guide](docker/README.md) for Docker deployment details.
+See [Docker Guide](docker/readme.md) for Docker deployment details.
 
 ## MCP Protocol
 
@@ -473,7 +473,7 @@ docker run -i --rm \
 
 | Document | Description |
 |----------|-------------|
-| [Docker Guide](docker/README.md) | Container deployment guide |
+| [Docker Guide](docker/readme.md) | Container deployment guide |
 | [MCP Specification](https://modelcontextprotocol.io/) | Model Context Protocol documentation |
 | [Claude Desktop Config Examples](claude_desktop_config.json) | Example configurations for macOS, Linux, and Windows |
 
@@ -494,7 +494,7 @@ NeuronMCP requires:
 - Database user with appropriate permissions
 - Access to NeuronDB vector search, ML, and embedding functions
 
-See [NeuronDB documentation](../NeuronDB/README.md) for installation instructions.
+See [NeuronDB documentation](../NeuronDB/readme.md) for installation instructions.
 
 ## Troubleshooting
 
@@ -566,7 +566,7 @@ env | grep -E "^NEURONDB_"
 
 ## Support
 
-- **Documentation**: [Component Documentation](../README.md)
+- **Documentation**: [Component Documentation](../readme.md)
 - **GitHub Issues**: [Report Issues](https://github.com/neurondb/NeurondB/issues)
 - **Email**: support@neurondb.ai
 

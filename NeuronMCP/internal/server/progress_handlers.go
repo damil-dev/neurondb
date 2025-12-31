@@ -34,7 +34,7 @@ func (s *Server) handleGetProgress(ctx context.Context, params json.RawMessage) 
 		Params: make(map[string]interface{}),
 	}
 
-	return s.middleware.Execute(ctx, mcpReq, func(ctx context.Context) (*middleware.MCPResponse, error) {
+	return s.middleware.Execute(ctx, mcpReq, func(ctx context.Context, _ *middleware.MCPRequest) (*middleware.MCPResponse, error) {
 		result, err := s.progress.HandleGetProgress(ctx, params)
 		if err != nil {
 			return &middleware.MCPResponse{
@@ -53,6 +53,7 @@ func (s *Server) handleGetProgress(ctx context.Context, params json.RawMessage) 
 		}, nil
 	})
 }
+
 
 
 

@@ -20,6 +20,7 @@ import (
 
 	"github.com/neurondb/NeuronMCP/internal/database"
 	"github.com/neurondb/NeuronMCP/internal/logging"
+	"github.com/neurondb/NeuronMCP/internal/validation"
 )
 
 /* HybridSearchTool performs hybrid semantic + lexical search */
@@ -107,6 +108,63 @@ func (t *HybridSearchTool) Execute(ctx context.Context, params map[string]interf
 	queryText, _ := params["query_text"].(string)
 	vectorColumn, _ := params["vector_column"].(string)
 	textColumn, _ := params["text_column"].(string)
+
+	// Validate table (SQL identifier)
+	if err := validation.ValidateSQLIdentifierRequired(table, "table"); err != nil {
+		return Error(fmt.Sprintf("Invalid table parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
+			"parameter": "table",
+			"error":     err.Error(),
+			"params":    params,
+		}), nil
+	}
+
+	// Validate vector_column (SQL identifier)
+	if err := validation.ValidateSQLIdentifierRequired(vectorColumn, "vector_column"); err != nil {
+		return Error(fmt.Sprintf("Invalid vector_column parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
+			"parameter": "vector_column",
+			"table":     table,
+			"error":     err.Error(),
+			"params":    params,
+		}), nil
+	}
+
+	// Validate text_column (SQL identifier)
+	if err := validation.ValidateSQLIdentifierRequired(textColumn, "text_column"); err != nil {
+		return Error(fmt.Sprintf("Invalid text_column parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
+			"parameter": "text_column",
+			"table":     table,
+			"error":     err.Error(),
+			"params":    params,
+		}), nil
+	}
+
+	// Validate query_vector
+	if err := validation.ValidateVectorRequired(queryVector, "query_vector", 1, 10000); err != nil {
+		return Error(fmt.Sprintf("Invalid query_vector parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
+			"parameter": "query_vector",
+			"table":     table,
+			"error":     err.Error(),
+			"params":    params,
+		}), nil
+	}
+
+	// Validate query_text
+	if err := validation.ValidateRequired(queryText, "query_text"); err != nil {
+		return Error(fmt.Sprintf("Invalid query_text parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
+			"parameter": "query_text",
+			"table":     table,
+			"error":     err.Error(),
+			"params":    params,
+		}), nil
+	}
+	if err := validation.ValidateMaxLength(queryText, "query_text", 10000); err != nil {
+		return Error(fmt.Sprintf("Invalid query_text parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
+			"parameter": "query_text",
+			"table":     table,
+			"error":     err.Error(),
+			"params":    params,
+		}), nil
+	}
 	vectorWeight := 0.7
 	if w, ok := params["vector_weight"].(float64); ok {
 		vectorWeight = w

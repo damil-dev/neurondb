@@ -86,7 +86,7 @@ func (s *Server) handleCallTool(ctx context.Context, params json.RawMessage) (in
 		},
 	}
 
-	return s.middleware.Execute(ctx, mcpReq, func(ctx context.Context) (*middleware.MCPResponse, error) {
+	return s.middleware.Execute(ctx, mcpReq, func(ctx context.Context, _ *middleware.MCPRequest) (*middleware.MCPResponse, error) {
 		return s.executeTool(ctx, req.Name, req.Arguments, req.DryRun, req.IdempotencyKey, req.RequireConfirm)
 	})
 }

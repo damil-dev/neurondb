@@ -164,7 +164,7 @@ func (m *RetryMiddleware) Enabled() bool {
 /* Execute handles retry logic */
 func (m *RetryMiddleware) Execute(ctx context.Context, req *middleware.MCPRequest, next middleware.Handler) (*middleware.MCPResponse, error) {
 	if !m.config.Enabled {
-		return next(ctx)
+		return next(ctx, req)
 	}
 
 	/* Check circuit breaker */
@@ -201,7 +201,7 @@ func (m *RetryMiddleware) Execute(ctx context.Context, req *middleware.MCPReques
 			}
 		}
 
-		resp, err := next(ctx)
+		resp, err := next(ctx, req)
 		if err == nil && !resp.IsError {
 			/* Success */
 			if m.config.CircuitBreaker != nil && m.config.CircuitBreaker.Enabled {

@@ -129,7 +129,7 @@ func (m *RateLimitMiddleware) Enabled() bool {
 /* Execute handles rate limiting */
 func (m *RateLimitMiddleware) Execute(ctx context.Context, req *middleware.MCPRequest, next middleware.Handler) (*middleware.MCPResponse, error) {
 	if !m.config.Enabled {
-		return next(ctx)
+		return next(ctx, req)
 	}
 
 	/* Check global rate limit */
@@ -187,7 +187,7 @@ func (m *RateLimitMiddleware) Execute(ctx context.Context, req *middleware.MCPRe
 		}
 	}
 
-	return next(ctx)
+	return next(ctx, req)
 }
 
 /* getUser gets user from context */

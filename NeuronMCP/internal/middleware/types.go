@@ -1,7 +1,7 @@
 /*-------------------------------------------------------------------------
  *
  * types.go
- *    Database operations
+ *    Middleware type definitions
  *
  * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
  *
@@ -14,6 +14,9 @@
 package middleware
 
 import "context"
+
+/* MiddlewareFunc is the function signature for middleware next handlers */
+type MiddlewareFunc func(ctx context.Context, params map[string]interface{}) (interface{}, error)
 
 /* MCPRequest represents an MCP request */
 type MCPRequest struct {
@@ -29,20 +32,20 @@ type MCPResponse struct {
 	Metadata map[string]interface{} `json:"metadata,omitempty"`
 }
 
-/* ContentBlock represents a content block in a response */
+/* ContentBlock represents a content block in an MCP response */
 type ContentBlock struct {
 	Type string `json:"type"`
-	Text string `json:"text"`
+	Text string `json:"text,omitempty"`
 }
 
-/* Handler is a function that handles a request */
-type Handler func(ctx context.Context) (*MCPResponse, error)
+/* Handler is the function signature for handlers */
+type Handler func(ctx context.Context, req *MCPRequest) (*MCPResponse, error)
 
-/* Middleware is the interface that all middleware must implement */
+/* Middleware interface for MCP middleware */
 type Middleware interface {
+	Execute(ctx context.Context, req *MCPRequest, next Handler) (*MCPResponse, error)
 	Name() string
 	Order() int
 	Enabled() bool
-	Execute(ctx context.Context, req *MCPRequest, next Handler) (*MCPResponse, error)
 }
 

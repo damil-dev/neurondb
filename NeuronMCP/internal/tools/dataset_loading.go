@@ -25,6 +25,7 @@ import (
 	"github.com/neurondb/NeuronMCP/internal/config"
 	"github.com/neurondb/NeuronMCP/internal/database"
 	"github.com/neurondb/NeuronMCP/internal/logging"
+	"github.com/neurondb/NeuronMCP/internal/validation"
 )
 
 /* DatasetLoadingTool loads HuggingFace datasets */
@@ -145,8 +146,21 @@ func (t *DatasetLoadingTool) Execute(ctx context.Context, params map[string]inte
 	if sourcePath == "" && datasetName != "" {
 		sourcePath = datasetName
 	}
-	if sourcePath == "" {
-		return Error("source_path is required and cannot be empty", "VALIDATION_ERROR", nil), nil
+	
+	// Validate source_path is required
+	if err := validation.ValidateRequired(sourcePath, "source_path"); err != nil {
+		return Error(fmt.Sprintf("Invalid source_path parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
+			"error":  err.Error(),
+			"params": params,
+		}), nil
+	}
+	
+	// Validate source_path length
+	if err := validation.ValidateMaxLength(sourcePath, "source_path", 2048); err != nil {
+		return Error(fmt.Sprintf("Invalid source_path parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
+			"error":  err.Error(),
+			"params": params,
+		}), nil
 	}
 
 	// Get source type

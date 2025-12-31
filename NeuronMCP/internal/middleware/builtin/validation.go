@@ -57,6 +57,6 @@ func (m *ValidationMiddleware) Execute(ctx context.Context, req *middleware.MCPR
    /* Params should be a map, which is already validated by type */
 	}
 
-	return next(ctx)
+	return next(ctx, req)
 }
 

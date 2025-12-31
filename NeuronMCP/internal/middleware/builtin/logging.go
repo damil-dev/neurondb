@@ -64,7 +64,7 @@ func (m *LoggingMiddleware) Execute(ctx context.Context, req *middleware.MCPRequ
 		})
 	}
 
-	resp, err := next(ctx)
+	resp, err := next(ctx, req)
 	duration := time.Since(start)
 
 	if err != nil {

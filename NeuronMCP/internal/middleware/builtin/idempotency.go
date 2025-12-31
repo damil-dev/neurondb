@@ -140,7 +140,7 @@ func (m *IdempotencyMiddleware) Enabled() bool {
 /* Execute handles idempotency */
 func (m *IdempotencyMiddleware) Execute(ctx context.Context, req *middleware.MCPRequest, next middleware.Handler) (*middleware.MCPResponse, error) {
 	if !m.Enabled() {
-		return next(ctx)
+		return next(ctx, req)
 	}
 
 	/* Extract idempotency key from request */
@@ -153,7 +153,7 @@ func (m *IdempotencyMiddleware) Execute(ctx context.Context, req *middleware.MCP
 
 	/* If no idempotency key, proceed normally */
 	if idempotencyKey == "" {
-		return next(ctx)
+		return next(ctx, req)
 	}
 
 	/* Generate normalized key (method + key) */
@@ -166,7 +166,7 @@ func (m *IdempotencyMiddleware) Execute(ctx context.Context, req *middleware.MCP
 	}
 
 	/* Execute request */
-	resp, err := next(ctx)
+	resp, err := next(ctx, req)
 	if err != nil {
 		return nil, err
 	}

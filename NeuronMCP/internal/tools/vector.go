@@ -24,6 +24,7 @@ import (
 
 	"github.com/neurondb/NeuronMCP/internal/database"
 	"github.com/neurondb/NeuronMCP/internal/logging"
+	"github.com/neurondb/NeuronMCP/internal/validation"
 )
 
 /* VectorSearchTool performs vector similarity search */
@@ -117,28 +118,72 @@ func (t *VectorSearchTool) Execute(ctx context.Context, params map[string]interf
 		additionalColumns = ac
 	}
 
-	if table == "" {
-		return Error("table parameter is required and cannot be empty for vector_search tool", "VALIDATION_ERROR", map[string]interface{}{
+	// Validate table name (SQL identifier)
+	if err := validation.ValidateSQLIdentifierRequired(table, "table"); err != nil {
+		return Error(fmt.Sprintf("Invalid table parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "table",
+			"error":     err.Error(),
 			"params":    params,
 		}), nil
 	}
 
-	if vectorColumn == "" {
-		return Error(fmt.Sprintf("vector_column parameter is required and cannot be empty for vector_search tool on table '%s'", table), "VALIDATION_ERROR", map[string]interface{}{
+	// Validate vector column name (SQL identifier)
+	if err := validation.ValidateSQLIdentifierRequired(vectorColumn, "vector_column"); err != nil {
+		return Error(fmt.Sprintf("Invalid vector_column parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "vector_column",
 			"table":     table,
+			"error":     err.Error(),
 			"params":    params,
 		}), nil
 	}
 
-	if queryVector == nil || len(queryVector) == 0 {
-		return Error(fmt.Sprintf("query_vector parameter is required and cannot be empty for vector_search tool on table '%s', column '%s'", table, vectorColumn), "VALIDATION_ERROR", map[string]interface{}{
+	// Validate query vector
+	if err := validation.ValidateVectorRequired(queryVector, "query_vector", 1, 10000); err != nil {
+		return Error(fmt.Sprintf("Invalid query_vector parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter":    "query_vector",
 			"table":        table,
 			"vector_column": vectorColumn,
+			"error":        err.Error(),
 			"params":       params,
 		}), nil
+	}
+
+	// Validate limit
+	if err := validation.ValidateIntRange(limit, 1, 1000, "limit"); err != nil {
+		return Error(fmt.Sprintf("Invalid limit parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
+			"parameter": "limit",
+			"error":     err.Error(),
+			"params":    params,
+		}), nil
+	}
+
+	// Validate distance metric
+	if err := validation.ValidateIn(distanceMetric, "distance_metric", "l2", "cosine", "inner_product", "l1", "hamming", "chebyshev", "minkowski"); err != nil {
+		return Error(fmt.Sprintf("Invalid distance_metric parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
+			"parameter": "distance_metric",
+			"error":     err.Error(),
+			"params":    params,
+		}), nil
+	}
+
+	// Validate additional columns (if provided)
+	for i, col := range additionalColumns {
+		colStr, ok := col.(string)
+		if !ok {
+			return Error(fmt.Sprintf("additional_columns[%d] must be a string", i), "VALIDATION_ERROR", map[string]interface{}{
+				"parameter": "additional_columns",
+				"index":      i,
+				"params":     params,
+			}), nil
+		}
+		if err := validation.ValidateSQLIdentifier(colStr, fmt.Sprintf("additional_columns[%d]", i)); err != nil {
+			return Error(fmt.Sprintf("Invalid additional_columns[%d]: %v", i, err), "VALIDATION_ERROR", map[string]interface{}{
+				"parameter": "additional_columns",
+				"index":      i,
+				"error":      err.Error(),
+				"params":     params,
+			}), nil
+		}
 	}
 
 	results, err := t.executor.ExecuteVectorSearch(ctx, table, vectorColumn, queryVector, distanceMetric, limit, additionalColumns)
