@@ -38,6 +38,16 @@
 #define HAVE_AVX512 0
 #endif
 
+/* FMA (Fused Multiply-Add) support */
+#ifdef __FMA__
+#define HAVE_FMA 1
+#elif defined(__AVX2__) && defined(__FMA__)
+/* Some compilers define __FMA__ when -mfma is used with AVX2 */
+#define HAVE_FMA 1
+#else
+#define HAVE_FMA 0
+#endif
+
 static int	simd_capabilities = -1;
 
 #define SIMD_NONE 0
@@ -312,9 +322,16 @@ cosine_distance_avx2(const Vector *a, const Vector *b)
 		__m256		va = _mm256_loadu_ps(&a->data[i]);
 		__m256		vb = _mm256_loadu_ps(&b->data[i]);
 
+#if HAVE_FMA
 		dot_vec = _mm256_fmadd_ps(va, vb, dot_vec);
 		norm_a_vec = _mm256_fmadd_ps(va, va, norm_a_vec);
 		norm_b_vec = _mm256_fmadd_ps(vb, vb, norm_b_vec);
+#else
+		/* Fallback: mul + add (slightly slower but portable) */
+		dot_vec = _mm256_add_ps(dot_vec, _mm256_mul_ps(va, vb));
+		norm_a_vec = _mm256_add_ps(norm_a_vec, _mm256_mul_ps(va, va));
+		norm_b_vec = _mm256_add_ps(norm_b_vec, _mm256_mul_ps(vb, vb));
+#endif
 	}
 
 	float		dot = horizontal_sum_avx2(dot_vec);
@@ -362,9 +379,16 @@ cosine_distance_avx512(const Vector *a, const Vector *b)
 		__m512		va = _mm512_loadu_ps(&a->data[i]);
 		__m512		vb = _mm512_loadu_ps(&b->data[i]);
 
+#if HAVE_FMA
 		dot_vec = _mm512_fmadd_ps(va, vb, dot_vec);
 		norm_a_vec = _mm512_fmadd_ps(va, va, norm_a_vec);
 		norm_b_vec = _mm512_fmadd_ps(vb, vb, norm_b_vec);
+#else
+		/* Fallback: mul + add (slightly slower but portable) */
+		dot_vec = _mm512_add_ps(dot_vec, _mm512_mul_ps(va, vb));
+		norm_a_vec = _mm512_add_ps(norm_a_vec, _mm512_mul_ps(va, va));
+		norm_b_vec = _mm512_add_ps(norm_b_vec, _mm512_mul_ps(vb, vb));
+#endif
 	}
 
 	float		dot = horizontal_sum_avx512(dot_vec);

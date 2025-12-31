@@ -63,7 +63,11 @@ vector_lt(PG_FUNCTION_ARGS)
 	NDB_CHECK_VECTOR_VALID(b);
 
 	if (a->dim != b->dim)
-		PG_RETURN_BOOL(false);
+		ereport(ERROR,
+				(errcode(ERRCODE_DATA_EXCEPTION),
+				 errmsg("cannot compare vectors of different dimensions: %d vs %d",
+						a->dim,
+						b->dim)));
 
 	for (i = 0; i < a->dim; i++)
 	{
@@ -96,7 +100,11 @@ vector_le(PG_FUNCTION_ARGS)
 	NDB_CHECK_VECTOR_VALID(b);
 
 	if (a->dim != b->dim)
-		PG_RETURN_BOOL(false);
+		ereport(ERROR,
+				(errcode(ERRCODE_DATA_EXCEPTION),
+				 errmsg("cannot compare vectors of different dimensions: %d vs %d",
+						a->dim,
+						b->dim)));
 
 	for (i = 0; i < a->dim; i++)
 	{
@@ -129,7 +137,11 @@ vector_gt(PG_FUNCTION_ARGS)
 	NDB_CHECK_VECTOR_VALID(b);
 
 	if (a->dim != b->dim)
-		PG_RETURN_BOOL(false);
+		ereport(ERROR,
+				(errcode(ERRCODE_DATA_EXCEPTION),
+				 errmsg("cannot compare vectors of different dimensions: %d vs %d",
+						a->dim,
+						b->dim)));
 
 	for (i = 0; i < a->dim; i++)
 	{
@@ -162,7 +174,11 @@ vector_ge(PG_FUNCTION_ARGS)
 	NDB_CHECK_VECTOR_VALID(b);
 
 	if (a->dim != b->dim)
-		PG_RETURN_BOOL(false);
+		ereport(ERROR,
+				(errcode(ERRCODE_DATA_EXCEPTION),
+				 errmsg("cannot compare vectors of different dimensions: %d vs %d",
+						a->dim,
+						b->dim)));
 
 	for (i = 0; i < a->dim; i++)
 	{

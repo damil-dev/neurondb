@@ -430,6 +430,13 @@ CREATE FUNCTION vector_inner_product(vector, vector) RETURNS real
     LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
 COMMENT ON FUNCTION vector_inner_product IS 'Negative inner product (for ordering)';
 
+-- Dot product (returns positive dot product, not negative like vector_inner_product)
+CREATE FUNCTION vector_dot(vector, vector) RETURNS real
+    LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE AS $$
+    SELECT -vector_inner_product($1, $2);
+$$;
+COMMENT ON FUNCTION vector_dot IS 'Dot product (positive value, opposite of vector_inner_product which is negative for ordering)';
+
 -- Note: Operator <#> is created after vector_inner_product_distance_op function definition (see line ~2470)
 
 -- Cosine Distance
@@ -437,6 +444,18 @@ CREATE FUNCTION vector_cosine_distance(vector, vector) RETURNS real
     AS 'MODULE_PATHNAME', 'vector_cosine_distance'
     LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
 COMMENT ON FUNCTION vector_cosine_distance IS 'Cosine distance (1 - cosine similarity)';
+
+-- Cosine Similarity (returns similarity, not distance)
+CREATE FUNCTION vector_cosine_similarity(vector, vector) RETURNS real
+    AS 'MODULE_PATHNAME', 'vector_cosine_similarity'
+    LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
+COMMENT ON FUNCTION vector_cosine_similarity IS 'Cosine similarity (returns similarity value, not distance)';
+
+-- Alias for vector_cosine_similarity
+CREATE FUNCTION vector_cosine_sim(vector, vector) RETURNS real
+    AS 'MODULE_PATHNAME', 'vector_cosine_similarity'
+    LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
+COMMENT ON FUNCTION vector_cosine_sim IS 'Cosine similarity (alias for vector_cosine_similarity)';
 
 CREATE FUNCTION vector_spherical_distance(vector, vector) RETURNS real
     AS 'MODULE_PATHNAME', 'vector_spherical_distance'
@@ -2324,8 +2343,7 @@ COMMENT ON FUNCTION vector_sum_finalfn IS 'Final function for vector_sum aggrega
 CREATE AGGREGATE vector_avg(vector) (
     SFUNC = vector_avg_transfn,
     STYPE = internal,
-    FINALFUNC = vector_avg_finalfn,
-    INITCOND = ''
+    FINALFUNC = vector_avg_finalfn
 );
 COMMENT ON AGGREGATE vector_avg(vector) IS 'Average of vectors (element-wise mean)';
 
@@ -2333,8 +2351,7 @@ COMMENT ON AGGREGATE vector_avg(vector) IS 'Average of vectors (element-wise mea
 CREATE AGGREGATE vector_sum(vector) (
     SFUNC = vector_sum_transfn,
     STYPE = internal,
-    FINALFUNC = vector_sum_finalfn,
-    INITCOND = ''
+    FINALFUNC = vector_sum_finalfn
 );
 COMMENT ON AGGREGATE vector_sum(vector) IS 'Sum of vectors (element-wise sum)';
 
@@ -4503,7 +4520,7 @@ DECLARE
     sql_query text;
 BEGIN
     -- Generate embedding for query
-    query_embedding := neurondb_embed(query_text, 'all-MiniLM-L6-v2');
+    query_embedding := neurondb_embed(query_text, 'sentence-transformers/all-MiniLM-L6-v2');
     
     -- Build and execute vector search query
     sql_query := format(

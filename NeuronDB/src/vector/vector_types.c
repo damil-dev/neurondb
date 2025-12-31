@@ -1418,13 +1418,14 @@ binaryvec_in(PG_FUNCTION_ARGS)
 				if (bit_value)
 				{
 					int			byte_idx = bit_index / 8;
+					int			max_bytes = (result->dim + 7) / 8;
 
-					if (byte_idx < 0 || byte_idx >= result->dim)
+					if (byte_idx < 0 || byte_idx >= max_bytes)
 					{
 						ereport(ERROR,
 								(errcode(ERRCODE_ARRAY_SUBSCRIPT_ERROR),
-								 errmsg("neurondb: bit index %d out of bounds (dim=%d)",
-										bit_index, result->dim)));
+								 errmsg("neurondb: bit index %d out of bounds (dim=%d bits, max_byte=%d)",
+										bit_index, result->dim, max_bytes)));
 					}
 					result->data[byte_idx] |= (1 << (bit_index % 8));
 				}
@@ -1471,13 +1472,14 @@ binaryvec_in(PG_FUNCTION_ARGS)
 				if (bit_value)
 				{
 					int			byte_idx = bit_index / 8;
+					int			max_bytes = (result->dim + 7) / 8;
 
-					if (byte_idx < 0 || byte_idx >= result->dim)
+					if (byte_idx < 0 || byte_idx >= max_bytes)
 					{
 						ereport(ERROR,
 								(errcode(ERRCODE_ARRAY_SUBSCRIPT_ERROR),
-								 errmsg("neurondb: bit index %d out of bounds (dim=%d)",
-										bit_index, result->dim)));
+								 errmsg("neurondb: bit index %d out of bounds (dim=%d bits, max_byte=%d)",
+										bit_index, result->dim, max_bytes)));
 					}
 					result->data[byte_idx] |= (1 << (bit_index % 8));
 				}

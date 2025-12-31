@@ -681,14 +681,17 @@ vector_eq(PG_FUNCTION_ARGS)
 		PG_RETURN_BOOL(false);
 
 	for (i = 0; i < a->dim; i++)
+	{
+		if (isnan(a->data[i]) || isnan(b->data[i]))
 		{
-			if (isnan(a->data[i]) || isnan(b->data[i]))
-			{
-				if (isnan(a->data[i]) != isnan(b->data[i]))
+			/* NaN comparison: both must be NaN for equality */
+			if (isnan(a->data[i]) != isnan(b->data[i]))
 				PG_RETURN_BOOL(false);
 		}
 		else if (fabs(a->data[i] - b->data[i]) > 1e-6)
+		{
 			PG_RETURN_BOOL(false);
+		}
 	}
 
 	PG_RETURN_BOOL(true);

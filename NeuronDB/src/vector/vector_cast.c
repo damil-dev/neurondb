@@ -454,6 +454,14 @@ vector_cast_dimension(PG_FUNCTION_ARGS)
 						new_dim,
 						VECTOR_MAX_DIM)));
 
+	/* Enforce dimension match when casting to specific dimension */
+	if (vec->dim != new_dim)
+		ereport(ERROR,
+				(errcode(ERRCODE_DATA_EXCEPTION),
+				 errmsg("vector dimension %d does not match type modifier %d",
+						vec->dim,
+						new_dim)));
+
 	result = new_vector(new_dim);
 	if (result == NULL)
 		ereport(ERROR,

@@ -79,6 +79,7 @@ static int	default_max_qps = 1000;
 static bool enforce_quotas = true;
 
 bool		neurondb_automl_use_gpu = false;
+bool		neurondb_vector_capsule_enabled = false;
 
 NeuronDBConfig *neurondb_config = NULL;
 
@@ -716,6 +717,17 @@ neurondb_init_all_gucs(void)
 							 &enforce_quotas,
 							 true,
 							 PGC_SUSET,
+							 0,
+							 NULL,
+							 NULL,
+							 NULL);
+
+	DefineCustomBoolVariable("neurondb.vector_capsule_enabled",
+							 "Enable VectorCapsule features (multi-representation vectors with metadata).",
+							 "When enabled, allows creation of VectorCapsule types with adaptive representation selection, integrity checking, and provenance tracking.",
+							 &neurondb_vector_capsule_enabled,
+							 false,
+							 PGC_USERSET,
 							 0,
 							 NULL,
 							 NULL,

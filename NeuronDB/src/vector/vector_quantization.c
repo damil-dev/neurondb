@@ -21,6 +21,7 @@
 #include "utils/memutils.h"
 #include <math.h>
 #include <stdint.h>
+#include <string.h>
 #include "neurondb_validation.h"
 #include "neurondb_safe_memory.h"
 #include "neurondb_macros.h"
@@ -28,11 +29,18 @@
 static inline uint16_t
 float_to_fp16(float f)
 {
-	uint32_t	bits = *(uint32_t *) & f;
-	uint16_t	sign = (bits >> 16) & 0x8000;
-	uint32_t	exp = (bits >> 23) & 0xFF;
-	uint32_t	mantissa = bits & 0x7FFFFF;
+	uint32_t	bits;
+	uint16_t	sign;
+	uint32_t	exp;
+	uint32_t	mantissa;
 	int			new_exp;
+
+	/* Safe type punning using memcpy to avoid strict-aliasing violations */
+	memcpy(&bits, &f, sizeof(uint32_t));
+
+	sign = (bits >> 16) & 0x8000;
+	exp = (bits >> 23) & 0xFF;
+	mantissa = bits & 0x7FFFFF;
 
 	if (exp == 0xFF)
 	{
@@ -62,6 +70,7 @@ fp16_to_float(uint16_t fp16)
 	uint16_t	exp = (fp16 >> 10) & 0x1F;
 	uint16_t	mantissa = fp16 & 0x3FF;
 	uint32_t	bits;
+	float		result;
 
 	if (exp == 0)
 	{
@@ -83,7 +92,9 @@ fp16_to_float(uint16_t fp16)
 		bits = (sign << 16) | (new_exp << 23) | (mantissa << 13);
 	}
 
-	return *(float *) &bits;
+	/* Safe type punning using memcpy to avoid strict-aliasing violations */
+	memcpy(&result, &bits, sizeof(float));
+	return result;
 }
 
 PG_FUNCTION_INFO_V1(vector_quantize_fp16);
