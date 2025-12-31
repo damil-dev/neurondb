@@ -17,6 +17,7 @@ package api
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/neurondb/NeuronAgent/internal/db"
 )
@@ -33,22 +34,22 @@ func GetPrincipalFromContext(ctx context.Context) (*db.Principal, bool) {
 	return principal, ok
 }
 
-/* MustGetAPIKeyFromContext gets the API key from context or panics */
-func MustGetAPIKeyFromContext(ctx context.Context) *db.APIKey {
+/* MustGetAPIKeyFromContext gets the API key from context or returns error */
+func MustGetAPIKeyFromContext(ctx context.Context) (*db.APIKey, error) {
 	apiKey, ok := GetAPIKeyFromContext(ctx)
 	if !ok {
-		panic("API key not found in context")
+		return nil, fmt.Errorf("API key not found in context: authentication required")
 	}
-	return apiKey
+	return apiKey, nil
 }
 
-/* MustGetPrincipalFromContext gets the principal from context or panics */
-func MustGetPrincipalFromContext(ctx context.Context) *db.Principal {
+/* MustGetPrincipalFromContext gets the principal from context or returns error */
+func MustGetPrincipalFromContext(ctx context.Context) (*db.Principal, error) {
 	principal, ok := GetPrincipalFromContext(ctx)
 	if !ok {
-		panic("Principal not found in context")
+		return nil, fmt.Errorf("Principal not found in context: authentication required")
 	}
-	return principal
+	return principal, nil
 }
 
 /* GetAuthFromContext gets both API key and principal from context */

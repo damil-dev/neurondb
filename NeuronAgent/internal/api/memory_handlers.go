@@ -14,22 +14,32 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
+	"github.com/neurondb/NeuronAgent/internal/validation"
 	"github.com/neurondb/NeuronAgent/pkg/neurondb"
 )
 
 /* ListMemoryChunks lists memory chunks for an agent */
 func (h *Handlers) ListMemoryChunks(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
+	requestID := GetRequestID(r.Context())
+	
+	// Validate UUID
+	if err := validation.ValidateUUIDRequired(vars["id"], "agent_id"); err != nil {
+		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid agent ID", err, requestID, r.URL.Path, r.Method, "memory", "", nil))
+		return
+	}
+	
 	agentID, err := uuid.Parse(vars["id"])
 	if err != nil {
-		requestID := GetRequestID(r.Context())
-		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid agent id", err, requestID, r.URL.Path, r.Method, "memory", "", nil))
+		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid agent id format", err, requestID, r.URL.Path, r.Method, "memory", "", nil))
 		return
 	}
 
@@ -37,9 +47,19 @@ func (h *Handlers) ListMemoryChunks(w http.ResponseWriter, r *http.Request) {
 	offset := 0
 	if l := r.URL.Query().Get("limit"); l != "" {
 		fmt.Sscanf(l, "%d", &limit)
+		// Validate limit
+		if err := validation.ValidateLimit(limit); err != nil {
+			respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid limit parameter", err, requestID, r.URL.Path, r.Method, "memory", agentID.String(), nil))
+			return
+		}
 	}
 	if o := r.URL.Query().Get("offset"); o != "" {
 		fmt.Sscanf(o, "%d", &offset)
+		// Validate offset
+		if err := validation.ValidateOffset(offset); err != nil {
+			respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid offset parameter", err, requestID, r.URL.Path, r.Method, "memory", agentID.String(), nil))
+			return
+		}
 	}
 
 	chunks, err := h.queries.ListMemoryChunks(r.Context(), agentID, limit, offset)
@@ -94,12 +114,28 @@ func (h *Handlers) DeleteMemoryChunk(w http.ResponseWriter, r *http.Request) {
 /* SearchMemory searches memory chunks by query text */
 func (h *Handlers) SearchMemory(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	agentID, err := uuid.Parse(vars["id"])
-	if err != nil {
-		requestID := GetRequestID(r.Context())
-		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid agent id", err, requestID, r.URL.Path, r.Method, "memory", "", nil))
+	requestID := GetRequestID(r.Context())
+	
+	// Validate UUID
+	if err := validation.ValidateUUIDRequired(vars["id"], "agent_id"); err != nil {
+		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid agent ID", err, requestID, r.URL.Path, r.Method, "memory", "", nil))
 		return
 	}
+	
+	agentID, err := uuid.Parse(vars["id"])
+	if err != nil {
+		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid agent id format", err, requestID, r.URL.Path, r.Method, "memory", "", nil))
+		return
+	}
+
+	// Validate request body size (max 1MB)
+	const maxBodySize = 1024 * 1024
+	bodyBytes, err := validation.ReadAndValidateBody(r, maxBodySize)
+	if err != nil {
+		respondError(w, NewErrorWithContext(http.StatusBadRequest, "request body validation failed", err, requestID, r.URL.Path, r.Method, "memory", agentID.String(), nil))
+		return
+	}
+	r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 
 	var req struct {
 		Query string `json:"query"`
@@ -107,14 +143,17 @@ func (h *Handlers) SearchMemory(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		requestID := GetRequestID(r.Context())
 		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid request body", err, requestID, r.URL.Path, r.Method, "memory", agentID.String(), nil))
 		return
 	}
 
-	if req.Query == "" {
-		requestID := GetRequestID(r.Context())
-		respondError(w, NewErrorWithContext(http.StatusBadRequest, "query is required", nil, requestID, r.URL.Path, r.Method, "memory", agentID.String(), nil))
+	// Validate query
+	if err := validation.ValidateRequired(req.Query, "query"); err != nil {
+		respondError(w, NewErrorWithContext(http.StatusBadRequest, "query validation failed", err, requestID, r.URL.Path, r.Method, "memory", agentID.String(), nil))
+		return
+	}
+	if err := validation.ValidateMaxLength(req.Query, "query", 10000); err != nil {
+		respondError(w, NewErrorWithContext(http.StatusBadRequest, "query too long", err, requestID, r.URL.Path, r.Method, "memory", agentID.String(), nil))
 		return
 	}
 

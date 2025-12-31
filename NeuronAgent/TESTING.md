@@ -286,6 +286,6 @@ SELECT * FROM neurondb_agent.agents WHERE name = 'test-agent';
 5. ✅ Test with Python client
 6. ✅ Run full examples
 
-See `examples/README.md` for more detailed examples.
+See `examples/readme.md` for more detailed examples.
 
 
