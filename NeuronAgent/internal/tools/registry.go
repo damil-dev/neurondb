@@ -22,6 +22,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/neurondb/NeuronAgent/internal/agent"
 	"github.com/neurondb/NeuronAgent/internal/auth"
+	"github.com/neurondb/NeuronAgent/internal/collaboration"
 	"github.com/neurondb/NeuronAgent/internal/db"
 	"github.com/neurondb/NeuronAgent/pkg/neurondb"
 )
@@ -32,6 +33,7 @@ type Registry struct {
 	db          *db.DB
 	handlers    map[string]ToolHandler
 	auditLogger *auth.AuditLogger
+	browserTool *BrowserTool
 	mu          sync.RWMutex
 }
 
@@ -44,13 +46,55 @@ func NewRegistry(queries *db.Queries, database *db.DB) *Registry {
 		auditLogger: auth.NewAuditLogger(queries),
 	}
 
-  /* Register built-in handlers */
+	/* Register built-in handlers */
 	sqlTool := NewSQLTool(queries)
 	sqlTool.db = database
 	registry.RegisterHandler("sql", sqlTool)
 	registry.RegisterHandler("http", NewHTTPTool())
 	registry.RegisterHandler("code", NewCodeTool())
 	registry.RegisterHandler("shell", NewShellTool())
+	browserTool := NewBrowserTool()
+	browserTool.SetDB(queries, database)
+	registry.RegisterHandler("browser", browserTool)
+	registry.browserTool = browserTool /* Store for cleanup */
+	registry.RegisterHandler("visualization", NewVisualizationTool())
+
+	return registry
+}
+
+/* NewRegistryWithVFS creates a registry with virtual file system support */
+func NewRegistryWithVFS(queries *db.Queries, database *db.DB, vfs interface{}) *Registry {
+	registry := NewRegistry(queries, database)
+
+	/* Register filesystem tool if VFS is provided */
+	if vfsInstance, ok := vfs.(*agent.VirtualFileSystem); ok {
+		registry.RegisterHandler("filesystem", NewFileSystemTool(vfsInstance))
+	}
+
+	return registry
+}
+
+/* NewRegistryWithAllFeatures creates a registry with all new tools */
+func NewRegistryWithAllFeatures(queries *db.Queries, database *db.DB, vfs interface{}, hierMemory interface{}, workspace interface{}) *Registry {
+	registry := NewRegistry(queries, database)
+
+	/* Register filesystem tool if VFS is provided */
+	if vfsInstance, ok := vfs.(*agent.VirtualFileSystem); ok {
+		registry.RegisterHandler("filesystem", NewFileSystemTool(vfsInstance))
+	}
+
+	/* Register memory tool if hierarchical memory is provided */
+	if hierMemoryInstance, ok := hierMemory.(*agent.HierarchicalMemoryManager); ok {
+		registry.RegisterHandler("memory", NewMemoryTool(hierMemoryInstance))
+	}
+
+	/* Register collaboration tool if workspace is provided */
+	if workspaceInstance, ok := workspace.(*collaboration.WorkspaceManager); ok {
+		registry.RegisterHandler("collaboration", NewCollaborationTool(workspaceInstance))
+	}
+
+	/* Register multimodal tool */
+	registry.RegisterHandler("multimodal", NewMultimodalTool())
 
 	return registry
 }
@@ -118,7 +162,7 @@ func (r *Registry) ExecuteTool(ctx context.Context, tool *db.Tool, args map[stri
 			tool.Name, tool.HandlerType, len(args), argKeys)
 	}
 
-  /* Validate arguments */
+	/* Validate arguments */
 	if err := ValidateArgs(args, tool.ArgSchema); err != nil {
 		argKeys := make([]string, 0, len(args))
 		for k := range args {
@@ -128,7 +172,7 @@ func (r *Registry) ExecuteTool(ctx context.Context, tool *db.Tool, args map[stri
 			tool.Name, tool.HandlerType, len(args), argKeys, err)
 	}
 
-  /* Get handler */
+	/* Get handler */
 	r.mu.RLock()
 	handler, exists := r.handlers[tool.HandlerType]
 	r.mu.RUnlock()
@@ -146,13 +190,13 @@ func (r *Registry) ExecuteTool(ctx context.Context, tool *db.Tool, args map[stri
 			tool.Name, tool.HandlerType, len(args), argKeys, availableHandlers)
 	}
 
-  /* Execute tool */
+	/* Execute tool */
 	result, err := handler.Execute(ctx, tool, args)
-	
-  /* Audit log tool execution */
+
+	/* Audit log tool execution */
 	agentID, _ := agent.GetAgentIDFromContext(ctx)
 	sessionID, _ := agent.GetSessionIDFromContext(ctx)
-	
+
 	outputs := make(map[string]interface{})
 	if err == nil {
 		outputs["result"] = result
@@ -161,12 +205,12 @@ func (r *Registry) ExecuteTool(ctx context.Context, tool *db.Tool, args map[stri
 		outputs["error"] = err.Error()
 		outputs["success"] = false
 	}
-	
+
 	/* Log audit trail (async, don't block on errors) */
 	go func() {
 		bgCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		
+
 		var agentIDPtr, sessionIDPtr *uuid.UUID
 		if agentID != uuid.Nil {
 			agentIDPtr = &agentID
@@ -174,10 +218,10 @@ func (r *Registry) ExecuteTool(ctx context.Context, tool *db.Tool, args map[stri
 		if sessionID != uuid.Nil {
 			sessionIDPtr = &sessionID
 		}
-		
+
 		_ = r.auditLogger.LogToolCall(bgCtx, nil, nil, agentIDPtr, sessionIDPtr, tool.Name, args, outputs)
 	}()
-	
+
 	if err != nil {
 		argKeys := make([]string, 0, len(args))
 		for k := range args {
@@ -194,3 +238,14 @@ func (r *Registry) ListTools(ctx context.Context) ([]db.Tool, error) {
 	return r.queries.ListTools(ctx)
 }
 
+/* Cleanup shuts down browser contexts and other cleanup tasks */
+func (r *Registry) Cleanup() {
+	if r.browserTool != nil {
+		r.browserTool.Cleanup()
+	}
+}
+
+/* GetBrowserTool returns the browser tool (for cleanup worker) */
+func (r *Registry) GetBrowserTool() *BrowserTool {
+	return r.browserTool
+}
