@@ -398,11 +398,15 @@ sub psql {
 	my ($stdout, $stderr);
 	my $result = run \@cmd, '<', \$sql, '>', \$stdout, '2>', \$stderr;
 	
+	# Check for SQL errors in stderr (psql may exit 0 even with SQL errors)
+	my $has_error = ($stderr && $stderr =~ /^(ERROR|FATAL):/m) ? 1 : 0;
+	my $success = $result && !$has_error;
+	
 	return {
 		exit_code => $result ? 0 : $? >> 8,
 		stdout => $stdout,
 		stderr => $stderr,
-		success => $result ? 1 : 0,
+		success => $success,
 	};
 }
 

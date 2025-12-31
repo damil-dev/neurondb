@@ -23,7 +23,7 @@ Demonstrates minimal usage of all three modules:
 
 =cut
 
-plan tests => 13;  # Updated to match actual test count
+plan tests => 14;  # Updated to match actual test count (neurondb_ok runs 3 tests)
 
 # Minimal PostgresNode usage: single node, basic init/start/stop
 my $node = PostgresNode->new('minimal_test');
