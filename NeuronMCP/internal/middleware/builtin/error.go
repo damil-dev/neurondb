@@ -51,7 +51,7 @@ func (m *ErrorHandlingMiddleware) Enabled() bool {
 
 /* Execute executes the middleware */
 func (m *ErrorHandlingMiddleware) Execute(ctx context.Context, req *middleware.MCPRequest, next middleware.Handler) (*middleware.MCPResponse, error) {
-	resp, err := next(ctx)
+	resp, err := next(ctx, req)
 	if err != nil {
 		errorMsg := err.Error()
 		var stack string

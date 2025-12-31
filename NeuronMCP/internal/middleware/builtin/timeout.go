@@ -60,7 +60,7 @@ func (m *TimeoutMiddleware) Execute(ctx context.Context, req *middleware.MCPRequ
 	errChan := make(chan error, 1)
 
 	go func() {
-		resp, err := next(ctx)
+		resp, err := next(ctx, req)
 		if err != nil {
 			errChan <- err
 			return

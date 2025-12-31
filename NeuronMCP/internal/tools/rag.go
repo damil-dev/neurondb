@@ -19,6 +19,7 @@ import (
 
 	"github.com/neurondb/NeuronMCP/internal/database"
 	"github.com/neurondb/NeuronMCP/internal/logging"
+	"github.com/neurondb/NeuronMCP/internal/validation"
 )
 
 /* ProcessDocumentTool processes a document for RAG */
@@ -100,36 +101,49 @@ func (t *ProcessDocumentTool) Execute(ctx context.Context, params map[string]int
 		generateEmbeddings = g
 	}
 
-	if text == "" {
-		return Error("text parameter is required and cannot be empty for process_document tool", "VALIDATION_ERROR", map[string]interface{}{
+	// Validate text is required
+	if err := validation.ValidateRequired(text, "text"); err != nil {
+		return Error(fmt.Sprintf("Invalid text parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "text",
-			"text_length": 0,
-			"params": params,
+			"error":     err.Error(),
+			"params":    params,
 		}), nil
 	}
 
+	// Validate text length (max 10MB)
 	textLen := len(text)
-	if chunkSize <= 0 {
-		return Error(fmt.Sprintf("chunk_size must be greater than 0 for process_document tool: text_length=%d, received chunk_size=%d", textLen, chunkSize), "VALIDATION_ERROR", map[string]interface{}{
+	if err := validation.ValidateMaxLength(text, "text", 10*1024*1024); err != nil {
+		return Error(fmt.Sprintf("Invalid text parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
+			"parameter": "text",
+			"error":     err.Error(),
+			"params":    params,
+		}), nil
+	}
+
+	// Validate chunk_size
+	if err := validation.ValidatePositive(chunkSize, "chunk_size"); err != nil {
+		return Error(fmt.Sprintf("Invalid chunk_size parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter":   "chunk_size",
 			"text_length": textLen,
-			"chunk_size":  chunkSize,
+			"error":       err.Error(),
 			"params":      params,
 		}), nil
 	}
 
-	if overlap < 0 {
-		return Error(fmt.Sprintf("overlap cannot be negative for process_document tool: text_length=%d, chunk_size=%d, received overlap=%d", textLen, chunkSize, overlap), "VALIDATION_ERROR", map[string]interface{}{
+	// Validate overlap
+	if err := validation.ValidateNonNegative(overlap, "overlap"); err != nil {
+		return Error(fmt.Sprintf("Invalid overlap parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter":   "overlap",
 			"text_length": textLen,
 			"chunk_size":  chunkSize,
-			"overlap":     overlap,
+			"error":       err.Error(),
 			"params":      params,
 		}), nil
 	}
 
+	// Validate overlap < chunkSize
 	if overlap >= chunkSize {
-		return Error(fmt.Sprintf("overlap must be less than chunk_size for process_document tool: text_length=%d, chunk_size=%d, overlap=%d", textLen, chunkSize, overlap), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("overlap must be less than chunk_size: overlap=%d, chunk_size=%d", overlap, chunkSize), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter":   "overlap",
 			"text_length": textLen,
 			"chunk_size":  chunkSize,

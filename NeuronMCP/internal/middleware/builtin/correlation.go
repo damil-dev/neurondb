@@ -77,7 +77,7 @@ func (m *CorrelationMiddleware) Execute(ctx context.Context, req *middleware.MCP
 	}
 	
 	/* Execute next middleware */
-	resp, err := next(ctx)
+	resp, err := next(ctx, req)
 	
 	/* Add correlation ID to response metadata */
 	if resp != nil {

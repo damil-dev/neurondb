@@ -319,5 +319,5 @@ Response:
 - [Tools Reference](../TOOLS_REFERENCE.md) - Detailed tool documentation with examples
 - [POSTGRESQL_TOOLS.md](../POSTGRESQL_TOOLS.md) - PostgreSQL-specific tools
 - [Examples](./examples/) - Example client usage and transcripts
-- [README](../README.md) - NeuronMCP overview and setup
+- [README](../readme.md) - NeuronMCP overview and setup
 

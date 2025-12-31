@@ -20,6 +20,7 @@ import (
 
 	"github.com/neurondb/NeuronMCP/internal/database"
 	"github.com/neurondb/NeuronMCP/internal/logging"
+	"github.com/neurondb/NeuronMCP/internal/validation"
 )
 
 /* TextSearchTool performs text-only full-text search */
@@ -96,6 +97,53 @@ func (t *TextSearchTool) Execute(ctx context.Context, params map[string]interfac
 	queryType := "plain"
 	if qt, ok := params["query_type"].(string); ok && qt != "" {
 		queryType = qt
+	}
+
+	// Validate table (SQL identifier)
+	if err := validation.ValidateSQLIdentifierRequired(table, "table"); err != nil {
+		return Error(fmt.Sprintf("Invalid table parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
+			"parameter": "table",
+			"error":     err.Error(),
+			"params":    params,
+		}), nil
+	}
+
+	// Validate text_column (SQL identifier)
+	if err := validation.ValidateSQLIdentifier(textColumn, "text_column"); err != nil {
+		return Error(fmt.Sprintf("Invalid text_column parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
+			"parameter": "text_column",
+			"table":     table,
+			"error":     err.Error(),
+			"params":    params,
+		}), nil
+	}
+
+	// Validate query_text
+	if err := validation.ValidateRequired(queryText, "query_text"); err != nil {
+		return Error(fmt.Sprintf("Invalid query_text parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
+			"parameter": "query_text",
+			"table":     table,
+			"error":     err.Error(),
+			"params":    params,
+		}), nil
+	}
+	if err := validation.ValidateMaxLength(queryText, "query_text", 10000); err != nil {
+		return Error(fmt.Sprintf("Invalid query_text parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
+			"parameter": "query_text",
+			"table":     table,
+			"error":     err.Error(),
+			"params":    params,
+		}), nil
+	}
+
+	// Validate query_type
+	if err := validation.ValidateIn(queryType, "query_type", "plain", "to", "phrase"); err != nil {
+		return Error(fmt.Sprintf("Invalid query_type parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
+			"parameter": "query_type",
+			"table":     table,
+			"error":     err.Error(),
+			"params":    params,
+		}), nil
 	}
 	limit := 10
 	if l, ok := params["limit"].(float64); ok {

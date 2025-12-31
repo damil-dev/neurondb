@@ -20,6 +20,7 @@ import (
 
 	"github.com/neurondb/NeuronMCP/internal/database"
 	"github.com/neurondb/NeuronMCP/internal/logging"
+	"github.com/neurondb/NeuronMCP/internal/validation"
 )
 
 /* CreateHNSWIndexTool creates an HNSW index */
@@ -114,39 +115,54 @@ func (t *CreateHNSWIndexTool) Execute(ctx context.Context, params map[string]int
 		efConstruction = int(ef)
 	}
 
-	if table == "" {
-		return Error("table parameter is required and cannot be empty for create_hnsw_index tool", "VALIDATION_ERROR", map[string]interface{}{
+	// Validate table name (SQL identifier)
+	if err := validation.ValidateSQLIdentifierRequired(table, "table"); err != nil {
+		return Error(fmt.Sprintf("Invalid table parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "table",
+			"error":     err.Error(),
 			"params":    params,
 		}), nil
 	}
 
-	if vectorColumn == "" {
-		return Error(fmt.Sprintf("vector_column parameter is required and cannot be empty for create_hnsw_index tool: table='%s'", table), "VALIDATION_ERROR", map[string]interface{}{
+	// Validate vector column (SQL identifier)
+	if err := validation.ValidateSQLIdentifierRequired(vectorColumn, "vector_column"); err != nil {
+		return Error(fmt.Sprintf("Invalid vector_column parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "vector_column",
 			"table":     table,
+			"error":     err.Error(),
 			"params":    params,
 		}), nil
 	}
 
-	if indexName == "" {
-		return Error(fmt.Sprintf("index_name parameter is required and cannot be empty for create_hnsw_index tool: table='%s', vector_column='%s'", table, vectorColumn), "VALIDATION_ERROR", map[string]interface{}{
+	// Validate index name (SQL identifier)
+	if err := validation.ValidateSQLIdentifierRequired(indexName, "index_name"); err != nil {
+		return Error(fmt.Sprintf("Invalid index_name parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter":     "index_name",
 			"table":         table,
 			"vector_column": vectorColumn,
+			"error":         err.Error(),
 			"params":        params,
 		}), nil
 	}
 
-	if m < 2 || m > 128 {
-		return Error(fmt.Sprintf("m parameter must be between 2 and 128 for create_hnsw_index tool: table='%s', vector_column='%s', index_name='%s', received m=%d", table, vectorColumn, indexName, m), "VALIDATION_ERROR", map[string]interface{}{
+	// Validate HNSW parameters
+	if err := validation.ValidateIntRange(m, 2, 128, "m"); err != nil {
+		return Error(fmt.Sprintf("Invalid m parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter":     "m",
 			"table":         table,
 			"vector_column": vectorColumn,
 			"index_name":    indexName,
-			"m":             m,
-			"min":           2,
-			"max":           128,
+			"error":         err.Error(),
+			"params":        params,
+		}), nil
+	}
+	if err := validation.ValidateIntRange(efConstruction, 4, 2000, "ef_construction"); err != nil {
+		return Error(fmt.Sprintf("Invalid ef_construction parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
+			"parameter":     "ef_construction",
+			"table":         table,
+			"vector_column": vectorColumn,
+			"index_name":    indexName,
+			"error":         err.Error(),
 			"params":        params,
 		}), nil
 	}

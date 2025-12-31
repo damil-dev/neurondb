@@ -1,7 +1,7 @@
 /*-------------------------------------------------------------------------
  *
  * chain.go
- *    Database operations
+ *    Middleware chain execution
  *
  * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
  *
@@ -48,15 +48,14 @@ func (c *Chain) Execute(ctx context.Context, req *MCPRequest, finalHandler Handl
   /* Build chain */
 	index := 0
 	var next Handler
-	next = func(ctx context.Context) (*MCPResponse, error) {
+	next = func(ctx context.Context, r *MCPRequest) (*MCPResponse, error) {
 		if index >= len(enabled) {
-			return finalHandler(ctx)
+			return finalHandler(ctx, r)
 		}
 		mw := enabled[index]
 		index++
-		return mw.Execute(ctx, req, next)
+		return mw.Execute(ctx, r, next)
 	}
 
-	return next(ctx)
+	return next(ctx, req)
 }
-

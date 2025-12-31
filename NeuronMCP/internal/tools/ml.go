@@ -24,6 +24,7 @@ import (
 
 	"github.com/neurondb/NeuronMCP/internal/database"
 	"github.com/neurondb/NeuronMCP/internal/logging"
+	"github.com/neurondb/NeuronMCP/internal/validation"
 )
 
 /* TrainModelTool trains an ML model using the unified neurondb.train function */
@@ -92,36 +93,51 @@ func (t *TrainModelTool) Execute(ctx context.Context, params map[string]interfac
 	featureCol, _ := params["feature_col"].(string)
 	labelCol, _ := params["label_col"].(string)
 
-	if algorithm == "" {
-		return Error("algorithm parameter is required and cannot be empty for train_model tool", "VALIDATION_ERROR", map[string]interface{}{
+	// Validate algorithm
+	if err := validation.ValidateRequired(algorithm, "algorithm"); err != nil {
+		return Error(fmt.Sprintf("Invalid algorithm parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "algorithm",
+			"error":     err.Error(),
+			"params":    params,
+		}), nil
+	}
+	if err := validation.ValidateIn(algorithm, "algorithm", "linear_regression", "ridge", "lasso", "logistic", "random_forest", "svm", "knn", "decision_tree", "naive_bayes"); err != nil {
+		return Error(fmt.Sprintf("Invalid algorithm parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
+			"parameter": "algorithm",
+			"error":     err.Error(),
 			"params":    params,
 		}), nil
 	}
 
-	if table == "" {
-		return Error(fmt.Sprintf("table parameter is required and cannot be empty for train_model tool with algorithm '%s'", algorithm), "VALIDATION_ERROR", map[string]interface{}{
+	// Validate table name (SQL identifier)
+	if err := validation.ValidateSQLIdentifierRequired(table, "table"); err != nil {
+		return Error(fmt.Sprintf("Invalid table parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "table",
 			"algorithm": algorithm,
+			"error":     err.Error(),
 			"params":    params,
 		}), nil
 	}
 
-	if featureCol == "" {
-		return Error(fmt.Sprintf("feature_col parameter is required and cannot be empty for train_model tool: algorithm='%s', table='%s'", algorithm, table), "VALIDATION_ERROR", map[string]interface{}{
+	// Validate feature column (SQL identifier)
+	if err := validation.ValidateSQLIdentifierRequired(featureCol, "feature_col"); err != nil {
+		return Error(fmt.Sprintf("Invalid feature_col parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "feature_col",
 			"algorithm": algorithm,
 			"table":     table,
+			"error":     err.Error(),
 			"params":    params,
 		}), nil
 	}
 
-	if labelCol == "" {
-		return Error(fmt.Sprintf("label_col parameter is required and cannot be empty for train_model tool: algorithm='%s', table='%s', feature_col='%s'", algorithm, table, featureCol), "VALIDATION_ERROR", map[string]interface{}{
+	// Validate label column (SQL identifier)
+	if err := validation.ValidateSQLIdentifierRequired(labelCol, "label_col"); err != nil {
+		return Error(fmt.Sprintf("Invalid label_col parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter":  "label_col",
 			"algorithm": algorithm,
 			"table":      table,
 			"feature_col": featureCol,
+			"error":      err.Error(),
 			"params":     params,
 		}), nil
 	}

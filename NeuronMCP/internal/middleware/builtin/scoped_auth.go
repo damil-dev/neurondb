@@ -84,25 +84,25 @@ func GetRequiredScope(toolName string) string {
 /* Execute executes the middleware */
 func (m *ScopedAuthMiddleware) Execute(ctx context.Context, req *middleware.MCPRequest, next middleware.Handler) (*middleware.MCPResponse, error) {
 	if !m.enabled || m.scopeChecker == nil {
-		return next(ctx)
+		return next(ctx, req)
 	}
 
 	/* Only check scopes for tool calls */
 	if req.Method != "tools/call" {
-		return next(ctx)
+		return next(ctx, req)
 	}
 
 	/* Extract tool name */
 	toolName, ok := req.Params["name"].(string)
 	if !ok || toolName == "" {
-		return next(ctx) // Let other validation handle this
+		return next(ctx, req) // Let other validation handle this
 	}
 
 	/* Get user ID from context */
 	userID, ok := ctx.Value("user_id").(string)
 	if !ok || userID == "" {
 		/* No user ID - allow through (might be handled by other auth middleware) */
-		return next(ctx)
+		return next(ctx, req)
 	}
 
 	/* Get required scope for the tool */
@@ -134,7 +134,7 @@ func (m *ScopedAuthMiddleware) Execute(ctx context.Context, req *middleware.MCPR
 		ctx = context.WithValue(ctx, "scopes", scopes)
 	}
 
-	return next(ctx)
+	return next(ctx, req)
 }
 
 

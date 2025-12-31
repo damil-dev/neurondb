@@ -53,7 +53,7 @@ func (m *AuditMiddleware) Enabled() bool {
 /* Execute executes the middleware */
 func (m *AuditMiddleware) Execute(ctx context.Context, req *middleware.MCPRequest, next middleware.Handler) (*middleware.MCPResponse, error) {
 	if m.auditLogger == nil {
-		return next(ctx)
+		return next(ctx, req)
 	}
 
 	/* Create request context with audit info */
@@ -76,7 +76,7 @@ func (m *AuditMiddleware) Execute(ctx context.Context, req *middleware.MCPReques
 	}
 
 	startTime := time.Now()
-	resp, err := next(ctx)
+	resp, err := next(ctx, req)
 	duration := time.Since(startTime)
 
 	/* Build audit entry */
@@ -120,6 +120,7 @@ func (m *AuditMiddleware) Execute(ctx context.Context, req *middleware.MCPReques
 
 	return resp, err
 }
+
 
 
 
