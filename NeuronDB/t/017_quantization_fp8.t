@@ -8,10 +8,11 @@ use lib "$FindBin::Bin";
 use PostgresNode;
 use TapTest;
 use NeuronDB;
+use QuantHelpers;
 
 =head1 NAME
 
-041_quantization_fp8.t - FP8 quantization tests
+017_quantization_fp8.t - FP8 quantization tests - FP8 quantization tests
 
 =head1 DESCRIPTION
 

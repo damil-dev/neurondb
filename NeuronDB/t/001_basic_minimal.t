@@ -8,6 +8,7 @@ use lib "$FindBin::Bin";
 use PostgresNode;
 use TapTest;
 use NeuronDB;
+use VectorOps;
 
 =head1 NAME
 
@@ -48,7 +49,10 @@ extension_ok($node, 'postgres', 'neurondb', 'Extension verified');
 
 schema_ok($node, 'postgres', 'neurondb', 'NeuronDB schema exists');
 
-# Minimal vector operations
+# Minimal vector operations using VectorOps module
+my $vec_results = VectorOps::test_vector_creation($node, 'postgres', 3);
+ok(scalar @$vec_results > 0 && $vec_results->[0], "Vector creation works");
+
 my ($success, $msg) = test_vector_operations($node, 'postgres');
 ok($success, "Vector operations: $msg");
 

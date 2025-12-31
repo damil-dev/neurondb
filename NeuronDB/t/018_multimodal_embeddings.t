@@ -8,10 +8,11 @@ use lib "$FindBin::Bin";
 use PostgresNode;
 use TapTest;
 use NeuronDB;
+use MultimodalHelpers;
 
 =head1 NAME
 
-043_multimodal.t - Multi-modal embeddings tests
+018_multimodal_embeddings.t - Multimodal embedding tests - Multi-modal embeddings tests
 
 =head1 DESCRIPTION
 

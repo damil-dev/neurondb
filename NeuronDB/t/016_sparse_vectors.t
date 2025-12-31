@@ -8,10 +8,11 @@ use lib "$FindBin::Bin";
 use PostgresNode;
 use TapTest;
 use NeuronDB;
+use SparseHelpers;
 
 =head1 NAME
 
-040_sparse_vectors.t - Sparse vectors and learned sparse retrieval tests
+016_sparse_vectors.t - Sparse vectors and learned sparse retrieval tests
 
 =head1 DESCRIPTION
 

@@ -4,6 +4,9 @@
 
 \set ON_ERROR_STOP on
 
+-- Enable fail-open mode for graceful fallback when LLM is not configured
+SET neurondb.llm_fail_open = on;
+
 \echo '=========================================================================='
 \echo '=========================================================================='
 \echo ''
