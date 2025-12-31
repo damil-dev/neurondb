@@ -369,9 +369,9 @@ NEURONDB_HOST=neurondb-metal
 
 1. Check Docker build context:
    ```bash
-   ls -la NeuronDB/docker/Dockerfile
-   ls -la NeuronAgent/docker/Dockerfile
-   ls -la NeuronMCP/docker/Dockerfile
+   ls -la dockers/neurondb/Dockerfile
+   ls -la dockers/neuronagent/Dockerfile
+   ls -la dockers/neuronmcp/Dockerfile
    ```
 
 2. Clear Docker build cache:
@@ -386,7 +386,7 @@ NEURONDB_HOST=neurondb-metal
    docker compose build neuronmcp
    ```
 
-## Advanced Usage
+## Extended Usage
 
 ### Using Docker Compose Directly
 
@@ -451,11 +451,11 @@ docker network inspect neurondb-network
 
 ## Related Documentation
 
-- [NeuronDB Docker Guide](NeuronDB/docker/README.md)
-- [NeuronAgent Docker Guide](NeuronAgent/docker/README.md)
-- [NeuronMCP Docker Guide](NeuronMCP/docker/README.md)
-- [Ecosystem Docker Guide](NeuronDB/docker/ECOSYSTEM.md)
-- [Main README](README.md)
+- [NeuronDB Docker Guide](../dockers/neurondb/readme.md)
+- [NeuronAgent Docker Guide](../dockers/neuronagent/readme.md)
+- [NeuronMCP Docker Guide](../dockers/neuronmcp/readme.md)
+- [Ecosystem Docker Guide](../dockers/neurondb/ECOSYSTEM.md)
+- [Main README](readme.md)
 
 ## Support
 

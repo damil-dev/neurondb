@@ -17,38 +17,34 @@ Docker deployment provides the easiest and most consistent way to run all Neuron
 
 ```bash
 # From repository root
-docker-compose up -d
+docker compose up -d
 ```
 
 ### Component-Specific Deployment
 
-**NeuronDB:**
+**NeuronDB (database only):**
 ```bash
-cd NeuronDB/docker
 docker compose up -d neurondb
 ```
 
 **NeuronAgent:**
 ```bash
-cd NeuronAgent/docker
-docker compose up -d agent-server
+docker compose up -d neuronagent
 ```
 
 **NeuronMCP:**
 ```bash
-cd NeuronMCP/docker
-docker compose up -d neurondb-mcp
+docker compose up -d neuronmcp
 ```
 
 **NeuronDesktop:**
 ```bash
-cd NeuronDesktop
-docker-compose up -d
+docker compose up -d neurondesk-api neurondesk-frontend
 ```
 
 ## Unified Docker Orchestration
 
-For unified orchestration of all services, see the [Unified Docker Guide](../../Docs/DOCKER.md) which provides:
+For unified orchestration of all services, see the [Unified Docker Guide](../../Docs/docker.md) which provides:
 
 - Single command to build and run all services
 - Automatic networking between containers
@@ -82,10 +78,10 @@ For unified orchestration of all services, see the [Unified Docker Guide](../../
 
 Each component uses environment variables for configuration. See component-specific Docker guides:
 
-- [NeuronDB Docker](../../NeuronDB/docker/README.md)
-- [NeuronAgent Docker](../../NeuronAgent/docker/README.md)
-- [NeuronMCP Docker](../../NeuronMCP/docker/README.md)
-- [NeuronDesktop README](../../NeuronDesktop/README.md)
+- [NeuronDB Docker](../../dockers/neurondb/readme.md)
+- [NeuronAgent Docker](../../dockers/neuronagent/readme.md)
+- [NeuronMCP Docker](../../dockers/neuronmcp/readme.md)
+- [NeuronDesktop README](../../NeuronDesktop/readme.md)
 
 ### Network Configuration
 
@@ -100,28 +96,25 @@ Services communicate via Docker network using container names:
 ### CUDA (NVIDIA)
 
 ```bash
-# Build CUDA variant
-cd NeuronDB/docker
-docker compose --profile cuda build
-docker compose --profile cuda up -d
+# Build and run CUDA variant (service is `neurondb-cuda`)
+docker compose --profile cuda build neurondb-cuda
+docker compose --profile cuda up -d neurondb-cuda
 ```
 
 ### ROCm (AMD)
 
 ```bash
-# Build ROCm variant
-cd NeuronDB/docker
-docker compose --profile rocm build
-docker compose --profile rocm up -d
+# Build and run ROCm variant (service is `neurondb-rocm`)
+docker compose --profile rocm build neurondb-rocm
+docker compose --profile rocm up -d neurondb-rocm
 ```
 
 ### Metal (Apple Silicon)
 
 ```bash
-# Build Metal variant
-cd NeuronDB/docker
-docker compose --profile metal build
-docker compose --profile metal up -d
+# Build and run Metal variant (service is `neurondb-metal`)
+docker compose --profile metal build neurondb-metal
+docker compose --profile metal up -d neurondb-metal
 ```
 
 ## Service Management
@@ -240,14 +233,14 @@ ports:
 
 ## Related Documentation
 
-- [Unified Docker Guide](../../Docs/DOCKER.md) - Complete unified orchestration guide
-- [NeuronDB Docker](../../NeuronDB/docker/README.md) - NeuronDB-specific Docker guide
-- [NeuronAgent Docker](../../NeuronAgent/docker/README.md) - NeuronAgent Docker guide
-- [NeuronMCP Docker](../../NeuronMCP/docker/README.md) - NeuronMCP Docker guide
+- [Unified Docker Guide](../../Docs/docker.md) - Complete unified orchestration guide
+- [NeuronDB Docker](../../dockers/neurondb/readme.md) - NeuronDB-specific Docker guide
+- [NeuronAgent Docker](../../dockers/neuronagent/readme.md) - NeuronAgent Docker guide
+- [NeuronMCP Docker](../../dockers/neuronmcp/readme.md) - NeuronMCP Docker guide
 - [Ecosystem Integration](../ecosystem/integration.md) - Component integration guide
 
 ## Official Documentation
 
 For comprehensive Docker deployment guides:
-**🌐 [https://www.neurondb.ai/docs/docker](https://www.neurondb.ai/docs/docker)**
+** [https://www.neurondb.ai/docs/docker](https://www.neurondb.ai/docs/docker)**
 

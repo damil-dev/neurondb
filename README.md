@@ -5,9 +5,25 @@
 [![Documentation](https://img.shields.io/badge/docs-latest-brightgreen.svg)](https://www.neurondb.ai/docs)
 [![Website](https://img.shields.io/badge/website-www.neurondb.ai-blue.svg)](https://www.neurondb.ai/)
 
-> **Transform PostgreSQL into an AI-powered database.** Vector search, machine learning, and agent runtime - all native to PostgreSQL. Four integrated components work together to build complete AI applications.
+> **Transform PostgreSQL into an AI-powered database.**Vector search, machine learning, and agent runtime - all native to PostgreSQL. Four integrated components work together to build complete AI applications.
 >
-> **📚 For comprehensive documentation, tutorials, API references, and best practices, visit [https://www.neurondb.ai/docs](https://www.neurondb.ai/docs)**
+> **For comprehensive documentation, tutorials, API references, and best practices, visit [https://www.neurondb.ai/docs](https://www.neurondb.ai/docs)**
+
+---
+
+## **First Time Here?**
+
+**→ Start with [Docs/start-here.md](Docs/start-here.md)** - A guide to help you find exactly what you need!
+
+**Quick Links:**
+- **New here?** → [Simple Start Guide](Docs/getting-started/simple-start.md) (5 minutes to running system!)
+- **Technical user?** → [QUICKSTART.md](QUICKSTART.md) (streamlined setup)
+- **Want to understand?** → [Architecture Guide](Docs/getting-started/architecture.md) (plain English)
+- **Need definitions?** → [Glossary](Docs/reference/glossary.md) (every term explained)
+- **Having problems?** → [Troubleshooting Guide](Docs/getting-started/troubleshooting.md) (common fixes)
+- **Technical details?** → Continue reading below
+
+---
 
 PostgreSQL AI extension with vector search, machine learning algorithms, and agent runtime capabilities. Four components operate independently while sharing the same database instance.
 
@@ -127,9 +143,9 @@ Database-native vector + ML primitives. Embed directly in PostgreSQL workloads. 
 
 | Document | Description |
 |----------|-------------|
-| [Component README](NeuronDB/README.md) | Complete feature documentation |
+| [Component README](NeuronDB/readme.md) | Complete feature documentation |
 | [Installation Guide](NeuronDB/INSTALL.md) | Build and installation instructions |
-| [Docker Guide](NeuronDB/docker/README.md) | Container deployment |
+| [Docker Guide](NeuronDB/docker/readme.md) | Container deployment |
 | [SQL API Reference](NeuronDB/docs/sql-api.md) | Function reference |
 
 **Location:** [`NeuronDB/`](NeuronDB/)
@@ -154,11 +170,11 @@ HTTP/WebSocket runtime for applications. Use when building agent-based apps. Pro
 
 | Document | Description |
 |----------|-------------|
-| [Component README](NeuronAgent/README.md) | Overview and quick start |
+| [Component README](NeuronAgent/readme.md) | Overview and quick start |
 | [API Reference](NeuronAgent/docs/API.md) | Complete REST API documentation |
 | [Architecture](NeuronAgent/docs/ARCHITECTURE.md) | System design and structure |
 | [Deployment Guide](NeuronAgent/docs/DEPLOYMENT.md) | Production deployment |
-| [Docker Guide](NeuronAgent/docker/README.md) | Container deployment |
+| [Docker Guide](NeuronAgent/docker/readme.md) | Container deployment |
 
 **Location:** [`NeuronAgent/`](NeuronAgent/)
 
@@ -181,8 +197,8 @@ MCP bridge for desktop clients and agent frameworks. Use with Claude Desktop, La
 
 | Document | Description |
 |----------|-------------|
-| [Component README](NeuronMCP/README.md) | Overview and usage |
-| [Docker Guide](NeuronMCP/docker/README.md) | Container deployment |
+| [Component README](NeuronMCP/readme.md) | Overview and usage |
+| [Docker Guide](NeuronMCP/docker/readme.md) | Container deployment |
 
 **Location:** [`NeuronMCP/`](NeuronMCP/)
 
@@ -207,7 +223,7 @@ Unified web interface providing a single dashboard for managing and interacting 
 
 | Document | Description |
 |----------|-------------|
-| [Component README](NeuronDesktop/README.md) | Overview and features |
+| [Component README](NeuronDesktop/readme.md) | Overview and features |
 | [API Reference](NeuronDesktop/docs/API.md) | Complete API documentation |
 | [Deployment Guide](NeuronDesktop/docs/DEPLOYMENT.md) | Production deployment |
 | [Integration Guide](NeuronDesktop/docs/INTEGRATION.md) | Component integration |
@@ -218,7 +234,17 @@ Unified web interface providing a single dashboard for managing and interacting 
 
 ## Quick Start
 
-** New to NeuronDB? Start here: [QUICKSTART.md](QUICKSTART.md)**
+**New to NeuronDB? Choose your path:**
+
+| Your Experience Level | Start Here | Time |
+|----------------------|------------|------|
+| **Complete beginner** | [Simple Start Guide](Docs/getting-started/simple-start.md) | 5 min |
+| **Technical user** | [QUICKSTART.md](QUICKSTART.md) | 10 min |
+| **Want details first** | Continue reading below | 30 min |
+
+**Additional Resources:**
+- **Understanding the system**: [Architecture Guide](Docs/getting-started/architecture.md) - How everything fits together (plain English)
+- **Having problems?**: [Troubleshooting Guide](Docs/getting-started/troubleshooting.md) - Common issues and fixes
 
 The quick start guide provides a complete, step-by-step walkthrough to get NeuronDB running in minutes with:
 - Single-command Docker Compose setup (includes all four components: NeuronDB, NeuronAgent, NeuronMCP, and NeuronDesktop)
@@ -258,22 +284,20 @@ This script will:
 4. Run NeuronAgent migrations
 5. Verify the installation
 
-**Verify Integration:**
-
-After setup, verify all components are properly integrated:
+**Verify Integration:**After setup, verify all components are properly integrated:
 
 ```bash
 ./scripts/verify_neurondb_integration.sh
 ```
 
 This comprehensive test suite runs 6 tiers of verification:
-- **Tier 0:** Basic extension (loads, version, schema)
-- **Tier 1:** Vector operations (create, index, kNN query)
-- **Tier 2:** Hybrid search (vector + full-text)
-- **Tier 3:** ML algorithms (classification, regression, clustering)
-- **Tier 4:** Embeddings (generation, storage, query)
-- **Tier 5:** NeuronAgent integration (API, agent creation, messaging)
-- **Tier 6:** NeuronMCP integration (MCP protocol, tools)
+- **Tier 0:**Basic extension (loads, version, schema)
+- **Tier 1:**Vector operations (create, index, kNN query)
+- **Tier 2:**Hybrid search (vector + full-text)
+- **Tier 3:**ML algorithms (classification, regression, clustering)
+- **Tier 4:**Embeddings (generation, storage, query)
+- **Tier 5:**NeuronAgent integration (API, agent creation, messaging)
+- **Tier 6:**NeuronMCP integration (MCP protocol, tools)
 
 Run specific tiers: `./scripts/verify_neurondb_integration.sh --tier 0`
 
@@ -422,12 +446,12 @@ After setup, verify integration:
 ```
 
 This comprehensive test verifies:
-- ✓ NeuronDB extension installed and functional
-- ✓ NeuronMCP schema, tables, views, and functions
-- ✓ NeuronAgent schema, tables, and vector columns
-- ✓ HNSW indexes on vector columns
-- ✓ Cross-module queries and operations
-- ✓ Vector operations with different dimensions
+-  NeuronDB extension installed and functional
+-  NeuronMCP schema, tables, views, and functions
+-  NeuronAgent schema, tables, and vector columns
+-  HNSW indexes on vector columns
+-  Cross-module queries and operations
+-  Vector operations with different dimensions
 
 ### Installation Methods
 
@@ -441,9 +465,7 @@ This comprehensive test verifies:
 
 Docker installation provides isolation and consistent environments.
 
-**Unified Setup (Recommended):**
-
-Start all services from the repository root:
+**Unified Setup (Recommended):**Start all services from the repository root:
 
 ```bash
 # From repository root - starts NeuronDB, NeuronAgent, NeuronMCP, and NeuronDesktop
@@ -687,18 +709,14 @@ Use NeuronMCP to connect MCP-compatible clients.
 
 ### Starting Services
 
-**Unified Start (Recommended):**
-
-Start all services from the repository root:
+**Unified Start (Recommended):**Start all services from the repository root:
 
 ```bash
 # From repository root - starts all services
 docker compose --profile default up -d
 ```
 
-**Individual Service Start:**
-
-Start services independently in any order:
+**Individual Service Start:**Start services independently in any order:
 
 ```bash
 # Start NeuronDB
@@ -786,9 +804,7 @@ docker compose restart neurondesk-api neurondesk-frontend
 
 **For comprehensive documentation, tutorials, API references, and best practices, visit:**
 
-🌐 **[https://www.neurondb.ai/docs](https://www.neurondb.ai/docs)**
-
-The official documentation site provides:
+ **[https://www.neurondb.ai/docs](https://www.neurondb.ai/docs)**The official documentation site provides:
 - Complete API reference for all 473 SQL functions
 - Detailed tutorials and guides
 - Performance optimization guides
@@ -796,7 +812,7 @@ The official documentation site provides:
 - Troubleshooting and FAQ
 - Latest updates and release notes
 
-**📖 See [DOCUMENTATION.md](DOCUMENTATION.md) for a complete documentation index with quick links to all topics.**
+**See [documentation.md](documentation.md) for a complete documentation index with quick links to all topics.**
 
 ### Component Documentation
 
@@ -804,13 +820,13 @@ The official documentation site provides:
 
 | Document | Purpose | Detailed Docs |
 |----------|---------|---------------|
-| [Main Documentation](NeuronDB/README.md) | Complete feature reference | [Vector Search](https://www.neurondb.ai/docs/vector-search) |
+| [Main Documentation](NeuronDB/readme.md) | Complete feature reference | [Vector Search](https://www.neurondb.ai/docs/vector-search) |
 | [Installation Guide](NeuronDB/INSTALL.md) | Build and install instructions | [Installation Guide](https://www.neurondb.ai/docs/installation) |
-| [Docker Guide](NeuronDB/docker/README.md) | Container deployment | [Docker Deployment](https://www.neurondb.ai/docs/docker) |
+| [Docker Guide](NeuronDB/docker/readme.md) | Container deployment | [Docker Deployment](https://www.neurondb.ai/docs/docker) |
 | [SQL API Reference](NeuronDB/docs/sql-api.md) | Function documentation | [Complete API Reference](https://www.neurondb.ai/docs/api) |
 | [Function Stability Policy](NeuronDB/docs/function-stability.md) | API stability classifications | - |
 | [Deprecation Policy](NeuronDB/docs/deprecation-policy.md) | Deprecation and removal process | - |
-| [API Snapshots](NeuronDB/docs/api-snapshots/README.md) | Versioned API references | - |
+| [API Snapshots](NeuronDB/docs/api-snapshots/readme.md) | Versioned API references | - |
 | [NeuronAgent OpenAPI Spec](NeuronAgent/openapi/openapi.yaml) | OpenAPI 3.0 specification | - |
 | [NeuronMCP Tool Catalog](NeuronMCP/docs/tool-resource-catalog.md) | Complete tool and resource catalog | - |
 | [Security Policy](SECURITY.md) | Security policy, disclosure, and signed releases | - |
@@ -822,18 +838,18 @@ The official documentation site provides:
 
 | Document | Purpose | Detailed Docs |
 |----------|---------|---------------|
-| [Main Documentation](NeuronAgent/README.md) | Overview and features | [NeuronAgent Guide](https://www.neurondb.ai/docs/neuronagent) |
+| [Main Documentation](NeuronAgent/readme.md) | Overview and features | [NeuronAgent Guide](https://www.neurondb.ai/docs/neuronagent) |
 | [API Reference](NeuronAgent/docs/API.md) | Complete REST API docs | [API Reference](https://www.neurondb.ai/docs/neuronagent/api) |
 | [Architecture](NeuronAgent/docs/ARCHITECTURE.md) | System design | [Architecture Guide](https://www.neurondb.ai/docs/neuronagent/architecture) |
 | [Deployment Guide](NeuronAgent/docs/DEPLOYMENT.md) | Production setup | [Deployment Guide](https://www.neurondb.ai/docs/neuronagent/deployment) |
-| [Docker Guide](NeuronAgent/docker/README.md) | Container deployment | [Docker Guide](https://www.neurondb.ai/docs/neuronagent/docker) |
+| [Docker Guide](NeuronAgent/docker/readme.md) | Container deployment | [Docker Guide](https://www.neurondb.ai/docs/neuronagent/docker) |
 
 #### NeuronMCP
 
 | Document | Purpose | Detailed Docs |
 |----------|---------|---------------|
-| [Main Documentation](NeuronMCP/README.md) | Overview and usage | [NeuronMCP Guide](https://www.neurondb.ai/docs/neuronmcp) |
-| [Docker Guide](NeuronMCP/docker/README.md) | Container deployment | [Docker Guide](https://www.neurondb.ai/docs/neuronmcp/docker) |
+| [Main Documentation](NeuronMCP/readme.md) | Overview and usage | [NeuronMCP Guide](https://www.neurondb.ai/docs/neuronmcp) |
+| [Docker Guide](NeuronMCP/docker/readme.md) | Container deployment | [Docker Guide](https://www.neurondb.ai/docs/neuronmcp/docker) |
 
 ### Ecosystem Documentation
 
@@ -855,7 +871,7 @@ Not sure where to start? Use this decision table:
 | Embedding in Postgres workloads | NeuronDB extension | Direct SQL, no service layer, native database integration |
 | Web UI for all components | NeuronDesktop | Unified dashboard, real-time updates, metrics |
 
-**All components connect to the same PostgreSQL database** and can be used together or independently.
+**All components connect to the same PostgreSQL database**and can be used together or independently.
 
 ## System Requirements
 
@@ -867,7 +883,7 @@ Not sure where to start? Use this decision table:
 | Build Tools | C compiler (GCC or Clang), Make |
 | Optional GPU | CUDA (NVIDIA), ROCm (AMD), Metal (macOS) |
 
-**Compatibility:** See [COMPATIBILITY.md](COMPATIBILITY.md) for detailed version matrices, tested combinations, and platform-specific notes.
+**Compatibility:**See [COMPATIBILITY.md](COMPATIBILITY.md) for detailed version matrices, tested combinations, and platform-specific notes.
 
 See [installation guide](NeuronDB/INSTALL.md) for platform-specific requirements.
 
@@ -915,9 +931,9 @@ Each component includes Docker configurations:
 | Kubernetes | Container orchestration | Large-scale production |
 
 See component-specific Docker guides:
-- [NeuronDB Docker](NeuronDB/docker/README.md)
-- [NeuronAgent Docker](NeuronAgent/docker/README.md)
-- [NeuronMCP Docker](NeuronMCP/docker/README.md)
+- [NeuronDB Docker](NeuronDB/docker/readme.md)
+- [NeuronAgent Docker](NeuronAgent/docker/readme.md)
+- [NeuronMCP Docker](NeuronMCP/docker/readme.md)
 
 ## Troubleshooting
 
@@ -925,7 +941,7 @@ See component-specific Docker guides:
 
 #### Connection Problems
 
-**Symptom:** Services cannot connect to NeuronDB
+**Symptom:**Services cannot connect to NeuronDB
 
 **Solutions:**
 
@@ -951,7 +967,7 @@ See component-specific Docker guides:
 
 #### Service Startup Issues
 
-**Symptom:** Service fails to start
+**Symptom:**Service fails to start
 
 **Solutions:**
 
@@ -977,7 +993,7 @@ See component-specific Docker guides:
 
 #### Performance Issues
 
-**Symptom:** Slow query performance
+**Symptom:**Slow query performance
 
 **Solutions:**
 
@@ -1124,10 +1140,10 @@ This software is licensed under a proprietary Software License Agreement with
 strict commercial use prohibitions.
 
 **Key Terms:**
-- ✓ Personal use of binaries ONLY is permitted
-- ✗ Commercial use is STRICTLY PROHIBITED
-- ✗ Creating companies based on this code is STRICTLY PROHIBITED
-- ✗ Using source code for commercial purposes is STRICTLY PROHIBITED
+-  Personal use of binaries ONLY is permitted
+-  Commercial use is STRICTLY PROHIBITED
+-  Creating companies based on this code is STRICTLY PROHIBITED
+-  Using source code for commercial purposes is STRICTLY PROHIBITED
 
 These terms apply RETROACTIVELY to ALL versions from 2024 onwards.
 
@@ -1148,19 +1164,19 @@ See [LICENSE](LICENSE) file for complete license terms.
 
 | Component | Documentation |
 |-----------|---------------|
-| [NeuronDB](NeuronDB/README.md) | PostgreSQL extension documentation |
-| [NeuronAgent](NeuronAgent/README.md) | Agent runtime documentation |
-| [NeuronMCP](NeuronMCP/README.md) | MCP server documentation |
-| [NeuronDesktop](NeuronDesktop/README.md) | Web interface documentation |
+| [NeuronDB](NeuronDB/readme.md) | PostgreSQL extension documentation |
+| [NeuronAgent](NeuronAgent/readme.md) | Agent runtime documentation |
+| [NeuronMCP](NeuronMCP/readme.md) | MCP server documentation |
+| [NeuronDesktop](NeuronDesktop/readme.md) | Web interface documentation |
 
 ### Docker Links
 
 | Component | Docker Guide |
 |-----------|--------------|
-| [NeuronDB Docker](NeuronDB/docker/README.md) | Container deployment |
-| [NeuronAgent Docker](NeuronAgent/docker/README.md) | Container deployment |
-| [NeuronMCP Docker](NeuronMCP/docker/README.md) | Container deployment |
-| [NeuronDesktop](NeuronDesktop/README.md) | Container deployment |
+| [NeuronDB Docker](NeuronDB/docker/readme.md) | Container deployment |
+| [NeuronAgent Docker](NeuronAgent/docker/readme.md) | Container deployment |
+| [NeuronMCP Docker](NeuronMCP/docker/readme.md) | Container deployment |
+| [NeuronDesktop](NeuronDesktop/readme.md) | Container deployment |
 
 ### Feature Links
 

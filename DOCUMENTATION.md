@@ -17,7 +17,7 @@ The official site provides complete API references, tutorials, guides, and best 
 | Document | Description | Time to Complete |
 |----------|-------------|------------------|
 | **[QUICKSTART.md](QUICKSTART.md)** | Get all services running in minutes | 5-10 minutes |
-| **[README.md](README.md)** | Project overview and architecture | 15 minutes |
+| **[readme.md](readme.md)** | Project overview and architecture | 15 minutes |
 | **[COMPATIBILITY.md](COMPATIBILITY.md)** | Version and platform compatibility | 5 minutes |
 
 ---
@@ -28,18 +28,18 @@ The official site provides complete API references, tutorials, guides, and best 
 
 | Component | Quick Links | Description |
 |-----------|-------------|-------------|
-| **NeuronDB** | [README](NeuronDB/README.md) · [INSTALL](NeuronDB/INSTALL.md) · [Docs](NeuronDB/docs/) | PostgreSQL extension with vector search, 52+ ML algorithms, GPU acceleration |
-| **NeuronAgent** | [README](NeuronAgent/README.md) · [API](NeuronAgent/docs/API.md) · [Architecture](NeuronAgent/docs/ARCHITECTURE.md) | REST/WebSocket agent runtime with autonomous agents |
-| **NeuronMCP** | [README](NeuronMCP/README.md) · [Tools](NeuronMCP/TOOLS_REFERENCE.md) · [Setup](NeuronMCP/docs/NEURONDB_MCP_SETUP.md) | MCP protocol server with 100+ tools |
-| **NeuronDesktop** | [README](NeuronDesktop/README.md) · [API](NeuronDesktop/docs/API.md) · [Deployment](NeuronDesktop/docs/DEPLOYMENT.md) | Unified web interface dashboard |
+| **NeuronDB** | [README](NeuronDB/readme.md) · [INSTALL](NeuronDB/INSTALL.md) · [Docs](NeuronDB/docs/) | PostgreSQL extension with vector search, 52+ ML algorithms, GPU acceleration |
+| **NeuronAgent** | [README](NeuronAgent/readme.md) · [API](NeuronAgent/docs/API.md) · [Architecture](NeuronAgent/docs/ARCHITECTURE.md) | REST/WebSocket agent runtime with autonomous agents |
+| **NeuronMCP** | [README](NeuronMCP/readme.md) · [Tools](NeuronMCP/TOOLS_REFERENCE.md) · [Setup](NeuronMCP/docs/NEURONDB_MCP_SETUP.md) | MCP protocol server with 100+ tools |
+| **NeuronDesktop** | [README](NeuronDesktop/readme.md) · [API](NeuronDesktop/docs/API.md) · [Deployment](NeuronDesktop/docs/DEPLOYMENT.md) | Unified web interface dashboard |
 
 ### Ecosystem Documentation
 
 | Document | Description |
 |----------|-------------|
-| [Ecosystem Overview](Docs/ecosystem/README.md) | How components work together |
+| [Ecosystem Overview](Docs/ecosystem/readme.md) | How components work together |
 | [Integration Guide](Docs/ecosystem/integration.md) | Component integration patterns |
-| [Docker Guide](dockers/README.md) | Docker deployment for all services |
+| [Docker Guide](dockers/readme.md) | Docker deployment for all services |
 
 ---
 
@@ -50,7 +50,7 @@ The official site provides complete API references, tutorials, guides, and best 
 | Guide | Platform | Use Case |
 |-------|----------|----------|
 | [NeuronDB Installation](NeuronDB/INSTALL.md) | All platforms | Install PostgreSQL extension |
-| [Docker Installation](dockers/README.md) | Docker | Container deployment |
+| [Docker Installation](dockers/readme.md) | Docker | Container deployment |
 | [Quick Start](QUICKSTART.md) | Docker | Get everything running fast |
 
 ### Setup Scripts
@@ -177,7 +177,7 @@ The official site provides complete API references, tutorials, guides, and best 
 | [SQL API Reference](NeuronDB/docs/sql-api.md) | Complete SQL function reference (473 functions) |
 | [Function Stability](NeuronDB/docs/function-stability.md) | API stability classifications |
 | [Deprecation Policy](NeuronDB/docs/deprecation-policy.md) | Deprecation and removal process |
-| [API Snapshots](NeuronDB/docs/api-snapshots/README.md) | Versioned API references |
+| [API Snapshots](NeuronDB/docs/api-snapshots/readme.md) | Versioned API references |
 
 ### NeuronAgent API
 
@@ -213,10 +213,10 @@ The official site provides complete API references, tutorials, guides, and best 
 
 | Document | Description |
 |----------|-------------|
-| [Docker Overview](dockers/README.md) | Docker deployment guide |
-| [NeuronDB Docker](NeuronDB/docker/README.md) | Database container deployment |
-| [NeuronAgent Docker](NeuronAgent/docker/README.md) | Agent runtime deployment |
-| [NeuronMCP Docker](NeuronMCP/docker/README.md) | MCP server deployment |
+| [Docker Overview](dockers/readme.md) | Docker deployment guide |
+| [NeuronDB Docker](NeuronDB/docker/readme.md) | Database container deployment |
+| [NeuronAgent Docker](NeuronAgent/docker/readme.md) | Agent runtime deployment |
+| [NeuronMCP Docker](NeuronMCP/docker/readme.md) | MCP server deployment |
 
 ### Production Deployment
 
@@ -298,7 +298,7 @@ The official site provides complete API references, tutorials, guides, and best 
 
 **Get Started**
 - Install everything quickly → [QUICKSTART.md](QUICKSTART.md)
-- Understand the architecture → [README.md](README.md)
+- Understand the architecture → [readme.md](readme.md)
 - Check compatibility → [COMPATIBILITY.md](COMPATIBILITY.md)
 
 **Work with Vectors**
@@ -312,23 +312,23 @@ The official site provides complete API references, tutorials, guides, and best 
 - Deploy models → [Model Management](NeuronDB/docs/ml-embeddings/model-management.md)
 
 **Build AI Agents**
-- Create agents → [NeuronAgent README](NeuronAgent/README.md)
+- Create agents → [NeuronAgent README](NeuronAgent/readme.md)
 - Use REST API → [API Reference](NeuronAgent/docs/API.md)
 - Deploy agents → [Deployment Guide](NeuronAgent/docs/DEPLOYMENT.md)
 
 **Integrate with MCP**
-- Setup MCP server → [NeuronMCP README](NeuronMCP/README.md)
+- Setup MCP server → [NeuronMCP README](NeuronMCP/readme.md)
 - Use with Claude → [Setup Guide](NeuronMCP/docs/NEURONDB_MCP_SETUP.md)
 - Explore tools → [Tools Reference](NeuronMCP/TOOLS_REFERENCE.md)
 
 **Use Web Interface**
-- Setup dashboard → [NeuronDesktop README](NeuronDesktop/README.md)
+- Setup dashboard → [NeuronDesktop README](NeuronDesktop/readme.md)
 - Integrate components → [Integration Guide](NeuronDesktop/docs/INTEGRATION.md)
 - Deploy production → [Deployment Guide](NeuronDesktop/docs/DEPLOYMENT.md)
 
 **Deploy with Docker**
 - Quick start → [QUICKSTART.md](QUICKSTART.md)
-- Docker guide → [Docker README](dockers/README.md)
+- Docker guide → [Docker README](dockers/readme.md)
 - Component-specific → Each component's `docker/` directory
 
 **Develop & Contribute**

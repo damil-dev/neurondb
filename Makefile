@@ -157,7 +157,7 @@ docker-run-cpu: ## Start all services (CPU variant)
 	@echo "$(CYAN)Starting NeuronDB Ecosystem (CPU)...$(NC)"
 	@if [ ! -f .env ]; then \
 		echo "$(YELLOW)Warning: .env file not found. Using defaults.$(NC)"; \
-		echo "$(YELLOW)Copy .env.example to .env to customize settings.$(NC)"; \
+		echo "$(YELLOW)Copy env.example to .env to customize settings.$(NC)"; \
 	fi
 	docker compose -f $(COMPOSE_FILE) --profile default up -d
 	@echo "$(GREEN)✓ Services started$(NC)"
@@ -172,7 +172,7 @@ docker-run-cuda: ## Start all services with CUDA GPU
 	@echo "$(CYAN)Starting NeuronDB Ecosystem (CUDA GPU)...$(NC)"
 	@if [ ! -f .env ]; then \
 		echo "$(YELLOW)Warning: .env file not found. Using defaults.$(NC)"; \
-		echo "$(YELLOW)Copy .env.example to .env and set DB_HOST=neurondb-cuda for GPU support.$(NC)"; \
+		echo "$(YELLOW)Copy env.example to .env and set DB_HOST=neurondb-cuda for GPU support.$(NC)"; \
 	fi
 	docker compose -f $(COMPOSE_FILE) --profile cuda up -d
 	@echo "$(GREEN)✓ Services started (CUDA)$(NC)"
@@ -187,7 +187,7 @@ docker-run-rocm: ## Start all services with ROCm GPU
 	@echo "$(CYAN)Starting NeuronDB Ecosystem (ROCm GPU)...$(NC)"
 	@if [ ! -f .env ]; then \
 		echo "$(YELLOW)Warning: .env file not found. Using defaults.$(NC)"; \
-		echo "$(YELLOW)Copy .env.example to .env and set DB_HOST=neurondb-rocm for GPU support.$(NC)"; \
+		echo "$(YELLOW)Copy env.example to .env and set DB_HOST=neurondb-rocm for GPU support.$(NC)"; \
 	fi
 	docker compose -f $(COMPOSE_FILE) --profile rocm up -d
 	@echo "$(GREEN)✓ Services started (ROCm)$(NC)"
@@ -202,7 +202,7 @@ docker-run-metal: ## Start all services with Metal GPU
 	@echo "$(CYAN)Starting NeuronDB Ecosystem (Metal GPU)...$(NC)"
 	@if [ ! -f .env ]; then \
 		echo "$(YELLOW)Warning: .env file not found. Using defaults.$(NC)"; \
-		echo "$(YELLOW)Copy .env.example to .env and set DB_HOST=neurondb-metal for GPU support.$(NC)"; \
+		echo "$(YELLOW)Copy env.example to .env and set DB_HOST=neurondb-metal for GPU support.$(NC)"; \
 	fi
 	docker compose -f $(COMPOSE_FILE) --profile metal up -d
 	@echo "$(GREEN)✓ Services started (Metal)$(NC)"
@@ -287,14 +287,14 @@ check-deps-neuronagent: ## Check NeuronAgent dependencies
 	@echo "$(CYAN)Checking NeuronAgent dependencies...$(NC)"
 	@missing=0; \
 	if ! command -v go >/dev/null 2>&1; then \
-		echo "$(YELLOW)⚠ Go compiler not found (need Go 1.23+)$(NC)"; \
+		echo "$(YELLOW)⚠ Go compiler not found (need Go 1.24+)$(NC)"; \
 		missing=1; \
 	else \
 		go_version=$$(go version 2>/dev/null | awk '{print $$3}' | sed 's/go//'); \
 		major=$$(echo $$go_version | cut -d. -f1); \
 		minor=$$(echo $$go_version | cut -d. -f2); \
-		if [ $$major -lt 1 ] || ([ $$major -eq 1 ] && [ $$minor -lt 23 ]); then \
-			echo "$(YELLOW)⚠ Go version too old (have $$go_version, need 1.23+)$(NC)"; \
+		if [ $$major -lt 1 ] || ([ $$major -eq 1 ] && [ $$minor -lt 24 ]); then \
+			echo "$(YELLOW)⚠ Go version too old (have $$go_version, need 1.24+)$(NC)"; \
 			missing=1; \
 		else \
 			echo "$(GREEN)✓ Go $$go_version found$(NC)"; \
@@ -310,14 +310,14 @@ check-deps-neuronmcp: ## Check NeuronMCP dependencies
 	@echo "$(CYAN)Checking NeuronMCP dependencies...$(NC)"
 	@missing=0; \
 	if ! command -v go >/dev/null 2>&1; then \
-		echo "$(YELLOW)⚠ Go compiler not found (need Go 1.23+)$(NC)"; \
+		echo "$(YELLOW)⚠ Go compiler not found (need Go 1.24+)$(NC)"; \
 		missing=1; \
 	else \
 		go_version=$$(go version 2>/dev/null | awk '{print $$3}' | sed 's/go//'); \
 		major=$$(echo $$go_version | cut -d. -f1); \
 		minor=$$(echo $$go_version | cut -d. -f2); \
-		if [ $$major -lt 1 ] || ([ $$major -eq 1 ] && [ $$minor -lt 23 ]); then \
-			echo "$(YELLOW)⚠ Go version too old (have $$go_version, need 1.23+)$(NC)"; \
+		if [ $$major -lt 1 ] || ([ $$major -eq 1 ] && [ $$minor -lt 24 ]); then \
+			echo "$(YELLOW)⚠ Go version too old (have $$go_version, need 1.24+)$(NC)"; \
 			missing=1; \
 		else \
 			echo "$(GREEN)✓ Go $$go_version found$(NC)"; \
@@ -333,14 +333,14 @@ check-deps-neurondesktop: ## Check NeuronDesktop dependencies
 	@echo "$(CYAN)Checking NeuronDesktop dependencies...$(NC)"
 	@missing=0; \
 	if ! command -v go >/dev/null 2>&1; then \
-		echo "$(YELLOW)⚠ Go compiler not found (need Go 1.23+)$(NC)"; \
+		echo "$(YELLOW)⚠ Go compiler not found (need Go 1.24+)$(NC)"; \
 		missing=1; \
 	else \
 		go_version=$$(go version 2>/dev/null | awk '{print $$3}' | sed 's/go//'); \
 		major=$$(echo $$go_version | cut -d. -f1); \
 		minor=$$(echo $$go_version | cut -d. -f2); \
-		if [ $$major -lt 1 ] || ([ $$major -eq 1 ] && [ $$minor -lt 23 ]); then \
-			echo "$(YELLOW)⚠ Go version too old (have $$go_version, need 1.23+)$(NC)"; \
+		if [ $$major -lt 1 ] || ([ $$major -eq 1 ] && [ $$minor -lt 24 ]); then \
+			echo "$(YELLOW)⚠ Go version too old (have $$go_version, need 1.24+)$(NC)"; \
 			missing=1; \
 		else \
 			echo "$(GREEN)✓ Go $$go_version found$(NC)"; \

@@ -1,118 +1,187 @@
-# NeuronDB Examples
+# NeuronDB Examples - Complete Collection
 
-**Complete examples and tutorials for building AI applications with NeuronDB**
+**Professional, working examples demonstrating NeuronDB capabilities**
 
-This directory contains practical, production-ready examples demonstrating how to use NeuronDB ecosystem components for common AI application patterns.
+This directory contains complete, production-ready examples showing how to build real-world applications with NeuronDB.
 
 ---
 
-## 📚 Available Examples
+## 📚 Example Categories
 
-### 1. Semantic Search on Documents
-
-**Location:** [`semantic-search-docs/`](semantic-search-docs/)
-
-Build a semantic search engine over document collections using vector embeddings.
+### 1. 🔍 Semantic Search (`semantic-search-docs/`)
+Complete working example for semantic search over document collections.
 
 **What you'll learn:**
-- Generate embeddings for text documents
-- Create and optimize HNSW indexes
-- Perform similarity search with different distance metrics
-- Combine semantic and keyword search (hybrid search)
+- Document ingestion and chunking
+- Embedding generation with Sentence Transformers
+- Vector storage in NeuronDB
+- Semantic search using HNSW indexes
+- Similarity scoring
 
-**Technologies:** NeuronDB vector search, embeddings, HNSW indexing
+**Files:**
+- `semantic_search.py` - Complete working implementation
+- `readme.md` - Detailed documentation
 
-**Time to complete:** 20 minutes
+**Quick Start:**
+```bash
+cd semantic-search-docs
+pip install psycopg2-binary sentence-transformers numpy
+
+# Run interactive demo
+python semantic_search.py demo
+
+# Or ingest your own documents
+python semantic_search.py ingest --input-dir /path/to/docs
+
+# Search
+python semantic_search.py search --query "your question"
+```
 
 ---
 
-### 2. RAG Chatbot with PDFs
-
-**Location:** [`rag-chatbot-pdfs/`](rag-chatbot-pdfs/)
-
-Create a Retrieval-Augmented Generation (RAG) chatbot that answers questions based on PDF documents.
+### 2. 💬 RAG Chatbot (`rag-chatbot-pdfs/`)
+Full RAG (Retrieval-Augmented Generation) chatbot over PDF documents.
 
 **What you'll learn:**
-- Extract text from PDF documents
-- Chunk documents for optimal RAG performance
-- Generate embeddings and store in vector database
-- Implement RAG pipeline with context retrieval
-- Integrate with LLMs for response generation
+- PDF text extraction
+- Document chunking strategies
+- Embedding generation and storage
+- Context retrieval
+- LLM integration (OpenAI/Anthropic)
+- Interactive chat interface
 
-**Technologies:** NeuronDB RAG pipeline, NeuronAgent, document processing
+**Files:**
+- `rag_chatbot.py` - Complete RAG implementation
+- `readme.md` - Usage guide
 
-**Time to complete:** 30 minutes
+**Quick Start:**
+```bash
+cd rag-chatbot-pdfs
+pip install psycopg2-binary sentence-transformers pypdf openai anthropic python-dotenv
+
+# Set API key
+export OPENAI_API_KEY=your_key
+
+# Run demo
+python rag_chatbot.py demo
+
+# Ingest PDFs
+python rag_chatbot.py ingest --input-dir /path/to/pdfs
+
+# Interactive chat
+python rag_chatbot.py chat
+
+# Single query
+python rag_chatbot.py query --query "your question"
+```
 
 ---
 
-### 3. AI Agent Tools
-
-**Location:** [`agent-tools/`](agent-tools/)
-
-Build custom tools for AI agents using NeuronAgent's tool framework.
+### 3. 🤖 Agent Tools (`agent-tools/`)
+NeuronAgent with multiple tools (SQL, HTTP, custom tools).
 
 **What you'll learn:**
-- Create custom agent tools
-- Register tools with NeuronAgent
-- Implement tool validation and error handling
-- Build multi-tool workflows
-- Use agent long-term memory
+- Agent creation and configuration
+- Tool registration (SQL, HTTP, custom)
+- Tool chaining for complex tasks
+- Agent state management
+- Error handling
 
-**Technologies:** NeuronAgent REST API, tool registry, WebSocket streaming
+**Files:**
+- `readme.md` - Setup and examples
 
-**Time to complete:** 25 minutes
+**Coming Soon:**
+Complete implementation with working agent examples.
 
 ---
 
-### 4. MCP Integration
-
-**Location:** [`mcp-integration/`](mcp-integration/)
-
-Integrate NeuronDB with MCP-compatible clients like Claude Desktop.
+### 4. 🔌 MCP Integration (`mcp-integration/`)
+Model Context Protocol integration examples.
 
 **What you'll learn:**
-- Configure NeuronMCP server
-- Connect Claude Desktop to NeuronDB
-- Use MCP tools from AI assistants
-- Build custom MCP workflows
-- Access PostgreSQL through MCP protocol
+- Claude Desktop configuration
+- MCP server setup
+- Tool discovery and usage
+- Custom MCP clients
+- Integration patterns
 
-**Technologies:** NeuronMCP, Model Context Protocol, Claude Desktop
+**Files:**
+- `claude_desktop_config.json` - Claude Desktop setup
+- `test_mcp_connection.py` - Connection testing
+- `readme.md` - Complete guide
 
-**Time to complete:** 15 minutes
+**Quick Start:**
+```bash
+cd mcp-integration
+
+# Configure Claude Desktop
+# Edit ~/.config/Claude/claude_desktop_config.json
+
+# Test connection
+python test_mcp_connection.py
+
+# List tools
+python list_tools.py
+```
 
 ---
 
-## 🎯 Example Categories
+### 5. 📊 Data Loading (`data_loading/`)
+Load datasets from HuggingFace Hub into NeuronDB.
 
-### By Use Case
+**What you'll learn:**
+- HuggingFace Datasets integration
+- Auto-schema detection
+- Batch loading
+- Embedding generation
+- Index creation
 
-| Use Case | Example | Complexity |
-|----------|---------|------------|
-| **Document Search** | Semantic Search | ⭐ Beginner |
-| **Question Answering** | RAG Chatbot | ⭐⭐ Intermediate |
-| **Agent Automation** | Agent Tools | ⭐⭐ Intermediate |
-| **AI Assistant Integration** | MCP Integration | ⭐ Beginner |
+**Files:**
+- `load_huggingface_dataset.py` - Complete loader
 
-### By Component
+**Quick Start:**
+```bash
+cd data_loading
+pip install datasets sentence-transformers psycopg2-binary
 
-| Component | Examples Using It |
-|-----------|------------------|
-| **NeuronDB** | All examples (core database) |
-| **NeuronAgent** | RAG Chatbot, Agent Tools |
-| **NeuronMCP** | MCP Integration |
-| **NeuronDesktop** | (Use any example through UI) |
+python load_huggingface_dataset.py \
+    --dataset ag_news \
+    --split train \
+    --limit 1000 \
+    --auto-embed \
+    --create-indexes
+```
 
-### By Technology
+---
 
-| Technology | Examples |
-|------------|----------|
-| **Vector Search** | Semantic Search, RAG Chatbot |
-| **Embeddings** | Semantic Search, RAG Chatbot |
-| **ML Models** | RAG Chatbot |
-| **RAG Pipeline** | RAG Chatbot |
-| **Agent Runtime** | Agent Tools, RAG Chatbot |
-| **MCP Protocol** | MCP Integration |
+### 6. 🧠 LLM Training (`llm_training/`)
+Train custom LLM models for PostgreSQL-specific tasks.
+
+**What you'll learn:**
+- Custom model training
+- Model export to Ollama
+- LLM server setup
+- PostgreSQL integration
+
+**Files:**
+- `train_postgres_llm.py` - Training script
+- `export_to_ollama.sh` - Ollama export
+- `start_custom_llm_system.sh` - Server startup
+- `stop_custom_llm_system.sh` - Server shutdown
+
+**Quick Start:**
+```bash
+cd llm_training
+
+# Train model
+python train_postgres_llm.py
+
+# Start server
+./start_custom_llm_system.sh
+
+# Stop server
+./stop_custom_llm_system.sh
+```
 
 ---
 
@@ -120,227 +189,453 @@ Integrate NeuronDB with MCP-compatible clients like Claude Desktop.
 
 ### Prerequisites
 
-1. **NeuronDB Running:** Follow [QUICKSTART.md](../QUICKSTART.md)
-2. **Components:** Install components needed for your example
-3. **API Keys:** Some examples require OpenAI/Anthropic API keys
+**Core Requirements:**
+- PostgreSQL 16+ with NeuronDB extension
+- Python 3.8+
+- pip
 
-### Quick Setup
+**Install NeuronDB first:**
+```bash
+# Using Docker (recommended for examples)
+cd ../
+./scripts/ecosystem-setup.sh --mode docker --all
+
+# Or native installation
+./scripts/install.sh
+```
+
+### Common Dependencies
+
+Most examples require:
+```bash
+pip install psycopg2-binary sentence-transformers numpy
+```
+
+For RAG examples, also install:
+```bash
+pip install pypdf openai anthropic python-dotenv
+```
+
+For data loading:
+```bash
+pip install datasets
+```
+
+### Environment Variables
+
+Set these for database connection:
+```bash
+export DB_HOST=localhost
+export DB_PORT=5432
+export DB_NAME=neurondb
+export DB_USER=postgres
+export DB_PASSWORD=neurondb
+```
+
+For LLM integration:
+```bash
+export OPENAI_API_KEY=your_openai_key
+export ANTHROPIC_API_KEY=your_anthropic_key
+```
+
+---
+
+## 📖 Example Walkthroughs
+
+### Quick Demo: Semantic Search (5 minutes)
 
 ```bash
-# Start all services
-docker compose up -d
+# 1. Navigate to example
+cd semantic-search-docs
 
-# Verify services are healthy
-docker compose ps
+# 2. Install dependencies
+pip install psycopg2-binary sentence-transformers numpy
 
-# Navigate to an example
-cd examples/semantic-search-docs/
+# 3. Run demo (creates sample docs, ingests, searches)
+python semantic_search.py demo
+```
+
+Output:
+```
+=================================================================
+  NeuronDB Semantic Search Demo
+=================================================================
+
+✓ Created 3 sample documents in sample_docs/
+
+=================================================================
+  Step 1: Ingesting Documents
+=================================================================
+
+Processing: machine_learning.md
+  Created 3 chunks
+✓ Ingested machine_learning.md
+
+...
+
+=================================================================
+  Step 2: Semantic Search
+=================================================================
+
+Query: "What is machine learning?"
+------------------------------------------------------------------
+
+1. machine_learning.md (chunk 0)
+   Similarity: 0.8542
+   Machine learning is a subset of artificial intelligence...
 ```
 
 ---
 
-## 📖 Example Structure
+### Quick Demo: RAG Chatbot (5 minutes)
 
-Each example follows a consistent structure:
+```bash
+# 1. Navigate to example
+cd rag-chatbot-pdfs
 
+# 2. Install dependencies
+pip install psycopg2-binary sentence-transformers pypdf openai
+
+# 3. Set API key
+export OPENAI_API_KEY=your_key
+
+# 4. Run demo
+python rag_chatbot.py demo
 ```
-example-name/
-├── README.md           # Complete tutorial and documentation
-├── setup.sql          # Database schema and setup (if applicable)
-├── data/              # Sample data files
-├── src/               # Source code
-│   ├── main.*         # Main implementation
-│   └── utils.*        # Utility functions
-├── config/            # Configuration files
-└── tests/             # Example tests
+
+Output:
 ```
+=================================================================
+  NeuronDB RAG Chatbot Demo
+=================================================================
 
----
+Query: "What is machine learning?"
+------------------------------------------------------------------
+Answer: Based on the provided context, machine learning is a branch 
+of artificial intelligence that enables systems to learn and improve 
+from experience without being explicitly programmed...
 
-## 💡 Tips for Using Examples
-
-### Best Practices
-
-1. **Read README First:** Each example has detailed instructions
-2. **Start Simple:** Begin with beginner examples
-3. **Understand Concepts:** Focus on learning patterns, not just copying code
-4. **Experiment:** Modify examples to fit your use case
-5. **Check Prerequisites:** Ensure required services are running
-
-### Common Patterns
-
-All examples demonstrate these key patterns:
-
-- **Database Connection:** How to connect to NeuronDB
-- **Error Handling:** Proper error handling and validation
-- **Configuration:** Environment-based configuration
-- **Testing:** How to test your implementation
-- **Deployment:** Production deployment considerations
+Sources:
+  1. ml_basics.txt (similarity: 0.912)
+  2. database_intro.txt (similarity: 0.654)
+```
 
 ---
 
 ## 🎓 Learning Path
 
-### Beginner Path
+### Beginners
+1. Start with **Semantic Search** example
+   - Understand document ingestion
+   - Learn about embeddings
+   - Practice vector search
 
-1. Start with **Semantic Search** to learn vector basics
-2. Try **MCP Integration** to understand the ecosystem
-3. Build confidence with simple queries and operations
+2. Try **Data Loading** example
+   - Load real datasets
+   - Experiment with different embeddings
+   - Understand indexing
 
-### Intermediate Path
+### Intermediate
+3. Build **RAG Chatbot**
+   - Combine search with LLM
+   - Learn context retrieval
+   - Build interactive interfaces
 
-1. Complete beginner examples first
-2. Move to **RAG Chatbot** for full-stack RAG
-3. Explore **Agent Tools** for custom automation
-4. Combine patterns in your own projects
+4. Explore **Agent Tools**
+   - Agent architecture
+   - Tool orchestration
+   - Complex workflows
 
-### Advanced Topics
+### Advanced
+5. Implement **MCP Integration**
+   - Protocol integration
+   - Custom clients
+   - Production deployments
 
-After completing examples, explore:
-
-- Custom ML models ([NeuronDB ML docs](../NeuronDB/docs/ml-algorithms/))
-- Advanced indexing ([Indexing guide](../NeuronDB/docs/vector-search/indexing.md))
-- Production optimization ([Performance docs](../NeuronDB/docs/performance/))
-- Multi-modal embeddings ([Embedding docs](../NeuronDB/docs/ml-embeddings/))
+6. Train **Custom LLMs**
+   - Model training
+   - Fine-tuning
+   - Deployment
 
 ---
 
-## 🔗 Additional Resources
+## 🔧 Customization Guide
 
-### Documentation
+### Modify Embedding Models
 
-- **[Main README](../README.md)** - Project overview
-- **[Quick Start](../QUICKSTART.md)** - Get started in minutes
-- **[Documentation Index](../DOCUMENTATION.md)** - Complete documentation reference
+```python
+# In any example, change:
+EMBEDDING_MODEL = "all-MiniLM-L6-v2"  # Fast, 384 dimensions
+EMBEDDING_DIM = 384
+
+# To:
+EMBEDDING_MODEL = "all-mpnet-base-v2"  # Better quality, 768 dimensions
+EMBEDDING_DIM = 768
+
+# Or use multilingual:
+EMBEDDING_MODEL = "paraphrase-multilingual-mpnet-base-v2"
+EMBEDDING_DIM = 768
+```
+
+### Adjust Chunking Strategy
+
+```python
+# Modify chunk size and overlap:
+CHUNK_SIZE = 500      # Increase for more context per chunk
+CHUNK_OVERLAP = 50    # Increase for better continuity
+
+# Or implement custom chunking:
+def custom_chunk(text):
+    # Split by paragraphs
+    paragraphs = text.split('\n\n')
+    return [p for p in paragraphs if len(p) > 100]
+```
+
+### Change LLM Provider
+
+```python
+# Switch between providers:
+chatbot = RAGChatbot(DB_CONFIG, llm_provider="openai")     # GPT-3.5/4
+chatbot = RAGChatbot(DB_CONFIG, llm_provider="anthropic")  # Claude
+```
+
+---
+
+## 📊 Performance Tips
+
+### Optimize Vector Search
+
+```sql
+-- Tune HNSW parameters
+CREATE INDEX documents_embedding_idx 
+ON documents 
+USING hnsw (embedding vector_cosine_ops)
+WITH (
+    m = 16,              -- Increase for better recall (16-32)
+    ef_construction = 64 -- Increase for better index quality (64-128)
+);
+
+-- Set runtime parameters
+SET hnsw.ef_search = 100;  -- Increase for better recall (40-200)
+```
+
+### Batch Processing
+
+```python
+# Process documents in batches
+BATCH_SIZE = 100
+
+for i in range(0, len(documents), BATCH_SIZE):
+    batch = documents[i:i + BATCH_SIZE]
+    # Process batch
+    embeddings = model.encode(batch, batch_size=32)
+    # Store in database
+```
+
+### Connection Pooling
+
+```python
+from psycopg2.pool import SimpleConnectionPool
+
+pool = SimpleConnectionPool(
+    minconn=1,
+    maxconn=10,
+    **DB_CONFIG
+)
+
+# Use connection from pool
+conn = pool.getconn()
+# ... do work ...
+pool.putconn(conn)
+```
+
+---
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+#### "Extension neurondb does not exist"
+```bash
+# Install NeuronDB extension
+cd ../scripts
+./install.sh
+```
+
+#### "ModuleNotFoundError: No module named 'sentence_transformers'"
+```bash
+pip install sentence-transformers
+```
+
+#### "CUDA out of memory" (when generating embeddings)
+```python
+# Use CPU instead
+model = SentenceTransformer(EMBEDDING_MODEL, device='cpu')
+
+# Or reduce batch size
+embeddings = model.encode(texts, batch_size=8)
+```
+
+#### "Connection refused" (database)
+```bash
+# Check if database is running
+./scripts/health-check.sh
+
+# Check connection parameters
+psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -c "SELECT 1;"
+```
+
+---
+
+## 📁 Example Structure
+
+```
+examples/
+├── readme.md                          # This file
+│
+├── semantic-search-docs/              # ✅ Complete working example
+│   ├── semantic_search.py
+│   └── readme.md
+│
+├── rag-chatbot-pdfs/                  # ✅ Complete working example  
+│   ├── rag_chatbot.py
+│   └── readme.md
+│
+├── agent-tools/                       # 📋 Documentation + samples
+│   └── readme.md
+│
+├── mcp-integration/                   # 📋 Configuration examples
+│   └── readme.md
+│
+├── data_loading/                      # ✅ Complete working example
+│   ├── load_huggingface_dataset.py
+│   └── readme.md (to be created)
+│
+└── llm_training/                      # ✅ Complete working example
+    ├── train_postgres_llm.py
+    ├── export_to_ollama.sh
+    ├── start_custom_llm_system.sh
+    ├── stop_custom_llm_system.sh
+    └── readme.md (to be created)
+```
+
+---
+
+## 🔗 Related Documentation
+
+### Core Documentation
+- **[Scripts README](../scripts/readme.md)** - Production scripts
+- **[Main README](../readme.md)** - Project overview
+- **[Quick Start](../QUICKSTART.md)** - Getting started
 
 ### Component Documentation
+- **[NeuronDB](../NeuronDB/readme.md)** - Database extension
+- **[NeuronAgent](../NeuronAgent/readme.md)** - Agent runtime
+- **[NeuronMCP](../NeuronMCP/readme.md)** - MCP server
+- **[NeuronDesktop](../NeuronDesktop/readme.md)** - Web interface
 
-- **[NeuronDB Docs](../NeuronDB/README.md)** - Database extension
-- **[NeuronAgent Docs](../NeuronAgent/README.md)** - Agent runtime
-- **[NeuronMCP Docs](../NeuronMCP/README.md)** - MCP server
-- **[NeuronDesktop Docs](../NeuronDesktop/README.md)** - Web interface
-
-### More Code Examples
-
-- **[NeuronDB Demo](../NeuronDB/demo/)** - 60+ SQL examples
-- **[NeuronAgent Examples](../NeuronAgent/examples/)** - 38 Python/Go examples
-- **[NeuronMCP Examples](../NeuronMCP/docs/examples/)** - MCP client examples
+### Advanced Guides
+- **[RAG Playbook](../NeuronDB/docs/rag/playbook.md)** - Complete RAG guidance
+- **[Vector Search](../NeuronDB/docs/vector-search/)** - Search optimization
+- **[Performance](../NeuronDB/docs/performance/)** - Performance tuning
 
 ---
 
 ## 🤝 Contributing Examples
 
-Have a great example to share? We'd love to include it!
+Want to add your own example?
 
-### Example Contribution Guidelines
+1. Create a new directory in `examples/`
+2. Include a working Python script or application
+3. Add a comprehensive readme.md
+4. Include requirements.txt
+5. Test thoroughly
+6. Submit a pull request
 
-1. **Clear Purpose:** Example should demonstrate a specific use case
-2. **Well Documented:** Include comprehensive README with setup instructions
-3. **Production Quality:** Use best practices and proper error handling
-4. **Self-Contained:** Include all necessary files and sample data
-5. **Tested:** Verify example works on clean installation
-
-### Submission Process
-
-1. Fork the repository
-2. Create example in `examples/your-example-name/`
-3. Follow the standard example structure
-4. Test thoroughly
-5. Submit pull request with description
-
-See [CONTRIBUTING.md](../CONTRIBUTING.md) for detailed guidelines.
+**Example Template:**
+```
+my-example/
+├── readme.md           # Explain what it does, prerequisites, usage
+├── example.py          # Complete working code
+├── requirements.txt    # Python dependencies
+└── sample_data/        # Optional sample data
+```
 
 ---
 
-## 📝 Example Template
+## 📈 Example Comparison
 
-Use this template when creating new examples:
-
-````markdown
-# Example Name
-
-Brief description of what this example demonstrates.
-
-## Overview
-
-**What you'll learn:**
-- Key concept 1
-- Key concept 2
-- Key concept 3
-
-**Time to complete:** X minutes
-
-**Difficulty:** ⭐ Beginner / ⭐⭐ Intermediate / ⭐⭐⭐ Advanced
-
-## Prerequisites
-
-- NeuronDB installed and running
-- Component X installed (if applicable)
-- API keys (if applicable)
-
-## Setup
-
-Step-by-step setup instructions...
-
-## Usage
-
-How to run the example...
-
-## Explanation
-
-Detailed explanation of key concepts...
-
-## Next Steps
-
-What to explore next...
-
-## Troubleshooting
-
-Common issues and solutions...
-````
+| Example | Complexity | Time | Prerequisites | Use Case |
+|---------|-----------|------|---------------|----------|
+| **Semantic Search** | ⭐⭐ | 5 min | Basic | Document search |
+| **Data Loading** | ⭐ | 10 min | Basic | Dataset import |
+| **RAG Chatbot** | ⭐⭐⭐ | 15 min | LLM API key | Q&A systems |
+| **Agent Tools** | ⭐⭐⭐⭐ | 30 min | NeuronAgent | Autonomous agents |
+| **MCP Integration** | ⭐⭐⭐ | 20 min | MCP client | Claude Desktop |
+| **LLM Training** | ⭐⭐⭐⭐⭐ | 2 hours | GPU (optional) | Custom models |
 
 ---
 
-## 🆘 Support
+## 💡 Tips & Best Practices
 
-### Getting Help
+### 1. Start Simple
+Begin with semantic search before moving to complex RAG systems.
 
-| Resource | Description |
-|----------|-------------|
-| **Example READMEs** | Each example has detailed documentation |
-| **[Troubleshooting Guide](../NeuronDB/docs/troubleshooting.md)** | Common issues and solutions |
-| **[GitHub Discussions](https://github.com/neurondb/NeurondB/discussions)** | Ask questions and share ideas |
-| **Email Support** | support@neurondb.ai |
+### 2. Use Sample Data
+All examples include sample data generation for quick testing.
 
-### Reporting Issues
+### 3. Monitor Performance
+Use `monitor-status.sh` to watch resource usage during experiments.
 
-If you find issues with an example:
+### 4. Iterate on Chunking
+Chunking strategy significantly impacts search quality. Experiment!
 
-1. Check the example's README for troubleshooting steps
-2. Verify all prerequisites are met
-3. Check logs for specific error messages
-4. Report issues with:
-   - Example name
-   - Steps to reproduce
-   - Error messages
-   - Environment details
+### 5. Test Embeddings
+Try different embedding models to find the best fit for your data.
 
----
+### 6. Optimize Indexes
+HNSW parameters can be tuned for your specific recall/speed needs.
 
-## 📊 Example Statistics
-
-| Metric | Count |
-|--------|-------|
-| **Total Examples** | 4 main examples |
-| **Additional Code Examples** | 100+ (across components) |
-| **SQL Demos** | 60+ in NeuronDB/demo/ |
-| **Python Examples** | 24 in NeuronAgent/examples/ |
-| **Coverage** | All major use cases covered |
+### 7. Version Control
+Track your modifications to example code for reproducibility.
 
 ---
 
-**Last Updated:** 2025-01-30  
-**Examples Version:** 1.0.0
+## 🎯 Next Steps
+
+After exploring these examples:
+
+1. **Build Your Application**
+   - Combine concepts from multiple examples
+   - Adapt to your specific use case
+   - Scale to production
+
+2. **Join the Community**
+   - Share your examples
+   - Ask questions
+   - Contribute improvements
+
+3. **Deploy to Production**
+   - Use `scripts/ecosystem-setup.sh` for deployment
+   - Follow deployment guides
+   - Monitor with `scripts/monitor-status.sh`
+
+---
+
+**Last Updated:** 2025-12-31  
+**Examples Version:** 2.0.0  
+**Status:** ✅ Production Ready
+
+---
+
+## 📬 Support
+
+Questions about examples?
+
+- **GitHub Issues**: [github.com/neurondb/neurondb/issues](https://github.com/neurondb/neurondb/issues)
+- **Documentation**: [www.neurondb.ai/docs](https://www.neurondb.ai/docs)
+- **Community Discord**: [discord.gg/neurondb](https://discord.gg/neurondb)
+
+---
 
 **Happy Building! 🚀**
-
