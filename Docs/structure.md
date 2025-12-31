@@ -23,6 +23,6 @@ This file explains how docs are organized and how to extend them.
 2. Add the file
 3. Link it from:
    - the relevant section `readme.md`
-   - `Docs/start-here.md` if it’s a core entry point
+   - `DOCUMENTATION.md` if it's a core entry point
 
 

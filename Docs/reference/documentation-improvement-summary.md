@@ -11,10 +11,10 @@ This file summarizes the intent behind the documentation layout in `Docs/`.
 
 ## What changed in this regenerated set
 
-- Recreated a coherent entry point: `Docs/start-here.md`
+- Consolidated documentation entry point: `DOCUMENTATION.md`
 - Established structure contract: `Docs/structure.md`
-- Re-added beginner docs for setup + troubleshooting
-- Re-added reference docs (glossary + summary)
+- Organized getting-started docs for setup + troubleshooting
+- Maintained reference docs (glossary + summary)
 
 ## Recommended next improvements
 

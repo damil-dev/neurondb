@@ -1,32 +1,74 @@
 # Simple Start
 
-Goal: get a working local environment with minimal friction.
+**Goal:** Get a working local environment with minimal friction.
 
 ## Choose your path
 
-- **Docker (recommended for fastest start)**: use root `docker-compose.yml` or `dockers/` compose files.
-- **Native build**: build/install the extension and run Postgres locally.
+**Pick the method that works best for you:**
+
+| Method | Best For | Time | Difficulty |
+|--------|----------|------|------------|
+| **Docker** (recommended) | Fastest start | 5 min | Easy |
+| **Native build** | Custom setup | 30+ min | Advanced |
 
 ## Docker quickstart (typical)
 
-1. Confirm you have Docker + Docker Compose.
-2. From repo root, look for:
-   - `docker-compose.yml`
-   - or `dockers/docker-compose.yml`
-3. Bring the stack up:
-   - `docker compose up -d`
-4. Verify Postgres is reachable and extension is installed.
+**Prerequisites checklist:**
+
+- [ ] Docker 20.10+ installed
+- [ ] Docker Compose 2.0+ installed
+- [ ] 4GB+ RAM available
+
+**Steps:**
+
+1. **From repo root**, run:
+   ```bash
+   docker compose up -d
+   ```
+
+2. **Verify** Postgres is reachable:
+   ```bash
+   docker compose exec neurondb psql -U neurondb -d neurondb -c "SELECT neurondb.version();"
+   ```
+
+**Expected output:** `1.0.0` (or current version)
 
 ## Native quickstart (outline)
 
-1. Build the extension in `NeuronDB/` (see `NeuronDB/INSTALL.md`).
-2. Install it into your Postgres `shared_preload_libraries` / extension directory.
-3. `CREATE EXTENSION neurondb;`
-4. Run a basic query / load sample data from `examples/`.
+<details>
+<summary><strong>Native Installation Steps</strong></summary>
+
+**For advanced users only** - Requires PostgreSQL development headers
+
+1. **Build the extension** in `NeuronDB/` (see [`NeuronDB/INSTALL.md`](../../NeuronDB/INSTALL.md))
+2. **Install** it into your Postgres `shared_preload_libraries` / extension directory
+3. **Create extension:**
+   ```sql
+   CREATE EXTENSION neurondb;
+   ```
+4. **Test** with a basic query or load sample data from [`examples/`](../../examples/)
+
+</details>
 
 ## Next steps
 
-- Read `Docs/getting-started/architecture.md` to understand the moving parts.
-- If something fails, go to `Docs/getting-started/troubleshooting.md`.
+**Continue your journey:**
+
+- [ ] Read [`architecture.md`](architecture.md) to understand the moving parts
+- [ ] Try examples from [`examples/`](../../examples/)
+- [ ] Explore the [complete documentation](../../DOCUMENTATION.md)
+- [ ] If something fails, check [`troubleshooting.md`](troubleshooting.md)
+
+---
+
+<details>
+<summary><strong>Quick Tips</strong></summary>
+
+- **Docker is recommended** for the easiest setup
+- **Read the architecture guide** to understand how components work together
+- **Check troubleshooting** if you encounter issues
+- **Start simple** - get it running first, then explore advanced features
+
+</details>
 
 
