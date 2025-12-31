@@ -1,7 +1,10 @@
 /*-------------------------------------------------------------------------
  *
  * validation.go
- *    Database operations
+ *    Request validation utilities for NeuronAgent API
+ *
+ * Provides validation functions for API requests including body size
+ * limits, UUID validation, and input sanitization.
  *
  * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
  *

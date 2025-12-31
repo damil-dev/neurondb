@@ -1,7 +1,10 @@
 /*-------------------------------------------------------------------------
  *
  * validator.go
- *    Database operations
+ *    Rate limiting and request validation for NeuronAgent
+ *
+ * Provides thread-safe rate limiting with per-key tracking and
+ * automatic reset based on time windows.
  *
  * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
  *

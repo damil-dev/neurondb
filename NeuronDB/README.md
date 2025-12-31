@@ -4,7 +4,7 @@ Vector search, machine learning, and hybrid search directly in PostgreSQL.
 
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/neurondb/NeurondB)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16%2C17%2C18-blue.svg)](https://www.postgresql.org/)
-[![License](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-Proprietary-red.svg)](LICENSE)
 
 ---
 
@@ -163,8 +163,14 @@ We welcome contributions. Please see [CONTRIBUTING.md](CONTRIBUTING.md) for:
 
 ## License
 
-NeuronDB is released under the GNU Affero General Public License v3.0 (AGPL-3.0).
-See [LICENSE](LICENSE) for details.
+NeuronDB is released under a proprietary license.
+See [LICENSE](../LICENSE) for details.
+
+**Summary:**
+- Personal use of binary code only
+- No commercial use permitted
+- No source code modifications or derivatives
+- Contact support@neurondb.ai for commercial licensing
 
 ## Authors
 

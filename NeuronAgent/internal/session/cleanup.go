@@ -1,7 +1,10 @@
 /*-------------------------------------------------------------------------
  *
  * cleanup.go
- *    Database operations
+ *    Session cleanup service for NeuronAgent
+ *
+ * Provides background service for automatically cleaning up expired
+ * sessions based on configurable age and interval settings.
  *
  * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
  *

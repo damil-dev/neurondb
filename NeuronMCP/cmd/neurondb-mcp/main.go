@@ -87,21 +87,21 @@ func main() {
   /* Create and start server */
 	srv, err := server.NewServerWithConfig(cfgPath)
 	if err != nil {
-		os.Stderr.WriteString("Failed to create server: " + err.Error() + "\n")
+		fmt.Fprintf(os.Stderr, "Error: Failed to create NeuronMCP server: %v\n", err)
 		os.Exit(1)
 	}
 
   /* Start server */
 	if err := srv.Start(ctx); err != nil {
 		if err != context.Canceled {
-			os.Stderr.WriteString("Server error: " + err.Error() + "\n")
+			fmt.Fprintf(os.Stderr, "Error: Server startup failed: %v\n", err)
 			os.Exit(1)
 		}
 	}
 
   /* Cleanup */
 	if err := srv.Stop(); err != nil {
-		os.Stderr.WriteString("Error stopping server: " + err.Error() + "\n")
+		fmt.Fprintf(os.Stderr, "Warning: Error occurred during server shutdown: %v\n", err)
 	}
 }
 

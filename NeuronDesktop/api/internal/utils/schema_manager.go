@@ -69,7 +69,7 @@ func (sm *SchemaManager) executeSchema(ctx context.Context, db *sql.DB, schemaSQ
 
 		if err := sm.executeStatement(ctx, db, stmt); err != nil {
 			// Log error but continue - schema might be partially initialized
-			fmt.Printf("Warning: Failed to execute schema statement %d: %v\n", i+1, err)
+			fmt.Fprintf(os.Stderr, "Warning: Failed to execute schema initialization statement %d (schema may be partially initialized): %v\n", i+1, err)
 		}
 	}
 

@@ -1,7 +1,10 @@
 /*-------------------------------------------------------------------------
  *
  * types.go
- *    Database operations
+ *    Type definitions for NeuronDB client package
+ *
+ * Defines data structures, interfaces, and type aliases used throughout
+ * the NeuronDB client package for embeddings, LLM, ML, and vector operations.
  *
  * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
  *

@@ -1,7 +1,10 @@
 /*-------------------------------------------------------------------------
  *
  * cache.go
- *    Database operations
+ *    In-memory session cache for NeuronAgent
+ *
+ * Provides thread-safe in-memory caching of sessions with TTL-based
+ * expiration and automatic cleanup of stale entries.
  *
  * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
  *

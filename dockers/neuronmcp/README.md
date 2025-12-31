@@ -1,7 +1,7 @@
 # NeuronMCP Docker Setup
 
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
-[![License](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](../../LICENSE)
+[![License](https://img.shields.io/badge/License-Proprietary-red.svg)](../../LICENSE)
 [![MCP](https://img.shields.io/badge/MCP-Protocol-blue.svg)](https://modelcontextprotocol.io/)
 
 Docker container for NeuronMCP service. Connects to external NeuronDB PostgreSQL instance. Implements Model Context Protocol over stdio for MCP-compatible clients.

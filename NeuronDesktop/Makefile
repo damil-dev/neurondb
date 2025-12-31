@@ -43,17 +43,17 @@ deps-frontend: ## Install frontend dependencies (npm)
 
 test: test-api test-frontend ## Run all tests
 
-test-api: build-api ## Run API tests
-	@echo "$(CYAN)Running API tests...$(NC)"
-	@cd api && go test ./... || echo "$(YELLOW)⚠ Some tests may have failed$(NC)"
+test-api: build-api ## Run API tests with race detector
+	@echo "$(CYAN)Running API tests with race detector...$(NC)"
+	@cd api && go test -race ./... || echo "$(YELLOW)⚠ Some tests may have failed$(NC)"
 
-test-api-unit: ## Run API unit tests only
-	@echo "$(CYAN)Running API unit tests...$(NC)"
-	@cd api && go test -v ./internal/handlers/... ./internal/db/...
+test-api-unit: ## Run API unit tests only (with race detector)
+	@echo "$(CYAN)Running API unit tests with race detector...$(NC)"
+	@cd api && go test -v -race ./internal/handlers/... ./internal/db/...
 
-test-api-integration: ## Run API integration tests only
-	@echo "$(CYAN)Running API integration tests...$(NC)"
-	@cd api && go test -v ./internal/mcp/... ./internal/neurondb/... ./internal/agent/...
+test-api-integration: ## Run API integration tests only (with race detector)
+	@echo "$(CYAN)Running API integration tests with race detector...$(NC)"
+	@cd api && go test -v -race ./internal/mcp/... ./internal/neurondb/... ./internal/agent/...
 
 test-api-e2e: ## Run end-to-end tests
 	@echo "$(CYAN)Running E2E tests...$(NC)"
@@ -63,9 +63,9 @@ test-api-all: ## Run all API tests with coverage
 	@echo "$(CYAN)Running comprehensive test suite...$(NC)"
 	@./tests/run_all_tests.sh
 
-test-api-coverage: ## Generate test coverage report
-	@echo "$(CYAN)Generating test coverage...$(NC)"
-	@cd api && go test -coverprofile=coverage.out ./...
+test-api-coverage: ## Generate test coverage report (with race detector)
+	@echo "$(CYAN)Generating test coverage with race detector...$(NC)"
+	@cd api && go test -race -coverprofile=coverage.out ./...
 	@cd api && go tool cover -html=coverage.out -o coverage.html
 	@echo "$(GREEN)✓ Coverage report generated: api/coverage.html$(NC)"
 

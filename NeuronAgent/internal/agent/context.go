@@ -1,7 +1,10 @@
 /*-------------------------------------------------------------------------
  *
  * context.go
- *    Database operations
+ *    Context loading and management for NeuronAgent
+ *
+ * Provides context loading functionality that combines message history
+ * and memory chunks to build comprehensive context for agent execution.
  *
  * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
  *

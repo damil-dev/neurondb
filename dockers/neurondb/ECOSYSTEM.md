@@ -1,7 +1,7 @@
 # NeuronDB Ecosystem Docker Setup
 
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
-[![License](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](../../LICENSE)
+[![License](https://img.shields.io/badge/License-Proprietary-red.svg)](../../LICENSE)
 
 Complete Docker deployment guide for running NeuronDB, NeuronAgent, and NeuronMCP as separate Docker services. Each service connects to NeuronDB PostgreSQL independently and can run in any order.
 

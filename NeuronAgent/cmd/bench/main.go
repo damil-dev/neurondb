@@ -56,7 +56,7 @@ func main() {
 		var err error
 		cfg, err = config.LoadConfig(configPath)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to load config: %v, using defaults\n", err)
+			fmt.Fprintf(os.Stderr, "Warning: Failed to load configuration from '%s': %v. Using default configuration.\n", configPath, err)
 		}
 	} else {
 		config.LoadFromEnv(cfg)
@@ -73,7 +73,7 @@ func main() {
 		ConnMaxIdleTime: 10 * time.Minute,
 	})
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to connect to database: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error: Failed to connect to database at %s:%d: %v\n", cfg.Database.Host, cfg.Database.Port, err)
 		os.Exit(1)
 	}
 	defer database.Close()
@@ -93,23 +93,23 @@ func main() {
 		TotalTasks:     limit,
 	}
 	if err := queries.CreateEvalRun(context.Background(), evalRun); err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to create eval run: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error: Failed to create evaluation run in database: %v\n", err)
 		os.Exit(1)
 	}
 
 	/* Load eval tasks */
 	tasks, err := queries.ListEvalTasks(context.Background(), nil, limit, 0)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to list eval tasks: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error: Failed to load evaluation tasks from database: %v\n", err)
 		os.Exit(1)
 	}
 
 	if len(tasks) == 0 {
-		fmt.Fprintf(os.Stderr, "No eval tasks found\n")
+		fmt.Fprintf(os.Stderr, "Error: No evaluation tasks found in database for dataset version '%s'\n", datasetVersion)
 		os.Exit(1)
 	}
 
-	fmt.Printf("Running evaluation: %d tasks\n", len(tasks))
+	fmt.Printf("Starting evaluation: %d task(s) to process\n", len(tasks))
 
 	/* Run evaluation */
 	passed := 0
@@ -120,14 +120,14 @@ func main() {
 	for _, task := range tasks {
 		result, err := evaluator.EvaluateTask(context.Background(), &task, agentID)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to evaluate task %s: %v\n", task.ID.String(), err)
+			fmt.Fprintf(os.Stderr, "Error: Failed to evaluate task %s: %v\n", task.ID.String(), err)
 			failed++
 			continue
 		}
 
 		result.EvalRunID = evalRun.ID
 		if err := queries.CreateEvalTaskResult(context.Background(), result); err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to save task result: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Warning: Failed to save evaluation result for task %s: %v\n", task.ID.String(), err)
 		}
 
 		if result.Passed {
@@ -162,7 +162,7 @@ func main() {
 	evalRun.CompletedAt = &now
 
 	if err := queries.UpdateEvalRun(context.Background(), evalRun); err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to update eval run: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Warning: Failed to update evaluation run with final results: %v\n", err)
 	}
 
 	/* Output results */
@@ -178,7 +178,7 @@ func main() {
 
 	outputJSON, err := json.MarshalIndent(output, "", "  ")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to marshal output: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error: Failed to serialize evaluation results to JSON: %v\n", err)
 		os.Exit(1)
 	}
 

@@ -28,9 +28,9 @@ export class ConfigManager {
 		// Validate configuration
 		const validation = ConfigValidator.validate(this.config);
 		if (!validation.valid) {
-			console.error("Configuration validation errors:");
+			console.error("Configuration validation failed with the following errors:");
 			validation.errors.forEach((error) => console.error(`  - ${error}`));
-			throw new Error("Invalid configuration");
+			throw new Error(`Invalid configuration: ${validation.errors.join("; ")}`);
 		}
 
 		return this.config;

@@ -1,7 +1,10 @@
 /*-------------------------------------------------------------------------
  *
  * request_id.go
- *    Database operations
+ *    Request ID middleware for NeuronAgent API
+ *
+ * Provides request ID generation and context management for tracking
+ * requests across the API with correlation support.
  *
  * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
  *

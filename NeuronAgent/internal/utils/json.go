@@ -1,7 +1,10 @@
 /*-------------------------------------------------------------------------
  *
  * json.go
- *    Database operations
+ *    JSON marshaling and unmarshaling utilities for NeuronAgent
+ *
+ * Provides safe JSON encoding and decoding functions with error handling
+ * and type conversion utilities.
  *
  * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
  *

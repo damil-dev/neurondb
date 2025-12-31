@@ -1,7 +1,10 @@
 /*-------------------------------------------------------------------------
  *
  * client.go
- *    Database operations
+ *    NeuronDB client package for NeuronAgent
+ *
+ * Provides a unified client interface for accessing NeuronDB functionality
+ * including embeddings, LLM, ML, vector operations, RAG, analytics, and more.
  *
  * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
  *

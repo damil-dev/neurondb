@@ -7,6 +7,11 @@ run:
 	go run ./cmd/server
 
 test:
+	@echo "Running tests with race detector..."
+	go test -race ./...
+
+test-fast:
+	@echo "Running tests (fast mode, no race detector)..."
 	go test ./...
 
 migrate:

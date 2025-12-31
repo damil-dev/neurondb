@@ -1,7 +1,10 @@
 /*-------------------------------------------------------------------------
  *
  * main.go
- *    Database operations
+ *    API key generation CLI tool for NeuronAgent
+ *
+ * Command-line utility for generating API keys with configurable
+ * rate limits and role assignments.
  *
  * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
  *
@@ -66,7 +69,7 @@ func main() {
 		MaxIdleConns: 2,
 	})
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to connect to database: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error: Failed to connect to database at %s:%d: %v\n", *dbHost, *dbPort, err)
 		os.Exit(1)
 	}
 	defer database.Close()
@@ -85,14 +88,14 @@ func main() {
 	}
 	key, apiKey, err := keyManager.GenerateAPIKey(ctx, orgIDPtr, userIDPtr, *rateLimit, roleList)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to generate API key: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error: Failed to generate API key: %v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Printf("API Key generated successfully!\n")
+	fmt.Println("API key generated successfully")
 	fmt.Printf("Key: %s\n", key)
 	fmt.Printf("Key ID: %s\n", apiKey.ID)
 	fmt.Printf("Prefix: %s\n", apiKey.KeyPrefix)
-	fmt.Printf("\n⚠️  Save this key securely - it cannot be retrieved again!\n")
+	fmt.Fprintf(os.Stderr, "\nWarning: Save this key securely - it cannot be retrieved again after generation.\n")
 }
 

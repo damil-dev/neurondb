@@ -1,7 +1,10 @@
 /*-------------------------------------------------------------------------
  *
  * handlers.go
- *    Database operations
+ *    MCP request handlers for NeuronMCP server
+ *
+ * Provides handlers for MCP protocol requests including tools/list,
+ * tools/call, resources/list, and resources/read operations.
  *
  * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
  *

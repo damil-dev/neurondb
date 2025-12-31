@@ -1,7 +1,11 @@
 /*-------------------------------------------------------------------------
  *
  * client.go
- *    Database operations
+ *    MCP client implementation for NeuronMCP
+ *
+ * Provides client functionality for connecting to and communicating with
+ * MCP (Model Context Protocol) servers, including tool execution and
+ * resource management.
  *
  * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
  *
@@ -81,7 +85,7 @@ func (c *MCPClient) Connect() error {
 
   /* Start server process */
 	if c.verbose {
-		fmt.Printf("Starting MCP server: %s\n", c.config.Command)
+		fmt.Printf("Starting MCP server process: %s\n", c.config.Command)
 	}
 
 	if err := c.transport.Start(); err != nil {
@@ -123,7 +127,7 @@ func (c *MCPClient) initialize() error {
 	}
 
 	if c.verbose {
-		fmt.Println("MCP connection initialized")
+		fmt.Println("MCP connection initialized successfully")
 	}
 
   /* Send initialized notification */
@@ -136,7 +140,7 @@ func (c *MCPClient) initialize() error {
 	if err := c.transport.SendNotification(notification); err != nil {
    /* Notification errors are not fatal */
 		if c.verbose {
-			fmt.Printf("Warning: failed to send initialized notification: %v\n", err)
+			fmt.Printf("Warning: Failed to send initialized notification to MCP server: %v\n", err)
 		}
 	}
 

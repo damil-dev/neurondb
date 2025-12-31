@@ -1,7 +1,10 @@
 /*-------------------------------------------------------------------------
  *
  * streaming.go
- *    Database operations
+ *    Server-Sent Events (SSE) streaming for NeuronAgent API
+ *
+ * Provides HTTP streaming functionality for real-time agent responses
+ * using Server-Sent Events protocol.
  *
  * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
  *

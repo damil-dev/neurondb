@@ -1,7 +1,10 @@
 /*-------------------------------------------------------------------------
  *
  * middleware.go
- *    Database operations
+ *    HTTP middleware for NeuronAgent API
+ *
+ * Provides authentication, CORS, logging, and request ID middleware
+ * for the NeuronAgent HTTP API server.
  *
  * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
  *
@@ -60,22 +63,27 @@ func AuthMiddleware(keyManager *auth.APIKeyManager, principalManager *auth.Princ
 			if len(keyPrefix) > 8 {
 				keyPrefix = keyPrefix[:8]
 			}
-			fmt.Printf("[MIDDLEWARE] Extracted key: prefix=%s, len=%d\n", keyPrefix, len(key))
+			requestID := GetRequestID(r.Context())
+			ctx := metrics.WithLogContext(r.Context(), requestID, "", "", "", "")
+			metrics.DebugWithContext(ctx, "API key extracted from authorization header", map[string]interface{}{
+				"key_prefix": keyPrefix,
+				"key_length":  len(key),
+			})
 
     /* Validate key */
 			apiKey, err := keyManager.ValidateAPIKey(r.Context(), key)
 			if err != nil {
-				requestID := GetRequestID(r.Context())
-     /* Log the actual error for debugging */
-				prefix := key
-				if len(prefix) > 8 {
-					prefix = prefix[:8]
-				}
-				fmt.Printf("[MIDDLEWARE] Authentication failed: %v, prefix=%s\n", err, prefix)
+				metrics.WarnWithContext(ctx, "API key validation failed", map[string]interface{}{
+					"key_prefix": keyPrefix,
+					"error":      err.Error(),
+				})
 				respondError(w, WrapError(ErrUnauthorized, requestID))
 				return
 			}
-			fmt.Printf("[MIDDLEWARE] Authentication succeeded: prefix=%s\n", apiKey.KeyPrefix)
+			metrics.DebugWithContext(ctx, "API key validation succeeded", map[string]interface{}{
+				"key_prefix": apiKey.KeyPrefix,
+				"key_id":     apiKey.ID.String(),
+			})
 
     /* Check rate limit */
 			if !rateLimiter.CheckLimit(apiKey.ID.String(), apiKey.RateLimitPerMin) {
@@ -87,9 +95,11 @@ func AuthMiddleware(keyManager *auth.APIKeyManager, principalManager *auth.Princ
     /* Resolve principal */
 			principal, err := principalManager.ResolvePrincipalFromAPIKey(r.Context(), apiKey)
 			if err != nil {
-				fmt.Printf("[MIDDLEWARE] Principal resolution failed: %v\n", err)
+				metrics.WarnWithContext(ctx, "Principal resolution failed, continuing with request", map[string]interface{}{
+					"key_id": apiKey.ID.String(),
+					"error":  err.Error(),
+				})
 				/* Continue anyway - principal resolution failure should not block requests */
-				/* In production, you might want to log this but still allow the request */
 			}
 
     /* Add API key and principal to context */
@@ -100,6 +110,31 @@ func AuthMiddleware(keyManager *auth.APIKeyManager, principalManager *auth.Princ
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
+}
+
+/* SecurityHeadersMiddleware adds security headers to all HTTP responses */
+func SecurityHeadersMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Prevent MIME type sniffing
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		// Enable XSS protection
+		w.Header().Set("X-XSS-Protection", "1; mode=block")
+		// Prevent clickjacking
+		w.Header().Set("X-Frame-Options", "DENY")
+		// Enforce HTTPS in production (Strict-Transport-Security)
+		// Note: Only set if request is already HTTPS to avoid issues
+		if r.TLS != nil {
+			w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+		}
+		// Content Security Policy - restrictive by default
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'")
+		// Referrer Policy
+		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		// Permissions Policy (formerly Feature-Policy)
+		w.Header().Set("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
+
+		next.ServeHTTP(w, r)
+	})
 }
 
 /* CORSMiddleware adds CORS headers */

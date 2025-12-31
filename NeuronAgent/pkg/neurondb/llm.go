@@ -1,7 +1,10 @@
 /*-------------------------------------------------------------------------
  *
  * llm.go
- *    Database operations
+ *    LLM client for NeuronDB integration
+ *
+ * Provides client functionality for Large Language Model operations through
+ * NeuronDB, including text generation, streaming, and configuration management.
  *
  * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
  *

@@ -1,7 +1,10 @@
 /*-------------------------------------------------------------------------
  *
  * embedding.go
- *    Database operations
+ *    Embedding client for NeuronDB integration
+ *
+ * Provides client functionality for generating text embeddings through
+ * NeuronDB using various embedding models.
  *
  * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
  *

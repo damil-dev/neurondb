@@ -31,6 +31,9 @@ services:
       - com.neurondb.variant=cpu
       - com.neurondb.version=${VERSION:-latest}
     environment:
+      # SECURITY WARNING: Default password 'neurondb' is for development only!
+      # For production, ALWAYS set POSTGRES_PASSWORD in .env file with a strong password.
+      # Generate secure password: openssl rand -base64 32
       POSTGRES_USER: ${POSTGRES_USER:-neurondb}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-neurondb}
       POSTGRES_DB: ${POSTGRES_DB:-neurondb}
@@ -90,6 +93,9 @@ services:
       - com.neurondb.variant=cuda
       - com.neurondb.version=${VERSION:-latest}
     environment:
+      # SECURITY WARNING: Default password 'neurondb' is for development only!
+      # For production, ALWAYS set POSTGRES_PASSWORD in .env file with a strong password.
+      # Generate secure password: openssl rand -base64 32
       POSTGRES_USER: ${POSTGRES_USER:-neurondb}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-neurondb}
       POSTGRES_DB: ${POSTGRES_DB:-neurondb}
@@ -152,6 +158,9 @@ services:
       - com.neurondb.variant=rocm
       - com.neurondb.version=${VERSION:-latest}
     environment:
+      # SECURITY WARNING: Default password 'neurondb' is for development only!
+      # For production, ALWAYS set POSTGRES_PASSWORD in .env file with a strong password.
+      # Generate secure password: openssl rand -base64 32
       POSTGRES_USER: ${POSTGRES_USER:-neurondb}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-neurondb}
       POSTGRES_DB: ${POSTGRES_DB:-neurondb}
@@ -212,6 +221,9 @@ services:
       - com.neurondb.variant=metal
       - com.neurondb.version=${VERSION:-latest}
     environment:
+      # SECURITY WARNING: Default password 'neurondb' is for development only!
+      # For production, ALWAYS set POSTGRES_PASSWORD in .env file with a strong password.
+      # Generate secure password: openssl rand -base64 32
       POSTGRES_USER: ${POSTGRES_USER:-neurondb}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-neurondb}
       POSTGRES_DB: ${POSTGRES_DB:-neurondb}
@@ -772,6 +784,7 @@ services:
       PGHOST: neurondb
       PGPORT: 5432
       PGUSER: ${POSTGRES_USER:-neurondb}
+      # SECURITY: PGPASSWORD must match POSTGRES_PASSWORD above
       PGPASSWORD: ${POSTGRES_PASSWORD:-neurondb}
       PGDATABASE: postgres
     command:
@@ -816,6 +829,7 @@ services:
       DB_HOST: neurondb
       DB_PORT: 5432
       DB_USER: ${POSTGRES_USER:-neurondb}
+      # SECURITY: DB_PASSWORD must match POSTGRES_PASSWORD above
       DB_PASSWORD: ${POSTGRES_PASSWORD:-neurondb}
       DB_NAME: neurondesk
       SERVER_HOST: 0.0.0.0

@@ -17,6 +17,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -78,11 +79,20 @@ func (t *SQLTool) Execute(ctx context.Context, tool *db.Tool, args map[string]in
 			tool.Name, queryType, queryPreview, len(query))
 	}
 
-  /* Check for dangerous keywords */
-	dangerous := []string{"DROP", "DELETE", "UPDATE", "INSERT", "ALTER", "CREATE", "TRUNCATE"}
+  /* Check for dangerous keywords - comprehensive list to prevent bypasses */
+	// Include variations and subqueries that could be used to bypass restrictions
+	dangerous := []string{
+		"DROP", "DELETE", "UPDATE", "INSERT", "ALTER", "CREATE", "TRUNCATE",
+		"INTO", "RETURNING", "EXEC", "EXECUTE", "CALL", "COPY", "GRANT", "REVOKE",
+		"BEGIN", "COMMIT", "ROLLBACK", "SAVEPOINT", "RELEASE",
+	}
 	var foundKeywords []string
 	for _, keyword := range dangerous {
-		if strings.Contains(queryUpper, keyword) {
+		// Use word boundary matching to avoid false positives in strings/comments
+		// This is more accurate than simple Contains() but still not perfect
+		// For production, a proper SQL parser would be better
+		pattern := "\\b" + keyword + "\\b"
+		if matched, _ := regexp.MatchString(pattern, queryUpper); matched {
 			foundKeywords = append(foundKeywords, keyword)
 		}
 	}

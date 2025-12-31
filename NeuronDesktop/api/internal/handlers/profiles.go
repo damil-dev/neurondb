@@ -76,21 +76,21 @@ func (h *ProfileHandlers) ListProfiles(w http.ResponseWriter, r *http.Request) {
 		// Initialize database schema for the default profile's database
 		if err := utils.InitSchema(r.Context(), neurondbDSN); err != nil {
 			// Log error but don't fail - schema might already be initialized
-			fmt.Printf("Warning: Failed to initialize schema for default profile: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Warning: Failed to initialize database schema for default profile (schema may already exist): %v\n", err)
 		}
 
 		if err := h.queries.CreateProfile(r.Context(), defaultProfile); err != nil {
 			// Log error but don't fail the request
-			fmt.Printf("Failed to create default profile: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error: Failed to create default profile during initialization: %v\n", err)
 		} else {
 			// Set as default
 			if err := h.queries.SetDefaultProfile(r.Context(), defaultProfile.ID); err != nil {
-				fmt.Printf("Failed to set default profile: %v\n", err)
+				fmt.Fprintf(os.Stderr, "Error: Failed to set default profile after creation: %v\n", err)
 			}
 			// Automatically create default model configurations
 			if err := utils.CreateDefaultModelsForProfile(r.Context(), h.queries, defaultProfile.ID); err != nil {
 				// Log error but don't fail - user can add models manually
-				fmt.Printf("Warning: Failed to create default models for profile %s: %v\n", defaultProfile.ID, err)
+				fmt.Fprintf(os.Stderr, "Warning: Failed to create default model configurations for profile %s (models can be added manually): %v\n", defaultProfile.ID, err)
 			}
 			// Reload profiles
 			profiles, _ = h.queries.ListProfiles(r.Context(), userID)
