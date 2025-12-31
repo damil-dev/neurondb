@@ -14,6 +14,7 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -23,15 +24,23 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/neurondb/NeuronAgent/internal/agent"
 	"github.com/neurondb/NeuronAgent/internal/db"
+	"github.com/neurondb/NeuronAgent/internal/validation"
 )
 
 /* CloneAgent clones an agent */
 func (h *Handlers) CloneAgent(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
+	requestID := GetRequestID(r.Context())
+	
+	// Validate UUID
+	if err := validation.ValidateUUIDRequired(vars["id"], "agent_id"); err != nil {
+		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid agent ID", err, requestID, r.URL.Path, r.Method, "agent", "", nil))
+		return
+	}
+	
 	id, err := uuid.Parse(vars["id"])
 	if err != nil {
-		requestID := GetRequestID(r.Context())
-		respondError(w, WrapError(ErrBadRequest, requestID))
+		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid agent ID format", err, requestID, r.URL.Path, r.Method, "agent", "", nil))
 		return
 	}
 
@@ -66,28 +75,52 @@ func (h *Handlers) CloneAgent(w http.ResponseWriter, r *http.Request) {
 /* GeneratePlan generates a plan for an agent */
 func (h *Handlers) GeneratePlan(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
+	requestID := GetRequestID(r.Context())
+	
+	// Validate UUID
+	if err := validation.ValidateUUIDRequired(vars["id"], "agent_id"); err != nil {
+		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid agent ID", err, requestID, r.URL.Path, r.Method, "agent", "", nil))
+		return
+	}
+	
 	id, err := uuid.Parse(vars["id"])
 	if err != nil {
-		requestID := GetRequestID(r.Context())
-		respondError(w, WrapError(ErrBadRequest, requestID))
+		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid agent ID format", err, requestID, r.URL.Path, r.Method, "agent", "", nil))
 		return
 	}
 
 	/* Get agent */
 	agent, err := h.queries.GetAgentByID(r.Context(), id)
 	if err != nil {
-		requestID := GetRequestID(r.Context())
 		respondError(w, NewErrorWithContext(http.StatusNotFound, "agent not found", err, requestID, r.URL.Path, r.Method, "agent", id.String(), nil))
 		return
 	}
+
+	// Validate request body size (max 1MB)
+	const maxBodySize = 1024 * 1024
+	bodyBytes, err := validation.ReadAndValidateBody(r, maxBodySize)
+	if err != nil {
+		respondError(w, NewErrorWithContext(http.StatusBadRequest, "request body validation failed", err, requestID, r.URL.Path, r.Method, "agent", id.String(), nil))
+		return
+	}
+	r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 
 	var req struct {
 		Task string `json:"task"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		requestID := GetRequestID(r.Context())
 		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid request body", err, requestID, r.URL.Path, r.Method, "agent", id.String(), nil))
+		return
+	}
+
+	// Validate task
+	if err := validation.ValidateRequired(req.Task, "task"); err != nil {
+		respondError(w, NewErrorWithContext(http.StatusBadRequest, "task validation failed", err, requestID, r.URL.Path, r.Method, "agent", id.String(), nil))
+		return
+	}
+	if err := validation.ValidateMaxLength(req.Task, "task", 10000); err != nil {
+		respondError(w, NewErrorWithContext(http.StatusBadRequest, "task too long", err, requestID, r.URL.Path, r.Method, "agent", id.String(), nil))
 		return
 	}
 

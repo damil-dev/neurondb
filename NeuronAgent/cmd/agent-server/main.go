@@ -125,7 +125,10 @@ func main() {
 		ConnMaxIdleTime: connMaxIdleTime,
 	})
 	if err != nil {
-		panic(fmt.Sprintf("Failed to connect to database: %v", err))
+		fmt.Fprintf(os.Stderr, "FATAL: Failed to connect to database: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Connection string: host=%s port=%d user=%s dbname=%s\n", 
+			cfg.Database.Host, cfg.Database.Port, cfg.Database.User, cfg.Database.Database)
+		os.Exit(1)
 	}
 	defer database.Close()
 
@@ -275,7 +278,8 @@ func main() {
 	go func() {
 		fmt.Printf("Server starting on %s\n", addr)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			panic(fmt.Sprintf("Server failed: %v", err))
+			fmt.Fprintf(os.Stderr, "FATAL: Server failed to start on %s: %v\n", addr, err)
+			os.Exit(1)
 		}
 	}()
 

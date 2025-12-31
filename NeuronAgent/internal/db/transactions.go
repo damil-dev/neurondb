@@ -100,12 +100,22 @@ func (d *DB) WithTransaction(ctx context.Context, fn func(*Transaction) error) e
 
 	defer func() {
 		if p := recover(); p != nil {
-			tx.Rollback()
-			panic(p)
+			rollbackErr := tx.Rollback()
+			if rollbackErr != nil {
+				err = fmt.Errorf("transaction panic occurred (%v) and rollback failed: %w", p, rollbackErr)
+			} else {
+				err = fmt.Errorf("transaction panic occurred: %v", p)
+			}
 		} else if err != nil {
-			tx.Rollback()
+			rollbackErr := tx.Rollback()
+			if rollbackErr != nil {
+				err = fmt.Errorf("transaction error (%w) and rollback failed: %w", err, rollbackErr)
+			}
 		} else {
-			err = tx.Commit()
+			commitErr := tx.Commit()
+			if commitErr != nil {
+				err = fmt.Errorf("transaction commit failed: %w", commitErr)
+			}
 		}
 	}()
 
