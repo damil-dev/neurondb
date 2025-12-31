@@ -99,7 +99,7 @@ func main() {
 		var err error
 		cfg, err = config.LoadConfig(cfgPath)
 		if err != nil {
-			fmt.Printf("Failed to load config: %v, using defaults\n", err)
+			fmt.Fprintf(os.Stderr, "Warning: Failed to load configuration from file '%s': %v. Using default configuration.\n", cfgPath, err)
 		}
 	} else {
    /* Load from environment variables if no config file */
@@ -136,7 +136,9 @@ func main() {
 	migrationRunner, err := db.NewMigrationRunner(database.DB, "./migrations")
 	if err == nil {
 		if err := migrationRunner.Run(context.Background()); err != nil {
-			fmt.Printf("Warning: Migration failed: %v\n", err)
+			metrics.WarnWithContext(context.Background(), "Database migration failed", map[string]interface{}{
+				"error": err.Error(),
+			})
 		}
 	}
 
@@ -168,6 +170,7 @@ func main() {
   /* Setup router */
 	router := mux.NewRouter()
 	router.Use(api.RequestIDMiddleware)
+	router.Use(api.SecurityHeadersMiddleware) /* Security headers must be set early */
 	router.Use(api.CORSMiddleware)
 	router.Use(api.LoggingMiddleware)
 	router.Use(api.AuthMiddleware(keyManager, principalManager, rateLimiter))
@@ -276,9 +279,15 @@ func main() {
 
   /* Graceful shutdown */
 	go func() {
-		fmt.Printf("Server starting on %s\n", addr)
+		metrics.InfoWithContext(context.Background(), "NeuronAgent server starting", map[string]interface{}{
+			"address": addr,
+			"host":    cfg.Server.Host,
+			"port":    cfg.Server.Port,
+		})
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			fmt.Fprintf(os.Stderr, "FATAL: Server failed to start on %s: %v\n", addr, err)
+			metrics.ErrorWithContext(context.Background(), "Server failed to start", err, map[string]interface{}{
+				"address": addr,
+			})
 			os.Exit(1)
 		}
 	}()
@@ -288,15 +297,15 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	fmt.Println("Shutting down server...")
+	metrics.InfoWithContext(context.Background(), "Shutdown signal received, gracefully shutting down server", nil)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	if err := srv.Shutdown(ctx); err != nil {
-		fmt.Printf("Server forced to shutdown: %v\n", err)
+		metrics.ErrorWithContext(context.Background(), "Server shutdown timeout exceeded, forcing shutdown", err, nil)
 	}
 
-	fmt.Println("Server exited")
+	metrics.InfoWithContext(context.Background(), "Server shutdown complete", nil)
 }
 

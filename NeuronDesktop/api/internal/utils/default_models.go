@@ -3,6 +3,7 @@ package utils
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/google/uuid"
@@ -144,7 +145,7 @@ func CreateDefaultModelsForProfile(ctx context.Context, queries *db.Queries, pro
 	if defaultModelID != "" {
 		if err := queries.SetDefaultModelConfig(ctx, profileID, defaultModelID); err != nil {
 			// Log error but don't fail - models are created
-			fmt.Printf("Warning: Failed to set default model config: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Warning: Failed to set default model configuration for profile %s (models created successfully): %v\n", profileID, err)
 		}
 	}
 

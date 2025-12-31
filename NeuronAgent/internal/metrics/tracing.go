@@ -1,7 +1,10 @@
 /*-------------------------------------------------------------------------
  *
  * tracing.go
- *    Database operations
+ *    Distributed tracing support for NeuronAgent
+ *
+ * Provides trace and span management for tracking request flows across
+ * services with trace ID generation and span context propagation.
  *
  * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
  *

@@ -1,7 +1,10 @@
 /*-------------------------------------------------------------------------
  *
  * queue.go
- *    Database operations
+ *    Job queue management for NeuronAgent
+ *
+ * Provides job queue operations for enqueueing, dequeuing, and
+ * managing background job execution with status tracking.
  *
  * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
  *

@@ -2,7 +2,7 @@
 
 [![Go](https://img.shields.io/badge/Go-1.23+-00ADD8.svg)](https://golang.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16+-blue.svg)](https://www.postgresql.org/)
-[![License](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](../LICENSE)
+[![License](https://img.shields.io/badge/License-Proprietary-red.svg)](../LICENSE)
 [![MCP](https://img.shields.io/badge/MCP-Protocol-blue.svg)](https://modelcontextprotocol.io/)
 
 Model Context Protocol server for NeuronDB PostgreSQL extension, implemented in Go. Enables MCP-compatible clients to access NeuronDB vector search, ML algorithms, and RAG capabilities.

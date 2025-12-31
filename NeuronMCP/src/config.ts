@@ -120,10 +120,12 @@ export class ConfigManager {
 					const content = readFileSync(path, "utf-8");
 					this.config = JSON.parse(content);
 					this.configPath = path;
-					console.error(`Loaded config from: ${path}`);
+					// Configuration loaded successfully (using console.log for informational message)
+					console.log(`Configuration loaded successfully from: ${path}`);
 					break;
 				} catch (error) {
-					console.error(`Failed to load config from ${path}:`, error);
+					const errorMessage = error instanceof Error ? error.message : String(error);
+					console.error(`Failed to load configuration file from path "${path}": ${errorMessage}`, error);
 				}
 			}
 		}

@@ -1,7 +1,10 @@
 /*-------------------------------------------------------------------------
  *
  * roles.go
- *    Database operations
+ *    Role-based access control for NeuronAgent
+ *
+ * Provides role management and authorization checks for API keys
+ * with support for admin, user, and read-only roles.
  *
  * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
  *

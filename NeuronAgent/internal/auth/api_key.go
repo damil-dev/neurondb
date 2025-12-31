@@ -66,22 +66,36 @@ func (m *APIKeyManager) GenerateAPIKey(ctx context.Context, organizationID, user
 /* ValidateAPIKey validates an API key and returns the key record */
 func (m *APIKeyManager) ValidateAPIKey(ctx context.Context, key string) (*db.APIKey, error) {
 	prefix := GetKeyPrefix(key)
-	fmt.Printf("[AUTH] ValidateAPIKey: prefix=%s, key_len=%d\n", prefix, len(key))
+	metrics.DebugWithContext(ctx, "Validating API key", map[string]interface{}{
+		"key_prefix": prefix,
+		"key_length":  len(key),
+	})
 
   /* Find key by prefix */
 	apiKey, err := m.queries.GetAPIKeyByPrefix(ctx, prefix)
 	if err != nil {
-		fmt.Printf("[AUTH] GetAPIKeyByPrefix failed: prefix=%s, error=%v\n", prefix, err)
+		metrics.WarnWithContext(ctx, "API key lookup failed", map[string]interface{}{
+			"key_prefix": prefix,
+			"error":      err.Error(),
+		})
 		return nil, fmt.Errorf("API key lookup failed: prefix=%s, error=%w", prefix, err)
 	}
-	fmt.Printf("[AUTH] GetAPIKeyByPrefix succeeded: prefix=%s, hash=%s\n", apiKey.KeyPrefix, apiKey.KeyHash[:30])
+	metrics.DebugWithContext(ctx, "API key found in database", map[string]interface{}{
+		"key_prefix": apiKey.KeyPrefix,
+		"key_id":     apiKey.ID.String(),
+	})
 
   /* Verify key */
 	if !VerifyAPIKey(key, apiKey.KeyHash) {
-		fmt.Printf("[AUTH] Key verification failed: prefix=%s\n", prefix)
+		metrics.WarnWithContext(ctx, "API key verification failed", map[string]interface{}{
+			"key_prefix": prefix,
+		})
 		return nil, fmt.Errorf("invalid API key: key verification failed")
 	}
-	fmt.Printf("[AUTH] Key verification succeeded: prefix=%s\n", prefix)
+	metrics.DebugWithContext(ctx, "API key verification succeeded", map[string]interface{}{
+		"key_prefix": prefix,
+		"key_id":     apiKey.ID.String(),
+	})
 
   /* Update last used */
 	_ = m.queries.UpdateAPIKeyLastUsed(ctx, apiKey.ID)

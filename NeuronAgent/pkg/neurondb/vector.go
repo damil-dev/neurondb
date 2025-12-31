@@ -1,7 +1,10 @@
 /*-------------------------------------------------------------------------
  *
  * vector.go
- *    Database operations
+ *    Vector operations and distance calculations
+ *
+ * Provides vector distance calculation functions including cosine similarity,
+ * L2 (Euclidean) distance, and inner product for vector comparison operations.
  *
  * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
  *

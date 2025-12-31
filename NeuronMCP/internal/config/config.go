@@ -56,11 +56,11 @@ func (m *ConfigManager) Load(configPath string) (*ServerConfig, error) {
 	validator := NewConfigValidator()
 	valid, errors := validator.Validate(m.config)
 	if !valid {
-		fmt.Fprintf(os.Stderr, "Configuration validation errors:\n")
+		fmt.Fprintf(os.Stderr, "Configuration validation failed with the following errors:\n")
 		for _, err := range errors {
 			fmt.Fprintf(os.Stderr, "  - %s\n", err)
 		}
-		return nil, fmt.Errorf("invalid configuration")
+		return nil, fmt.Errorf("invalid configuration: %d validation error(s)", len(errors))
 	}
 
 	return m.config, nil

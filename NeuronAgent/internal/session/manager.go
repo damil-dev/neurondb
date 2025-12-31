@@ -1,7 +1,10 @@
 /*-------------------------------------------------------------------------
  *
  * manager.go
- *    Database operations
+ *    Session management for NeuronAgent
+ *
+ * Provides session lifecycle management including creation, retrieval,
+ * and caching of agent conversation sessions.
  *
  * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
  *

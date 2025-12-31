@@ -1,7 +1,10 @@
 /*-------------------------------------------------------------------------
  *
  * errors.go
- *    Database operations
+ *    Error handling utilities for NeuronAgent
+ *
+ * Provides error sanitization and formatting utilities to prevent sensitive
+ * data leakage in error messages and logs.
  *
  * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
  *

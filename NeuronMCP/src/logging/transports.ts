@@ -25,7 +25,8 @@ export class LogTransport {
 				}
 			} catch (error) {
 				// Fallback to stderr if file write fails
-				process.stderr.write(`Failed to write to log file: ${error}\n${message}`);
+				const errorMessage = error instanceof Error ? error.message : String(error);
+				process.stderr.write(`Failed to write log message to file "${this.output}": ${errorMessage}\nOriginal message: ${message}`);
 			}
 		}
 	}

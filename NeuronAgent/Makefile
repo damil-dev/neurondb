@@ -5,15 +5,20 @@ build:
 	@echo "Building NeuronAgent..."
 	@go build -o bin/neuronagent cmd/agent-server/main.go
 
-# Run tests
+# Run tests with race detector (default - recommended for all testing)
 test:
-	@echo "Running tests..."
+	@echo "Running tests with race detector..."
+	@go test -v -race ./...
+
+# Run tests without race detector (faster, less thorough)
+test-fast:
+	@echo "Running tests (fast mode, no race detector)..."
 	@go test -v ./...
 
-# Run tests with coverage
+# Run tests with coverage (includes race detector)
 test-coverage:
-	@echo "Running tests with coverage..."
-	@go test -v -coverprofile=coverage.out ./...
+	@echo "Running tests with coverage and race detector..."
+	@go test -v -race -coverprofile=coverage.out ./...
 	@go tool cover -html=coverage.out -o coverage.html
 
 # Clean build artifacts

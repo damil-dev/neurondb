@@ -43,7 +43,8 @@ export class Database {
 
 		// Handle pool errors
 		this.pool.on("error", (err) => {
-			console.error("Unexpected database pool error:", err);
+			const errorMessage = err instanceof Error ? err.message : String(err);
+			console.error(`Database connection pool error occurred: ${errorMessage}`, err);
 		});
 	}
 

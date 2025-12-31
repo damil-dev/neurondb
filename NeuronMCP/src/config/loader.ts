@@ -105,7 +105,8 @@ export class ConfigLoader {
 					const config = JSON.parse(content);
 					return config;
 				} catch (error) {
-					console.error(`Failed to load config from ${path}:`, error);
+					const errorMessage = error instanceof Error ? error.message : String(error);
+					console.error(`Failed to load configuration file from path "${path}": ${errorMessage}`, error);
 				}
 			}
 		}

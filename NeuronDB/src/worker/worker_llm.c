@@ -467,17 +467,16 @@ process_llm_job_safe(int job_id, const char *job_type, const char *payload)
 			AbortCurrentTransaction();
 
 		elog(LOG,
-			 "neurondb: LLM job crashed; "
-			 "marking as failed.");
+			 "neurondb: LLM job execution crashed unexpectedly; "
+			 "marking job as failed and updating status.");
 
 		if (job_type && job_id > 0)
 		{
 			ndb_llm_job_update(job_id,
 							   "failed",
 							   NULL,
-							   "Crash or unexpected "
-							   "error during job "
-							   "execution");
+							   "Job execution crashed or encountered "
+							   "an unexpected error during processing");
 		}
 	}
 	PG_END_TRY();
@@ -499,9 +498,8 @@ prune_llm_jobs_safe(int max_age_days)
 		if (IsTransactionState())
 			AbortCurrentTransaction();
 		elog(LOG,
-			 "neurondb: Exception pruning "
-			 "old LLM jobs; continuing "
-			 "safely.");
+			 "neurondb: Exception occurred while pruning old LLM jobs; "
+			 "operation aborted safely, continuing execution.");
 		pruned = 0;
 	}
 	PG_END_TRY();

@@ -1,7 +1,10 @@
 /*-------------------------------------------------------------------------
  *
  * runtime.go
- *    Database operations
+ *    Agent runtime and execution engine for NeuronAgent
+ *
+ * Provides the core agent runtime that orchestrates agent execution,
+ * including planning, reflection, tool execution, and LLM interactions.
  *
  * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
  *

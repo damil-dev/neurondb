@@ -1,7 +1,7 @@
 # NeuronAgent Docker Setup
 
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
-[![License](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](../../LICENSE)
+[![License](https://img.shields.io/badge/License-Proprietary-red.svg)](../../LICENSE)
 
 Docker container for NeuronAgent service. Connects to external NeuronDB PostgreSQL instance. Provides REST API and WebSocket endpoints for agent runtime operations.
 

@@ -1,7 +1,10 @@
 /*-------------------------------------------------------------------------
  *
  * validation.go
- *    Database operations
+ *    Request validation middleware for NeuronMCP
+ *
+ * Provides middleware for validating MCP request structure, parameters,
+ * and required fields before request processing.
  *
  * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
  *

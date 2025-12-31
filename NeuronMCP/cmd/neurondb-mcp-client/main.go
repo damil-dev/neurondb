@@ -1,7 +1,10 @@
 /*-------------------------------------------------------------------------
  *
  * main.go
- *    Database operations
+ *    MCP client CLI tool for NeuronMCP
+ *
+ * Command-line client for connecting to MCP servers and executing
+ * commands interactively or in batch mode.
  *
  * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
  *
@@ -52,19 +55,19 @@ func main() {
 
   /* Validate arguments */
 	if *configPath == "" {
-		fmt.Fprintf(os.Stderr, "Error: -c/--config is required\n")
+		fmt.Fprintf(os.Stderr, "Error: Configuration file path (-c/--config) is required\n")
 		flag.Usage()
 		os.Exit(1)
 	}
 
 	if *execute == "" && *file == "" {
-		fmt.Fprintf(os.Stderr, "Error: Either -e/--execute or -f/--file must be provided\n")
+		fmt.Fprintf(os.Stderr, "Error: Either command execution (-e/--execute) or command file (-f/--file) must be provided\n")
 		flag.Usage()
 		os.Exit(1)
 	}
 
 	if *execute != "" && *file != "" {
-		fmt.Fprintf(os.Stderr, "Error: Cannot use both -e/--execute and -f/--file\n")
+		fmt.Fprintf(os.Stderr, "Error: Cannot specify both command execution (-e/--execute) and command file (-f/--file) simultaneously\n")
 		flag.Usage()
 		os.Exit(1)
 	}
@@ -72,7 +75,7 @@ func main() {
   /* Load configuration */
 	config, err := client.LoadConfig(*configPath, *serverName)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error loading configuration: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error: Failed to load configuration from file '%s': %v\n", *configPath, err)
 		os.Exit(1)
 	}
 
@@ -82,12 +85,12 @@ func main() {
   /* Create and connect client */
 	mcpClient, err := client.NewMCPClient(config, *verbose)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error creating MCP client: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error: Failed to create MCP client: %v\n", err)
 		os.Exit(1)
 	}
 
 	if err := mcpClient.Connect(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error connecting to MCP server: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error: Failed to connect to MCP server '%s': %v\n", *serverName, err)
 		os.Exit(1)
 	}
 	defer mcpClient.Disconnect()
@@ -113,7 +116,7 @@ func main() {
    /* Batch command execution */
 		commands, err := readCommandsFile(*file)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error reading command file: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error: Failed to read command file '%s': %v\n", *file, err)
 			os.Exit(1)
 		}
 
@@ -126,7 +129,7 @@ func main() {
 					"error":   err.Error(),
 					"command": command,
 				}
-				fmt.Fprintf(os.Stderr, "  Error: %v\n", err)
+				fmt.Fprintf(os.Stderr, "  Error: Command execution failed for '%s': %v\n", command, err)
 			}
 			outputMgr.AddResult(command, result)
 			if *verbose {
@@ -139,7 +142,7 @@ func main() {
   /* Save output */
 	outputFile, err := outputMgr.Save()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error saving output: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error: Failed to save command execution results to output file: %v\n", err)
 		os.Exit(1)
 	}
 	fmt.Printf("\nResults saved to: %s\n", outputFile)

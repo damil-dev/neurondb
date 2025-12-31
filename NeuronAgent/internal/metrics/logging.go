@@ -1,7 +1,9 @@
 /*-------------------------------------------------------------------------
  *
  * logging.go
- *    Database operations
+ *    Logging initialization and configuration for NeuronAgent
+ *
+ * Provides logging setup using zerolog with configurable levels and formats.
  *
  * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
  *

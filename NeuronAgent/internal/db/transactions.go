@@ -1,7 +1,10 @@
 /*-------------------------------------------------------------------------
  *
  * transactions.go
- *    Database operations
+ *    Database transaction management for NeuronAgent
+ *
+ * Provides transaction handling, retry logic, and transaction utilities
+ * for safe database operations with automatic rollback on errors.
  *
  * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
  *

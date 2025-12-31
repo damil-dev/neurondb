@@ -1,7 +1,10 @@
 /*-------------------------------------------------------------------------
  *
  * time.go
- *    Database operations
+ *    Time formatting and parsing utilities for NeuronAgent
+ *
+ * Provides time formatting functions using standard formats (ISO8601, RFC3339)
+ * and time parsing utilities for consistent date/time handling.
  *
  * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
  *

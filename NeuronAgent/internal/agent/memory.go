@@ -1,7 +1,10 @@
 /*-------------------------------------------------------------------------
  *
  * memory.go
- *    Database operations
+ *    Agent memory management for NeuronAgent
+ *
+ * Provides memory chunk storage, retrieval, and semantic search functionality
+ * for agents to maintain context and learn from past interactions.
  *
  * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
  *

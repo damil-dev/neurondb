@@ -398,7 +398,12 @@ class NeurondbMCPServer {
 
 const server = new NeurondbMCPServer();
 server.start().catch((error) => {
-	console.error("Fatal error:", error);
+	const errorMessage = error instanceof Error ? error.message : String(error);
+	const errorStack = error instanceof Error ? error.stack : undefined;
+	process.stderr.write(`Fatal error occurred during NeuronMCP server startup: ${errorMessage}\n`);
+	if (errorStack) {
+		process.stderr.write(`Stack trace:\n${errorStack}\n`);
+	}
 	process.exit(1);
 });
 

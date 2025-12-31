@@ -679,16 +679,21 @@ vector_eq(PG_FUNCTION_ARGS)
 	a = PG_GETARG_VECTOR_P(0);
 	NDB_CHECK_VECTOR_VALID(a);
 	b = PG_GETARG_VECTOR_P(1);
-
 	NDB_CHECK_VECTOR_VALID(b);
-	int			i;
-
+	
+	/* Check dimension mismatch FIRST - before any element access
+	 * This must be checked before the loop to prevent out-of-bounds access
+	 * and to ensure mathematical correctness of vector comparison.
+	 * Use same pattern as vector_lt/vector_le in operators.c
+	 */
 	if (a->dim != b->dim)
 		ereport(ERROR,
 				(errcode(ERRCODE_DATA_EXCEPTION),
 				 errmsg("cannot compare vectors of different dimensions: %d vs %d",
 						a->dim,
 						b->dim)));
+
+	int			i;
 
 	for (i = 0; i < a->dim; i++)
 		if (a->data[i] != b->data[i])

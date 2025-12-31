@@ -1,7 +1,10 @@
 /*-------------------------------------------------------------------------
  *
  * timeout.go
- *    Database operations
+ *    Timeout middleware for NeuronMCP
+ *
+ * Provides request timeout management middleware that enforces maximum
+ * execution time for MCP requests with configurable timeout values.
  *
  * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
  *

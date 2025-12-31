@@ -1,7 +1,10 @@
 /*-------------------------------------------------------------------------
  *
  * uuid.go
- *    Database operations
+ *    UUID utility functions for NeuronAgent
+ *
+ * Provides UUID generation and parsing utilities for creating unique
+ * identifiers throughout the application.
  *
  * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
  *

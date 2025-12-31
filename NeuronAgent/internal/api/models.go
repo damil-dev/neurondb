@@ -1,7 +1,10 @@
 /*-------------------------------------------------------------------------
  *
  * models.go
- *    Database operations
+ *    API request and response models for NeuronAgent
+ *
+ * Defines data structures for API requests, responses, and internal
+ * data transfer objects used throughout the API handlers.
  *
  * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
  *

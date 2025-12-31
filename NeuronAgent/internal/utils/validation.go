@@ -1,7 +1,10 @@
 /*-------------------------------------------------------------------------
  *
  * validation.go
- *    Database operations
+ *    Input validation utilities for NeuronAgent
+ *
+ * Provides validation functions for email addresses, URLs, and other
+ * common input types with regex-based pattern matching.
  *
  * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
  *

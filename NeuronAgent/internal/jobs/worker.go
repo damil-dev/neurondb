@@ -1,7 +1,10 @@
 /*-------------------------------------------------------------------------
  *
  * worker.go
- *    Database operations
+ *    Background job worker for NeuronAgent
+ *
+ * Provides worker pool for processing background jobs from the queue
+ * with configurable concurrency and graceful shutdown support.
  *
  * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
  *

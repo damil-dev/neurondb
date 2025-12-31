@@ -1,7 +1,10 @@
 /*-------------------------------------------------------------------------
  *
  * llm.go
- *    Database operations
+ *    LLM client wrapper for NeuronAgent
+ *
+ * Provides LLM client functionality for agent text generation and streaming
+ * using NeuronDB's LLM capabilities with configuration management.
  *
  * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
  *

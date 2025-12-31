@@ -1,7 +1,10 @@
 /*-------------------------------------------------------------------------
  *
  * manager.go
- *    Database operations
+ *    Middleware manager for NeuronMCP server
+ *
+ * Provides middleware registration, ordering, and execution management
+ * for MCP request processing pipeline.
  *
  * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
  *

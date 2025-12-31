@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 
 	"github.com/neurondb/NeuronDesktop/api/internal/auth"
 	"github.com/neurondb/NeuronDesktop/api/internal/db"
@@ -115,11 +116,11 @@ func (h *AuthHandlers) Register(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.queries.CreateProfile(r.Context(), userProfile); err != nil {
 		// Log error but don't fail registration - user can still log in
-		fmt.Printf("Warning: Failed to create profile for user %s: %v\n", user.Username, err)
+		fmt.Fprintf(os.Stderr, "Warning: Failed to create default profile for user '%s' during registration (user can still log in): %v\n", user.Username, err)
 	} else {
 		// Create default model configurations for this profile
 		if err := utils.CreateDefaultModelsForProfile(r.Context(), h.queries, userProfile.ID); err != nil {
-			fmt.Printf("Warning: Failed to create default models for profile %s: %v\n", userProfile.ID, err)
+			fmt.Fprintf(os.Stderr, "Warning: Failed to create default model configurations for profile %s (models can be added manually): %v\n", userProfile.ID, err)
 		}
 	}
 

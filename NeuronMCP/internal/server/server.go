@@ -1,7 +1,10 @@
 /*-------------------------------------------------------------------------
  *
  * server.go
- *    Database operations
+ *    MCP server implementation for NeuronMCP
+ *
+ * Provides the main MCP server that handles protocol communication,
+ * request routing, middleware execution, and tool/resource management.
  *
  * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
  *

@@ -1,7 +1,10 @@
 /*-------------------------------------------------------------------------
  *
  * websocket.go
- *    Database operations
+ *    WebSocket handler for NeuronAgent API
+ *
+ * Provides WebSocket support for real-time agent communication and
+ * streaming responses.
  *
  * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
  *

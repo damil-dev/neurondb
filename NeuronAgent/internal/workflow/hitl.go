@@ -23,6 +23,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/neurondb/NeuronAgent/internal/db"
+	"github.com/neurondb/NeuronAgent/internal/metrics"
 )
 
 type HITLManager struct {
@@ -64,15 +65,24 @@ func (h *HITLManager) RequestApproval(ctx context.Context, workflowExecutionID u
 	case "email":
 		if err := h.sendEmailNotification(ctx, approvalRequest.ID, config); err != nil {
 			/* Log error but don't fail - approval request is created */
-			fmt.Printf("Failed to send email notification: %v\n", err)
+			metrics.WarnWithContext(ctx, "Failed to send email notification for approval request", map[string]interface{}{
+				"approval_id": approvalRequest.ID.String(),
+				"error":       err.Error(),
+			})
 		}
 	case "webhook":
 		if err := h.sendWebhookNotification(ctx, approvalRequest.ID, config); err != nil {
-			fmt.Printf("Failed to send webhook notification: %v\n", err)
+			metrics.WarnWithContext(ctx, "Failed to send webhook notification for approval request", map[string]interface{}{
+				"approval_id": approvalRequest.ID.String(),
+				"error":       err.Error(),
+			})
 		}
 	case "ticket":
 		if err := h.createTicket(ctx, approvalRequest.ID, config); err != nil {
-			fmt.Printf("Failed to create ticket: %v\n", err)
+			metrics.WarnWithContext(ctx, "Failed to create ticket for approval request", map[string]interface{}{
+				"approval_id": approvalRequest.ID.String(),
+				"error":       err.Error(),
+			})
 		}
 	}
 
@@ -112,21 +122,29 @@ func (h *HITLManager) WaitForApproval(ctx context.Context, approvalRequestID uui
 func (h *HITLManager) sendEmailNotification(ctx context.Context, approvalID uuid.UUID, config ApprovalStepConfig) error {
 	/* TODO: Integrate with email service (SMTP) */
 	/* For now, just log */
-	fmt.Printf("Email notification sent for approval %s to %v\n", approvalID.String(), config.Recipients)
+	metrics.InfoWithContext(ctx, "Email notification sent for approval request", map[string]interface{}{
+		"approval_id": approvalID.String(),
+		"recipients":  config.Recipients,
+	})
 	return nil
 }
 
 /* sendWebhookNotification sends webhook notification */
 func (h *HITLManager) sendWebhookNotification(ctx context.Context, approvalID uuid.UUID, config ApprovalStepConfig) error {
 	/* TODO: Send HTTP POST to webhook URLs */
-	fmt.Printf("Webhook notification sent for approval %s to %v\n", approvalID.String(), config.Recipients)
+	metrics.InfoWithContext(ctx, "Webhook notification sent for approval request", map[string]interface{}{
+		"approval_id": approvalID.String(),
+		"recipients":  config.Recipients,
+	})
 	return nil
 }
 
 /* createTicket creates a ticket in external system */
 func (h *HITLManager) createTicket(ctx context.Context, approvalID uuid.UUID, config ApprovalStepConfig) error {
 	/* TODO: Integrate with ticket system (Jira, ServiceNow, etc.) */
-	fmt.Printf("Ticket created for approval %s\n", approvalID.String())
+	metrics.InfoWithContext(ctx, "Ticket created for approval request", map[string]interface{}{
+		"approval_id": approvalID.String(),
+	})
 	return nil
 }
 

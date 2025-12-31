@@ -1,7 +1,10 @@
 /*-------------------------------------------------------------------------
  *
  * errors.go
- *    Database operations
+ *    API error handling and error types for NeuronAgent
+ *
+ * Provides structured error types and error response formatting for
+ * the NeuronAgent HTTP API with context and metadata support.
  *
  * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
  *
