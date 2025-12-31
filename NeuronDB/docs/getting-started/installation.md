@@ -1,4 +1,8 @@
-# Installation Guide
+# NeuronDB Extension Installation Guide
+
+> **Note:** This guide is for installing the NeuronDB PostgreSQL extension specifically.
+> 
+> For complete ecosystem installation (Docker, all components), see the [ecosystem installation guide](../../../../Docs/getting-started/installation.md).
 
 NeuronDB is a PostgreSQL extension that must be compiled and installed on your PostgreSQL server. This guide walks you through the complete installation process on different platforms.
 
