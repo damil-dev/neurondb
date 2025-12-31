@@ -27,12 +27,17 @@ import (
 	"github.com/neurondb/NeuronAgent/internal/agent"
 	"github.com/neurondb/NeuronAgent/internal/api"
 	"github.com/neurondb/NeuronAgent/internal/auth"
+	"github.com/neurondb/NeuronAgent/internal/browser"
+	"github.com/neurondb/NeuronAgent/internal/collaboration"
 	"github.com/neurondb/NeuronAgent/internal/config"
 	"github.com/neurondb/NeuronAgent/internal/db"
 	"github.com/neurondb/NeuronAgent/internal/jobs"
 	"github.com/neurondb/NeuronAgent/internal/metrics"
+	"github.com/neurondb/NeuronAgent/internal/multimodal"
+	"github.com/neurondb/NeuronAgent/internal/notifications"
 	"github.com/neurondb/NeuronAgent/internal/session"
 	"github.com/neurondb/NeuronAgent/internal/tools"
+	"github.com/neurondb/NeuronAgent/internal/worker"
 	"github.com/neurondb/NeuronAgent/pkg/neurondb"
 )
 
@@ -44,12 +49,12 @@ var (
 
 func main() {
 	var (
-		showVersion = flag.Bool("version", false, "Show version information")
+		showVersion      = flag.Bool("version", false, "Show version information")
 		showVersionShort = flag.Bool("v", false, "Show version information (short)")
-		configPath  = flag.String("c", "", "Path to configuration file")
-		configPathLong = flag.String("config", "", "Path to configuration file")
-		showHelp    = flag.Bool("help", false, "Show help message")
-		showHelpShort = flag.Bool("h", false, "Show help message (short)")
+		configPath       = flag.String("c", "", "Path to configuration file")
+		configPathLong   = flag.String("config", "", "Path to configuration file")
+		showHelp         = flag.Bool("help", false, "Show help message")
+		showHelpShort    = flag.Bool("h", false, "Show help message (short)")
 	)
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: %s [OPTIONS]\n\n", os.Args[0])
@@ -83,9 +88,9 @@ func main() {
 		os.Exit(0)
 	}
 
-  /* Load configuration */
+	/* Load configuration */
 	cfg := config.DefaultConfig()
-	
+
 	/* Determine config path - command line flag takes precedence over environment variable */
 	cfgPath := *configPath
 	if cfgPath == "" {
@@ -94,7 +99,7 @@ func main() {
 	if cfgPath == "" {
 		cfgPath = os.Getenv("CONFIG_PATH")
 	}
-	
+
 	if cfgPath != "" {
 		var err error
 		cfg, err = config.LoadConfig(cfgPath)
@@ -102,14 +107,14 @@ func main() {
 			fmt.Fprintf(os.Stderr, "Warning: Failed to load configuration from file '%s': %v. Using default configuration.\n", cfgPath, err)
 		}
 	} else {
-   /* Load from environment variables if no config file */
+		/* Load from environment variables if no config file */
 		config.LoadFromEnv(cfg)
 	}
 
-  /* Initialize logging */
+	/* Initialize logging */
 	metrics.InitLogging(cfg.Logging.Level, cfg.Logging.Format)
 
-  /* Connect to database */
+	/* Connect to database */
 	connStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
 		cfg.Database.Host, cfg.Database.Port, cfg.Database.User, cfg.Database.Password, cfg.Database.Database)
 
@@ -117,7 +122,7 @@ func main() {
 	if cfg.Database.ConnMaxIdleTime > 0 {
 		connMaxIdleTime = cfg.Database.ConnMaxIdleTime
 	}
-	
+
 	database, err := db.NewDB(connStr, db.PoolConfig{
 		MaxOpenConns:    cfg.Database.MaxOpenConns,
 		MaxIdleConns:    cfg.Database.MaxIdleConns,
@@ -126,13 +131,13 @@ func main() {
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FATAL: Failed to connect to database: %v\n", err)
-		fmt.Fprintf(os.Stderr, "Connection string: host=%s port=%d user=%s dbname=%s\n", 
+		fmt.Fprintf(os.Stderr, "Connection string: host=%s port=%d user=%s dbname=%s\n",
 			cfg.Database.Host, cfg.Database.Port, cfg.Database.User, cfg.Database.Database)
 		os.Exit(1)
 	}
 	defer database.Close()
 
-  /* Run migrations */
+	/* Run migrations */
 	migrationRunner, err := db.NewMigrationRunner(database.DB, "./migrations")
 	if err == nil {
 		if err := migrationRunner.Run(context.Background()); err != nil {
@@ -142,32 +147,79 @@ func main() {
 		}
 	}
 
-  /* Initialize components */
+	/* Initialize components */
 	queries := db.NewQueries(database.DB)
 	queries.SetConnInfoFunc(database.GetConnInfoString)
-	
+
 	/* Initialize NeuronDB client */
 	neurondbClient := neurondb.NewClient(database.DB)
 	embedClient := neurondbClient.Embedding
-	
-	/* Initialize tool registry with NeuronDB clients */
-	toolRegistry := tools.NewRegistryWithNeuronDB(queries, database, neurondbClient)
-	runtime := agent.NewRuntime(database, queries, toolRegistry, embedClient)
 
-  /* Initialize session management */
+	/* Initialize advanced features */
+	/* VFS uses database storage directly, so we pass nil for storage backend */
+	vfs := agent.NewVirtualFileSystem(queries, nil, 100*1024*1024) /* 100MB max file size */
+	pubsub := collaboration.NewPubSub()
+	workspaceManager := collaboration.NewWorkspaceManager(queries, pubsub)
+
+	/* Initialize notification services */
+	emailService := notifications.NewEmailService("", 0, "", "", "") /* Configure via config */
+	webhookService := notifications.NewWebhookService(30 * time.Second)
+
+	/* Initialize basic runtime first to get hierarchical memory */
+	toolRegistry := tools.NewRegistryWithNeuronDB(queries, database, neurondbClient)
+	baseRuntime := agent.NewRuntime(database, queries, toolRegistry, embedClient)
+
+	/* Get hierarchical memory from base runtime */
+	hierMemory := baseRuntime.HierMemory()
+
+	/* Re-initialize tool registry with all features */
+	toolRegistry = tools.NewRegistryWithAllFeatures(queries, database, vfs, hierMemory, workspaceManager)
+
+	/* Get browser driver for cleanup worker */
+	var browserDriver *browser.Driver
+	if browserTool := toolRegistry.GetBrowserTool(); browserTool != nil {
+		browserDriver = browserTool.GetDriver()
+	}
+
+	/* Initialize runtime with all features */
+	runtime := agent.NewRuntimeWithFeatures(database, queries, toolRegistry, embedClient, vfs, workspaceManager)
+
+	/* Initialize async task executor and notifier */
+	taskNotifier := agent.NewTaskNotifier(queries, emailService, webhookService)
+	asyncExecutor := agent.NewAsyncTaskExecutor(queries, runtime, taskNotifier)
+	runtime.SetAsyncExecutor(asyncExecutor)
+
+	/* Initialize sub-agent manager */
+	subAgentManager := agent.NewSubAgentManager(queries, runtime)
+	runtime.SetSubAgentManager(subAgentManager)
+	runtime.SetAlertManager(taskNotifier)
+
+	/* Initialize enhanced multimodal processor */
+	multimodalProcessor := multimodal.NewEnhancedMultimodalProcessor()
+	runtime.SetMultimodalProcessor(multimodalProcessor)
+
+	/* Initialize session management */
 	sessionCache := session.NewCache(5 * time.Minute)
- 	_ = session.NewManager(queries, sessionCache) /* Session manager for future use */
+	_ = session.NewManager(queries, sessionCache) /* Session manager for future use */
 	sessionCleanup := session.NewCleanupService(queries, 1*time.Hour, 24*time.Hour)
 	sessionCleanup.Start()
 	defer sessionCleanup.Stop()
 
-  /* Initialize API */
+	/* Initialize browser session cleanup */
+	browserCleanup := browser.NewCleanupWorker(database, browserDriver, 1*time.Hour, 24*time.Hour)
+	browserCleanup.Start()
+	defer browserCleanup.Stop()
+
+	/* Initialize API */
 	handlers := api.NewHandlers(queries, runtime)
+	collabHandlers := api.NewCollaborationHandlers(queries, workspaceManager)
+	asyncTasksHandlers := api.NewAsyncTasksHandlers(queries, asyncExecutor)
+	alertPrefsHandlers := api.NewAlertPreferencesHandlers(queries)
 	keyManager := auth.NewAPIKeyManager(queries)
 	principalManager := auth.NewPrincipalManager(queries)
 	rateLimiter := auth.NewRateLimiter()
 
-  /* Setup router */
+	/* Setup router */
 	router := mux.NewRouter()
 	router.Use(api.RequestIDMiddleware)
 	router.Use(api.SecurityHeadersMiddleware) /* Security headers must be set early */
@@ -175,7 +227,7 @@ func main() {
 	router.Use(api.LoggingMiddleware)
 	router.Use(api.AuthMiddleware(keyManager, principalManager, rateLimiter))
 
-  /* API routes */
+	/* API routes */
 	apiRouter := router.PathPrefix("/api/v1").Subrouter()
 	apiRouter.HandleFunc("/agents", handlers.CreateAgent).Methods("POST")
 	apiRouter.HandleFunc("/agents", handlers.ListAgents).Methods("GET")
@@ -244,7 +296,23 @@ func main() {
 	apiRouter.HandleFunc("/analytics/overview", handlers.GetAnalyticsOverview).Methods("GET")
 	apiRouter.HandleFunc("/ws", api.HandleWebSocket(runtime)).Methods("GET")
 
-  /* Health check */
+	/* Collaboration workspace routes */
+	apiRouter.HandleFunc("/workspaces", collabHandlers.CreateWorkspace).Methods("POST")
+	apiRouter.HandleFunc("/workspaces/{id}", collabHandlers.GetWorkspace).Methods("GET")
+	apiRouter.HandleFunc("/workspaces/{id}/participants", collabHandlers.AddParticipant).Methods("POST")
+
+	/* Async task routes */
+	apiRouter.HandleFunc("/async-tasks", asyncTasksHandlers.CreateAsyncTask).Methods("POST")
+	apiRouter.HandleFunc("/async-tasks", asyncTasksHandlers.ListAsyncTasks).Methods("GET")
+	apiRouter.HandleFunc("/async-tasks/{id}", asyncTasksHandlers.GetAsyncTaskStatus).Methods("GET")
+	apiRouter.HandleFunc("/async-tasks/{id}/cancel", asyncTasksHandlers.CancelAsyncTask).Methods("POST")
+
+	/* Alert preferences routes */
+	apiRouter.HandleFunc("/alert-preferences", alertPrefsHandlers.SetAlertPreferences).Methods("POST")
+	apiRouter.HandleFunc("/alert-preferences", alertPrefsHandlers.GetAlertPreferences).Methods("GET")
+	apiRouter.HandleFunc("/agents/{agent_id}/alert-preferences", alertPrefsHandlers.GetAlertPreferences).Methods("GET")
+
+	/* Health check */
 	router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		if err := database.HealthCheck(r.Context()); err != nil {
 			w.WriteHeader(http.StatusServiceUnavailable)
@@ -253,22 +321,55 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 	}).Methods("GET")
 
-  /* Metrics endpoint (no auth required) */
+	/* Metrics endpoint (no auth required) */
 	router.Handle("/metrics", metrics.Handler()).Methods("GET")
 
-  /* Start background workers */
+	/* Start background workers */
 	queue := jobs.NewQueue(queries)
 	processor := jobs.NewProcessor(database)
-	worker := jobs.NewWorker(queue, processor, 5)
-	worker.Start()
-	defer worker.Stop()
+	jobWorker := jobs.NewWorker(queue, processor, 5)
+	jobWorker.Start()
+	defer jobWorker.Stop()
 
-  /* Start job scheduler */
+	/* Start job scheduler */
 	scheduler := jobs.NewScheduler(queue)
 	scheduler.Start()
 	defer scheduler.Stop()
 
-  /* Start server */
+	/* Start memory promoter worker */
+	if runtime.HierMemory() != nil {
+		memoryPromoter := worker.NewMemoryPromoter(runtime.HierMemory(), queries, 5*time.Minute)
+		go func() {
+			ctx := context.Background()
+			if err := memoryPromoter.Start(ctx); err != nil {
+				metrics.ErrorWithContext(ctx, "Memory promoter worker failed", err, nil)
+			}
+		}()
+	}
+
+	/* Start verifier worker */
+	if runtime.Verifier() != nil {
+		verifierWorker := worker.NewVerifierWorker(queries, runtime, 10*time.Second, 3)
+		go func() {
+			ctx := context.Background()
+			if err := verifierWorker.Start(ctx); err != nil {
+				metrics.ErrorWithContext(ctx, "Verifier worker failed", err, nil)
+			}
+		}()
+	}
+
+	/* Start async task worker */
+	if asyncExecutor != nil {
+		asyncTaskWorker := worker.NewAsyncTaskWorker(queries, asyncExecutor, 5*time.Second, 5)
+		go func() {
+			ctx := context.Background()
+			if err := asyncTaskWorker.Start(ctx); err != nil {
+				metrics.ErrorWithContext(ctx, "Async task worker failed", err, nil)
+			}
+		}()
+	}
+
+	/* Start server */
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
 	srv := &http.Server{
 		Addr:         addr,
@@ -277,7 +378,7 @@ func main() {
 		WriteTimeout: cfg.Server.WriteTimeout,
 	}
 
-  /* Graceful shutdown */
+	/* Graceful shutdown */
 	go func() {
 		metrics.InfoWithContext(context.Background(), "NeuronAgent server starting", map[string]interface{}{
 			"address": addr,
@@ -292,12 +393,17 @@ func main() {
 		}
 	}()
 
-  /* Wait for interrupt signal */
+	/* Wait for interrupt signal */
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
 	metrics.InfoWithContext(context.Background(), "Shutdown signal received, gracefully shutting down server", nil)
+
+	/* Cleanup resources */
+	if toolRegistry != nil {
+		toolRegistry.Cleanup()
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -308,4 +414,3 @@ func main() {
 
 	metrics.InfoWithContext(context.Background(), "Server shutdown complete", nil)
 }
-
