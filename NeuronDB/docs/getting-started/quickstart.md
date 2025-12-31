@@ -1,11 +1,15 @@
-# Quick Start Guide
+# NeuronDB Extension Quick Start
 
-Get up and running with NeuronDB quickly.
+> **Note:** This guide is for using the NeuronDB extension after it's already installed.
+> 
+> For complete ecosystem setup (Docker, all components), see the [root QUICKSTART.md](../../../../QUICKSTART.md).
+
+Get up and running with the NeuronDB extension quickly.
 
 ## Prerequisites
 
 - PostgreSQL 16, 17, or 18 installed
-- NeuronDB extension installed (see [Installation Guide](installation.md))
+- NeuronDB extension installed (see [Installation Guide](installation.md) or [INSTALL.md](../../INSTALL.md))
 
 ## Step 1: Create Extension
 
