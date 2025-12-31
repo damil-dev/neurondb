@@ -2273,7 +2273,7 @@ train_ridge_regression(PG_FUNCTION_ARGS)
 									 ridge_model.mse,
 									 ridge_model.mae);
 
-					/* Use ndb_jsonb_in_cstring like test 006 fix */
+					/* Use ndb_jsonb_in_cstring (consistent with other ML algorithms) */
 					updated_metrics = ndb_jsonb_in_cstring(metrics_buf.data);
 					if (updated_metrics == NULL)
 					{

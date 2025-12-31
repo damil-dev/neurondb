@@ -105,7 +105,7 @@ ndb_rocm_lr_pack_model(const LRModel *model,
 		metrics_json = DatumGetJsonbP(DirectFunctionCall1(
 														  jsonb_in,
 														  CStringGetDatum(buf.data)));
-		nfree(buf.data);
+		pfree(buf.data);
 		*metrics = metrics_json;
 	}
 
@@ -405,7 +405,7 @@ ndb_rocm_lr_train(const float *features,
 	nalloc(grad_weights, double, feature_dim);
 	if (grad_weights == NULL)
 	{
-		nfree(weights);
+		pfree(weights);
 		if (errstr)
 			*errstr = pstrdup("ndb_rocm_lr_train: palloc grad_weights failed");
 		return -1;
@@ -478,8 +478,8 @@ ndb_rocm_lr_train(const float *features,
 				 "ndb_rocm_lr_train: insufficient GPU memory: need %.2f MB, have %.2f MB",
 				 total_required / (1024.0 * 1024.0),
 				 free_mem / (1024.0 * 1024.0));
-			nfree(weights);
-			nfree(grad_weights);
+			pfree(weights);
+			pfree(grad_weights);
 			return -1;
 		}
 	}
@@ -561,7 +561,7 @@ ndb_rocm_lr_train(const float *features,
 					/* Defensive: Check for NaN/Inf during conversion */
 					if (!isfinite(val))
 					{
-						nfree(h_features_col);
+						pfree(h_features_col);
 						if (errstr && *errstr == NULL)
 							*errstr = psprintf("ndb_rocm_lr_train: non-finite feature value at sample %d, feature %d: %f",
 											   block_i, feat_j, val);
@@ -576,7 +576,7 @@ ndb_rocm_lr_train(const float *features,
 
 		/* Copy column-major features to GPU */
 		status = hipMemcpy(d_features, h_features_col, feature_bytes, hipMemcpyHostToDevice);
-		nfree(h_features_col);
+		pfree(h_features_col);
 		if (status != hipSuccess)
 		{
 			elog(WARNING,
@@ -689,7 +689,7 @@ ndb_rocm_lr_train(const float *features,
 			h_weights_init[j] = (float) weights[j];
 
 		status = hipMemcpy(d_weights, h_weights_init, weight_bytes_gpu, hipMemcpyHostToDevice);
-		nfree(h_weights_init);
+		pfree(h_weights_init);
 
 		if (status != hipSuccess)
 		{
@@ -1090,8 +1090,8 @@ ndb_rocm_lr_train(const float *features,
 				status = hipMemcpy(h_weights_fallback, d_weights, weight_bytes_gpu, hipMemcpyDeviceToHost);
 				if (status != hipSuccess)
 				{
-					nfree(host_predictions);
-					nfree(h_weights_fallback);
+					pfree(host_predictions);
+					pfree(h_weights_fallback);
 					goto gpu_fail;
 				}
 
@@ -1105,8 +1105,8 @@ ndb_rocm_lr_train(const float *features,
 								   hipMemcpyDeviceToHost);
 				if (status != hipSuccess)
 				{
-					nfree(host_predictions);
-					nfree(h_weights_fallback);
+					pfree(host_predictions);
+					pfree(h_weights_fallback);
 					goto gpu_fail;
 				}
 
@@ -1118,8 +1118,8 @@ ndb_rocm_lr_train(const float *features,
 												  grad_weights,
 												  &grad_bias) != 0)
 				{
-					nfree(host_predictions);
-					nfree(h_weights_fallback);
+					pfree(host_predictions);
+					pfree(h_weights_fallback);
 					if ((iter % 100) == 0)
 					{
 						elog(WARNING,
@@ -1129,7 +1129,7 @@ ndb_rocm_lr_train(const float *features,
 					goto gpu_fail;
 				}
 
-				nfree(host_predictions);
+				pfree(host_predictions);
 
 				/*
 				 * Average gradients and add L2 regularization with defensive
@@ -1215,11 +1215,11 @@ ndb_rocm_lr_train(const float *features,
 						status = hipMemcpy(d_bias, &bias, sizeof(double), hipMemcpyHostToDevice);
 					}
 
-					nfree(h_weights_fallback);
+					pfree(h_weights_fallback);
 				}
 				else
 				{
-					nfree(h_weights_fallback);
+					pfree(h_weights_fallback);
 					elog(ERROR,
 						 "ndb_rocm_lr_train: n_samples is zero in gradient computation");
 					if (errstr && *errstr == NULL)
@@ -1259,7 +1259,7 @@ ndb_rocm_lr_train(const float *features,
 				for (i = 0; i < feature_dim; i++)
 					weights[i] = (double) h_weights_final[i];
 			}
-			nfree(h_weights_final);
+			pfree(h_weights_final);
 		}
 
 		/* Copy final bias from device */
@@ -1273,7 +1273,7 @@ ndb_rocm_lr_train(const float *features,
 	}
 
 	/* Free host buffers allocated before the loop */
-	nfree(h_grad_weights_float);
+	pfree(h_grad_weights_float);
 
 	/* Build model payload */
 	{
@@ -1380,7 +1380,7 @@ ndb_rocm_lr_train(const float *features,
 			metrics_json = DatumGetJsonbP(DirectFunctionCall1(
 															  jsonb_in,
 															  CStringGetDatum(buf.data)));
-			nfree(buf.data);
+			pfree(buf.data);
 			if (metrics_json == NULL)
 			{
 				elog(ERROR,
@@ -1389,7 +1389,7 @@ ndb_rocm_lr_train(const float *features,
 		}
 
 		if (host_preds != NULL)
-			nfree(host_preds);
+			pfree(host_preds);
 	}
 
 	*model_data = payload;
@@ -1434,7 +1434,7 @@ ndb_rocm_lr_train(const float *features,
 				}
 				PG_END_TRY();
 
-				nfree(buf.data);
+				pfree(buf.data);
 			}
 		}
 		*metrics = metrics_json;
@@ -1449,13 +1449,13 @@ ndb_rocm_lr_train(const float *features,
 cleanup:
 	/* Free host buffers */
 	if (h_grad_weights_float)
-		nfree(h_grad_weights_float);
+		pfree(h_grad_weights_float);
 	if (h_errors)
-		nfree(h_errors);
+		pfree(h_errors);
 	if (weights)
-		nfree(weights);
+		pfree(weights);
 	if (grad_weights)
-		nfree(grad_weights);
+		pfree(grad_weights);
 
 	/* Free device buffers */
 	if (d_features)
@@ -1803,7 +1803,7 @@ ndb_rocm_lr_evaluate(const bytea * model_data,
 			h_weights_double[i] = (double) weights[i];
 
 		cuda_err = hipMemcpy(d_weights, h_weights_double, weight_bytes, hipMemcpyHostToDevice);
-		nfree(h_weights_double);
+		pfree(h_weights_double);
 
 		if (cuda_err != hipSuccess)
 			goto cleanup;

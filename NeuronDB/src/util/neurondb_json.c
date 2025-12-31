@@ -217,7 +217,7 @@ ndb_jsonb_out_cstring(Jsonb * jsonb)
 	if (json_text != NULL)
 	{
 		result = text_to_cstring(json_text);
-		nfree(json_text);
+		pfree(json_text);
 	}
 
 	return result;
@@ -264,7 +264,7 @@ ndb_jsonb_object_field(Jsonb * jsonb, const char *field_name)
 	}
 	PG_END_TRY();
 
-	nfree(field_text);
+	pfree(field_text);
 
 	return result;
 }
@@ -347,9 +347,9 @@ ndb_jsonb_extract_path(Jsonb * jsonb, const char **path, int path_len)
 	/* Free individual text elements */
 	for (i = 0; i < path_len; i++)
 	{
-		nfree(path_texts[i]);
+		pfree(path_texts[i]);
 	}
-	nfree(path_texts);
+	pfree(path_texts);
 
 	jsonb_datum = PointerGetDatum(jsonb);
 	array_datum = PointerGetDatum(path_array);
@@ -374,7 +374,7 @@ ndb_jsonb_extract_path(Jsonb * jsonb, const char **path, int path_len)
 	}
 	PG_END_TRY();
 
-	nfree(path_array);
+	pfree(path_array);
 
 	return result;
 }
@@ -414,9 +414,9 @@ ndb_jsonb_extract_path_text(Jsonb * jsonb, const char **path, int path_len)
 	/* Free individual text elements */
 	for (i = 0; i < path_len; i++)
 	{
-		nfree(path_texts[i]);
+		pfree(path_texts[i]);
 	}
-	nfree(path_texts);
+	pfree(path_texts);
 
 	jsonb_datum = PointerGetDatum(jsonb);
 	array_datum = PointerGetDatum(path_array);
@@ -441,7 +441,7 @@ ndb_jsonb_extract_path_text(Jsonb * jsonb, const char **path, int path_len)
 	}
 	PG_END_TRY();
 
-	nfree(path_array);
+	pfree(path_array);
 
 	return result;
 }
@@ -463,7 +463,7 @@ ndb_jsonb_extract_path_cstring(Jsonb * jsonb, const char **path, int path_len)
 	if (path_text != NULL)
 	{
 		result = text_to_cstring(path_text);
-		nfree(path_text);
+		pfree(path_text);
 	}
 
 	return result;
@@ -534,7 +534,7 @@ ndb_jsonb_typeof_cstring(Jsonb * jsonb)
 	if (type_text != NULL)
 	{
 		result = text_to_cstring(type_text);
-		nfree(type_text);
+		pfree(type_text);
 	}
 
 	return result;
@@ -631,7 +631,7 @@ ndb_json_quote_string(const char *str)
 
 	appendStringInfoChar(&buf, '"');
 	result = pstrdup(buf.data);
-	nfree(buf.data);
+	pfree(buf.data);
 	return result;
 }
 
@@ -921,15 +921,15 @@ ndb_json_find_key(const char *json_str, const char *key)
 				if (field_text != NULL)
 				{
 					result = text_to_cstring(field_text);
-					nfree(field_text);
+					pfree(field_text);
 				}
-				nfree(field);
+				pfree(field);
 			}
 			if (jsonb != NULL)
 			{
 				Jsonb	   *jsonb_ptr = (Jsonb *) jsonb;
 
-				nfree(jsonb_ptr);
+				pfree(jsonb_ptr);
 				jsonb = NULL;
 			}
 		}
@@ -941,7 +941,7 @@ ndb_json_find_key(const char *json_str, const char *key)
 		{
 			Jsonb	   *jsonb_ptr = (Jsonb *) jsonb;
 
-			nfree(jsonb_ptr);
+			pfree(jsonb_ptr);
 			jsonb = NULL;
 		}
 	}
@@ -986,7 +986,7 @@ ndb_json_find_key(const char *json_str, const char *key)
 					{
 						char	   *unescaped = ndb_json_unescape_string(temp_result);
 
-						nfree(temp_result);
+						pfree(temp_result);
 						result = (volatile char *) unescaped;
 					}
 					else
@@ -1022,7 +1022,7 @@ ndb_json_find_key(const char *json_str, const char *key)
 				result = (volatile char *) pnstrdup(value_start, value_end - value_start);
 			}
 		}
-		nfree(key_pattern);
+		pfree(key_pattern);
 	}
 
 	return (char *) result;
@@ -1094,7 +1094,7 @@ ndb_json_extract_number(const char *json_str, const char *key, bool *found)
 			*found = true;
 	}
 
-	nfree(value_str);
+	pfree(value_str);
 	return result;
 }
 
@@ -1149,7 +1149,7 @@ ndb_json_extract_bool(const char *json_str, const char *key, bool *found)
 			*found = true;
 	}
 
-	nfree(value_str);
+	pfree(value_str);
 	return result;
 }
 
@@ -1288,10 +1288,10 @@ ndb_json_parse_gen_params(const char *params_json,
 					float_val = strtof(value_str, &endptr);
 					if (endptr != value_str && float_val > 0.0f)
 						gen_params->temperature = float_val;
-					nfree(value_str);
-					nfree(field_text);
+					pfree(value_str);
+					pfree(field_text);
 				}
-				nfree(field);
+				pfree(field);
 			}
 
 			field = ndb_jsonb_object_field((Jsonb *) jsonb, "top_p");
@@ -1304,10 +1304,10 @@ ndb_json_parse_gen_params(const char *params_json,
 					float_val = strtof(value_str, &endptr);
 					if (endptr != value_str && float_val > 0.0f && float_val <= 1.0f)
 						gen_params->top_p = float_val;
-					nfree(value_str);
-					nfree(field_text);
+					pfree(value_str);
+					pfree(field_text);
 				}
-				nfree(field);
+				pfree(field);
 			}
 
 			field = ndb_jsonb_object_field((Jsonb *) jsonb, "top_k");
@@ -1320,10 +1320,10 @@ ndb_json_parse_gen_params(const char *params_json,
 					int_val = (int) strtol(value_str, &endptr, 10);
 					if (endptr != value_str && int_val >= 0)
 						gen_params->top_k = int_val;
-					nfree(value_str);
-					nfree(field_text);
+					pfree(value_str);
+					pfree(field_text);
 				}
-				nfree(field);
+				pfree(field);
 			}
 
 			field = ndb_jsonb_object_field((Jsonb *) jsonb, "max_tokens");
@@ -1338,10 +1338,10 @@ ndb_json_parse_gen_params(const char *params_json,
 					int_val = (int) strtol(value_str, &endptr, 10);
 					if (endptr != value_str && int_val > 0)
 						gen_params->max_tokens = int_val;
-					nfree(value_str);
-					nfree(field_text);
+					pfree(value_str);
+					pfree(field_text);
 				}
-				nfree(field);
+				pfree(field);
 			}
 
 			field = ndb_jsonb_object_field((Jsonb *) jsonb, "min_tokens");
@@ -1356,10 +1356,10 @@ ndb_json_parse_gen_params(const char *params_json,
 					int_val = (int) strtol(value_str, &endptr, 10);
 					if (endptr != value_str && int_val >= 0)
 						gen_params->min_tokens = int_val;
-					nfree(value_str);
-					nfree(field_text);
+					pfree(value_str);
+					pfree(field_text);
 				}
-				nfree(field);
+				pfree(field);
 			}
 
 			field = ndb_jsonb_object_field((Jsonb *) jsonb, "repetition_penalty");
@@ -1372,10 +1372,10 @@ ndb_json_parse_gen_params(const char *params_json,
 					float_val = strtof(value_str, &endptr);
 					if (endptr != value_str && float_val > 0.0f)
 						gen_params->repetition_penalty = float_val;
-					nfree(value_str);
-					nfree(field_text);
+					pfree(value_str);
+					pfree(field_text);
 				}
-				nfree(field);
+				pfree(field);
 			}
 
 			field = ndb_jsonb_object_field((Jsonb *) jsonb, "do_sample");
@@ -1389,10 +1389,10 @@ ndb_json_parse_gen_params(const char *params_json,
 						gen_params->do_sample = true;
 					else if (strcmp(value_str, "false") == 0 || strcmp(value_str, "FALSE") == 0)
 						gen_params->do_sample = false;
-					nfree(value_str);
-					nfree(field_text);
+					pfree(value_str);
+					pfree(field_text);
 				}
-				nfree(field);
+				pfree(field);
 			}
 
 			field = ndb_jsonb_object_field((Jsonb *) jsonb, "return_prompt");
@@ -1406,10 +1406,10 @@ ndb_json_parse_gen_params(const char *params_json,
 						gen_params->return_prompt = true;
 					else if (strcmp(value_str, "false") == 0 || strcmp(value_str, "FALSE") == 0)
 						gen_params->return_prompt = false;
-					nfree(value_str);
-					nfree(field_text);
+					pfree(value_str);
+					pfree(field_text);
 				}
-				nfree(field);
+				pfree(field);
 			}
 
 			field = ndb_jsonb_object_field((Jsonb *) jsonb, "seed");
@@ -1422,10 +1422,10 @@ ndb_json_parse_gen_params(const char *params_json,
 					int_val = (int) strtol(value_str, &endptr, 10);
 					if (endptr != value_str)
 						gen_params->seed = int_val;
-					nfree(value_str);
-					nfree(field_text);
+					pfree(value_str);
+					pfree(field_text);
 				}
-				nfree(field);
+				pfree(field);
 			}
 
 			field = ndb_jsonb_object_field((Jsonb *) jsonb, "streaming");
@@ -1441,10 +1441,10 @@ ndb_json_parse_gen_params(const char *params_json,
 						gen_params->streaming = true;
 					else if (strcmp(value_str, "false") == 0 || strcmp(value_str, "FALSE") == 0)
 						gen_params->streaming = false;
-					nfree(value_str);
-					nfree(field_text);
+					pfree(value_str);
+					pfree(field_text);
 				}
-				nfree(field);
+				pfree(field);
 			}
 
 			field = ndb_jsonb_object_field((Jsonb *) jsonb, "stop_sequences");
@@ -1459,14 +1459,14 @@ ndb_json_parse_gen_params(const char *params_json,
 				if (tmp != NULL)
 				{
 					stop_seqs = ndb_json_parse_array(tmp, &count);
-					nfree(tmp);
+					pfree(tmp);
 					if (stop_seqs != NULL && count > 0)
 					{
 						gen_params->stop_sequences = stop_seqs;
 						gen_params->num_stop_sequences = count;
 					}
 				}
-				nfree(field);
+				pfree(field);
 			}
 
 			field = ndb_jsonb_object_field((Jsonb *) jsonb, "logit_bias");
@@ -1494,7 +1494,7 @@ ndb_json_parse_gen_params(const char *params_json,
 						char	   *token_str = pnstrdup(v.val.string.val, v.val.string.len);
 						int32		token_id = (int32) strtol(token_str, &endptr, 10);
 
-						nfree(token_str);
+						pfree(token_str);
 
 						if (endptr != token_str && token_id >= 0)
 						{
@@ -1531,17 +1531,17 @@ ndb_json_parse_gen_params(const char *params_json,
 				}
 				else
 				{
-					nfree(tokens);
-					nfree(biases);
+					pfree(tokens);
+					pfree(biases);
 				}
-				nfree(field);
+				pfree(field);
 			}
 		}
 		if (jsonb != NULL)
 		{
 			Jsonb	   *jsonb_ptr = (Jsonb *) jsonb;
 
-			nfree(jsonb_ptr);
+			pfree(jsonb_ptr);
 			jsonb = NULL;
 		}
 	}
@@ -1552,7 +1552,7 @@ ndb_json_parse_gen_params(const char *params_json,
 		{
 			Jsonb	   *jsonb_ptr = (Jsonb *) jsonb;
 
-			nfree(jsonb_ptr);
+			pfree(jsonb_ptr);
 			jsonb = NULL;
 		}
 	}
@@ -1576,7 +1576,7 @@ ndb_json_parse_gen_params(const char *params_json,
 
 			if (*p != '"')
 			{
-				nfree(json_copy);
+				pfree(json_copy);
 				if (errstr)
 					*errstr = pstrdup("invalid JSON format: expected key");
 				return -1;
@@ -1587,7 +1587,7 @@ ndb_json_parse_gen_params(const char *params_json,
 				p++;
 			if (*p != '"')
 			{
-				nfree(json_copy);
+				pfree(json_copy);
 				if (errstr)
 					*errstr = pstrdup("invalid JSON format: unterminated key");
 				return -1;
@@ -1705,7 +1705,7 @@ ndb_json_parse_gen_params(const char *params_json,
 			}
 		}
 
-		nfree(json_copy);
+		pfree(json_copy);
 	}
 
 	return 0;
@@ -1737,22 +1737,22 @@ ndb_json_parse_gen_params_free(NdbGenParams *gen_params)
 		for (i = 0; i < gen_params->num_stop_sequences; i++)
 		{
 			if (gen_params->stop_sequences[i] != NULL)
-				nfree(gen_params->stop_sequences[i]);
+				pfree(gen_params->stop_sequences[i]);
 		}
-		nfree(gen_params->stop_sequences);
+		pfree(gen_params->stop_sequences);
 		gen_params->stop_sequences = NULL;
 		gen_params->num_stop_sequences = 0;
 	}
 
 	if (gen_params->logit_bias_tokens != NULL)
 	{
-		nfree(gen_params->logit_bias_tokens);
+		pfree(gen_params->logit_bias_tokens);
 		gen_params->logit_bias_tokens = NULL;
 	}
 
 	if (gen_params->logit_bias_values != NULL)
 	{
-		nfree(gen_params->logit_bias_values);
+		pfree(gen_params->logit_bias_values);
 		gen_params->logit_bias_values = NULL;
 	}
 
@@ -1824,9 +1824,9 @@ ndb_json_extract_openai_response(const char *json_str,
 					if (msg_text != NULL)
 					{
 						response->error_message = text_to_cstring(msg_text);
-						nfree(msg_text);
+						pfree(msg_text);
 					}
-					nfree(msg_field);
+					pfree(msg_field);
 				}
 				else
 				{
@@ -1834,16 +1834,16 @@ ndb_json_extract_openai_response(const char *json_str,
 					if (error_text != NULL)
 					{
 						response->error_message = text_to_cstring(error_text);
-						nfree(error_text);
+						pfree(error_text);
 					}
 				}
-				nfree(error_field);
+				pfree(error_field);
 			}
 			if (jsonb != NULL)
 			{
 				Jsonb	   *jsonb_ptr = (Jsonb *) jsonb;
 
-				nfree(jsonb_ptr);
+				pfree(jsonb_ptr);
 				jsonb = NULL;
 			}
 		}
@@ -1875,26 +1875,26 @@ ndb_json_extract_openai_response(const char *json_str,
 								{
 									char	   *temp = pnstrdup(content_str + 1, strlen(content_str) - 2);
 
-									nfree(content_str);
+									pfree(content_str);
 									content_str = temp;
 									if (strchr(content_str, '\\') != NULL)
 									{
 										char	   *unescaped = ndb_json_unescape_string(content_str);
 
-										nfree(content_str);
+										pfree(content_str);
 										content_str = unescaped;
 									}
 								}
 								response->text = content_str;
-								nfree(content_text);
+								pfree(content_text);
 							}
-							nfree(content);
+							pfree(content);
 						}
-						nfree(message);
+						pfree(message);
 					}
-					nfree(first_choice);
+					pfree(first_choice);
 				}
-				nfree(choices);
+				pfree(choices);
 			}
 
 			usage = ndb_jsonb_object_field((Jsonb *) jsonb, "usage");
@@ -1915,10 +1915,10 @@ ndb_json_extract_openai_response(const char *json_str,
 					{
 						tokens_str = text_to_cstring(tokens_text);
 						response->tokens_in = (int) strtol(tokens_str, NULL, 10);
-						nfree(tokens_str);
-						nfree(tokens_text);
+						pfree(tokens_str);
+						pfree(tokens_text);
 					}
-					nfree(prompt_tokens_field);
+					pfree(prompt_tokens_field);
 				}
 
 				if (completion_tokens_field != NULL)
@@ -1928,19 +1928,19 @@ ndb_json_extract_openai_response(const char *json_str,
 					{
 						tokens_str = text_to_cstring(tokens_text);
 						response->tokens_out = (int) strtol(tokens_str, NULL, 10);
-						nfree(tokens_str);
-						nfree(tokens_text);
+						pfree(tokens_str);
+						pfree(tokens_text);
 					}
-					nfree(completion_tokens_field);
+					pfree(completion_tokens_field);
 				}
-				nfree(usage);
+				pfree(usage);
 			}
 		}
 		if (jsonb != NULL)
 		{
 			Jsonb	   *jsonb_ptr = (Jsonb *) jsonb;
 
-			nfree(jsonb_ptr);
+			pfree(jsonb_ptr);
 			jsonb = NULL;
 		}
 	}
@@ -1951,7 +1951,7 @@ ndb_json_extract_openai_response(const char *json_str,
 		{
 			Jsonb	   *jsonb_ptr = (Jsonb *) jsonb;
 
-			nfree(jsonb_ptr);
+			pfree(jsonb_ptr);
 			jsonb = NULL;
 		}
 	}
@@ -2235,13 +2235,13 @@ ndb_json_extract_openai_response_free(NdbOpenAIResponse *response)
 
 	if (response->text != NULL)
 	{
-		nfree(response->text);
+		pfree(response->text);
 		response->text = NULL;
 	}
 
 	if (response->error_message != NULL)
 	{
-		nfree(response->error_message);
+		pfree(response->error_message);
 		response->error_message = NULL;
 	}
 }
@@ -2336,15 +2336,15 @@ ndb_json_parse_openai_embedding(const char *json_str,
 							{
 								float	   *vec_ptr = (float *) vec;
 
-								nfree(vec_ptr);
+								pfree(vec_ptr);
 								vec = NULL;
 							}
 						}
-						nfree(embedding);
+						pfree(embedding);
 					}
-					nfree(first_item);
+					pfree(first_item);
 				}
-				nfree(data);
+				pfree(data);
 			}
 		}
 	}
@@ -2357,7 +2357,7 @@ ndb_json_parse_openai_embedding(const char *json_str,
 			{
 				float	   *vec_ptr = (float *) vec;
 
-				nfree(vec_ptr);
+				pfree(vec_ptr);
 				vec = NULL;
 			}
 			vec = NULL;
@@ -2369,7 +2369,7 @@ ndb_json_parse_openai_embedding(const char *json_str,
 	{
 		Jsonb	   *jsonb_ptr = (Jsonb *) jsonb;
 
-		nfree(jsonb_ptr);
+		pfree(jsonb_ptr);
 		jsonb = NULL;
 	}
 
@@ -2490,7 +2490,7 @@ ndb_json_parse_openai_embedding(const char *json_str,
 				{
 					if (vec != NULL)
 					{
-						nfree(vec);
+						pfree(vec);
 					}
 				}
 			}
@@ -2568,10 +2568,10 @@ ndb_json_parse_sparse_vector(const char *json_str,
 				{
 					value_str = text_to_cstring(field_text);
 					result->vocab_size = (int32) strtol(value_str, NULL, 10);
-					nfree(value_str);
-					nfree(field_text);
+					pfree(value_str);
+					pfree(field_text);
 				}
-				nfree(field);
+				pfree(field);
 			}
 
 			field = ndb_jsonb_object_field((Jsonb *) jsonb, "model");
@@ -2586,7 +2586,7 @@ ndb_json_parse_sparse_vector(const char *json_str,
 					{
 						char	   *temp = pnstrdup(value_str + 1, strlen(value_str) - 2);
 
-						nfree(value_str);
+						pfree(value_str);
 						value_str = temp;
 					}
 
@@ -2597,10 +2597,10 @@ ndb_json_parse_sparse_vector(const char *json_str,
 					else if (strcmp(value_str, "ColBERTv2") == 0)
 						result->model_type = 2;
 
-					nfree(value_str);
-					nfree(field_text);
+					pfree(value_str);
+					pfree(field_text);
 				}
-				nfree(field);
+				pfree(field);
 			}
 
 			field = ndb_jsonb_object_field((Jsonb *) jsonb, "tokens");
@@ -2614,7 +2614,7 @@ ndb_json_parse_sparse_vector(const char *json_str,
 				if (tmp != NULL)
 				{
 					temp_tokens = ndb_json_parse_int_array(tmp, &count);
-					nfree(tmp);
+					pfree(tmp);
 					if (temp_tokens != NULL && count > 0)
 					{
 						int32 *tmp_token_ids = NULL;
@@ -2623,10 +2623,10 @@ ndb_json_parse_sparse_vector(const char *json_str,
 						for (i = 0; i < count; i++)
 							tmp_token_ids[i] = (int32) temp_tokens[i];
 						nnz = count;
-						nfree(temp_tokens);
+						pfree(temp_tokens);
 					}
 				}
-				nfree(field);
+				pfree(field);
 			}
 
 			field = ndb_jsonb_object_field((Jsonb *) jsonb, "weights");
@@ -2640,7 +2640,7 @@ ndb_json_parse_sparse_vector(const char *json_str,
 				if (tmp != NULL)
 				{
 					temp_weights = ndb_json_parse_float_array(tmp, &count);
-					nfree(tmp);
+					pfree(tmp);
 					if (temp_weights != NULL && count > 0)
 					{
 						float4 *tmp_weights = NULL;
@@ -2648,17 +2648,17 @@ ndb_json_parse_sparse_vector(const char *json_str,
 						weights = (volatile float4 *) tmp_weights;
 						for (i = 0; i < count && i < (int) nnz; i++)
 							tmp_weights[i] = (float4) temp_weights[i];
-						nfree(temp_weights);
+						pfree(temp_weights);
 					}
 				}
-				nfree(field);
+				pfree(field);
 			}
 		}
 		if (jsonb != NULL)
 		{
 			Jsonb	   *jsonb_ptr = (Jsonb *) jsonb;
 
-			nfree(jsonb_ptr);
+			pfree(jsonb_ptr);
 			jsonb = NULL;
 		}
 	}
@@ -2669,7 +2669,7 @@ ndb_json_parse_sparse_vector(const char *json_str,
 		{
 			Jsonb	   *jsonb_ptr = (Jsonb *) jsonb;
 
-			nfree(jsonb_ptr);
+			pfree(jsonb_ptr);
 			jsonb = NULL;
 		}
 	}
@@ -2809,14 +2809,14 @@ ndb_json_parse_sparse_vector(const char *json_str,
 		{
 			int32	   *token_ids_ptr = (int32 *) token_ids;
 
-			nfree(token_ids_ptr);
+			pfree(token_ids_ptr);
 			token_ids = NULL;
 		}
 		if (weights != NULL)
 		{
 			float4	   *weights_ptr = (float4 *) weights;
 
-			nfree(weights_ptr);
+			pfree(weights_ptr);
 			weights = NULL;
 		}
 		if (errstr)
@@ -2862,13 +2862,13 @@ ndb_json_parse_sparse_vector_free(NdbSparseVectorParse *result)
 
 	if (result->token_ids != NULL)
 	{
-		nfree(result->token_ids);
+		pfree(result->token_ids);
 		result->token_ids = NULL;
 	}
 
 	if (result->weights != NULL)
 	{
-		nfree(result->weights);
+		pfree(result->weights);
 		result->weights = NULL;
 	}
 
@@ -3124,22 +3124,22 @@ ndb_json_merge_objects(const char *json1, const char *json2)
 			result = buf.data;
 
 			if (str1 != NULL)
-				nfree(str1);
+				pfree(str1);
 			if (str2 != NULL)
-				nfree(str2);
+				pfree(str2);
 		}
 		if (jsonb1 != NULL)
 		{
 			Jsonb	   *jsonb1_ptr = (Jsonb *) jsonb1;
 
-			nfree(jsonb1_ptr);
+			pfree(jsonb1_ptr);
 			jsonb1 = NULL;
 		}
 		if (jsonb2 != NULL)
 		{
 			Jsonb	   *jsonb2_ptr = (Jsonb *) jsonb2;
 
-			nfree(jsonb2_ptr);
+			pfree(jsonb2_ptr);
 			jsonb2 = NULL;
 		}
 	}
@@ -3152,14 +3152,14 @@ ndb_json_merge_objects(const char *json1, const char *json2)
 		{
 			Jsonb	   *jsonb1_ptr = (Jsonb *) jsonb1;
 
-			nfree(jsonb1_ptr);
+			pfree(jsonb1_ptr);
 			jsonb1 = NULL;
 		}
 		if (jsonb2 != NULL)
 		{
 			Jsonb	   *jsonb2_ptr = (Jsonb *) jsonb2;
 
-			nfree(jsonb2_ptr);
+			pfree(jsonb2_ptr);
 			jsonb2 = NULL;
 		}
 
@@ -3244,9 +3244,9 @@ ndb_json_parse_array(const char *json_str, int *count)
 									elem_str = text_to_cstring(elem_text);
 									local_result[(int) n] = elem_str;
 									n++;
-									nfree(elem_text);
+									pfree(elem_text);
 								}
-								nfree(elem_jsonb);
+								pfree(elem_jsonb);
 							}
 						}
 					}
@@ -3258,7 +3258,7 @@ ndb_json_parse_array(const char *json_str, int *count)
 		{
 			Jsonb	   *jsonb_ptr = (Jsonb *) jsonb;
 
-			nfree(jsonb_ptr);
+			pfree(jsonb_ptr);
 			jsonb = NULL;
 		}
 	}
@@ -3269,7 +3269,7 @@ ndb_json_parse_array(const char *json_str, int *count)
 		{
 			Jsonb	   *jsonb_ptr = (Jsonb *) jsonb;
 
-			nfree(jsonb_ptr);
+			pfree(jsonb_ptr);
 			jsonb = NULL;
 		}
 		if (result != NULL)
@@ -3277,7 +3277,7 @@ ndb_json_parse_array(const char *json_str, int *count)
 			{
 				char	  **result_ptr = (char **) result;
 
-				nfree(result_ptr);
+				pfree(result_ptr);
 				result = NULL;
 			}
 			result = NULL;
@@ -3297,7 +3297,7 @@ ndb_json_parse_array(const char *json_str, int *count)
 			{
 				char	  **result_ptr = (char **) result;
 
-				nfree(result_ptr);
+				pfree(result_ptr);
 				result = NULL;
 			}
 			result = NULL;
@@ -3341,7 +3341,7 @@ ndb_json_parse_array(const char *json_str, int *count)
 						{
 							char	   *unescaped = ndb_json_unescape_string(value);
 
-							nfree(value);
+							pfree(value);
 							value = unescaped;
 						}
 					}
@@ -3378,7 +3378,7 @@ ndb_json_parse_array(const char *json_str, int *count)
 	}
 
 	if (result != NULL)
-		nfree(result);
+		pfree(result);
 
 	return NULL;
 }
@@ -3408,10 +3408,10 @@ ndb_json_parse_array_free(char **array, int count)
 	for (i = 0; i < count; i++)
 	{
 		if (array[i] != NULL)
-			nfree(array[i]);
+			pfree(array[i]);
 	}
 
-	nfree(array);
+	pfree(array);
 }
 
 /*
@@ -3548,7 +3548,7 @@ ndb_json_validate(const char *json_str)
 			{
 				Jsonb	   *jsonb_ptr = (Jsonb *) jsonb;
 
-				nfree(jsonb_ptr);
+				pfree(jsonb_ptr);
 				jsonb = NULL;
 			}
 		}
@@ -3560,7 +3560,7 @@ ndb_json_validate(const char *json_str)
 		{
 			Jsonb	   *jsonb_ptr = (Jsonb *) jsonb;
 
-			nfree(jsonb_ptr);
+			pfree(jsonb_ptr);
 			jsonb = NULL;
 		}
 		result = false;
@@ -3634,7 +3634,7 @@ ndb_json_strip_whitespace(const char *json_str)
 			{
 				Jsonb	   *jsonb_ptr = (Jsonb *) jsonb;
 
-				nfree(jsonb_ptr);
+				pfree(jsonb_ptr);
 				jsonb = NULL;
 			}
 		}
@@ -3646,7 +3646,7 @@ ndb_json_strip_whitespace(const char *json_str)
 		{
 			Jsonb	   *jsonb_ptr = (Jsonb *) jsonb;
 
-			nfree(jsonb_ptr);
+			pfree(jsonb_ptr);
 			jsonb = NULL;
 		}
 		result = pstrdup(json_str);
@@ -3761,9 +3761,9 @@ ndb_json_parse_object(const char *json_str, int *count)
 										value_str = text_to_cstring(value_text);
 										((NdbJsonParseResult *) result)[(int) n].value_type = (v.type == jbvBinary) ? 4 : 5;
 										((NdbJsonParseResult *) result)[(int) n].value = value_str;
-										nfree(value_text);
+										pfree(value_text);
 									}
-									nfree(value_jsonb);
+									pfree(value_jsonb);
 								}
 								if (value_str == NULL)
 								{
@@ -3781,7 +3781,7 @@ ndb_json_parse_object(const char *json_str, int *count)
 		{
 			Jsonb	   *jsonb_ptr = (Jsonb *) jsonb;
 
-			nfree(jsonb_ptr);
+			pfree(jsonb_ptr);
 			jsonb = NULL;
 		}
 	}
@@ -3792,26 +3792,27 @@ ndb_json_parse_object(const char *json_str, int *count)
 		{
 			Jsonb	   *jsonb_ptr = (Jsonb *) jsonb;
 
-			nfree(jsonb_ptr);
+			pfree(jsonb_ptr);
 			jsonb = NULL;
 		}
 		if (result != NULL)
 		{
-			int			i;
+		int			i;
+		NdbJsonParseResult *res_array = (NdbJsonParseResult *) result;
 
-			for (i = 0; i < (int) n; i++)
-			{
-				if (((NdbJsonParseResult *) result)[i].key != NULL)
-					nfree(((NdbJsonParseResult *) result)[i].key);
-				if (((NdbJsonParseResult *) result)[i].value != NULL)
-					nfree(((NdbJsonParseResult *) result)[i].value);
-			}
-			{
-				NdbJsonParseResult *result_ptr = (NdbJsonParseResult *) result;
+		for (i = 0; i < (int) n; i++)
+		{
+			if (res_array[i].key != NULL)
+				pfree(res_array[i].key);
+			if (res_array[i].value != NULL)
+				pfree(res_array[i].value);
+		}
+		{
+			NdbJsonParseResult *result_ptr = (NdbJsonParseResult *) result;
 
-				nfree(result_ptr);
-				result = NULL;
-			}
+			pfree(result_ptr);
+			result = NULL;
+		}
 			result = NULL;
 		}
 	}
@@ -3827,7 +3828,7 @@ ndb_json_parse_object(const char *json_str, int *count)
 	{
 		NdbJsonParseResult *result_ptr = (NdbJsonParseResult *) result;
 
-		nfree(result_ptr);
+		pfree(result_ptr);
 	}
 
 	return NULL;
@@ -3847,12 +3848,12 @@ ndb_json_parse_object_free(NdbJsonParseResult *arr, int count)
 	for (i = 0; i < count; i++)
 	{
 		if (arr[i].key != NULL)
-			nfree(arr[i].key);
+			pfree(arr[i].key);
 		if (arr[i].value != NULL)
-			nfree(arr[i].value);
+			pfree(arr[i].value);
 	}
 
-	nfree(arr);
+	pfree(arr);
 }
 
 /*
@@ -3902,7 +3903,7 @@ ndb_jsonb_build_object(const char *key1, const char *value1,...)
 
 	result = ndb_jsonb_in_cstring(json_str);
 
-	nfree(buf.data);
+	pfree(buf.data);
 
 	return result;
 }
@@ -3945,7 +3946,7 @@ ndb_jsonb_build_array(const char *value1,...)
 
 	result = ndb_jsonb_in_cstring(json_str);
 
-	nfree(buf.data);
+	pfree(buf.data);
 
 	return result;
 }

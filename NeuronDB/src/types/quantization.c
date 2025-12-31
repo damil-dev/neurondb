@@ -524,8 +524,8 @@ quantize_analyze_int8(PG_FUNCTION_ARGS)
 						 8.0);
 		result_jsonb = DatumGetJsonbP(DirectFunctionCall1(
 														  jsonb_in, CStringGetTextDatum(json_buf.data)));
-		nfree(json_buf.data);
-		nfree(quantized);
+		pfree(json_buf.data);
+		pfree(quantized);
 		PG_RETURN_POINTER(result_jsonb);
 	}
 
@@ -577,9 +577,9 @@ quantize_analyze_int8(PG_FUNCTION_ARGS)
 	result_jsonb = DatumGetJsonbP(DirectFunctionCall1(
 													  jsonb_in, CStringGetTextDatum(json_buf.data)));
 
-	nfree(json_buf.data);
-	nfree(quantized);
-	nfree(dequantized);
+	pfree(json_buf.data);
+	pfree(quantized);
+	pfree(dequantized);
 
 	PG_RETURN_POINTER(result_jsonb);
 }
@@ -672,9 +672,9 @@ quantize_analyze_fp16(PG_FUNCTION_ARGS)
 	result_jsonb = DatumGetJsonbP(DirectFunctionCall1(
 													  jsonb_in, CStringGetTextDatum(json_buf.data)));
 
-	nfree(json_buf.data);
-	nfree(quantized);
-	nfree(dequantized);
+	pfree(json_buf.data);
+	pfree(quantized);
+	pfree(dequantized);
 
 	PG_RETURN_POINTER(result_jsonb);
 }
@@ -775,9 +775,9 @@ quantize_analyze_binary(PG_FUNCTION_ARGS)
 	result_jsonb = DatumGetJsonbP(DirectFunctionCall1(
 													  jsonb_in, CStringGetTextDatum(json_buf.data)));
 
-	nfree(json_buf.data);
-	nfree(quantized);
-	nfree(dequantized);
+	pfree(json_buf.data);
+	pfree(quantized);
+	pfree(dequantized);
 
 	PG_RETURN_POINTER(result_jsonb);
 }
@@ -858,8 +858,8 @@ quantize_compare_distances(PG_FUNCTION_ARGS)
 		for (i = 0; i < b_original->dim; i++)
 			b_dequantized->data[i] = ((float4) bq->data[i]) / scale_b;
 
-		nfree(aq);
-		nfree(bq);
+		pfree(aq);
+		pfree(bq);
 	}
 	else if (strcmp(qtype, "fp16") == 0)
 	{
@@ -878,8 +878,8 @@ quantize_compare_distances(PG_FUNCTION_ARGS)
 		for (i = 0; i < b_original->dim; i++)
 			b_dequantized->data[i] = fp16_to_float(bq->data[i]);
 
-		nfree(aq);
-		nfree(bq);
+		pfree(aq);
+		pfree(bq);
 	}
 	else if (strcmp(qtype, "binary") == 0)
 	{
@@ -910,12 +910,12 @@ quantize_compare_distances(PG_FUNCTION_ARGS)
 				(bq->data[byte_idx] & (1 << bit_idx)) ? 1.0f : -1.0f;
 		}
 
-		nfree(aq);
-		nfree(bq);
+		pfree(aq);
+		pfree(bq);
 	}
 	else
 	{
-		nfree(qtype);
+		pfree(qtype);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("quantization type must be 'int8', 'fp16', or 'binary'")));
@@ -949,10 +949,10 @@ quantize_compare_distances(PG_FUNCTION_ARGS)
 	result_jsonb = DatumGetJsonbP(DirectFunctionCall1(
 													  jsonb_in, CStringGetTextDatum(json_buf.data)));
 
-	nfree(json_buf.data);
-	nfree(qtype);
-	nfree(a_dequantized);
-	nfree(b_dequantized);
+	pfree(json_buf.data);
+	pfree(qtype);
+	pfree(a_dequantized);
+	pfree(b_dequantized);
 
 	PG_RETURN_POINTER(result_jsonb);
 }
@@ -1033,8 +1033,8 @@ quantize_analyze_uint8(PG_FUNCTION_ARGS)
 						 4.0);
 		result_jsonb = DatumGetJsonbP(DirectFunctionCall1(
 														  jsonb_in, CStringGetTextDatum(json_buf.data)));
-		nfree(json_buf.data);
-		nfree(quantized);
+		pfree(json_buf.data);
+		pfree(quantized);
 		PG_RETURN_POINTER(result_jsonb);
 	}
 
@@ -1086,9 +1086,9 @@ quantize_analyze_uint8(PG_FUNCTION_ARGS)
 	result_jsonb = DatumGetJsonbP(DirectFunctionCall1(
 													  jsonb_in, CStringGetTextDatum(json_buf.data)));
 
-	nfree(json_buf.data);
-	nfree(quantized);
-	nfree(dequantized);
+	pfree(json_buf.data);
+	pfree(quantized);
+	pfree(dequantized);
 
 	PG_RETURN_POINTER(result_jsonb);
 }
@@ -1207,9 +1207,9 @@ quantize_analyze_ternary(PG_FUNCTION_ARGS)
 	result_jsonb = DatumGetJsonbP(DirectFunctionCall1(
 													  jsonb_in, CStringGetTextDatum(json_buf.data)));
 
-	nfree(json_buf.data);
-	nfree(quantized);
-	nfree(dequantized);
+	pfree(json_buf.data);
+	pfree(quantized);
+	pfree(dequantized);
 
 	PG_RETURN_POINTER(result_jsonb);
 }
@@ -1283,8 +1283,8 @@ quantize_analyze_int4(PG_FUNCTION_ARGS)
 						 8.0);
 		result_jsonb = DatumGetJsonbP(DirectFunctionCall1(
 														  jsonb_in, CStringGetTextDatum(json_buf.data)));
-		nfree(json_buf.data);
-		nfree(quantized);
+		pfree(json_buf.data);
+		pfree(quantized);
 		PG_RETURN_POINTER(result_jsonb);
 	}
 
@@ -1344,9 +1344,9 @@ quantize_analyze_int4(PG_FUNCTION_ARGS)
 	result_jsonb = DatumGetJsonbP(DirectFunctionCall1(
 													  jsonb_in, CStringGetTextDatum(json_buf.data)));
 
-	nfree(json_buf.data);
-	nfree(quantized);
-	nfree(dequantized);
+	pfree(json_buf.data);
+	pfree(quantized);
+	pfree(dequantized);
 
 	PG_RETURN_POINTER(result_jsonb);
 }
@@ -1780,7 +1780,7 @@ halfvec_in(PG_FUNCTION_ARGS)
 	for (i = 0; i < dim; i++)
 		result->data[i] = float4_to_fp16(temp_data[i]);
 
-	nfree(temp_data);
+	pfree(temp_data);
 	PG_RETURN_POINTER(result);
 }
 
@@ -2528,7 +2528,7 @@ vector_to_bit(PG_FUNCTION_ARGS)
 		}
 	}
 
-	nfree(vb);
+	pfree(vb);
 	PG_RETURN_VARBIT_P(result);
 }
 

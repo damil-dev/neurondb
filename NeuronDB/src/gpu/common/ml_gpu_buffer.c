@@ -217,7 +217,7 @@ ml_gpu_buffer_release(MLGpuBuffer *buf)
 		return;
 
 	if (buf->host_owner && buf->host_ptr != NULL)
-		nfree(buf->host_ptr);
+		pfree(buf->host_ptr);
 
 	backend = ndb_gpu_get_active_backend();
 	if (buf->device_owner && buf->device_ptr != NULL && backend

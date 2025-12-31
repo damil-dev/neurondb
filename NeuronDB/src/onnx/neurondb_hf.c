@@ -120,10 +120,10 @@ neurondb_hf_embedding(PG_FUNCTION_ARGS)
 	PG_CATCH();
 	{
 		neurondb_onnx_free_tensor(input_tensor);
-		nfree(input_data);
-		nfree(token_ids);
-		nfree(model_name);
-		nfree(txt);
+		pfree(input_data);
+		pfree(token_ids);
+		pfree(model_name);
+		pfree(txt);
 		PG_RE_THROW();
 	}
 	PG_END_TRY();
@@ -147,10 +147,10 @@ neurondb_hf_embedding(PG_FUNCTION_ARGS)
 
 	neurondb_onnx_free_tensor(input_tensor);
 	neurondb_onnx_free_tensor(output_tensor);
-	nfree(input_data);
-	nfree(token_ids);
-	nfree(model_name);
-	nfree(txt);
+	pfree(input_data);
+	pfree(token_ids);
+	pfree(model_name);
+	pfree(txt);
 
 	PG_RETURN_POINTER(result);
 }
@@ -212,10 +212,10 @@ neurondb_hf_classify(PG_FUNCTION_ARGS)
 	PG_CATCH();
 	{
 		neurondb_onnx_free_tensor(input_tensor);
-		nfree(input_data);
-		nfree(token_ids);
-		nfree(model_name);
-		nfree(txt);
+		pfree(input_data);
+		pfree(token_ids);
+		pfree(model_name);
+		pfree(txt);
 		PG_RE_THROW();
 	}
 	PG_END_TRY();
@@ -261,10 +261,10 @@ neurondb_hf_classify(PG_FUNCTION_ARGS)
 
 	neurondb_onnx_free_tensor(input_tensor);
 	neurondb_onnx_free_tensor(output_tensor);
-	nfree(input_data);
-	nfree(token_ids);
-	nfree(model_name);
-	nfree(txt);
+	pfree(input_data);
+	pfree(token_ids);
+	pfree(model_name);
+	pfree(txt);
 
 	PG_RETURN_TEXT_P(cstring_to_text(buf.data));
 }
@@ -328,10 +328,10 @@ neurondb_hf_ner(PG_FUNCTION_ARGS)
 	PG_CATCH();
 	{
 		neurondb_onnx_free_tensor(input_tensor);
-		nfree(input_data);
-		nfree(token_ids);
-		nfree(model_name);
-		nfree(txt);
+		pfree(input_data);
+		pfree(token_ids);
+		pfree(model_name);
+		pfree(txt);
 		PG_RE_THROW();
 	}
 	PG_END_TRY();
@@ -371,10 +371,10 @@ neurondb_hf_ner(PG_FUNCTION_ARGS)
 
 	neurondb_onnx_free_tensor(input_tensor);
 	neurondb_onnx_free_tensor(output_tensor);
-	nfree(input_data);
-	nfree(token_ids);
-	nfree(model_name);
-	nfree(txt);
+	pfree(input_data);
+	pfree(token_ids);
+	pfree(model_name);
+	pfree(txt);
 
 	PG_RETURN_TEXT_P(cstring_to_text(buf.data));
 }
@@ -445,11 +445,11 @@ neurondb_hf_qa(PG_FUNCTION_ARGS)
 	PG_CATCH();
 	{
 		neurondb_onnx_free_tensor(input_tensor);
-		nfree(input_data);
-		nfree(token_ids);
-		nfree(model_name);
-		nfree(question);
-		nfree(context);
+		pfree(input_data);
+		pfree(token_ids);
+		pfree(model_name);
+		pfree(question);
+		pfree(context);
 		PG_RE_THROW();
 	}
 	PG_END_TRY();
@@ -494,11 +494,11 @@ neurondb_hf_qa(PG_FUNCTION_ARGS)
 
 	neurondb_onnx_free_tensor(input_tensor);
 	neurondb_onnx_free_tensor(output_tensor);
-	nfree(input_data);
-	nfree(token_ids);
-	nfree(model_name);
-	nfree(question);
-	nfree(context);
+	pfree(input_data);
+	pfree(token_ids);
+	pfree(model_name);
+	pfree(question);
+	pfree(context);
 
 	PG_RETURN_TEXT_P(cstring_to_text(buf.data));
 }
@@ -604,7 +604,7 @@ sample_token_multinomial(float *logits, int vocab_size, float temperature)
 		}
 	}
 
-	nfree(probs);
+	pfree(probs);
 	return selected;
 }
 
@@ -780,7 +780,7 @@ ndb_onnx_hf_complete(const char *model_name,
 
 		/* Allocate input data */
 		if (input_data != NULL)
-			nfree(input_data);
+			pfree(input_data);
 		nalloc(input_data, float, current_seq_len);
 
 		/* Copy prompt tokens */
@@ -814,11 +814,11 @@ ndb_onnx_hf_complete(const char *model_name,
 			if (input_tensor)
 				neurondb_onnx_free_tensor(input_tensor);
 			if (input_data)
-				nfree(input_data);
+				pfree(input_data);
 			if (generated_token_ids)
-				nfree(generated_token_ids);
+				pfree(generated_token_ids);
 			if (input_token_ids)
-				nfree(input_token_ids);
+				pfree(input_token_ids);
 			MemoryContextSwitchTo(oldcontext);
 			MemoryContextDelete(complete_context);
 			PG_RE_THROW();
@@ -855,11 +855,11 @@ ndb_onnx_hf_complete(const char *model_name,
 			if (output_tensor)
 				neurondb_onnx_free_tensor(output_tensor);
 			if (input_data)
-				nfree(input_data);
+				pfree(input_data);
 			if (generated_token_ids)
-				nfree(generated_token_ids);
+				pfree(generated_token_ids);
 			if (input_token_ids)
-				nfree(input_token_ids);
+				pfree(input_token_ids);
 			MemoryContextSwitchTo(oldcontext);
 			MemoryContextDelete(complete_context);
 			return -1;
@@ -925,11 +925,11 @@ ndb_onnx_hf_complete(const char *model_name,
 	if (output_tensor)
 		neurondb_onnx_free_tensor(output_tensor);
 	if (input_data)
-		nfree(input_data);
+		pfree(input_data);
 	if (generated_token_ids)
-		nfree(generated_token_ids);
+		pfree(generated_token_ids);
 	if (input_token_ids)
-		nfree(input_token_ids);
+		pfree(input_token_ids);
 
 	MemoryContextSwitchTo(oldcontext);
 	MemoryContextDelete(complete_context);
@@ -1093,8 +1093,8 @@ ndb_onnx_hf_embed(const char *model_name,
 		MemoryContextSwitchTo(workcontext);
 		neurondb_onnx_free_tensor(input_tensor);
 		neurondb_onnx_free_tensor(output_tensor);
-		nfree(input_data);
-		nfree(token_ids);
+		pfree(input_data);
+		pfree(token_ids);
 		MemoryContextSwitchTo(oldcontext);
 		MemoryContextDelete(workcontext);
 	}
@@ -1102,15 +1102,15 @@ ndb_onnx_hf_embed(const char *model_name,
 	{
 		/* Cleanup on error */
 		if (result_vec)
-			nfree(result_vec);
+			pfree(result_vec);
 		if (input_tensor)
 			neurondb_onnx_free_tensor(input_tensor);
 		if (output_tensor)
 			neurondb_onnx_free_tensor(output_tensor);
 		if (input_data)
-			nfree(input_data);
+			pfree(input_data);
 		if (token_ids)
-			nfree(token_ids);
+			pfree(token_ids);
 		if (workcontext)
 		{
 			MemoryContextSwitchTo(oldcontext);
@@ -1343,7 +1343,7 @@ ndb_onnx_hf_image_embed(const char *model_name,
 				input_tensor = neurondb_onnx_create_tensor(input_data, input_shape, 4);
 				if (!input_tensor)
 				{
-					nfree(input_data);
+					pfree(input_data);
 					input_data = NULL;
 					if (errstr)
 						*errstr = pstrdup("Failed to create input tensor");
@@ -1357,7 +1357,7 @@ ndb_onnx_hf_image_embed(const char *model_name,
 					{
 						neurondb_onnx_free_tensor(input_tensor);
 						if (input_data)
-							nfree(input_data);
+							pfree(input_data);
 						if (errstr)
 							*errstr = pstrdup("ONNX inference failed");
 						rc = -1;
@@ -1375,7 +1375,7 @@ ndb_onnx_hf_image_embed(const char *model_name,
 							neurondb_onnx_free_tensor(input_tensor);
 							neurondb_onnx_free_tensor(output_tensor);
 							if (input_data)
-								nfree(input_data);
+								pfree(input_data);
 							if (errstr)
 								*errstr = pstrdup("Memory allocation failed");
 							*dim_out = 0;
@@ -1400,7 +1400,7 @@ ndb_onnx_hf_image_embed(const char *model_name,
 							neurondb_onnx_free_tensor(input_tensor);
 							neurondb_onnx_free_tensor(output_tensor);
 							if (input_data)
-								nfree(input_data);
+								pfree(input_data);
 
 							rc = 0;
 						}
@@ -1417,10 +1417,10 @@ ndb_onnx_hf_image_embed(const char *model_name,
 		if (output_tensor)
 			neurondb_onnx_free_tensor(output_tensor);
 		if (input_data)
-			nfree(input_data);
+			pfree(input_data);
 		if (*vec_out)
 		{
-			nfree(*vec_out);
+			pfree(*vec_out);
 			*vec_out = NULL;
 			*dim_out = 0;
 		}
@@ -1482,11 +1482,11 @@ ndb_onnx_hf_multimodal_embed(const char *model_name,
 				*errstr = psprintf("Text embedding failed: %s",
 								   text_err ? text_err : "unknown error");
 			if (text_err)
-				nfree(text_err);
+				pfree(text_err);
 			return -1;
 		}
 		if (text_err)
-			nfree(text_err);
+			pfree(text_err);
 	}
 
 	/* Get image embedding */
@@ -1497,16 +1497,16 @@ ndb_onnx_hf_multimodal_embed(const char *model_name,
 									&image_vec, &image_dim, &img_err) != 0)
 		{
 			if (text_vec)
-				nfree(text_vec);
+				pfree(text_vec);
 			if (errstr)
 				*errstr = psprintf("Image embedding failed: %s",
 								   img_err ? img_err : "unknown error");
 			if (img_err)
-				nfree(img_err);
+				pfree(img_err);
 			return -1;
 		}
 		if (img_err)
-			nfree(img_err);
+			pfree(img_err);
 	}
 
 	/* Combine embeddings (CLIP uses shared space) */
@@ -1521,9 +1521,9 @@ ndb_onnx_hf_multimodal_embed(const char *model_name,
 		if (!*vec_out)
 		{
 			if (text_vec)
-				nfree(text_vec);
+				pfree(text_vec);
 			if (image_vec)
-				nfree(image_vec);
+				pfree(image_vec);
 			if (errstr)
 				*errstr = pstrdup("Memory allocation failed");
 			*dim_out = 0;
@@ -1545,18 +1545,18 @@ ndb_onnx_hf_multimodal_embed(const char *model_name,
 		}
 
 		if (text_vec)
-			nfree(text_vec);
+			pfree(text_vec);
 		if (image_vec)
-			nfree(image_vec);
+			pfree(image_vec);
 
 		rc = 0;
 	}
 	else
 	{
 		if (text_vec)
-			nfree(text_vec);
+			pfree(text_vec);
 		if (image_vec)
-			nfree(image_vec);
+			pfree(image_vec);
 		if (errstr)
 			*errstr = pstrdup("Failed to combine embeddings (dimension mismatch)");
 		rc = -1;
@@ -1639,7 +1639,7 @@ ndb_onnx_hf_rerank(const char *model_name,
 		{
 			if (errstr)
 				*errstr = pstrdup("Failed to load ONNX cross-encoder model");
-			nfree(scores);
+			pfree(scores);
 			rc = -1;
 		}
 		else
@@ -1651,9 +1651,9 @@ ndb_onnx_hf_rerank(const char *model_name,
 			{
 				if (errstr)
 					*errstr = pstrdup("Failed to tokenize query");
-				nfree(scores);
+				pfree(scores);
 				if (query_token_ids)
-					nfree(query_token_ids);
+					pfree(query_token_ids);
 				rc = -1;
 			}
 			else
@@ -1674,7 +1674,7 @@ ndb_onnx_hf_rerank(const char *model_name,
 					{
 						scores[i] = 0.0f;
 						if (doc_token_ids)
-							nfree(doc_token_ids);
+							pfree(doc_token_ids);
 						continue;
 					}
 
@@ -1708,7 +1708,7 @@ ndb_onnx_hf_rerank(const char *model_name,
 					{
 						scores[i] = 0.0f;
 						if (doc_token_ids)
-							nfree(doc_token_ids);
+							pfree(doc_token_ids);
 						continue;
 					}
 
@@ -1740,9 +1740,9 @@ ndb_onnx_hf_rerank(const char *model_name,
 					{
 						scores[i] = 0.0f;
 						if (combined_token_ids)
-							nfree(combined_token_ids);
+							pfree(combined_token_ids);
 						if (doc_token_ids)
-							nfree(doc_token_ids);
+							pfree(doc_token_ids);
 						continue;
 					}
 
@@ -1758,11 +1758,11 @@ ndb_onnx_hf_rerank(const char *model_name,
 					{
 						scores[i] = 0.0f;
 						if (input_data)
-							nfree(input_data);
+							pfree(input_data);
 						if (combined_token_ids)
-							nfree(combined_token_ids);
+							pfree(combined_token_ids);
 						if (doc_token_ids)
-							nfree(doc_token_ids);
+							pfree(doc_token_ids);
 						continue;
 					}
 
@@ -1774,11 +1774,11 @@ ndb_onnx_hf_rerank(const char *model_name,
 						scores[i] = 0.0f;
 						neurondb_onnx_free_tensor(input_tensor);
 						if (input_data)
-							nfree(input_data);
+							pfree(input_data);
 						if (combined_token_ids)
-							nfree(combined_token_ids);
+							pfree(combined_token_ids);
 						if (doc_token_ids)
-							nfree(doc_token_ids);
+							pfree(doc_token_ids);
 						continue;
 					}
 
@@ -1804,11 +1804,11 @@ ndb_onnx_hf_rerank(const char *model_name,
 					neurondb_onnx_free_tensor(input_tensor);
 					neurondb_onnx_free_tensor(output_tensor);
 					if (input_data)
-						nfree(input_data);
+						pfree(input_data);
 					if (combined_token_ids)
-						nfree(combined_token_ids);
+						pfree(combined_token_ids);
 					if (doc_token_ids)
-						nfree(doc_token_ids);
+						pfree(doc_token_ids);
 					input_tensor = NULL;
 					output_tensor = NULL;
 					input_data = NULL;
@@ -1818,7 +1818,7 @@ ndb_onnx_hf_rerank(const char *model_name,
 
 				/* Cleanup query tokens */
 				if (query_token_ids)
-					nfree(query_token_ids);
+					pfree(query_token_ids);
 
 				*scores_out = scores;
 				rc = 0;
@@ -1833,15 +1833,15 @@ ndb_onnx_hf_rerank(const char *model_name,
 		if (output_tensor)
 			neurondb_onnx_free_tensor(output_tensor);
 		if (input_data)
-			nfree(input_data);
+			pfree(input_data);
 		if (combined_token_ids)
-			nfree(combined_token_ids);
+			pfree(combined_token_ids);
 		if (doc_token_ids)
-			nfree(doc_token_ids);
+			pfree(doc_token_ids);
 		if (query_token_ids)
-			nfree(query_token_ids);
+			pfree(query_token_ids);
 		if (scores)
-			nfree(scores);
+			pfree(scores);
 		if (errstr && !*errstr)
 			*errstr = pstrdup("ONNX reranking error");
 		*scores_out = NULL;

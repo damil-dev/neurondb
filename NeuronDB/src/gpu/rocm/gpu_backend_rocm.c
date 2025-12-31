@@ -736,8 +736,8 @@ rocm_backend_dbscan_impl(const float *vectors,
 		}
 	}
 
-	nfree(visited);
-	nfree(neighbors);
+	pfree(visited);
+	pfree(neighbors);
 
 	return true;
 }
@@ -938,7 +938,7 @@ ndb_rocm_launch_kmeans_assign(const float *vectors,
 			assignments[i] = (int)assign32[i];
 	}
 
-	nfree(assign32);
+	pfree(assign32);
 
 	return rc == 0 ? 0 : -1;
 }
@@ -977,8 +977,8 @@ ndb_rocm_launch_kmeans_update(const float *vectors,
 		k,
 		dim);
 
-	nfree(assign32);
-	nfree(counts);
+	pfree(assign32);
+	pfree(counts);
 
 	return rc == 0 ? 0 : -1;
 }

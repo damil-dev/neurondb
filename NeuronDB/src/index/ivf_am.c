@@ -495,7 +495,7 @@ ivfBuildCallback(Relation index,
 	}
 
 	buildstate->indtuples++;
-	nfree(vectorData);
+	pfree(vectorData);
 }
 
 static IndexBuildResult *
@@ -534,26 +534,51 @@ ivfbuild(Relation heap, Relation index, struct IndexInfo *indexInfo)
 		IvfOptions opts;
 		IvfOptions *opts_ptr = NULL;
 
-		/* Use defaults if rd_options is not available during build */
+		/* Safely get options from index->rd_options */
+		/* Validate rd_options before accessing to prevent NULL pointer dereference */
 		if (index->rd_options != NULL)
 		{
-			/* index->rd_options is already a processed bytea from build_reloptions */
-			/* We can access it directly using VARDATA */
-			opts_ptr = (IvfOptions *) VARDATA(index->rd_options);
-			if (opts_ptr != NULL)
+			/* index->rd_options is a bytea created by build_reloptions */
+			/* Validate that it's large enough and properly formatted */
+			Size bytea_size = VARSIZE(index->rd_options);
+			Size expected_size = MAXALIGN(sizeof(IvfOptions));
+			
+			/* Only access if size is reasonable */
+			if (bytea_size >= expected_size)
 			{
-				opts = *opts_ptr;
+				bytea *opts_bytea = index->rd_options;
+				opts_ptr = (IvfOptions *) VARDATA(opts_bytea);
+				
+				/* Validate pointer is not NULL and structure is valid */
+				if (opts_ptr != NULL)
+				{
+					/* Copy structure safely */
+					opts.nlists = opts_ptr->nlists;
+					opts.nprobe = opts_ptr->nprobe;
+					
+					/* Validate values are reasonable */
+					if (opts.nlists <= 0)
+						opts.nlists = IVF_DEFAULT_NLISTS;
+					if (opts.nprobe <= 0)
+						opts.nprobe = IVF_DEFAULT_NPROBE;
+				}
+				else
+				{
+					/* Use defaults if pointer is NULL */
+					opts.nlists = IVF_DEFAULT_NLISTS;
+					opts.nprobe = IVF_DEFAULT_NPROBE;
+				}
 			}
 			else
 			{
-				/* Use defaults if parsing failed */
+				/* Size mismatch - use defaults */
 				opts.nlists = IVF_DEFAULT_NLISTS;
 				opts.nprobe = IVF_DEFAULT_NPROBE;
 			}
 		}
 		else
 		{
-			/* Use defaults during index build */
+			/* Use defaults during index build if rd_options is NULL */
 			opts.nlists = IVF_DEFAULT_NLISTS;
 			opts.nprobe = IVF_DEFAULT_NPROBE;
 		}
@@ -623,12 +648,33 @@ ivfbuild(Relation heap, Relation index, struct IndexInfo *indexInfo)
 												  (void *) &buildstate,
 												  NULL);
 
+	/* Allow nlists to be up to sampleCount, but warn if it's too high */
 	if (buildstate.sampleCount < nlists)
-		ereport(ERROR,
-				(errcode(ERRCODE_INSUFFICIENT_RESOURCES),
-				 errmsg("ivf: not enough sample vectors (%d < %d)",
-						buildstate.sampleCount,
-						nlists)));
+	{
+		/* If user explicitly set nlists > sampleCount, use sampleCount instead */
+		if (nlists > buildstate.sampleCount && buildstate.sampleCount > 0)
+		{
+			ereport(WARNING,
+					(errmsg("ivf: reducing nlists from %d to %d (not enough sample vectors)",
+							nlists, buildstate.sampleCount)));
+			nlists = buildstate.sampleCount;
+		}
+		else if (buildstate.sampleCount == 0)
+		{
+			/* Empty table - create empty index */
+			ereport(WARNING,
+					(errmsg("ivf: building empty index (no sample vectors available)")));
+			nlists = 1; /* Use minimum nlists for empty index */
+		}
+		else
+		{
+			ereport(ERROR,
+					(errcode(ERRCODE_INSUFFICIENT_RESOURCES),
+					 errmsg("ivf: not enough sample vectors (%d < %d)",
+							buildstate.sampleCount,
+							nlists)));
+		}
+	}
 
 	/* Set dimension in metadata - re-read block 0 */
 	metaBuffer = ReadBuffer(index, 0);
@@ -688,7 +734,6 @@ ivfbuild(Relation heap, Relation index, struct IndexInfo *indexInfo)
 	for (i = 0; i < nlists; i++)
 	{
 		IvfCentroidData *centroid = NULL;
-
 		char *centroid_raw = NULL;
 
 		if (kmeans->centroids[i] == NULL)
@@ -722,19 +767,51 @@ ivfbuild(Relation heap, Relation index, struct IndexInfo *indexInfo)
 							 false);
 		if (offnum == InvalidOffsetNumber)
 		{
-			nfree(centroid);
+			/* Current page is full, allocate a new page */
+			MarkBufferDirty(centroidsBuf);
 			UnlockReleaseBuffer(centroidsBuf);
-			kmeans_free(kmeans);
-			ereport(ERROR,
-					(errcode(ERRCODE_INTERNAL_ERROR),
-					 errmsg("ivf: failed to add centroid to page")));
+
+			/* Allocate new page for remaining centroids */
+			centroidsBuf = ReadBuffer(index, P_NEW);
+			if (!BufferIsValid(centroidsBuf))
+			{
+				pfree(centroid_raw);
+				kmeans_free(kmeans);
+				ereport(ERROR,
+						(errcode(ERRCODE_INTERNAL_ERROR),
+						 errmsg("neurondb: ReadBuffer failed for centroid overflow page")));
+			}
+			LockBuffer(centroidsBuf, BUFFER_LOCK_EXCLUSIVE);
+			centroidsPage = BufferGetPage(centroidsBuf);
+			PageInit(centroidsPage,
+					 BufferGetPageSize(centroidsBuf),
+					 sizeof(IvfCentroidData));
+
+			/* Try again on the new page */
+			offnum = PageAddItem(centroidsPage,
+								 (Item) centroid,
+								 centroidSize,
+								 InvalidOffsetNumber,
+								 false,
+								 false);
+			if (offnum == InvalidOffsetNumber)
+			{
+				/* Still failed - centroid too large for even an empty page */
+				pfree(centroid_raw);
+				UnlockReleaseBuffer(centroidsBuf);
+				kmeans_free(kmeans);
+				ereport(ERROR,
+						(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
+						 errmsg("ivf: centroid size (%zu bytes) exceeds page size", centroidSize),
+						 errhint("Reduce vector dimensionality or use a different index type")));
+			}
 		}
 
 		/*
 		 * PageAddItem copies the data, so we can free the temporary
 		 * allocation
 		 */
-		nfree(centroid);
+		pfree(centroid_raw);
 	}
 
 	MarkBufferDirty(centroidsBuf);
@@ -878,7 +955,7 @@ ivfinsert(Relation index,
 		SET_VARSIZE(input_vec, VECTOR_SIZE(dim));
 		input_vec->dim = dim;
 		memcpy(input_vec->data, vectorData, dim * sizeof(float4));
-		nfree(vectorData);
+		pfree(vectorData);
 	}
 
 	/*
@@ -1155,7 +1232,7 @@ ivfinsert(Relation index,
 									0,
 									false);
 
-			nfree(entryData);
+			pfree(entryData);
 		}
 
 		if (newOffnum == InvalidOffsetNumber)
@@ -1194,7 +1271,7 @@ ivfinsert(Relation index,
 	}
 
 
-	nfree(input_vec);
+	pfree(input_vec);
 	return true;
 }
 
@@ -1482,7 +1559,7 @@ ivfoptions(Datum reloptions, bool validate)
 							found_nprobe = true;
 						}
 					}
-					nfree(elem_str);
+					pfree(elem_str);
 				}
 			}
 			
@@ -1567,17 +1644,17 @@ ivfrescan(IndexScanDesc scan,
 	/* Free previous results */
 	if (so->results)
 	{
-		nfree(so->results);
+		pfree(so->results);
 		so->results = NULL;
 	}
 	if (so->distances)
 	{
-		nfree(so->distances);
+		pfree(so->distances);
 		so->distances = NULL;
 	}
 	if (so->selectedClusters)
 	{
-		nfree(so->selectedClusters);
+		pfree(so->selectedClusters);
 		so->selectedClusters = NULL;
 	}
 
@@ -1635,13 +1712,13 @@ ivfrescan(IndexScanDesc scan,
 		{
 			char *queryVector_raw = NULL;
 			if (so->queryVector)
-				nfree(so->queryVector);
+				pfree(so->queryVector);
 			nalloc(queryVector_raw, char, VECTOR_SIZE(dim));
 			so->queryVector = (Vector *) queryVector_raw;
 			SET_VARSIZE(so->queryVector, VECTOR_SIZE(dim));
 			so->queryVector->dim = dim;
 			memcpy(so->queryVector->data, vectorData, dim * sizeof(float4));
-			nfree(vectorData);
+			pfree(vectorData);
 		}
 
 		/*
@@ -1822,7 +1899,7 @@ ivfSelectClusters(Relation index,
 		selectedClusters[i] = bestIdx;
 	}
 
-	nfree(clusterDistances);
+	pfree(clusterDistances);
 }
 
 /*
@@ -2004,7 +2081,7 @@ ivfCollectCandidates(Relation index,
 
 		*resultCount = actualK;
 
-		nfree(indices);
+		pfree(indices);
 	}
 	else
 	{
@@ -2013,8 +2090,8 @@ ivfCollectCandidates(Relation index,
 		*resultCount = 0;
 	}
 
-	nfree(candidates);
-	nfree(candidateDistances);
+	pfree(candidates);
+	pfree(candidateDistances);
 }
 
 static bool
@@ -2134,15 +2211,15 @@ ivfendscan(IndexScanDesc scan)
 		return;
 
 	if (so->results)
-		nfree(so->results);
+		pfree(so->results);
 	if (so->distances)
-		nfree(so->distances);
+		pfree(so->distances);
 	if (so->selectedClusters)
-		nfree(so->selectedClusters);
+		pfree(so->selectedClusters);
 	if (so->queryVector)
-		nfree(so->queryVector);
+		pfree(so->queryVector);
 
-	nfree(so);
+	pfree(so);
 	scan->opaque = NULL;
 }
 
@@ -2324,12 +2401,12 @@ kmeans_free(KMeansState * state)
 	int			i;
 
 	for (i = 0; i < state->k; i++)
-		nfree(state->centroids[i]);
+		pfree(state->centroids[i]);
 
-	nfree(state->centroids);
-	nfree(state->assignments);
-	nfree(state->counts);
-	nfree(state);
+	pfree(state->centroids);
+	pfree(state->assignments);
+	pfree(state->counts);
+	pfree(state);
 }
 
 /*
@@ -2456,7 +2533,7 @@ ivfdelete(Relation index,
 			SET_VARSIZE(inputVec, VECTOR_SIZE(dim));
 			inputVec->dim = dim;
 			memcpy(inputVec->data, vectorData, dim * sizeof(float4));
-			nfree(vectorData);
+			pfree(vectorData);
 		}
 	}
 
@@ -2670,7 +2747,7 @@ ivfdelete(Relation index,
 			UnlockReleaseBuffer(centroidsBuf);
 		}
 
-		nfree(inputVec);
+		pfree(inputVec);
 	}
 
 	/* Step 5: Update metadata - reacquire EXCLUSIVE lock */

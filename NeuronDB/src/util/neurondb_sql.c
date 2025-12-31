@@ -54,7 +54,7 @@ ndb_sql_get_load_dataset(const char *quoted_feat_col,
 					 quoted_table);
 
 	result = pstrdup(buf.data);
-	nfree(buf.data);
+	pfree(buf.data);
 
 	return result;
 }
@@ -78,7 +78,7 @@ ndb_sql_get_load_dataset_limited(const char *quoted_feat_col,
 					 max_rows);
 
 	result = pstrdup(buf.data);
-	nfree(buf.data);
+	pfree(buf.data);
 
 	return result;
 }
@@ -102,7 +102,7 @@ ndb_sql_get_load_dataset_chunk(const char *quoted_feat_col,
 					 offset);
 
 	result = pstrdup(buf.data);
-	nfree(buf.data);
+	pfree(buf.data);
 
 	return result;
 }
@@ -124,7 +124,7 @@ ndb_sql_get_check_dataset(const char *quoted_feat_col,
 					 quoted_target_col);
 
 	result = pstrdup(buf.data);
-	nfree(buf.data);
+	pfree(buf.data);
 
 	return result;
 }
@@ -144,7 +144,7 @@ ndb_sql_get_count_dataset(const char *quoted_feat_col,
 					 quoted_target_col);
 
 	result = pstrdup(buf.data);
-	nfree(buf.data);
+	pfree(buf.data);
 
 	return result;
 }
@@ -170,7 +170,7 @@ ndb_sql_get_eval_dataset(const char *quoted_feat_col,
 					 quoted_target_col);
 
 	result = pstrdup(buf.data);
-	nfree(buf.data);
+	pfree(buf.data);
 
 	return result;
 }

@@ -122,7 +122,7 @@ ndb_rocm_linreg_pack_model(const LinRegModel *model,
 
 		metrics_json = DatumGetJsonbP(DirectFunctionCall1(
 														  jsonb_in, CStringGetTextDatum(buf.data)));
-		nfree(buf.data);
+		pfree(buf.data);
 		*metrics = metrics_json;
 	}
 
@@ -383,7 +383,7 @@ cpu_fallback:
 				h_Xty[j] += xi[j] * targets[i];
 			}
 
-			nfree(xi);
+			pfree(xi);
 		}
 	}
 
@@ -489,8 +489,8 @@ cpu_fallback:
 		{
 			if (errstr)
 				*errstr = pstrdup("neurondb: failed to allocate memory for Cholesky decomposition");
-			nfree(h_XtX);
-			nfree(h_Xty);
+			pfree(h_XtX);
+			pfree(h_Xty);
 			return -1;
 		}
 
@@ -573,13 +573,13 @@ cpu_fallback:
 		if (!cholesky_success)
 		{
 			if (L)
-				nfree(L);
+				pfree(L);
 			if (XtX_work)
-				nfree(XtX_work);
-			nfree(h_XtX);
-			nfree(h_Xty);
-			nfree(h_XtX_inv);
-			nfree(h_beta);
+				pfree(XtX_work);
+			pfree(h_XtX);
+			pfree(h_Xty);
+			pfree(h_XtX_inv);
+			pfree(h_beta);
 			return -1;
 		}
 
@@ -643,13 +643,13 @@ cpu_fallback:
 					sum / L[row * dim_with_intercept + row];
 			}
 
-			nfree(col_vec);
+			pfree(col_vec);
 		}
 
-		nfree(L);
-		nfree(y_work);
+		pfree(L);
+		pfree(y_work);
 		if (XtX_work)
-			nfree(XtX_work);
+			pfree(XtX_work);
 		/* Note: h_beta is already computed above via Cholesky solve */
 	}
 
@@ -706,13 +706,13 @@ cpu_fallback:
 		rc = ndb_rocm_linreg_pack_model(
 										&model, &payload, &metrics_json, errstr);
 
-		nfree(model.coefficients);
+		pfree(model.coefficients);
 	}
 
-	nfree(h_XtX);
-	nfree(h_Xty);
-	nfree(h_XtX_inv);
-	nfree(h_beta);
+	pfree(h_XtX);
+	pfree(h_Xty);
+	pfree(h_XtX_inv);
+	pfree(h_beta);
 
 	if (rc == 0 && payload != NULL)
 	{
@@ -723,9 +723,9 @@ cpu_fallback:
 	}
 
 	if (payload != NULL)
-		nfree(payload);
+		pfree(payload);
 	if (metrics_json != NULL)
-		nfree(metrics_json);
+		pfree(metrics_json);
 
 	return -1;
 }
@@ -1076,7 +1076,7 @@ ndb_rocm_linreg_evaluate(const bytea * model_data,
 			h_coefficients_double[i] = (double) coefficients[i];
 
 		cuda_err = hipMemcpy(d_coefficients, h_coefficients_double, coeff_bytes, hipMemcpyHostToDevice);
-		nfree(h_coefficients_double);
+		pfree(h_coefficients_double);
 
 		if (cuda_err != hipSuccess)
 		{

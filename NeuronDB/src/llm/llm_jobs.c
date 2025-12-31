@@ -23,6 +23,7 @@
 #include "lib/stringinfo.h"
 #include "storage/ipc.h"
 #include "utils/timestamp.h"
+#include "neurondb_macros.h"
 #include "neurondb_llm.h"
 #include "neurondb_validation.h"
 #include "neurondb_spi_safe.h"
@@ -96,7 +97,7 @@ ndb_llm_job_enqueue(const char *job_type, const char *payload)
 											 &isnull));
 		if (isnull)
 		{
-			nfree(query.data);
+			pfree(query.data);
 			ndb_spi_session_end(&session);
 			ereport(ERROR,
 					(errmsg("Job ID returned as NULL after "
@@ -105,13 +106,13 @@ ndb_llm_job_enqueue(const char *job_type, const char *payload)
 	}
 	else
 	{
-		nfree(query.data);
+		pfree(query.data);
 		ndb_spi_session_end(&session);
 		ereport(ERROR,
 				(errmsg("Failed to insert llm job: %s", query.data)));
 	}
 
-	nfree(query.data);
+	pfree(query.data);
 	ndb_spi_session_end(&session);
 	return job_id;
 }
@@ -186,7 +187,7 @@ ndb_llm_job_acquire(int *job_id, char **job_type, char **payload)
 		}
 	}
 
-	nfree(query.data);
+	pfree(query.data);
 	ndb_spi_session_end(&session);
 	return found;
 }
@@ -256,7 +257,7 @@ ndb_llm_job_update(int job_id,
 				ok = true;
 		}
 	}
-	nfree(query.data);
+	pfree(query.data);
 	ndb_spi_session_end(&session);
 	return ok;
 }
@@ -293,7 +294,7 @@ ndb_llm_job_prune(int max_age_days)
 		deleted = SPI_processed;
 	}
 
-	nfree(query.data);
+	pfree(query.data);
 	ndb_spi_session_end(&session);
 	return deleted;
 }
@@ -341,7 +342,7 @@ ndb_llm_job_count_status(const char *status)
 		if (isnull)
 			count = 0;
 	}
-	nfree(query.data);
+	pfree(query.data);
 	ndb_spi_session_end(&session);
 	return count;
 }
@@ -386,7 +387,7 @@ ndb_llm_job_retry_failed(int max_retries)
 		== SPI_OK_UPDATE)
 		retried = SPI_processed;
 
-	nfree(query.data);
+	pfree(query.data);
 	ndb_spi_session_end(&session);
 	return retried;
 }
@@ -414,11 +415,11 @@ ndb_llm_job_clear(void)
 
 	if (ndb_spi_execute(session, query.data, false, 0) != SPI_OK_UTILITY)
 	{
-		nfree(query.data);
+		pfree(query.data);
 		ndb_spi_session_end(&session);
 		ereport(ERROR, (errmsg("Failed to truncate llm jobs table")));
 	}
 
-	nfree(query.data);
+	pfree(query.data);
 	ndb_spi_session_end(&session);
 }

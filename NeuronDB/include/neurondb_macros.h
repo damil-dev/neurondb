@@ -52,7 +52,9 @@
  *	 nfree(model);
  *	 nfree(coeffs);
  *
- * TEMPORARY DEBUGGING: Forced to pure pfree to isolate allocator issues
+ * NOTE: This ONLY works for simple lvalue pointers (local variables).
+ * DO NOT use with: array elements, struct fields, function returns, casts, or complex expressions.
+ * For those cases, use pfree() directly.
  */
 #undef nfree
 #define nfree(ptr)					\

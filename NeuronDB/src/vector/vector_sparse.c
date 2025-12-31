@@ -418,8 +418,8 @@ vecmap_add(PG_FUNCTION_ARGS)
 	memcpy(VECMAP_INDICES(result), result_indices, sizeof(int32) * result_nnz);
 	memcpy(VECMAP_VALUES(result), result_values, sizeof(float4) * result_nnz);
 
-	nfree(result_indices);
-	nfree(result_values);
+	pfree(result_indices);
+	pfree(result_values);
 
 	PG_RETURN_POINTER(result);
 }
@@ -522,8 +522,8 @@ vecmap_sub(PG_FUNCTION_ARGS)
 	memcpy(VECMAP_INDICES(result), result_indices, sizeof(int32) * result_nnz);
 	memcpy(VECMAP_VALUES(result), result_values, sizeof(float4) * result_nnz);
 
-	nfree(result_indices);
-	nfree(result_values);
+	pfree(result_indices);
+	pfree(result_values);
 
 	PG_RETURN_POINTER(result);
 }

@@ -210,7 +210,7 @@ ndb_cuda_svm_pack_model(const SVMModel * model,
 			/* Copy JSONB to current context using MemoryContextAlloc and memcpy */
 			/* JSONB is a varlena type, so we need to copy the entire structure */
 			{
-				/* TEMP FIX: Skip copy, use TopMemoryContext JSONB directly like Random Forest */
+				/* Use TopMemoryContext JSONB directly (same pattern as Random Forest) to avoid unnecessary copy */
 				metrics_json = temp_json;
 				/*
 				size_t		jsonb_size = VARSIZE(temp_json);
@@ -450,13 +450,13 @@ ndb_cuda_svm_train(const float *features,
 		if (errstr)
 			*errstr = pstrdup("CUDA SVM train: failed to allocate memory");
 		if (alphas)
-			nfree(alphas);
+			pfree(alphas);
 		if (errors)
-			nfree(errors);
+			pfree(errors);
 		if (kernel_matrix)
-			nfree(kernel_matrix);
+			pfree(kernel_matrix);
 		if (kernel_row)
-			nfree(kernel_row);
+			pfree(kernel_row);
 		return -1;
 	}
 
@@ -469,10 +469,10 @@ ndb_cuda_svm_train(const float *features,
 			{
 				if (errstr)
 					*errstr = pstrdup("CUDA SVM train: failed to compute kernel matrix");
-				nfree(alphas);
-				nfree(errors);
-				nfree(kernel_matrix);
-				nfree(kernel_row);
+				pfree(alphas);
+				pfree(errors);
+				pfree(kernel_matrix);
+				pfree(kernel_row);
 				return -1;
 			}
 			memcpy(kernel_matrix + i * sample_limit, kernel_row, sizeof(float) * (size_t) sample_limit);
@@ -480,10 +480,10 @@ ndb_cuda_svm_train(const float *features,
 	}
 	PG_CATCH();
 	{
-		if (alphas) nfree(alphas);
-		if (errors) nfree(errors);
-		if (kernel_matrix) nfree(kernel_matrix);
-		if (kernel_row) nfree(kernel_row);
+		if (alphas) pfree(alphas);
+		if (errors) pfree(errors);
+		if (kernel_matrix) pfree(kernel_matrix);
+		if (kernel_row) pfree(kernel_row);
 		if (errstr && *errstr == NULL)
 			*errstr = pstrdup("CUDA SVM train: exception during kernel matrix computation");
 		return -1;
@@ -650,15 +650,15 @@ ndb_cuda_svm_train(const float *features,
 		if (errstr)
 			*errstr = pstrdup("CUDA SVM train: failed to allocate support vectors");
 		if (model.alphas)
-			nfree(model.alphas);
+			pfree(model.alphas);
 		if (model.support_vectors)
-			nfree(model.support_vectors);
+			pfree(model.support_vectors);
 		if (model.support_vector_indices)
-			nfree(model.support_vector_indices);
-		nfree(alphas);
-		nfree(errors);
-		nfree(kernel_matrix);
-		nfree(kernel_row);
+			pfree(model.support_vector_indices);
+		pfree(alphas);
+		pfree(errors);
+		pfree(kernel_matrix);
+		pfree(kernel_row);
 		return -1;
 	}
 
@@ -693,28 +693,28 @@ ndb_cuda_svm_train(const float *features,
 		if (errstr && *errstr == NULL)
 			*errstr = pstrdup("CUDA SVM train: model packing failed");
 		if (model.alphas)
-			nfree(model.alphas);
+			pfree(model.alphas);
 		if (model.support_vectors)
-			nfree(model.support_vectors);
+			pfree(model.support_vectors);
 		if (model.support_vector_indices)
-			nfree(model.support_vector_indices);
-		nfree(alphas);
-		nfree(errors);
-		nfree(kernel_matrix);
-		nfree(kernel_row);
+			pfree(model.support_vector_indices);
+		pfree(alphas);
+		pfree(errors);
+		pfree(kernel_matrix);
+		pfree(kernel_row);
 		return -1;
 	}
 
 	if (model.alphas)
-		nfree(model.alphas);
+		pfree(model.alphas);
 	if (model.support_vectors)
-		nfree(model.support_vectors);
+		pfree(model.support_vectors);
 	if (model.support_vector_indices)
-		nfree(model.support_vector_indices);
-	nfree(alphas);
-	nfree(errors);
-	nfree(kernel_matrix);
-	nfree(kernel_row);
+		pfree(model.support_vector_indices);
+	pfree(alphas);
+	pfree(errors);
+	pfree(kernel_matrix);
+	pfree(kernel_row);
 
 	rc = 0;
 	return rc;
@@ -764,7 +764,7 @@ ndb_cuda_svm_predict(const bytea * model_data,
 	{
 		if (errstr)
 			*errstr = pstrdup("CUDA SVM predict: model_data too small for expected layout");
-		nfree(detoasted);
+		pfree(detoasted);
 		return -1;
 	}
 
@@ -775,7 +775,7 @@ ndb_cuda_svm_predict(const bytea * model_data,
 							   "has %d, input has %d",
 							   hdr->feature_dim,
 							   feature_dim);
-		nfree(detoasted);
+		pfree(detoasted);
 		return -1;
 	}
 
@@ -805,7 +805,7 @@ ndb_cuda_svm_predict(const bytea * model_data,
 		*confidence_out = fabs(prediction);
 
 	/* Free detoasted copy */
-	nfree(detoasted);
+	pfree(detoasted);
 
 	return 0;
 }
@@ -848,7 +848,7 @@ ndb_cuda_svm_predict_batch(const bytea * model_data,
 	{
 		if (errstr)
 			*errstr = pstrdup("CUDA SVM batch predict: model_data too small");
-		nfree(detoasted);
+		pfree(detoasted);
 		return -1;
 	}
 
@@ -865,7 +865,7 @@ ndb_cuda_svm_predict_batch(const bytea * model_data,
 	{
 		if (errstr)
 			*errstr = pstrdup("CUDA SVM batch predict: model_data too small for expected layout");
-		nfree(detoasted);
+		pfree(detoasted);
 		return -1;
 	}
 
@@ -875,7 +875,7 @@ ndb_cuda_svm_predict_batch(const bytea * model_data,
 		if (errstr)
 			*errstr = psprintf("CUDA SVM batch predict: feature dimension mismatch (expected %d, got %d)",
 							   hdr->feature_dim, feature_dim);
-		nfree(detoasted);
+		pfree(detoasted);
 		return -1;
 	}
 
@@ -904,7 +904,7 @@ ndb_cuda_svm_predict_batch(const bytea * model_data,
 	}
 
 	/* Free detoasted copy */
-	nfree(detoasted);
+	pfree(detoasted);
 
 	return 0;
 }
@@ -971,7 +971,7 @@ ndb_cuda_svm_evaluate_batch(const bytea * model_data,
 
 	if (rc != 0)
 	{
-		nfree(predictions);
+		pfree(predictions);
 		return -1;
 	}
 
@@ -1023,7 +1023,7 @@ ndb_cuda_svm_evaluate_batch(const bytea * model_data,
 	else
 		*f1_out = 0.0;
 
-	nfree(predictions);
+	pfree(predictions);
 
 	return 0;
 }

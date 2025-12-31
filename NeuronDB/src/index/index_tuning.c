@@ -93,7 +93,7 @@ index_tune_hnsw(PG_FUNCTION_ARGS)
 
 	/* Get vector dimension */
 	/* Use safe free/reinit to handle potential memory context changes */
-	nfree(sql.data);
+	pfree(sql.data);
 	initStringInfo(&sql);
 	appendStringInfo(&sql,
 					 "SELECT vector_dims(%s) FROM %s LIMIT 1",
@@ -197,10 +197,10 @@ index_tune_hnsw(PG_FUNCTION_ARGS)
 	result_jsonb = DatumGetJsonbP(DirectFunctionCall1(
 													  jsonb_in, CStringGetTextDatum(json_buf.data)));
 
-	nfree(json_buf.data);
-	nfree(tbl_name);
-	nfree(col_name);
-	nfree(sql.data);
+	pfree(json_buf.data);
+	pfree(tbl_name);
+	pfree(col_name);
+	pfree(sql.data);
 	ndb_spi_session_end(&session);
 
 	PG_RETURN_POINTER(result_jsonb);
@@ -257,7 +257,7 @@ index_tune_ivf(PG_FUNCTION_ARGS)
 
 	/* Get vector dimension */
 	/* Use safe free/reinit to handle potential memory context changes */
-	nfree(sql.data);
+	pfree(sql.data);
 	initStringInfo(&sql);
 	appendStringInfo(&sql,
 					 "SELECT vector_dims(%s) FROM %s LIMIT 1",
@@ -307,10 +307,10 @@ index_tune_ivf(PG_FUNCTION_ARGS)
 	result_jsonb = DatumGetJsonbP(DirectFunctionCall1(
 													  jsonb_in, CStringGetTextDatum(json_buf.data)));
 
-	nfree(json_buf.data);
-	nfree(tbl_name);
-	nfree(col_name);
-	nfree(sql.data);
+	pfree(json_buf.data);
+	pfree(tbl_name);
+	pfree(col_name);
+	pfree(sql.data);
 	ndb_spi_session_end(&session);
 
 	PG_RETURN_POINTER(result_jsonb);
@@ -370,7 +370,7 @@ index_recommend_type(PG_FUNCTION_ARGS)
 
 	/* Estimate update frequency (check for recent updates) */
 	/* Use safe free/reinit to handle potential memory context changes */
-	nfree(sql.data);
+	pfree(sql.data);
 	initStringInfo(&sql);
 	appendStringInfo(&sql,
 					 "SELECT COUNT(*) FROM %s WHERE "
@@ -448,10 +448,10 @@ index_recommend_type(PG_FUNCTION_ARGS)
 	result_jsonb = DatumGetJsonbP(DirectFunctionCall1(
 													  jsonb_in, CStringGetTextDatum(json_buf.data)));
 
-	nfree(json_buf.data);
-	nfree(tbl_name);
-	nfree(col_name);
-	nfree(sql.data);
+	pfree(json_buf.data);
+	pfree(tbl_name);
+	pfree(col_name);
+	pfree(sql.data);
 	ndb_spi_session_end(&session);
 
 	PG_RETURN_POINTER(result_jsonb);
@@ -511,13 +511,13 @@ index_tune_query_params(PG_FUNCTION_ARGS)
 				index_type = "hnsw";
 			else if (strcmp(amname, "ivfflat") == 0)
 				index_type = "ivf";
-			nfree(amname);
+			pfree(amname);
 		}
 	}
 
 	/* Get query performance metrics */
 	/* Use safe free/reinit to handle potential memory context changes */
-	nfree(sql.data);
+	pfree(sql.data);
 	initStringInfo(&sql);
 	appendStringInfo(&sql,
 					 "SELECT AVG(latency_ms) as avg_latency, "
@@ -608,9 +608,9 @@ index_tune_query_params(PG_FUNCTION_ARGS)
 	result_jsonb = DatumGetJsonbP(DirectFunctionCall1(
 													  jsonb_in, CStringGetTextDatum(json_buf.data)));
 
-	nfree(json_buf.data);
-	nfree(idx_name);
-	nfree(sql.data);
+	pfree(json_buf.data);
+	pfree(idx_name);
+	pfree(sql.data);
 	ndb_spi_session_end(&session);
 
 	PG_RETURN_POINTER(result_jsonb);

@@ -1432,7 +1432,7 @@ train_linear_regression(PG_FUNCTION_ARGS)
 
 			initStringInfo(&hyperbuf);
 			appendStringInfo(&hyperbuf, "{}");
-			/* Use ndb_jsonb_in_cstring like test 006 fix */
+			/* Use ndb_jsonb_in_cstring (consistent with other ML algorithms) */
 			gpu_hyperparams = ndb_jsonb_in_cstring(hyperbuf.data);
 			if (gpu_hyperparams == NULL)
 			{
@@ -1579,7 +1579,7 @@ train_linear_regression(PG_FUNCTION_ARGS)
 									 linreg_model.n_features > 0 ? linreg_model.n_features : 0,
 									 linreg_model.n_samples > 0 ? linreg_model.n_samples : 0);
 
-					/* Use ndb_jsonb_in_cstring like test 006 fix */
+					/* Use ndb_jsonb_in_cstring (consistent with other ML algorithms) */
 					updated_metrics = ndb_jsonb_in_cstring(metrics_buf.data);
 					if (updated_metrics == NULL)
 					{
@@ -3448,7 +3448,7 @@ linreg_gpu_evaluate(const MLGpuModel *model,
 						 state->feature_dim > 0 ? state->feature_dim : 0,
 						 state->n_samples > 0 ? state->n_samples : 0);
 
-		/* Use ndb_jsonb_in_cstring like test 006 fix */
+		/* Use ndb_jsonb_in_cstring (consistent with other ML algorithms) */
 		metrics_json = ndb_jsonb_in_cstring(buf.data);
 		if (metrics_json == NULL)
 		{
@@ -3551,7 +3551,7 @@ linreg_gpu_serialize(const MLGpuModel *model,
 						 state->feature_dim > 0 ? state->feature_dim : 0,
 						 state->n_samples > 0 ? state->n_samples : 0);
 
-		/* Use ndb_jsonb_in_cstring like test 006 fix */
+		/* Use ndb_jsonb_in_cstring (consistent with other ML algorithms) */
 		*metadata_out = ndb_jsonb_in_cstring(metrics_buf.data);
 		if (*metadata_out == NULL)
 		{

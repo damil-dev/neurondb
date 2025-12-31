@@ -152,7 +152,7 @@ ndb_cuda_gmm_pack_model(const struct GMMModel *model,
 			{
 				if (errstr)
 					*errstr = pstrdup("invalid GMM model: mixing_coeffs contains invalid value");
-				nfree(blob);
+				pfree(blob);
 				return -1;
 			}
 			mixing_dest[i] = coeff;
@@ -163,7 +163,7 @@ ndb_cuda_gmm_pack_model(const struct GMMModel *model,
 		{
 			if (errstr)
 				*errstr = pstrdup("invalid GMM model: mixing_coeffs do not sum to 1.0");
-			nfree(blob);
+			pfree(blob);
 			return -1;
 		}
 	}
@@ -191,7 +191,7 @@ ndb_cuda_gmm_pack_model(const struct GMMModel *model,
 					{
 					if (errstr)
 						*errstr = pstrdup("invalid GMM model: means contains non-finite value");
-					nfree(blob);
+					pfree(blob);
 					return -1;
 					}
 					means_dest[i * model->dim + j] = mean_val;
@@ -226,7 +226,7 @@ ndb_cuda_gmm_pack_model(const struct GMMModel *model,
 					{
 					if (errstr)
 						*errstr = pstrdup("invalid GMM model: variances contains invalid value");
-					nfree(blob);
+					pfree(blob);
 					return -1;
 					}
 					/* Regularize to avoid division by zero */
@@ -613,19 +613,19 @@ ndb_cuda_gmm_train(const float *features,
 cleanup:
 	/* Free model structure arrays (not the data they point to) */
 	if (means_2d != NULL)
-		nfree(means_2d);
+		pfree(means_2d);
 	if (variances_2d != NULL)
-		nfree(variances_2d);
+		pfree(variances_2d);
 
 	/* Free host memory */
 	if (mixing_coeffs != NULL)
-		nfree(mixing_coeffs);
+		pfree(mixing_coeffs);
 	if (means != NULL)
-		nfree(means);
+		pfree(means);
 	if (variances != NULL)
-		nfree(variances);
+		pfree(variances);
 	if (responsibilities != NULL)
-		nfree(responsibilities);
+		pfree(responsibilities);
 
 	return rc;
 }
@@ -718,7 +718,7 @@ ndb_cuda_gmm_predict(const bytea * model_data,
 			char	   *msg = psprintf("CUDA GMM predict: feature dimension mismatch (expected %d, got %d)", hdr->n_features, feature_dim);
 
 			*errstr = pstrdup(msg);
-			nfree(msg);
+			pfree(msg);
 		}
 		return -1;
 	}
@@ -770,7 +770,7 @@ ndb_cuda_gmm_predict(const bytea * model_data,
 		{
 			if (errstr)
 				*errstr = pstrdup("CUDA GMM predict: invalid mixing coefficient in model");
-			nfree(component_probs);
+			pfree(component_probs);
 			return -1;
 		}
 
@@ -787,7 +787,7 @@ ndb_cuda_gmm_predict(const bytea * model_data,
 			{
 				if (errstr)
 					*errstr = pstrdup("CUDA GMM predict: invalid mean or variance in model");
-				nfree(component_probs);
+				pfree(component_probs);
 				return -1;
 			}
 
@@ -799,7 +799,7 @@ ndb_cuda_gmm_predict(const bytea * model_data,
 			{
 				if (errstr)
 					*errstr = pstrdup("CUDA GMM predict: variance is zero or negative");
-				nfree(component_probs);
+				pfree(component_probs);
 				return -1;
 			}
 
@@ -808,7 +808,7 @@ ndb_cuda_gmm_predict(const bytea * model_data,
 			{
 				if (errstr)
 					*errstr = pstrdup("CUDA GMM predict: computed non-finite log variance");
-				nfree(component_probs);
+				pfree(component_probs);
 				return -1;
 			}
 
@@ -817,7 +817,7 @@ ndb_cuda_gmm_predict(const bytea * model_data,
 			{
 				if (errstr)
 					*errstr = pstrdup("CUDA GMM predict: computed non-finite log-likelihood contribution");
-				nfree(component_probs);
+				pfree(component_probs);
 				return -1;
 			}
 
@@ -830,7 +830,7 @@ ndb_cuda_gmm_predict(const bytea * model_data,
 		{
 			if (errstr)
 				*errstr = pstrdup("CUDA GMM predict: computed non-finite log-likelihood");
-			nfree(component_probs);
+			pfree(component_probs);
 			return -1;
 		}
 
@@ -839,7 +839,7 @@ ndb_cuda_gmm_predict(const bytea * model_data,
 		{
 			if (errstr)
 				*errstr = pstrdup("CUDA GMM predict: computed invalid exp value");
-			nfree(component_probs);
+			pfree(component_probs);
 			return -1;
 		}
 
@@ -848,7 +848,7 @@ ndb_cuda_gmm_predict(const bytea * model_data,
 		{
 			if (errstr)
 				*errstr = pstrdup("CUDA GMM predict: computed invalid component probability");
-			nfree(component_probs);
+			pfree(component_probs);
 			return -1;
 		}
 	}
@@ -860,7 +860,7 @@ ndb_cuda_gmm_predict(const bytea * model_data,
 	{
 		if (errstr)
 			*errstr = pstrdup("CUDA GMM predict: first component probability is non-finite");
-		nfree(component_probs);
+		pfree(component_probs);
 		return -1;
 	}
 
@@ -870,7 +870,7 @@ ndb_cuda_gmm_predict(const bytea * model_data,
 		{
 			if (errstr)
 				*errstr = pstrdup("CUDA GMM predict: component probability is non-finite");
-			nfree(component_probs);
+			pfree(component_probs);
 			return -1;
 		}
 		if (component_probs[i] > max_prob)
@@ -891,7 +891,7 @@ ndb_cuda_gmm_predict(const bytea * model_data,
 			{
 				if (errstr)
 					*errstr = pstrdup("CUDA GMM predict: component probability is non-finite during normalization");
-				nfree(component_probs);
+				pfree(component_probs);
 				return -1;
 			}
 			sum += component_probs[k];
@@ -901,7 +901,7 @@ ndb_cuda_gmm_predict(const bytea * model_data,
 		{
 			if (errstr)
 				*errstr = pstrdup("CUDA GMM predict: sum of probabilities is non-finite");
-			nfree(component_probs);
+			pfree(component_probs);
 			return -1;
 		}
 
@@ -912,7 +912,7 @@ ndb_cuda_gmm_predict(const bytea * model_data,
 			{
 				if (errstr)
 					*errstr = pstrdup("CUDA GMM predict: sum of probabilities is zero or non-finite");
-				nfree(component_probs);
+				pfree(component_probs);
 				return -1;
 			}
 
@@ -923,7 +923,7 @@ ndb_cuda_gmm_predict(const bytea * model_data,
 				{
 					if (errstr)
 						*errstr = pstrdup("CUDA GMM predict: computed invalid normalized probability");
-					nfree(component_probs);
+					pfree(component_probs);
 					return -1;
 				}
 			}
@@ -944,7 +944,7 @@ ndb_cuda_gmm_predict(const bytea * model_data,
 	{
 		if (errstr)
 			*errstr = pstrdup("CUDA GMM predict: invalid best_component index");
-		nfree(component_probs);
+		pfree(component_probs);
 		return -1;
 	}
 
@@ -953,13 +953,13 @@ ndb_cuda_gmm_predict(const bytea * model_data,
 	{
 		if (errstr)
 			*errstr = pstrdup("CUDA GMM predict: computed invalid final probability");
-		nfree(component_probs);
+		pfree(component_probs);
 		return -1;
 	}
 
 	*cluster_out = best_component;
 	*probability_out = final_prob;
-	nfree(component_probs);
+	pfree(component_probs);
 
 	return 0;
 }

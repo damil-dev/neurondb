@@ -403,6 +403,6 @@ ndb_image_metadata_to_json(const ImageMetadata *meta)
 	}
 	appendStringInfo(&json, "}");
 
-	nfree(format_name);
+	pfree(format_name);
 	return json.data;
 }

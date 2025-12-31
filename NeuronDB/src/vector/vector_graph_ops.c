@@ -95,7 +95,7 @@ queue_dequeue(Queue * q)
 	if (q->front == NULL)
 		q->rear = NULL;
 
-	nfree(node);
+	pfree(node);
 	q->size--;
 	return node_idx;
 }
@@ -105,7 +105,7 @@ queue_free(Queue * q)
 {
 	while (q->front != NULL)
 		queue_dequeue(q);
-	nfree(q);
+	pfree(q);
 }
 
 typedef struct StackNode
@@ -156,7 +156,7 @@ stack_pop(Stack * s)
 	node_idx = node->node_idx;
 	s->top = node->next;
 
-	nfree(node);
+	pfree(node);
 	s->size--;
 	return node_idx;
 }
@@ -166,7 +166,7 @@ stack_free(Stack * s)
 {
 	while (s->top != NULL)
 		stack_pop(s);
-	nfree(s);
+	pfree(s);
 }
 
 /*

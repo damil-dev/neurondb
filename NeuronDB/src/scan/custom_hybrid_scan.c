@@ -657,22 +657,22 @@ hybrid_exec(CustomScanState * node)
 					state->scores[i] = mergedScores[idx];
 				}
 
-				nfree(indices);
+				pfree(indices);
 			}
 
-			nfree(mergedItems);
-			nfree(mergedScores);
+			pfree(mergedItems);
+			pfree(mergedScores);
 		}
 
 		/* Free temporary arrays */
 		if (vectorItems)
-			nfree(vectorItems);
+			pfree(vectorItems);
 		if (vectorDistances)
-			nfree(vectorDistances);
+			pfree(vectorDistances);
 		if (ftsItems)
-			nfree(ftsItems);
+			pfree(ftsItems);
 		if (ftsScores)
-			nfree(ftsScores);
+			pfree(ftsScores);
 	}
 
 	/* Return next result */
@@ -717,16 +717,16 @@ hybrid_end(CustomScanState * node)
 			if (state->candidates[i])
 				ExecDropSingleTupleTableSlot(state->candidates[i]);
 		}
-		nfree(state->candidates);
+		pfree(state->candidates);
 	}
 	if (state->scores)
-		nfree(state->scores);
+		pfree(state->scores);
 
 	/* Free query strings */
 	if (state->queryVector)
-		nfree(state->queryVector);
+		pfree(state->queryVector);
 	if (state->ftsQuery)
-		nfree(state->ftsQuery);
+		pfree(state->ftsQuery);
 }
 
 /*

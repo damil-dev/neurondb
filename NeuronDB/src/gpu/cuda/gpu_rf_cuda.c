@@ -421,7 +421,7 @@ ndb_cuda_rf_train(const float *features,
 								DirectFunctionCall1(jsonb_out,
 													JsonbPGetDatum(hyperparams)));
 			if (hyperparams_text)
-				nfree(hyperparams_text);
+				pfree(hyperparams_text);
 		}
 		PG_CATCH();
 		{
@@ -475,17 +475,17 @@ ndb_cuda_rf_train(const float *features,
 			if (errstr)
 				*errstr = pstrdup("CUDA RF train: palloc failed");
 			if (label_ints)
-				nfree(label_ints);
+				pfree(label_ints);
 			if (class_counts)
-				nfree(class_counts);
+				pfree(class_counts);
 			if (tmp_left_counts)
-				nfree(tmp_left_counts);
+				pfree(tmp_left_counts);
 			if (tmp_right_counts)
-				nfree(tmp_right_counts);
+				pfree(tmp_right_counts);
 			if (best_left_counts)
-				nfree(best_left_counts);
+				pfree(best_left_counts);
 			if (best_right_counts)
-				nfree(best_right_counts);
+				pfree(best_right_counts);
 			return -1;
 		}
 	}
@@ -811,19 +811,19 @@ gpu_cleanup:
 	if (d_right_counts)
 		cudaFree(d_right_counts);
 	if (label_ints)
-		nfree(label_ints);
+		pfree(label_ints);
 	if (class_counts)
-		nfree(class_counts);
+		pfree(class_counts);
 	if (tmp_left_counts)
-		nfree(tmp_left_counts);
+		pfree(tmp_left_counts);
 	if (tmp_right_counts)
-		nfree(tmp_right_counts);
+		pfree(tmp_right_counts);
 	if (best_left_counts)
-		nfree(best_left_counts);
+		pfree(best_left_counts);
 	if (best_right_counts)
-		nfree(best_right_counts);
+		pfree(best_right_counts);
 	if (metrics_json)
-		nfree(metrics_json);
+		pfree(metrics_json);
 
 	return rc;
 
@@ -959,7 +959,7 @@ ndb_cuda_rf_predict(const bytea * model_data,
 					*errstr = psprintf("CUDA RF predict: model upload failed (rc=%d) - check CUDA memory allocation", rc);
 			}
 			if (votes)
-				nfree(votes);
+				pfree(votes);
 			return -1;
 		}
 
@@ -968,7 +968,7 @@ ndb_cuda_rf_predict(const bytea * model_data,
 			if (errstr && *errstr == NULL)
 				*errstr = pstrdup("CUDA RF predict: model upload returned NULL");
 			if (votes)
-				nfree(votes);
+				pfree(votes);
 			return -1;
 		}
 
@@ -977,7 +977,7 @@ ndb_cuda_rf_predict(const bytea * model_data,
 			if (errstr && *errstr == NULL)
 				*errstr = pstrdup("CUDA RF predict: uploaded model is not valid");
 			if (votes)
-				nfree(votes);
+				pfree(votes);
 			return -1;
 		}
 
@@ -1052,7 +1052,7 @@ ndb_cuda_rf_predict(const bytea * model_data,
 	{
 		/* Error details should already be set in errstr by ndb_cuda_rf_infer_model */
 		if (votes)
-			nfree(votes);
+			pfree(votes);
 		if (errstr != NULL && *errstr == NULL)
 		{
 			/* Fallback error message if ndb_cuda_rf_infer_model didn't set one */
@@ -1079,7 +1079,7 @@ ndb_cuda_rf_predict(const bytea * model_data,
 	*class_out = best_class;
 
 	if (votes)
-		nfree(votes);
+		pfree(votes);
 
 	return 0;
 }
@@ -1182,7 +1182,7 @@ ndb_cuda_rf_model_upload(const NdbCudaRfNode *nodes,
 						sizeof(NdbCudaRfNode) * (size_t) total_nodes);
 	if (status != cudaSuccess)
 	{
-		nfree(model);
+		pfree(model);
 		return -1;
 	}
 
@@ -1192,7 +1192,7 @@ ndb_cuda_rf_model_upload(const NdbCudaRfNode *nodes,
 	if (status != cudaSuccess)
 	{
 		cudaFree(model->d_nodes);
-		nfree(model);
+		pfree(model);
 		return -1;
 	}
 
@@ -1205,7 +1205,7 @@ ndb_cuda_rf_model_upload(const NdbCudaRfNode *nodes,
 	{
 		cudaFree(model->d_nodes);
 		cudaFree(model->d_trees);
-		nfree(model);
+		pfree(model);
 		return -1;
 	}
 
@@ -1218,7 +1218,7 @@ ndb_cuda_rf_model_upload(const NdbCudaRfNode *nodes,
 	{
 		cudaFree(model->d_nodes);
 		cudaFree(model->d_trees);
-		nfree(model);
+		pfree(model);
 		return -1;
 	}
 
@@ -1631,7 +1631,7 @@ ndb_cuda_rf_predict_batch(const bytea * model_data,
 	{
 		cudaFree(d_features);
 		cudaFree(d_votes);
-		nfree(h_votes);
+		pfree(h_votes);
 		if (errstr)
 			*errstr = psprintf("failed to copy features to GPU: %s",
 							   cudaGetErrorString(status));
@@ -1649,7 +1649,7 @@ ndb_cuda_rf_predict_batch(const bytea * model_data,
 	{
 		cudaFree(d_features);
 		cudaFree(d_votes);
-		nfree(h_votes);
+		pfree(h_votes);
 		if (errstr)
 			*errstr = psprintf("batch prediction failed: %s",
 							   cudaGetErrorString(cudaGetLastError()));
@@ -1665,7 +1665,7 @@ ndb_cuda_rf_predict_batch(const bytea * model_data,
 	{
 		cudaFree(d_features);
 		cudaFree(d_votes);
-		nfree(h_votes);
+		pfree(h_votes);
 		if (errstr)
 			*errstr = psprintf("failed to copy votes from GPU: %s",
 							   cudaGetErrorString(status));
@@ -1693,7 +1693,7 @@ ndb_cuda_rf_predict_batch(const bytea * model_data,
 
 	cudaFree(d_features);
 	cudaFree(d_votes);
-	nfree(h_votes);
+	pfree(h_votes);
 
 	return 0;
 }
@@ -1776,10 +1776,10 @@ ndb_cuda_rf_evaluate_batch(const bytea * model_data,
 
 	if (rc != 0)
 	{
-		nfree(predictions);
-		nfree(tp);
-		nfree(fp);
-		nfree(fn);
+		pfree(predictions);
+		pfree(tp);
+		pfree(fp);
+		pfree(fn);
 		return -1;
 	}
 
@@ -1847,10 +1847,10 @@ ndb_cuda_rf_evaluate_batch(const bytea * model_data,
 		*f1_out = 0.0;
 	}
 
-	nfree(predictions);
-	nfree(tp);
-	nfree(fp);
-	nfree(fn);
+	pfree(predictions);
+	pfree(tp);
+	pfree(fp);
+	pfree(fn);
 
 	return 0;
 }

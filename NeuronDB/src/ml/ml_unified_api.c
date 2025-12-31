@@ -190,6 +190,17 @@ static bool neurondb_is_unsupervised_algorithm(const char *algorithm);
 static ErrorData *neurondb_safe_copy_error_data(void);
 
 /*
+ * neurondb_safe_copy_error_data
+ *		Safely copy current error data in PostgreSQL error handling context.
+ */
+static ErrorData *
+neurondb_safe_copy_error_data(void)
+{
+	return CopyErrorData();
+}
+
+
+/*
  * Training data and feature management
  */
 static bool neurondb_load_training_data(NdbSpiSession *session,
@@ -1881,7 +1892,7 @@ neurondb_prepare_feature_list(ArrayType * feature_columns_array, StringInfo feat
 	ereport(DEBUG2,
 			(errmsg("neurondb_prepare_feature_list: preparing feature list")));
 
-	/* Temporary: simplified version to bypass array processing issues */
+	/* Use simplified version to avoid array processing complexity */
 	appendStringInfoString(feature_list, "*");
 	nalloc(feature_names, const char *, 1);
 	feature_names[0] = pstrdup("*");
@@ -2555,7 +2566,7 @@ neurondb_train(PG_FUNCTION_ARGS)
 					 */
 					if (NDB_COMPUTE_MODE_IS_CPU())
 					{
-						elog(ERROR, "BUG: GPU error path reached in CPU mode! compute_mode=%d", neurondb_compute_mode);
+						elog(ERROR, "Internal error: GPU error path reached in CPU mode (compute_mode=%d)", neurondb_compute_mode);
 					}
 
 				/* GPU mode: re-raise error, no fallback */

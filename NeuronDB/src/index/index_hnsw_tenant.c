@@ -77,7 +77,7 @@ hnsw_tenant_create(PG_FUNCTION_ARGS)
 
 	index_tbl = get_hnsw_tenant_table(tbl_str, col_str, tenant_id);
 
-	nfree(index_tbl);
+	pfree(index_tbl);
 	PG_RETURN_BOOL(true);
 }
 
@@ -133,7 +133,7 @@ hnsw_tenant_search(PG_FUNCTION_ARGS)
 			tenant_id_long = strtol(tenant_id_str, &endptr, 10);
 			if (errno != 0 || *endptr != '\0' || tenant_id_long < 0 || tenant_id_long > INT_MAX)
 			{
-				nfree(tenant_id_str);
+				pfree(tenant_id_str);
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
 						 errmsg("tenant_id must be a non-negative integer, got: %s", tenant_id_str)));
@@ -177,7 +177,7 @@ hnsw_tenant_search(PG_FUNCTION_ARGS)
 			values[1] = Int32GetDatum(tenant_id);
 
 			ret = ndb_spi_execute_with_args(lookup_session, lookup_sql.data, 2, argtypes, values, NULL, true, 1);
-			nfree(lookup_sql.data);
+			pfree(lookup_sql.data);
 
 			if (ret == SPI_OK_SELECT && SPI_processed > 0)
 			{
@@ -245,7 +245,7 @@ hnsw_tenant_search(PG_FUNCTION_ARGS)
 
 			MemoryContextSwitchTo(oldcontext);
 
-			nfree(index_tbl);
+			pfree(index_tbl);
 		}
 	}
 
@@ -304,8 +304,8 @@ hnsw_tenant_quota(PG_FUNCTION_ARGS)
 	result = JsonbToCString(NULL, &result_jsonb->root, VARSIZE(result_jsonb));
 	result_txt = cstring_to_text(result);
 
-	nfree(result_jsonb);
-	nfree(result);
+	pfree(result_jsonb);
+	pfree(result);
 
 	PG_RETURN_TEXT_P(result_txt);
 }
@@ -336,12 +336,12 @@ ensure_hnsw_tenant_metadata_table(void)
 	ret = ndb_spi_execute(session, sql.data, false, 0);
 	if (ret != SPI_OK_UTILITY && ret != SPI_OK_SELECT)
 	{
-		nfree(sql.data);
+		pfree(sql.data);
 		ndb_spi_session_end(&session);
 		elog(ERROR, "Failed to create metadata table: %s", sql.data);
 	}
 
-	nfree(sql.data);
+	pfree(sql.data);
 	ndb_spi_session_end(&session);
 }
 
@@ -384,13 +384,13 @@ upsert_tenant_hnsw_metadata(const char *tbl, const char *col, int32 tenant_id,
 		ret = ndb_spi_execute_with_args(session, sql.data, 6, argtypes, values, NULL, false, 0);
 		if (ret != SPI_OK_INSERT && ret != SPI_OK_UPDATE)
 		{
-			nfree(sql.data);
+			pfree(sql.data);
 			ndb_spi_session_end(&session);
 			elog(ERROR, "ndb_spi_execute_with_args failed in upsert_tenant_hnsw_metadata: ret=%d sql=%s",
 				 ret, sql.data);
 		}
 
-		nfree(sql.data);
+		pfree(sql.data);
 		ndb_spi_session_end(&session);
 	}
 }
@@ -439,16 +439,16 @@ maybe_build_hnsw_index(const char *tbl, const char *col, int32 tenant_id)
 		ret = ndb_spi_execute(session, sql.data, false, 0);
 		if (ret != SPI_OK_UTILITY)
 		{
-			nfree(sql.data);
-			nfree(idx_tbl);
+			pfree(sql.data);
+			pfree(idx_tbl);
 			ndb_spi_session_end(&session);
 			elog(ERROR, "Failed creating index table: %s", sql.data);
 		}
 
-		nfree(sql.data);
+		pfree(sql.data);
 		ndb_spi_session_end(&session);
 	}
-	nfree(idx_tbl);
+	pfree(idx_tbl);
 }
 
 /*
@@ -480,7 +480,7 @@ get_tenant_quota_json(int32 tenant_id, int32 * used, int32 * total)
 		ret = ndb_spi_execute(session, sql.data, true, 1);
 		if (ret != SPI_OK_SELECT)
 		{
-			nfree(sql.data);
+			pfree(sql.data);
 			ndb_spi_session_end(&session);
 			elog(ERROR, "Failed to read quota for tenant %d", tenant_id);
 		}
@@ -499,7 +499,7 @@ get_tenant_quota_json(int32 tenant_id, int32 * used, int32 * total)
 			*used = 0;
 			*total = 0;
 		}
-		nfree(sql.data);
+		pfree(sql.data);
 		ndb_spi_session_end(&session);
 	}
 

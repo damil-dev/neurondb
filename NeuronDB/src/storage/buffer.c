@@ -119,7 +119,7 @@ rebuild_hnsw_safe(PG_FUNCTION_ARGS)
 				vectors_processed = 0;
 			}
 		}
-		nfree(sql.data);
+		pfree(sql.data);
 	}
 
 	ndb_spi_session_end(&session);

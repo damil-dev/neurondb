@@ -467,13 +467,13 @@ neurondb_rank_documents(PG_FUNCTION_ARGS)
 	algorithm = algorithm_text ? text_to_cstring(algorithm_text)
 		: pstrdup("bm25");
 
-	elog(NOTICE, "neurondb_rank_documents: DEBUG 1 - Query='%s', Algorithm='%s'", query, algorithm);
+	elog(DEBUG1, "neurondb_rank_documents: Query='%s', Algorithm='%s'", query, algorithm);
 
 	ndims = ARR_NDIM(documents_array);
 	dims = ARR_DIMS(documents_array);
 	nelems = ArrayGetNItems(ndims, dims);
 
-	elog(NOTICE, "neurondb_rank_documents: DEBUG 2 - Array dimensions: %d, elements: %d", ndims, nelems);
+	elog(DEBUG1, "neurondb_rank_documents: Array dimensions: %d, elements: %d", ndims, nelems);
 
 	deconstruct_array(documents_array,
 					  TEXTOID,
@@ -491,7 +491,7 @@ neurondb_rank_documents(PG_FUNCTION_ARGS)
 			ranklist[i].doc = NULL;
 			ranklist[i].score = -FLT_MAX;
 			ranklist[i].rawidx = i;
-			elog(NOTICE, "neurondb_rank_documents: DEBUG 3 - Element %d is NULL", i);
+			elog(DEBUG2, "neurondb_rank_documents: Element %d is NULL", i);
 			continue;
 		}
 		ranklist[i].doc = TextDatumGetCString(elem_values[i]);
@@ -499,11 +499,11 @@ neurondb_rank_documents(PG_FUNCTION_ARGS)
 		if (ranklist[i].doc == NULL)
 		{
 			ranklist[i].doc = pstrdup("");
-			elog(NOTICE, "neurondb_rank_documents: DEBUG 4 - NULL document at index %d, using empty string", i);
+			elog(DEBUG2, "neurondb_rank_documents: NULL document at index %d, using empty string", i);
 		}
 		else
 		{
-			elog(NOTICE, "neurondb_rank_documents: DEBUG 5 - Element %d: doc='%.50s' (len=%zu)", i, ranklist[i].doc, strlen(ranklist[i].doc));
+			elog(DEBUG2, "neurondb_rank_documents: Element %d: doc='%.50s' (len=%zu)", i, ranklist[i].doc, strlen(ranklist[i].doc));
 		}
 		if (strcmp(algorithm, "bm25") == 0)
 			ranklist[i].score = simple_bm25(query, ranklist[i].doc);

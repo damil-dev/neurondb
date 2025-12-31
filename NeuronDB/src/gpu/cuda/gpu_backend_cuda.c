@@ -699,8 +699,8 @@ ndb_cuda_launch_kmeans_update(const float *vectors,
 	rc = gpu_kmeans_update(
 						   vectors, assign32, centroids, counts, num_vectors, k, dim);
 
-	nfree(assign32);
-	nfree(counts);
+	pfree(assign32);
+	pfree(counts);
 
 	return rc == 0 ? 0 : -1;
 }

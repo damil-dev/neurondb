@@ -5,7 +5,7 @@
  *
  * Provides memory context validation and management functions.
  * Note: Safe pointer freeing functionality has been moved to neurondb_macros.h
- * (use nfree() instead of ndb_safe_pfree()).
+ * (use pfree() instead of ndb_safe_pfree()).
  *
  * Copyright (c) 2024-2025, neurondb, Inc.
  *
@@ -20,6 +20,7 @@
 #include "utils/memutils.h"
 #include "utils/elog.h"
 
+#include "neurondb_macros.h"
 #include "neurondb_validation.h"
 #include "neurondb_safe_memory.h"
 

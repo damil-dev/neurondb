@@ -55,7 +55,7 @@ ifeq ($(ROCM_AVAILABLE),yes)
 		$(warning ROCm path found but hipcc not available at $(HIPCC))
 	endif
 else
-	$(info ROCm not found at $(ROCM_PATH) - ROCm backend disabled)
+$(info ROCm not found at $(ROCM_PATH) - ROCm backend disabled)
 endif
 
 .PHONY: rocm-check rocm-info

@@ -411,9 +411,9 @@ vector_l2_distance_fp16(PG_FUNCTION_ARGS)
 	if (a == NULL || b == NULL)
 	{
 		if (a != NULL)
-			nfree(a);
+			pfree(a);
 		if (b != NULL)
-			nfree(b);
+			pfree(b);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_BINARY_REPRESENTATION),
 				 errmsg("failed to dequantize FP16 vectors")));
@@ -423,8 +423,8 @@ vector_l2_distance_fp16(PG_FUNCTION_ARGS)
 	result = l2_distance(a, b);
 
 	/* Free temporary vectors */
-	nfree(a);
-	nfree(b);
+	pfree(a);
+	pfree(b);
 
 	PG_RETURN_FLOAT4(result);
 }
@@ -461,8 +461,8 @@ vector_cosine_distance_fp16(PG_FUNCTION_ARGS)
 
 	result = cosine_distance(a, b);
 
-	nfree(a);
-	nfree(b);
+	pfree(a);
+	pfree(b);
 
 	PG_RETURN_FLOAT4(result);
 }

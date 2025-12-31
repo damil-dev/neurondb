@@ -186,12 +186,12 @@ hybrid_search(PG_FUNCTION_ARGS)
 
 			if (!isfinite(val))
 			{
-				nfree(vec_lit.data);
+				pfree(vec_lit.data);
 				ndb_spi_session_end(&session);
-				nfree(tbl_str);
-				nfree(txt_str);
-				nfree(filter_str);
-				nfree(qtype_str);
+				pfree(tbl_str);
+				pfree(txt_str);
+				pfree(filter_str);
+				pfree(qtype_str);
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 						 errmsg("hybrid_search: non-finite value in vector at index %d", i)));
@@ -238,12 +238,12 @@ hybrid_search(PG_FUNCTION_ARGS)
 		spi_ret = ndb_spi_execute(session, sql.data, true, limit);
 		if (spi_ret != SPI_OK_SELECT)
 		{
-			nfree(sql.data);
-			nfree(vec_lit.data);
+			pfree(sql.data);
+			pfree(vec_lit.data);
 			ndb_spi_session_end(&session);
-			nfree(tbl_str);
-			nfree(txt_str);
-			nfree(filter_str);
+			pfree(tbl_str);
+			pfree(txt_str);
+			pfree(filter_str);
 			ereport(ERROR, (errmsg("Failed to execute hybrid search SQL")));
 		}
 
@@ -323,12 +323,12 @@ hybrid_search(PG_FUNCTION_ARGS)
 		funcctx->user_fctx = state;
 		funcctx->max_calls = proc;
 
-		nfree(sql.data);
-		nfree(vec_lit.data);
-		nfree(tbl_str);
-		nfree(txt_str);
-		nfree(filter_str);
-		nfree(qtype_str);
+		pfree(sql.data);
+		pfree(vec_lit.data);
+		pfree(tbl_str);
+		pfree(txt_str);
+		pfree(filter_str);
+		pfree(qtype_str);
 		ndb_spi_session_end(&session);
 		MemoryContextSwitchTo(oldcontext);
 	}
@@ -471,8 +471,8 @@ reciprocal_rank_fusion(PG_FUNCTION_ARGS)
 				entry->score += 1.0 / (k + (double) j + 1.0);
 			}
 		}
-		nfree(ids);
-		nfree(nulls);
+		pfree(ids);
+		pfree(nulls);
 	}
 
 	/* Output: sort the ids by score descending, return as text[] */
@@ -549,18 +549,18 @@ reciprocal_rank_fusion(PG_FUNCTION_ARGS)
 			result_datums[idx] =
 				PointerGetDatum(cstring_to_text(items[idx].key));
 			result_nulls[idx] = false;
-			nfree(items[idx].key);
+			pfree(items[idx].key);
 		}
 
-		nfree(items);
+		pfree(items);
 	}
 
 	ret_array = construct_array(
 								result_datums, item_count, TEXTOID, -1, false, 'i');
 
 	hash_destroy(item_hash);
-	nfree(result_datums);
-	nfree(result_nulls);
+	pfree(result_datums);
+	pfree(result_nulls);
 
 	PG_RETURN_ARRAYTYPE_P(ret_array);
 }
@@ -642,10 +642,10 @@ semantic_keyword_search(PG_FUNCTION_ARGS)
 	spi_ret = ndb_spi_execute(session, sql.data, true, top_k);
 	if (spi_ret != SPI_OK_SELECT)
 	{
-		nfree(sql.data);
-		nfree(vec_lit.data);
-		nfree(tbl_str);
-		nfree(kw_str);
+		pfree(sql.data);
+		pfree(vec_lit.data);
+		pfree(tbl_str);
+		pfree(kw_str);
 		ndb_spi_session_end(&session);
 		ereport(ERROR,
 				(errmsg("Failed to execute semantic_keyword_search "
@@ -655,10 +655,10 @@ semantic_keyword_search(PG_FUNCTION_ARGS)
 	proc = SPI_processed;
 	if (proc == 0)
 	{
-		nfree(sql.data);
-		nfree(vec_lit.data);
-		nfree(tbl_str);
-		nfree(kw_str);
+		pfree(sql.data);
+		pfree(vec_lit.data);
+		pfree(tbl_str);
+		pfree(kw_str);
 		ndb_spi_session_end(&session);
 		ret_array = construct_empty_array(TEXTOID);
 		PG_RETURN_ARRAYTYPE_P(ret_array);
@@ -684,12 +684,12 @@ semantic_keyword_search(PG_FUNCTION_ARGS)
 
 	ret_array = construct_array(datums, proc, TEXTOID, -1, false, 'i');
 
-	nfree(datums);
-	nfree(nulls);
-	nfree(sql.data);
-	nfree(vec_lit.data);
-	nfree(tbl_str);
-	nfree(kw_str);
+	pfree(datums);
+	pfree(nulls);
+	pfree(sql.data);
+	pfree(vec_lit.data);
+	pfree(tbl_str);
+	pfree(kw_str);
 	ndb_spi_session_end(&session);
 
 	PG_RETURN_ARRAYTYPE_P(ret_array);
@@ -754,8 +754,8 @@ multi_vector_search(PG_FUNCTION_ARGS)
 
 		if (nvecs < 1)
 		{
-			nfree(tbl_str);
-			nfree(agg_str);
+			pfree(tbl_str);
+			pfree(agg_str);
 			ndb_spi_session_end(&session);
 			ereport(ERROR,
 					(errmsg("multi_vector_search: at least one query "
@@ -767,10 +767,10 @@ multi_vector_search(PG_FUNCTION_ARGS)
 
 			if (first_vec->dim <= 0)
 			{
-				nfree(tbl_str);
-				nfree(agg_str);
-				nfree(vec_datums);
-				nfree(vec_nulls);
+				pfree(tbl_str);
+				pfree(agg_str);
+				pfree(vec_datums);
+				pfree(vec_nulls);
 				ndb_spi_session_end(&session);
 				ereport(ERROR,
 						(errmsg("query vectors must have positive "
@@ -801,11 +801,11 @@ multi_vector_search(PG_FUNCTION_ARGS)
 				if (i)
 					appendStringInfoString(&subquery, ", ");
 				appendStringInfo(&subquery, "'%s'::vector", lit.data);
-				nfree(lit.data);
+				pfree(lit.data);
 			}
 		}
-		nfree(vec_datums);
-		nfree(vec_nulls);
+		pfree(vec_datums);
+		pfree(vec_nulls);
 
 		initStringInfo(&sql);
 		appendStringInfo(&sql,
@@ -828,10 +828,10 @@ multi_vector_search(PG_FUNCTION_ARGS)
 		spi_ret = ndb_spi_execute(session, sql.data, true, top_k);
 		if (spi_ret != SPI_OK_SELECT)
 		{
-			nfree(sql.data);
-			nfree(subquery.data);
-			nfree(tbl_str);
-			nfree(agg_str);
+			pfree(sql.data);
+			pfree(subquery.data);
+			pfree(tbl_str);
+			pfree(agg_str);
 			ndb_spi_session_end(&session);
 			ereport(ERROR,
 					(errmsg("Failed to execute multi_vector_search SQL")));
@@ -839,10 +839,10 @@ multi_vector_search(PG_FUNCTION_ARGS)
 		proc = SPI_processed;
 		if (proc == 0)
 		{
-			nfree(sql.data);
-			nfree(subquery.data);
-			nfree(tbl_str);
-			nfree(agg_str);
+			pfree(sql.data);
+			pfree(subquery.data);
+			pfree(tbl_str);
+			pfree(agg_str);
 			ndb_spi_session_end(&session);
 			ret_array = construct_empty_array(TEXTOID);
 			PG_RETURN_ARRAYTYPE_P(ret_array);
@@ -867,12 +867,12 @@ multi_vector_search(PG_FUNCTION_ARGS)
 			nulls[i] = isnull;
 		}
 		ret_array = construct_array(datums, proc, TEXTOID, -1, false, 'i');
-		nfree(datums);
-		nfree(nulls);
-		nfree(sql.data);
-		nfree(subquery.data);
-		nfree(tbl_str);
-		nfree(agg_str);
+		pfree(datums);
+		pfree(nulls);
+		pfree(sql.data);
+		pfree(subquery.data);
+		pfree(tbl_str);
+		pfree(agg_str);
 		ndb_spi_session_end(&session);
 
 		PG_RETURN_ARRAYTYPE_P(ret_array);
@@ -949,10 +949,10 @@ faceted_vector_search(PG_FUNCTION_ARGS)
 	spi_ret = ndb_spi_execute(session, sql.data, true, 0);
 	if (spi_ret != SPI_OK_SELECT)
 	{
-		nfree(sql.data);
-		nfree(vec_lit.data);
-		nfree(tbl_str);
-		nfree(facet_str);
+		pfree(sql.data);
+		pfree(vec_lit.data);
+		pfree(tbl_str);
+		pfree(facet_str);
 		ndb_spi_session_end(&session);
 		ereport(ERROR,
 				(errmsg("Failed to execute faceted_vector_search "
@@ -961,10 +961,10 @@ faceted_vector_search(PG_FUNCTION_ARGS)
 	proc = SPI_processed;
 	if (proc == 0)
 	{
-		nfree(sql.data);
-		nfree(vec_lit.data);
-		nfree(tbl_str);
-		nfree(facet_str);
+		pfree(sql.data);
+		pfree(vec_lit.data);
+		pfree(tbl_str);
+		pfree(facet_str);
 		ndb_spi_session_end(&session);
 		ret_array = construct_empty_array(TEXTOID);
 		PG_RETURN_ARRAYTYPE_P(ret_array);
@@ -989,12 +989,12 @@ faceted_vector_search(PG_FUNCTION_ARGS)
 		nulls[i] = isnull;
 	}
 	ret_array = construct_array(datums, proc, TEXTOID, -1, false, 'i');
-	nfree(datums);
-	nfree(nulls);
-	nfree(sql.data);
-	nfree(vec_lit.data);
-	nfree(tbl_str);
-	nfree(facet_str);
+	pfree(datums);
+	pfree(nulls);
+	pfree(sql.data);
+	pfree(vec_lit.data);
+	pfree(tbl_str);
+	pfree(facet_str);
 	ndb_spi_session_end(&session);
 
 	PG_RETURN_ARRAYTYPE_P(ret_array);
@@ -1074,10 +1074,10 @@ temporal_vector_search(PG_FUNCTION_ARGS)
 	spi_ret = ndb_spi_execute(session, sql.data, true, top_k);
 	if (spi_ret != SPI_OK_SELECT)
 	{
-		nfree(sql.data);
-		nfree(vec_lit.data);
-		nfree(tbl_str);
-		nfree(ts_str);
+		pfree(sql.data);
+		pfree(vec_lit.data);
+		pfree(tbl_str);
+		pfree(ts_str);
 		ndb_spi_session_end(&session);
 		ereport(ERROR,
 				(errmsg("Failed to execute temporal_vector_search "
@@ -1087,10 +1087,10 @@ temporal_vector_search(PG_FUNCTION_ARGS)
 	proc = SPI_processed;
 	if (proc == 0)
 	{
-		nfree(sql.data);
-		nfree(vec_lit.data);
-		nfree(tbl_str);
-		nfree(ts_str);
+		pfree(sql.data);
+		pfree(vec_lit.data);
+		pfree(tbl_str);
+		pfree(ts_str);
 		ndb_spi_session_end(&session);
 		ret_array = construct_empty_array(TEXTOID);
 		PG_RETURN_ARRAYTYPE_P(ret_array);
@@ -1115,12 +1115,12 @@ temporal_vector_search(PG_FUNCTION_ARGS)
 		nulls[i] = isnull;
 	}
 	ret_array = construct_array(datums, proc, TEXTOID, -1, false, 'i');
-	nfree(datums);
-	nfree(nulls);
-	nfree(sql.data);
-	nfree(vec_lit.data);
-	nfree(tbl_str);
-	nfree(ts_str);
+	pfree(datums);
+	pfree(nulls);
+	pfree(sql.data);
+	pfree(vec_lit.data);
+	pfree(tbl_str);
+	pfree(ts_str);
 	ndb_spi_session_end(&session);
 
 	PG_RETURN_ARRAYTYPE_P(ret_array);
@@ -1190,9 +1190,9 @@ diverse_vector_search(PG_FUNCTION_ARGS)
 	spi_ret = ndb_spi_execute(session, sql.data, true, top_k * 10);
 	if (spi_ret != SPI_OK_SELECT)
 	{
-		nfree(sql.data);
-		nfree(vec_lit.data);
-		nfree(tbl_str);
+		pfree(sql.data);
+		pfree(vec_lit.data);
+		pfree(tbl_str);
 		ndb_spi_session_end(&session);
 		ereport(ERROR,
 				(errmsg("Failed to execute diverse_vector_search "
@@ -1202,9 +1202,9 @@ diverse_vector_search(PG_FUNCTION_ARGS)
 	proc = SPI_processed;
 	if (proc == 0)
 	{
-		nfree(sql.data);
-		nfree(vec_lit.data);
-		nfree(tbl_str);
+		pfree(sql.data);
+		pfree(vec_lit.data);
+		pfree(tbl_str);
 		ndb_spi_session_end(&session);
 		ret_array = construct_empty_array(TEXTOID);
 		PG_RETURN_ARRAYTYPE_P(ret_array);
@@ -1309,7 +1309,7 @@ diverse_vector_search(PG_FUNCTION_ARGS)
 		construct_array(datums, select_count, TEXTOID, -1, false, 'i');
 	for (i = 0; i < n_candidates; i++)
 	{
-		nfree(cands[i].id);
+		pfree(cands[i].id);
 
 		/*
 		 * Only pfree detoasted vectors if address does not match the original
@@ -1323,15 +1323,15 @@ diverse_vector_search(PG_FUNCTION_ARGS)
 
 			if ((void *) cands[i].vec
 				!= (void *) DatumGetPointer(orig))
-				nfree(cands[i].vec);
+				pfree(cands[i].vec);
 		}
 	}
-	nfree(datums);
-	nfree(nulls);
-	nfree(cands);
-	nfree(sql.data);
-	nfree(vec_lit.data);
-	nfree(tbl_str);
+	pfree(datums);
+	pfree(nulls);
+	pfree(cands);
+	pfree(sql.data);
+	pfree(vec_lit.data);
+	pfree(tbl_str);
 	ndb_spi_session_end(&session);
 	PG_RETURN_ARRAYTYPE_P(ret_array);
 }
@@ -1437,13 +1437,13 @@ full_text_search(PG_FUNCTION_ARGS)
 		spi_ret = ndb_spi_execute(session, sql.data, true, limit);
 		if (spi_ret != SPI_OK_SELECT)
 		{
-			nfree(sql.data);
+			pfree(sql.data);
 			ndb_spi_session_end(&session);
-			nfree(tbl_str);
-			nfree(txt_str);
-			nfree(col_str);
-			nfree(qtype_str);
-			nfree(filter_str);
+			pfree(tbl_str);
+			pfree(txt_str);
+			pfree(col_str);
+			pfree(qtype_str);
+			pfree(filter_str);
 			ereport(ERROR, (errmsg("Failed to execute full_text_search SQL")));
 		}
 
@@ -1523,12 +1523,12 @@ full_text_search(PG_FUNCTION_ARGS)
 		funcctx->user_fctx = state;
 		funcctx->max_calls = proc;
 
-		nfree(sql.data);
-		nfree(tbl_str);
-		nfree(txt_str);
-		nfree(col_str);
-		nfree(qtype_str);
-		nfree(filter_str);
+		pfree(sql.data);
+		pfree(tbl_str);
+		pfree(txt_str);
+		pfree(col_str);
+		pfree(qtype_str);
+		pfree(filter_str);
 		ndb_spi_session_end(&session);
 		MemoryContextSwitchTo(oldcontext);
 	}

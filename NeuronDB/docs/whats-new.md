@@ -183,7 +183,7 @@ src/
 ### Documentation Updates
 
 **Updated Files:**
-- README.md - Completely refreshed with new features
+- readme.md - Completely refreshed with new features
 - GPU.md - Multi-backend GPU support documentation
 - FEATURES.md - Complete feature catalog
 - WORKER_STATUS.md - Background worker status

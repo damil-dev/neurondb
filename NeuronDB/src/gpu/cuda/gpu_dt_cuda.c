@@ -45,7 +45,7 @@ dt_free_tree(DTNode *node)
 		dt_free_tree(node->left);
 		dt_free_tree(node->right);
 	}
-	nfree(node);
+	pfree(node);
 }
 
 /*
@@ -174,7 +174,7 @@ ndb_cuda_dt_pack_model(const DTModel *model,
 									model->root, nodes, &node_idx, &node_count)
 		< 0)
 	{
-		nfree(blob);
+		pfree(blob);
 		if (errstr)
 			*errstr = pstrdup(
 							  "failed to serialize decision tree nodes");
@@ -413,7 +413,7 @@ dt_build_tree_gpu(const float *features,
 					majority = i;
 			}
 			node->leaf_value = (double) majority;
-			nfree(class_counts);
+			pfree(class_counts);
 		}
 		else
 		{
@@ -509,7 +509,7 @@ dt_build_tree_gpu(const float *features,
 							parent_counts[label]++;
 					}
 					parent_imp = dt_compute_gini(parent_counts, class_count, n_samples);
-					nfree(parent_counts);
+					pfree(parent_counts);
 				}
 
 				/* Compute Gini impurity */
@@ -564,11 +564,11 @@ dt_build_tree_gpu(const float *features,
 
 	/* Clean up working arrays */
 	if (label_ints)
-		nfree(label_ints);
+		pfree(label_ints);
 	if (left_counts)
-		nfree(left_counts);
+		pfree(left_counts);
 	if (right_counts)
-		nfree(right_counts);
+		pfree(right_counts);
 
 	/* If no good split found, make leaf */
 	if (best_feature < 0 || best_gain <= 0.0)
@@ -594,7 +594,7 @@ dt_build_tree_gpu(const float *features,
 					majority = i;
 			}
 			node->leaf_value = (double) majority;
-			nfree(class_counts);
+			pfree(class_counts);
 		}
 		else
 		{
@@ -604,8 +604,8 @@ dt_build_tree_gpu(const float *features,
 				sum += labels[indices[i]];
 			node->leaf_value = (n_samples > 0) ? (sum / (double) n_samples) : 0.0;
 		}
-		nfree(left_indices);
-		nfree(right_indices);
+		pfree(left_indices);
+		pfree(right_indices);
 		return node;
 	}
 
@@ -634,7 +634,7 @@ dt_build_tree_gpu(const float *features,
 					majority = i;
 			}
 			node->leaf_value = (double) majority;
-			nfree(class_counts);
+			pfree(class_counts);
 		}
 		else
 		{
@@ -644,8 +644,8 @@ dt_build_tree_gpu(const float *features,
 				sum += labels[indices[i]];
 			node->leaf_value = (n_samples > 0) ? (sum / (double) n_samples) : 0.0;
 		}
-		nfree(left_indices);
-		nfree(right_indices);
+		pfree(left_indices);
+		pfree(right_indices);
 		return node;
 	}
 
@@ -692,7 +692,7 @@ dt_build_tree_gpu(const float *features,
 					majority = i;
 			}
 			node->leaf_value = (double) majority;
-			nfree(class_counts);
+			pfree(class_counts);
 		}
 		else
 		{
@@ -702,8 +702,8 @@ dt_build_tree_gpu(const float *features,
 				sum += labels[indices[i]];
 			node->leaf_value = (n_samples > 0) ? (sum / (double) n_samples) : 0.0;
 		}
-		nfree(left_indices);
-		nfree(right_indices);
+		pfree(left_indices);
+		pfree(right_indices);
 		return node;
 	}
 
@@ -717,11 +717,11 @@ dt_build_tree_gpu(const float *features,
 								   class_count, errstr);
 	if (node->left == NULL)
 	{
-		nfree(left_indices);
+		pfree(left_indices);
 		left_indices = NULL;
-		nfree(right_indices);
+		pfree(right_indices);
 		right_indices = NULL;
-		nfree(node);
+		pfree(node);
 		return NULL;
 	}
 
@@ -731,16 +731,16 @@ dt_build_tree_gpu(const float *features,
 	if (node->right == NULL)
 	{
 		dt_free_tree(node->left);
-		nfree(left_indices);
+		pfree(left_indices);
 		left_indices = NULL;
-		nfree(right_indices);
+		pfree(right_indices);
 		right_indices = NULL;
-		nfree(node);
+		pfree(node);
 		return NULL;
 	}
 
-	nfree(left_indices);
-	nfree(right_indices);
+	pfree(left_indices);
+	pfree(right_indices);
 	return node;
 }
 
@@ -854,7 +854,7 @@ ndb_cuda_dt_train(const float *features,
 	{
 		if (errstr && *errstr == NULL)
 			*errstr = pstrdup("CUDA DT train: failed to build tree");
-		nfree(indices);
+		pfree(indices);
 		return -1;
 	}
 
@@ -874,13 +874,13 @@ ndb_cuda_dt_train(const float *features,
 		if (errstr && *errstr == NULL)
 			*errstr = pstrdup("CUDA DT train: model packing failed");
 		dt_free_tree(root);
-		nfree(model);
-		nfree(indices);
+		pfree(model);
+		pfree(indices);
 		return -1;
 	}
 
-	nfree(indices);
-	nfree(model);			/* Note: root is now owned by packed model */
+	pfree(indices);
+	pfree(model);			/* Note: root is now owned by packed model */
 
 	rc = 0;
 	return rc;
@@ -1122,7 +1122,7 @@ ndb_cuda_dt_evaluate_batch(const bytea * model_data,
 
 	if (rc != 0)
 	{
-		nfree(predictions);
+		pfree(predictions);
 		return -1;
 	}
 
@@ -1174,7 +1174,7 @@ ndb_cuda_dt_evaluate_batch(const bytea * model_data,
 	else
 		*f1_out = 0.0;
 
-	nfree(predictions);
+	pfree(predictions);
 
 	return 0;
 }

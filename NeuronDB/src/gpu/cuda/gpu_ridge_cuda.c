@@ -139,7 +139,7 @@ ndb_cuda_ridge_pack_model(const RidgeModel *model,
 				 buf.data ? buf.data : "(unknown)");
 		}
 
-		nfree(buf.data);
+		pfree(buf.data);
 		*metrics = metrics_json;
 	}
 
@@ -343,13 +343,13 @@ ndb_cuda_ridge_train(const float *features,
 		if (errstr)
 			*errstr = psprintf("ndb_cuda_ridge_train: failed to allocate host memory (dim_with_intercept=%d)", dim_with_intercept);
 		if (h_XtX)
-			nfree(h_XtX);
+			pfree(h_XtX);
 		if (h_Xty)
-			nfree(h_Xty);
+			pfree(h_Xty);
 		if (h_XtX_inv)
-			nfree(h_XtX_inv);
+			pfree(h_XtX_inv);
 		if (h_beta)
-			nfree(h_beta);
+			pfree(h_beta);
 		return -1;
 	}
 
@@ -589,7 +589,7 @@ cpu_fallback:
 			h_Xty[j] += xi[j] * targets[i];
 		}
 
-		nfree(xi);
+		pfree(xi);
 	}
 
 	/* Add Ridge penalty (λI) to diagonal (excluding intercept) */
@@ -684,15 +684,15 @@ matrix_inversion:
 		}
 
 		for (row = 0; row < dim_with_intercept; row++)
-			nfree(augmented[row]);
-		nfree(augmented);
+			pfree(augmented[row]);
+		pfree(augmented);
 
 		if (!invert_success)
 		{
-			nfree(h_XtX);
-			nfree(h_Xty);
-			nfree(h_XtX_inv);
-			nfree(h_beta);
+			pfree(h_XtX);
+			pfree(h_Xty);
+			pfree(h_XtX_inv);
+			pfree(h_beta);
 			if (d_XtX)
 				cudaFree(d_XtX);
 			if (d_Xty)
@@ -843,14 +843,14 @@ build_model:
 				if (errstr && *errstr == NULL)
 					*errstr = pstrdup("ndb_cuda_ridge_train: model packing failed");
 			}
-			nfree(model.coefficients);
+			pfree(model.coefficients);
 		}
 	}
 
-	nfree(h_XtX);
-	nfree(h_Xty);
-	nfree(h_XtX_inv);
-	nfree(h_beta);
+	pfree(h_XtX);
+	pfree(h_Xty);
+	pfree(h_XtX_inv);
+	pfree(h_beta);
 	if (d_XtX)
 		cudaFree(d_XtX);
 	if (d_Xty)
@@ -870,9 +870,9 @@ build_model:
 
 	/* Cleanup and return error */
 	if (payload != NULL)
-		nfree(payload);
+		pfree(payload);
 	if (metrics_json != NULL)
-		nfree(metrics_json);
+		pfree(metrics_json);
 
 	/* Always set error string if returning -1 - this ensures caller gets error details */
 	/* Force set error string even if it was set before (may have been corrupted) */
@@ -1224,7 +1224,7 @@ ndb_cuda_ridge_evaluate(const bytea * model_data,
 			h_coefficients_double[i] = (double) coefficients[i];
 
 		cuda_err = cudaMemcpy(d_coefficients, h_coefficients_double, coeff_bytes, cudaMemcpyHostToDevice);
-		nfree(h_coefficients_double);
+		pfree(h_coefficients_double);
 
 		if (cuda_err != cudaSuccess)
 		{

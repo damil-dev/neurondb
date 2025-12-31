@@ -55,7 +55,7 @@ ifeq ($(CUDA_AVAILABLE),yes)
 		$(warning CUDA path found but nvcc not available at $(NVCC))
 	endif
 else
-	$(info CUDA not found at $(CUDA_PATH) - CUDA backend disabled)
+$(info CUDA not found at $(CUDA_PATH) - CUDA backend disabled)
 endif
 
 # CUDA compilation rule - MUST be at top level (pattern rules cannot be in conditionals)

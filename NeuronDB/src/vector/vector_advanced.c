@@ -143,7 +143,7 @@ vector_percentile(PG_FUNCTION_ARGS)
 	if (idx >= vec->dim)
 		idx = vec->dim - 1;
 	result = sorted[idx];
-	nfree(sorted);
+	pfree(sorted);
 
 	PG_RETURN_FLOAT4(result);
 }
@@ -250,8 +250,8 @@ vector_quantile(PG_FUNCTION_ARGS)
 	}
 
 	result = construct_array(elems, n_quantiles, FLOAT4OID, sizeof(float4), true, 'i');
-	nfree(elems);
-	nfree(nulls);
+	pfree(elems);
+	pfree(nulls);
 
 	PG_RETURN_ARRAYTYPE_P(result);
 }

@@ -165,8 +165,8 @@ neurondb_onnx_cleanup(void)
 		if (entry->session)
 			neurondb_onnx_unload_model(entry->session);
 		if (entry->model_name)
-			nfree(entry->model_name);
-		nfree(entry);
+			pfree(entry->model_name);
+		pfree(entry);
 	}
 
 	g_model_cache_head = NULL;
@@ -334,9 +334,9 @@ neurondb_onnx_unload_model(ONNXModelSession *session)
 		g_ort_api->ReleaseSessionOptions(session->session_options);
 
 	if (session->model_path)
-		nfree(session->model_path);
+		pfree(session->model_path);
 
-	nfree(session);
+	pfree(session);
 }
 
 /*
@@ -433,7 +433,7 @@ neurondb_onnx_run_inference(ONNXModelSession *session, ONNXTensor *input)
 			ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT,
 			&input_tensor);
 
-		nfree(shape_cast);
+		pfree(shape_cast);
 	}
 	onnx_check_status(status, "CreateTensorWithDataAsOrtValue");
 
@@ -483,7 +483,7 @@ neurondb_onnx_run_inference(ONNXModelSession *session, ONNXTensor *input)
 		for (i = 0; i < num_dims; i++)
 			output_dims[i] = (int64)dims_temp[i];
 
-		nfree(dims_temp);
+		pfree(dims_temp);
 	}
 
 	{
@@ -522,10 +522,10 @@ neurondb_onnx_free_tensor(ONNXTensor *tensor)
 	if (!tensor)
 		return;
 	if (tensor->data)
-		nfree(tensor->data);
+		pfree(tensor->data);
 	if (tensor->shape)
-		nfree(tensor->shape);
-	nfree(tensor);
+		pfree(tensor->shape);
+	pfree(tensor);
 }
 
 /*
@@ -620,8 +620,8 @@ onnx_cache_evict_lru(void)
 
 
 	neurondb_onnx_unload_model(lru_entry->session);
-	nfree(lru_entry->model_name);
-	nfree(lru_entry);
+	pfree(lru_entry->model_name);
+	pfree(lru_entry);
 
 	g_model_cache_count--;
 }

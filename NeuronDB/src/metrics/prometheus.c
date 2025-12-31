@@ -491,7 +491,7 @@ send_metrics(int socket)
 		ssize_t __w = write(socket, metrics.data, metrics.len);
 		(void) __w;
 	}
-	nfree(metrics.data);
+	pfree(metrics.data);
 }
 
 /*

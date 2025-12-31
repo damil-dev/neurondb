@@ -95,7 +95,7 @@ parse_vector_str(const char *vec, int *out_dim)
 		token = strtok_r(NULL, ",", &saveptr);
 	}
 
-	nfree(copy);
+	pfree(copy);
 	*out_dim = count;
 
 	if (count == 0)

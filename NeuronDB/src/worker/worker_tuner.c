@@ -315,7 +315,7 @@ sample_and_tune(void)
 		elog(LOG,
 			 "neurondb: neuranmon_state invalid in sample_and_tune, "
 			 "skipping adjustment");
-		nfree(sql.data);
+		pfree(sql.data);
 		ndb_spi_session_end(&session);
 		return;
 	}
@@ -372,11 +372,11 @@ sample_and_tune(void)
 					 "neurondb: failed to set neurondb.hnsw_ef_search to %d",
 					 new_ef_search);
 			}
-			nfree(sql.data);
+			pfree(sql.data);
 		}
 		PG_CATCH();
 		{
-			nfree(sql.data);
+			pfree(sql.data);
 			EmitErrorReport();
 			FlushErrorState();
 			elog(WARNING,
@@ -391,7 +391,7 @@ sample_and_tune(void)
 		LWLockRelease(neuranmon_state->lock);
 	}
 
-	nfree(sql.data);
+	pfree(sql.data);
 	ndb_spi_session_end(&session);
 }
 
@@ -437,7 +437,7 @@ rotate_caches(void)
 		{
 		}
 
-		nfree(sql.data);
+		pfree(sql.data);
 	}
 	PG_CATCH();
 	{
@@ -494,7 +494,7 @@ record_metrics(void)
 				 "neurondb: histogram INSERT returned unexpected code %d",
 				 ret);
 		}
-		nfree(sql.data);
+		pfree(sql.data);
 	}
 	PG_CATCH();
 	{
@@ -585,8 +585,8 @@ export_prometheus_metrics(void)
 				 "neurondb: Prometheus metrics INSERT returned unexpected code %d",
 				 ret);
 		}
-		nfree(sql.data);
-		nfree(metrics.data);
+		pfree(sql.data);
+		pfree(metrics.data);
 	}
 	PG_CATCH();
 	{

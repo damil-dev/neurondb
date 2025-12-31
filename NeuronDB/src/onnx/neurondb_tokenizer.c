@@ -305,19 +305,19 @@ evict_lru_tokenizer(void)
 			{
 				next = vocab_entry->next;
 				if (vocab_entry->token)
-					nfree(vocab_entry->token);
-				nfree(vocab_entry);
+					pfree(vocab_entry->token);
+				pfree(vocab_entry);
 			}
 		}
-		nfree(lru_entry->vocab_table);
+		pfree(lru_entry->vocab_table);
 	}
 
 	/* Free cache entry */
 	if (lru_entry->model_name)
-		nfree(lru_entry->model_name);
+		pfree(lru_entry->model_name);
 	if (lru_entry->vocab_path)
-		nfree(lru_entry->vocab_path);
-	nfree(lru_entry);
+		pfree(lru_entry->vocab_path);
+	pfree(lru_entry);
 
 	g_tokenizer_cache_count--;
 }
@@ -457,7 +457,7 @@ tokenize_text(const char *text, int *num_tokens)
 	}
 
 	/* Free the temporary, mutable copy */
-	nfree(text_copy);
+	pfree(text_copy);
 
 	*num_tokens = count;
 	return tokens;
@@ -561,10 +561,10 @@ neurondb_tokenize_with_model(const char *text,
 			token_id = TOKEN_UNK_ID;
 		}
 		token_ids[output_idx++] = token_id;
-		nfree(tokens[i]);	/* Free each token string */
+		pfree(tokens[i]);	/* Free each token string */
 	}
 	/* Free the tokens array itself */
-	nfree(tokens);
+	pfree(tokens);
 
 	/* Always add [SEP] if there is room */
 	if (output_idx < max_length)
@@ -813,12 +813,12 @@ neurondb_hf_tokenize(PG_FUNCTION_ARGS)
 	result = construct_array(
 							 dvalues, output_length, INT4OID, sizeof(int32), true, 'i');
 
-	nfree(token_ids);
-	nfree(dvalues);
-	nfree(dnulls);
-	nfree(text_str);
+	pfree(token_ids);
+	pfree(dvalues);
+	pfree(dnulls);
+	pfree(text_str);
 	if (model_name)
-		nfree(model_name);
+		pfree(model_name);
 
 	PG_RETURN_ARRAYTYPE_P(result);
 }
@@ -923,11 +923,11 @@ neurondb_hf_detokenize(PG_FUNCTION_ARGS)
 	/* Detokenize */
 	text_str = neurondb_detokenize(token_ids, length, model_name);
 
-	nfree(token_ids);
-	nfree(dvalues);
-	nfree(dnulls);
+	pfree(token_ids);
+	pfree(dvalues);
+	pfree(dnulls);
 	if (model_name)
-		nfree(model_name);
+		pfree(model_name);
 
 	PG_RETURN_TEXT_P(cstring_to_text(text_str));
 }

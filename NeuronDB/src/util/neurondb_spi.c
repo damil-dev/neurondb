@@ -65,7 +65,7 @@ ndb_spi_session_begin(MemoryContext parent_context, bool assume_spi_connected)
 	{
 		if (SPI_connect() != SPI_OK_CONNECT)
 		{
-			nfree(session);
+			pfree(session);
 			ereport(ERROR,
 					(errcode(ERRCODE_INTERNAL_ERROR),
 					 errmsg("neurondb: SPI_connect failed in ndb_spi_session_begin")));
@@ -93,7 +93,7 @@ ndb_spi_session_end(NdbSpiSession **session)
 	{
 	}
 
-	nfree(*session);
+	pfree(*session);
 }
 
 bool
@@ -345,7 +345,7 @@ ndb_spi_stringinfo_free(NdbSpiSession *session, StringInfoData * str)
 	if (session == NULL || str == NULL || str->data == NULL)
 		return;
 
-	nfree(str->data);
+	pfree(str->data);
 }
 
 /*

@@ -80,8 +80,8 @@ typedef struct TimeSeriesGpuModelState
 	char		model_type[32];
 }			TimeSeriesGpuModelState;
 
-/*  Fix for SPI_getbinval 'isnull' argument: always use a local 'bool' variable, not 'int' */
-/*  throughout this file, especially within the ARIMA forecast and model loading code. */
+/* Always use a local 'bool' variable for SPI_getbinval 'isnull' argument, not 'int' */
+/* throughout this file, especially within the ARIMA forecast and model loading code. */
 
 static void
 compute_moving_average(const float *data, int n, int window, float *result)

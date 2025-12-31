@@ -113,14 +113,14 @@ ndb_llm_cache_lookup(const char *key, int max_age_seconds, char **out_text)
 			if (spi_text != NULL)
 			{
 				spi_text_cstr = text_to_cstring(spi_text);
-				nfree(spi_text);
+				pfree(spi_text);
 				if (out_text)
 				{
 					*out_text = spi_text_cstr;
 					hit = true;
 				} else
 				{
-					nfree(spi_text_cstr);
+					pfree(spi_text_cstr);
 				}
 			}
 		}
@@ -208,7 +208,7 @@ ndb_llm_cache_store(const char *key, const char *text)
 			ret);
 	}
 
-	nfree(val.data);
+	pfree(val.data);
 	ndb_spi_session_end(&session);
 }
 
@@ -249,7 +249,7 @@ ndb_llm_cache_test(PG_FUNCTION_ARGS)
 	if (hit && result)
 	{
 		out = cstring_to_text(result);
-		nfree(result);
+		pfree(result);
 		PG_RETURN_TEXT_P(out);
 	} else
 		PG_RETURN_NULL();
@@ -292,7 +292,7 @@ ndb_llm_cache_evict_lru(int max_size)
 	if (spi_ret != SPI_OK_SELECT)
 	{
 		elog(WARNING, "neurondb: ndb_llm_cache_evict_lru: failed to get cache size: SPI return code %d", spi_ret);
-		nfree(sql.data);
+		pfree(sql.data);
 		ndb_spi_session_end(&session);
 		return 0;
 	}
@@ -301,7 +301,7 @@ ndb_llm_cache_evict_lru(int max_size)
 		if (ndb_spi_get_int32(session, 0, 1, &count_val))
 			current_count = count_val;
 	}
-	nfree(sql.data);
+	pfree(sql.data);
 
 	if (current_count <= max_size)
 	{
@@ -322,7 +322,7 @@ ndb_llm_cache_evict_lru(int max_size)
 	spi_ret = ndb_spi_execute(session, sql.data, false, 0);
 	if (spi_ret == SPI_OK_DELETE)
 		evicted = current_count - max_size;
-	nfree(sql.data);
+	pfree(sql.data);
 
 	ndb_spi_session_end(&session);
 	return evicted;
@@ -378,7 +378,7 @@ ndb_llm_cache_stats(PG_FUNCTION_ARGS)
 		if (ndb_spi_get_int32(session, 0, 1, &count_val))
 			total_entries = count_val;
 	}
-	nfree(sql.data);
+	pfree(sql.data);
 
 	/* Get stale entries */
 	initStringInfo(&sql);
@@ -392,7 +392,7 @@ ndb_llm_cache_stats(PG_FUNCTION_ARGS)
 		if (ndb_spi_get_int32(session, 0, 1, &count_val))
 			stale_entries = count_val;
 	}
-	nfree(sql.data);
+	pfree(sql.data);
 
 	/* Get oldest and newest entry timestamps */
 	initStringInfo(&sql);
@@ -419,7 +419,7 @@ ndb_llm_cache_stats(PG_FUNCTION_ARGS)
 		if (!isnull2)
 			newest_entry = DatumGetTimestampTz(d2);
 	}
-	nfree(sql.data);
+	pfree(sql.data);
 
 	ndb_spi_session_end(&session);
 
@@ -440,7 +440,7 @@ ndb_llm_cache_stats(PG_FUNCTION_ARGS)
 
 		oldest_str = DatumGetCString(DirectFunctionCall1(timestamptz_out, TimestampTzGetDatum(oldest_entry)));
 		appendStringInfo(&jsonbuf, ",\"oldest_entry\":%s", ndb_json_quote_string(oldest_str));
-		nfree(oldest_str);
+		pfree(oldest_str);
 	}
 	if (newest_entry != 0)
 	{
@@ -448,7 +448,7 @@ ndb_llm_cache_stats(PG_FUNCTION_ARGS)
 
 		newest_str = DatumGetCString(DirectFunctionCall1(timestamptz_out, TimestampTzGetDatum(newest_entry)));
 		appendStringInfo(&jsonbuf, ",\"newest_entry\":%s", ndb_json_quote_string(newest_str));
-		nfree(newest_str);
+		pfree(newest_str);
 	}
 	appendStringInfoChar(&jsonbuf, '}');
 
@@ -456,7 +456,7 @@ ndb_llm_cache_stats(PG_FUNCTION_ARGS)
 		Jsonb *result = NULL;
 		
 		result = ndb_jsonb_in_cstring(jsonbuf.data);
-		nfree(jsonbuf.data);
+		pfree(jsonbuf.data);
 		PG_RETURN_JSONB_P(result);
 	}
 }
@@ -499,7 +499,7 @@ ndb_llm_cache_clear(PG_FUNCTION_ARGS)
 			"DELETE FROM " NDB_FQ_LLM_CACHE " "
 			"WHERE key LIKE %s",
 			ndb_json_quote_string(pattern_str));
-		nfree(pattern_str);
+		pfree(pattern_str);
 	}
 
 	spi_ret = ndb_spi_execute(session, sql.data, false, 0);
@@ -509,7 +509,7 @@ ndb_llm_cache_clear(PG_FUNCTION_ARGS)
 		deleted = SPI_processed;
 	}
 
-	nfree(sql.data);
+	pfree(sql.data);
 	ndb_spi_session_end(&session);
 
 	PG_RETURN_INT32(deleted);
@@ -548,7 +548,7 @@ ndb_llm_cache_evict_stale(PG_FUNCTION_ARGS)
 	if (spi_ret == SPI_OK_DELETE)
 		deleted = SPI_processed;
 
-	nfree(sql.data);
+	pfree(sql.data);
 	ndb_spi_session_end(&session);
 
 	PG_RETURN_INT32(deleted);
@@ -640,7 +640,7 @@ ndb_llm_cache_warm(PG_FUNCTION_ARGS)
 			/* BULLETPROOF: Copy cache_key to current context before SPI calls */
 			/* ndb_llm_cache_lookup/store use SPI which may change memory context */
 			cache_key = pstrdup(key_buf.data);
-			nfree(key_buf.data);  /* Free original StringInfo data */
+			pfree(key_buf.data);  /* Free original StringInfo data */
 
 			/* Check if already cached */
 			{
@@ -650,9 +650,9 @@ ndb_llm_cache_warm(PG_FUNCTION_ARGS)
 				hit = ndb_llm_cache_lookup(cache_key, neurondb_llm_cache_ttl, &cached_text);
 				if (hit && cached_text != NULL)
 				{
-					nfree(cached_text);
-					nfree(cache_key);
-					nfree(input_str);
+					pfree(cached_text);
+					pfree(cache_key);
+					pfree(input_str);
 					continue;
 				}
 			}
@@ -705,20 +705,20 @@ ndb_llm_cache_warm(PG_FUNCTION_ARGS)
 				ndb_llm_cache_store(cache_key, cache_val.data);
 				cached++;
 
-				nfree(cache_val.data);
+				pfree(cache_val.data);
 			}
 
-			nfree(cache_key);
-			nfree(input_str);
+			pfree(cache_key);
+			pfree(input_str);
 		}
 	}
 
 	if (text_datums)
-		nfree(text_datums);
+		pfree(text_datums);
 	if (text_nulls)
-		nfree(text_nulls);
+		pfree(text_nulls);
 	if (model_str)
-		nfree(model_str);
+		pfree(model_str);
 
 	PG_RETURN_INT32(cached);
 }

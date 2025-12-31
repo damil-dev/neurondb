@@ -119,7 +119,7 @@ vectorp_in(PG_FUNCTION_ARGS)
 	result->flags = 0;
 
 	memcpy(result->data, temp_data, sizeof(float4) * dim);
-	nfree(temp_data);
+	pfree(temp_data);
 
 	PG_RETURN_POINTER(result);
 }
@@ -344,8 +344,8 @@ vecmap_in(PG_FUNCTION_ARGS)
 	memcpy(VECMAP_INDICES(result), indices, sizeof(int32) * nnz);
 	memcpy(VECMAP_VALUES(result), values, sizeof(float4) * nnz);
 
-	nfree(indices);
-	nfree(values);
+	pfree(indices);
+	pfree(values);
 
 	PG_RETURN_POINTER(result);
 }
@@ -661,7 +661,7 @@ vgraph_in(PG_FUNCTION_ARGS)
 
 	memcpy(VGRAPH_EDGES(result), edges, sizeof(GraphEdge) * num_edges);
 
-	nfree(edges);
+	pfree(edges);
 
 	PG_RETURN_POINTER(result);
 }
