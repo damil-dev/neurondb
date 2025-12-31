@@ -339,3 +339,4 @@ For issues, questions, or contributions:
 - Validate compose file: `docker-compose -f dockers/docker-compose.yml config`
 - Report issues: Include output of `./docker.sh --version`
 
+

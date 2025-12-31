@@ -161,31 +161,27 @@ Use the unified Docker Compose setup for easy integration:
 
 ```bash
 # From repository root
-docker-compose up -d
+docker compose up -d
 ```
 
 This starts all services with automatic networking.
 
-### Component-Specific Docker
+### Start components individually
 
-Start components individually:
+From repository root:
 
 ```bash
-# Start NeuronDB
-cd NeuronDB/docker
+# Database only (CPU profile)
 docker compose up -d neurondb
 
-# Start NeuronAgent
-cd NeuronAgent/docker
-docker compose up -d agent-server
+# Agent (depends on neurondb)
+docker compose up -d neuronagent
 
-# Start NeuronMCP
-cd NeuronMCP/docker
-docker compose up -d neurondb-mcp
+# MCP server (depends on neurondb)
+docker compose up -d neuronmcp
 
-# Start NeuronDesktop
-cd NeuronDesktop
-docker-compose up -d
+# Desktop UI + API
+docker compose up -d neurondesk-api neurondesk-frontend
 ```
 
 ### Docker Network Configuration
@@ -292,5 +288,5 @@ This tests:
 ## Official Documentation
 
 For comprehensive integration guides:
-**🌐 [https://www.neurondb.ai/docs/ecosystem](https://www.neurondb.ai/docs/ecosystem)**
+** [https://www.neurondb.ai/docs/ecosystem](https://www.neurondb.ai/docs/ecosystem)**
 

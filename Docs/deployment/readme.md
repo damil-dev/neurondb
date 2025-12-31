@@ -6,18 +6,18 @@ This guide covers all deployment options, from development to production, includ
 
 ---
 
-## 🎯 Deployment Options Summary
+##  Deployment Options Summary
 
 | Option | Use Case | Complexity | Scalability | HA | Cost |
 |--------|----------|------------|-------------|-------|------|
-| **[Docker Compose](#docker-compose)** | Development, small production | ⭐ Easy | ⭐ Limited | ❌ No | 💰 Low |
-| **[Individual Containers](#individual-containers)** | Medium production | ⭐⭐ Moderate | ⭐⭐ Good | ⚠️ Partial | 💰💰 Medium |
-| **[Kubernetes](#kubernetes)** | Large-scale production | ⭐⭐⭐ Complex | ⭐⭐⭐ Excellent | ✅ Yes | 💰💰💰 High |
-| **[Bare Metal](#bare-metal)** | High-performance | ⭐⭐ Moderate | ⭐⭐ Good | ⚠️ Manual | 💰💰 Medium |
+| **[Docker Compose](#docker-compose)** | Development, small production |  Easy |  Limited |  No |  Low |
+| **[Individual Containers](#individual-containers)** | Medium production |  Moderate |  Good |  Partial |  Medium |
+| **[Kubernetes](#kubernetes)** | Large-scale production |  Complex |  Excellent |  Yes |  High |
+| **[Bare Metal](#bare-metal)** | High-performance |  Moderate |  Good |  Manual |  Medium |
 
 ---
 
-## 🐳 Docker Compose
+##  Docker Compose
 
 **Best for:** Development, testing, small production deployments
 
@@ -79,18 +79,18 @@ services:
 
 ### Advantages
 
-✅ **Simple setup** - Single command to start everything  
-✅ **Easy configuration** - Environment variables and YAML  
-✅ **Quick iteration** - Fast rebuild and restart  
-✅ **Integrated networking** - Automatic service discovery  
-✅ **Volume management** - Easy data persistence  
+ **Simple setup** - Single command to start everything  
+ **Easy configuration** - Environment variables and YAML  
+ **Quick iteration** - Fast rebuild and restart  
+ **Integrated networking** - Automatic service discovery  
+ **Volume management** - Easy data persistence  
 
 ### Limitations
 
-❌ **No HA** - Single point of failure  
-❌ **Limited scaling** - Can't scale beyond single host  
-❌ **Manual updates** - No rolling updates  
-❌ **Resource limits** - Single host constraints  
+ **No HA** - Single point of failure  
+ **Limited scaling** - Can't scale beyond single host  
+ **Manual updates** - No rolling updates  
+ **Resource limits** - Single host constraints  
 
 ### Production Considerations
 
@@ -117,7 +117,7 @@ services:
 
 ---
 
-## 📦 Individual Containers
+##  Individual Containers
 
 **Best for:** Medium-scale production, service isolation
 
@@ -242,10 +242,10 @@ server {
 
 ### Advantages
 
-✅ **Service isolation** - Independent scaling  
-✅ **Better resource control** - Per-service limits  
-✅ **Easier updates** - Update one service at a time  
-✅ **Load balancing** - Multiple instances per service  
+ **Service isolation** - Independent scaling  
+ **Better resource control** - Per-service limits  
+ **Easier updates** - Update one service at a time  
+ **Load balancing** - Multiple instances per service  
 
 ### Scaling Example
 
@@ -264,7 +264,7 @@ done
 
 ---
 
-## ☸️ Kubernetes
+##  Kubernetes
 
 **Best for:** Large-scale production, high availability
 
@@ -480,16 +480,16 @@ kubectl get hpa -n neurondb
 
 ### Advantages
 
-✅ **High availability** - Automatic failover  
-✅ **Auto-scaling** - Based on metrics  
-✅ **Rolling updates** - Zero-downtime deployments  
-✅ **Service discovery** - Built-in DNS  
-✅ **Load balancing** - Automatic distribution  
-✅ **Self-healing** - Automatic pod replacement  
+ **High availability** - Automatic failover  
+ **Auto-scaling** - Based on metrics  
+ **Rolling updates** - Zero-downtime deployments  
+ **Service discovery** - Built-in DNS  
+ **Load balancing** - Automatic distribution  
+ **Self-healing** - Automatic pod replacement  
 
 ---
 
-## 🖥️ Bare Metal
+##  Bare Metal
 
 **Best for:** High-performance requirements, full control
 
@@ -608,20 +608,20 @@ server {
 
 ### Advantages
 
-✅ **Maximum performance** - No containerization overhead  
-✅ **Full control** - Complete system access  
-✅ **Hardware optimization** - Direct GPU access  
-✅ **Cost effective** - No orchestration overhead  
+ **Maximum performance** - No containerization overhead  
+ **Full control** - Complete system access  
+ **Hardware optimization** - Direct GPU access  
+ **Cost effective** - No orchestration overhead  
 
 ### Limitations
 
-❌ **Manual management** - Requires system administration  
-❌ **Slower updates** - Manual deployment process  
-❌ **Complex scaling** - Manual server provisioning  
+ **Manual management** - Requires system administration  
+ **Slower updates** - Manual deployment process  
+ **Complex scaling** - Manual server provisioning  
 
 ---
 
-## 🔒 Security Best Practices
+##  Security Best Practices
 
 ### Network Security
 
@@ -657,7 +657,7 @@ ALTER SYSTEM SET ssl_key_file = '/etc/ssl/private/server.key';
 
 ---
 
-## 📊 Monitoring & Observability
+##  Monitoring & Observability
 
 ### Prometheus + Grafana
 
@@ -687,7 +687,7 @@ scrape_configs:
 
 ---
 
-## 🆘 Troubleshooting
+##  Troubleshooting
 
 See comprehensive troubleshooting guides:
 - **[NeuronDB Troubleshooting](../NeuronDB/docs/troubleshooting.md)**
@@ -695,10 +695,10 @@ See comprehensive troubleshooting guides:
 
 ---
 
-## 📚 Additional Resources
+##  Additional Resources
 
 - **[Docker Deployment Guide](docker.md)** - Detailed Docker documentation
-- **[Component Documentation](../components/README.md)** - Component-specific guides
+- **[Component Documentation](../components/readme.md)** - Component-specific guides
 - **[Performance Tuning](../NeuronDB/docs/performance/)** - Optimization guides
 - **[Security Policy](../SECURITY.md)** - Security best practices
 

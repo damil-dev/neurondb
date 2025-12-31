@@ -1,186 +1,79 @@
-# Quick Start Guide
+# Quick Start
 
-Get up and running with the NeuronDB ecosystem in minutes.
+This guide is a short, code-accurate path to verifying the system works.
 
 ## Prerequisites
 
-- Docker and Docker Compose installed
-- Or PostgreSQL 16+ with NeuronDB extension installed
+- Docker and Docker Compose plugin (`docker compose`)
+- `psql` installed locally (or use `docker compose exec` to run `psql` inside the container)
 
-## Quick Start with Docker
+## 1) Start NeuronDB (CPU profile)
 
-### 1. Start NeuronDB
+From the repository root:
 
 ```bash
-cd NeuronDB/docker
 docker compose up -d neurondb
 ```
 
-### 2. Verify Installation
+## 2) Create the extension and verify it loads
 
 ```bash
-psql "postgresql://neurondb:neurondb@localhost:5433/neurondb" \
-  -c "SELECT neurondb.version();"
+PGPASSWORD=neurondb psql -h localhost -p 5433 -U neurondb -d neurondb   -c "CREATE EXTENSION IF NOT EXISTS neurondb; SELECT neurondb.version();"
 ```
 
-### 3. Create Your First Vector Table
+## 3) Minimal vector table, index, and query
+
+NeuronDB defines `vector`, operator classes (for example `vector_l2_ops`), and the `<->` operator in `NeuronDB/neurondb--1.0.sql`.
 
 ```sql
--- Connect to database
-psql "postgresql://neurondb:neurondb@localhost:5433/neurondb"
-
--- Create table with vector column
 CREATE TABLE documents (
-    id SERIAL PRIMARY KEY,
-    title TEXT,
-    content TEXT,
-    embedding vector(384)
+  id bigserial PRIMARY KEY,
+  embedding vector(3)
 );
 
--- Insert sample data
-INSERT INTO documents (title, content, embedding)
-VALUES (
-    'Machine Learning',
-    'Machine learning is a subset of AI',
-    neurondb.embed_text('Machine learning is a subset of AI', 'model_name')
-);
+INSERT INTO documents (embedding) VALUES
+  ('[1,0,0]'),
+  ('[0,1,0]'),
+  ('[0,0,1]');
 
--- Create HNSW index
-SELECT neurondb.hnsw_create_index('documents', 'embedding', 'documents_idx', 16, 200);
-```
+CREATE INDEX documents_embedding_hnsw_idx
+  ON documents
+  USING hnsw (embedding vector_l2_ops);
 
-### 4. Perform Vector Search
-
-```sql
--- Search for similar documents
-SELECT id, title,
-       embedding <-> neurondb.embed_text('artificial intelligence', 'model_name') AS distance
+SELECT id, embedding <-> '[1,0,0]'::vector AS distance
 FROM documents
 ORDER BY distance
-LIMIT 5;
+LIMIT 3;
 ```
 
-## Quick Start with NeuronAgent
-
-### 1. Start NeuronAgent
+## 4) Start NeuronAgent and check health (optional)
 
 ```bash
-cd NeuronAgent/docker
-docker compose up -d agent-server
+docker compose up -d neuronagent
+curl -sS http://localhost:8080/health
 ```
 
-### 2. Create an Agent
+## 5) Start NeuronDesktop (optional)
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/agents \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "research_agent",
-    "profile": "research",
-    "tools": ["sql", "http"]
-  }'
+docker compose up -d neurondesk-api neurondesk-frontend
 ```
 
-### 3. Send a Message
+- UI: `http://localhost:3000/`
+- API: `http://localhost:8081/health`
+
+## 6) NeuronMCP (optional)
+
+NeuronMCP runs as a container in this repo’s docker compose. Start it with:
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/sessions/SESSION_ID/messages \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "content": "Find documents about machine learning"
-  }'
+docker compose up -d neuronmcp
 ```
 
-## Quick Start with NeuronMCP
+For client configuration and tool details, see `NeuronMCP/readme.md` and `NeuronMCP/TOOLS_REFERENCE.md`.
 
-### 1. Configure Claude Desktop
+## Next steps
 
-Add to `claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "neurondb": {
-      "command": "neurondb-mcp",
-      "env": {
-        "NEURONDB_HOST": "localhost",
-        "NEURONDB_PORT": "5432",
-        "NEURONDB_DATABASE": "neurondb",
-        "NEURONDB_USER": "neurondb",
-        "NEURONDB_PASSWORD": "neurondb"
-      }
-    }
-  }
-}
-```
-
-### 2. Use in Claude Desktop
-
-NeuronMCP tools will be available in Claude Desktop for vector search, embeddings, and ML operations.
-
-## Quick Start with NeuronDesktop
-
-### 1. Start NeuronDesktop
-
-```bash
-cd NeuronDesktop
-docker-compose up -d
-```
-
-### 2. Access the Interface
-
-- **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:8081
-
-### 3. Configure Profiles
-
-1. Navigate to Settings
-2. Create a new profile
-3. Configure connections to:
-   - NeuronDB (PostgreSQL)
-   - NeuronAgent (HTTP API)
-   - NeuronMCP (MCP server)
-
-### 4. Use the Interface
-
-- **MCP Console**: Test and use MCP tools
-- **NeuronDB Search**: Perform vector searches
-- **Agent Management**: Create and manage agents
-
-## Next Steps
-
-1. **[Installation Guide](installation.md)** - Complete installation instructions
-2. **[Component Documentation](../components/README.md)** - Detailed component guides
-3. **[Integration Guide](../ecosystem/integration.md)** - Connect all components
-4. **[Official Documentation](https://www.neurondb.ai/docs/getting-started/quickstart)** - Comprehensive quick start
-
-## Example Workflows
-
-### Vector Search Workflow
-
-1. Create vector table
-2. Generate embeddings
-3. Create HNSW index
-4. Perform similarity search
-
-### RAG Workflow
-
-1. Ingest documents into PostgreSQL
-2. Generate embeddings using NeuronDB
-3. Retrieve context using vector search
-4. Pass to LLM through NeuronAgent
-
-### Agent Workflow
-
-1. Create agent with tools
-2. Start session
-3. Send messages
-4. Agent executes tools and responds
-
-## Official Documentation
-
-For detailed tutorials and examples:
-**🌐 [https://www.neurondb.ai/docs/getting-started](https://www.neurondb.ai/docs/getting-started)**
-
+- Docker and profiles: `dockers/readme.md`
+- NeuronDB extension docs: `NeuronDB/docs/`
+- NeuronAgent OpenAPI: `NeuronAgent/openapi/openapi.yaml`

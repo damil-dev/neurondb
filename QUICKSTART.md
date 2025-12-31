@@ -1,14 +1,20 @@
 # Quick Start Guide
 
-Get NeuronDB up and running in minutes with this step-by-step guide. No tribal knowledge required.
+Get NeuronDB up and running in minutes with this step-by-step guide.
+
+> **New here?** Start with **[Simple Start Guide](Docs/getting-started/simple-start.md)** instead - it explains everything in plain English!
+
+> **TECHNICAL USER?** Continue below for a streamlined technical setup.
+
+---
 
 ## Prerequisites
 
 Before starting, ensure you have:
 
 - **Docker** 20.10+ and **Docker Compose** 2.0+
-- **5-10 minutes** for setup and verification
-- **4GB RAM** minimum (8GB recommended)
+- **5-10 minutes**for setup and verification
+- **4GB RAM**minimum (8GB recommended)
 
 Verify Docker installation:
 
@@ -95,7 +101,7 @@ echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":
 docker compose exec -T neurondb-mcp /app/neurondb-mcp | head -20
 ```
 
-**Expected output:** JSON-RPC response with server information.
+**Expected output:**JSON-RPC response with server information.
 
 **Alternative: Use the Python MCP client:**
 
@@ -117,9 +123,9 @@ This script runs all three tests above and reports success or failure.
 
 **Expected output:**
 ```
-✓ NeuronDB SQL query successful
-✓ NeuronAgent REST API responding
-✓ NeuronMCP server responding
+ NeuronDB SQL query successful
+ NeuronAgent REST API responding
+ NeuronMCP server responding
 All smoke tests passed!
 ```
 
@@ -266,9 +272,9 @@ After `docker compose up -d`, you have:
 | **NeuronDesktop API** | `neurondesk-api` | 8081 | NeuronDesktop backend API |
 | **NeuronDesktop Frontend** | `neurondesk-frontend` | 3000 | NeuronDesktop web interface |
 
-**Network:** All services communicate via `neurondb-network` Docker network.
+**Network:**All services communicate via `neurondb-network` Docker network.
 
-**Data:** Persistent data stored in Docker volumes:
+**Data:**Persistent data stored in Docker volumes:
 - `neurondb-data` (PostgreSQL data)
 
 ## Accessing Services
@@ -319,23 +325,23 @@ curl http://localhost:8081/health
 
 All services use default configuration suitable for development. To customize:
 
-1. **Edit `docker-compose.yml`** for service-level changes
-2. **Set environment variables** for runtime configuration
-3. **Mount configuration files** for advanced setups
+1. **Edit `docker-compose.yml`**for service-level changes
+2. **Set environment variables**for runtime configuration
+3. **Mount configuration files**for advanced setups
 
 See component-specific documentation for detailed configuration options.
 
 ## Getting Help
 
-- **Documentation:** See [README.md](README.md) for detailed documentation
-- **Issues:** Check service logs: `docker compose logs [service-name]`
-- **Support:** Contact support@neurondb.ai
+- **Documentation:**See [readme.md](readme.md) for detailed documentation
+- **Issues:**Check service logs: `docker compose logs [service-name]`
+- **Support:**Contact support@neurondb.ai
 
 ## Next Steps
 
-- Read the [full documentation](README.md)
+- Read the [full documentation](readme.md)
 - Explore [NeuronDB examples](NeuronDB/demo/)
 - Try [NeuronAgent examples](NeuronAgent/examples/)
-- Check out [NeuronMCP documentation](NeuronMCP/README.md)
-- Access [NeuronDesktop web interface](http://localhost:3000) and see [NeuronDesktop documentation](NeuronDesktop/README.md)
+- Check out [NeuronMCP documentation](NeuronMCP/readme.md)
+- Access [NeuronDesktop web interface](http://localhost:3000) and see [NeuronDesktop documentation](NeuronDesktop/readme.md)
 
