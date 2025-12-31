@@ -12,7 +12,7 @@ use VectorOps;
 
 =head1 NAME
 
-010_vector_types.t - Exhaustive vector type operations tests
+050_vector_types_exhaustive.t - Exhaustive vector type operations tests
 
 =head1 DESCRIPTION
 
@@ -110,10 +110,9 @@ subtest 'Vector Creation - Array Conversion' => sub {
 	
 	# Various dimensions
 	for my $dim (3, 5, 10, 128) {
-		my @vals = map { $_ * 0.1 } (1..$dim);
-		my $array_sql = 'ARRAY[' . join(',', @vals) . ']';
+		my $arr = '{' . join(',', map { $_ * 0.1 } (1..$dim)) . '}';
 		query_ok($node, 'postgres', 
-			"SELECT array_to_vector(${array_sql}::real[])::vector($dim);", 
+			"SELECT array_to_vector(ARRAY$arr::real[])::vector($dim);", 
 			"array_to_vector with dimension $dim");
 	}
 };

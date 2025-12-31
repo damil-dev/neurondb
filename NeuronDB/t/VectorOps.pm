@@ -63,9 +63,10 @@ sub test_vector_creation {
 	push @results, $result->{success};
 	
 	# Test array conversion
-	my $array_str = '{' . join(',', map { $_ * 0.1 } (1..$dim)) . '}';
+	my @array_vals = map { $_ * 0.1 } (1..$dim);
+	my $array_sql = 'ARRAY[' . join(',', @array_vals) . ']';
 	$result = $node->psql($dbname,
-		"SELECT array_to_vector(ARRAY$array_str::real[])::vector($dim);"
+		"SELECT array_to_vector(${array_sql}::real[])::vector($dim);"
 	);
 	push @results, $result->{success};
 	

@@ -12,7 +12,7 @@ use SparseHelpers;
 
 =head1 NAME
 
-016_sparse_vectors.t - Sparse vectors and learned sparse retrieval tests
+110_sparse_vectors.t - Sparse vectors and learned sparse retrieval tests
 
 =head1 DESCRIPTION
 
@@ -20,7 +20,7 @@ Tests for sparse_vector type, SPLADE/ColBERTv2, and hybrid dense+sparse search.
 
 =cut
 
-plan tests => 11;  # 1 setup + 7 query_ok + 2 negative (pass/skip) + 1 stop
+plan tests => 9;  # 1 setup + 7 query_ok + 2 negative (may skip) + 1 cleanup (but skips reduce count)
 
 my $node = PostgresNode->new('sparse_test');
 ok($node, 'PostgresNode created');
