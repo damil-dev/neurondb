@@ -127,7 +127,7 @@ ndb_rocm_ridge_pack_model(const RidgeModel *model,
 
 		metrics_json = DatumGetJsonbP(DirectFunctionCall1(
 														  jsonb_in, CStringGetTextDatum(buf.data)));
-		nfree(buf.data);
+		pfree(buf.data);
 		*metrics = metrics_json;
 	}
 
@@ -475,7 +475,7 @@ cpu_fallback:
 			h_Xty[j] += xi[j] * targets[i];
 		}
 
-		nfree(xi);
+		pfree(xi);
 	}
 
 	/* Add Ridge penalty (λI) to diagonal (excluding intercept) */
@@ -558,15 +558,15 @@ matrix_inversion:
 		}
 
 		for (row = 0; row < dim_with_intercept; row++)
-			nfree(augmented[row]);
-		nfree(augmented);
+			pfree(augmented[row]);
+		pfree(augmented);
 
 		if (!invert_success)
 		{
-			nfree(h_XtX);
-			nfree(h_Xty);
-			nfree(h_XtX_inv);
-			nfree(h_beta);
+			pfree(h_XtX);
+			pfree(h_Xty);
+			pfree(h_XtX_inv);
+			pfree(h_beta);
 			if (d_XtX)
 				hipFree(d_XtX);
 			if (d_Xty)
@@ -702,13 +702,13 @@ build_model:
 		rc = ndb_rocm_ridge_pack_model(
 									   &model, &payload, &metrics_json, errstr);
 
-		nfree(model.coefficients);
+		pfree(model.coefficients);
 	}
 
-	nfree(h_XtX);
-	nfree(h_Xty);
-	nfree(h_XtX_inv);
-	nfree(h_beta);
+	pfree(h_XtX);
+	pfree(h_Xty);
+	pfree(h_XtX_inv);
+	pfree(h_beta);
 	if (d_XtX)
 		hipFree(d_XtX);
 	if (d_Xty)
@@ -727,9 +727,9 @@ build_model:
 	}
 
 	if (payload != NULL)
-		nfree(payload);
+		pfree(payload);
 	if (metrics_json != NULL)
-		nfree(metrics_json);
+		pfree(metrics_json);
 
 	return -1;
 }
@@ -1060,7 +1060,7 @@ ndb_rocm_ridge_evaluate(const bytea * model_data,
 			h_coefficients_double[i] = (double) coefficients[i];
 
 		cuda_err = hipMemcpy(d_coefficients, h_coefficients_double, coeff_bytes, hipMemcpyHostToDevice);
-		nfree(h_coefficients_double);
+		pfree(h_coefficients_double);
 
 		if (cuda_err != hipSuccess)
 		{

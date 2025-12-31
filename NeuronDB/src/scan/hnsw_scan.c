@@ -189,10 +189,10 @@ hnswInitSearchState(const float4 * query, int dim, int efSearch, int k)
 static void
 hnswFreeSearchState(HnswSearchState * state)
 {
-	nfree(state->candidates);
-	nfree(state->visited);
-	nfree(state->results);
-	nfree(state);
+	pfree(state->candidates);
+	pfree(state->visited);
+	pfree(state->results);
+	pfree(state);
 }
 
 /*

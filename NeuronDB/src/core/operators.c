@@ -662,9 +662,9 @@ vec_join(PG_FUNCTION_ARGS)
 			if (newstate->session == NULL)
 			{
 				MemoryContextSwitchTo(oldcontext);
-				nfree(left_table);
-				nfree(right_table);
-				nfree(join_pred);
+				pfree(left_table);
+				pfree(right_table);
+				pfree(join_pred);
 				PG_RETURN_NULL();
 			}
 
@@ -673,9 +673,9 @@ vec_join(PG_FUNCTION_ARGS)
 			{
 				ndb_spi_session_end(&newstate->session);
 				MemoryContextSwitchTo(oldcontext);
-				nfree(left_table);
-				nfree(right_table);
-				nfree(join_pred);
+				pfree(left_table);
+				pfree(right_table);
+				pfree(join_pred);
 				PG_RETURN_NULL();
 			}
 		}
@@ -685,9 +685,9 @@ vec_join(PG_FUNCTION_ARGS)
 			EmitErrorReport();
 			FlushErrorState();
 			MemoryContextSwitchTo(oldcontext);
-			nfree(left_table);
-			nfree(right_table);
-			nfree(join_pred);
+			pfree(left_table);
+			pfree(right_table);
+			pfree(join_pred);
 			if (IsTransactionState())
 				AbortCurrentTransaction();
 			PG_RE_THROW();
@@ -709,9 +709,9 @@ vec_join(PG_FUNCTION_ARGS)
 		funcctx->user_fctx = newstate;
 		funcctx->tuple_desc = BlessTupleDesc(tupdesc);
 
-		nfree(left_table);
-		nfree(right_table);
-		nfree(join_pred);
+		pfree(left_table);
+		pfree(right_table);
+		pfree(join_pred);
 
 		MemoryContextSwitchTo(oldcontext);
 	}
@@ -875,7 +875,7 @@ graph_knn(PG_FUNCTION_ARGS)
 			newstate->session = ndb_spi_session_begin(funcctx->multi_call_memory_ctx, false);
 			if (newstate->session == NULL)
 			{
-				nfree(graph_col_cstr);
+				pfree(graph_col_cstr);
 				MemoryContextSwitchTo(oldcontext);
 				PG_RETURN_NULL();
 			}
@@ -883,7 +883,7 @@ graph_knn(PG_FUNCTION_ARGS)
 			if (ndb_spi_execute(newstate->session, querybuf, true, 0) != SPI_OK_SELECT)
 			{
 				ndb_spi_session_end(&newstate->session);
-				nfree(graph_col_cstr);
+				pfree(graph_col_cstr);
 				MemoryContextSwitchTo(oldcontext);
 				PG_RETURN_NULL();
 			}
@@ -893,7 +893,7 @@ graph_knn(PG_FUNCTION_ARGS)
 			ndb_spi_session_end(&newstate->session);
 			EmitErrorReport();
 			FlushErrorState();
-			nfree(graph_col_cstr);
+			pfree(graph_col_cstr);
 			MemoryContextSwitchTo(oldcontext);
 			if (IsTransactionState())
 				AbortCurrentTransaction();
@@ -916,7 +916,7 @@ graph_knn(PG_FUNCTION_ARGS)
 		funcctx->user_fctx = newstate;
 		funcctx->tuple_desc = BlessTupleDesc(tupdesc);
 
-		nfree(graph_col_cstr);
+		pfree(graph_col_cstr);
 
 		MemoryContextSwitchTo(oldcontext);
 	}
@@ -1069,7 +1069,7 @@ hybrid_rank(PG_FUNCTION_ARGS)
 					if (!isnull2)
 						beta = bval;
 				}
-				nfree(sql.data);
+				pfree(sql.data);
 				ndb_spi_session_end(&session);
 			}
 			PG_CATCH();
@@ -1078,7 +1078,7 @@ hybrid_rank(PG_FUNCTION_ARGS)
 					ndb_spi_session_end(&session);
 				EmitErrorReport();
 				FlushErrorState();
-				nfree(sql.data);
+				pfree(sql.data);
 				if (IsTransactionState())
 					AbortCurrentTransaction();
 				PG_RE_THROW();
@@ -1139,8 +1139,8 @@ hybrid_rank(PG_FUNCTION_ARGS)
 		float4		final_score =
 			alpha * lexical_score + beta * vector_score;
 
-		nfree(rel_str);
-		nfree(txt_str);
+		pfree(rel_str);
+		pfree(txt_str);
 		PG_RETURN_FLOAT4(final_score);
 	}
 }
@@ -1183,7 +1183,7 @@ vec_window_rank(PG_FUNCTION_ARGS)
 
 	for (p = part_str; *p; ++p)
 		hash = ((hash << 5) + hash) + (unsigned char) *p;
-	nfree(part_str);
+	pfree(part_str);
 
 	PG_RETURN_INT64((int64) (hash % 10 + 1));
 }
@@ -1256,7 +1256,7 @@ vec_route(PG_FUNCTION_ARGS)
 
 		if ((Pointer) centroid != DatumGetPointer(cent_dat))
 		{
-			nfree(centroid);
+			pfree(centroid);
 		}
 	}
 

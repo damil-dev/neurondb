@@ -145,7 +145,7 @@ ndb_cuda_nb_pack_model(const GaussianNBModel * model,
 			{
 				if (errstr)
 					*errstr = pstrdup("invalid NB model: class_priors contains invalid value (must be in [0, 1])");
-				nfree(blob);
+				pfree(blob);
 				return -1;
 			}
 			priors_dest[i] = prior;
@@ -173,7 +173,7 @@ ndb_cuda_nb_pack_model(const GaussianNBModel * model,
 					{
 						if (errstr)
 							*errstr = pstrdup("invalid NB model: means contains non-finite value");
-						nfree(blob);
+						pfree(blob);
 						return -1;
 					}
 					means_dest[i * model->n_features + j] = mean_val;
@@ -208,7 +208,7 @@ ndb_cuda_nb_pack_model(const GaussianNBModel * model,
 					{
 						if (errstr)
 							*errstr = pstrdup("invalid NB model: variances contains invalid value");
-						nfree(blob);
+						pfree(blob);
 						return -1;
 					}
 					/* Regularize to avoid division by zero */
@@ -259,7 +259,7 @@ ndb_cuda_nb_pack_model(const GaussianNBModel * model,
 		}
 		PG_END_TRY();
 
-		nfree(buf.data);
+		pfree(buf.data);
 		*metrics = metrics_json;
 	}
 
@@ -507,19 +507,19 @@ ndb_cuda_nb_train(const float *features,
 cleanup:
 	/* Free model structure arrays (not the data they point to) */
 	if (model.means != NULL)
-		nfree(model.means);
+		pfree(model.means);
 	if (model.variances != NULL)
-		nfree(model.variances);
+		pfree(model.variances);
 
 	/* Free host memory */
 	if (class_counts != NULL)
-		nfree(class_counts);
+		pfree(class_counts);
 	if (class_priors != NULL)
-		nfree(class_priors);
+		pfree(class_priors);
 	if (means != NULL)
-		nfree(means);
+		pfree(means);
 	if (variances != NULL)
-		nfree(variances);
+		pfree(variances);
 
 	return rc;
 }
@@ -633,7 +633,7 @@ ndb_cuda_nb_predict(const bytea * model_data,
 		{
 			if (errstr)
 				*errstr = pstrdup("CUDA NB predict: invalid prior in model");
-			nfree(class_log_probs);
+			pfree(class_log_probs);
 			return -1;
 		}
 		log_prob = log(prior + 1e-10);	/* Add small epsilon to avoid log(0) */
@@ -648,7 +648,7 @@ ndb_cuda_nb_predict(const bytea * model_data,
 			{
 				if (errstr)
 					*errstr = pstrdup("CUDA NB predict: invalid mean or variance in model");
-				nfree(class_log_probs);
+				pfree(class_log_probs);
 				return -1;
 			}
 
@@ -660,7 +660,7 @@ ndb_cuda_nb_predict(const bytea * model_data,
 			{
 				if (errstr)
 					*errstr = pstrdup("CUDA NB predict: variance is zero or negative");
-				nfree(class_log_probs);
+				pfree(class_log_probs);
 				return -1;
 			}
 
@@ -671,7 +671,7 @@ ndb_cuda_nb_predict(const bytea * model_data,
 			{
 				if (errstr)
 					*errstr = pstrdup("CUDA NB predict: computed non-finite log_pdf");
-				nfree(class_log_probs);
+				pfree(class_log_probs);
 				return -1;
 			}
 
@@ -683,7 +683,7 @@ ndb_cuda_nb_predict(const bytea * model_data,
 		{
 			if (errstr)
 				*errstr = pstrdup("CUDA NB predict: computed non-finite log_prob");
-			nfree(class_log_probs);
+			pfree(class_log_probs);
 			return -1;
 		}
 
@@ -713,7 +713,7 @@ ndb_cuda_nb_predict(const bytea * model_data,
 		{
 			if (errstr)
 				*errstr = pstrdup("CUDA NB predict: max_log_prob is non-finite");
-			nfree(class_log_probs);
+			pfree(class_log_probs);
 			return -1;
 		}
 
@@ -725,7 +725,7 @@ ndb_cuda_nb_predict(const bytea * model_data,
 			{
 				if (errstr)
 					*errstr = pstrdup("CUDA NB predict: computed non-finite exp value");
-				nfree(class_log_probs);
+				pfree(class_log_probs);
 				return -1;
 			}
 			sum += exp_val;
@@ -736,7 +736,7 @@ ndb_cuda_nb_predict(const bytea * model_data,
 		{
 			if (errstr)
 				*errstr = pstrdup("CUDA NB predict: sum of probabilities is zero or non-finite");
-			nfree(class_log_probs);
+			pfree(class_log_probs);
 			return -1;
 		}
 
@@ -745,7 +745,7 @@ ndb_cuda_nb_predict(const bytea * model_data,
 		{
 			if (errstr)
 				*errstr = pstrdup("CUDA NB predict: computed invalid probability");
-			nfree(class_log_probs);
+			pfree(class_log_probs);
 			return -1;
 		}
 
@@ -753,7 +753,7 @@ ndb_cuda_nb_predict(const bytea * model_data,
 	}
 
 	*class_out = best_class;
-	nfree(class_log_probs);
+	pfree(class_log_probs);
 
 	return 0;
 }
@@ -889,7 +889,7 @@ ndb_cuda_nb_evaluate_batch(const bytea * model_data,
 
 	if (rc != 0)
 	{
-		nfree(predictions);
+		pfree(predictions);
 		return -1;
 	}
 
@@ -941,7 +941,7 @@ ndb_cuda_nb_evaluate_batch(const bytea * model_data,
 	else
 		*f1_out = 0.0;
 
-	nfree(predictions);
+	pfree(predictions);
 
 	return 0;
 }

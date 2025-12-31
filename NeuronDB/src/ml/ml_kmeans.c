@@ -566,7 +566,7 @@ Datum
 	initStringInfo(&metrics_json);
 	appendStringInfo(&metrics_json, "{\"storage\": \"cpu\", \"k\": %d, \"dim\": %d, \"max_iters\": %d, \"n_samples\": %d}",
 					 num_clusters, dim, max_iters, nvec);
-	/* Use ndb_jsonb_in_cstring like other ML algorithms fix */
+	/* Use ndb_jsonb_in_cstring (consistent with other ML algorithms) */
 	metrics = ndb_jsonb_in_cstring(metrics_json.data);
 	if (metrics == NULL)
 	{
@@ -1265,7 +1265,7 @@ kmeans_gpu_train(MLGpuModel *model, const MLGpuTrainSpec *spec, char **errstr)
 	appendStringInfo(&metrics_json,
 					 "{\"training_backend\":1,\"k\":%d,\"dim\":%d,\"max_iters\":%d,\"n_samples\":%d}",
 					 num_clusters, dim, max_iters, nvec);
-	/* Use ndb_jsonb_in_cstring like other ML algorithms fix */
+	/* Use ndb_jsonb_in_cstring (consistent with other ML algorithms) */
 	metrics = ndb_jsonb_in_cstring(metrics_json.data);
 	if (metrics == NULL)
 	{
@@ -1444,7 +1444,7 @@ kmeans_gpu_evaluate(const MLGpuModel *model, const MLGpuEvalSpec *spec,
 					 state->dim > 0 ? state->dim : 0,
 					 state->n_samples > 0 ? state->n_samples : 0);
 
-	/* Use ndb_jsonb_in_cstring like other ML algorithms fix */
+	/* Use ndb_jsonb_in_cstring (consistent with other ML algorithms) */
 	metrics_json = ndb_jsonb_in_cstring(buf.data);
 	if (metrics_json == NULL)
 	{

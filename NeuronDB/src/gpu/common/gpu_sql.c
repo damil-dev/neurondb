@@ -689,7 +689,7 @@ hnsw_knn_search_gpu(PG_FUNCTION_ARGS)
 					candidateCount = 1;
 					visited[current] = true;
 
-					nfree(nodeVec);
+					pfree(nodeVec);
 				}
 				UnlockReleaseBuffer(nodeBuf);
 			}
@@ -751,7 +751,7 @@ hnsw_knn_search_gpu(PG_FUNCTION_ARGS)
 								candidateCount++;
 								visited[neighbors[j]] = true;
 
-								nfree(neighborVec);
+								pfree(neighborVec);
 							}
 							UnlockReleaseBuffer(neighborBuf);
 						}
@@ -825,12 +825,12 @@ hnsw_knn_search_gpu(PG_FUNCTION_ARGS)
 					UnlockReleaseBuffer(resultBuf);
 				}
 
-				nfree(topKIndices);
+				pfree(topKIndices);
 			}
 
-			nfree(candidates);
-			nfree(candidateDists);
-			nfree(visited);
+			pfree(candidates);
+			pfree(candidateDists);
+			pfree(visited);
 
 		}
 		else
@@ -867,9 +867,9 @@ hnsw_knn_search_gpu(PG_FUNCTION_ARGS)
 			{
 				funcctx->user_fctx = NULL;
 				if (results)
-					nfree(results);
+					pfree(results);
 				if (distances)
-					nfree(distances);
+					pfree(distances);
 			}
 		}
 
@@ -1340,8 +1340,8 @@ ivf_knn_search_gpu(PG_FUNCTION_ARGS)
 					distances[i] = candidate_distances[indices[i]];
 				}
 
-				nfree(candidate_distances);
-				nfree(indices);
+				pfree(candidate_distances);
+				pfree(indices);
 			}
 			else
 			{
@@ -1351,15 +1351,15 @@ ivf_knn_search_gpu(PG_FUNCTION_ARGS)
 			}
 
 			if (centroids)
-				nfree(centroids);
+				pfree(centroids);
 			if (centroid_distances)
-				nfree(centroid_distances);
+				pfree(centroid_distances);
 			if (selected_clusters)
-				nfree(selected_clusters);
+				pfree(selected_clusters);
 			if (candidate_vectors)
-				nfree(candidate_vectors);
+				pfree(candidate_vectors);
 			if (candidate_tids)
-				nfree(candidate_tids);
+				pfree(candidate_tids);
 		}
 		else
 		{
@@ -1397,9 +1397,9 @@ ivf_knn_search_gpu(PG_FUNCTION_ARGS)
 			{
 				funcctx->user_fctx = NULL;
 				if (results)
-					nfree(results);
+					pfree(results);
 				if (distances)
-					nfree(distances);
+					pfree(distances);
 			}
 		}
 		MemoryContextSwitchTo(oldcontext);

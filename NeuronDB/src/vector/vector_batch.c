@@ -154,8 +154,8 @@ vector_l2_distance_batch(PG_FUNCTION_ARGS)
 	}
 
 	result = construct_array(elems, nvec, FLOAT4OID, sizeof(float4), true, 'i');
-	nfree(elems);
-	nfree(nulls);
+	pfree(elems);
+	pfree(nulls);
 
 	PG_RETURN_ARRAYTYPE_P(result);
 }
@@ -280,8 +280,8 @@ vector_cosine_distance_batch(PG_FUNCTION_ARGS)
 	}
 
 	result = construct_array(elems, nvec, FLOAT4OID, sizeof(float4), true, 'i');
-	nfree(elems);
-	nfree(nulls);
+	pfree(elems);
+	pfree(nulls);
 
 	PG_RETURN_ARRAYTYPE_P(result);
 }
@@ -406,8 +406,8 @@ vector_inner_product_batch(PG_FUNCTION_ARGS)
 	}
 
 	result = construct_array(elems, nvec, FLOAT4OID, sizeof(float4), true, 'i');
-	nfree(elems);
-	nfree(nulls);
+	pfree(elems);
+	pfree(nulls);
 
 	PG_RETURN_ARRAYTYPE_P(result);
 }
@@ -536,8 +536,8 @@ vector_normalize_batch(PG_FUNCTION_ARGS)
 		lbs[0] = 1;
 		result = construct_md_array(elems, nulls, 1, dims, lbs, vector_oid, typlen, typbyval, typalign);
 	}
-	nfree(elems);
-	nfree(nulls);
+	pfree(elems);
+	pfree(nulls);
 
 	PG_RETURN_ARRAYTYPE_P(result);
 }

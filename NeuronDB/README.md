@@ -176,7 +176,7 @@ Website: https://neurondb.ai/docs
 
 <div align="center">
 
-**[Documentation](docs/README.md)** • 
+**[Documentation](docs/readme.md)** • 
 **[Full Documentation](https://neurondb.ai/docs)** • 
 **[GitHub](https://github.com/neurondb/NeurondB)** • 
 **[Support](mailto:support@neurondb.ai)**

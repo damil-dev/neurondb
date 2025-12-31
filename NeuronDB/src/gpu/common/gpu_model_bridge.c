@@ -759,7 +759,7 @@ ndb_gpu_try_train_model(const char *algorithm,
 													   DirectFunctionCall1(jsonb_out,
 																		   JsonbPGetDatum(metadata)));
 
-				nfree(meta_txt);
+				pfree(meta_txt);
 			}
 			else
 			{
@@ -1032,7 +1032,7 @@ lr_fallback:;
 											   DirectFunctionCall1(jsonb_out,
 																   JsonbPGetDatum(metadata)));
 
-					nfree(meta_txt);
+					pfree(meta_txt);
 				}
 				else
 				{
@@ -1050,12 +1050,12 @@ lr_fallback:;
 				/* result is NULL, free payload and metadata */
 				if (payload != NULL)
 				{
-					nfree(payload);
+					pfree(payload);
 					payload = NULL;
 				}
 				if (metadata != NULL)
 				{
-					nfree(metadata);
+					pfree(metadata);
 					metadata = NULL;
 				}
 			}
@@ -1325,9 +1325,24 @@ linreg_fallback:;
 		/* Only set model_data if it's not already set (e.g., by direct path) */
 		if (result->spec.model_data == NULL)
 		{
+			/*
+			 * IMPORTANT: Detach returned payload from any GPU backend state.
+			 *
+			 * Some GPU backends may allocate the returned model payload in memory
+			 * tied to backend_state and/or free it during ops->destroy().  The
+			 * payload must survive beyond ops->destroy() because the caller will
+			 * persist/serialize it and later free it via ndb_gpu_free_train_result().
+			 *
+			 * So always take a deep copy of the varlena payload into PostgreSQL
+			 * managed memory before we destroy backend_state.
+			 */
+			bytea *payload_copy = NULL;
+			if (payload != NULL)
+				payload_copy = (bytea *) PG_DETOAST_DATUM_COPY(PointerGetDatum(payload));
+
 			ereport(DEBUG2, (errmsg("gpu_model_bridge: setting model_data from payload")));
-			result->spec.model_data = payload;
-			result->payload = payload;
+			result->spec.model_data = payload_copy;
+			result->payload = payload_copy;
 			ereport(DEBUG2, (errmsg("gpu_model_bridge: model_data set successfully")));
 		}
 		else
@@ -1339,7 +1354,7 @@ linreg_fallback:;
 			if (payload != NULL)
 			{
 				ereport(DEBUG2, (errmsg("gpu_model_bridge: freeing unused payload")));
-				nfree(payload);
+				pfree(payload);
 				ereport(DEBUG2, (errmsg("gpu_model_bridge: unused payload freed")));
 			}
 			ereport(DEBUG2, (errmsg("gpu_model_bridge: payload pointer set")));
@@ -1347,17 +1362,14 @@ linreg_fallback:;
 		ereport(DEBUG2, (errmsg("gpu_model_bridge: model_data assignment completed")));
 	}
 
-	ereport(DEBUG2, (errmsg("gpu_model_bridge: about to check ops->destroy, ops=%p", (void *) ops)));
-	if (ops != NULL && ops->destroy != NULL && model.backend_state != NULL)
-	{
-		ereport(DEBUG2, (errmsg("gpu_model_bridge: calling ops->destroy")));
-		ops->destroy(&model);
-		ereport(DEBUG2, (errmsg("gpu_model_bridge: ops->destroy completed")));
-	}
-	else
-	{
-		ereport(DEBUG2, (errmsg("gpu_model_bridge: ops is NULL or destroy is NULL, skipping")));
-	}
+	/*
+	 * DO NOT call ops->destroy here!
+	 * The model->backend_state owns the payload memory that result->spec.model_data points to.
+	 * If we destroy the backend_state now, we'll free the payload, but the caller (neurondb_train)
+	 * still needs to write spec.model_data to the catalog via ml_catalog_register_model.
+	 * The caller is responsible for cleanup after the catalog write completes.
+	 */
+	ereport(DEBUG2, (errmsg("gpu_model_bridge: skipping ops->destroy to preserve model_data lifetime")));
 
 	ereport(DEBUG2, (errmsg("gpu_model_bridge: about to check if (!trained), trained=%d", trained)));
 	if (!trained)
@@ -1444,39 +1456,47 @@ ndb_gpu_free_train_result(MLGpuTrainResult *result)
 	if (result->spec.algorithm)
 	{
 		tmp = (char *) result->spec.algorithm;
-		nfree(tmp);
+		pfree(tmp);
 		result->spec.algorithm = NULL;
 	}
 	if (result->spec.training_table)
 	{
 		tmp = (char *) result->spec.training_table;
-		nfree(tmp);
+		pfree(tmp);
 		result->spec.training_table = NULL;
 	}
 	if (result->spec.training_column)
 	{
 		tmp = (char *) result->spec.training_column;
-		nfree(tmp);
+		pfree(tmp);
 		result->spec.training_column = NULL;
 	}
 	if (result->spec.project_name)
 	{
 		tmp = (char *) result->spec.project_name;
-		nfree(tmp);
+		pfree(tmp);
 		result->spec.project_name = NULL;
 	}
 	if (result->spec.model_name)
 	{
 		tmp = (char *) result->spec.model_name;
-		nfree(tmp);
+		pfree(tmp);
 		result->spec.model_name = NULL;
 	}
-	nfree(result->spec.model_data);
-	nfree(result->spec.metrics);
+	/* 
+	 * DO NOT free result->spec.model_data here!
+	 * After ml_catalog_register_model writes the payload to the catalog,
+	 * the payload memory is either:
+	 * 1. Still owned by the GPU backend_state (which will be freed later), OR
+	 * 2. Already written to the catalog and no longer needed.
+	 * Either way, freeing it here causes a double-free crash.
+	 */
+	if (result->spec.metrics)
+		pfree(result->spec.metrics);
 	if (result->metadata && result->metadata != result->spec.metrics)
-		nfree(result->metadata);
+		pfree(result->metadata);
 	if (result->metrics && result->metrics != result->spec.metrics)
-		nfree(result->metrics);
+		pfree(result->metrics);
 
 	memset(result, 0, sizeof(MLGpuTrainResult));
 }

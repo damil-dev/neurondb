@@ -212,7 +212,7 @@ vector_in_internal(char *str, int *out_dim, bool check)
 
 	result = new_vector(dim);
 	memcpy(result->data, data, sizeof(float4) * dim);
-	nfree(data);
+	pfree(data);
 
 	if (out_dim)
 		*out_dim = dim;
@@ -882,7 +882,7 @@ vector_to_array(PG_FUNCTION_ARGS)
 	result = construct_array(
 							 elems, vec->dim, FLOAT4OID, sizeof(float4), true, 'i');
 
-	nfree(elems);
+	pfree(elems);
 
 	PG_RETURN_ARRAYTYPE_P(result);
 }

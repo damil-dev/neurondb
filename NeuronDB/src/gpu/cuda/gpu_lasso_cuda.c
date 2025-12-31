@@ -144,7 +144,7 @@ ndb_cuda_lasso_pack_model(const LassoModel *model,
 		metrics_json = DatumGetJsonbP(DirectFunctionCall1(
 														  jsonb_in,
 														  CStringGetDatum(buf.data)));
-		nfree(buf.data);
+		pfree(buf.data);
 		*metrics = metrics_json;
 	}
 
@@ -279,7 +279,7 @@ ndb_cuda_lasso_train(const float *features,
 								parsed_max_iters = true;
 						}
 					}
-					nfree(key);
+					pfree(key);
 				}
 			}
 		}
@@ -573,7 +573,7 @@ ndb_cuda_lasso_train(const float *features,
 		rc = ndb_cuda_lasso_pack_model(
 									   &model, &payload, &metrics_json, errstr);
 
-		nfree(model.coefficients);
+		pfree(model.coefficients);
 	}
 
 	rc = 0;
@@ -592,11 +592,11 @@ cleanup:
 	}
 
 cleanup_host:
-	nfree(weights);
-	nfree(weights_old);
-	nfree(residuals);
-	nfree(h_rho);
-	nfree(h_z);
+	pfree(weights);
+	pfree(weights_old);
+	pfree(residuals);
+	pfree(h_rho);
+	pfree(h_z);
 
 	if (rc == 0 && payload)
 	{
@@ -607,9 +607,9 @@ cleanup_host:
 	}
 
 	if (payload)
-		nfree(payload);
+		pfree(payload);
 	if (metrics_json)
-		nfree(metrics_json);
+		pfree(metrics_json);
 
 	return -1;
 }
@@ -942,7 +942,7 @@ ndb_cuda_lasso_evaluate(const bytea * model_data,
 			h_coefficients_double[i] = (double) coefficients[i];
 
 		cuda_err = cudaMemcpy(d_coefficients, h_coefficients_double, coeff_bytes, cudaMemcpyHostToDevice);
-		nfree(h_coefficients_double);
+		pfree(h_coefficients_double);
 
 		if (cuda_err != cudaSuccess)
 		{

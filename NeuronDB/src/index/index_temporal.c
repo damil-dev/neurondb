@@ -104,26 +104,26 @@ temporal_index_create(PG_FUNCTION_ARGS)
 	ret = ndb_spi_execute(session, sql.data, false, 0);
 	if (ret != SPI_OK_UTILITY)
 	{
-		nfree(sql.data);
+		pfree(sql.data);
 		ndb_spi_session_end(&session);
 		elog(ERROR, "Failed to create TVX index table: %s", sql.data);
 	}
 
 	/* Use safe free/reinit to handle potential memory context changes */
-	nfree(sql.data);
+	pfree(sql.data);
 	initStringInfo(&sql);
 
 	appendStringInfo(&sql, "TRUNCATE %s", idx_tbl);
 	ret = ndb_spi_execute(session, sql.data, false, 0);
 	if (ret != SPI_OK_UTILITY)
 	{
-		nfree(sql.data);
+		pfree(sql.data);
 		ndb_spi_session_end(&session);
 		elog(ERROR, "Failed to truncate TVX index table: %s", idx_tbl);
 	}
 
 	/* Use safe free/reinit to handle potential memory context changes */
-	nfree(sql.data);
+	pfree(sql.data);
 	initStringInfo(&sql);
 
 	appendStringInfo(&sql,
@@ -137,16 +137,16 @@ temporal_index_create(PG_FUNCTION_ARGS)
 	ret = ndb_spi_execute(session, sql.data, false, 0);
 	if (ret != SPI_OK_INSERT)
 	{
-		nfree(sql.data);
+		pfree(sql.data);
 		ndb_spi_session_end(&session);
 		elog(ERROR,
 			 "Failed to bulk insert vectors into TVX index: %s",
 			 sql.data);
 	}
 
-	nfree(sql.data);
+	pfree(sql.data);
 	ndb_spi_session_end(&session);
-	nfree(idx_tbl);
+	pfree(idx_tbl);
 
 	PG_RETURN_BOOL(true);
 }
@@ -238,18 +238,18 @@ temporal_knn_search(PG_FUNCTION_ARGS)
 		ret = ndb_spi_execute(session2, sql.data, true, 0);
 		if (ret != SPI_OK_SELECT)
 		{
-			nfree(sql.data);
+			pfree(sql.data);
 			ndb_spi_session_end(&session2);
 			elog(ERROR, "Failed temporal index scan: %s", sql.data);
 		}
 
 		/* Store session to keep SPI connection alive for tuptable access */
 		funcctx->user_fctx = session2;
-		nfree(sql.data);
+		pfree(sql.data);
 
 		MemoryContextSwitchTo(oldcontext);
 
-		nfree(idx_tbl);
+		pfree(idx_tbl);
 	}
 
 	funcctx = SRF_PERCALL_SETUP();

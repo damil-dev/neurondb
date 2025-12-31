@@ -61,7 +61,7 @@ endif
 	# This will be handled in Makefile.core
 else
 	METAL_AVAILABLE := no
-	$(info Metal only available on macOS - Metal backend disabled)
+$(info Metal only available on macOS - Metal backend disabled)
 endif
 
 .PHONY: metal-check metal-info

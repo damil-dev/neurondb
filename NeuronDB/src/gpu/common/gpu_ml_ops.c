@@ -304,7 +304,7 @@ neurondb_gpu_kmeans_update(const float *data,
 		}
 	}
 
-	nfree(counts);
+	pfree(counts);
 }
 
 /*

@@ -301,7 +301,7 @@ ndb_rocm_rf_predict(const bytea * model_data,
 	{
 		if (errstr)
 			*errstr = pstrdup("ROCm RF inference failed");
-		nfree(votes);
+		pfree(votes);
 		return -1;
 	}
 
@@ -320,7 +320,7 @@ ndb_rocm_rf_predict(const bytea * model_data,
 		best_class = model_hdr->majority_class;
 
 	*class_out = best_class;
-	nfree(votes);
+	pfree(votes);
 	return 0;
 }
 
@@ -715,22 +715,22 @@ cleanup:
 	if (rc != 0)
 	{
 		if (payload != NULL)
-			nfree(payload);
+			pfree(payload);
 		if (metrics_json != NULL)
-			nfree(metrics_json);
+			pfree(metrics_json);
 	}
 	if (label_ints != NULL)
-		nfree(label_ints);
+		pfree(label_ints);
 	if (class_counts != NULL)
-		nfree(class_counts);
+		pfree(class_counts);
 	if (tmp_left_counts != NULL)
-		nfree(tmp_left_counts);
+		pfree(tmp_left_counts);
 	if (tmp_right_counts != NULL)
-		nfree(tmp_right_counts);
+		pfree(tmp_right_counts);
 	if (best_left_counts != NULL)
-		nfree(best_left_counts);
+		pfree(best_left_counts);
 	if (best_right_counts != NULL)
-		nfree(best_right_counts);
+		pfree(best_right_counts);
 
 	return rc;
 }

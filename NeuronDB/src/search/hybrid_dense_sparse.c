@@ -181,7 +181,7 @@ hybrid_dense_sparse_search(PG_FUNCTION_ARGS)
 		tuplestore_putvalues(tupstore, tupdesc, values, nulls);
 	}
 
-	nfree(sql.data);
+	pfree(sql.data);
 	ndb_spi_session_end(&session);
 
 	PG_RETURN_NULL();

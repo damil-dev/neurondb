@@ -116,9 +116,9 @@ create_vector_fdw(PG_FUNCTION_ARGS)
 	conn_str = text_to_cstring(connection_string);
 
 
-	nfree(name_str);
-	nfree(type_str);
-	nfree(conn_str);
+	pfree(name_str);
+	pfree(type_str);
+	pfree(conn_str);
 
 	PG_RETURN_BOOL(true);
 }

@@ -382,21 +382,12 @@
  */
 
 /*
- * NDB_SAFE_PFREE_AND_NULL - Safely free pointer and set to NULL
+ * REMOVED: NDB_SAFE_PFREE_AND_NULL is deprecated. Use nfree() directly.
  *
- * CRITICAL PATTERN: Always use this for all pfree operations to prevent
+ * All code should now use nfree(ptr) from neurondb_macros.h.
+ * The nfree macro checks for NULL internally and sets ptr = NULL to prevent
  * double-free and use-after-free bugs.
- *
- * Usage:
- *   NDB_SAFE_PFREE_AND_NULL(ptr);
- *
- * This macro is an alias for nfree from neurondb_macros.h.
- * It checks for NULL internally and sets ptr = NULL to prevent
- * double-free and use-after-free.
- *
- * Must be applied to ALL pfree operations per crash-proof plan.
  */
-#define NDB_SAFE_PFREE_AND_NULL(ptr) nfree(ptr)
 
 /*-------------------------------------------------------------------------
  * SPI Context Safety Macros

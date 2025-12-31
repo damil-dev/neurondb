@@ -115,7 +115,7 @@ http_post_json(const char *url,
 		curl = curl_easy_init();
 		if (!curl)
 		{
-			nfree(buf.data);
+			pfree(buf.data);
 			buf.data = NULL;
 			return -1;
 		}
@@ -151,12 +151,12 @@ http_post_json(const char *url,
 			}
 			if (buf.data)
 			{
-				nfree(buf.data);
+				pfree(buf.data);
 				buf.data = NULL;
 			}
 			if (auth_header_data)
 			{
-				nfree(auth_header_data);
+				pfree(auth_header_data);
 			}
 			return -1;
 		}
@@ -183,7 +183,7 @@ http_post_json(const char *url,
 		buf.data = NULL;		/* Ownership transferred to caller */
 		if (auth_header_data)
 		{
-			nfree(auth_header_data);
+			pfree(auth_header_data);
 		}
 		result = (int) code;
 	}
@@ -204,12 +204,12 @@ http_post_json(const char *url,
 		}
 		if (buf.data)
 		{
-			nfree(buf.data);
+			pfree(buf.data);
 			buf.data = NULL;
 		}
 		if (auth_header_data)
 		{
-			nfree(auth_header_data);
+			pfree(auth_header_data);
 			auth_header_data = NULL;
 		}
 		if (out)
@@ -256,9 +256,9 @@ ndb_openai_complete(const NdbLLMConfig *cfg,
 	if (prompt == NULL || out == NULL)
 	{
 		elog(WARNING, "neurondb: ndb_openai_complete called with NULL parameters");
-		nfree(url.data);
+		pfree(url.data);
 		url.data = NULL;
-		nfree(body.data);
+		pfree(body.data);
 		body.data = NULL;
 		return -1;
 	}
@@ -267,9 +267,9 @@ ndb_openai_complete(const NdbLLMConfig *cfg,
 	if (strlen(prompt) == 0)
 	{
 		elog(WARNING, "neurondb: ndb_openai_complete called with empty prompt");
-		nfree(url.data);
+		pfree(url.data);
 		url.data = NULL;
-		nfree(body.data);
+		pfree(body.data);
 		body.data = NULL;
 		return -1;
 	}
@@ -278,9 +278,9 @@ ndb_openai_complete(const NdbLLMConfig *cfg,
 	if (cfg == NULL)
 	{
 		elog(WARNING, "neurondb: ndb_openai_complete called with NULL cfg");
-		nfree(url.data);
+		pfree(url.data);
 		url.data = NULL;
-		nfree(body.data);
+		pfree(body.data);
 		body.data = NULL;
 		return -1;
 	}
@@ -288,9 +288,9 @@ ndb_openai_complete(const NdbLLMConfig *cfg,
 	/* Validate API key is always required for OpenAI */
 	if (!cfg->api_key || cfg->api_key[0] == '\0')
 	{
-		nfree(url.data);
+		pfree(url.data);
 		url.data = NULL;
-		nfree(body.data);
+		pfree(body.data);
 		body.data = NULL;
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
@@ -344,9 +344,9 @@ ndb_openai_complete(const NdbLLMConfig *cfg,
 
 	appendStringInfoChar(&body, '}');
 
-	nfree(model_quoted);
+	pfree(model_quoted);
 	model_quoted = NULL;
-	nfree(prompt_quoted);
+	pfree(prompt_quoted);
 	prompt_quoted = NULL;
 
 	/* Make HTTP request */
@@ -361,8 +361,8 @@ ndb_openai_complete(const NdbLLMConfig *cfg,
 	if (out->http_status < 0)
 	{
 		elog(WARNING, "neurondb: ndb_openai_complete: http_post_json failed");
-		nfree(url.data);
-		nfree(body.data);
+		pfree(url.data);
+		pfree(body.data);
 		return -1;
 	}
 
@@ -386,8 +386,8 @@ ndb_openai_complete(const NdbLLMConfig *cfg,
 			Jsonb	   *jsonb = NULL;
 
 			/* Free response if it was partially allocated */
-			nfree(response.text);
-			nfree(response.error_message);
+			pfree(response.text);
+			pfree(response.error_message);
 			/* Fallback: try to extract any text content from JSON using JSONB */
 			PG_TRY();
 			{
@@ -456,9 +456,9 @@ ndb_openai_complete(const NdbLLMConfig *cfg,
 		out->text = NULL;
 	}
 
-	nfree(url.data);
+	pfree(url.data);
 	url.data = NULL;
-	nfree(body.data);
+	pfree(body.data);
 	body.data = NULL;
 
 	return (out->http_status >= 200 && out->http_status < 300) ? 0 : -1;
@@ -491,9 +491,9 @@ ndb_openai_embed(const NdbLLMConfig *cfg,
 
 	if (text == NULL || vec_out == NULL || dim_out == NULL)
 	{
-		nfree(url.data);
+		pfree(url.data);
 		url.data = NULL;
-		nfree(body.data);
+		pfree(body.data);
 		body.data = NULL;
 		return -1;
 	}
@@ -501,9 +501,9 @@ ndb_openai_embed(const NdbLLMConfig *cfg,
 	/* Validate API key is always required for OpenAI */
 	if (!cfg->api_key || cfg->api_key[0] == '\0')
 	{
-		nfree(url.data);
+		pfree(url.data);
 		url.data = NULL;
-		nfree(body.data);
+		pfree(body.data);
 		body.data = NULL;
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
@@ -533,9 +533,9 @@ ndb_openai_embed(const NdbLLMConfig *cfg,
 					 model_quoted,
 					 text_quoted);
 
-	nfree(model_quoted);
+	pfree(model_quoted);
 	model_quoted = NULL;
-	nfree(text_quoted);
+	pfree(text_quoted);
 	text_quoted = NULL;
 
 	/* Make HTTP request */
@@ -546,17 +546,17 @@ ndb_openai_embed(const NdbLLMConfig *cfg,
 	{
 		int			ok = ndb_json_parse_openai_embedding(json_resp, vec_out, dim_out);
 
-		nfree(url.data);
-		nfree(body.data);
+		pfree(url.data);
+		pfree(body.data);
 		if (json_resp)
-			nfree(json_resp);
+			pfree(json_resp);
 		return (ok == 0) ? 0 : -1;
 	}
 
-	nfree(url.data);
-	nfree(body.data);
+	pfree(url.data);
+	pfree(body.data);
 	if (json_resp)
-		nfree(json_resp);
+		pfree(json_resp);
 	return -1;
 }
 
@@ -594,16 +594,16 @@ ndb_openai_embed_batch(const NdbLLMConfig *cfg,
 	if (texts == NULL || num_texts <= 0 || vecs_out == NULL
 		|| dims_out == NULL || num_success_out == NULL)
 	{
-		nfree(url.data);
-		nfree(body.data);
+		pfree(url.data);
+		pfree(body.data);
 		return -1;
 	}
 
 	/* Validate API key is always required for OpenAI */
 	if (!cfg->api_key || cfg->api_key[0] == '\0')
 	{
-		nfree(url.data);
-		nfree(body.data);
+		pfree(url.data);
+		pfree(body.data);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("API key is required for OpenAI but was not provided"),
@@ -638,14 +638,14 @@ ndb_openai_embed_batch(const NdbLLMConfig *cfg,
 				appendStringInfoChar(&body, ',');
 			text_quoted = ndb_json_quote_string(texts[i]);
 			appendStringInfoString(&body, text_quoted);
-			nfree(text_quoted);
+			pfree(text_quoted);
 		}
 	}
 
 	appendStringInfoChar(&body, '}');
 	appendStringInfoChar(&body, '}');
 
-	nfree(model_quoted);
+	pfree(model_quoted);
 
 	/* Make HTTP request */
 	http_status = http_post_json(
@@ -725,7 +725,7 @@ ndb_openai_embed_batch(const NdbLLMConfig *cfg,
 							}
 							else if (vec)
 							{
-								nfree(vec);
+								pfree(vec);
 							}
 
 							/* Move past this embedding object */
@@ -754,10 +754,10 @@ ndb_openai_embed_batch(const NdbLLMConfig *cfg,
 	*dims_out = dims;
 	*num_success_out = success_count;
 
-	nfree(url.data);
-	nfree(body.data);
+	pfree(url.data);
+	pfree(body.data);
 	if (json_resp)
-		nfree(json_resp);
+		pfree(json_resp);
 
 	return (success_count > 0) ? 0 : -1;
 }
@@ -797,16 +797,16 @@ ndb_openai_vision_complete(const NdbLLMConfig *cfg,
 
 	if (image_data == NULL || image_size == 0 || out == NULL)
 	{
-		nfree(url.data);
-		nfree(body.data);
+		pfree(url.data);
+		pfree(body.data);
 		return -1;
 	}
 
 	/* Validate API key is always required for OpenAI */
 	if (!cfg->api_key || cfg->api_key[0] == '\0')
 	{
-		nfree(url.data);
-		nfree(body.data);
+		pfree(url.data);
+		pfree(body.data);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("API key is required for OpenAI but was not provided"),
@@ -828,13 +828,13 @@ ndb_openai_vision_complete(const NdbLLMConfig *cfg,
 		if (img_meta)
 		{
 			if (img_meta->mime_type)
-				nfree(img_meta->mime_type);
+				pfree(img_meta->mime_type);
 			if (img_meta->error_msg)
-				nfree(img_meta->error_msg);
-			nfree(img_meta);
+				pfree(img_meta->error_msg);
+			pfree(img_meta);
 		}
-		nfree(url.data);
-		nfree(body.data);
+		pfree(url.data);
+		pfree(body.data);
 		return -1;
 	}
 
@@ -847,8 +847,8 @@ ndb_openai_vision_complete(const NdbLLMConfig *cfg,
 	encoded_text = ndb_encode_base64(image_bytea);
 	base64_data = text_to_cstring(encoded_text);
 
-	nfree(image_bytea);
-	nfree(encoded_text);
+	pfree(image_bytea);
+	pfree(encoded_text);
 
 	/* Build OpenAI chat completion endpoint for vision */
 	if (cfg->endpoint)
@@ -901,18 +901,18 @@ ndb_openai_vision_complete(const NdbLLMConfig *cfg,
 
 	appendStringInfoChar(&body, '}');
 
-	nfree(model_quoted);
-	nfree(prompt_quoted);
-	nfree(base64_data);
+	pfree(model_quoted);
+	pfree(prompt_quoted);
+	pfree(base64_data);
 
 	/* Free image metadata */
 	if (img_meta)
 	{
 		if (img_meta->mime_type)
-			nfree(img_meta->mime_type);
+			pfree(img_meta->mime_type);
 		if (img_meta->error_msg)
-			nfree(img_meta->error_msg);
-		nfree(img_meta);
+			pfree(img_meta->error_msg);
+		pfree(img_meta);
 	}
 
 	/* Make HTTP request with retry logic */
@@ -938,14 +938,14 @@ ndb_openai_vision_complete(const NdbLLMConfig *cfg,
 		else
 		{
 			/* Free response if it was partially allocated */
-			nfree(response.text);
-			nfree(response.error_message);
+			pfree(response.text);
+			pfree(response.error_message);
 		}
 		rc = 0;
 	}
 
-	nfree(url.data);
-	nfree(body.data);
+	pfree(url.data);
+	pfree(body.data);
 
 	return rc;
 }
@@ -1095,8 +1095,8 @@ ndb_openai_rerank(const NdbLLMConfig *cfg,
 		http_status = http_post_json(url.data, cfg->api_key, body.data,
 									 cfg->timeout_ms > 0 ? cfg->timeout_ms : 30000, &json_response);
 
-		nfree(url.data);
-		nfree(body.data);
+		pfree(url.data);
+		pfree(body.data);
 
 		if (http_status == 200 && json_response)
 		{
@@ -1117,26 +1117,26 @@ ndb_openai_rerank(const NdbLLMConfig *cfg,
 				if (score > 1.0f)
 					score = 1.0f;
 				scores[i] = score;
-				nfree(text);
+				pfree(text);
 			}
 			else
 			{
 				/* Parsing failed - cannot return dummy score */
-				nfree(json_response);
-				nfree(scores);
+				pfree(json_response);
+				pfree(scores);
 				ereport(ERROR,
 						(errcode(ERRCODE_EXTERNAL_ROUTINE_INVOCATION_EXCEPTION),
 						 errmsg("OpenAI reranking failed: could not parse response for document %d", i),
 						 errdetail("Failed to extract relevance score from OpenAI API response")));
 			}
-			nfree(json_response);
+			pfree(json_response);
 			json_response = NULL;
 		}
 		else
 		{
 			/* API call failed - cannot return dummy score */
-			nfree(json_response);
-			nfree(scores);
+			pfree(json_response);
+			pfree(scores);
 			ereport(ERROR,
 					(errcode(ERRCODE_EXTERNAL_ROUTINE_INVOCATION_EXCEPTION),
 					 errmsg("OpenAI reranking failed: API call failed for document %d", i),

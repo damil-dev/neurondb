@@ -81,7 +81,7 @@ auto_route_query(PG_FUNCTION_ARGS)
 
 
 	if (query_str)
-		nfree(query_str);
+		pfree(query_str);
 
 	PG_RETURN_BOOL(use_ann);
 }
@@ -169,7 +169,7 @@ learn_from_query(PG_FUNCTION_ARGS)
 		}
 
 		if (sql.data)
-			nfree(sql.data);
+			pfree(sql.data);
 	}
 
 	if (found)
@@ -198,7 +198,7 @@ learn_from_query(PG_FUNCTION_ARGS)
 		{
 			ndb_spi_session_end(&session);
 			if (query_str)
-				nfree(query_str);
+				pfree(query_str);
 			ereport(ERROR,
 					(errmsg("learn_from_query: NULL detected in "
 							"stats fields")));
@@ -247,17 +247,17 @@ learn_from_query(PG_FUNCTION_ARGS)
 			if (ndb_spi_execute(session, usql.data, false, 0) != SPI_OK_UPDATE)
 			{
 				if (usql.data)
-					nfree(usql.data);
+					pfree(usql.data);
 				ndb_spi_session_end(&session);
 				if (query_str)
-					nfree(query_str);
+					pfree(query_str);
 				ereport(ERROR,
 						(errmsg("learn_from_query: failed to "
 								"UPDATE "
 								"neurondb_query_history")));
 			}
 			if (usql.data)
-				nfree(usql.data);
+				pfree(usql.data);
 		}
 	}
 	else
@@ -280,20 +280,20 @@ learn_from_query(PG_FUNCTION_ARGS)
 		if (ndb_spi_execute(session, isql.data, false, 0) != SPI_OK_INSERT)
 		{
 			if (isql.data)
-				nfree(isql.data);
+				pfree(isql.data);
 			ndb_spi_session_end(&session);
 			if (query_str)
-				nfree(query_str);
+				pfree(query_str);
 			ereport(ERROR,
 					(errmsg("learn_from_query: failed to INSERT "
 							"neurondb_query_history")));
 		}
 		if (isql.data)
-			nfree(isql.data);
+			pfree(isql.data);
 	}
 
 	if (query_str)
-		nfree(query_str);
+		pfree(query_str);
 
 	ndb_spi_session_end(&session);
 
@@ -422,7 +422,7 @@ scale_precision(PG_FUNCTION_ARGS)
 		for (k = 0; k < input->dim; k++)
 			result->data[k] = (float4) int8buf[k];
 
-		nfree(int8buf);
+		pfree(int8buf);
 	}
 	else if (target_precision == 16)
 	{
@@ -477,7 +477,7 @@ prefetch_entry_points(PG_FUNCTION_ARGS)
 	if (session == NULL)
 	{
 		if (idx_str)
-			nfree(idx_str);
+			pfree(idx_str);
 		ereport(ERROR,
 				(errmsg("prefetch_entry_points: failed to begin SPI session")));
 	}
@@ -522,13 +522,13 @@ prefetch_entry_points(PG_FUNCTION_ARGS)
 			}
 		}
 		if (sql.data)
-			nfree(sql.data);
+			pfree(sql.data);
 	}
 
 	ndb_spi_session_end(&session);
 
 	if (idx_str)
-		nfree(idx_str);
+		pfree(idx_str);
 
 
 	PG_RETURN_INT32(prefetched_count);

@@ -251,7 +251,7 @@ gtree_validate(const GTree *t)
 				(errmsg("gtree_validate: out of memory for seen "
 						"array")));
 	depth = gtree_depth_dfs(t, t->root, 0, seen);
-	nfree(seen);
+	pfree(seen);
 
 	if (depth > GTREE_MAX_DEPTH)
 		ereport(ERROR,

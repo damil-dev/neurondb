@@ -874,7 +874,7 @@ neurondb_has_opclass(PG_FUNCTION_ARGS)
 	session = ndb_spi_session_begin(CurrentMemoryContext, false);
 	if (session == NULL)
 	{
-		nfree(name);
+		pfree(name);
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
 				 errmsg("neurondb: neurondb_has_opclass: failed to begin SPI session")));
@@ -889,7 +889,7 @@ neurondb_has_opclass(PG_FUNCTION_ARGS)
 					 name);
 
 	ret = ndb_spi_execute(session, query.data, true, 0);
-	nfree(query.data);
+	pfree(query.data);
 
 	if (ret == SPI_OK_SELECT && SPI_processed > 0)
 	{
@@ -899,7 +899,7 @@ neurondb_has_opclass(PG_FUNCTION_ARGS)
 	ndb_spi_session_end(&session);
 
 
-	nfree(name);
+	pfree(name);
 
 	PG_RETURN_BOOL(exists);
 }

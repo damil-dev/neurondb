@@ -148,7 +148,7 @@ ndb_rocm_knn_pack(const struct KNNModel *model,
 			{
 				if (errstr)
 					*errstr = pstrdup("invalid KNN model: features array contains non-finite value");
-				nfree(blob);
+				pfree(blob);
 				return -1;
 			}
 		}
@@ -169,7 +169,7 @@ ndb_rocm_knn_pack(const struct KNNModel *model,
 			{
 				if (errstr)
 					*errstr = pstrdup("invalid KNN model: labels array contains non-finite value");
-				nfree(blob);
+				pfree(blob);
 				return -1;
 			}
 			/* For classification, labels should be integers */
@@ -181,7 +181,7 @@ ndb_rocm_knn_pack(const struct KNNModel *model,
 				{
 					if (errstr)
 						*errstr = pstrdup("invalid KNN model: classification labels must be non-negative integers");
-					nfree(blob);
+					pfree(blob);
 					return -1;
 				}
 			}
@@ -225,7 +225,7 @@ ndb_rocm_knn_pack(const struct KNNModel *model,
 		}
 		PG_END_TRY();
 
-		nfree(buf.data);
+		pfree(buf.data);
 		*metrics = metrics_json;
 	}
 
@@ -583,7 +583,7 @@ ndb_rocm_knn_predict(const bytea * model_data,
 	{
 		if (errstr && *errstr == NULL)
 			*errstr = pstrdup("HIP distance computation failed");
-		nfree(distances);
+		pfree(distances);
 		return -1;
 	}
 
@@ -594,7 +594,7 @@ ndb_rocm_knn_predict(const bytea * model_data,
 		{
 			if (errstr)
 				*errstr = pstrdup("HIP KNN predict: computed invalid distance");
-			nfree(distances);
+			pfree(distances);
 			return -1;
 		}
 	}
@@ -604,7 +604,7 @@ ndb_rocm_knn_predict(const bytea * model_data,
 	{
 		if (errstr && *errstr == NULL)
 			*errstr = pstrdup("HIP top-k computation failed");
-		nfree(distances);
+		pfree(distances);
 		return -1;
 	}
 
@@ -613,7 +613,7 @@ ndb_rocm_knn_predict(const bytea * model_data,
 	{
 		if (errstr)
 			*errstr = pstrdup("HIP KNN predict: computed non-finite prediction");
-		nfree(distances);
+		pfree(distances);
 		return -1;
 	}
 	/* For classification, prediction should be an integer */
@@ -623,12 +623,12 @@ ndb_rocm_knn_predict(const bytea * model_data,
 		{
 			if (errstr)
 				*errstr = pstrdup("HIP KNN predict: classification prediction must be non-negative integer");
-			nfree(distances);
+			pfree(distances);
 			return -1;
 		}
 	}
 
-	nfree(distances);
+	pfree(distances);
 	return 0;
 }
 
@@ -830,7 +830,7 @@ ndb_rocm_knn_evaluate_batch(const bytea * model_data,
 
 	if (rc != 0)
 	{
-		nfree(predictions);
+		pfree(predictions);
 		return -1;
 	}
 
@@ -886,7 +886,7 @@ ndb_rocm_knn_evaluate_batch(const bytea * model_data,
 	else
 		*f1_out = 0.0;
 
-	nfree(predictions);
+	pfree(predictions);
 
 	return 0;
 }

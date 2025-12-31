@@ -590,7 +590,7 @@ ndb_cuda_knn_predict(const bytea * model_data,
 	{
 		if (errstr && *errstr == NULL)
 			*errstr = pstrdup("CUDA distance computation failed");
-		nfree(distances);
+		pfree(distances);
 		return -1;
 	}
 
@@ -601,7 +601,7 @@ ndb_cuda_knn_predict(const bytea * model_data,
 		{
 			if (errstr)
 				*errstr = pstrdup("CUDA KNN predict: computed invalid distance");
-			nfree(distances);
+			pfree(distances);
 			return -1;
 		}
 	}
@@ -611,7 +611,7 @@ ndb_cuda_knn_predict(const bytea * model_data,
 	{
 		if (errstr && *errstr == NULL)
 			*errstr = pstrdup("CUDA top-k computation failed");
-		nfree(distances);
+		pfree(distances);
 		return -1;
 	}
 
@@ -620,7 +620,7 @@ ndb_cuda_knn_predict(const bytea * model_data,
 	{
 		if (errstr)
 			*errstr = pstrdup("CUDA KNN predict: computed non-finite prediction");
-		nfree(distances);
+		pfree(distances);
 		return -1;
 	}
 	/* For classification, prediction should be an integer */
@@ -630,12 +630,12 @@ ndb_cuda_knn_predict(const bytea * model_data,
 		{
 			if (errstr)
 				*errstr = pstrdup("CUDA KNN predict: classification prediction must be non-negative integer");
-			nfree(distances);
+			pfree(distances);
 			return -1;
 		}
 	}
 
-	nfree(distances);
+	pfree(distances);
 	return 0;
 }
 
@@ -837,7 +837,7 @@ ndb_cuda_knn_evaluate_batch(const bytea * model_data,
 
 	if (rc != 0)
 	{
-		nfree(predictions);
+		pfree(predictions);
 		return -1;
 	}
 
@@ -893,7 +893,7 @@ ndb_cuda_knn_evaluate_batch(const bytea * model_data,
 	else
 		*f1_out = 0.0;
 
-	nfree(predictions);
+	pfree(predictions);
 
 	return 0;
 }

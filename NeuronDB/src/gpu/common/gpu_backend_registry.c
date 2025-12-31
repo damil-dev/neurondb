@@ -44,6 +44,7 @@
 #include "ml_lasso_regression_internal.h"
 #include "ml_gpu_xgboost.h"
 #include "ml_gpu_catboost.h"
+#include "neurondb_macros.h"
 
 #include <string.h>
 

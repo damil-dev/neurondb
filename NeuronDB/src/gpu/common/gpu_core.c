@@ -592,7 +592,7 @@ neurondb_gpu_info(PG_FUNCTION_ARGS)
 	tuplestore_putvalues(rsinfo->setResult, rsinfo->setDesc, values, nulls);
 
 	if (info)
-		nfree(info);
+		pfree(info);
 
 	return (Datum) 0;
 }

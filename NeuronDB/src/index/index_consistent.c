@@ -295,8 +295,8 @@ build_hnsw_index(const char *table, const char *col, uint32 seed)
 	ret = ndb_spi_execute(session, sql.data, false, 0);
 	if (ret != SPI_OK_UTILITY)
 	{
-		nfree(sql.data);
-		nfree(index_table);
+		pfree(sql.data);
+		pfree(index_table);
 		ndb_spi_session_end(&session);
 		elog(ERROR,
 			 "Failed to create index table '%s': %s",
@@ -305,14 +305,14 @@ build_hnsw_index(const char *table, const char *col, uint32 seed)
 	}
 
 	/* Use safe free/reinit to handle potential memory context changes */
-	nfree(sql.data);
+	pfree(sql.data);
 	initStringInfo(&sql);
 
 	/* Remove all rows in case we rebuild */
 	appendStringInfo(&sql, "TRUNCATE %s", index_table);
 	ndb_spi_execute(session, sql.data, false, 0);
 	/* Use safe free/reinit to handle potential memory context changes */
-	nfree(sql.data);
+	pfree(sql.data);
 	initStringInfo(&sql);
 
 	/*
@@ -332,15 +332,15 @@ build_hnsw_index(const char *table, const char *col, uint32 seed)
 	ret = ndb_spi_execute(session, sql.data, false, 0);
 	if (ret != SPI_OK_INSERT)
 	{
-		nfree(sql.data);
-		nfree(index_table);
+		pfree(sql.data);
+		pfree(index_table);
 		ndb_spi_session_end(&session);
 		elog(ERROR, "Failed to bulk insert vectors: %s", sql.data);
 	}
 
 	/* Store/Update metadata (example: in a metadata table) */
 	/* Use safe free/reinit to handle potential memory context changes */
-	nfree(sql.data);
+	pfree(sql.data);
 	initStringInfo(&sql);
 	appendStringInfo(&sql,
 					 "CREATE TABLE IF NOT EXISTS neurondb_hnsw_metadata ("
@@ -352,7 +352,7 @@ build_hnsw_index(const char *table, const char *col, uint32 seed)
 	ndb_spi_execute(session, sql.data, false, 0);
 
 	/* Use safe free/reinit to handle potential memory context changes */
-	nfree(sql.data);
+	pfree(sql.data);
 	initStringInfo(&sql);
 
 	appendStringInfo(&sql,
@@ -377,16 +377,16 @@ build_hnsw_index(const char *table, const char *col, uint32 seed)
 	ret = ndb_spi_execute_with_args(session, sql.data, 4, argtypes, values, NULL, false, 0);
 	if (ret != SPI_OK_INSERT && ret != SPI_OK_UPDATE)
 	{
-		nfree(sql.data);
-		nfree(index_table);
+		pfree(sql.data);
+		pfree(index_table);
 		ndb_spi_session_end(&session);
 		elog(ERROR, "Metadata insert/update failed (%d)", ret);
 	}
 
-	nfree(sql.data);
+	pfree(sql.data);
 
 	/* Done, cleanup */
-	nfree(index_table);
+	pfree(index_table);
 	ndb_spi_session_end(&session);
 }
 

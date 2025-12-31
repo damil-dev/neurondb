@@ -516,7 +516,7 @@ ndb_spi_get_jsonb_safe(int row_idx, int col_idx, MemoryContext dest_context)
 	if (result == NULL || VARSIZE(result) < sizeof(Jsonb))
 	{
 		if (result != NULL)
-			nfree(result);
+			pfree(result);
 		MemoryContextSwitchTo(oldcontext);
 		elog(ERROR,
 			 "neurondb: JSONB copy validation failed");

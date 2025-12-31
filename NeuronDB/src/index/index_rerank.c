@@ -149,15 +149,15 @@ rerank_index_create(PG_FUNCTION_ARGS)
 	ret = ndb_spi_execute(session, sql.data, false, 0);
 	if (ret != SPI_OK_UTILITY)
 	{
-		nfree(sql.data);
-		nfree(cache_tbl);
+		pfree(sql.data);
+		pfree(cache_tbl);
 		ndb_spi_session_end(&session);
 		elog(ERROR, "Failed to create rerank cache table: %s", sql.data);
 	}
 
-	nfree(sql.data);
+	pfree(sql.data);
 	ndb_spi_session_end(&session);
-	nfree(cache_tbl);
+	pfree(cache_tbl);
 
 	PG_RETURN_BOOL(true);
 }
@@ -216,7 +216,7 @@ rerank_get_candidates(PG_FUNCTION_ARGS)
 		ret = ndb_spi_execute(session, sql.data, true, 0);
 		if (ret != SPI_OK_SELECT)
 		{
-			nfree(sql.data);
+			pfree(sql.data);
 			ndb_spi_session_end(&session);
 			MemoryContextSwitchTo(oldcontext);
 			elog(ERROR,
@@ -246,7 +246,7 @@ rerank_get_candidates(PG_FUNCTION_ARGS)
 			appendStringInfoString(&vec_buf, "]'::vector");
 			vec_lit = vec_buf.data;
 			/* Use safe free/reinit to handle potential memory context changes */
-			nfree(sql.data);
+			pfree(sql.data);
 			initStringInfo(&sql);
 
 			/*
@@ -275,12 +275,12 @@ rerank_get_candidates(PG_FUNCTION_ARGS)
 			/* Free vector literal */
 			if (vec_lit != NULL)
 			{
-				nfree(vec_lit);
+				pfree(vec_lit);
 			}
 
 			if (ret != SPI_OK_INSERT && ret != SPI_OK_UPDATE)
 			{
-				nfree(sql.data);
+				pfree(sql.data);
 				ndb_spi_session_end(&session);
 				MemoryContextSwitchTo(oldcontext);
 				elog(ERROR,
@@ -289,7 +289,7 @@ rerank_get_candidates(PG_FUNCTION_ARGS)
 			}
 
 			/* Use safe free/reinit */
-			nfree(sql.data);
+			pfree(sql.data);
 			initStringInfo(&sql);
 			appendStringInfo(&sql,
 							 "SELECT candidate_id, candidate_vec, similarity "
@@ -302,7 +302,7 @@ rerank_get_candidates(PG_FUNCTION_ARGS)
 			ret = ndb_spi_execute(session, sql.data, true, 0);
 			if (ret != SPI_OK_SELECT)
 			{
-				nfree(sql.data);
+				pfree(sql.data);
 				ndb_spi_session_end(&session);
 				MemoryContextSwitchTo(oldcontext);
 				elog(ERROR,
@@ -311,8 +311,8 @@ rerank_get_candidates(PG_FUNCTION_ARGS)
 			}
 		}
 
-		nfree(sql.data);
-		nfree(cache_tbl);
+		pfree(sql.data);
+		pfree(cache_tbl);
 
 		/* Store session to keep SPI connection alive for tuptable access */
 		funcctx->user_fctx = session;
@@ -439,19 +439,19 @@ rerank_index_warm(PG_FUNCTION_ARGS)
 		ret = ndb_spi_execute_with_args(session, sql.data, 1, argtypes, values, NULL, false, 0);
 		if (ret != SPI_OK_INSERT && ret != SPI_OK_UPDATE)
 		{
-			nfree(sql.data);
+			pfree(sql.data);
 			ndb_spi_session_end(&session);
 			elog(ERROR,
 				 "Failed to cache candidates for query_hash " NDB_UINT64_FMT ": %s",
 				 NDB_UINT64_CAST(qhash), sql.data);
 		}
 		/* Use safe free/reinit to handle potential memory context changes */
-		nfree(sql.data);
+		pfree(sql.data);
 		initStringInfo(&sql);
 	}
 
 	if (cache_tbl)
-		nfree(cache_tbl);
+		pfree(cache_tbl);
 
 	ndb_spi_session_end(&session);
 

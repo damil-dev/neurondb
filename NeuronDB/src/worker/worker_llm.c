@@ -5,7 +5,7 @@
  *
  * Processes queued LLM jobs (completion, embedding, reranking) asynchronously.
  * Uses SKIP LOCKED to avoid blocking and enforces per-job retry limits.
- * All crash scenarios are caught and handled robustly.
+ * All error scenarios are caught and handled robustly.
  *
  * Copyright (c) 2024-2025, neurondb, Inc.
  *
@@ -90,7 +90,7 @@ neuranllm_main(Datum main_arg)
 	BackgroundWorkerUnblockSignals();
 	BackgroundWorkerInitializeConnection("postgres", NULL, 0);
 
-	elog(LOG, "neurondb: LLM worker started (all crashes handled)");
+	elog(LOG, "neurondb: LLM worker started with comprehensive error handling");
 
 	while (!got_sigterm)
 	{
@@ -168,14 +168,14 @@ neuranllm_main(Datum main_arg)
 									 (const char *) job_type,
 									 (const char *) payload);
 
-				if (job_type != NULL)
-				{
-					nfree((void *) job_type);
-				}
-				if (payload != NULL)
-				{
-					nfree((void *) payload);
-				}
+			if (job_type != NULL)
+			{
+				pfree(job_type);
+			}
+			if (payload != NULL)
+			{
+				pfree(payload);
+			}
 			}
 
 			PopActiveSnapshot();
@@ -207,13 +207,11 @@ neuranllm_main(Datum main_arg)
 				AbortCurrentTransaction();
 			if (job_type != NULL)
 			{
-				pfree((void *) job_type);
-				job_type = NULL;
+				pfree(job_type);
 			}
 			if (payload != NULL)
 			{
-				pfree((void *) payload);
-				payload = NULL;
+				pfree(payload);
 			}
 			elog(LOG,
 				 "neurondb: LLM worker caught exception, all "
@@ -388,9 +386,9 @@ process_llm_job(int job_id, const char *job_type, const char *payload)
 									   result_json.data,
 									   NULL);
 
-					nfree(vec_str);
+					pfree(vec_str);
 					vec_str = NULL;
-					nfree(vec);
+					pfree(vec);
 					vec = NULL;
 				}
 				else
@@ -435,17 +433,17 @@ process_llm_job(int job_id, const char *job_type, const char *payload)
 
 	if (result_json.data)
 	{
-		nfree(result_json.data);
+		pfree(result_json.data);
 		result_json.data = NULL;
 	}
 	if (resp.json)
 	{
-		nfree(resp.json);
+		pfree(resp.json);
 		resp.json = NULL;
 	}
 	if (error_msg)
 	{
-		nfree(error_msg);
+		pfree(error_msg);
 		error_msg = NULL;
 	}
 

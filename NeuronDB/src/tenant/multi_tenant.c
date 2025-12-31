@@ -428,11 +428,11 @@ audit_log_query(PG_FUNCTION_ARGS)
 	if (session == NULL)
 	{
 		if (hmac_hex)
-			nfree(hmac_hex);
+			pfree(hmac_hex);
 		if (hmac_data.data)
-			nfree(hmac_data.data);
+			pfree(hmac_data.data);
 		if (hmac_key && strstr(hmac_key, "neurondb_audit_") == hmac_key)
-			nfree(hmac_key);
+			pfree(hmac_key);
 		elog(ERROR, "failed to begin SPI session in audit_log_query");
 	}
 
@@ -466,21 +466,21 @@ audit_log_query(PG_FUNCTION_ARGS)
 		ndb_spi_session_end(&session);
 
 		if (hmac_hex)
-			nfree(hmac_hex);
+			pfree(hmac_hex);
 		if (hmac_data.data)
-			nfree(hmac_data.data);
+			pfree(hmac_data.data);
 		if (hmac_key && strstr(hmac_key, "neurondb_audit_") == hmac_key)
-			nfree(hmac_key);
+			pfree(hmac_key);
 	}
 	PG_CATCH();
 	{
 		ndb_spi_session_end(&session);
 		if (hmac_hex)
-			nfree(hmac_hex);
+			pfree(hmac_hex);
 		if (hmac_data.data)
-			nfree(hmac_data.data);
+			pfree(hmac_data.data);
 		if (hmac_key && strstr(hmac_key, "neurondb_audit_") == hmac_key)
-			nfree(hmac_key);
+			pfree(hmac_key);
 		PG_RE_THROW();
 	}
 	PG_END_TRY();

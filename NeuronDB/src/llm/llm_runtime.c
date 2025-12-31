@@ -234,7 +234,7 @@ cache_store_text(const char *key, const char *text)
 				 ret);
 		}
 	}
-	nfree(val.data);
+	pfree(val.data);
 	ndb_spi_session_end(&session);
 }
 
@@ -441,8 +441,8 @@ record_llm_stats(const char *model_name,
 								  false,
 								  0);
 
-		nfree(metric_name.data);
-		nfree(metric_name_str);
+		pfree(metric_name.data);
+		pfree(metric_name_str);
 	}
 
 	ndb_spi_session_end(&session);
@@ -580,7 +580,7 @@ ndb_llm_complete(PG_FUNCTION_ARGS)
 				nalloc(model_from_params, char, len - 1);
 				memcpy(model_from_params, raw_model + 1, len - 2);
 				model_from_params[len - 2] = '\0';
-				nfree(raw_model);
+				pfree(raw_model);
 			}
 			else
 			{
@@ -594,13 +594,13 @@ ndb_llm_complete(PG_FUNCTION_ARGS)
 			}
 			else
 			{
-				nfree(model_from_params);
+				pfree(model_from_params);
 				model_from_params = NULL;
 			}
 		}
 		else if (raw_model)
 		{
-			nfree(raw_model);
+			pfree(raw_model);
 		}
 	}
 	
@@ -631,7 +631,7 @@ ndb_llm_complete(PG_FUNCTION_ARGS)
 				tokens_in =
 					0;
 			if (token_ids)
-				nfree(token_ids);
+				pfree(token_ids);
 
 #ifdef HAVE_ONNX_RUNTIME
 			PG_TRY();
@@ -683,7 +683,7 @@ ndb_llm_complete(PG_FUNCTION_ARGS)
 					}
 				}
 				if (output_token_ids)
-					nfree(output_token_ids);
+					pfree(output_token_ids);
 			}
 			PG_CATCH();
 			{
@@ -843,7 +843,7 @@ ndb_llm_complete(PG_FUNCTION_ARGS)
 						
 						memcpy(unquoted, error_text + 1, len - 2);
 						unquoted[len - 2] = '\0';
-						nfree(error_text);
+						pfree(error_text);
 						error_text = unquoted;
 					}
 				}
@@ -884,7 +884,7 @@ ndb_llm_complete(PG_FUNCTION_ARGS)
 								 cfg.model ? cfg.model : "unknown",
 								 url_str.data,
 								 error_text);
-				nfree(error_text);
+				pfree(error_text);
 			}
 			else if (resp.json)
 			{
@@ -902,7 +902,7 @@ ndb_llm_complete(PG_FUNCTION_ARGS)
 								 cfg.model ? cfg.model : "unknown",
 								 url_str.data);
 				}
-				nfree(url_str.data);
+				pfree(url_str.data);
 			}
 
 			record_llm_stats(cfg.model,
@@ -1035,7 +1035,7 @@ ndb_llm_complete(PG_FUNCTION_ARGS)
 	
 	/* Clean up model_from_params if we allocated it */
 	if (model_from_params)
-		nfree(model_from_params);
+		pfree(model_from_params);
 	
 	PG_RETURN_TEXT_P(cstring_to_text(resp.text ? resp.text : ""));
 }
@@ -1110,13 +1110,13 @@ ndb_llm_image_analyze(PG_FUNCTION_ARGS)
 			if (img_meta)
 			{
 				if (img_meta->mime_type)
-					nfree(img_meta->mime_type);
+					pfree(img_meta->mime_type);
 				if (img_meta->error_msg)
-					nfree(img_meta->error_msg);
-				nfree(img_meta);
+					pfree(img_meta->error_msg);
+				pfree(img_meta);
 			}
 			if (need_free_detoasted)
-				nfree(detoasted_image);
+				pfree(detoasted_image);
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("ndb_llm_image_analyze: %s", error_msg),
@@ -1127,10 +1127,10 @@ ndb_llm_image_analyze(PG_FUNCTION_ARGS)
 		if (img_meta)
 		{
 			if (img_meta->mime_type)
-				nfree(img_meta->mime_type);
+				pfree(img_meta->mime_type);
 			if (img_meta->error_msg)
-				nfree(img_meta->error_msg);
-			nfree(img_meta);
+				pfree(img_meta->error_msg);
+			pfree(img_meta);
 		}
 	}
 
@@ -1179,15 +1179,15 @@ ndb_llm_image_analyze(PG_FUNCTION_ARGS)
 		cache_hit = true;
 		success = true;
 		if (need_free_detoasted)
-			nfree(detoasted_image);
-		nfree(keysrc.data);
-		nfree(keyhex.data);
+			pfree(detoasted_image);
+		pfree(keysrc.data);
+		pfree(keyhex.data);
 		if (prompt)
-			nfree(prompt);
+			pfree(prompt);
 		if (params)
-			nfree(params);
+			pfree(params);
 		if (model_str)
-			nfree(model_str);
+			pfree(model_str);
 		PG_RETURN_TEXT_P(cstring_to_text(cached));
 	}
 
@@ -1210,15 +1210,15 @@ ndb_llm_image_analyze(PG_FUNCTION_ARGS)
 							 tokens_out,
 							 error_type);
 			if (need_free_detoasted)
-				nfree(detoasted_image);
-			nfree(keysrc.data);
-			nfree(keyhex.data);
+				pfree(detoasted_image);
+			pfree(keysrc.data);
+			pfree(keyhex.data);
 			if (prompt)
-				nfree(prompt);
+				pfree(prompt);
 			if (params)
-				nfree(params);
+				pfree(params);
 			if (model_str)
-				nfree(model_str);
+				pfree(model_str);
 			PG_RETURN_NULL();
 		}
 		record_llm_stats(cfg.model,
@@ -1230,15 +1230,15 @@ ndb_llm_image_analyze(PG_FUNCTION_ARGS)
 						 tokens_out,
 						 error_type);
 		if (need_free_detoasted)
-			nfree(detoasted_image);
-		nfree(keysrc.data);
-		nfree(keyhex.data);
+			pfree(detoasted_image);
+		pfree(keysrc.data);
+		pfree(keyhex.data);
 		if (prompt)
-			nfree(prompt);
+			pfree(prompt);
 		if (params)
-			nfree(params);
+			pfree(params);
 		if (model_str)
-			nfree(model_str);
+			pfree(model_str);
 		ereport(ERROR, (errmsg("neurondb: LLM rate limited")));
 	}
 
@@ -1267,19 +1267,19 @@ ndb_llm_image_analyze(PG_FUNCTION_ARGS)
 							 tokens_out,
 							 error_type);
 			if (need_free_detoasted)
-				nfree(detoasted_image);
+				pfree(detoasted_image);
 			if (resp.text)
-				nfree(resp.text);
+				pfree(resp.text);
 			if (resp.json)
-				nfree(resp.json);
-			nfree(keysrc.data);
-			nfree(keyhex.data);
+				pfree(resp.json);
+			pfree(keysrc.data);
+			pfree(keyhex.data);
 			if (prompt)
-				nfree(prompt);
+				pfree(prompt);
 			if (params)
-				nfree(params);
+				pfree(params);
 			if (model_str)
-				nfree(model_str);
+				pfree(model_str);
 			PG_RETURN_NULL();
 		}
 		record_llm_stats(cfg.model,
@@ -1291,19 +1291,19 @@ ndb_llm_image_analyze(PG_FUNCTION_ARGS)
 						 tokens_out,
 						 error_type);
 		if (need_free_detoasted)
-			nfree(detoasted_image);
+			pfree(detoasted_image);
 		if (resp.text)
-			nfree(resp.text);
+			pfree(resp.text);
 		if (resp.json)
-			nfree(resp.json);
-		nfree(keysrc.data);
-		nfree(keyhex.data);
+			pfree(resp.json);
+		pfree(keysrc.data);
+		pfree(keyhex.data);
 		if (prompt)
-			nfree(prompt);
+			pfree(prompt);
 		if (params)
-			nfree(params);
+			pfree(params);
 		if (model_str)
-			nfree(model_str);
+			pfree(model_str);
 		ereport(ERROR, (errmsg("neurondb: vision API failed")));
 	}
 
@@ -1325,17 +1325,17 @@ ndb_llm_image_analyze(PG_FUNCTION_ARGS)
 					 NULL);
 
 	if (need_free_detoasted)
-		nfree(detoasted_image);
+		pfree(detoasted_image);
 	if (resp.json)
-		nfree(resp.json);
-	nfree(keysrc.data);
-	nfree(keyhex.data);
+		pfree(resp.json);
+	pfree(keysrc.data);
+	pfree(keyhex.data);
 	if (prompt)
-		nfree(prompt);
+		pfree(prompt);
 	if (params)
-		nfree(params);
+		pfree(params);
 	if (model_str)
-		nfree(model_str);
+		pfree(model_str);
 
 	PG_RETURN_TEXT_P(cstring_to_text(resp.text));
 }
@@ -1466,7 +1466,7 @@ ndb_llm_embed(PG_FUNCTION_ARGS)
 		else
 			tokens_in = 0;		/* Fallback: estimate from word count */
 		if (token_ids)
-			nfree(token_ids);
+			pfree(token_ids);
 	}
 	tokens_out = dim;			/* Embedding dimension */
 	record_llm_stats(cfg.model,
@@ -1955,10 +1955,10 @@ ndb_llm_complete_batch(PG_FUNCTION_ARGS)
 			/* Free prompts */
 			for (i = 0; i < num_prompts; i++)
 				if (prompts[i])
-					nfree(prompts[i]);
-			nfree(prompts);
+					pfree(prompts[i]);
+			pfree(prompts);
 			if (params)
-				nfree(params);
+				pfree(params);
 			ereport(ERROR,
 					(errcode(ERRCODE_EXTERNAL_ROUTINE_INVOCATION_EXCEPTION),
 					 errmsg("neurondb: batch completion "
@@ -2021,7 +2021,7 @@ ndb_llm_complete_batch(PG_FUNCTION_ARGS)
 		}
 
 		if (params)
-			nfree(params);
+			pfree(params);
 		MemoryContextSwitchTo(oldcontext);
 	}
 
@@ -2105,26 +2105,26 @@ ndb_llm_complete_batch(PG_FUNCTION_ARGS)
 						 < cleanup_state->batch_resp->num_items;
 						 i++)
 						if (cleanup_state->batch_resp->texts[i])
-							nfree(cleanup_state->batch_resp->texts
+							pfree(cleanup_state->batch_resp->texts
 									 [i]);
-					nfree(cleanup_state->batch_resp->texts);
+					pfree(cleanup_state->batch_resp->texts);
 				}
 				if (cleanup_state->batch_resp->tokens_in)
-					nfree(cleanup_state->batch_resp->tokens_in);
+					pfree(cleanup_state->batch_resp->tokens_in);
 				if (cleanup_state->batch_resp->tokens_out)
-					nfree(cleanup_state->batch_resp->tokens_out);
+					pfree(cleanup_state->batch_resp->tokens_out);
 				if (cleanup_state->batch_resp->http_status)
-					nfree(cleanup_state->batch_resp->http_status);
-				nfree(cleanup_state->batch_resp);
+					pfree(cleanup_state->batch_resp->http_status);
+				pfree(cleanup_state->batch_resp);
 			}
 			if (cleanup_state->prompts)
 			{
 				for (i = 0; i < cleanup_state->num_prompts; i++)
 					if (cleanup_state->prompts[i])
-						nfree(cleanup_state->prompts[i]);
-				nfree(cleanup_state->prompts);
+						pfree(cleanup_state->prompts[i]);
+				pfree(cleanup_state->prompts);
 			}
-			nfree(cleanup_state);
+			pfree(cleanup_state);
 			SRF_RETURN_DONE(funcctx);
 		}
 	}
@@ -2514,8 +2514,8 @@ ndb_llm_rerank_batch(PG_FUNCTION_ARGS)
 			/* Free queries */
 			for (i = 0; i < num_queries; i++)
 				if (queries[i])
-					nfree(queries[i]);
-			nfree(queries);
+					pfree(queries[i]);
+			pfree(queries);
 			/* Free documents */
 			for (i = 0; i < num_queries; i++)
 			{
@@ -2525,15 +2525,15 @@ ndb_llm_rerank_batch(PG_FUNCTION_ARGS)
 
 					for (j = 0; j < ndocs_array[i]; j++)
 					{
-						nfree(docs_ptr[j]);
+						pfree(docs_ptr[j]);
 					}
-					nfree(docs_ptr);
+					pfree(docs_ptr);
 				}
 			}
-			nfree(docs_array);
-			nfree(ndocs_array);
+			pfree(docs_array);
+			pfree(ndocs_array);
 			if (model)
-				nfree(model);
+				pfree(model);
 			ereport(ERROR,
 					(errcode(ERRCODE_EXTERNAL_ROUTINE_INVOCATION_EXCEPTION),
 					 errmsg("neurondb: batch reranking "
@@ -2564,8 +2564,8 @@ ndb_llm_rerank_batch(PG_FUNCTION_ARGS)
 		/* Free queries and documents arrays (scores are stored in state) */
 		for (i = 0; i < num_queries; i++)
 			if (queries[i])
-				nfree(queries[i]);
-		nfree(queries);
+				pfree(queries[i]);
+		pfree(queries);
 		for (i = 0; i < num_queries; i++)
 		{
 			if (docs_array[i])
@@ -2574,14 +2574,14 @@ ndb_llm_rerank_batch(PG_FUNCTION_ARGS)
 
 				for (j = 0; j < ndocs_array[i]; j++)
 				{
-					nfree(docs_ptr[j]);
+					pfree(docs_ptr[j]);
 				}
-				nfree(docs_ptr);
+				pfree(docs_ptr);
 			}
 		}
-		nfree(docs_array);
+		pfree(docs_array);
 		if (model)
-			nfree(model);
+			pfree(model);
 		MemoryContextSwitchTo(oldcontext);
 	}
 
@@ -2675,14 +2675,14 @@ ndb_llm_rerank_batch(PG_FUNCTION_ARGS)
 			{
 				for (i = 0; i < state->num_queries; i++)
 					if (state->scores[i])
-						nfree(state->scores[i]);
-				nfree(state->scores);
+						pfree(state->scores[i]);
+				pfree(state->scores);
 			}
 			if (state->nscores)
-				nfree(state->nscores);
+				pfree(state->nscores);
 			if (state->ndocs_array)
-				nfree(state->ndocs_array);
-			nfree(state);
+				pfree(state->ndocs_array);
+			pfree(state);
 		}
 		SRF_RETURN_DONE(funcctx);
 	}

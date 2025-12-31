@@ -101,7 +101,7 @@ vector_time_travel(PG_FUNCTION_ARGS)
 	session = ndb_spi_session_begin(tmpcontext, false);
 	if (session == NULL)
 	{
-		nfree(tbl_str);
+		pfree(tbl_str);
 		MemoryContextSwitchTo(oldcontext);
 		MemoryContextDelete(tmpcontext);
 		ereport(ERROR,
@@ -119,11 +119,11 @@ vector_time_travel(PG_FUNCTION_ARGS)
 		table_exists = true;
 	else
 		table_exists = false;
-	nfree(check_sql.data);
+	pfree(check_sql.data);
 
 	if (!table_exists)
 	{
-		nfree(tbl_str);
+		pfree(tbl_str);
 		ndb_spi_session_end(&session);
 		MemoryContextSwitchTo(oldcontext);
 		MemoryContextDelete(tmpcontext);
@@ -148,8 +148,8 @@ vector_time_travel(PG_FUNCTION_ARGS)
 
 	if (ret != SPI_OK_SELECT)
 	{
-		nfree(sql.data);
-		nfree(tbl_str);
+		pfree(sql.data);
+		pfree(tbl_str);
 		ndb_spi_session_end(&session);
 		MemoryContextSwitchTo(oldcontext);
 		MemoryContextDelete(tmpcontext);
@@ -178,8 +178,8 @@ vector_time_travel(PG_FUNCTION_ARGS)
 
 
 	/* Clean up and free all allocated memory */
-	nfree(sql.data);
-	nfree(tbl_str);
+	pfree(sql.data);
+	pfree(tbl_str);
 	ndb_spi_session_end(&session);
 
 	MemoryContextSwitchTo(oldcontext);
@@ -235,7 +235,7 @@ compress_cold_tier(PG_FUNCTION_ARGS)
 	session = ndb_spi_session_begin(tmpcontext, false);
 	if (session == NULL)
 	{
-		nfree(tbl_str);
+		pfree(tbl_str);
 		MemoryContextSwitchTo(oldcontext);
 		MemoryContextDelete(tmpcontext);
 		ereport(ERROR,
@@ -253,11 +253,11 @@ compress_cold_tier(PG_FUNCTION_ARGS)
 		table_exists = true;
 	else
 		table_exists = false;
-	nfree(check_sql.data);
+	pfree(check_sql.data);
 
 	if (!table_exists)
 	{
-		nfree(tbl_str);
+		pfree(tbl_str);
 		ndb_spi_session_end(&session);
 		MemoryContextSwitchTo(oldcontext);
 		MemoryContextDelete(tmpcontext);
@@ -296,12 +296,12 @@ compress_cold_tier(PG_FUNCTION_ARGS)
 		coldtable_exists = true;
 	else
 		coldtable_exists = false;
-	nfree(check_sql.data);
+	pfree(check_sql.data);
 	if (!coldtable_exists)
 	{
-		nfree(sql.data);
-		nfree(tbl_str);
-		nfree(cold_tbl_str);
+		pfree(sql.data);
+		pfree(tbl_str);
+		pfree(cold_tbl_str);
 		ndb_spi_session_end(&session);
 		MemoryContextSwitchTo(oldcontext);
 		MemoryContextDelete(tmpcontext);
@@ -415,10 +415,10 @@ compress_cold_tier(PG_FUNCTION_ARGS)
 	}
 
 	/* Clean up */
-	nfree(sql.data);
-	nfree(cold_table.data);
-	nfree(tbl_str);
-	nfree(cold_tbl_str);
+	pfree(sql.data);
+	pfree(cold_table.data);
+	pfree(tbl_str);
+	pfree(cold_tbl_str);
 	ndb_spi_session_end(&session);
 	MemoryContextSwitchTo(oldcontext);
 	MemoryContextDelete(tmpcontext);
@@ -478,8 +478,8 @@ vacuum_vectors(PG_FUNCTION_ARGS)
 	session = ndb_spi_session_begin(tmpcontext, false);
 	if (session == NULL)
 	{
-		nfree(sql.data);
-		nfree(tbl_str);
+		pfree(sql.data);
+		pfree(tbl_str);
 		MemoryContextSwitchTo(oldcontext);
 		MemoryContextDelete(tmpcontext);
 		ereport(ERROR,
@@ -489,8 +489,8 @@ vacuum_vectors(PG_FUNCTION_ARGS)
 	ret = ndb_spi_execute(session, sql.data, true, 1);
 	if (!(ret == SPI_OK_SELECT && SPI_processed > 0))
 	{
-		nfree(sql.data);
-		nfree(tbl_str);
+		pfree(sql.data);
+		pfree(tbl_str);
 		ndb_spi_session_end(&session);
 		MemoryContextSwitchTo(oldcontext);
 		MemoryContextDelete(tmpcontext);
@@ -499,7 +499,7 @@ vacuum_vectors(PG_FUNCTION_ARGS)
 						"vacuum_vector",
 						tbl_str)));
 	}
-	nfree(sql.data);
+	pfree(sql.data);
 
 	/* Step 1: Detailed table stats extraction */
 	initStringInfo(&stat_sql);
@@ -526,7 +526,7 @@ vacuum_vectors(PG_FUNCTION_ARGS)
 		if (!isnull)
 			live_tuples = DatumGetInt64(live_datum);
 	}
-	nfree(stat_sql.data);
+	pfree(stat_sql.data);
 
 	/* Step 2: Identify and remove orphaned vectors: ids with no embedding */
 	initStringInfo(&sql);
@@ -552,7 +552,7 @@ vacuum_vectors(PG_FUNCTION_ARGS)
 			orphan_count = DatumGetInt64(orphan_datum);
 	}
 	cleaned_count += orphan_count;
-	nfree(sql.data);
+	pfree(sql.data);
 
 
 	/* Step 3: Issue PostgreSQL VACUUM (FULL/standard as specified) */
@@ -571,7 +571,7 @@ vacuum_vectors(PG_FUNCTION_ARGS)
 			 "neurondb: PostgreSQL VACUUM failed on \"%s\"",
 			 tbl_str);
 	else
-	nfree(sql.data);
+	pfree(sql.data);
 
 	/* Step 4: Update and persist neurondb-specific statistics */
 	initStringInfo(&sql);
@@ -612,7 +612,7 @@ vacuum_vectors(PG_FUNCTION_ARGS)
 					 (long) cleaned_count);
 	ndb_spi_execute(session, sql.data, false, 0);
 	NDB_CHECK_SPI_TUPTABLE();
-	nfree(sql.data);
+	pfree(sql.data);
 
 	/* Generate and emit overall statistics and status */
 	initStringInfo(&statmsg);
@@ -623,8 +623,8 @@ vacuum_vectors(PG_FUNCTION_ARGS)
 					 (long) dead_tuples,
 					 (long) orphan_count);
 
-	nfree(statmsg.data);
-	nfree(tbl_str);
+	pfree(statmsg.data);
+	pfree(tbl_str);
 
 	ndb_spi_session_end(&session);
 	MemoryContextSwitchTo(oldcontext);
@@ -686,8 +686,8 @@ rebalance_index(PG_FUNCTION_ARGS)
 	session = ndb_spi_session_begin(tmpcontext, false);
 	if (session == NULL)
 	{
-		nfree(check_sql.data);
-		nfree(idx_str);
+		pfree(check_sql.data);
+		pfree(idx_str);
 		MemoryContextSwitchTo(oldcontext);
 		MemoryContextDelete(tmpcontext);
 		ereport(ERROR,
@@ -699,11 +699,11 @@ rebalance_index(PG_FUNCTION_ARGS)
 		index_exists = true;
 	else
 		index_exists = false;
-	nfree(check_sql.data);
+	pfree(check_sql.data);
 
 	if (!index_exists)
 	{
-		nfree(idx_str);
+		pfree(idx_str);
 		ndb_spi_session_end(&session);
 		MemoryContextSwitchTo(oldcontext);
 		MemoryContextDelete(tmpcontext);
@@ -788,8 +788,8 @@ rebalance_index(PG_FUNCTION_ARGS)
 			 idx_str);
 
 
-	nfree(sql.data);
-	nfree(idx_str);
+	pfree(sql.data);
+	pfree(idx_str);
 	ndb_spi_session_end(&session);
 
 	MemoryContextSwitchTo(oldcontext);

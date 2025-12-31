@@ -354,8 +354,8 @@ vector_to_array_float4(PG_FUNCTION_ARGS)
 							 sizeof(float4),
 							 true,
 							 'i');
-	nfree(elems);
-	nfree(nulls);
+	pfree(elems);
+	pfree(nulls);
 
 	PG_RETURN_ARRAYTYPE_P(result);
 }
@@ -411,8 +411,8 @@ vector_to_array_float8(PG_FUNCTION_ARGS)
 							 sizeof(float8),
 							 true,
 							 'd');
-	nfree(elems);
-	nfree(nulls);
+	pfree(elems);
+	pfree(nulls);
 
 	PG_RETURN_ARRAYTYPE_P(result);
 }
@@ -588,8 +588,8 @@ vector_to_sparsevec(PG_FUNCTION_ARGS)
 	memcpy(VECMAP_INDICES(result), indices, sizeof(int32) * nnz);
 	memcpy(VECMAP_VALUES(result), values, sizeof(float4) * nnz);
 
-	nfree(indices);
-	nfree(values);
+	pfree(indices);
+	pfree(values);
 
 	PG_RETURN_POINTER(result);
 }

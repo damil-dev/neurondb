@@ -213,10 +213,10 @@ temporal_rerank_results(ItemPointer * items,
 			timestamps[idx] = sort_items[idx].timestamp;
 		}
 
-		nfree(sort_items);
+		pfree(sort_items);
 	}
 
-	nfree(scores);
+	pfree(scores);
 
 }
 
@@ -377,8 +377,8 @@ temporal_integrate_hnsw_search(Relation heapRel,
 
 	temporal_rerank_results(items, distances, timestamps, resultCount, config);
 
-	nfree(timestamps);
-	nfree(config);
+	pfree(timestamps);
+	pfree(config);
 }
 
 static TimestampTz

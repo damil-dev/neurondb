@@ -158,7 +158,7 @@ distributed_knn_search(PG_FUNCTION_ARGS)
 				ret = ndb_spi_execute(session, sql.data, true, 0);
 				if (ret != SPI_OK_SELECT)
 				{
-					nfree(sql.data);
+					pfree(sql.data);
 					ndb_spi_session_end(&session);
 					elog(ERROR,
 						 "neurondb: SPI SELECT failed "
@@ -194,7 +194,7 @@ distributed_knn_search(PG_FUNCTION_ARGS)
 				}
 
 				ndb_spi_session_end(&session);
-				nfree(sql.data);
+				pfree(sql.data);
 			}
 
 			/* Global stable sort and SRF context build */
@@ -272,7 +272,7 @@ distributed_knn_search(PG_FUNCTION_ARGS)
 					}
 
 					funcctx->user_fctx = sctx;
-					nfree(sorted_idxs);
+					pfree(sorted_idxs);
 					MemoryContextSwitchTo(oldcontext);
 				}
 			}
@@ -304,10 +304,10 @@ distributed_knn_search(PG_FUNCTION_ARGS)
 		}
 		else
 		{
-			nfree(sctx->ids);
-			nfree(sctx->dists);
-			nfree(sctx->nulls);
-			nfree(sctx);
+			pfree(sctx->ids);
+			pfree(sctx->dists);
+			pfree(sctx->nulls);
+			pfree(sctx);
 			SRF_RETURN_DONE(funcctx);
 		}
 	}
@@ -475,8 +475,8 @@ merge_distributed_results(PG_FUNCTION_ARGS)
 			result = construct_array(
 									 recs, nres, RECORDOID, -1, false, 'd');
 
-			nfree(cands);
-			nfree(recs);
+			pfree(cands);
+			pfree(recs);
 
 			PG_RETURN_ARRAYTYPE_P(result);
 		}
@@ -554,13 +554,13 @@ sync_index_async(PG_FUNCTION_ARGS)
 	ret = ndb_spi_execute(session, sql.data, false, 0);
 	if (ret != SPI_OK_UTILITY)
 	{
-		nfree(sql.data);
+		pfree(sql.data);
 		ndb_spi_session_end(&session);
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
 				 errmsg("neurondb: failed to create sync state sequence")));
 	}
-	nfree(sql.data);
+	pfree(sql.data);
 
 	initStringInfo(&sql);
 	appendStringInfo(&sql,
@@ -577,7 +577,7 @@ sync_index_async(PG_FUNCTION_ARGS)
 	ret = ndb_spi_execute(session, sql.data, false, 0);
 	if (ret != SPI_OK_UTILITY)
 	{
-		nfree(sql.data);
+		pfree(sql.data);
 		ndb_spi_session_end(&session);
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
@@ -621,9 +621,9 @@ sync_index_async(PG_FUNCTION_ARGS)
 		ret = ndb_spi_execute(session, sql.data, false, 0);
 		if (ret != SPI_OK_SELECT)
 		{
-			nfree(sql.data);
-			nfree(slot_name.data);
-			nfree(pub_name.data);
+			pfree(sql.data);
+			pfree(slot_name.data);
+			pfree(pub_name.data);
 			ndb_spi_session_end(&session);
 			ereport(ERROR,
 					(errcode(ERRCODE_INTERNAL_ERROR),
@@ -684,9 +684,9 @@ sync_index_async(PG_FUNCTION_ARGS)
 	ret = ndb_spi_execute_with_args(session, sql.data, 3, argtypes, values, nulls, false, 0);
 	if (ret != SPI_OK_INSERT && ret != SPI_OK_UPDATE)
 	{
-		nfree(sql.data);
-		nfree(slot_name.data);
-		nfree(pub_name.data);
+		pfree(sql.data);
+		pfree(slot_name.data);
+		pfree(pub_name.data);
 		ndb_spi_session_end(&session);
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
@@ -712,17 +712,17 @@ sync_index_async(PG_FUNCTION_ARGS)
 		{
 			char	   *lsn_str = TextDatumGetCString(lsn_datum);
 
-			nfree(lsn_str);
+			pfree(lsn_str);
 		}
 	}
 
 	ndb_spi_session_end(&session);
 
-	nfree(idx_str);
-	nfree(replica_str);
-	nfree(slot_name.data);
-	nfree(pub_name.data);
-	nfree(sql.data);
+	pfree(idx_str);
+	pfree(replica_str);
+	pfree(slot_name.data);
+	pfree(pub_name.data);
+	pfree(sql.data);
 
 	PG_RETURN_BOOL(true);
 }

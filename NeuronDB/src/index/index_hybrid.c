@@ -81,7 +81,7 @@ hybrid_index_create(PG_FUNCTION_ARGS)
 	ret = ndb_spi_execute(session, sql.data, false, 0);
 	if (ret != SPI_OK_UTILITY)
 	{
-		nfree(sql.data);
+		pfree(sql.data);
 		ndb_spi_session_end(&session);
 		elog(ERROR,
 			 "Failed to create vector ANN index on %s.%s: SPI error "
@@ -92,7 +92,7 @@ hybrid_index_create(PG_FUNCTION_ARGS)
 	}
 
 	/* Use safe free/reinit to handle potential memory context changes */
-	nfree(sql.data);
+	pfree(sql.data);
 	initStringInfo(&sql);
 
 	/*
@@ -110,7 +110,7 @@ hybrid_index_create(PG_FUNCTION_ARGS)
 	ret = ndb_spi_execute(session, sql.data, false, 0);
 	if (ret != SPI_OK_UTILITY)
 	{
-		nfree(sql.data);
+		pfree(sql.data);
 		ndb_spi_session_end(&session);
 		elog(ERROR,
 			 "Failed to create GIN index on %s.%s: SPI error %d",
@@ -119,7 +119,7 @@ hybrid_index_create(PG_FUNCTION_ARGS)
 			 ret);
 	}
 
-	nfree(sql.data);
+	pfree(sql.data);
 	ndb_spi_session_end(&session);
 
 	/* In production: store fusion config and columns in metadata */
@@ -231,7 +231,7 @@ hybrid_index_search(PG_FUNCTION_ARGS)
 				 sql.data);
 		if (SPI_processed == 0)
 		{
-			nfree(sql.data);
+			pfree(sql.data);
 			ndb_spi_session_end(&session2);
 			funcctx->max_calls = 0;
 			SRF_RETURN_DONE(funcctx);

@@ -100,7 +100,7 @@ sparse_index_create(PG_FUNCTION_ARGS)
 	ret = ndb_spi_execute(session, sql.data, false, 0);
 	if (ret != SPI_OK_UTILITY)
 	{
-		nfree(sql.data);
+		pfree(sql.data);
 		ndb_spi_session_end(&session);
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
@@ -109,7 +109,7 @@ sparse_index_create(PG_FUNCTION_ARGS)
 
 	/* Build inverted index by scanning table */
 	/* Use safe free/reinit to handle potential memory context changes */
-	nfree(sql.data);
+	pfree(sql.data);
 	initStringInfo(&sql);
 	appendStringInfo(&sql,
 					 "SELECT ctid, %s FROM %s WHERE %s IS NOT NULL",
@@ -120,7 +120,7 @@ sparse_index_create(PG_FUNCTION_ARGS)
 	ret = ndb_spi_execute(session, sql.data, true, 0);
 	if (ret != SPI_OK_SELECT)
 	{
-		nfree(sql.data);
+		pfree(sql.data);
 		ndb_spi_session_end(&session);
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
@@ -135,7 +135,7 @@ sparse_index_create(PG_FUNCTION_ARGS)
 	 * with doc IDs and weights 4. Store in metadata table
 	 */
 
-	nfree(sql.data);
+	pfree(sql.data);
 	ndb_spi_session_end(&session);
 
 

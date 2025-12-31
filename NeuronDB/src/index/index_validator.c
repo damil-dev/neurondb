@@ -694,7 +694,7 @@ check_hnsw_connectivity(Relation index, ValidateResult * result)
 				UnlockReleaseBuffer(nodeBuf);
 			}
 
-			nfree(queue);
+			pfree(queue);
 		}
 
 		/* Count unreachable nodes */
@@ -739,7 +739,7 @@ check_hnsw_connectivity(Relation index, ValidateResult * result)
 			UnlockReleaseBuffer(nodeBuf);
 		}
 
-		nfree(visited);
+		pfree(visited);
 	}
 
 	if (orphanCount > 0)
@@ -1135,9 +1135,9 @@ neurondb_rebuild_index(PG_FUNCTION_ARGS)
 			session = ndb_spi_session_begin(CurrentMemoryContext, false);
 			if (session == NULL)
 			{
-				nfree(indexInfo);
-				nfree(inner_indexName);
-				nfree(rebuildCmd);
+				pfree(indexInfo);
+				pfree(inner_indexName);
+				pfree(rebuildCmd);
 				ereport(ERROR,
 						(errcode(ERRCODE_INTERNAL_ERROR),
 						 errmsg("neurondb: failed to begin SPI session during index rebuild")));
@@ -1146,8 +1146,8 @@ neurondb_rebuild_index(PG_FUNCTION_ARGS)
 			ndb_spi_execute(session, rebuildCmd, false, 0);
 			ndb_spi_session_end(&session);
 
-			nfree(indexName);
-			nfree(rebuildCmd);
+			pfree(indexName);
+			pfree(rebuildCmd);
 
 		}
 
@@ -1163,7 +1163,7 @@ neurondb_rebuild_index(PG_FUNCTION_ARGS)
 			pfree(indexInfo);
 			relation_close(heapRel, AccessShareLock);
 			index_close(indexRel, AccessExclusiveLock);
-			nfree(indexName);
+			pfree(indexName);
 			ereport(ERROR,
 					(errcode(ERRCODE_INTERNAL_ERROR),
 					 errmsg("neurondb: failed to begin SPI session during rebuild history tracking")));
@@ -1179,7 +1179,7 @@ neurondb_rebuild_index(PG_FUNCTION_ARGS)
 							 "last_rebuild_time TIMESTAMPTZ NOT NULL, "
 							 "rebuild_count BIGINT DEFAULT 1)");
 			(void) ndb_spi_execute(session2, sql.data, false, 0);
-			nfree(sql.data);
+			pfree(sql.data);
 		}
 		/* Upsert rebuild history */
 		{
@@ -1200,10 +1200,10 @@ neurondb_rebuild_index(PG_FUNCTION_ARGS)
 							 quote_literal_cstr(indexName),
 							 quote_literal_cstr(rebuildTimeStr));
 			(void) ndb_spi_execute(session2, sql.data, false, 0);
-			nfree(sql.data);
-			nfree(rebuildTimeStr);
+			pfree(sql.data);
+			pfree(rebuildTimeStr);
 		}
-		nfree(indexName);
+		pfree(indexName);
 		ndb_spi_session_end(&session2);
 
 		pfree(indexInfo);
@@ -1278,7 +1278,7 @@ index_statistics(PG_FUNCTION_ARGS)
 	if (!RelationIsValid(indexRel))
 	{
 		index_close(indexRel, AccessShareLock);
-		nfree(idx_name);
+		pfree(idx_name);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("invalid index: %s", idx_name)));
@@ -1360,8 +1360,8 @@ index_statistics(PG_FUNCTION_ARGS)
 	result_jsonb = DatumGetJsonbP(DirectFunctionCall1(
 													  jsonb_in, CStringGetTextDatum(json_buf.data)));
 
-	nfree(json_buf.data);
-	nfree(idx_name);
+	pfree(json_buf.data);
+	pfree(idx_name);
 	index_close(indexRel, AccessShareLock);
 
 	PG_RETURN_POINTER(result_jsonb);
@@ -1429,7 +1429,7 @@ index_health(PG_FUNCTION_ARGS)
 	if (!RelationIsValid(indexRel))
 	{
 		index_close(indexRel, AccessShareLock);
-		nfree(idx_name);
+		pfree(idx_name);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("invalid index: %s", idx_name)));
@@ -1477,8 +1477,8 @@ index_health(PG_FUNCTION_ARGS)
 	result_jsonb = DatumGetJsonbP(DirectFunctionCall1(
 													  jsonb_in, CStringGetTextDatum(json_buf.data)));
 
-	nfree(json_buf.data);
-	nfree(idx_name);
+	pfree(json_buf.data);
+	pfree(idx_name);
 	index_close(indexRel, AccessShareLock);
 
 	PG_RETURN_POINTER(result_jsonb);
@@ -1547,7 +1547,7 @@ index_rebuild_recommendation(PG_FUNCTION_ARGS)
 	if (!RelationIsValid(indexRel))
 	{
 		index_close(indexRel, AccessShareLock);
-		nfree(idx_name);
+		pfree(idx_name);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("invalid index: %s", idx_name)));
@@ -1589,7 +1589,7 @@ index_rebuild_recommendation(PG_FUNCTION_ARGS)
 					days_since_last_rebuild = (GetCurrentTimestamp() - last_rebuild_time) / (24 * 60 * 60 * 1000000.0);
 				}
 			}
-			nfree(sql.data);
+			pfree(sql.data);
 			ndb_spi_session_end(&session3);
 		}
 	}
@@ -1644,8 +1644,8 @@ index_rebuild_recommendation(PG_FUNCTION_ARGS)
 	result_jsonb = DatumGetJsonbP(DirectFunctionCall1(
 													  jsonb_in, CStringGetTextDatum(json_buf.data)));
 
-	nfree(json_buf.data);
-	nfree(idx_name);
+	pfree(json_buf.data);
+	pfree(idx_name);
 	index_close(indexRel, AccessShareLock);
 
 	PG_RETURN_POINTER(result_jsonb);

@@ -195,7 +195,7 @@ ndb_rls_end(RLSFilterState *state)
 		state->slot = NULL;
 	}
 
-	nfree(state);
+	pfree(state);
 }
 
 /*
@@ -286,14 +286,14 @@ ndb_compile_rls_policies(List * policies, Relation rel, EState * estate)
 			/* Use SPI to parse and evaluate the qual */
 			/* For production, policies should store compiled Expr nodes */
 			/* For now, return NULL to indicate we need SPI-based evaluation */
-			nfree(qualStr);
+			pfree(qualStr);
 			continue;			/* Skip complex parsing for now - would need
 								 * full query context */
 		}
 
 		/* Add to qual list */
 		qualList = lappend(qualList, qualExpr);
-		nfree(qualStr);
+		pfree(qualStr);
 	}
 
 	/* Combine quals with OR (any policy can allow access) */
@@ -481,9 +481,9 @@ neurondb_create_tenant_policy(PG_FUNCTION_ARGS)
 		if (ret < 0)
 		{
 			ndb_spi_session_end(&session);
-			nfree(query.data);
-			nfree(table_str);
-			nfree(column_str);
+			pfree(query.data);
+			pfree(table_str);
+			pfree(column_str);
 			ereport(ERROR,
 					(errcode(ERRCODE_INTERNAL_ERROR),
 					 errmsg("Failed to create RLS policy")));
@@ -492,17 +492,17 @@ neurondb_create_tenant_policy(PG_FUNCTION_ARGS)
 	}
 	else
 	{
-		nfree(query.data);
-		nfree(table_str);
-		nfree(column_str);
+		pfree(query.data);
+		pfree(table_str);
+		pfree(column_str);
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
 				 errmsg("failed to begin SPI session")));
 	}
 
-	nfree(query.data);
-	nfree(table_str);
-	nfree(column_str);
+	pfree(query.data);
+	pfree(table_str);
+	pfree(column_str);
 
 	PG_RETURN_VOID();
 }

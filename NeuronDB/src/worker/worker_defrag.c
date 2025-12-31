@@ -140,7 +140,7 @@ neurandefrag_run(PG_FUNCTION_ARGS)
 					 "AND n.nspname NOT IN ('pg_catalog', 'information_schema')");
 
 	ret = ndb_spi_execute(session, query.data, true, 0);
-	nfree(query.data);
+	pfree(query.data);
 
 	if (ret == SPI_OK_SELECT && SPI_processed > 0)
 	{
@@ -440,7 +440,7 @@ neurandefrag_main(Datum main_arg)
 													  &isnull);
 							if (isnull)
 							{
-								nfree(relname);
+								pfree(relname);
 								continue;
 							}
 							indexOid = DatumGetObjectId(oid_datum);
@@ -484,13 +484,13 @@ neurandefrag_main(Datum main_arg)
 							}
 
 							index_close(indexRel, AccessShareLock);
-							nfree(relname);
+							pfree(relname);
 						}
 
 						SPI_freetuptable(tuptable);
 					}
 
-					nfree(sql.data);
+					pfree(sql.data);
 				}
 				PG_CATCH();
 				{

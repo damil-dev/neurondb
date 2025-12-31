@@ -501,7 +501,7 @@ hnswinsert(Relation index,
 	MarkBufferDirty(metaBuffer);
 	UnlockReleaseBuffer(metaBuffer);
 
-	nfree(vectorData);
+	pfree(vectorData);
 
 	return true;
 }
@@ -585,7 +585,7 @@ hnswbulkdelete(IndexVacuumInfo * info,
 			if (callback(&node->heapPtr, callback_state))
 			{
 				/* Remove node from graph structure */
-				/* DEADLOCK FIX: Copy neighbor block numbers before unlocking nodeBuf */
+				/* Copy neighbor block numbers before unlocking nodeBuf to prevent deadlock */
 				BlockNumber **neighborBlocksPerLevel = NULL;
 				int *neighborCountPerLevel = NULL;
 				int			maxLevel = node->level;
@@ -651,12 +651,12 @@ hnswbulkdelete(IndexVacuumInfo * info,
 					for (level = 0; level <= maxLevel; level++)
 					{
 						if (neighborBlocksPerLevel[level])
-							nfree(neighborBlocksPerLevel[level]);
+							pfree(neighborBlocksPerLevel[level]);
 					}
-					nfree(neighborBlocksPerLevel);
+					pfree(neighborBlocksPerLevel);
 				}
 				if (neighborCountPerLevel)
-					nfree(neighborCountPerLevel);
+					pfree(neighborCountPerLevel);
 
 				/* Relock nodeBuf if needed for entry point update */
 				nodeBuf = ReadBuffer(index, blkno);
@@ -939,7 +939,7 @@ hnswoptions(Datum reloptions, bool validate)
 							found_ef_search = true;
 						}
 					}
-					nfree(elem_str);
+					pfree(elem_str);
 				}
 			}
 			
@@ -1134,7 +1134,7 @@ hnswrescan(IndexScanDesc scan,
 			char *queryVector_raw = NULL;
 			if (so->queryVector)
 			{
-				nfree(so->queryVector);
+				pfree(so->queryVector);
 				so->queryVector = NULL;
 			}
 			nalloc(queryVector_raw, char, VECTOR_SIZE(dim));
@@ -1142,7 +1142,7 @@ hnswrescan(IndexScanDesc scan,
 			SET_VARSIZE(so->queryVector, VECTOR_SIZE(dim));
 			so->queryVector->dim = dim;
 			memcpy(so->queryVector->data, vectorData, dim * sizeof(float4));
-			nfree(vectorData);
+			pfree(vectorData);
 			vectorData = NULL;
 		}
 		/* Get k from GUC or default to 10 */
@@ -1242,21 +1242,21 @@ hnswendscan(IndexScanDesc scan)
 
 	if (so->results)
 	{
-		nfree(so->results);
+		pfree(so->results);
 		so->results = NULL;
 	}
 	if (so->distances)
 	{
-		nfree(so->distances);
+		pfree(so->distances);
 		so->distances = NULL;
 	}
 	if (so->queryVector)
 	{
-		nfree(so->queryVector);
+		pfree(so->queryVector);
 		so->queryVector = NULL;
 	}
 
-	nfree(so);
+	pfree(so);
 	so = NULL;
 }
 
@@ -1616,7 +1616,7 @@ hnswExtractVectorData(Datum value, Oid typeOid, int *out_dim, MemoryContext ctx)
 		if (hv->dim <= 0 || hv->dim > 32767)
 		{
 			if (needsFree)
-				nfree(hv);
+				pfree(hv);
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("hnsw: invalid halfvec dimension %d", hv->dim)));
@@ -1643,7 +1643,7 @@ hnswExtractVectorData(Datum value, Oid typeOid, int *out_dim, MemoryContext ctx)
 		if (sv->total_dim <= 0 || sv->total_dim > 32767)
 		{
 			if (needsFree)
-				nfree(sv);
+				pfree(sv);
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("hnsw: invalid sparsevec total_dim %d", sv->total_dim)));
@@ -1688,7 +1688,7 @@ hnswExtractVectorData(Datum value, Oid typeOid, int *out_dim, MemoryContext ctx)
 			if (nbits <= 0 || nbits > 32767)
 			{
 				if (needsFree)
-					nfree(bit_vec);
+					pfree(bit_vec);
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 						 errmsg("hnsw: invalid bit vector length %d", nbits)));
@@ -1697,7 +1697,7 @@ hnswExtractVectorData(Datum value, Oid typeOid, int *out_dim, MemoryContext ctx)
 			if (bit_data == NULL)
 			{
 				if (needsFree)
-					nfree(bit_vec);
+					pfree(bit_vec);
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 						 errmsg("hnsw: bit vector data is NULL")));
@@ -1971,7 +1971,7 @@ hnswSearch(Relation index,
 					}
 
 					if (neighborBlocks)
-						nfree(neighborBlocks);
+						pfree(neighborBlocks);
 				}
 				else
 				{
@@ -1987,10 +1987,10 @@ hnswSearch(Relation index,
 			*results = NULL;
 			*distances = NULL;
 			*resultCount = 0;
-			nfree(visited);
-			nfree(visitedSet);
-			nfree(candidates);
-			nfree(candidateDists);
+			pfree(visited);
+			pfree(visitedSet);
+			pfree(candidates);
+			pfree(candidateDists);
 			return;
 		}
 
@@ -2005,10 +2005,10 @@ hnswSearch(Relation index,
 			*results = NULL;
 			*distances = NULL;
 			*resultCount = 0;
-			nfree(visited);
-			nfree(visitedSet);
-			nfree(candidates);
-			nfree(candidateDists);
+			pfree(visited);
+			pfree(visitedSet);
+			pfree(candidates);
+			pfree(candidateDists);
 			return;
 		}
 
@@ -2020,10 +2020,10 @@ hnswSearch(Relation index,
 			*results = NULL;
 			*distances = NULL;
 			*resultCount = 0;
-			nfree(visited);
-			nfree(visitedSet);
-			nfree(candidates);
-			nfree(candidateDists);
+			pfree(visited);
+			pfree(visitedSet);
+			pfree(candidates);
+			pfree(candidateDists);
 			return;
 		}
 
@@ -2033,10 +2033,10 @@ hnswSearch(Relation index,
 			*results = NULL;
 			*distances = NULL;
 			*resultCount = 0;
-			nfree(visited);
-			nfree(visitedSet);
-			nfree(candidates);
-			nfree(candidateDists);
+			pfree(visited);
+			pfree(visitedSet);
+			pfree(candidates);
+			pfree(candidateDists);
 			return;
 		}
 
@@ -2047,10 +2047,10 @@ hnswSearch(Relation index,
 			*results = NULL;
 			*distances = NULL;
 			*resultCount = 0;
-			nfree(visited);
-			nfree(visitedSet);
-			nfree(candidates);
-			nfree(candidateDists);
+			pfree(visited);
+			pfree(visitedSet);
+			pfree(candidates);
+			pfree(candidateDists);
 			return;
 		}
 
@@ -2217,7 +2217,7 @@ hnswSearch(Relation index,
 			}
 
 			if (neighborBlocks)
-				nfree(neighborBlocks);
+				pfree(neighborBlocks);
 		}
 
 		nalloc(indices, int, candidateCount);
@@ -2266,20 +2266,20 @@ hnswSearch(Relation index,
 			topKDists = NULL;
 		}
 
-		nfree(indices);
+		pfree(indices);
 		indices = NULL;
 
 		*results = topK;
 		*distances = topKDists;
 		*resultCount = topKCount;
 
-		nfree(candidates);
+		pfree(candidates);
 		candidates = NULL;
-		nfree(candidateDists);
+		pfree(candidateDists);
 		candidateDists = NULL;
-		nfree(visited);
+		pfree(visited);
 		visited = NULL;
-		nfree(visitedSet);
+		pfree(visitedSet);
 		visitedSet = NULL;
 }
 
@@ -2519,8 +2519,6 @@ hnswInsertNode(Relation index,
 				 errmsg("hnsw: failed to add node to page")));
 
 	MarkBufferDirty(buf);
-	/* Ensure the buffer is written before unlocking to avoid issues when relocking */
-	/* Note: We don't flush here as it's expensive, but we ensure blkno is correct */
 	UnlockReleaseBuffer(buf);
 
 	/* Step 5: Link neighbors at each level bidirectionally */
@@ -2659,7 +2657,7 @@ hnswInsertNode(Relation index,
 				 * Link new node to neighbors, and each neighbor back
 				 * (bidirectional)
 				 * 
-				 * DEADLOCK FIX: Copy new node neighbor data while holding lock,
+				 * Copy new node neighbor data while holding lock to prevent deadlock,
 				 * then unlock newNodeBuf before processing neighbors.
 				 * Relock newNodeBuf only when updating it.
 				 */
@@ -2776,7 +2774,7 @@ hnswInsertNode(Relation index,
 					if (pruneCount < 0)
 						pruneCount = 0;
 
-					/* DEADLOCK FIX: Copy neighbor block numbers before unlocking neighborBuf */
+					/* Copy neighbor block numbers before unlocking neighborBuf to prevent deadlock */
 					if (pruneCount > 0)
 					{
 						nalloc(pruneNeighborBlocks, BlockNumber, pruneCount);
@@ -2904,12 +2902,12 @@ hnswInsertNode(Relation index,
 						neighborBuf = InvalidBuffer;
 					}
 
-					nfree(neighborDists);
+					pfree(neighborDists);
 					neighborDists = NULL;
-					nfree(neighborIndices);
+					pfree(neighborIndices);
 					neighborIndices = NULL;
 					if (pruneNeighborBlocks)
-						nfree(pruneNeighborBlocks);
+						pfree(pruneNeighborBlocks);
 				}
 				else
 				{
@@ -2937,30 +2935,30 @@ hnswInsertNode(Relation index,
 					/* Free newNodeNeighbors after processing all neighbors for this level */
 					if (newNodeNeighbors)
 					{
-						nfree(newNodeNeighbors);
+						pfree(newNodeNeighbors);
 						newNodeNeighbors = NULL;
 					}
 				}
 
 			if (selectedNeighbors)
 			{
-				nfree(selectedNeighbors);
+				pfree(selectedNeighbors);
 				selectedNeighbors = NULL;
 			}
 			if (selectedDistances)
 			{
-				nfree(selectedDistances);
+				pfree(selectedDistances);
 				selectedDistances = NULL;
 			}
 
 			if (candidates)
 			{
-				nfree(candidates);
+				pfree(candidates);
 				candidates = NULL;
 			}
 			if (candidateDistances)
 			{
-				nfree(candidateDistances);
+				pfree(candidateDistances);
 				candidateDistances = NULL;
 			}
 
@@ -2989,7 +2987,7 @@ hnswInsertNode(Relation index,
 	if (level > metaPage->maxLevel)
 		metaPage->maxLevel = level;
 
-	nfree(node);
+	pfree(node);
 	node = NULL;
 }
 
