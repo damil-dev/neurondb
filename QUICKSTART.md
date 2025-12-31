@@ -10,18 +10,28 @@ Get NeuronDB up and running in minutes with this step-by-step guide.
 
 ## Prerequisites
 
-Before starting, ensure you have:
+**Before starting, verify you have:**
 
-- **Docker** 20.10+ and **Docker Compose** 2.0+
-- **5-10 minutes**for setup and verification
-- **4GB RAM**minimum (8GB recommended)
+- [ ] **Docker** 20.10+ and **Docker Compose** 2.0+
+- [ ] **5-10 minutes** for setup and verification
+- [ ] **4GB RAM** minimum (8GB recommended)
+- [ ] Ports **5433, 8080, 8081, 3000** available
 
-Verify Docker installation:
+<details>
+<summary><strong>Verify Docker installation</strong></summary>
 
 ```bash
 docker --version
 docker compose version
 ```
+
+**Expected output:**
+```
+Docker version 20.10.0 or higher
+Docker Compose version v2.0.0 or higher
+```
+
+</details>
 
 ## Step 1: Start All Services
 
@@ -33,12 +43,13 @@ docker compose up -d
 ```
 
 This command will:
-1. Build all Docker images (first time only, takes a few minutes)
-2. Start PostgreSQL with NeuronDB extension
-3. Start NeuronAgent (REST API server)
-4. Start NeuronMCP (MCP protocol server)
-5. Start NeuronDesktop (web interface with API and frontend)
-6. Configure networking between all components
+
+- [x] Build all Docker images (first time only, takes a few minutes)
+- [x] Start PostgreSQL with NeuronDB extension
+- [x] Start NeuronAgent (REST API server)
+- [x] Start NeuronMCP (MCP protocol server)
+- [x] Start NeuronDesktop (web interface with API and frontend)
+- [x] Configure networking between all components
 
 **What to expect:**
 - First run: 5-10 minutes (building images)
@@ -51,13 +62,16 @@ docker compose ps
 ```
 
 You should see five services running:
-- `neurondb-cpu` (PostgreSQL with NeuronDB extension)
-- `neuronagent` (REST API server)
-- `neurondb-mcp` (MCP protocol server)
-- `neurondesk-api` (NeuronDesktop API server)
-- `neurondesk-frontend` (NeuronDesktop web interface)
 
-Wait for all services to show "healthy" status (may take 30-60 seconds).
+| Service | Status | Description |
+|---------|--------|-------------|
+| `neurondb-cpu` | healthy | PostgreSQL with NeuronDB extension |
+| `neuronagent` | healthy | REST API server |
+| `neurondb-mcp` | healthy | MCP protocol server |
+| `neurondesk-api` | healthy | NeuronDesktop API server |
+| `neurondesk-frontend` | healthy | NeuronDesktop web interface |
+
+**Wait for all services to show "healthy" status** (may take 30-60 seconds)
 
 ## Step 2: Run Smoke Tests
 
@@ -123,17 +137,18 @@ This script runs all three tests above and reports success or failure.
 
 **Expected output:**
 ```
- NeuronDB SQL query successful
- NeuronAgent REST API responding
- NeuronMCP server responding
+NeuronDB SQL query successful
+NeuronAgent REST API responding
+NeuronMCP server responding
 All smoke tests passed!
 ```
 
 ## Next Steps
 
-Now that everything is running, try these examples:
+**Congratulations!** Your NeuronDB ecosystem is running. Try these examples:
 
-### Example 1: Create a Vector Table
+<details>
+<summary><strong>Example 1: Create a Vector Table</strong></summary>
 
 ```bash
 docker compose exec neurondb psql -U neurondb -d neurondb <<EOF
@@ -150,7 +165,10 @@ SELECT id, content FROM documents;
 EOF
 ```
 
-### Example 2: Create an Agent via REST API
+</details>
+
+<details>
+<summary><strong>Example 2: Create an Agent via REST API</strong></summary>
 
 ```bash
 # First, create an API key (check NeuronAgent documentation)
@@ -166,7 +184,13 @@ curl -X POST http://localhost:8080/api/v1/agents \
   }'
 ```
 
+**Note:** Replace `YOUR_API_KEY` with an actual API key from NeuronAgent
+
+</details>
+
 ## Troubleshooting
+
+**Having issues?** Check these common problems:
 
 ### Services Won't Start
 
@@ -181,17 +205,31 @@ docker compose logs neurondesk-frontend
 
 **Common issues:**
 
-1. **Port already in use:**
-   - Change ports in `docker-compose.yml` or stop conflicting services
-   - Default ports: 5433 (PostgreSQL), 8080 (NeuronAgent)
+<details>
+<summary><strong>Port already in use</strong></summary>
 
-2. **Out of memory:**
-   - Ensure Docker has at least 4GB RAM allocated
-   - Check: Docker Desktop → Settings → Resources
+- Change ports in `docker-compose.yml` or stop conflicting services
+- Default ports: **5433** (PostgreSQL), **8080** (NeuronAgent), **8081** (NeuronDesktop API), **3000** (NeuronDesktop UI)
 
-3. **Build failures:**
-   - Ensure Docker has sufficient disk space (10GB+ recommended)
-   - Try: `docker compose build --no-cache`
+</details>
+
+<details>
+<summary><strong>Out of memory</strong></summary>
+
+- Ensure Docker has at least **4GB RAM** allocated
+- Check: Docker Desktop → Settings → Resources
+- Recommended: **8GB+** for optimal performance
+
+</details>
+
+<details>
+<summary><strong>Build failures</strong></summary>
+
+- Ensure Docker has sufficient disk space (**10GB+** recommended)
+- Try: `docker compose build --no-cache`
+- Check Docker logs: `docker compose logs --tail=50`
+
+</details>
 
 ### Services Start But Tests Fail
 

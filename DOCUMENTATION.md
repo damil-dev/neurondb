@@ -2,36 +2,114 @@
 
 **Complete documentation reference for the NeuronDB AI Database Ecosystem**
 
-## 🌐 Official Documentation
+## How to Use This Documentation
+
+This documentation is organized to support different reading modes:
+
+- **Getting started**: Get running quickly and understand the basics
+- **Internals**: Deeper architecture, internals, performance, and deployment patterns
+- **Reference**: Concise lookups (glossary, doc maps, summaries)
+
+### Recommended Learning Path
+
+**Follow this path for the best learning experience:**
+
+- [ ] **Step 1:** Start with **[QUICKSTART.md](QUICKSTART.md)** - Get all services running in minutes
+- [ ] **Step 2:** Read **[Docs/getting-started/simple-start.md](Docs/getting-started/simple-start.md)** - Simple setup guide
+- [ ] **Step 3:** Review **[Docs/getting-started/architecture.md](Docs/getting-started/architecture.md)** - Understand the architecture
+- [ ] **Step 4:** Keep **[Docs/getting-started/troubleshooting.md](Docs/getting-started/troubleshooting.md)** handy for issues
+- [ ] **Step 5:** Use **[Docs/reference/readme.md](Docs/reference/readme.md)** for quick lookups
+
+### Documentation Entry Points
+
+- **Getting started**: [Docs/getting-started/readme.md](Docs/getting-started/readme.md)
+- **Components**: [Docs/components/readme.md](Docs/components/readme.md)
+- **Deployment**: [Docs/deployment/readme.md](Docs/deployment/readme.md)
+- **Reference**: [Docs/reference/readme.md](Docs/reference/readme.md)
+
+### Docker
+
+- **Canonical compose file**: Repository root [`docker-compose.yml`](docker-compose.yml)
+- **Docker management docs**: [dockers/readme.md](dockers/readme.md)
+
+---
+
+## Official Documentation
 
 **For comprehensive, up-to-date documentation, visit:**
 
 **[https://www.neurondb.ai/docs](https://www.neurondb.ai/docs)**
 
-The official site provides complete API references, tutorials, guides, and best practices.
+<details>
+<summary><strong>What's available on the official site</strong></summary>
+
+- Complete API references (all 473 SQL functions)
+- Detailed tutorials and step-by-step guides
+- Best practices and production guides
+- Performance optimization strategies
+- Latest updates and release notes
+
+</details>
 
 ---
 
-## 📚 Quick Start
+## Quick Start
 
 | Document | Description | Time to Complete |
 |----------|-------------|------------------|
 | **[QUICKSTART.md](QUICKSTART.md)** | Get all services running in minutes | 5-10 minutes |
-| **[readme.md](readme.md)** | Project overview and architecture | 15 minutes |
+| **[README.md](README.md)** | Project overview and architecture | 15 minutes |
 | **[COMPATIBILITY.md](COMPATIBILITY.md)** | Version and platform compatibility | 5 minutes |
 
 ---
 
-## 🏗️ Architecture & Components
+## Architecture & Components
+
+### System Architecture
+
+<details>
+<summary><strong>Architecture Diagram</strong></summary>
+
+```mermaid
+graph TB
+    subgraph "NeuronDB Ecosystem"
+        DB[NeuronDB<br/>PostgreSQL Extension]
+        AGENT[NeuronAgent<br/>REST/WebSocket API]
+        MCP[NeuronMCP<br/>MCP Protocol Server]
+        DESKTOP[NeuronDesktop<br/>Web UI + API]
+    end
+    
+    subgraph "Clients"
+        CLI[CLI Tools]
+        WEB[Web Browser]
+        MCP_CLIENT[MCP Clients<br/>Claude Desktop]
+    end
+    
+    CLI -->|SQL| DB
+    WEB -->|HTTP| DESKTOP
+    MCP_CLIENT -->|JSON-RPC| MCP
+    
+    DESKTOP -->|HTTP| AGENT
+    DESKTOP -->|SQL| DB
+    AGENT -->|SQL| DB
+    MCP -->|SQL| DB
+    
+    style DB fill:#e1f5ff
+    style AGENT fill:#fff4e1
+    style MCP fill:#e8f5e9
+    style DESKTOP fill:#f3e5f5
+```
+
+</details>
 
 ### Component Documentation
 
 | Component | Quick Links | Description |
 |-----------|-------------|-------------|
-| **NeuronDB** | [README](NeuronDB/readme.md) · [INSTALL](NeuronDB/INSTALL.md) · [Docs](NeuronDB/docs/) | PostgreSQL extension with vector search, 52+ ML algorithms, GPU acceleration |
-| **NeuronAgent** | [README](NeuronAgent/readme.md) · [API](NeuronAgent/docs/API.md) · [Architecture](NeuronAgent/docs/ARCHITECTURE.md) | REST/WebSocket agent runtime with autonomous agents |
-| **NeuronMCP** | [README](NeuronMCP/readme.md) · [Tools](NeuronMCP/TOOLS_REFERENCE.md) · [Setup](NeuronMCP/docs/NEURONDB_MCP_SETUP.md) | MCP protocol server with 100+ tools |
-| **NeuronDesktop** | [README](NeuronDesktop/readme.md) · [API](NeuronDesktop/docs/API.md) · [Deployment](NeuronDesktop/docs/DEPLOYMENT.md) | Unified web interface dashboard |
+| **NeuronDB** | [README](NeuronDB/README.md) · [INSTALL](NeuronDB/INSTALL.md) · [Docs](NeuronDB/docs/) | PostgreSQL extension with vector search, 52+ ML algorithms, GPU acceleration |
+| **NeuronAgent** | [README](NeuronAgent/README.md) · [API](NeuronAgent/docs/API.md) · [Architecture](NeuronAgent/docs/ARCHITECTURE.md) | REST/WebSocket agent runtime with autonomous agents |
+| **NeuronMCP** | [README](NeuronMCP/README.md) · [Tools](NeuronMCP/TOOLS_REFERENCE.md) · [Setup](NeuronMCP/docs/NEURONDB_MCP_SETUP.md) | MCP protocol server with 100+ tools |
+| **NeuronDesktop** | [README](NeuronDesktop/README.md) · [API](NeuronDesktop/docs/API.md) · [Deployment](NeuronDesktop/docs/DEPLOYMENT.md) | Unified web interface dashboard |
 
 ### Ecosystem Documentation
 
@@ -43,7 +121,7 @@ The official site provides complete API references, tutorials, guides, and best 
 
 ---
 
-## 🚀 Installation & Setup
+## Installation & Setup
 
 ### Installation Guides
 
@@ -63,7 +141,7 @@ The official site provides complete API references, tutorials, guides, and best 
 
 ---
 
-## 📖 Feature Documentation
+## Feature Documentation
 
 ### Vector Search & Indexing
 
@@ -249,7 +327,7 @@ The official site provides complete API references, tutorials, guides, and best 
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 | Document | Description |
 |----------|-------------|
@@ -259,7 +337,7 @@ The official site provides complete API references, tutorials, guides, and best 
 
 ---
 
-## 📋 Reference
+## Reference
 
 ### Version Information
 
@@ -278,7 +356,7 @@ The official site provides complete API references, tutorials, guides, and best 
 
 ---
 
-## 🆘 Support
+## Support
 
 ### Getting Help
 
@@ -292,70 +370,116 @@ The official site provides complete API references, tutorials, guides, and best 
 
 ---
 
-## 🔍 Quick Navigation by Task
+## Quick Navigation by Task
 
-### I want to...
+**Find what you need quickly:**
 
-**Get Started**
-- Install everything quickly → [QUICKSTART.md](QUICKSTART.md)
-- Understand the architecture → [readme.md](readme.md)
-- Check compatibility → [COMPATIBILITY.md](COMPATIBILITY.md)
+<details>
+<summary><strong>Get Started</strong></summary>
 
-**Work with Vectors**
-- Store and search vectors → [Vector Types](NeuronDB/docs/vector-search/vector-types.md)
-- Create indexes → [Indexing](NeuronDB/docs/vector-search/indexing.md)
-- Optimize search → [Distance Metrics](NeuronDB/docs/vector-search/distance-metrics.md)
+- [ ] Install everything quickly → [QUICKSTART.md](QUICKSTART.md)
+- [ ] Understand the architecture → [README.md](README.md)
+- [ ] Check compatibility → [COMPATIBILITY.md](COMPATIBILITY.md)
 
-**Use Machine Learning**
-- Train models → [ML Algorithms](NeuronDB/docs/ml-algorithms/)
-- Generate embeddings → [Embedding Generation](NeuronDB/docs/ml-embeddings/embedding-generation.md)
-- Deploy models → [Model Management](NeuronDB/docs/ml-embeddings/model-management.md)
+</details>
 
-**Build AI Agents**
-- Create agents → [NeuronAgent README](NeuronAgent/readme.md)
-- Use REST API → [API Reference](NeuronAgent/docs/API.md)
-- Deploy agents → [Deployment Guide](NeuronAgent/docs/DEPLOYMENT.md)
+<details>
+<summary><strong>Work with Vectors</strong></summary>
 
-**Integrate with MCP**
-- Setup MCP server → [NeuronMCP README](NeuronMCP/readme.md)
-- Use with Claude → [Setup Guide](NeuronMCP/docs/NEURONDB_MCP_SETUP.md)
-- Explore tools → [Tools Reference](NeuronMCP/TOOLS_REFERENCE.md)
+- [ ] Store and search vectors → [Vector Types](NeuronDB/docs/vector-search/vector-types.md)
+- [ ] Create indexes → [Indexing](NeuronDB/docs/vector-search/indexing.md)
+- [ ] Optimize search → [Distance Metrics](NeuronDB/docs/vector-search/distance-metrics.md)
 
-**Use Web Interface**
-- Setup dashboard → [NeuronDesktop README](NeuronDesktop/readme.md)
-- Integrate components → [Integration Guide](NeuronDesktop/docs/INTEGRATION.md)
-- Deploy production → [Deployment Guide](NeuronDesktop/docs/DEPLOYMENT.md)
+</details>
 
-**Deploy with Docker**
-- Quick start → [QUICKSTART.md](QUICKSTART.md)
-- Docker guide → [Docker README](dockers/readme.md)
-- Component-specific → Each component's `docker/` directory
+<details>
+<summary><strong>Use Machine Learning</strong></summary>
 
-**Develop & Contribute**
-- Contributing → [CONTRIBUTING.md](CONTRIBUTING.md)
-- Testing → [Testing Guide](NeuronAgent/TESTING.md)
-- Security → [SECURITY.md](SECURITY.md)
+- [ ] Train models → [ML Algorithms](NeuronDB/docs/ml-algorithms/)
+- [ ] Generate embeddings → [Embedding Generation](NeuronDB/docs/ml-embeddings/embedding-generation.md)
+- [ ] Deploy models → [Model Management](NeuronDB/docs/ml-embeddings/model-management.md)
+
+</details>
+
+<details>
+<summary><strong>Build AI Agents</strong></summary>
+
+- [ ] Create agents → [NeuronAgent README](NeuronAgent/README.md)
+- [ ] Use REST API → [API Reference](NeuronAgent/docs/API.md)
+- [ ] Deploy agents → [Deployment Guide](NeuronAgent/docs/DEPLOYMENT.md)
+
+</details>
+
+<details>
+<summary><strong>Integrate with MCP</strong></summary>
+
+- [ ] Setup MCP server → [NeuronMCP README](NeuronMCP/README.md)
+- [ ] Use with Claude → [Setup Guide](NeuronMCP/docs/NEURONDB_MCP_SETUP.md)
+- [ ] Explore tools → [Tools Reference](NeuronMCP/TOOLS_REFERENCE.md)
+
+</details>
+
+<details>
+<summary><strong>Use Web Interface</strong></summary>
+
+- [ ] Setup dashboard → [NeuronDesktop README](NeuronDesktop/README.md)
+- [ ] Integrate components → [Integration Guide](NeuronDesktop/docs/INTEGRATION.md)
+- [ ] Deploy production → [Deployment Guide](NeuronDesktop/docs/DEPLOYMENT.md)
+
+</details>
+
+<details>
+<summary><strong>Deploy with Docker</strong></summary>
+
+- [ ] Quick start → [QUICKSTART.md](QUICKSTART.md)
+- [ ] Docker guide → [Docker README](dockers/README.md)
+- [ ] Component-specific → Each component's `docker/` directory
+
+</details>
+
+<details>
+<summary><strong>Develop & Contribute</strong></summary>
+
+- [ ] Contributing → [CONTRIBUTING.md](CONTRIBUTING.md)
+- [ ] Testing → [Testing Guide](NeuronAgent/TESTING.md)
+- [ ] Security → [SECURITY.md](SECURITY.md)
+
+</details>
 
 ---
 
-## 📊 Statistics
+## Statistics
 
-**Project Scale:**
-- **473 SQL functions** in NeuronDB extension
-- **52+ ML algorithms** supported
-- **100+ MCP tools** available
-- **4 integrated components** working together
-- **3 PostgreSQL versions** supported (16, 17, 18)
-- **4 GPU platforms** supported (CPU, CUDA, ROCm, Metal)
+**Project Scale & Capabilities:**
 
-**Documentation:**
-- **60+ documentation files** in NeuronDB
-- **38 code examples** in NeuronAgent
-- **5 deployment guides** across components
-- **4 API references** (SQL, REST, MCP, Web UI)
+<details>
+<summary><strong>Project Statistics</strong></summary>
+
+| Category | Count | Details |
+|----------|-------|---------|
+| **SQL Functions** | 473 | NeuronDB extension functions |
+| **ML Algorithms** | 52+ | Classification, regression, clustering, etc. |
+| **MCP Tools** | 100+ | Model Context Protocol tools |
+| **Components** | 4 | NeuronDB, NeuronAgent, NeuronMCP, NeuronDesktop |
+| **PostgreSQL Versions** | 3 | 16, 17, 18 |
+| **GPU Platforms** | 4 | CPU, CUDA, ROCm, Metal |
+
+</details>
+
+<details>
+<summary><strong>Documentation Statistics</strong></summary>
+
+| Category | Count | Location |
+|----------|-------|-----------|
+| **Documentation Files** | 60+ | NeuronDB/docs/ |
+| **Code Examples** | 38 | NeuronAgent/examples/ |
+| **Deployment Guides** | 5 | Across components |
+| **API References** | 4 | SQL, REST, MCP, Web UI |
+
+</details>
 
 ---
 
-**Last Updated:** 2025-01-30  
+**Last Updated:** 2025-12-31  
 **Documentation Version:** 1.0.0
 

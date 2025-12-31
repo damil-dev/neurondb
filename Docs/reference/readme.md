@@ -15,4 +15,7 @@ Use this section as a lookup when you already know what you’re looking for.
 
 ## Supplemental docs
 
-The repository also keeps a set of supplemental pointer documents under `Docs/misc/`.
+For additional documentation, see:
+- Component-specific docs in each component directory
+- Examples in the `examples/` directory
+- Advanced topics in `Docs/advanced/`

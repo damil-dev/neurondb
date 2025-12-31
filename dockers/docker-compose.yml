@@ -1,6 +1,17 @@
 # Unified Docker Compose Configuration for NeuronDB Ecosystem
 # Orchestrates NeuronDB, NeuronAgent, and NeuronMCP with automatic networking
 #
+# ⚠️ IMPORTANT: This file is maintained for reference but the CANONICAL compose file
+#    is at the repository root: ../docker-compose.yml
+#
+# For new users, use the root file:
+#   docker compose up -d
+#
+# This file exists for:
+#   - Reference when working in dockers/ directory
+#   - Component-specific deployments
+#   - Historical compatibility
+#
 # Modern Docker Compose (v2) - no version field required
 # Usage:
 #   CPU (default):  docker compose --profile default up -d

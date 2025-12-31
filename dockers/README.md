@@ -17,6 +17,15 @@ dockers/
 
 ## Quick Start
 
+> **⚠️ Important:** The canonical `docker-compose.yml` file is at the repository root.
+> 
+> For new users, simply run from the repository root:
+> ```bash
+> docker compose up -d
+> ```
+> 
+> This `dockers/` directory contains component-specific Docker files and the `docker.sh` management script.
+
 ### Using docker.sh (Recommended)
 
 The `docker.sh` script provides a clean interface for managing all services:
@@ -49,6 +58,13 @@ The `docker.sh` script provides a clean interface for managing all services:
 
 ### Direct Docker Compose (Advanced)
 
+**Recommended:** Use the root `docker-compose.yml`:
+```bash
+# From project root (recommended)
+docker compose up -d
+```
+
+**Alternative:** Use this directory's compose file (for reference):
 ```bash
 # From project root
 cd /path/to/neurondb
@@ -329,7 +345,7 @@ Comprehensive testing of the docker.sh script:
 
 - **Script Version**: 1.0.0
 - **Docker Compose**: v2 format (compatible with v1 and v2)
-- **Last Updated**: 2025-12-30
+- **Last Updated**: 2025-12-31
 
 ## Support
 
