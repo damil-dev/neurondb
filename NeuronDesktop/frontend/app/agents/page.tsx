@@ -229,16 +229,25 @@ export default function AgentsPage() {
             )}
           </div>
           {selectedProfile && (
-            <button
-              onClick={() => {
-                resetForm()
-                setShowCreateModal(true)
-              }}
-              className="btn btn-primary flex items-center gap-2"
-            >
-              <PlusIcon className="w-5 h-5" />
-              Create Agent
-            </button>
+            <div className="flex gap-3">
+              <a
+                href="/agents/create"
+                className="btn btn-primary flex items-center gap-2"
+              >
+                <PlusIcon className="w-5 h-5" />
+                Create Agent (Wizard)
+              </a>
+              <button
+                onClick={() => {
+                  resetForm()
+                  setShowCreateModal(true)
+                }}
+                className="btn btn-secondary flex items-center gap-2"
+              >
+                <PlusIcon className="w-5 h-5" />
+                Quick Create
+              </button>
+            </div>
           )}
         </div>
       </div>
