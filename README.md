@@ -75,10 +75,10 @@ Prefer a step-by-step guide? See [`QUICKSTART.md`](QUICKSTART.md)
 
 | Component | Path | What it is |
 |---|---|---|
-| NeuronDB | `NeuronDB/` | PostgreSQL extension (vector + ML, optional GPU backends) |
-| NeuronAgent | `NeuronAgent/` | Agent runtime + REST/WebSocket API (Go) |
-| NeuronMCP | `NeuronMCP/` | MCP server for MCP-compatible clients (Go) |
-| NeuronDesktop | `NeuronDesktop/` | Web UI + API for the ecosystem |
+| NeuronDB | `NeuronDB/` | PostgreSQL extension with vector search, 52+ ML algorithms, GPU acceleration (CUDA/ROCm/Metal), embeddings, RAG pipeline, hybrid search, and background workers |
+| NeuronAgent | `NeuronAgent/` | Agent runtime + REST/WebSocket API (Go) with multi-agent collaboration, workflow engine, HITL, 20+ tools, hierarchical memory, budget management, and evaluation framework |
+| NeuronMCP | `NeuronMCP/` | MCP server for MCP-compatible clients (Go) with 100+ tools and resources |
+| NeuronDesktop | `NeuronDesktop/` | Web UI + API for the ecosystem providing unified interface |
 
 ## Documentation
 
