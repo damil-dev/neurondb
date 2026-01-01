@@ -117,8 +117,10 @@ def list_sql_files(category: str, module: Optional[str] = None) -> List[str]:
 				all_files.append(rel_path)
 	
 	# Sort files numerically by their prefix (001, 002, 003, etc.)
-	# All basic test files are now in the basic/ directory with sequential numbering
-	def sort_key(filepath: str) -> Tuple[int, str]:
+	# First sort by directory path, then by numeric prefix within each directory
+	def sort_key(filepath: str) -> Tuple[str, int, str]:
+		# Split into directory and filename
+		dir_part = os.path.dirname(filepath)
 		basename = os.path.basename(filepath)
 		# Extract numeric prefix
 		match = re.match(r'^(\d{3})_', basename)
@@ -126,21 +128,20 @@ def list_sql_files(category: str, module: Optional[str] = None) -> List[str]:
 			num = int(match.group(1))
 		else:
 			num = 999999  # Files without numeric prefix go to end
-		# Return (number, full_path) for sorting - files are now in flat structure
-		return (num, filepath)
+		# Return (directory, number, full_path) for sorting
+		return (dir_part, num, filepath)
 	
 	all_files.sort(key=sort_key)
 
 	# Filter by category
 	if category == "basic":
-		# Include files from basic/ directory (all basic tests are now in basic/ with sequential numbering)
-		# Exclude files with _advance/_negative/_perf suffixes
+		# Include files from basic/ subdirectory and its subdirectories (ml/, vector/, rag/, core/, gpu/, other/)
+		# or files without _advance/_negative in the root sql/ directory
 		result = []
 		for f in all_files:
-			# Check if file is in basic/ directory (not in subdirectories)
-			dir_part = os.path.dirname(f)
-			basename = os.path.basename(f)
-			if dir_part == "basic" and "_advance.sql" not in basename and "_negative.sql" not in basename and "_perf.sql" not in basename:
+			if "/basic/" in f or (f.startswith("basic/") or os.path.dirname(f) == "basic"):
+				result.append(os.path.join(TESTS_SQL_DIR, f))
+			elif "/" not in f and "_advance.sql" not in f and "_negative.sql" not in f and "_perf.sql" not in f:
 				result.append(os.path.join(TESTS_SQL_DIR, f))
 		files = result
 	elif category == "advance":
@@ -2294,28 +2295,28 @@ def parse_args() -> argparse.Namespace:
 		help=f"Which test category to run (default: basic).",
 	)
 	parser.add_argument(
-		"--db",
+		"-d", "--db",
 		default=DEFAULT_DB,
 		help=f"Database name (default: {DEFAULT_DB}).",
 	)
 	parser.add_argument(
-		"--host",
+		"-H", "--host",
 		default=DEFAULT_HOST,
 		help=f"PostgreSQL host (default: {DEFAULT_HOST}).",
 	)
 	parser.add_argument(
-		"--port",
+		"-p", "--port",
 		type=int,
-		default=None,  # Will be set based on local/docker mode
-		help=f"PostgreSQL port (default: 5432 for local, 5433 for Docker).",
+		default=DEFAULT_PORT,
+		help=f"PostgreSQL port (default: {DEFAULT_PORT}).",
 	)
 	parser.add_argument(
-		"--user",
+		"-U", "--user",
 		default=None,
 		help="PostgreSQL user (default: system user).",
 	)
 	parser.add_argument(
-		"--password",
+		"-P", "--password",
 		default=None,
 		help="PostgreSQL password (if required). Will set PGPASSWORD environment variable.",
 	)
@@ -2379,58 +2380,7 @@ def parse_args() -> argparse.Namespace:
 		default=None,
 		help="Module to run tests for (default: all). Examples: ml, vector, embedding, rag, hybrid, reranking, index, quantization, core, worker, storage, scan, util, planner, tenant, types, metrics, gpu, onnx, crash, multimodal, llm. By default, all modules are tested.",
 	)
-	# Use mutually exclusive group for local/docker
-	# Default is local (use_docker=False), --docker flag sets use_docker=True
-	deployment_group = parser.add_mutually_exclusive_group()
-	deployment_group.add_argument(
-		"--local",
-		action="store_true",
-		help="Use local PostgreSQL (default). All tests pass with latest source code.",
-	)
-	deployment_group.add_argument(
-		"--docker",
-		action="store_true",
-		help="Use Docker PostgreSQL. Builds package from latest source code and Docker image. PostgreSQL and NeuronDB must run in Docker.",
-	)
-	parser.add_argument(
-		"--skip-build",
-		action="store_true",
-		help="Skip building package and Docker image (use existing image). Only valid with --docker.",
-	)
-	parser.add_argument(
-		"--buildpkg",
-		action="store_true",
-		default=False,
-		help="Build package from source (default: False, uses existing package if available). Only valid with --docker.",
-	)
-	args = parser.parse_args()
-	# Set use_docker based on flags (default to local if neither specified)
-	# If --docker is specified, use docker; otherwise use local
-	args.use_docker = args.docker
-	
-	# Validate --skip-build and --buildpkg are only used with --docker
-	if getattr(args, 'skip_build', False) and not args.docker:
-		parser.error("--skip-build can only be used with --docker")
-	if getattr(args, 'buildpkg', False) and not args.docker:
-		parser.error("--buildpkg can only be used with --docker")
-	
-	# Set default port based on mode if not specified
-	if args.port is None:
-		if args.docker:
-			args.port = 5433  # Default Docker port
-		else:
-			args.port = DEFAULT_PORT  # Default local port (5432)
-	
-	# Set default credentials for Docker if not specified
-	if args.docker:
-		if args.user is None:
-			args.user = "neurondb"
-		if args.password is None:
-			args.password = "neurondb"
-		if args.db == DEFAULT_DB:
-			args.db = "neurondb"  # Ensure database name is set
-	
-	return args
+	return parser.parse_args()
 
 
 
@@ -2494,318 +2444,6 @@ def write_artifacts(name: str, ok: bool, out_dir: str, err_dir: str,
 		print(f"Warning: Failed to write artifacts for {name}: {e}", file=sys.stderr)
 
 
-def build_package_from_source(repo_root: str, package_version: str = "1.0.0.beta", verbose: bool = False) -> Tuple[bool, str]:
-	"""
-	Build DEB package from latest source code using existing build system.
-	Uses packaging/deb/neurondb/build.sh which handles the full build process.
-	The build system automatically places packages in repo/deb/pool/main/n/neurondb/
-	
-	Returns:
-		Tuple[bool, str]: (success, message)
-	"""
-	try:
-		build_script = os.path.join(repo_root, "packaging", "deb", "neurondb", "build.sh")
-		if not os.path.exists(build_script):
-			return False, f"Package build script not found: {build_script}"
-		
-		if not os.access(build_script, os.X_OK):
-			os.chmod(build_script, 0o755)
-		
-		# Use existing build system - set VERSION environment variable
-		# The build script will detect source location and build accordingly
-		env = os.environ.copy()
-		env["VERSION"] = package_version
-		
-		# Run from the build script directory (as expected by the build system)
-		build_dir = os.path.dirname(build_script)
-		cmd = ["./build.sh"]
-		
-		if verbose:
-			print(f"Building package using existing build system: {build_script}")
-			print(f"Working directory: {build_dir}")
-			print(f"Version: {package_version}")
-			print(f"Package will be placed in repo/deb/pool/main/n/neurondb/")
-		
-		proc = subprocess.Popen(
-			cmd,
-			cwd=build_dir,
-			stdout=subprocess.PIPE,
-			stderr=subprocess.STDOUT if verbose else subprocess.PIPE,
-			text=True,
-			env=env
-		)
-		
-		# Stream output for verbose mode
-		if verbose:
-			for line in proc.stdout:
-				print(line, end='')
-			proc.wait()
-			stdout = ""
-			stderr = ""
-		else:
-			stdout, stderr = proc.communicate()
-		
-		if proc.returncode != 0:
-			error_msg = (stderr or stdout or "Unknown error")[:500]
-			return False, f"Package build failed: {error_msg}"
-		
-		# Check if package was created (build script creates it in its own directory)
-		package_file = os.path.join(build_dir, f"neurondb_{package_version}_amd64.deb")
-		repo_package_file = os.path.join(repo_root, "repo", "deb", "pool", "main", "n", "neurondb", f"neurondb_{package_version}_amd64.deb")
-		
-		# Check both locations: build directory and repo folder
-		if os.path.exists(package_file):
-			return True, f"Package built successfully: {package_file}"
-		elif os.path.exists(repo_package_file):
-			return True, f"Package built and placed in repo: {repo_package_file}"
-		else:
-			# Also check for any .deb file in case version format differs
-			import glob
-			deb_files = glob.glob(os.path.join(build_dir, "neurondb_*.deb"))
-			if deb_files:
-				return True, f"Package built successfully: {deb_files[0]}"
-			# Check repo folder too
-			repo_deb_files = glob.glob(os.path.join(repo_root, "repo", "deb", "pool", "main", "n", "neurondb", "neurondb_*.deb"))
-			if repo_deb_files:
-				return True, f"Package found in repo: {repo_deb_files[0]}"
-			return False, f"Package file not found after build. Checked: {package_file} and {repo_package_file}"
-			
-	except Exception as e:
-		return False, f"Exception building package: {str(e)}"
-
-
-def check_docker_permissions() -> Tuple[bool, bool]:
-	"""
-	Check if Docker commands can run without sudo.
-	
-	Returns:
-		Tuple[bool, bool]: (can_access_docker, needs_sudo)
-	"""
-	try:
-		# Try to run docker ps without sudo
-		proc = subprocess.Popen(
-			["docker", "ps"],
-			stdout=subprocess.PIPE,
-			stderr=subprocess.PIPE,
-			text=True
-		)
-		proc.communicate()
-		if proc.returncode == 0:
-			return True, False  # Can access, no sudo needed
-		else:
-			# Check if it's a permission error
-			return False, True  # Needs sudo
-	except FileNotFoundError:
-		return False, False  # Docker not installed
-	except Exception:
-		return False, True  # Assume needs sudo
-
-
-def build_docker_image_from_package(
-	repo_root: str,
-	dockerfile_path: str,
-	image_name: str,
-	package_version: str = "1.0.0.beta",
-	pg_major: int = 17,
-	verbose: bool = False
-) -> Tuple[bool, str]:
-	"""
-	Build Docker image from package.
-	
-	Returns:
-		Tuple[bool, str]: (success, message)
-	"""
-	try:
-		if not os.path.exists(dockerfile_path):
-			return False, f"Dockerfile not found: {dockerfile_path}"
-		
-		# Check if sudo is needed
-		can_access, needs_sudo = check_docker_permissions()
-		if not can_access and not needs_sudo:
-			return False, "Docker is not installed or not accessible"
-		
-		# Build Docker image
-		if needs_sudo:
-			cmd = ["sudo", "docker", "build",
-				"-f", dockerfile_path,
-				"--build-arg", f"PG_MAJOR={pg_major}",
-				"--build-arg", f"PACKAGE_VERSION={package_version}",
-				"-t", image_name,
-				"."]
-		else:
-			cmd = ["docker", "build",
-				"-f", dockerfile_path,
-				"--build-arg", f"PG_MAJOR={pg_major}",
-				"--build-arg", f"PACKAGE_VERSION={package_version}",
-				"-t", image_name,
-				"."]
-		
-		if verbose:
-			print(f"Building Docker image: {' '.join(cmd)}")
-		
-		proc = subprocess.Popen(
-			cmd,
-			cwd=repo_root,
-			stdout=subprocess.PIPE,
-			stderr=subprocess.STDOUT,
-			text=True
-		)
-		
-		# Stream output for verbose mode
-		if verbose:
-			for line in proc.stdout:
-				print(line, end='')
-			proc.wait()
-			stdout = ""
-		else:
-			stdout, _ = proc.communicate()
-		
-		if proc.returncode != 0:
-			error_msg = stdout[-500:] if stdout else "Unknown error"
-			return False, f"Docker build failed: {error_msg}"
-		
-		return True, f"Docker image built successfully: {image_name}"
-		
-	except Exception as e:
-		return False, f"Exception building Docker image: {str(e)}"
-
-
-def ensure_docker_container_running(
-	container_name: str,
-	image_name: str,
-	port: int = 5433,
-	verbose: bool = False
-) -> Tuple[bool, str]:
-	"""
-	Ensure Docker container is running. Stop and remove existing container if it exists with different image,
-	then create and start a new one with the specified image.
-	
-	Returns:
-		Tuple[bool, str]: (success, message)
-	"""
-	try:
-		# Check if sudo is needed
-		can_access, needs_sudo = check_docker_permissions()
-		if not can_access and not needs_sudo:
-			return False, "Docker is not installed or not accessible"
-		
-		docker_base = ["sudo", "docker"] if needs_sudo else ["docker"]
-		
-		# Check if container exists
-		proc = subprocess.Popen(
-			docker_base + ["ps", "-a", "--filter", f"name={container_name}", "--format", "{{.Names}}"],
-			stdout=subprocess.PIPE,
-			stderr=subprocess.PIPE,
-			text=True
-		)
-		stdout, stderr = proc.communicate()
-		container_exists = container_name in stdout
-		
-		if container_exists:
-			# Check what image the container is using
-			proc = subprocess.Popen(
-				docker_base + ["inspect", "--format", "{{.Config.Image}}", container_name],
-				stdout=subprocess.PIPE,
-				stderr=subprocess.PIPE,
-				text=True
-			)
-			stdout, stderr = proc.communicate()
-			current_image = stdout.strip() if proc.returncode == 0 else ""
-			
-			# Check if container is running
-			proc = subprocess.Popen(
-				docker_base + ["ps", "--filter", f"name={container_name}", "--format", "{{.Names}}"],
-				stdout=subprocess.PIPE,
-				stderr=subprocess.PIPE,
-				text=True
-			)
-			stdout, stderr = proc.communicate()
-			is_running = container_name in stdout
-			
-			# If image doesn't match or container is not running, stop and remove it
-			if current_image != image_name or not is_running:
-				if is_running:
-					if verbose:
-						print(f"Stopping existing container: {container_name}")
-					proc = subprocess.Popen(
-						docker_base + ["stop", container_name],
-						stdout=subprocess.PIPE,
-						stderr=subprocess.PIPE,
-						text=True
-					)
-					proc.communicate()
-				
-				if verbose:
-					print(f"Removing existing container: {container_name}")
-				proc = subprocess.Popen(
-					docker_base + ["rm", container_name],
-					stdout=subprocess.PIPE,
-					stderr=subprocess.PIPE,
-					text=True
-				)
-				proc.communicate()
-				container_exists = False
-			else:
-				# Container exists, is running, and has correct image
-				return True, f"Container {container_name} is already running with correct image"
-		
-		if not container_exists:
-			# Create and start new container
-			if verbose:
-				print(f"Creating new container: {container_name}")
-			cmd = docker_base + [
-				"run", "-d",
-				"--name", container_name,
-				"-p", f"{port}:5432",
-				"-e", "POSTGRES_USER=neurondb",
-				"-e", "POSTGRES_PASSWORD=neurondb",
-				"-e", "POSTGRES_DB=neurondb",
-				"-e", "POSTGRES_HOST_AUTH_METHOD=md5",
-				image_name
-			]
-			proc = subprocess.Popen(
-				cmd,
-				stdout=subprocess.PIPE,
-				stderr=subprocess.PIPE,
-				text=True
-			)
-			stdout, stderr = proc.communicate()
-			if proc.returncode != 0:
-				return False, f"Failed to create container: {stderr}"
-			# Wait for container to be ready
-			time.sleep(5)
-			return True, f"Container {container_name} created and started"
-			
-	except Exception as e:
-		return False, f"Exception managing container: {str(e)}"
-
-
-def restart_docker_container(container_name: str, verbose: bool = False) -> Tuple[bool, str]:
-	"""
-	Restart a Docker container.
-	Returns (success, message).
-	"""
-	try:
-		needs_sudo, _ = check_docker_permissions()
-		docker_base = ["sudo", "docker"] if needs_sudo else ["docker"]
-		
-		# Restart the container
-		proc = subprocess.Popen(
-			docker_base + ["restart", container_name],
-			stdout=subprocess.PIPE,
-			stderr=subprocess.PIPE,
-			text=True
-		)
-		stdout, stderr = proc.communicate()
-		
-		if proc.returncode == 0:
-			return True, f"Container {container_name} restarted successfully"
-		else:
-			return False, f"Failed to restart container: {stderr.strip()}"
-	except Exception as e:
-		return False, f"Exception restarting container: {str(e)}"
-
-
 def main() -> int:
 	global _shutdown_requested
 	
@@ -2825,10 +2463,6 @@ def main() -> int:
 	if args.password:
 		os.environ["PGPASSWORD"] = args.password
 	
-	# Handle local/docker flags (default is local, docker overrides if specified)
-	use_docker = getattr(args, 'use_docker', False)  # Default to False (local)
-	use_local = not use_docker
-	
 	# Set host, port, and user in environment if provided
 	if args.host:
 		os.environ["PGHOST"] = args.host
@@ -2836,144 +2470,6 @@ def main() -> int:
 		os.environ["PGPORT"] = str(args.port)
 	if args.user:
 		os.environ["PGUSER"] = args.user
-	
-	# Print mode information
-	if use_local:
-		print(f"\n{RESET}Using local PostgreSQL (latest source code - all tests pass)")
-	else:
-		print(f"\n{RESET}Using Docker PostgreSQL (PostgreSQL and NeuronDB must run in Docker)")
-		
-		# Build package from source and Docker image (unless --skip-build)
-		repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-		dockerfile_path = os.path.join(repo_root, "NeuronDB", "docker", "Dockerfile.package")
-		package_version = "1.0.0.beta"
-		pg_major = 17
-		image_name = f"neurondb:cpu-package-pg{pg_major}"
-		container_name = "neurondb-cpu"
-		# Store container name in args for later use
-		setattr(args, 'container_name', container_name)
-		
-		should_build_pkg = getattr(args, 'buildpkg', False)
-		should_skip_build = getattr(args, 'skip_build', False)
-		
-		if should_skip_build:
-			print(f"\n{BOLD}Skipping build (using existing Docker image)...{RESET}")
-		elif should_build_pkg:
-			# Build package from source, then Docker image, then ensure container runs
-			print(f"\n{BOLD}Building package from latest source code...{RESET}")
-			build_start = time.perf_counter()
-			build_ok, build_msg = build_package_from_source(repo_root, package_version, args.verbose)
-			build_elapsed = time.perf_counter() - build_start
-			if build_ok:
-				print(format_status_line(True, datetime.now(), f"Package built from source", build_elapsed))
-			else:
-				print(format_status_line(False, datetime.now(), f"Package build failed: {build_msg}", build_elapsed))
-				print(f"ERROR: {build_msg}", file=sys.stderr)
-				return 1
-			
-			print(f"\n{BOLD}Building Docker image from package...{RESET}")
-			docker_start = time.perf_counter()
-			docker_ok, docker_msg = build_docker_image_from_package(
-				repo_root, dockerfile_path, image_name, package_version, pg_major, args.verbose
-			)
-			docker_elapsed = time.perf_counter() - docker_start
-			if docker_ok:
-				print(format_status_line(True, datetime.now(), f"Docker image built", docker_elapsed))
-			else:
-				print(format_status_line(False, datetime.now(), f"Docker build failed: {docker_msg}", docker_elapsed))
-				print(f"ERROR: {docker_msg}", file=sys.stderr)
-				return 1
-			
-			# Ensure container is running after build
-			print(f"\n{BOLD}Ensuring Docker container is running...{RESET}")
-			container_start = time.perf_counter()
-			container_ok, container_msg = ensure_docker_container_running(
-				container_name, image_name, args.port, args.verbose
-			)
-			container_elapsed = time.perf_counter() - container_start
-			if container_ok:
-				print(format_status_line(True, datetime.now(), f"Container ready", container_elapsed))
-			else:
-				print(format_status_line(False, datetime.now(), f"Container setup failed: {container_msg}", container_elapsed))
-				print(f"ERROR: {container_msg}", file=sys.stderr)
-				return 1
-			
-			# Wait for PostgreSQL to be fully ready
-			print("Waiting for PostgreSQL to be ready...")
-			time.sleep(5)
-		else:
-			# Default: Check for existing package, use it if found
-			print(f"\n{BOLD}Checking for existing package...{RESET}")
-			import glob
-			repo_package_dir = os.path.join(repo_root, "repo", "deb", "pool", "main", "n", "neurondb")
-			build_package_dir = os.path.join(repo_root, "packaging", "deb", "neurondb")
-			
-			# Check repo folder first, then build directory
-			existing_packages = glob.glob(os.path.join(repo_package_dir, f"neurondb_{package_version}_amd64.deb"))
-			if not existing_packages:
-				existing_packages = glob.glob(os.path.join(repo_package_dir, "neurondb_*.deb"))
-			if not existing_packages:
-				existing_packages = glob.glob(os.path.join(build_package_dir, f"neurondb_{package_version}_amd64.deb"))
-			if not existing_packages:
-				existing_packages = glob.glob(os.path.join(build_package_dir, "neurondb_*.deb"))
-			
-			if existing_packages:
-				print(format_status_line(True, datetime.now(), f"Using existing package: {existing_packages[0]}", 0.0))
-				print(f"\n{BOLD}Building Docker image from existing package...{RESET}")
-				docker_start = time.perf_counter()
-				docker_ok, docker_msg = build_docker_image_from_package(
-					repo_root, dockerfile_path, image_name, package_version, pg_major, args.verbose
-				)
-				docker_elapsed = time.perf_counter() - docker_start
-				if docker_ok:
-					print(format_status_line(True, datetime.now(), f"Docker image built", docker_elapsed))
-				else:
-					print(format_status_line(False, datetime.now(), f"Docker build failed: {docker_msg}", docker_elapsed))
-					print(f"ERROR: {docker_msg}", file=sys.stderr)
-					return 1
-			else:
-				# No existing package found, build from source
-				print(format_status_line(False, datetime.now(), f"No existing package found, building from source...", 0.0))
-				build_start = time.perf_counter()
-				build_ok, build_msg = build_package_from_source(repo_root, package_version, args.verbose)
-				build_elapsed = time.perf_counter() - build_start
-				if build_ok:
-					print(format_status_line(True, datetime.now(), f"Package built from source", build_elapsed))
-				else:
-					print(format_status_line(False, datetime.now(), f"Package build failed: {build_msg}", build_elapsed))
-					print(f"ERROR: {build_msg}", file=sys.stderr)
-					return 1
-				
-				print(f"\n{BOLD}Building Docker image from package...{RESET}")
-				docker_start = time.perf_counter()
-				docker_ok, docker_msg = build_docker_image_from_package(
-					repo_root, dockerfile_path, image_name, package_version, pg_major, args.verbose
-				)
-				docker_elapsed = time.perf_counter() - docker_start
-				if docker_ok:
-					print(format_status_line(True, datetime.now(), f"Docker image built", docker_elapsed))
-				else:
-					print(format_status_line(False, datetime.now(), f"Docker build failed: {docker_msg}", docker_elapsed))
-					print(f"ERROR: {docker_msg}", file=sys.stderr)
-					return 1
-			
-			# Ensure container is running after build
-			print(f"\n{BOLD}Ensuring Docker container is running...{RESET}")
-			container_start = time.perf_counter()
-			container_ok, container_msg = ensure_docker_container_running(
-				container_name, image_name, args.port, args.verbose
-			)
-			container_elapsed = time.perf_counter() - container_start
-			if container_ok:
-				print(format_status_line(True, datetime.now(), f"Container ready", container_elapsed))
-			else:
-				print(format_status_line(False, datetime.now(), f"Container setup failed: {container_msg}", container_elapsed))
-				print(f"ERROR: {container_msg}", file=sys.stderr)
-				return 1
-			
-			# Wait for PostgreSQL to be fully ready
-			print("Waiting for PostgreSQL to be ready...")
-			time.sleep(5)
 	
 	# Print header information
 	print_header_info(SCRIPT_NAME, SCRIPT_VERSION, args.db, args.psql, args.host, args.port, args.compute)
@@ -3062,28 +2558,12 @@ def main() -> int:
 	restart_msg = ""
 	if not current_mode_ok:
 		# Only restart if mode is not already correct
-		# For Docker, we can't restart automatically - user must restart container manually
+		restart_ok, restart_msg = restart_postgresql(args.db, args.psql, args.host, args.port, args.verbose)
 		restart_elapsed = time.perf_counter() - restart_start
-		if use_docker:
-			# Automatically restart Docker container
-			container_name = getattr(args, 'container_name', 'neurondb-cpu')
-			restart_ok, restart_msg = restart_docker_container(container_name, args.verbose)
-			if restart_ok:
-				print(format_status_line(True, when, f"Restarting Docker container to apply GUC changes...", restart_elapsed))
-			else:
-				print(format_status_line(False, when, f"Restarting Docker container to apply GUC changes...", restart_elapsed))
-				print(f"WARNING: {restart_msg}", file=sys.stderr)
-		else:
-			restart_ok, restart_msg = restart_postgresql(args.db, args.psql, args.host, args.port, args.verbose)
-		
 		if restart_ok:
-			if use_docker:
-				print(format_status_line(True, when, f"Restarting Docker container to apply GUC changes...", restart_elapsed))
-			else:
-				print(format_status_line(True, when, f"Restarting PostgreSQL to apply GUC changes...", restart_elapsed))
-			# Wait a bit for PostgreSQL to be fully ready (longer for Docker)
-			wait_time = 5 if use_docker else 2
-			time.sleep(wait_time)
+			print(format_status_line(True, when, f"Restarting PostgreSQL to apply GUC changes...", restart_elapsed))
+			# Wait a bit for PostgreSQL to be fully ready
+			time.sleep(2)
 			# Verify connection after restart
 			conn_ok, _, _ = check_postgresql_connection(args.db, args.psql, args.host, args.port)
 			if not conn_ok:
@@ -3093,38 +2573,8 @@ def main() -> int:
 				if not conn_ok:
 					print(f"Failed to connect to PostgreSQL after restart. Aborting.", file=sys.stderr)
 					return 1
-			
-			# For Docker: Ensure NeuronDB extension is created after restart
-			# (NeuronDB provides the vector type, so no separate pgvector extension needed)
-			if use_docker:
-				ext_check_sql = "SELECT EXISTS(SELECT 1 FROM pg_extension WHERE extname = 'neurondb');"
-				ext_check_ok, ext_check_out, ext_check_err = run_psql_command(args.db, ext_check_sql, args.psql, args.verbose)
-				if ext_check_ok and ext_check_out and 't' not in ext_check_out.lower():
-					# Extension doesn't exist, create it
-					create_ext_sql = "CREATE EXTENSION IF NOT EXISTS neurondb;"
-					create_ext_ok, create_ext_out, create_ext_err = run_psql_command(args.db, create_ext_sql, args.psql, args.verbose)
-					if create_ext_ok:
-						if args.verbose:
-							print(f"Created NeuronDB extension after container restart", file=sys.stderr)
-					else:
-						print(f"Warning: Failed to create NeuronDB extension after restart: {create_ext_err}", file=sys.stderr)
-			
-			# For Docker: Ensure NeuronDB extension is created after restart
-			# (NeuronDB provides the vector type, so no separate pgvector extension needed)
-			if use_docker:
-				ext_check_sql = "SELECT EXISTS(SELECT 1 FROM pg_extension WHERE extname = 'neurondb');"
-				ext_check_ok, ext_check_out, ext_check_err = run_psql_command(args.db, ext_check_sql, args.psql, args.verbose)
-				if ext_check_ok and ext_check_out and 't' not in ext_check_out.lower():
-					# Extension doesn't exist, create it
-					create_ext_sql = "CREATE EXTENSION IF NOT EXISTS neurondb;"
-					create_ext_ok, create_ext_out, create_ext_err = run_psql_command(args.db, create_ext_sql, args.psql, args.verbose)
-					if create_ext_ok:
-						if args.verbose:
-							print(f"Created NeuronDB extension after container restart", file=sys.stderr)
-					else:
-						print(f"Warning: Failed to create NeuronDB extension after restart: {create_ext_err}", file=sys.stderr)
-		elif not use_docker:
-			# Restart failed (only for local PostgreSQL) - check if connection still works and mode is correct
+		else:
+			# Restart failed - check if connection still works and mode is correct
 			print(format_status_line(False, when, f"Restarting PostgreSQL to apply GUC changes...", restart_elapsed))
 			time.sleep(2)
 			conn_ok, _, _ = check_postgresql_connection(args.db, args.psql, args.host, args.port)
@@ -3155,27 +2605,6 @@ def main() -> int:
 				print(f"ERROR: Failed to restart PostgreSQL automatically: {restart_msg}", file=sys.stderr)
 				print(f"ALTER SYSTEM changes require a restart. Please restart PostgreSQL manually and re-run tests.", file=sys.stderr)
 				return 1
-		else:
-			# Docker mode - restart failed, but we already warned the user
-			# Check if mode is already correct (maybe it was set before)
-			time.sleep(2)
-			conn_ok, _, _ = check_postgresql_connection(args.db, args.psql, args.host, args.port)
-			if conn_ok:
-				try:
-					cmd_check = [args.psql, "-d", args.db, "-t", "-A", "-c", "SELECT current_setting('neurondb.compute_mode');"]
-					proc = subprocess.Popen(cmd_check, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
-					out_check, err_check = proc.communicate()
-					if proc.returncode == 0 and out_check.strip():
-						current_mode = out_check.strip()
-						if current_mode == str(mode_enum):
-							print(f"Note: compute_mode is already correct ({mode_enum}). Continuing without restart...", file=sys.stderr)
-							restart_ok = True  # Treat as success
-						else:
-							print(f"ERROR: compute_mode needs to be {mode_enum} but is {current_mode}.", file=sys.stderr)
-							print(f"Please restart Docker container manually: docker restart <container-name>", file=sys.stderr)
-							return 1
-				except Exception:
-					pass
 	else:
 		# Mode already correct, skip restart
 		restart_elapsed = time.perf_counter() - restart_start
@@ -3403,15 +2832,9 @@ def main() -> int:
 			critical_crash = True
 			critical_crashes += 1
 			print(f"\n    {RED_BOLD}!! PostgreSQL CRASHED during/after this test!{RESET}")
+			print(f"    {RED_BOLD}Attempting to restart PostgreSQL...{RESET}")
 			
-			if use_docker:
-				print(f"    {RED_BOLD}Docker PostgreSQL crashed. Please restart container manually:{RESET}")
-				print(f"    {RED_BOLD}docker restart <container-name>{RESET}")
-				restart_ok = False
-				restart_msg = "Docker container must be restarted manually"
-			else:
-				print(f"    {RED_BOLD}Attempting to restart PostgreSQL...{RESET}")
-				restart_ok, restart_msg = restart_postgresql(args.db, args.psql, args.host, args.port, args.verbose)
+			restart_ok, restart_msg = restart_postgresql(args.db, args.psql, args.host, args.port, args.verbose)
 			if restart_ok:
 				# Wait a bit more and verify connection is stable
 				time.sleep(2)
