@@ -107,7 +107,7 @@ graph TB
 | Component | Quick Links | Description |
 |-----------|-------------|-------------|
 | **NeuronDB** | [README](NeuronDB/README.md) · [INSTALL](NeuronDB/INSTALL.md) · [Docs](NeuronDB/docs/) | PostgreSQL extension with vector search, 52+ ML algorithms, GPU acceleration |
-| **NeuronAgent** | [README](NeuronAgent/README.md) · [API](NeuronAgent/docs/API.md) · [Architecture](NeuronAgent/docs/ARCHITECTURE.md) | REST/WebSocket agent runtime with autonomous agents |
+| **NeuronAgent** | [README](NeuronAgent/README.md) · [API](NeuronAgent/docs/API.md) · [Architecture](NeuronAgent/docs/ARCHITECTURE.md) | REST/WebSocket agent runtime with multi-agent collaboration, workflow engine, HITL, 20+ tools, hierarchical memory, budget management, and evaluation framework |
 | **NeuronMCP** | [README](NeuronMCP/README.md) · [Tools](NeuronMCP/TOOLS_REFERENCE.md) · [Setup](NeuronMCP/docs/NEURONDB_MCP_SETUP.md) | MCP protocol server with 100+ tools |
 | **NeuronDesktop** | [README](NeuronDesktop/README.md) · [API](NeuronDesktop/docs/API.md) · [Deployment](NeuronDesktop/docs/DEPLOYMENT.md) | Unified web interface dashboard |
 
