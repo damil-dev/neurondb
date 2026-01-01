@@ -8,10 +8,24 @@
 
 \set ON_ERROR_STOP on
 
+-- Ensure neurondb types/operators (including vector) are available
+CREATE EXTENSION IF NOT EXISTS neurondb;
+
 -- Create test_train table and view
 DROP TABLE IF EXISTS test_train CASCADE;
 CREATE TABLE test_train (features vector(28), label integer);
-INSERT INTO test_train (features, label) SELECT array_to_vector(ARRAY(SELECT random()::real FROM generate_series(1, 28)))::vector(28), (random() * 2)::integer FROM generate_series(1, 1000);
+/*
+ * IMPORTANT: Use LATERAL so the random vector is generated per-row.
+ * Without LATERAL, the uncorrelated subquery becomes an initplan and runs once,
+ * producing identical vectors for all rows (making all <-> distances 0).
+ */
+INSERT INTO test_train (features, label)
+SELECT array_to_vector(v.a)::vector(28),
+	   (random() * 2)::integer
+FROM generate_series(1, 1000) g
+	CROSS JOIN LATERAL (
+		SELECT ARRAY(SELECT random()::real FROM generate_series(1, 28)) AS a
+	) v;
 CREATE OR REPLACE VIEW test_train_view AS SELECT features, label FROM test_train;
 SET client_min_messages TO WARNING;
 
@@ -190,35 +204,51 @@ END $$;
 \echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
 
 \echo 'Test 7: KNN query using HNSW index'
+-- Use a fixed query vector to ensure meaningful distances
+WITH query_vec AS (
+	SELECT array_to_vector(ARRAY[0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0,0.9,0.8,0.7,0.6,0.5,0.4,0.3,0.2,0.1,0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8]::real[])::vector(28) AS v
+)
 SELECT 
-	id,
-	embedding <-> (SELECT embedding FROM index_test_table LIMIT 1) AS distance
-FROM index_test_table
-ORDER BY embedding <-> (SELECT embedding FROM index_test_table LIMIT 1)
+	t.id,
+	(t.embedding <-> q.v)::numeric(18,12) AS distance
+FROM index_test_table t, query_vec q
+ORDER BY t.embedding <-> q.v
 LIMIT 10;
 
 \echo 'Test 8: KNN query using IVF index'
+-- Use a fixed query vector to ensure meaningful distances
+WITH query_vec AS (
+	SELECT array_to_vector(ARRAY[0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0,0.9,0.8,0.7,0.6,0.5,0.4,0.3,0.2,0.1,0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8]::real[])::vector(28) AS v
+)
 SELECT 
-	id,
-	embedding <-> (SELECT embedding FROM index_test_table LIMIT 1) AS distance
-FROM index_test_table
-ORDER BY embedding <-> (SELECT embedding FROM index_test_table LIMIT 1)
+	t.id,
+	(t.embedding <-> q.v)::numeric(18,12) AS distance
+FROM index_test_table t, query_vec q
+ORDER BY t.embedding <-> q.v
 LIMIT 10;
 
 \echo 'Test 9: Cosine distance query'
+-- Use a fixed query vector to ensure meaningful distances
+WITH query_vec AS (
+	SELECT array_to_vector(ARRAY[0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0,0.9,0.8,0.7,0.6,0.5,0.4,0.3,0.2,0.1,0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8]::real[])::vector(28) AS v
+)
 SELECT 
-	id,
-	embedding <=> (SELECT embedding FROM index_test_table LIMIT 1) AS distance
-FROM index_test_table
-ORDER BY embedding <=> (SELECT embedding FROM index_test_table LIMIT 1)
+	t.id,
+	(t.embedding <=> q.v)::numeric(18,12) AS distance
+FROM index_test_table t, query_vec q
+ORDER BY t.embedding <=> q.v
 LIMIT 10;
 
 \echo 'Test 10: Inner product query'
+-- Use a fixed query vector to ensure meaningful distances
+WITH query_vec AS (
+	SELECT array_to_vector(ARRAY[0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0,0.9,0.8,0.7,0.6,0.5,0.4,0.3,0.2,0.1,0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8]::real[])::vector(28) AS v
+)
 SELECT 
-	id,
-	embedding <#> (SELECT embedding FROM index_test_table LIMIT 1) AS distance
-FROM index_test_table
-ORDER BY embedding <#> (SELECT embedding FROM index_test_table LIMIT 1)
+	t.id,
+	(t.embedding <#> q.v)::numeric(18,12) AS distance
+FROM index_test_table t, query_vec q
+ORDER BY t.embedding <#> q.v
 LIMIT 10;
 
 /*-------------------------------------------------------------------
