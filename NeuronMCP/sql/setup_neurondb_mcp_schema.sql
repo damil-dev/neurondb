@@ -12,11 +12,10 @@
  */
 
 -- Ensure required extensions are available
+-- Note: The neurondb extension will create the neurondb schema automatically
+-- Do NOT create the schema manually here, as it must be owned by the extension
 CREATE EXTENSION IF NOT EXISTS neurondb;
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
-
--- Ensure neurondb schema exists
-CREATE SCHEMA IF NOT EXISTS neurondb;
 
 -- ============================================================================
 -- PART 1: LLM MODELS & PROVIDERS (5 tables)
