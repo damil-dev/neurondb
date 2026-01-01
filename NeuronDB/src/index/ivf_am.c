@@ -61,7 +61,6 @@ extern float fp16_to_float(uint16 fp16);
  */
 typedef struct IvfOptions
 {
-	int32		vl_len_;		/* varlena header (do not touch directly!) */
 	int			nlists;			/* Number of clusters */
 	int			nprobe;			/* Number of lists to probe */
 }			IvfOptions;
@@ -401,7 +400,7 @@ ivf_handler(PG_FUNCTION_ARGS)
 	amroutine->amstorage = false;
 	amroutine->amclusterable = false;
 	amroutine->ampredlocks = false;
-	amroutine->amcanparallel = true;
+	amroutine->amcanparallel = false;	/* TODO: Parallel build not yet implemented */
 	amroutine->amcaninclude = false;
 	amroutine->amusemaintenanceworkmem = false;
 	amroutine->amsummarizing = false;
@@ -541,7 +540,7 @@ ivfbuild(Relation heap, Relation index, struct IndexInfo *indexInfo)
 			/* index->rd_options is a bytea created by build_reloptions */
 			/* Validate that it's large enough and properly formatted */
 			Size bytea_size = VARSIZE(index->rd_options);
-			Size expected_size = MAXALIGN(sizeof(IvfOptions));
+			Size expected_size = VARHDRSZ + MAXALIGN(sizeof(IvfOptions));
 			
 			/* Only access if size is reasonable */
 			if (bytea_size >= expected_size)
@@ -921,6 +920,7 @@ ivfinsert(Relation index,
 	BlockNumber meta_blkno = 0;
 	Buffer		meta_buf;
 	IvfMetaPageData *meta = NULL;
+	BlockNumber centroidsBlock = InvalidBlockNumber;  /* Copied from meta page */
 	int			i,
 				min_idx = 0,
 				nlist;
@@ -970,6 +970,9 @@ ivfinsert(Relation index,
 	}
 	LockBuffer(meta_buf, BUFFER_LOCK_SHARE);
 	meta = (IvfMetaPageData *) PageGetContents(BufferGetPage(meta_buf));
+	
+	/* Copy all needed fields from meta page into locals before unlocking */
+	centroidsBlock = meta->centroidsBlock;
 	nlist = meta->nlists;
 
 	if (nlist <= 0)
@@ -981,10 +984,14 @@ ivfinsert(Relation index,
 		return false;
 	}
 
+	UnlockReleaseBuffer(meta_buf);
+	meta_buf = InvalidBuffer;  /* Prevent accidental reuse */
+	meta = NULL;  /* Prevent accidental reuse */
+
 	/*
 	 * Step 2: Find nearest centroid by L2 distance
 	 */
-	if (meta->centroidsBlock != InvalidBlockNumber)
+	if (centroidsBlock != InvalidBlockNumber)
 	{
 		Buffer		centroidsBuf;
 		Page		centroidsPage;
@@ -995,7 +1002,7 @@ ivfinsert(Relation index,
 		float4		accum;
 		int			k;
 
-		centroidsBuf = ReadBuffer(index, meta->centroidsBlock);
+		centroidsBuf = ReadBuffer(index, centroidsBlock);
 		if (!BufferIsValid(centroidsBuf))
 		{
 			ereport(ERROR,
@@ -1008,7 +1015,6 @@ ivfinsert(Relation index,
 		if (PageIsNew(centroidsPage) || PageIsEmpty(centroidsPage))
 		{
 			UnlockReleaseBuffer(centroidsBuf);
-			UnlockReleaseBuffer(meta_buf);
 			ereport(ERROR,
 					(errcode(ERRCODE_DATA_EXCEPTION),
 					 errmsg("IVF index centroids page is empty")));
@@ -1052,14 +1058,11 @@ ivfinsert(Relation index,
 	else
 	{
 		/* No centroids block - cannot assign vector */
-		UnlockReleaseBuffer(meta_buf);
 		ereport(ERROR,
 				(errcode(ERRCODE_DATA_EXCEPTION),
 				 errmsg("IVF index has no centroids block")));
 		return false;
 	}
-
-	UnlockReleaseBuffer(meta_buf);
 
 	/*
 	 * Step 3: Append to selected inverted list
@@ -1078,7 +1081,7 @@ ivfinsert(Relation index,
 		bool		needNewBlock = false;
 
 		/* Get centroid for selected list */
-		centroidsBuf = ReadBuffer(index, meta->centroidsBlock);
+		centroidsBuf = ReadBuffer(index, centroidsBlock);
 		if (!BufferIsValid(centroidsBuf))
 		{
 			ereport(ERROR,
@@ -1530,38 +1533,48 @@ ivfoptions(Datum reloptions, bool validate)
 			deconstruct_array(arr, TEXTOID, -1, false, 'i', &elems, &nulls, &nelems);
 			
 			/* Parse each element to extract parameter name and value */
-			for (int i = 0; i < nelems; i++)
 			{
-				if (!nulls[i] && elems[i] != (Datum) 0)
+				int			i;
+				
+				for (i = 0; i < nelems; i++)
 				{
-					char *elem_str = text_to_cstring(DatumGetTextP(elems[i]));
-					char *eq_pos = strchr(elem_str, '=');
-					
-					if (eq_pos != NULL)
+					if (!nulls[i] && elems[i] != (Datum) 0)
 					{
-						char *param_name;
-						char *param_value_str;
-						int param_value;
+						char *elem_str = text_to_cstring(DatumGetTextP(elems[i]));
+						char *eq_pos = strchr(elem_str, '=');
 						
-						*eq_pos = '\0';
-						param_name = elem_str;
-						param_value_str = eq_pos + 1;
-						param_value = atoi(param_value_str);
-						
-						if (strcmp(param_name, "lists") == 0)
+						if (eq_pos != NULL)
 						{
-							parsed_nlists = param_value;
-							found_nlists = true;
+							char *param_name;
+							char *param_value_str;
+							int param_value;
+							
+							*eq_pos = '\0';
+							param_name = elem_str;
+							param_value_str = eq_pos + 1;
+							param_value = atoi(param_value_str);
+							
+							if (strcmp(param_name, "lists") == 0)
+							{
+								parsed_nlists = param_value;
+								found_nlists = true;
+							}
+							else if (strcmp(param_name, "probes") == 0)
+							{
+								parsed_nprobe = param_value;
+								found_nprobe = true;
+							}
 						}
-						else if (strcmp(param_name, "probes") == 0)
-						{
-							parsed_nprobe = param_value;
-							found_nprobe = true;
-						}
+						pfree(elem_str);
 					}
-					pfree(elem_str);
 				}
 			}
+			
+			/* Free deconstruct_array outputs */
+			if (elems)
+				pfree(elems);
+			if (nulls)
+				pfree(nulls);
 			
 			/* Apply the correctly parsed values */
 			opts = (IvfOptions *) VARDATA(result);
@@ -1667,7 +1680,7 @@ ivfrescan(IndexScanDesc scan,
 	/* Get nprobe from index options or metadata */
 	if (scan->indexRelation->rd_options != NULL)
 	{
-		options = (IvfOptions *) scan->indexRelation->rd_options;
+		options = (IvfOptions *) VARDATA(scan->indexRelation->rd_options);
 		if (options != NULL && options->nprobe > 0)
 			so->nprobe = options->nprobe;
 		else
