@@ -28,10 +28,13 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-neurondb}
       POSTGRES_DB: ${POSTGRES_DB:-neurondb}
       POSTGRES_HOST_AUTH_METHOD: ${POSTGRES_HOST_AUTH_METHOD:-md5}
+      # PostgreSQL 18+ uses version-specific data directory
+      PGDATA: /var/lib/postgresql/data
     ports:
       - "${POSTGRES_PORT:-5433}:5432"
     volumes:
-      - neurondb-data:/var/lib/postgresql/data
+      # For PostgreSQL 18+, mount at /var/lib/postgresql to allow version-specific subdirectories
+      - neurondb-data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-neurondb}"]
       interval: 30s
@@ -75,6 +78,8 @@ services:
       NVIDIA_VISIBLE_DEVICES: ${NVIDIA_VISIBLE_DEVICES:-all}
       NVIDIA_DRIVER_CAPABILITIES: ${NVIDIA_DRIVER_CAPABILITIES:-compute,utility}
       NEURONDB_GPU_ENABLED: ${NEURONDB_GPU_ENABLED:-on}
+      # PostgreSQL 18+ uses version-specific data directory
+      PGDATA: /var/lib/postgresql/data
     ports:
       - "${POSTGRES_CUDA_PORT:-5434}:5432"
     deploy:
@@ -91,7 +96,8 @@ services:
               capabilities: [gpu]
     runtime: nvidia
     volumes:
-      - neurondb-cuda-data:/var/lib/postgresql/data
+      # For PostgreSQL 18+, mount at /var/lib/postgresql to allow version-specific subdirectories
+      - neurondb-cuda-data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-neurondb}"]
       interval: 30s
@@ -123,10 +129,13 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-neurondb}
       POSTGRES_HOST_AUTH_METHOD: ${POSTGRES_HOST_AUTH_METHOD:-md5}
       NEURONDB_GPU_ENABLED: ${NEURONDB_GPU_ENABLED:-on}
+      # PostgreSQL 18+ uses version-specific data directory
+      PGDATA: /var/lib/postgresql/data
     ports:
       - "${POSTGRES_ROCM_PORT:-5435}:5432"
     volumes:
-      - neurondb-rocm-data:/var/lib/postgresql/data
+      # For PostgreSQL 18+, mount at /var/lib/postgresql to allow version-specific subdirectories
+      - neurondb-rocm-data:/var/lib/postgresql
     # ROCm requires device access - adjust based on your setup
     devices:
       - /dev/kfd:/dev/kfd
@@ -169,10 +178,13 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-neurondb}
       POSTGRES_HOST_AUTH_METHOD: ${POSTGRES_HOST_AUTH_METHOD:-md5}
       NEURONDB_GPU_ENABLED: ${NEURONDB_GPU_ENABLED:-on}
+      # PostgreSQL 18+ uses version-specific data directory
+      PGDATA: /var/lib/postgresql/data
     ports:
       - "${POSTGRES_METAL_PORT:-5436}:5432"
     volumes:
-      - neurondb-metal-data:/var/lib/postgresql/data
+      # For PostgreSQL 18+, mount at /var/lib/postgresql to allow version-specific subdirectories
+      - neurondb-metal-data:/var/lib/postgresql
     platform: linux/arm64
     deploy:
       resources:
