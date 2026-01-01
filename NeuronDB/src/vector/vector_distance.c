@@ -206,6 +206,10 @@ cosine_distance(Vector *a, Vector *b)
 
 	result = (float4) (1.0 - (dot / (sqrt(norm_a) * sqrt(norm_b))));
 
+	/* Clamp to non-negative to handle floating-point rounding errors */
+	if (result < 0.0f)
+		result = 0.0f;
+
 	/* Validate result */
 	if (isnan(result) || isinf(result))
 		ereport(ERROR,
