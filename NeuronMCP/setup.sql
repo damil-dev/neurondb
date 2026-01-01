@@ -59,8 +59,9 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 -- SECTION 2: SCHEMA
 -- ============================================================================
 
--- Ensure neurondb schema exists
-CREATE SCHEMA IF NOT EXISTS neurondb;
+-- Note: The neurondb extension automatically creates the neurondb schema.
+-- Do NOT create the schema manually here, as it must be owned by the extension.
+-- If you need to ensure the schema exists, create the extension first.
 
 -- ============================================================================
 -- SECTION 3: TABLES
