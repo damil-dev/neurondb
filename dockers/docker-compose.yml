@@ -48,19 +48,20 @@ services:
       context: ..
       dockerfile: dockers/neurondb/Dockerfile
       args:
-        PG_MAJOR: ${PG_MAJOR:-17}
+        PG_MAJOR: ${PG_MAJOR:-18}
         PACKAGE_VERSION: ${PACKAGE_VERSION:-1.0.0.beta}
         ONNX_VERSION: ${ONNX_VERSION:-1.17.0}
         VERSION: ${VERSION:-latest}
         BUILD_DATE: ${BUILD_DATE:-}
         VCS_REF: ${VCS_REF:-}
-    image: neurondb:cpu-pg17
-    container_name: neurondb-cpu
+    image: neurondb:cpu-pg${PG_MAJOR:-18}
+    container_name: neurondb-${PG_MAJOR:-18}-cpu
     init: true
     labels:
     - com.neurondb.service=neurondb
     - com.neurondb.variant=cpu
     - com.neurondb.version=${VERSION:-latest}
+    - com.neurondb.postgres.version=${PG_MAJOR:-18}
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-neurondb}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-neurondb}
@@ -69,7 +70,7 @@ services:
       NEURONDB_GPU_BACKEND_TYPE: ${NEURONDB_GPU_BACKEND_TYPE:-0}
       NEURONDB_COMPUTE_MODE: ${NEURONDB_COMPUTE_MODE:-0}
     ports:
-    - ${POSTGRES_PORT:-5433}:5432
+    - ${POSTGRES_PORT:-5418}:5432
     volumes:
     - neurondb-data:/var/lib/postgresql
     healthcheck:
@@ -102,7 +103,7 @@ services:
       context: ..
       dockerfile: dockers/neurondb/Dockerfile.cuda
       args:
-        PG_MAJOR: ${PG_MAJOR:-17}
+        PG_MAJOR: ${PG_MAJOR:-18}
         CUDA_VERSION: ${CUDA_VERSION:-12.2.0}
         PACKAGE_VERSION: ${PACKAGE_VERSION:-1.0.0.beta}
         ONNX_VERSION: ${ONNX_VERSION:-1.17.0}
@@ -110,8 +111,8 @@ services:
         VERSION: ${VERSION:-latest}
         BUILD_DATE: ${BUILD_DATE:-}
         VCS_REF: ${VCS_REF:-}
-    image: neurondb:cuda-pg17
-    container_name: neurondb-cuda
+    image: neurondb:cuda-pg${PG_MAJOR:-18}
+    container_name: neurondb-${PG_MAJOR:-18}-cuda
     init: true
     labels:
     - com.neurondb.service=neurondb
@@ -157,9 +158,6 @@ services:
     # Runtime is optional - container will run without GPU if nvidia runtime not available
     # To enable GPU: install nvidia-container-toolkit and uncomment the runtime line below
     # runtime: nvidia
-    environment:
-      NVIDIA_VISIBLE_DEVICES: ${NVIDIA_VISIBLE_DEVICES:-all}
-      NVIDIA_DRIVER_CAPABILITIES: ${NVIDIA_DRIVER_CAPABILITIES:-compute,utility}
   neurondb-rocm:
     profiles:
     - rocm
@@ -168,14 +166,14 @@ services:
       context: ..
       dockerfile: dockers/neurondb/Dockerfile.gpu.rocm
       args:
-        PG_MAJOR: ${PG_MAJOR:-17}
+        PG_MAJOR: ${PG_MAJOR:-18}
         ROCM_VERSION: ${ROCM_VERSION:-5.7}
         ONNX_VERSION: ${ONNX_VERSION:-1.17.0}
         VERSION: ${VERSION:-latest}
         BUILD_DATE: ${BUILD_DATE:-}
         VCS_REF: ${VCS_REF:-}
-    image: neurondb:rocm-pg17
-    container_name: neurondb-rocm
+    image: neurondb:rocm-pg${PG_MAJOR:-18}
+    container_name: neurondb-${PG_MAJOR:-18}-rocm
     init: true
     labels:
     - com.neurondb.service=neurondb
@@ -192,7 +190,7 @@ services:
     ports:
     - ${POSTGRES_ROCM_PORT:-5435}:5432
     volumes:
-    - neurondb-rocm-data:/var/lib/postgresql/data
+    - neurondb-rocm-data:/var/lib/postgresql
     devices:
     - /dev/kfd:/dev/kfd
     - /dev/dri:/dev/dri
@@ -226,13 +224,13 @@ services:
       context: ..
       dockerfile: dockers/neurondb/Dockerfile.gpu.metal
       args:
-        PG_MAJOR: ${PG_MAJOR:-17}
+        PG_MAJOR: ${PG_MAJOR:-18}
         ONNX_VERSION: ${ONNX_VERSION:-1.17.0}
         VERSION: ${VERSION:-latest}
         BUILD_DATE: ${BUILD_DATE:-}
         VCS_REF: ${VCS_REF:-}
-    image: neurondb:metal-pg17
-    container_name: neurondb-metal
+    image: neurondb:metal-pg${PG_MAJOR:-18}
+    container_name: neurondb-${PG_MAJOR:-18}-metal
     init: true
     labels:
     - com.neurondb.service=neurondb
@@ -249,7 +247,7 @@ services:
     ports:
     - ${POSTGRES_METAL_PORT:-5436}:5432
     volumes:
-    - neurondb-metal-data:/var/lib/postgresql/data
+    - neurondb-metal-data:/var/lib/postgresql
     platform: linux/arm64
     healthcheck:
       test:

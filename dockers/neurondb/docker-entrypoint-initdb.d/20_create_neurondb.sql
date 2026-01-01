@@ -7,6 +7,23 @@
 -- (docker-entrypoint-neurondb.sh) will ensure the extension is created after
 -- PostgreSQL starts.
 
+-- Clean up any orphaned neurondb schema that exists without the extension
+-- This can happen if a previous initialization partially completed
+DO $$
+BEGIN
+    -- Check if schema exists but extension doesn't
+    IF EXISTS (
+        SELECT 1 FROM pg_namespace WHERE nspname = 'neurondb'
+    ) AND NOT EXISTS (
+        SELECT 1 FROM pg_extension WHERE extname = 'neurondb'
+    ) THEN
+        -- Drop the orphaned schema so the extension can create it properly
+        DROP SCHEMA IF EXISTS neurondb CASCADE;
+        RAISE NOTICE 'Dropped orphaned neurondb schema (extension will recreate it)';
+    END IF;
+END
+$$;
+
 -- Try to create the extension if it doesn't exist
 -- Handle the case where shared_preload_libraries might not be configured yet
 DO $$

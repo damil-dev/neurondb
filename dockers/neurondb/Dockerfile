@@ -52,6 +52,12 @@ RUN apt-get update && \
         postgresql-server-dev-${PG_MAJOR} && \
     rm -rf /var/lib/apt/lists/*
 
+# Install ML libraries via pip (provides C libraries with headers)
+RUN pip3 install --no-cache-dir --break-system-packages \
+    xgboost \
+    lightgbm \
+    catboost
+
 # Install ONNX Runtime (CPU build) matching architecture
 RUN set -eux; \
     arch="$(dpkg --print-architecture)"; \
@@ -108,13 +114,20 @@ ENV ONNX_PATH=/usr/local/onnxruntime \
 
 RUN mkdir -p ${NEURONDB_HOME} /docker-entrypoint-initdb.d
 
-# Runtime dependencies required by neurondb.so
+# Runtime dependencies required by neurondb.so and ML libraries
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         libcurl4 \
         libssl3 \
-        ca-certificates && \
+        ca-certificates \
+        libgomp1 \
+        python3 \
+        python3-pip && \
     rm -rf /var/lib/apt/lists/*
+
+# Copy Python site-packages with ML libraries from builder
+COPY --from=builder /usr/local/lib/python3.*/dist-packages/ /usr/local/lib/python3.11/dist-packages/
+RUN ldconfig
 
 # Copy runtime assets from builder
 COPY --from=builder /usr/lib/postgresql/${PG_MAJOR}/lib/neurondb*.so /usr/lib/postgresql/${PG_MAJOR}/lib/
@@ -135,9 +148,11 @@ COPY NeuronMCP/sql/ /docker-entrypoint-initdb.d/neurondb_mcp/
 # Copy NeuronAgent migration files for auto-setup
 COPY NeuronAgent/migrations/ /docker-entrypoint-initdb.d/neurondb_agent/
 
-VOLUME ["/var/lib/postgresql/data"]
+# Volume declaration removed - let base postgres image handle it
+# docker-compose.yml mounts the volume at the correct path for each PG version
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=5 CMD pg_isready -U "${POSTGRES_USER:-postgres}"
 
-# Default entrypoint inherited from postgres image
+# Use standard postgres entrypoint - init scripts handle extension creation
+# The test script will also ensure extension exists if needed
 
