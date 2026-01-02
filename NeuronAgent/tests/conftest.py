@@ -31,6 +31,16 @@ except ImportError:
     class NeuronAgentClient:
         def __init__(self, *args, **kwargs):
             pass
+    # Fallback managers
+    class AgentManager:
+        def __init__(self, *args, **kwargs):
+            pass
+    class SessionManager:
+        def __init__(self, *args, **kwargs):
+            pass
+
+# Make managers available for import
+__all__ = ['NeuronAgentClient', 'AgentManager', 'SessionManager']
 
 # Initialize Faker for test data generation
 fake = Faker()
@@ -97,6 +107,39 @@ def api_key() -> str:
     if not key:
         # Try the key we know works: vaqSx2Is6KiQ47TO-t1YYsNPgmamUcEjztXe2ikL74k=
         key = "vaqSx2Is6KiQ47TO-t1YYsNPgmamUcEjztXe2ikL74k="
+    
+    # If still no key, try to generate a fresh one
+    if not key:
+        import subprocess
+        try:
+            result = subprocess.run(
+                [
+                    'go', 'run', 'cmd/generate-key/main.go',
+                    '-org', 'test-org',
+                    '-user', 'test-user',
+                    '-rate', '1000',
+                    '-roles', 'user,admin',
+                    '-db-host', TEST_CONFIG['db_host'],
+                    '-db-port', str(TEST_CONFIG['db_port']),
+                    '-db-name', TEST_CONFIG['db_name'],
+                    '-db-user', TEST_CONFIG['db_user'],
+                ],
+                cwd=os.path.join(os.path.dirname(__file__), '..'),
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            if result.returncode == 0:
+                # Extract key from output - try multiple patterns
+                for line in result.stdout.split('\n'):
+                    if 'Key:' in line:
+                        key = line.split(':')[-1].strip()
+                        break
+                    elif 'Key =' in line:
+                        key = line.split('=')[-1].strip()
+                        break
+        except Exception:
+            pass
     
     if not key:
         pytest.skip("API key not available. Set NEURONAGENT_API_KEY or ensure generate-key tool works.")

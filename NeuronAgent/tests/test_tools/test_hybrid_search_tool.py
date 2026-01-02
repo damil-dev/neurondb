@@ -1,6 +1,13 @@
 """Tests for Hybrid Search Tool."""
 import pytest
-from neurondb_client import SessionManager
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../examples'))
+try:
+    from neurondb_client import SessionManager, AgentManager
+except ImportError:
+    SessionManager = None
+    AgentManager = None
 
 @pytest.mark.tool
 @pytest.mark.requires_server

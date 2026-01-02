@@ -1,6 +1,12 @@
 """Tests for Token Counting."""
 import pytest
-from neurondb_client import SessionManager
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../examples'))
+try:
+    from neurondb_client import SessionManager
+except ImportError:
+    SessionManager = None
 
 @pytest.mark.api
 @pytest.mark.requires_server
@@ -20,6 +26,15 @@ class TestTokenCounting:
     
     def test_token_counting_prompt(self, api_client, test_agent):
         """Test token counting for system prompts."""
+        import sys
+        import os
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../examples'))
+        try:
+            from neurondb_client import AgentManager
+        except ImportError:
+            AgentManager = None
+        if AgentManager is None:
+            pytest.skip("AgentManager not available")
         agent_mgr = AgentManager(api_client)
         agent = agent_mgr.get(test_agent['id'])
         assert 'system_prompt' in agent

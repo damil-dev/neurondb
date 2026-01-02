@@ -195,12 +195,13 @@ class TestAgentProfiles:
             "model_name": "gpt-4"
         }
         
+        response = None
         try:
             response = api_client.post("/api/v1/agents", json_data=agent_data)
             assert "id" in response
             # Profile should be applied
         finally:
-            if "id" in response:
+            if response and "id" in response:
                 api_client.delete(f"/api/v1/agents/{response['id']}")
 
 
