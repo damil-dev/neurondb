@@ -82,6 +82,9 @@ func (b *BaseTool) Description() string {
 
 /* InputSchema returns the input schema */
 func (b *BaseTool) InputSchema() map[string]interface{} {
+	if b.inputSchema == nil {
+		return make(map[string]interface{})
+	}
 	return b.inputSchema
 }
 

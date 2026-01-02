@@ -75,11 +75,17 @@ const (
 
 /* SerializeResponse serializes a JSON-RPC response to JSON */
 func SerializeResponse(resp *JSONRPCResponse) ([]byte, error) {
+	if resp == nil {
+		return nil, fmt.Errorf("response cannot be nil")
+	}
 	return json.Marshal(resp)
 }
 
 /* ValidateRequest validates a JSON-RPC request */
 func ValidateRequest(req *JSONRPCRequest) error {
+	if req == nil {
+		return fmt.Errorf("request cannot be nil")
+	}
 	if req.JSONRPC != "2.0" {
 		return fmt.Errorf("invalid JSON-RPC version")
 	}
@@ -93,6 +99,9 @@ func ValidateRequest(req *JSONRPCRequest) error {
 
 /* IsNotification checks if a request is a notification (no ID) */
 func IsNotification(req *JSONRPCRequest) bool {
+	if req == nil {
+		return true /* nil is treated as notification per test expectations */
+	}
 	return len(req.ID) == 0 || bytes.Equal(req.ID, []byte("null"))
 }
 

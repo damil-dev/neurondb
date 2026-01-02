@@ -137,6 +137,10 @@ func (t *StdioTransport) ReadMessage() (*JSONRPCRequest, error) {
 
 /* WriteMessage writes a JSON-RPC message to stdout */
 func (t *StdioTransport) WriteMessage(resp *JSONRPCResponse) error {
+	if resp == nil {
+		return fmt.Errorf("cannot write nil response")
+	}
+	
 	data, err := SerializeResponse(resp)
 	if err != nil {
 		return fmt.Errorf("failed to serialize response: %w", err)

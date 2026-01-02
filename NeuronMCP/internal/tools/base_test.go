@@ -272,8 +272,13 @@ func TestNewBaseTool(t *testing.T) {
 	if tool2 == nil {
 		t.Fatal("NewBaseTool() returned nil")
 	}
-	if tool2.InputSchema() == nil {
-		t.Error("InputSchema() should return nil for nil schema")
+	/* InputSchema should return empty map, not nil */
+	schema := tool2.InputSchema()
+	if schema == nil {
+		t.Error("InputSchema() should not return nil (should return empty map)")
+	}
+	if len(schema) != 0 {
+		t.Errorf("InputSchema() should return empty map for nil schema, got %v", schema)
 	}
 }
 

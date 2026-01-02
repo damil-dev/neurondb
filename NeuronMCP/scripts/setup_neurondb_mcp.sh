@@ -273,12 +273,12 @@ main() {
     fi
     
     # Run schema SQL
-    if ! run_sql_file "$SQL_DIR/setup_neurondb_mcp_schema.sql" "Schema setup"; then
+    if ! run_sql_file "$SQL_DIR/001_initial_schema.sql" "Schema setup"; then
         exit 1
     fi
     
     # Run functions SQL
-    if ! run_sql_file "$SQL_DIR/neurondb_mcp_functions.sql" "Functions setup"; then
+    if ! run_sql_file "$SQL_DIR/002_functions.sql" "Functions setup"; then
         exit 1
     fi
     

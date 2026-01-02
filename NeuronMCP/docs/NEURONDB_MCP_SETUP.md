@@ -573,8 +573,8 @@ When `generate_embedding` tool is called:
 If upgrading from a previous version:
 
 1. **Backup**: Always backup your database before migration
-2. **Run Schema**: Execute `setup_neurondb_mcp_schema.sql`
-3. **Run Functions**: Execute `neurondb_mcp_functions.sql`
+2. **Run Schema**: Execute `sql/001_initial_schema.sql`
+3. **Run Functions**: Execute `sql/002_functions.sql`
 4. **Verify**: Run verification queries from setup script
 5. **Migrate Data**: If you have existing configurations, migrate them to new schema
 
@@ -628,8 +628,8 @@ Once configured, NeuronMCP tools automatically use the database configurations:
 
 ## Additional Resources
 
-- **Schema SQL**: `sql/setup_neurondb_mcp_schema.sql`
-- **Functions SQL**: `sql/neurondb_mcp_functions.sql`
+- **Schema SQL**: `sql/001_initial_schema.sql`
+- **Functions SQL**: `sql/002_functions.sql`
 - **Setup Script**: `scripts/setup_neurondb_mcp.sh`
 - **Go Integration**: `internal/database/config.go`
 

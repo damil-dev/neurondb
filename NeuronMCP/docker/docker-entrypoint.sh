@@ -135,8 +135,8 @@ if [ -d "$SQL_DIR" ] && [ -n "$(ls -A $SQL_DIR/*.sql 2>/dev/null)" ]; then
                 log_info "NeuronMCP schema not found, running setup..."
                 
                 # Run SQL setup scripts in order
-                SCHEMA_FILE="$SQL_DIR/setup_neurondb_mcp_schema.sql"
-                FUNCTIONS_FILE="$SQL_DIR/neurondb_mcp_functions.sql"
+                SCHEMA_FILE="$SQL_DIR/001_initial_schema.sql"
+                FUNCTIONS_FILE="$SQL_DIR/002_functions.sql"
                 
                 if [ -f "$SCHEMA_FILE" ]; then
                     log_info "Running schema setup: $(basename $SCHEMA_FILE)"
