@@ -174,6 +174,7 @@ func main() {
 	mcpHandlers := handlers.NewMCPHandlers(mcpManager)
 	neurondbHandlers := handlers.NewNeuronDBHandlers(queries, cfg.Security.EnableSQLConsole)
 	agentHandlers := handlers.NewAgentHandlers(queries)
+	templateHandlers := handlers.NewTemplateHandlers(queries, logger)
 	profileHandlers := handlers.NewProfileHandlers(queries)
 	metricsHandlers := handlers.NewMetricsHandlers()
 	factoryHandlers := handlers.NewFactoryHandlers(queries)
@@ -355,6 +356,11 @@ func main() {
 	apiRouter.HandleFunc("/profiles/{profile_id}/agent/sessions/{session_id}/messages", agentHandlers.SendMessage).Methods("POST")
 	apiRouter.HandleFunc("/profiles/{profile_id}/agent/sessions/{session_id}/messages", agentHandlers.GetMessages).Methods("GET")
 	apiRouter.HandleFunc("/profiles/{profile_id}/agent/ws", agentHandlers.AgentWebSocket).Methods("GET")
+
+	// Template routes
+	apiRouter.HandleFunc("/templates", templateHandlers.ListTemplates).Methods("GET")
+	apiRouter.HandleFunc("/templates/{id}", templateHandlers.GetTemplate).Methods("GET")
+	apiRouter.HandleFunc("/profiles/{profile_id}/templates/{id}/deploy", templateHandlers.DeployTemplate).Methods("POST")
 
 	// Model configuration routes
 	modelConfigHandlers := handlers.NewModelConfigHandlers(queries)
