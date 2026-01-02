@@ -72,6 +72,17 @@ func NewDBWithRetry(connStr string, poolConfig PoolConfig, maxRetries int, retry
 				db.SetMaxIdleConns(poolConfig.MaxIdleConns)
 				db.SetConnMaxLifetime(poolConfig.ConnMaxLifetime)
 				db.SetConnMaxIdleTime(poolConfig.ConnMaxIdleTime)
+				
+				/* Set search_path and timezone on the connection pool */
+				/* Note: This sets it for the initial connection, but we need it for all connections */
+				/* We'll add it to the connection string instead */
+				
+				/* Test the connection works */
+				_, err = db.Exec("SELECT 1")
+				if err != nil {
+					db.Close()
+					return nil, fmt.Errorf("connection test failed: %w", err)
+				}
 
 				return &DB{
 					DB:         db,

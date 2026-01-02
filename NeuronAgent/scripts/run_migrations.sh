@@ -4,7 +4,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-MIGRATIONS_DIR="$SCRIPT_DIR/../migrations"
+MIGRATIONS_DIR="$SCRIPT_DIR/../sql"
 
 DB_NAME="${DB_NAME:-neurondb}"
 DB_USER="${DB_USER:-postgres}"

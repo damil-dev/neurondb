@@ -94,11 +94,11 @@ if [ -f "$INITIAL_SCHEMA" ]; then
             log_info "To setup schema manually: psql \$CONN_STR -f $INITIAL_SCHEMA"
         fi
     fi
-elif [ -d "/app/migrations" ]; then
-    MIGRATION_COUNT=$(find "/app/migrations" -name "*.sql" | wc -l)
-    log_info "Found ${MIGRATION_COUNT} migration file(s) in /app/migrations (initial_schema.sql not found, using migration files)"
+elif [ -d "/app/sql" ]; then
+    MIGRATION_COUNT=$(find "/app/sql" -name "*.sql" | wc -l)
+    log_info "Found ${MIGRATION_COUNT} migration file(s) in /app/sql (initial_schema.sql not found, using migration files)"
 else
-    log_warn "Initial schema file not found at $INITIAL_SCHEMA and migrations directory not found"
+    log_warn "Initial schema file not found at $INITIAL_SCHEMA and sql directory not found"
 fi
 
 # Log startup information
