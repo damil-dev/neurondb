@@ -181,52 +181,6 @@ func (c *Client) UpdateAgent(agentID string, agentConfig *config.AgentConfig) (*
 	return &agent, nil
 }
 
-func (c *Client) UpdateAgent(agentID string, agentConfig *config.AgentConfig) (*Agent, error) {
-	reqBody := map[string]interface{}{}
-
-	if agentConfig.Name != "" {
-		reqBody["name"] = agentConfig.Name
-	}
-
-	if agentConfig.Description != "" {
-		reqBody["description"] = agentConfig.Description
-	}
-
-	if agentConfig.SystemPrompt != "" {
-		reqBody["system_prompt"] = agentConfig.SystemPrompt
-	}
-
-	if agentConfig.Model.Name != "" {
-		reqBody["model_name"] = agentConfig.Model.Name
-	}
-
-	if len(agentConfig.Tools) > 0 {
-		reqBody["enabled_tools"] = agentConfig.Tools
-	}
-
-	if len(agentConfig.Config) > 0 {
-		reqBody["config"] = agentConfig.Config
-	}
-
-	body, err := json.Marshal(reqBody)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
-	}
-
-	resp, err := c.makeRequest("PUT", fmt.Sprintf("/api/v1/agents/%s", agentID), bytes.NewReader(body))
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	var agent Agent
-	if err := json.NewDecoder(resp.Body).Decode(&agent); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
-	}
-
-	return &agent, nil
-}
-
 func (c *Client) DeleteAgent(agentID string) error {
 	resp, err := c.makeRequest("DELETE", fmt.Sprintf("/api/v1/agents/%s", agentID), nil)
 	if err != nil {

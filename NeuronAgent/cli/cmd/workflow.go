@@ -14,9 +14,7 @@
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
-	"os"
 
 	"github.com/spf13/cobra"
 	"github.com/neurondb/NeuronAgent/cli/pkg/config"
@@ -26,7 +24,7 @@ var workflowCreateCmd = &cobra.Command{
 	Use:   "create [file]",
 	Short: "Create workflow from YAML file",
 	Args:  cobra.ExactArgs(1),
-	RunE:  createWorkflow,
+	RunE:  runCreateWorkflow,
 }
 
 var workflowListCmd = &cobra.Command{
@@ -77,7 +75,7 @@ func init() {
 	workflowCmd.AddCommand(workflowTemplatesCmd)
 }
 
-func createWorkflow(cmd *cobra.Command, args []string) error {
+func runCreateWorkflow(cmd *cobra.Command, args []string) error {
 	filePath := args[0]
 	
 	fmt.Printf("📄 Loading workflow from: %s\n", filePath)
