@@ -9,8 +9,10 @@ import {
   TrashIcon,
   PencilIcon,
   ChatBubbleLeftRightIcon,
-  CpuChipIcon
+  CpuChipIcon,
+  SparklesIcon
 } from '@/components/Icons'
+import AgentPlayground from '@/components/AgentPlayground'
 
 export default function AgentsPage() {
   const [profiles, setProfiles] = useState<Profile[]>([])
@@ -20,6 +22,8 @@ export default function AgentsPage() {
   const [loading, setLoading] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null)
+  const [showPlayground, setShowPlayground] = useState(false)
+  const [playgroundAgentId, setPlaygroundAgentId] = useState<string | undefined>(undefined)
   const [formData, setFormData] = useState<CreateAgentRequest>({
     name: '',
     description: '',
@@ -313,14 +317,26 @@ export default function AgentsPage() {
                 </div>
                 <div className="flex gap-2">
                   <button
+                    onClick={() => {
+                      setPlaygroundAgentId(agent.id)
+                      setShowPlayground(true)
+                    }}
+                    className="p-2 text-gray-600 dark:text-slate-400 hover:text-green-600 dark:hover:text-green-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded"
+                    title="Test Agent in Playground"
+                  >
+                    <SparklesIcon className="w-4 h-4" />
+                  </button>
+                  <button
                     onClick={() => openEditModal(agent)}
                     className="p-2 text-gray-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded"
+                    title="Edit Agent"
                   >
                     <PencilIcon className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => handleDeleteAgent(agent.id)}
                     className="p-2 text-gray-600 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded"
+                    title="Delete Agent"
                   >
                     <TrashIcon className="w-4 h-4" />
                   </button>
@@ -495,6 +511,21 @@ export default function AgentsPage() {
                 {loading ? 'Creating...' : editingAgent ? 'Update' : 'Create'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Agent Playground Modal */}
+      {showPlayground && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full h-full max-w-7xl max-h-[95vh] m-4 flex flex-col">
+            <AgentPlayground
+              agentId={playgroundAgentId}
+              onClose={() => {
+                setShowPlayground(false)
+                setPlaygroundAgentId(undefined)
+              }}
+            />
           </div>
         </div>
       )}
