@@ -40,6 +40,8 @@ services:
       POSTGRES_HOST_AUTH_METHOD: ${POSTGRES_HOST_AUTH_METHOD:-md5}
       NEURONDB_GPU_BACKEND_TYPE: ${NEURONDB_GPU_BACKEND_TYPE:-0}
       NEURONDB_COMPUTE_MODE: ${NEURONDB_COMPUTE_MODE:-0}
+      # HuggingFace API key for embeddings (can also be set via ALTER SYSTEM)
+      NEURONDB_LLM_API_KEY: ${NEURONDB_LLM_API_KEY:-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}
     ports:
       - ${POSTGRES_PORT:-5433}:5432
     volumes:
