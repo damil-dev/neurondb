@@ -128,6 +128,7 @@ NeuronAgent/cmd/*/agent-server
 NeuronAgent/cmd/*/generate-key
 NeuronAgent/cmd/*/neuronagent-cli
 NeuronAgent/neuronagent-cli
+NeuronAgent/cli/neuronagent-cli
 *.exe
 *.exe~
 *.dll
@@ -290,6 +291,7 @@ NeuronMCP/fix_*.js
 NeuronDesktop/api/bin/
 NeuronDesktop/api/bin/neurondesk-api
 NeuronDesktop/api/**/neurondesk-api
+NeuronDesktop/api/main
 
 # Node.js / Next.js
 NeuronDesktop/frontend/node_modules/
