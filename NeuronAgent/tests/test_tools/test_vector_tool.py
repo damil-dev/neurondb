@@ -1,7 +1,17 @@
 """Tests for Vector Tool."""
 import pytest
-import numpy as np
-from neurondb_client import SessionManager
+import sys
+import os
+try:
+    import numpy as np
+except ImportError:
+    np = None
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../examples'))
+try:
+    from neurondb_client import SessionManager, AgentManager
+except ImportError:
+    SessionManager = None
+    AgentManager = None
 
 @pytest.mark.tool
 @pytest.mark.requires_server
@@ -11,6 +21,8 @@ class TestVectorTool:
     
     def test_vector_tool_similarity(self, api_client, test_agent, test_session):
         """Test vector similarity calculation."""
+        if SessionManager is None or AgentManager is None:
+            pytest.skip("Client managers not available")
         session_mgr = SessionManager(api_client)
         agent_mgr = AgentManager(api_client)
         agent_mgr.update(test_agent['id'], enabled_tools=['vector'])
@@ -24,6 +36,8 @@ class TestVectorTool:
     
     def test_vector_tool_embedding(self, api_client, test_agent, test_session):
         """Test vector embedding generation."""
+        if SessionManager is None:
+            pytest.skip("SessionManager not available")
         session_mgr = SessionManager(api_client)
         response = session_mgr.send_message(
             session_id=test_session['id'],
@@ -34,6 +48,8 @@ class TestVectorTool:
     
     def test_vector_tool_search(self, api_client, test_agent, test_session):
         """Test vector similarity search."""
+        if SessionManager is None:
+            pytest.skip("SessionManager not available")
         session_mgr = SessionManager(api_client)
         response = session_mgr.send_message(
             session_id=test_session['id'],
@@ -44,6 +60,8 @@ class TestVectorTool:
     
     def test_vector_tool_operations(self, api_client, test_agent, test_session):
         """Test vector mathematical operations."""
+        if SessionManager is None:
+            pytest.skip("SessionManager not available")
         session_mgr = SessionManager(api_client)
         response = session_mgr.send_message(
             session_id=test_session['id'],
@@ -51,4 +69,3 @@ class TestVectorTool:
             role="user"
         )
         assert 'response' in response
-

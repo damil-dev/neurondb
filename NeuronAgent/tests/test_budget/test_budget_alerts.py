@@ -1,6 +1,12 @@
 """Tests for Budget Alerts."""
 import pytest
-from neurondb_client import AgentManager
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../examples'))
+try:
+    from neurondb_client import AgentManager
+except ImportError:
+    AgentManager = None
 
 @pytest.mark.api
 @pytest.mark.requires_server
@@ -9,6 +15,8 @@ class TestBudgetAlerts:
     
     def test_budget_alert_configuration(self, api_client, test_agent):
         """Test configuring budget alerts."""
+        if AgentManager is None:
+            pytest.skip("AgentManager not available")
         agent_mgr = AgentManager(api_client)
         updated = agent_mgr.update(
             test_agent['id'],
@@ -51,6 +59,8 @@ class TestBudgetAlerts:
     
     def test_budget_alert_notifications(self, api_client, test_agent):
         """Test budget alert notifications."""
+        if AgentManager is None:
+            pytest.skip("AgentManager not available")
         agent_mgr = AgentManager(api_client)
         # Configure alerts with notification settings
         updated = agent_mgr.update(

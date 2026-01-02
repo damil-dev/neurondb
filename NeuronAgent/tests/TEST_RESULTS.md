@@ -92,9 +92,9 @@ Tests are skipped because they require:
 
 ```bash
 cd NeuronAgent
-psql -d neurondb -f migrations/001_initial_schema.sql
-psql -d neurondb -f migrations/002_add_indexes.sql
-psql -d neurondb -f migrations/003_add_triggers.sql
+psql -d neurondb -f sql/001_initial_schema.sql
+psql -d neurondb -f sql/002_add_indexes.sql
+psql -d neurondb -f sql/003_add_triggers.sql
 # ... run all migrations in order
 ```
 
