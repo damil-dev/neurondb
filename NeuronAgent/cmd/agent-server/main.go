@@ -115,7 +115,8 @@ func main() {
 	metrics.InitLogging(cfg.Logging.Level, cfg.Logging.Format)
 
 	/* Connect to database */
-	connStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
+	/* Add search_path to connection string to ensure it's set for all connections */
+	connStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable search_path=neurondb_agent,public",
 		cfg.Database.Host, cfg.Database.Port, cfg.Database.User, cfg.Database.Password, cfg.Database.Database)
 
 	connMaxIdleTime := 10 * time.Minute
@@ -138,7 +139,7 @@ func main() {
 	defer database.Close()
 
 	/* Run migrations */
-	migrationRunner, err := db.NewMigrationRunner(database.DB, "./migrations")
+	migrationRunner, err := db.NewMigrationRunner(database.DB, "./sql")
 	if err == nil {
 		if err := migrationRunner.Run(context.Background()); err != nil {
 			metrics.WarnWithContext(context.Background(), "Database migration failed", map[string]interface{}{

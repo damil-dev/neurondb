@@ -54,9 +54,9 @@ CREATE EXTENSION neurondb;
 
 3. Run migrations:
 ```bash
-psql -d neurondb -f migrations/001_initial_schema.sql
-psql -d neurondb -f migrations/002_add_indexes.sql
-psql -d neurondb -f migrations/003_add_triggers.sql
+psql -d neurondb -f sql/001_initial_schema.sql
+psql -d neurondb -f sql/002_add_indexes.sql
+psql -d neurondb -f sql/003_add_triggers.sql
 ```
 
 ## Running
