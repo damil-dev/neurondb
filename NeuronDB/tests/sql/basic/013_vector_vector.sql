@@ -23,8 +23,8 @@ SELECT
 	vector_to_array_float8(array_to_vector_float8(ARRAY[10.0,20.0,30.0]::double precision[])) AS arr_f8,
 	vector_to_array(vector '{4,5,6}') AS arr_brace,
 	vector_to_array(vector '[4,5,6]') AS arr_bracket,
-	vector_cast_dimension(vector '[1,2,3,4,5]', 3) AS truncate,
-	vector_cast_dimension(vector '[1,2,3]', 5) AS pad;
+	vector_cast_dimension(vector '[1,2,3,4,5]'::vector, 3) AS truncate,
+	vector_cast_dimension(vector '[1,2,3]'::vector, 5) AS pad;
 
 -- Length, dims, shape, min/max dim edge cases
 SELECT v,
