@@ -15,7 +15,7 @@ import (
 	"github.com/neurondb/NeuronDesktop/api/internal/db"
 )
 
-// TestClient provides HTTP client for testing with authentication
+/* TestClient provides HTTP client for testing with authentication */
 type TestClient struct {
 	Server   *httptest.Server
 	Router   *mux.Router
@@ -26,14 +26,14 @@ type TestClient struct {
 	IsAdmin  bool
 }
 
-// ServerSetupFunc is a function type for setting up a test server
-// This allows handlers package to provide the setup without creating import cycles
+/* ServerSetupFunc is a function type for setting up a test server */
+/* This allows handlers package to provide the setup without creating import cycles */
 type ServerSetupFunc func(*db.Queries) *httptest.Server
 
-// DefaultServerSetup is set by handlers package to avoid import cycle
+/* DefaultServerSetup is set by handlers package to avoid import cycle */
 var DefaultServerSetup ServerSetupFunc
 
-// NewTestClient creates a new test HTTP client
+/* NewTestClient creates a new test HTTP client */
 func NewTestClient(t *testing.T, queries *db.Queries) *TestClient {
 	t.Helper()
 
@@ -41,7 +41,7 @@ func NewTestClient(t *testing.T, queries *db.Queries) *TestClient {
 	if DefaultServerSetup != nil {
 		server = DefaultServerSetup(queries)
 	} else {
-		// Fallback: create minimal server if setup function not provided
+		/* Fallback: create minimal server if setup function not provided */
 		router := mux.NewRouter()
 		router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
@@ -57,15 +57,15 @@ func NewTestClient(t *testing.T, queries *db.Queries) *TestClient {
 	}
 }
 
-// Authenticate creates a test user and authenticates
+/* Authenticate creates a test user and authenticates */
 func (tc *TestClient) Authenticate(ctx context.Context, username, password string) error {
-	// Create user
+	/* Create user */
 	user, err := CreateTestUser(ctx, tc.Queries, username, password)
 	if err != nil {
 		return err
 	}
 
-	// Generate token
+	/* Generate token */
 	token, err := auth.GenerateToken(user.ID, user.Username, user.IsAdmin)
 	if err != nil {
 		return err
@@ -79,15 +79,15 @@ func (tc *TestClient) Authenticate(ctx context.Context, username, password strin
 	return nil
 }
 
-// AuthenticateAsAdmin creates an admin user and authenticates
+/* AuthenticateAsAdmin creates an admin user and authenticates */
 func (tc *TestClient) AuthenticateAsAdmin(ctx context.Context, username, password string) error {
-	// Create admin user
+	/* Create admin user */
 	user, err := CreateTestAdmin(ctx, tc.Queries, username, password)
 	if err != nil {
 		return err
 	}
 
-	// Generate token
+	/* Generate token */
 	token, err := auth.GenerateToken(user.ID, user.Username, user.IsAdmin)
 	if err != nil {
 		return err
@@ -101,7 +101,7 @@ func (tc *TestClient) AuthenticateAsAdmin(ctx context.Context, username, passwor
 	return nil
 }
 
-// Do performs an HTTP request
+/* Do performs an HTTP request */
 func (tc *TestClient) Do(method, path string, body interface{}) (*http.Response, error) {
 	var reqBody io.Reader
 	if body != nil {
@@ -128,27 +128,27 @@ func (tc *TestClient) Do(method, path string, body interface{}) (*http.Response,
 	return http.DefaultClient.Do(req)
 }
 
-// Get performs a GET request
+/* Get performs a GET request */
 func (tc *TestClient) Get(path string) (*http.Response, error) {
 	return tc.Do("GET", path, nil)
 }
 
-// Post performs a POST request
+/* Post performs a POST request */
 func (tc *TestClient) Post(path string, body interface{}) (*http.Response, error) {
 	return tc.Do("POST", path, body)
 }
 
-// Put performs a PUT request
+/* Put performs a PUT request */
 func (tc *TestClient) Put(path string, body interface{}) (*http.Response, error) {
 	return tc.Do("PUT", path, body)
 }
 
-// Delete performs a DELETE request
+/* Delete performs a DELETE request */
 func (tc *TestClient) Delete(path string) (*http.Response, error) {
 	return tc.Do("DELETE", path, nil)
 }
 
-// ParseResponse parses JSON response
+/* ParseResponse parses JSON response */
 func ParseResponse(t *testing.T, resp *http.Response, v interface{}) error {
 	t.Helper()
 
@@ -162,7 +162,7 @@ func ParseResponse(t *testing.T, resp *http.Response, v interface{}) error {
 	return json.NewDecoder(resp.Body).Decode(v)
 }
 
-// AssertStatus asserts response status code
+/* AssertStatus asserts response status code */
 func AssertStatus(t *testing.T, resp *http.Response, expected int) {
 	t.Helper()
 

@@ -8,14 +8,14 @@ import (
 	"time"
 )
 
-// Logger provides structured logging
+/* Logger provides structured logging */
 type Logger struct {
 	level  string
 	format string
 	output *os.File
 }
 
-// NewLogger creates a new logger
+/* NewLogger creates a new logger */
 func NewLogger(level, format, output string) *Logger {
 	var file *os.File
 	var err error
@@ -39,7 +39,7 @@ func NewLogger(level, format, output string) *Logger {
 	}
 }
 
-// LogEntry represents a log entry
+/* LogEntry represents a log entry */
 type LogEntry struct {
 	Timestamp string                 `json:"timestamp"`
 	Level     string                 `json:"level"`
@@ -57,7 +57,7 @@ func (l *Logger) shouldLog(level string) bool {
 
 	currentLevel, ok := levels[l.level]
 	if !ok {
-		currentLevel = 1 // Default to info
+		currentLevel = 1 /* Default to info */
 	}
 
 	logLevel, ok := levels[level]
@@ -92,22 +92,22 @@ func (l *Logger) log(level, message string, fields map[string]interface{}) {
 	}
 }
 
-// Debug logs a debug message
+/* Debug logs a debug message */
 func (l *Logger) Debug(message string, fields map[string]interface{}) {
 	l.log("debug", message, fields)
 }
 
-// Info logs an info message
+/* Info logs an info message */
 func (l *Logger) Info(message string, fields map[string]interface{}) {
 	l.log("info", message, fields)
 }
 
-// Warn logs a warning message
+/* Warn logs a warning message */
 func (l *Logger) Warn(message string, fields map[string]interface{}) {
 	l.log("warn", message, fields)
 }
 
-// Error logs an error message
+/* Error logs an error message */
 func (l *Logger) Error(message string, err error, fields map[string]interface{}) {
 	if fields == nil {
 		fields = make(map[string]interface{})

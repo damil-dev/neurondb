@@ -6,7 +6,7 @@ import (
 	"github.com/neurondb/NeuronDesktop/api/internal/logging"
 )
 
-// BootstrapMetrics tracks bootstrap performance metrics
+/* BootstrapMetrics tracks bootstrap performance metrics */
 type BootstrapMetrics struct {
 	StartTime           time.Time
 	EndTime             time.Time
@@ -21,20 +21,20 @@ type BootstrapMetrics struct {
 	FailedSteps         int
 }
 
-// NewBootstrapMetrics creates a new metrics tracker
+/* NewBootstrapMetrics creates a new metrics tracker */
 func NewBootstrapMetrics() *BootstrapMetrics {
 	return &BootstrapMetrics{
 		StartTime: time.Now(),
 	}
 }
 
-// Finish marks the bootstrap as complete and calculates final metrics
+/* Finish marks the bootstrap as complete and calculates final metrics */
 func (bm *BootstrapMetrics) Finish() {
 	bm.EndTime = time.Now()
 	bm.Duration = bm.EndTime.Sub(bm.StartTime)
 }
 
-// LogMetrics logs the bootstrap metrics
+/* LogMetrics logs the bootstrap metrics */
 func (bm *BootstrapMetrics) LogMetrics(logger *logging.Logger) {
 	logger.Info("Bootstrap metrics", map[string]interface{}{
 		"total_duration":        bm.Duration.String(),
@@ -50,7 +50,7 @@ func (bm *BootstrapMetrics) LogMetrics(logger *logging.Logger) {
 	})
 }
 
-// TrackStep tracks a step execution
+/* TrackStep tracks a step execution */
 func (bm *BootstrapMetrics) TrackStep(name string, duration time.Duration, success bool) {
 	bm.TotalSteps++
 	if success {

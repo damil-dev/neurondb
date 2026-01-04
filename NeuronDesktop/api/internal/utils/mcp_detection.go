@@ -7,23 +7,20 @@ import (
 	"path/filepath"
 )
 
-// FindNeuronMCPBinary attempts to find the NeuronMCP binary
-// Returns the path if found, empty string otherwise
+/* FindNeuronMCPBinary attempts to find the NeuronMCP binary
+Returns the path if found, empty string otherwise */
 func FindNeuronMCPBinary() string {
-	// Check environment variable first
 	if path := os.Getenv("NEURONMCP_BINARY_PATH"); path != "" {
 		if isExecutable(path) {
 			return path
 		}
 	}
 
-	// Get current working directory and try to find relative paths
 	wd, err := os.Getwd()
 	if err != nil {
 		wd = "."
 	}
 
-	// Try relative to current directory: ../NeuronMCP/bin/neurondb-mcp
 	relativePaths := []string{
 		filepath.Join(wd, "..", "NeuronMCP", "bin", "neurondb-mcp"),
 		filepath.Join(wd, "..", "..", "NeuronMCP", "bin", "neurondb-mcp"),
@@ -37,12 +34,10 @@ func FindNeuronMCPBinary() string {
 		}
 	}
 
-	// Try to find in PATH
 	if path, err := exec.LookPath("neurondb-mcp"); err == nil {
 		return path
 	}
 
-	// Try to build if source exists
 	mcpDirs := []string{
 		filepath.Join(wd, "..", "NeuronMCP"),
 		filepath.Join(wd, "..", "..", "NeuronMCP"),
@@ -57,7 +52,6 @@ func FindNeuronMCPBinary() string {
 
 		mainGo := filepath.Join(absMcpDir, "cmd", "neurondb-mcp", "main.go")
 		if _, err := os.Stat(mainGo); err == nil {
-			// Try to build
 			binaryPath := filepath.Join(absMcpDir, "bin", "neurondb-mcp")
 			if buildNeuronMCP(absMcpDir, binaryPath) {
 				if isExecutable(binaryPath) {
@@ -70,27 +64,24 @@ func FindNeuronMCPBinary() string {
 	return ""
 }
 
-// isExecutable checks if a file exists and is executable
+/* isExecutable checks if a file exists and is executable */
 func isExecutable(path string) bool {
 	info, err := os.Stat(path)
 	if err != nil {
 		return false
 	}
-	// Check if it's a regular file and executable
 	mode := info.Mode()
 	return mode.IsRegular() && (mode&0111 != 0)
 }
 
-// buildNeuronMCP attempts to build NeuronMCP binary
+/* buildNeuronMCP attempts to build NeuronMCP binary */
 func buildNeuronMCP(sourceDir, outputPath string) bool {
-	// Try make first
 	cmd := exec.Command("make", "build")
 	cmd.Dir = sourceDir
 	if err := cmd.Run(); err == nil {
 		return true
 	}
 
-	// Try go build
 	cmd = exec.Command("go", "build", "-o", outputPath, "./cmd/neurondb-mcp")
 	cmd.Dir = sourceDir
 	if err := cmd.Run(); err == nil {
@@ -100,15 +91,14 @@ func buildNeuronMCP(sourceDir, outputPath string) bool {
 	return false
 }
 
-// GetDefaultMCPConfig creates a default MCP configuration
-// Returns nil if NeuronMCP binary cannot be found
+/* GetDefaultMCPConfig creates a default MCP configuration
+Returns nil if NeuronMCP binary cannot be found */
 func GetDefaultMCPConfig() map[string]interface{} {
 	binaryPath := FindNeuronMCPBinary()
 	if binaryPath == "" {
 		return nil
 	}
 
-	// Get environment variables with defaults
 	host := getEnvOrDefault("NEURONDB_HOST", "localhost")
 	port := getEnvOrDefault("NEURONDB_PORT", "5432")
 	database := getEnvOrDefault("NEURONDB_DATABASE", "neurondb")
@@ -128,7 +118,7 @@ func GetDefaultMCPConfig() map[string]interface{} {
 	}
 }
 
-// getEnvOrDefault gets an environment variable or returns default
+/* getEnvOrDefault gets an environment variable or returns default */
 func getEnvOrDefault(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
@@ -136,7 +126,7 @@ func getEnvOrDefault(key, defaultValue string) string {
 	return defaultValue
 }
 
-// GetDefaultNeuronDBDSN creates a default NeuronDB DSN
+/* GetDefaultNeuronDBDSN creates a default NeuronDB DSN */
 func GetDefaultNeuronDBDSN() string {
 	host := getEnvOrDefault("NEURONDB_HOST", "localhost")
 	port := getEnvOrDefault("NEURONDB_PORT", "5432")

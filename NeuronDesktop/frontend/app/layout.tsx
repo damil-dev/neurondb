@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import AuthGuard from '@/components/AuthGuard'
 import ThemeProvider from '@/components/ThemeProvider'
+import ToastContainer from '@/components/Toast'
 import './globals.css'
 import 'highlight.js/styles/github-dark.css'
 
@@ -20,6 +21,7 @@ export default function RootLayout({
         <ThemeProvider>
           <AuthGuard>
             {children}
+            <ToastContainer />
           </AuthGuard>
         </ThemeProvider>
       </body>

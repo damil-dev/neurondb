@@ -15,21 +15,21 @@ func ValidateFilePath(path, fieldName string) error {
 	
 	path = strings.TrimSpace(path)
 	
-	// Check for path traversal attempts
+	/* Check for path traversal attempts */
 	if strings.Contains(path, "..") {
 		return fmt.Errorf("%s contains path traversal attempt: %s", fieldName, path)
 	}
 	
-	// Check for absolute paths (if you want to restrict to relative)
-	// This is optional - remove if absolute paths are allowed
+	/* Check for absolute paths (if you want to restrict to relative) */
+	/* This is optional - remove if absolute paths are allowed */
 	if filepath.IsAbs(path) {
-		// Allow absolute paths but validate they exist and are readable
+		/* Allow absolute paths but validate they exist and are readable */
 		if _, err := os.Stat(path); err != nil {
 			return fmt.Errorf("%s points to non-existent file: %w", fieldName, err)
 		}
 	}
 	
-	// Check for null bytes
+	/* Check for null bytes */
 	if strings.Contains(path, "\x00") {
 		return fmt.Errorf("%s contains null byte", fieldName)
 	}
@@ -51,7 +51,7 @@ func ValidateExecutablePath(path, fieldName string) error {
 		return err
 	}
 	
-	// Check if file exists and is executable
+	/* Check if file exists and is executable */
 	info, err := os.Stat(path)
 	if err != nil {
 		return fmt.Errorf("%s points to non-existent file: %w", fieldName, err)
@@ -61,7 +61,7 @@ func ValidateExecutablePath(path, fieldName string) error {
 		return fmt.Errorf("%s points to a directory, not a file: %s", fieldName, path)
 	}
 	
-	// Check if file is executable (Unix)
+	/* Check if file is executable (Unix) */
 	if info.Mode().Perm()&0111 == 0 {
 		return fmt.Errorf("%s is not executable: %s", fieldName, path)
 	}

@@ -4,7 +4,7 @@ import (
 	"time"
 )
 
-// Profile represents a connection profile
+/* Profile represents a connection profile */
 type Profile struct {
 	ID                string                 `json:"id"`
 	Name              string                 `json:"name"`
@@ -21,7 +21,7 @@ type Profile struct {
 	UpdatedAt         time.Time              `json:"updated_at"`
 }
 
-// APIKey represents an API key
+/* APIKey represents an API key */
 type APIKey struct {
 	ID         string     `json:"id"`
 	KeyHash    string     `json:"-"`
@@ -33,7 +33,7 @@ type APIKey struct {
 	CreatedAt  time.Time  `json:"created_at"`
 }
 
-// RequestLog represents a logged request/response
+/* RequestLog represents a logged request/response */
 type RequestLog struct {
 	ID           string                 `json:"id"`
 	ProfileID    *string                `json:"profile_id,omitempty"`
@@ -46,7 +46,33 @@ type RequestLog struct {
 	CreatedAt    time.Time              `json:"created_at"`
 }
 
-// ModelConfig represents a model configuration
+/* AuditLog represents an audit log entry */
+type AuditLog struct {
+	ID           string                 `json:"id"`
+	UserID       string                 `json:"user_id"`
+	Action       string                 `json:"action"`
+	ResourceType string                 `json:"resource_type"`
+	ResourceID   *string                `json:"resource_id,omitempty"`
+	Details      map[string]interface{} `json:"details,omitempty"`
+	IPAddress    *string                `json:"ip_address,omitempty"`
+	UserAgent    *string                `json:"user_agent,omitempty"`
+	CreatedAt    time.Time              `json:"created_at"`
+}
+
+/* AuditLog represents an audit log entry */
+type AuditLog struct {
+	ID           string                 `json:"id"`
+	UserID       string                 `json:"user_id"`
+	Action       string                 `json:"action"`
+	ResourceType string                 `json:"resource_type"`
+	ResourceID   *string                `json:"resource_id,omitempty"`
+	Details      map[string]interface{} `json:"details,omitempty"`
+	IPAddress    *string                `json:"ip_address,omitempty"`
+	UserAgent    *string                `json:"user_agent,omitempty"`
+	CreatedAt    time.Time              `json:"created_at"`
+}
+
+/* ModelConfig represents a model configuration */
 type ModelConfig struct {
 	ID            string                 `json:"id"`
 	ProfileID     string                 `json:"profile_id"`
@@ -61,14 +87,14 @@ type ModelConfig struct {
 	UpdatedAt     time.Time              `json:"updated_at"`
 }
 
-// AppSetting represents an application setting
+/* AppSetting represents an application setting */
 type AppSetting struct {
 	Key       string                 `json:"key"`
 	Value     map[string]interface{} `json:"value"`
 	UpdatedAt time.Time              `json:"updated_at"`
 }
 
-// User represents a user account
+/* User represents a user account */
 type User struct {
 	ID           string    `json:"id"`
 	Username     string    `json:"username"`

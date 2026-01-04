@@ -13,14 +13,14 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// Provider wraps OIDC provider and OAuth2 config
+/* Provider wraps OIDC provider and OAuth2 config */
 type Provider struct {
 	provider   *oidc.Provider
 	oauth2Conf *oauth2.Config
 	verifier   *oidc.IDTokenVerifier
 }
 
-// NewProvider creates a new OIDC provider
+/* NewProvider creates a new OIDC provider */
 func NewProvider(ctx context.Context, issuerURL, clientID, clientSecret, redirectURL string, scopes []string) (*Provider, error) {
 	provider, err := oidc.NewProvider(ctx, issuerURL)
 	if err != nil {
@@ -46,7 +46,7 @@ func NewProvider(ctx context.Context, issuerURL, clientID, clientSecret, redirec
 	}, nil
 }
 
-// AuthCodeURL generates the OAuth2 authorization URL with PKCE
+/* AuthCodeURL generates the OAuth2 authorization URL with PKCE */
 func (p *Provider) AuthCodeURL(state, nonce, codeVerifier string) (string, error) {
 	codeChallenge := base64URLEncode(sha256Hash(codeVerifier))
 
@@ -60,7 +60,7 @@ func (p *Provider) AuthCodeURL(state, nonce, codeVerifier string) (string, error
 	return url, nil
 }
 
-// ExchangeCode exchanges authorization code for tokens
+/* ExchangeCode exchanges authorization code for tokens */
 func (p *Provider) ExchangeCode(ctx context.Context, code, codeVerifier string) (*oauth2.Token, error) {
 	opts := []oauth2.AuthCodeOption{
 		oauth2.SetAuthURLParam("code_verifier", codeVerifier),
@@ -74,7 +74,7 @@ func (p *Provider) ExchangeCode(ctx context.Context, code, codeVerifier string) 
 	return token, nil
 }
 
-// VerifyIDToken verifies and extracts claims from ID token
+/* VerifyIDToken verifies and extracts claims from ID token */
 func (p *Provider) VerifyIDToken(ctx context.Context, rawIDToken string) (*oidc.IDToken, map[string]interface{}, error) {
 	idToken, err := p.verifier.Verify(ctx, rawIDToken)
 	if err != nil {
@@ -89,7 +89,7 @@ func (p *Provider) VerifyIDToken(ctx context.Context, rawIDToken string) (*oidc.
 	return idToken, claims, nil
 }
 
-// Claims represents OIDC user claims
+/* Claims represents OIDC user claims */
 type Claims struct {
 	Subject           string `json:"sub"`
 	Email             string `json:"email"`
@@ -101,7 +101,7 @@ type Claims struct {
 	Picture           string `json:"picture"`
 }
 
-// ExtractClaims extracts structured claims from raw claims map
+/* ExtractClaims extracts structured claims from raw claims map */
 func ExtractClaims(rawClaims map[string]interface{}) *Claims {
 	claims := &Claims{}
 
@@ -133,7 +133,7 @@ func ExtractClaims(rawClaims map[string]interface{}) *Claims {
 	return claims
 }
 
-// LoginAttempt represents a stored login attempt with state/nonce
+/* LoginAttempt represents a stored login attempt with state/nonce */
 type LoginAttempt struct {
 	ID           string
 	State        string
@@ -144,7 +144,7 @@ type LoginAttempt struct {
 	ExpiresAt    time.Time
 }
 
-// NewLoginAttempt creates a new login attempt
+/* NewLoginAttempt creates a new login attempt */
 func NewLoginAttempt(ttl time.Duration) (*LoginAttempt, error) {
 	state, err := generateRandomString(32)
 	if err != nil {
@@ -172,7 +172,7 @@ func NewLoginAttempt(ttl time.Duration) (*LoginAttempt, error) {
 	}, nil
 }
 
-// Helper functions
+/* Helper functions */
 
 func generateRandomString(length int) (string, error) {
 	bytes := make([]byte, length)

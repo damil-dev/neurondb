@@ -3,7 +3,11 @@ package metrics
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"os/exec"
 	"runtime"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/shirou/gopsutil/v3/cpu"
@@ -12,7 +16,7 @@ import (
 	"github.com/shirou/gopsutil/v3/net"
 )
 
-// SystemMetrics represents current system metrics
+/* SystemMetrics represents current system metrics */
 type SystemMetrics struct {
 	Timestamp time.Time      `json:"timestamp"`
 	CPU       CPUMetrics     `json:"cpu"`
@@ -23,7 +27,7 @@ type SystemMetrics struct {
 	GPU       GPUMetrics     `json:"gpu,omitempty"`
 }
 
-// CPUMetrics contains CPU usage information
+/* CPUMetrics contains CPU usage information */
 type CPUMetrics struct {
 	UsagePercent float64   `json:"usage_percent"`
 	UsagePerCore []float64 `json:"usage_per_core,omitempty"`
@@ -32,7 +36,7 @@ type CPUMetrics struct {
 	Temperature  float64   `json:"temperature,omitempty"`
 }
 
-// MemoryMetrics contains memory usage information
+/* MemoryMetrics contains memory usage information */
 type MemoryMetrics struct {
 	Total       uint64  `json:"total"`
 	Used        uint64  `json:"used"`
@@ -43,7 +47,7 @@ type MemoryMetrics struct {
 	Buffers     uint64  `json:"buffers,omitempty"`
 }
 
-// DiskMetrics contains disk usage information
+/* DiskMetrics contains disk usage information */
 type DiskMetrics struct {
 	Total       uint64  `json:"total"`
 	Used        uint64  `json:"used"`
@@ -55,7 +59,7 @@ type DiskMetrics struct {
 	WriteCount  uint64  `json:"write_count,omitempty"`
 }
 
-// NetworkMetrics contains network usage information
+/* NetworkMetrics contains network usage information */
 type NetworkMetrics struct {
 	BytesSent     uint64  `json:"bytes_sent"`
 	BytesRecv     uint64  `json:"bytes_recv"`
@@ -65,7 +69,7 @@ type NetworkMetrics struct {
 	BytesRecvRate float64 `json:"bytes_recv_rate,omitempty"`
 }
 
-// ProcessMetrics contains process information
+/* ProcessMetrics contains process information */
 type ProcessMetrics struct {
 	Count      int    `json:"count"`
 	GoRoutines int    `json:"go_routines"`
@@ -75,7 +79,7 @@ type ProcessMetrics struct {
 	HeapInuse  uint64 `json:"heap_inuse"`
 }
 
-// GPUMetrics contains GPU usage information (if available)
+/* GPUMetrics contains GPU usage information (if available) */
 type GPUMetrics struct {
 	Available   bool        `json:"available"`
 	Count       int         `json:"count,omitempty"`
@@ -84,7 +88,7 @@ type GPUMetrics struct {
 	Temperature []float64   `json:"temperature,omitempty"`
 }
 
-// GPUMemory contains GPU memory information
+/* GPUMemory contains GPU memory information */
 type GPUMemory struct {
 	Total uint64 `json:"total"`
 	Used  uint64 `json:"used"`
@@ -96,13 +100,12 @@ var (
 	lastNetworkTime  time.Time
 )
 
-// CollectSystemMetrics collects current system metrics
+/* CollectSystemMetrics collects current system metrics */
 func CollectSystemMetrics(ctx context.Context) (*SystemMetrics, error) {
 	metrics := &SystemMetrics{
 		Timestamp: time.Now(),
 	}
 
-	// CPU Metrics
 	cpuPercent, err := cpu.PercentWithContext(ctx, time.Second, false)
 	if err == nil && len(cpuPercent) > 0 {
 		metrics.CPU.UsagePercent = cpuPercent[0]
@@ -123,7 +126,6 @@ func CollectSystemMetrics(ctx context.Context) (*SystemMetrics, error) {
 		metrics.CPU.Frequency = cpuInfo[0].Mhz
 	}
 
-	// Memory Metrics
 	memStat, err := mem.VirtualMemoryWithContext(ctx)
 	if err == nil {
 		metrics.Memory.Total = memStat.Total
@@ -135,7 +137,6 @@ func CollectSystemMetrics(ctx context.Context) (*SystemMetrics, error) {
 		metrics.Memory.Buffers = memStat.Buffers
 	}
 
-	// Disk Metrics
 	diskStat, err := disk.UsageWithContext(ctx, "/")
 	if err == nil {
 		metrics.Disk.Total = diskStat.Total
@@ -160,7 +161,6 @@ func CollectSystemMetrics(ctx context.Context) (*SystemMetrics, error) {
 		metrics.Disk.WriteCount = totalWriteCount
 	}
 
-	// Network Metrics
 	netIO, err := net.IOCountersWithContext(ctx, false)
 	if err == nil && len(netIO) > 0 {
 		stats := netIO[0]
@@ -169,7 +169,6 @@ func CollectSystemMetrics(ctx context.Context) (*SystemMetrics, error) {
 		metrics.Network.PacketsSent = stats.PacketsSent
 		metrics.Network.PacketsRecv = stats.PacketsRecv
 
-		// Calculate rates if we have previous stats
 		if lastNetworkStats != nil && !lastNetworkTime.IsZero() {
 			elapsed := time.Since(lastNetworkTime).Seconds()
 			if elapsed > 0 {
@@ -181,7 +180,6 @@ func CollectSystemMetrics(ctx context.Context) (*SystemMetrics, error) {
 		lastNetworkTime = time.Now()
 	}
 
-	// Process Metrics (Go runtime)
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
 	metrics.Process.GoRoutines = runtime.NumGoroutine()
@@ -190,14 +188,197 @@ func CollectSystemMetrics(ctx context.Context) (*SystemMetrics, error) {
 	metrics.Process.HeapIdle = m.HeapIdle
 	metrics.Process.HeapInuse = m.HeapInuse
 
-	// GPU Metrics (placeholder - would need nvidia-ml-py or similar)
-	metrics.GPU.Available = false
-	// TODO: Add GPU detection using nvidia-smi or similar
+	gpuMetrics, err := detectGPU(ctx)
+	if err == nil {
+		metrics.GPU = *gpuMetrics
+	} else {
+		metrics.GPU.Available = false
+	}
 
 	return metrics, nil
 }
 
-// GetMetricsJSON returns metrics as JSON string
+/* detectGPU detects and collects GPU metrics */
+func detectGPU(ctx context.Context) (*GPUMetrics, error) {
+	metrics := &GPUMetrics{
+		Available: false,
+	}
+
+	if nvidiaMetrics, err := detectNVIDIAGPU(ctx); err == nil {
+		metrics = nvidiaMetrics
+		return metrics, nil
+	}
+
+	if amdMetrics, err := detectAMDGPU(ctx); err == nil {
+		metrics = amdMetrics
+		return metrics, nil
+	}
+
+	if runtime.GOOS == "darwin" {
+		if metalMetrics, err := detectAppleMetalGPU(ctx); err == nil {
+			metrics = metalMetrics
+			return metrics, nil
+		}
+	}
+
+	return metrics, fmt.Errorf("no GPU detected")
+}
+
+/* detectNVIDIAGPU detects NVIDIA GPUs using nvidia-smi */
+func detectNVIDIAGPU(ctx context.Context) (*GPUMetrics, error) {
+	cmd := exec.CommandContext(ctx, "nvidia-smi", "--query-gpu=index,name,utilization.gpu,memory.used,memory.total,temperature.gpu", "--format=csv,noheader,nounits")
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("nvidia-smi not available: %w", err)
+	}
+
+	metrics := &GPUMetrics{
+		Available: true,
+		Usage:     []float64{},
+		Memory:    []GPUMemory{},
+		Temperature: []float64{},
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	metrics.Count = len(lines)
+
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+
+		parts := strings.Split(line, ", ")
+		if len(parts) < 6 {
+			continue
+		}
+
+		if usage, err := strconv.ParseFloat(strings.TrimSpace(parts[2]), 64); err == nil {
+			metrics.Usage = append(metrics.Usage, usage)
+		}
+
+		memUsed, _ := strconv.ParseUint(strings.TrimSpace(parts[3]), 10, 64)
+		memTotal, _ := strconv.ParseUint(strings.TrimSpace(parts[4]), 10, 64)
+		metrics.Memory = append(metrics.Memory, GPUMemory{
+			Used:  memUsed * 1024 * 1024, // Convert MB to bytes
+			Total: memTotal * 1024 * 1024,
+			Free:  (memTotal - memUsed) * 1024 * 1024,
+		})
+
+		if temp, err := strconv.ParseFloat(strings.TrimSpace(parts[5]), 64); err == nil {
+			metrics.Temperature = append(metrics.Temperature, temp)
+		}
+	}
+
+	if metrics.Count == 0 {
+		return nil, fmt.Errorf("no NVIDIA GPUs found")
+	}
+
+	return metrics, nil
+}
+
+/* detectAMDGPU detects AMD GPUs using rocm-smi */
+func detectAMDGPU(ctx context.Context) (*GPUMetrics, error) {
+	cmd := exec.CommandContext(ctx, "rocm-smi", "--showid", "--showtemp", "--showmemuse", "--showmeminfo", "vram", "--csv")
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("rocm-smi not available: %w", err)
+	}
+
+	metrics := &GPUMetrics{
+		Available:   true,
+		Usage:       []float64{},
+		Memory:      []GPUMemory{},
+		Temperature: []float64{},
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	if len(lines) < 2 {
+		return nil, fmt.Errorf("invalid rocm-smi output")
+	}
+
+	for i := 1; i < len(lines); i++ {
+		line := strings.TrimSpace(lines[i])
+		if line == "" {
+			continue
+		}
+
+		parts := strings.Split(line, ",")
+		if len(parts) < 5 {
+			continue
+		}
+
+		memParts := strings.Split(strings.TrimSpace(parts[4]), "/")
+		if len(memParts) == 2 {
+			memUsed, _ := strconv.ParseUint(strings.TrimSpace(memParts[0]), 10, 64)
+			memTotal, _ := strconv.ParseUint(strings.TrimSpace(memParts[1]), 10, 64)
+			metrics.Memory = append(metrics.Memory, GPUMemory{
+				Used:  memUsed * 1024 * 1024, // Convert MB to bytes
+				Total: memTotal * 1024 * 1024,
+				Free:  (memTotal - memUsed) * 1024 * 1024,
+			})
+		}
+
+		if temp, err := strconv.ParseFloat(strings.TrimSpace(parts[2]), 64); err == nil {
+			metrics.Temperature = append(metrics.Temperature, temp)
+		}
+
+		metrics.Usage = append(metrics.Usage, 0.0)
+	}
+
+	metrics.Count = len(metrics.Memory)
+	if metrics.Count == 0 {
+		return nil, fmt.Errorf("no AMD GPUs found")
+	}
+
+	return metrics, nil
+}
+
+/* detectAppleMetalGPU detects Apple Metal GPUs using system_profiler */
+func detectAppleMetalGPU(ctx context.Context) (*GPUMetrics, error) {
+	cmd := exec.CommandContext(ctx, "system_profiler", "SPDisplaysDataType", "-json")
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("system_profiler not available: %w", err)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(output, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse system_profiler output: %w", err)
+	}
+
+	metrics := &GPUMetrics{
+		Available:   true,
+		Usage:       []float64{},
+		Memory:      []GPUMemory{},
+		Temperature: []float64{},
+	}
+
+	if displays, ok := result["SPDisplaysData"].([]interface{}); ok {
+		for _, display := range displays {
+			if displayMap, ok := display.(map[string]interface{}); ok {
+				if gpuName, ok := displayMap["sppci_model"].(string); ok && strings.Contains(strings.ToLower(gpuName), "metal") {
+					metrics.Count++
+
+					metrics.Memory = append(metrics.Memory, GPUMemory{
+						Total: 0, // Not available via system_profiler
+						Used:  0,
+						Free:  0,
+					})
+					metrics.Usage = append(metrics.Usage, 0.0) // Not available
+					metrics.Temperature = append(metrics.Temperature, 0.0) // Not available
+				}
+			}
+		}
+	}
+
+	if metrics.Count == 0 {
+		return nil, fmt.Errorf("no Apple Metal GPUs found")
+	}
+
+	return metrics, nil
+}
+
+/* GetMetricsJSON returns metrics as JSON string */
 func GetMetricsJSON(ctx context.Context) (string, error) {
 	metrics, err := CollectSystemMetrics(ctx)
 	if err != nil {

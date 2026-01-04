@@ -9,18 +9,19 @@ import (
 
 	"github.com/neurondb/NeuronDesktop/api/internal/db"
 	"github.com/neurondb/NeuronDesktop/api/internal/logging"
+	"github.com/neurondb/NeuronDesktop/api/internal/mcp"
 	"github.com/neurondb/NeuronDesktop/api/internal/utils"
 	"golang.org/x/crypto/bcrypt"
 )
 
-// Bootstrap handles all application initialization tasks
+/* Bootstrap handles all application initialization tasks */
 type Bootstrap struct {
 	queries   *db.Queries
 	logger    *logging.Logger
 	validator *Validator
 }
 
-// NewBootstrap creates a new bootstrap instance
+/* NewBootstrap creates a new bootstrap instance */
 func NewBootstrap(queries *db.Queries, logger *logging.Logger) *Bootstrap {
 	return &Bootstrap{
 		queries:   queries,
@@ -29,7 +30,7 @@ func NewBootstrap(queries *db.Queries, logger *logging.Logger) *Bootstrap {
 	}
 }
 
-// Initialize performs all initialization tasks in the correct order
+/* Initialize performs all initialization tasks in the correct order */
 func (b *Bootstrap) Initialize(ctx context.Context) error {
 	metrics := NewBootstrapMetrics()
 	defer metrics.Finish()
@@ -37,7 +38,6 @@ func (b *Bootstrap) Initialize(ctx context.Context) error {
 
 	b.logger.Info("Starting application bootstrap sequence", nil)
 
-	// Step 1: Ensure default admin user exists (with retry)
 	stepStart := time.Now()
 	adminUser, err := b.ensureAdminUserWithRetry(ctx)
 	if err != nil {
@@ -46,7 +46,6 @@ func (b *Bootstrap) Initialize(ctx context.Context) error {
 	}
 	metrics.TrackStep("admin_user", time.Since(stepStart), true)
 
-	// Step 2: Validate admin user
 	validationStart := time.Now()
 	if validation := b.validator.ValidateAdminUser(ctx, b.queries); !validation.Valid {
 		b.logger.Info("Admin user validation failed", map[string]interface{}{
@@ -60,7 +59,6 @@ func (b *Bootstrap) Initialize(ctx context.Context) error {
 		metrics.TrackStep("validation", time.Since(validationStart), true)
 	}
 
-	// Step 3: Ensure default profile exists (with retry)
 	profileStart := time.Now()
 	defaultProfile, err := b.ensureDefaultProfileWithRetry(ctx, adminUser)
 	if err != nil {
@@ -69,7 +67,6 @@ func (b *Bootstrap) Initialize(ctx context.Context) error {
 	}
 	metrics.TrackStep("profile", time.Since(profileStart), true)
 
-	// Step 4: Initialize profile database schema (with retry)
 	if defaultProfile != nil {
 		schemaStart := time.Now()
 		if err := b.initializeProfileSchemaWithRetry(ctx, defaultProfile); err != nil {
@@ -82,7 +79,6 @@ func (b *Bootstrap) Initialize(ctx context.Context) error {
 		}
 	}
 
-	// Step 5: Validate profile
 	if defaultProfile != nil {
 		if validation := b.validator.ValidateProfile(ctx, b.queries); !validation.Valid {
 			b.logger.Info("Profile validation failed", map[string]interface{}{
@@ -91,12 +87,10 @@ func (b *Bootstrap) Initialize(ctx context.Context) error {
 		}
 	}
 
-	// Step 6: Verify connections
 	if defaultProfile != nil {
 		b.verifyConnections(ctx, defaultProfile)
 	}
 
-	// Step 7: Perform health check
 	healthStart := time.Now()
 	healthChecker := NewHealthChecker(b.queries, b.logger)
 	healthStatus := healthChecker.CheckAll(ctx)
@@ -118,7 +112,7 @@ func (b *Bootstrap) Initialize(ctx context.Context) error {
 	return nil
 }
 
-// ensureAdminUserWithRetry ensures admin user exists with retry logic
+/* ensureAdminUserWithRetry ensures admin user exists with retry logic */
 func (b *Bootstrap) ensureAdminUserWithRetry(ctx context.Context) (*db.User, error) {
 	var adminUser *db.User
 	var err error
@@ -135,7 +129,7 @@ func (b *Bootstrap) ensureAdminUserWithRetry(ctx context.Context) (*db.User, err
 	return adminUser, nil
 }
 
-// ensureDefaultProfileWithRetry ensures default profile exists with retry logic
+/* ensureDefaultProfileWithRetry ensures default profile exists with retry logic */
 func (b *Bootstrap) ensureDefaultProfileWithRetry(ctx context.Context, adminUser *db.User) (*db.Profile, error) {
 	var defaultProfile *db.Profile
 	var err error
@@ -152,7 +146,7 @@ func (b *Bootstrap) ensureDefaultProfileWithRetry(ctx context.Context, adminUser
 	return defaultProfile, nil
 }
 
-// initializeProfileSchemaWithRetry initializes schema with retry logic
+/* initializeProfileSchemaWithRetry initializes schema with retry logic */
 func (b *Bootstrap) initializeProfileSchemaWithRetry(ctx context.Context, profile *db.Profile) error {
 	retryFunc := func(ctx context.Context) error {
 		return b.initializeProfileSchema(ctx, profile)
@@ -161,19 +155,19 @@ func (b *Bootstrap) initializeProfileSchemaWithRetry(ctx context.Context, profil
 	return RetryWithBackoff(ctx, b.logger, "initialize profile schema", retryFunc)
 }
 
-// ensureAdminUser ensures the default admin user exists
+/* ensureAdminUser ensures the default admin user exists */
 func (b *Bootstrap) ensureAdminUser(ctx context.Context) (*db.User, error) {
 	b.logger.Info("Checking for default admin user", nil)
 
 	adminUser, err := b.queries.GetUserByUsername(ctx, "admin")
 	if err != nil {
-		// Admin user doesn't exist, create it
+		/* Admin user doesn't exist, create it */
 		b.logger.Info("Creating default admin user", nil)
 
-		// Get admin password from environment or generate a random one
+		/* Get admin password from environment or generate a random one */
 		adminPassword := os.Getenv("ADMIN_PASSWORD")
 		if adminPassword == "" {
-			// Generate a random password and log it (one-time setup)
+			/* Generate a random password and log it (one-time setup) */
 			adminPassword = fmt.Sprintf("admin-%d", time.Now().Unix())
 			b.logger.Info("⚠️  ADMIN_PASSWORD not set - using temporary password", map[string]interface{}{
 				"password": adminPassword,
@@ -212,7 +206,7 @@ func (b *Bootstrap) ensureAdminUser(ctx context.Context) (*db.User, error) {
 	return adminUser, nil
 }
 
-// ensureDefaultProfile ensures the default profile exists
+/* ensureDefaultProfile ensures the default profile exists */
 func (b *Bootstrap) ensureDefaultProfile(ctx context.Context, adminUser *db.User) (*db.Profile, error) {
 	b.logger.Info("Checking for default profile", nil)
 
@@ -220,17 +214,17 @@ func (b *Bootstrap) ensureDefaultProfile(ctx context.Context, adminUser *db.User
 	if err != nil || defaultProfile == nil {
 		b.logger.Info("Creating default profile", nil)
 
-		// Determine user ID for profile
+		/* Determine user ID for profile */
 		userID := "default"
 		if adminUser != nil {
 			userID = adminUser.ID
 		}
 
-		// Get default configuration
+		/* Get default configuration */
 		neurondbDSN := utils.GetDefaultNeuronDBDSN()
 		mcpConfig := utils.GetDefaultMCPConfig()
 
-		// Hash password for admin profile (use same as admin user password)
+		/* Hash password for admin profile (use same as admin user password) */
 		adminPassword := os.Getenv("ADMIN_PASSWORD")
 		if adminPassword == "" {
 			adminPassword = fmt.Sprintf("admin-%d", time.Now().Unix())
@@ -261,7 +255,7 @@ func (b *Bootstrap) ensureDefaultProfile(ctx context.Context, adminUser *db.User
 			return nil, fmt.Errorf("failed to set default profile: %w", err)
 		}
 
-		// Create default model configurations
+		/* Create default model configurations */
 		if err := utils.CreateDefaultModelsForProfile(ctx, b.queries, defaultProfile.ID); err != nil {
 			b.logger.Error("Failed to create default models", err, map[string]interface{}{
 				"profile_id": defaultProfile.ID,
@@ -278,7 +272,7 @@ func (b *Bootstrap) ensureDefaultProfile(ctx context.Context, adminUser *db.User
 			"user_id":    defaultProfile.UserID,
 		})
 
-		// Reload to get full profile data
+		/* Reload to get full profile data */
 		defaultProfile, _ = b.queries.GetDefaultProfile(ctx)
 		return defaultProfile, nil
 	}
@@ -290,7 +284,7 @@ func (b *Bootstrap) ensureDefaultProfile(ctx context.Context, adminUser *db.User
 	return defaultProfile, nil
 }
 
-// initializeProfileSchema initializes the database schema for a profile
+/* initializeProfileSchema initializes the database schema for a profile */
 func (b *Bootstrap) initializeProfileSchema(ctx context.Context, profile *db.Profile) error {
 	b.logger.Info("Initializing database schema for profile", map[string]interface{}{
 		"profile_id": profile.ID,
@@ -307,22 +301,22 @@ func (b *Bootstrap) initializeProfileSchema(ctx context.Context, profile *db.Pro
 	return nil
 }
 
-// verifyConnections verifies connections for a profile
+/* verifyConnections verifies connections for a profile */
 func (b *Bootstrap) verifyConnections(ctx context.Context, profile *db.Profile) {
 	b.logger.Info("Verifying connections for default profile", map[string]interface{}{
 		"profile_id": profile.ID,
 	})
 
-	// Verify PostgreSQL (NeuronDB) connection
+	/* Verify PostgreSQL (NeuronDB) connection */
 	b.verifyPostgreSQLConnection(ctx, profile)
 
-	// Verify MCP server connection
+	/* Verify MCP server connection */
 	if profile.MCPConfig != nil {
 		b.verifyMCPConnection(ctx, profile)
 	}
 }
 
-// verifyPostgreSQLConnection verifies the PostgreSQL connection
+/* verifyPostgreSQLConnection verifies the PostgreSQL connection */
 func (b *Bootstrap) verifyPostgreSQLConnection(ctx context.Context, profile *db.Profile) {
 	b.logger.Info("Verifying PostgreSQL (NeuronDB) connection", map[string]interface{}{
 		"dsn": profile.NeuronDBDSN,
@@ -351,7 +345,7 @@ func (b *Bootstrap) verifyPostgreSQLConnection(ctx context.Context, profile *db.
 		"dsn": profile.NeuronDBDSN,
 	})
 
-	// Test NeuronDB extension (optional - may not be installed)
+	/* Test NeuronDB extension (optional - may not be installed) */
 	var version string
 	if err := conn.QueryRowContext(testCtx, "SELECT neurondb.version()").Scan(&version); err == nil {
 		b.logger.Info("✓ NeuronDB extension verified", map[string]interface{}{
@@ -362,12 +356,120 @@ func (b *Bootstrap) verifyPostgreSQLConnection(ctx context.Context, profile *db.
 	}
 }
 
-// verifyMCPConnection verifies the MCP server connection
+/* verifyMCPConnection verifies the MCP server connection */
 func (b *Bootstrap) verifyMCPConnection(ctx context.Context, profile *db.Profile) {
-	// This is a placeholder - MCP verification would require MCPManager
-	// For now, just log that we would verify it
-	b.logger.Info("MCP connection verification", map[string]interface{}{
-		"command": profile.MCPConfig["command"],
+	if profile.MCPConfig == nil {
+		b.logger.Info("MCP connection verification skipped - no MCP config", map[string]interface{}{
+			"profile_id": profile.ID,
+		})
+		return
+	}
+
+	b.logger.Info("Verifying MCP connection", map[string]interface{}{
+		"profile_id": profile.ID,
+		"command":    profile.MCPConfig["command"],
 	})
-	// TODO: Implement MCP connection verification using MCPManager
+
+	/* Create MCP config from profile */
+	mcpConfig := mcp.MCPConfig{
+		Command: "/home/pge/pge/neurondb/NeuronMCP/bin/neurondb-mcp", // Default
+		Args:    []string{},
+		Env:     make(map[string]string),
+	}
+
+	/* Set default database environment variables from profile's NeuronDB DSN */
+	if profile.NeuronDBDSN != "" {
+		mcpConfig.Env["NEURONDB_CONNECTION_STRING"] = profile.NeuronDBDSN
+	}
+
+	/* Override with profile MCP config */
+	if cmd, ok := profile.MCPConfig["command"].(string); ok && cmd != "" {
+		mcpConfig.Command = cmd
+	}
+	if args, ok := profile.MCPConfig["args"].([]interface{}); ok {
+		for _, arg := range args {
+			if s, ok := arg.(string); ok {
+				mcpConfig.Args = append(mcpConfig.Args, s)
+			}
+		}
+	}
+	if env, ok := profile.MCPConfig["env"].(map[string]interface{}); ok {
+		for k, v := range env {
+			if s, ok := v.(string); ok {
+				mcpConfig.Env[k] = s
+			}
+		}
+	}
+
+	/* Retry logic with exponential backoff */
+	maxRetries := 3
+	baseDelay := 2 * time.Second
+	var lastErr error
+
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		if attempt > 0 {
+			delay := baseDelay * time.Duration(1<<uint(attempt-1)) // Exponential backoff
+			b.logger.Info("Retrying MCP connection verification", map[string]interface{}{
+				"attempt": attempt + 1,
+				"delay":    delay.String(),
+			})
+			select {
+			case <-ctx.Done():
+				b.logger.Info("MCP connection verification cancelled", nil)
+				return
+			case <-time.After(delay):
+			}
+		}
+
+		/* Create a temporary client for verification */
+		testClient, err := mcp.NewClient(mcpConfig)
+		if err != nil {
+			lastErr = err
+			b.logger.Info("Failed to create MCP client for verification", map[string]interface{}{
+				"attempt": attempt + 1,
+				"error":   err.Error(),
+			})
+			continue
+		}
+
+		/* Verify client is alive */
+		if !testClient.IsAlive() {
+			testClient.Close()
+			lastErr = fmt.Errorf("MCP client is not alive")
+			b.logger.Info("MCP client not alive", map[string]interface{}{
+				"attempt": attempt + 1,
+			})
+			continue
+		}
+
+		/* Try to list tools as a health check */
+		_, err = testClient.ListTools()
+
+		if err != nil {
+			testClient.Close()
+			lastErr = err
+			b.logger.Info("Failed to list MCP tools during verification", map[string]interface{}{
+				"attempt": attempt + 1,
+				"error":   err.Error(),
+			})
+			continue
+		}
+
+		/* Success - close test client and log success */
+		testClient.Close()
+		b.logger.Info("✓ MCP connection verified successfully", map[string]interface{}{
+			"profile_id": profile.ID,
+			"command":    mcpConfig.Command,
+			"attempts":   attempt + 1,
+		})
+		return
+	}
+
+	/* All retries failed */
+	b.logger.Info("⚠ MCP connection verification failed after retries", map[string]interface{}{
+		"profile_id": profile.ID,
+		"command":    mcpConfig.Command,
+		"error":      lastErr.Error(),
+		"attempts":   maxRetries,
+	})
 }

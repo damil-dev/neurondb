@@ -229,7 +229,10 @@ function MCPPage() {
     lastLoadedProfileRef.current = selectedProfile
     threadsLoadingRef.current = true
     
-    const loadThreads = async () => {
+    let retryCount = 0
+    const maxRetries = 2
+    
+    const loadThreads = async (): Promise<void> => {
       if (!isMountedRef.current || !selectedProfile) {
         threadsLoadingRef.current = false
         return
@@ -243,26 +246,44 @@ function MCPPage() {
         const apiThreads = response.data || []
         
         if (apiThreads.length > 0) {
-          // Load full thread data with messages
+          // Load full thread data with messages (with timeout per thread)
+          const loadThreadWithTimeout = async (apiThread: MCPThread, timeout: number = 5000): Promise<Thread | null> => {
+            try {
+              const threadResponse = await Promise.race([
+                mcpAPI.getThread(selectedProfile, apiThread.id),
+                new Promise<never>((_, reject) => 
+                  setTimeout(() => reject(new Error('Thread load timeout')), timeout)
+                )
+              ])
+              return convertAPIThreadToLocal(threadResponse.data)
+            } catch (error) {
+              logError(`loadThread - ${apiThread.id}`, error, { threadId: apiThread.id, selectedProfile })
+              return null
+            }
+          }
+          
           const threadsWithMessages = (await Promise.all(
-            apiThreads.map(async (apiThread) => {
-              try {
-                const threadResponse = await mcpAPI.getThread(selectedProfile, apiThread.id)
-                return convertAPIThreadToLocal(threadResponse.data)
-              } catch (error) {
-                logError(`loadThread - ${apiThread.id}`, error, { threadId: apiThread.id, selectedProfile })
-                return null
-              }
-            })
+            apiThreads.map(thread => loadThreadWithTimeout(thread))
           )).filter((thread): thread is Thread => thread !== null)
           
           if (!isMountedRef.current) return
           
           if (threadsWithMessages.length > 0) {
             setThreads(threadsWithMessages)
-            setActiveThreadId(threadsWithMessages[0].id)
+            // Only set active thread if we don't already have one selected
+            if (!activeThreadId || !threadsWithMessages.find(t => t.id === activeThreadId)) {
+              setActiveThreadId(threadsWithMessages[0].id)
+            }
           } else {
-            // All threads failed to load, create a new one
+            // All threads failed to load - only create new one if we don't have any threads
+            if (threads.length === 0 && retryCount < maxRetries) {
+              retryCount++
+              console.log(`All threads failed to load, retrying (${retryCount}/${maxRetries})...`)
+              await new Promise(resolve => setTimeout(resolve, 1000 * retryCount)) // Exponential backoff
+              return loadThreads()
+            }
+            
+            // Create a new thread only once
             try {
               const newThread = await createNewThreadInDB()
               if (isMountedRef.current) {
@@ -271,33 +292,54 @@ function MCPPage() {
               }
             } catch (error) {
               logError('loadThreads - createNewThread fallback', error, { selectedProfile })
+              if (isMountedRef.current) {
+                setMcpError('Failed to load threads and create new thread. Please check database connection.')
+              }
             }
           }
         } else {
-          // Create initial thread if none exist
+          // Create initial thread if none exist (only once)
+          if (threads.length === 0) {
+            try {
+              const newThread = await createNewThreadInDB()
+              if (isMountedRef.current) {
+                setThreads([newThread])
+                setActiveThreadId(newThread.id)
+              }
+            } catch (error) {
+              logError('loadThreads - createInitialThread', error, { selectedProfile })
+              if (isMountedRef.current) {
+                setMcpError('Failed to create initial thread. Please check database connection.')
+              }
+            }
+          }
+        }
+      } catch (error: any) {
+        logError('loadThreads', error, { selectedProfile, retryCount })
+        
+        // Only retry if we haven't exceeded max retries and don't have threads
+        if (retryCount < maxRetries && threads.length === 0) {
+          retryCount++
+          console.log(`Thread loading failed, retrying (${retryCount}/${maxRetries})...`)
+          await new Promise(resolve => setTimeout(resolve, 1000 * retryCount)) // Exponential backoff
+          return loadThreads()
+        }
+        
+        // Try to create initial thread on error (only if we don't have threads)
+        if (threads.length === 0) {
           try {
             const newThread = await createNewThreadInDB()
             if (isMountedRef.current) {
               setThreads([newThread])
               setActiveThreadId(newThread.id)
+              setMcpError(null) // Clear error if thread creation succeeds
             }
-          } catch (error) {
-            logError('loadThreads - createInitialThread', error, { selectedProfile })
+          } catch (createError: any) {
+            logError('loadThreads - createThreadOnError', createError, { selectedProfile, originalError: error })
+            if (isMountedRef.current) {
+              setMcpError('Failed to load or create threads. Please check database connection and migration status.')
+            }
           }
-        }
-      } catch (error: any) {
-        logError('loadThreads', error, { selectedProfile })
-        
-        // Try to create initial thread on error (might fail if tables don't exist)
-        try {
-          const newThread = await createNewThreadInDB()
-          if (isMountedRef.current) {
-            setThreads([newThread])
-            setActiveThreadId(newThread.id)
-            setMcpError(null) // Clear error if thread creation succeeds
-          }
-        } catch (createError: any) {
-          logError('loadThreads - createThreadOnError', createError, { selectedProfile, originalError: error })
         }
       } finally {
         threadsLoadingRef.current = false
@@ -307,7 +349,13 @@ function MCPPage() {
       }
     }
     
-    loadThreads()
+    loadThreads().catch((error) => {
+      logError('loadThreads - unhandled error', error, { selectedProfile })
+      threadsLoadingRef.current = false
+      if (isMountedRef.current) {
+        setLoadingThreads(false)
+      }
+    })
   }, [selectedProfile])
 
   // Convert API thread format to local format
@@ -688,8 +736,37 @@ function MCPPage() {
       if (!isMountedRef.current) return
       setConnecting(false)
       setConnected(false)
-      if (event.code !== 1000) {
-        // Only show the first error message
+      
+      // Handle different close codes with reconnection logic
+      if (event.code === 1000 || event.code === 1001) {
+        // Normal closure - allow auto-reconnect
+        shouldAutoConnectRef.current = true
+        reconnectAttemptRef.current = 0
+      } else if (event.code === 1006) {
+        // Abnormal closure - attempt reconnection with exponential backoff
+        if (shouldAutoConnectRef.current && reconnectAttemptRef.current < 5) {
+          reconnectAttemptRef.current++
+          const delay = Math.min(1000 * Math.pow(2, reconnectAttemptRef.current - 1), 30000) // Max 30s
+          console.log(`WebSocket closed abnormally. Reconnecting in ${delay}ms (attempt ${reconnectAttemptRef.current}/5)...`)
+          setTimeout(() => {
+            if (isMountedRef.current && shouldAutoConnectRef.current && selectedProfile) {
+              connectWebSocket()
+            }
+          }, delay)
+          if (!errorShownRef.current) {
+            setMcpError(`Connection lost. Reconnecting... (attempt ${reconnectAttemptRef.current}/5)`)
+            errorShownRef.current = true
+          }
+        } else {
+          // Max retries reached
+          if (!errorShownRef.current) {
+            setMcpError('Connection lost. Maximum reconnection attempts reached. Please refresh the page.')
+            errorShownRef.current = true
+          }
+          shouldAutoConnectRef.current = false
+        }
+      } else {
+        // Other error codes - show error but allow manual reconnect
         if (!errorShownRef.current) {
           // Common close codes that indicate server not running
           if (event.code === 1006 || event.code === 1001) {
@@ -699,11 +776,7 @@ function MCPPage() {
           }
           errorShownRef.current = true
         }
-        // Stop auto-reconnecting - user must manually connect
         shouldAutoConnectRef.current = false
-      } else {
-        // Normal close - allow auto-reconnect on next profile change
-        shouldAutoConnectRef.current = true
       }
     }
     

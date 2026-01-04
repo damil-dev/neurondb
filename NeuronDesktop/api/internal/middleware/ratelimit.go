@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// RateLimiter provides rate limiting functionality
+/* RateLimiter provides rate limiting functionality */
 type RateLimiter struct {
 	requests map[string][]time.Time
 	mu       sync.RWMutex
@@ -15,7 +15,7 @@ type RateLimiter struct {
 	window   time.Duration
 }
 
-// NewRateLimiter creates a new rate limiter
+/* NewRateLimiter creates a new rate limiter */
 func NewRateLimiter(limit int, window time.Duration) *RateLimiter {
 	rl := &RateLimiter{
 		requests: make(map[string][]time.Time),
@@ -23,13 +23,12 @@ func NewRateLimiter(limit int, window time.Duration) *RateLimiter {
 		window:   window,
 	}
 
-	// Cleanup old entries periodically
 	go rl.cleanup()
 
 	return rl
 }
 
-// Allow checks if a request is allowed
+/* Allow checks if a request is allowed */
 func (rl *RateLimiter) Allow(key string) bool {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
@@ -37,14 +36,12 @@ func (rl *RateLimiter) Allow(key string) bool {
 	now := time.Now()
 	cutoff := now.Add(-rl.window)
 
-	// Get or create request history
 	history, exists := rl.requests[key]
 	if !exists {
 		rl.requests[key] = []time.Time{now}
 		return true
 	}
 
-	// Remove old requests
 	filtered := make([]time.Time, 0)
 	for _, t := range history {
 		if t.After(cutoff) {
@@ -52,19 +49,18 @@ func (rl *RateLimiter) Allow(key string) bool {
 		}
 	}
 
-	// Check if limit exceeded
+	/* Check if limit exceeded */
 	if len(filtered) >= rl.limit {
 		return false
 	}
 
-	// Add current request
 	filtered = append(filtered, now)
 	rl.requests[key] = filtered
 
 	return true
 }
 
-// Remaining returns the number of remaining requests
+/* Remaining returns the number of remaining requests */
 func (rl *RateLimiter) Remaining(key string) int {
 	rl.mu.RLock()
 	defer rl.mu.RUnlock()
@@ -87,14 +83,14 @@ func (rl *RateLimiter) Remaining(key string) int {
 	return rl.limit - count
 }
 
-// Reset resets the rate limit for a key
+/* Reset resets the rate limit for a key */
 func (rl *RateLimiter) Reset(key string) {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 	delete(rl.requests, key)
 }
 
-// cleanup removes old entries periodically
+/* cleanup removes old entries periodically */
 func (rl *RateLimiter) cleanup() {
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
@@ -102,7 +98,7 @@ func (rl *RateLimiter) cleanup() {
 	for range ticker.C {
 		rl.mu.Lock()
 		now := time.Now()
-		cutoff := now.Add(-rl.window * 2) // Keep entries for 2x window
+		cutoff := now.Add(-rl.window * 2) /* Keep entries for 2x window */
 
 		for key, history := range rl.requests {
 			allOld := true
@@ -120,30 +116,22 @@ func (rl *RateLimiter) cleanup() {
 	}
 }
 
-// RateLimitMiddleware provides rate limiting middleware
+/* RateLimitMiddleware provides rate limiting middleware */
 func RateLimitMiddleware(limiter *RateLimiter) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Skip rate limiting for lightweight auth verification endpoint
-			// This endpoint is called immediately after login to verify the token works
 			if r.URL.Path == "/api/v1/auth/me" {
 				next.ServeHTTP(w, r)
 				return
 			}
 
-			// Get rate limit key (user ID from context, session ID, or IP)
 			key := r.RemoteAddr
 
-			// Try to get user ID from context (set by session or JWT middleware)
-			// This is set by both session middleware and JWT middleware
 			if userID, ok := r.Context().Value("user_id").(string); ok && userID != "" {
 				key = "user:" + userID
 			} else if authHeader := r.Header.Get("Authorization"); authHeader != "" {
-				// For JWT/API key, use a hash of the token (not the full token)
-				// Extract just the token part and hash it
 				if len(authHeader) > 7 && authHeader[:7] == "Bearer " {
 					token := authHeader[7:]
-					// Use first 16 chars as key (safe for rate limiting)
 					if len(token) > 16 {
 						key = "token:" + token[:16]
 					} else {

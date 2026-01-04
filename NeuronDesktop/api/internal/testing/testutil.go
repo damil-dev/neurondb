@@ -13,17 +13,17 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// TestDB holds test database connection
+/* TestDB holds test database connection */
 type TestDB struct {
 	DB      *sql.DB
 	Queries *db.Queries
 }
 
-// SetupTestDB creates a test database connection
+/* SetupTestDB creates a test database connection */
 func SetupTestDB(t *testing.T) *TestDB {
 	t.Helper()
 
-	// Use test database from environment or default
+	/* Use test database from environment or default */
 	testDBName := os.Getenv("TEST_DB_NAME")
 	if testDBName == "" {
 		testDBName = "neurondesk_test"
@@ -37,7 +37,7 @@ func SetupTestDB(t *testing.T) *TestDB {
 		testDBName,
 	)
 
-	// Connect to postgres database first to create test database
+	/* Connect to postgres database first to create test database */
 	postgresDSN := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=postgres sslmode=disable",
 		getEnv("TEST_DB_HOST", "localhost"),
 		getEnv("TEST_DB_PORT", "5432"),
@@ -51,23 +51,22 @@ func SetupTestDB(t *testing.T) *TestDB {
 	}
 	defer postgresDB.Close()
 
-	// Create test database if it doesn't exist
+	/* Create test database if it doesn't exist */
 	_, err = postgresDB.Exec(fmt.Sprintf("SELECT 1 FROM pg_database WHERE datname = '%s'", testDBName))
 	if err != nil {
-		// Database doesn't exist, create it
+		/* Database doesn't exist, create it */
 		_, err = postgresDB.Exec(fmt.Sprintf("CREATE DATABASE %s", testDBName))
 		if err != nil {
 			t.Fatalf("Failed to create test database: %v", err)
 		}
 	}
 
-	// Connect to test database
+	/* Connect to test database */
 	testDB, err := sql.Open("pgx", dsn)
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}
 
-	// Test connection
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -76,7 +75,7 @@ func SetupTestDB(t *testing.T) *TestDB {
 		t.Fatalf("Failed to ping test database: %v", err)
 	}
 
-	// Run migrations
+	/* Run migrations */
 	if err := runMigrations(testDB); err != nil {
 		testDB.Close()
 		t.Fatalf("Failed to run migrations: %v", err)
@@ -90,14 +89,14 @@ func SetupTestDB(t *testing.T) *TestDB {
 	}
 }
 
-// CleanupTestDB cleans up test database
+/* CleanupTestDB cleans up test database */
 func (tdb *TestDB) CleanupTestDB(t *testing.T) {
 	t.Helper()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// Truncate all tables
+	/* Truncate all tables */
 	tables := []string{
 		"mcp_chat_messages",
 		"mcp_chat_threads",
@@ -112,7 +111,7 @@ func (tdb *TestDB) CleanupTestDB(t *testing.T) {
 	for _, table := range tables {
 		_, err := tdb.DB.ExecContext(ctx, fmt.Sprintf("TRUNCATE TABLE %s CASCADE", table))
 		if err != nil {
-			// Table might not exist, ignore
+			/* Table might not exist, ignore */
 			t.Logf("Warning: Failed to truncate %s: %v", table, err)
 		}
 	}
@@ -120,7 +119,7 @@ func (tdb *TestDB) CleanupTestDB(t *testing.T) {
 	tdb.DB.Close()
 }
 
-// CreateTestUser creates a test user
+/* CreateTestUser creates a test user */
 func CreateTestUser(ctx context.Context, queries *db.Queries, username, password string) (*db.User, error) {
 	passwordHash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
@@ -140,9 +139,9 @@ func CreateTestUser(ctx context.Context, queries *db.Queries, username, password
 	return user, nil
 }
 
-// CreateTestAdmin creates a test admin user
+/* CreateTestAdmin creates a test admin user */
 func CreateTestAdmin(ctx context.Context, queries *db.Queries, username, password string) (*db.User, error) {
-	// Create user with admin flag set
+	/* Create user with admin flag set */
 	passwordHash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, err
@@ -161,7 +160,7 @@ func CreateTestAdmin(ctx context.Context, queries *db.Queries, username, passwor
 	return user, nil
 }
 
-// CreateTestProfile creates a test profile
+/* CreateTestProfile creates a test profile */
 func CreateTestProfile(ctx context.Context, queries *db.Queries, userID string) (*db.Profile, error) {
 	profile := &db.Profile{
 		UserID:      userID,
@@ -181,7 +180,7 @@ func CreateTestProfile(ctx context.Context, queries *db.Queries, userID string) 
 	return profile, nil
 }
 
-// CreateTestProfileWithPassword creates a test profile with credentials
+/* CreateTestProfileWithPassword creates a test profile with credentials */
 func CreateTestProfileWithPassword(ctx context.Context, queries *db.Queries, userID, username, password string) (*db.Profile, error) {
 	passwordHash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
@@ -208,7 +207,7 @@ func CreateTestProfileWithPassword(ctx context.Context, queries *db.Queries, use
 	return profile, nil
 }
 
-// runMigrations runs database migrations
+/* runMigrations runs database migrations */
 func runMigrations(db *sql.DB) error {
 	migrations := []string{
 		`CREATE EXTENSION IF NOT EXISTS "uuid-ossp";`,

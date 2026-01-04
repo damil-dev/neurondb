@@ -17,19 +17,19 @@ import (
 	"github.com/neurondb/NeuronDesktop/api/internal/utils"
 )
 
-// FactoryHandlers handles factory/installation status endpoints
+/* FactoryHandlers handles factory/installation status endpoints */
 type FactoryHandlers struct {
 	queries *db.Queries
 }
 
-// NewFactoryHandlers creates new factory handlers
+/* NewFactoryHandlers creates new factory handlers */
 func NewFactoryHandlers(queries *db.Queries) *FactoryHandlers {
 	return &FactoryHandlers{
 		queries: queries,
 	}
 }
 
-// FactoryStatusResponse represents the factory status
+/* FactoryStatusResponse represents the factory status */
 type FactoryStatusResponse struct {
 	OS              OSInfo          `json:"os"`
 	Docker          DockerInfo      `json:"docker"`
@@ -39,7 +39,7 @@ type FactoryStatusResponse struct {
 	InstallCommands InstallCommands `json:"install_commands"`
 }
 
-// OSInfo represents OS information
+/* OSInfo represents OS information */
 type OSInfo struct {
 	Type    string `json:"type"`    // "linux", "darwin", "windows"
 	Distro  string `json:"distro"`  // "ubuntu", "debian", "rhel", "rocky", "macos"
@@ -47,13 +47,13 @@ type OSInfo struct {
 	Arch    string `json:"arch"`    // "amd64", "arm64"
 }
 
-// DockerInfo represents Docker availability
+/* DockerInfo represents Docker availability */
 type DockerInfo struct {
 	Available bool   `json:"available"`
 	Version   string `json:"version,omitempty"`
 }
 
-// ComponentStatus represents the status of a component
+/* ComponentStatus represents the status of a component */
 type ComponentStatus struct {
 	Installed    bool                   `json:"installed"`
 	Running      bool                   `json:"running"`
@@ -63,7 +63,7 @@ type ComponentStatus struct {
 	Details      map[string]interface{} `json:"details,omitempty"`
 }
 
-// InstallCommands provides OS-specific install commands
+/* InstallCommands provides OS-specific install commands */
 type InstallCommands struct {
 	Docker []string `json:"docker,omitempty"`
 	Deb    []string `json:"deb,omitempty"`
@@ -71,14 +71,13 @@ type InstallCommands struct {
 	MacPkg []string `json:"macpkg,omitempty"`
 }
 
-// GetSetupState returns the setup completion state
+/* GetSetupState returns the setup completion state */
 func (h *FactoryHandlers) GetSetupState(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
 	setting, err := h.queries.GetSetting(ctx, "setup_complete")
 	if err != nil {
-		// If setting doesn't exist, setup is not complete
 		WriteSuccess(w, map[string]interface{}{
 			"setup_complete": false,
 		}, http.StatusOK)
@@ -91,7 +90,7 @@ func (h *FactoryHandlers) GetSetupState(w http.ResponseWriter, r *http.Request) 
 	}, http.StatusOK)
 }
 
-// SetSetupState marks setup as complete
+/* SetSetupState marks setup as complete */
 func (h *FactoryHandlers) SetSetupState(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
@@ -117,40 +116,40 @@ func (h *FactoryHandlers) SetSetupState(w http.ResponseWriter, r *http.Request) 
 	}, http.StatusOK)
 }
 
-// GetFactoryStatus returns the factory status
+/* GetFactoryStatus returns the factory status */
 func (h *FactoryHandlers) GetFactoryStatus(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
 	status := FactoryStatusResponse{}
 
-	// Detect OS
+	/* Detect OS */
 	osInfo := detectOS()
 	status.OS = osInfo
 
-	// Check Docker
+	/* Check Docker */
 	dockerInfo := checkDocker()
 	status.Docker = dockerInfo
 
-	// Check NeuronDB
+	/* Check NeuronDB */
 	neurondbStatus := h.checkNeuronDB(ctx)
 	status.NeuronDB = neurondbStatus
 
-	// Check NeuronAgent
+	/* Check NeuronAgent */
 	agentStatus := h.checkNeuronAgent(ctx)
 	status.NeuronAgent = agentStatus
 
-	// Check NeuronMCP
+	/* Check NeuronMCP */
 	mcpStatus := h.checkNeuronMCP(ctx)
 	status.NeuronMCP = mcpStatus
 
-	// Generate install commands
+	/* Generate install commands */
 	status.InstallCommands = generateInstallCommands(osInfo, dockerInfo)
 
 	WriteSuccess(w, status, http.StatusOK)
 }
 
-// detectOS detects the operating system
+/* detectOS detects the operating system */
 func detectOS() OSInfo {
 	info := OSInfo{
 		Type: runtime.GOOS,
@@ -159,7 +158,7 @@ func detectOS() OSInfo {
 
 	switch runtime.GOOS {
 	case "linux":
-		// Try to detect distro
+		/* Try to detect distro */
 		if data, err := os.ReadFile("/etc/os-release"); err == nil {
 			lines := strings.Split(string(data), "\n")
 			for _, line := range lines {
@@ -186,7 +185,7 @@ func detectOS() OSInfo {
 	return info
 }
 
-// checkDocker checks if Docker is available
+/* checkDocker checks if Docker is available */
 func checkDocker() DockerInfo {
 	info := DockerInfo{Available: false}
 
@@ -200,14 +199,14 @@ func checkDocker() DockerInfo {
 	return info
 }
 
-// checkNeuronDB checks NeuronDB installation and connectivity
+/* checkNeuronDB checks NeuronDB installation and connectivity */
 func (h *FactoryHandlers) checkNeuronDB(ctx context.Context) ComponentStatus {
 	status := ComponentStatus{
 		Status:  "missing",
 		Details: make(map[string]interface{}),
 	}
 
-	// Try to get default profile to check DSN
+	/* Try to get default profile to check DSN */
 	profile, err := h.queries.GetDefaultProfile(ctx)
 	if err != nil || profile == nil {
 		status.ErrorMessage = "No default profile configured"
@@ -223,7 +222,7 @@ func (h *FactoryHandlers) checkNeuronDB(ctx context.Context) ComponentStatus {
 
 	status.Details["dsn"] = maskDSN(dsn)
 
-	// Try to connect
+	/* Try to connect */
 	db, err := sql.Open("pgx", dsn)
 	if err != nil {
 		status.ErrorMessage = fmt.Sprintf("Failed to open connection: %v", err)
@@ -243,13 +242,13 @@ func (h *FactoryHandlers) checkNeuronDB(ctx context.Context) ComponentStatus {
 	status.Reachable = true
 	status.Details["connected"] = true
 
-	// Check PostgreSQL version
+	/* Check PostgreSQL version */
 	var pgVersion string
 	if err := db.QueryRowContext(testCtx, "SELECT version()").Scan(&pgVersion); err == nil {
 		status.Details["postgres_version"] = pgVersion
 	}
 
-	// Check NeuronDB extension
+	/* Check NeuronDB extension */
 	var extVersion string
 	if err := db.QueryRowContext(testCtx, "SELECT neurondb.version()").Scan(&extVersion); err == nil {
 		status.Installed = true
@@ -266,14 +265,14 @@ func (h *FactoryHandlers) checkNeuronDB(ctx context.Context) ComponentStatus {
 	return status
 }
 
-// checkNeuronAgent checks NeuronAgent installation and connectivity
+/* checkNeuronAgent checks NeuronAgent installation and connectivity */
 func (h *FactoryHandlers) checkNeuronAgent(ctx context.Context) ComponentStatus {
 	status := ComponentStatus{
 		Status:  "missing",
 		Details: make(map[string]interface{}),
 	}
 
-	// Try to get default profile
+	/* Try to get default profile */
 	profile, err := h.queries.GetDefaultProfile(ctx)
 	if err != nil || profile == nil {
 		status.ErrorMessage = "No default profile configured"
@@ -289,7 +288,7 @@ func (h *FactoryHandlers) checkNeuronAgent(ctx context.Context) ComponentStatus 
 
 	status.Details["endpoint"] = endpoint
 
-	// Try to reach /health endpoint
+	/* Try to reach /health endpoint */
 	client := &http.Client{Timeout: 5 * time.Second}
 	healthURL := strings.TrimSuffix(endpoint, "/") + "/health"
 
@@ -324,14 +323,14 @@ func (h *FactoryHandlers) checkNeuronAgent(ctx context.Context) ComponentStatus 
 	return status
 }
 
-// checkNeuronMCP checks if NeuronMCP binary is available and can connect
+/* checkNeuronMCP checks if NeuronMCP binary is available and can connect */
 func (h *FactoryHandlers) checkNeuronMCP(ctx context.Context) ComponentStatus {
 	status := ComponentStatus{
 		Status:  "missing",
 		Details: make(map[string]interface{}),
 	}
 
-	// Use existing detection utility
+	/* Use existing detection utility */
 	binaryPath := utils.FindNeuronMCPBinary()
 	if binaryPath == "" {
 		status.ErrorMessage = "NeuronMCP binary not found in PATH or common locations"
@@ -346,7 +345,7 @@ func (h *FactoryHandlers) checkNeuronMCP(ctx context.Context) ComponentStatus {
 	status.Installed = true
 	status.Details["binary_path"] = binaryPath
 
-	// Verify binary is executable by checking file permissions
+	/* Verify binary is executable by checking file permissions */
 	info, err := os.Stat(binaryPath)
 	if err != nil {
 		status.ErrorMessage = fmt.Sprintf("Cannot access binary: %v", err)
@@ -370,13 +369,13 @@ func (h *FactoryHandlers) checkNeuronMCP(ctx context.Context) ComponentStatus {
 	status.Details["executable"] = true
 	status.Status = "installed"
 
-	// Try to get profile to check database connectivity
-	// MCP needs database access to function, so we test connectivity
+	/* Try to get profile to check database connectivity */
+	/* MCP needs database access to function, so we test connectivity */
 	profile, err := h.queries.GetDefaultProfile(ctx)
 	if err == nil && profile != nil {
 		dsn := profile.NeuronDBDSN
 		if dsn != "" {
-			// Test database connection using the same DSN that MCP would use
+			/* Test database connection using the same DSN that MCP would use */
 			db, err := sql.Open("pgx", dsn)
 			if err == nil {
 				testDbCtx, cancelDb := context.WithTimeout(ctx, 3*time.Second)
@@ -386,7 +385,7 @@ func (h *FactoryHandlers) checkNeuronMCP(ctx context.Context) ComponentStatus {
 					status.Reachable = true
 					status.Details["database_reachable"] = true
 
-					// If binary is installed and database is reachable, mark as ready
+					/* If binary is installed and database is reachable, mark as ready */
 					if status.Status == "installed" {
 						status.Status = "reachable"
 						status.Details["ready"] = true
@@ -420,11 +419,11 @@ func (h *FactoryHandlers) checkNeuronMCP(ctx context.Context) ComponentStatus {
 	return status
 }
 
-// generateInstallCommands generates OS-specific install commands
+/* generateInstallCommands generates OS-specific install commands */
 func generateInstallCommands(osInfo OSInfo, dockerInfo DockerInfo) InstallCommands {
 	cmds := InstallCommands{}
 
-	// Docker commands (always available if Docker is installed)
+	/* Docker commands (always available if Docker is installed) */
 	if dockerInfo.Available {
 		cmds.Docker = []string{
 			"# Install NeuronDB (CPU)",
@@ -438,7 +437,7 @@ func generateInstallCommands(osInfo OSInfo, dockerInfo DockerInfo) InstallComman
 		}
 	}
 
-	// OS-specific package commands
+	/* OS-specific package commands */
 	switch osInfo.Distro {
 	case "ubuntu", "debian":
 		cmds.Deb = []string{
@@ -484,9 +483,9 @@ func generateInstallCommands(osInfo OSInfo, dockerInfo DockerInfo) InstallComman
 	return cmds
 }
 
-// maskDSN masks sensitive parts of DSN
+/* maskDSN masks sensitive parts of DSN */
 func maskDSN(dsn string) string {
-	// Simple masking: hide password if present
+	/* Simple masking: hide password if present */
 	if strings.Contains(dsn, "@") {
 		parts := strings.Split(dsn, "@")
 		if len(parts) == 2 {

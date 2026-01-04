@@ -2,7 +2,7 @@ package mcp
 
 import "encoding/json"
 
-// JSON-RPC 2.0 message types (reused from NeuronMCP)
+/* JSON-RPC 2.0 message types (reused from NeuronMCP) */
 type JSONRPCRequest struct {
 	JSONRPC string          `json:"jsonrpc"`
 	ID      json.RawMessage `json:"id,omitempty"`
@@ -23,13 +23,13 @@ type JSONRPCError struct {
 	Data    interface{} `json:"data,omitempty"`
 }
 
-// MCP Request types
+/* MCP Request types */
 type CallToolRequest struct {
 	Name      string                 `json:"name"`
 	Arguments map[string]interface{} `json:"arguments,omitempty"`
 }
 
-// MCP Response types
+/* MCP Response types */
 type ToolDefinition struct {
 	Name        string                 `json:"name"`
 	Description string                 `json:"description"`
@@ -76,7 +76,7 @@ type ResourceContent struct {
 	Text     string `json:"text"`
 }
 
-// Prompts types
+/* Prompts types */
 type ListPromptsResponse struct {
 	Prompts []PromptDefinition `json:"prompts"`
 }

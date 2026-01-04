@@ -10,14 +10,14 @@ import (
 	"time"
 )
 
-// Client provides HTTP access to NeuronAgent
+/* Client provides HTTP access to NeuronAgent */
 type Client struct {
 	baseURL    string
 	apiKey     string
 	httpClient *http.Client
 }
 
-// NewClient creates a new NeuronAgent client
+/* NewClient creates a new NeuronAgent client */
 func NewClient(baseURL, apiKey string) *Client {
 	return &Client{
 		baseURL: baseURL,
@@ -28,7 +28,7 @@ func NewClient(baseURL, apiKey string) *Client {
 	}
 }
 
-// Agent represents an agent in NeuronAgent
+/* Agent represents an agent in NeuronAgent */
 type Agent struct {
 	ID           string                 `json:"id"`
 	Name         string                 `json:"name"`
@@ -40,7 +40,7 @@ type Agent struct {
 	CreatedAt    string                 `json:"created_at,omitempty"`
 }
 
-// Session represents a session in NeuronAgent
+/* Session represents a session in NeuronAgent */
 type Session struct {
 	ID             string                 `json:"id"`
 	AgentID        string                 `json:"agent_id"`
@@ -49,7 +49,7 @@ type Session struct {
 	CreatedAt      string                 `json:"created_at,omitempty"`
 }
 
-// Message represents a message in a session
+/* Message represents a message in a session */
 type Message struct {
 	ID        string                 `json:"id"`
 	SessionID string                 `json:"session_id"`
@@ -59,7 +59,7 @@ type Message struct {
 	CreatedAt string                 `json:"created_at,omitempty"`
 }
 
-// CreateAgentRequest is the request to create an agent
+/* CreateAgentRequest is the request to create an agent */
 type CreateAgentRequest struct {
 	Name         string                 `json:"name"`
 	Description  string                 `json:"description,omitempty"`
@@ -69,14 +69,24 @@ type CreateAgentRequest struct {
 	Config       map[string]interface{} `json:"config,omitempty"`
 }
 
-// CreateSessionRequest is the request to create a session
+/* UpdateAgentRequest is the request to update an agent */
+type UpdateAgentRequest struct {
+	Name         string                 `json:"name,omitempty"`
+	Description  string                 `json:"description,omitempty"`
+	SystemPrompt string                 `json:"system_prompt,omitempty"`
+	ModelName    string                 `json:"model_name,omitempty"`
+	EnabledTools []string               `json:"enabled_tools,omitempty"`
+	Config       map[string]interface{} `json:"config,omitempty"`
+}
+
+/* CreateSessionRequest is the request to create a session */
 type CreateSessionRequest struct {
 	AgentID        string                 `json:"agent_id"`
 	ExternalUserID string                 `json:"external_user_id,omitempty"`
 	Metadata       map[string]interface{} `json:"metadata,omitempty"`
 }
 
-// SendMessageRequest is the request to send a message
+/* SendMessageRequest is the request to send a message */
 type SendMessageRequest struct {
 	Role     string                 `json:"role"`
 	Content  string                 `json:"content"`
@@ -84,7 +94,7 @@ type SendMessageRequest struct {
 	Metadata map[string]interface{} `json:"metadata,omitempty"`
 }
 
-// ListAgents lists all agents
+/* ListAgents lists all agents */
 func (c *Client) ListAgents(ctx context.Context) ([]Agent, error) {
 	req, err := c.newRequest(ctx, "GET", "/api/v1/agents", nil)
 	if err != nil {
@@ -99,7 +109,7 @@ func (c *Client) ListAgents(ctx context.Context) ([]Agent, error) {
 	return agents, nil
 }
 
-// GetAgent gets a single agent
+/* GetAgent gets a single agent */
 func (c *Client) GetAgent(ctx context.Context, id string) (*Agent, error) {
 	req, err := c.newRequest(ctx, "GET", fmt.Sprintf("/api/v1/agents/%s", id), nil)
 	if err != nil {
@@ -114,7 +124,7 @@ func (c *Client) GetAgent(ctx context.Context, id string) (*Agent, error) {
 	return &agent, nil
 }
 
-// CreateAgent creates a new agent
+/* CreateAgent creates a new agent */
 func (c *Client) CreateAgent(ctx context.Context, req CreateAgentRequest) (*Agent, error) {
 	httpReq, err := c.newRequest(ctx, "POST", "/api/v1/agents", req)
 	if err != nil {
@@ -129,7 +139,32 @@ func (c *Client) CreateAgent(ctx context.Context, req CreateAgentRequest) (*Agen
 	return &agent, nil
 }
 
-// CreateSession creates a new session
+/* UpdateAgent updates an existing agent */
+func (c *Client) UpdateAgent(ctx context.Context, id string, req UpdateAgentRequest) (*Agent, error) {
+	httpReq, err := c.newRequest(ctx, "PUT", fmt.Sprintf("/api/v1/agents/%s", id), req)
+	if err != nil {
+		return nil, err
+	}
+
+	var agent Agent
+	if err := c.doRequest(httpReq, &agent); err != nil {
+		return nil, err
+	}
+
+	return &agent, nil
+}
+
+/* DeleteAgent deletes an agent */
+func (c *Client) DeleteAgent(ctx context.Context, id string) error {
+	req, err := c.newRequest(ctx, "DELETE", fmt.Sprintf("/api/v1/agents/%s", id), nil)
+	if err != nil {
+		return err
+	}
+
+	return c.doRequest(req, nil)
+}
+
+/* CreateSession creates a new session */
 func (c *Client) CreateSession(ctx context.Context, req CreateSessionRequest) (*Session, error) {
 	httpReq, err := c.newRequest(ctx, "POST", "/api/v1/sessions", req)
 	if err != nil {
@@ -144,7 +179,7 @@ func (c *Client) CreateSession(ctx context.Context, req CreateSessionRequest) (*
 	return &session, nil
 }
 
-// GetSession gets a session
+/* GetSession gets a session */
 func (c *Client) GetSession(ctx context.Context, id string) (*Session, error) {
 	req, err := c.newRequest(ctx, "GET", fmt.Sprintf("/api/v1/sessions/%s", id), nil)
 	if err != nil {
@@ -159,7 +194,7 @@ func (c *Client) GetSession(ctx context.Context, id string) (*Session, error) {
 	return &session, nil
 }
 
-// SendMessage sends a message to a session
+/* SendMessage sends a message to a session */
 func (c *Client) SendMessage(ctx context.Context, sessionID string, req SendMessageRequest) (*Message, error) {
 	httpReq, err := c.newRequest(ctx, "POST", fmt.Sprintf("/api/v1/sessions/%s/messages", sessionID), req)
 	if err != nil {
@@ -174,7 +209,7 @@ func (c *Client) SendMessage(ctx context.Context, sessionID string, req SendMess
 	return &message, nil
 }
 
-// GetMessages gets messages from a session
+/* GetMessages gets messages from a session */
 func (c *Client) GetMessages(ctx context.Context, sessionID string) ([]Message, error) {
 	req, err := c.newRequest(ctx, "GET", fmt.Sprintf("/api/v1/sessions/%s/messages", sessionID), nil)
 	if err != nil {
@@ -189,7 +224,7 @@ func (c *Client) GetMessages(ctx context.Context, sessionID string) ([]Message, 
 	return messages, nil
 }
 
-// ListSessions lists sessions for an agent
+/* ListSessions lists sessions for an agent */
 func (c *Client) ListSessions(ctx context.Context, agentID string) ([]Session, error) {
 	req, err := c.newRequest(ctx, "GET", fmt.Sprintf("/api/v1/agents/%s/sessions", agentID), nil)
 	if err != nil {
@@ -204,7 +239,38 @@ func (c *Client) ListSessions(ctx context.Context, agentID string) ([]Session, e
 	return sessions, nil
 }
 
-// Helper methods
+/* Model represents a model in NeuronAgent */
+type Model struct {
+	ID          string                 `json:"id,omitempty"`
+	Name        string                 `json:"name"`
+	DisplayName string                 `json:"display_name,omitempty"`
+	Provider    string                 `json:"provider,omitempty"`
+	Description string                 `json:"description,omitempty"`
+	Config      map[string]interface{} `json:"config,omitempty"`
+}
+
+/* ListModels lists available models from NeuronAgent */
+func (c *Client) ListModels(ctx context.Context) ([]Model, error) {
+	req, err := c.newRequest(ctx, "GET", "/api/v1/models", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Models []Model `json:"models"`
+	}
+	if err := c.doRequest(req, &response); err != nil {
+		/* If endpoint doesn't exist, return empty list (backward compatibility) */
+		if httpErr, ok := err.(*HTTPError); ok && httpErr.StatusCode == 404 {
+			return []Model{}, nil
+		}
+		return nil, err
+	}
+
+	return response.Models, nil
+}
+
+/* Helper methods */
 
 func (c *Client) newRequest(ctx context.Context, method, path string, body interface{}) (*http.Request, error) {
 	var bodyReader io.Reader

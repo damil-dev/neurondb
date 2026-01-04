@@ -13,7 +13,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// Session represents a user session
+/* Session represents a user session */
 type Session struct {
 	ID            string
 	UserID        string
@@ -24,7 +24,7 @@ type Session struct {
 	IPHash        string
 }
 
-// RefreshToken represents a refresh token
+/* RefreshToken represents a refresh token */
 type RefreshToken struct {
 	ID          string
 	SessionID   string
@@ -35,7 +35,7 @@ type RefreshToken struct {
 	CreatedAt   time.Time
 }
 
-// Manager manages sessions and refresh tokens
+/* Manager manages sessions and refresh tokens */
 type Manager struct {
 	db             *sql.DB
 	accessTTL      time.Duration
@@ -45,7 +45,7 @@ type Manager struct {
 	cookieSameSite http.SameSite
 }
 
-// NewManager creates a new session manager
+/* NewManager creates a new session manager */
 func NewManager(db *sql.DB, accessTTL, refreshTTL time.Duration, cookieDomain string, cookieSecure bool, cookieSameSite string) *Manager {
 	sameSite := http.SameSiteLaxMode
 	switch cookieSameSite {
@@ -65,9 +65,9 @@ func NewManager(db *sql.DB, accessTTL, refreshTTL time.Duration, cookieDomain st
 	}
 }
 
-// CreateSession creates a new session and refresh token
+/* CreateSession creates a new session and refresh token */
 func (m *Manager) CreateSession(ctx context.Context, userID, userAgent, ip string) (*Session, string, error) {
-	// Hash user agent and IP for privacy
+	/* Hash user agent and IP for privacy */
 	userAgentHash := hashString(userAgent)
 	ipHash := hashString(ip)
 
@@ -83,7 +83,7 @@ func (m *Manager) CreateSession(ctx context.Context, userID, userAgent, ip strin
 		IPHash:        ipHash,
 	}
 
-	// Create session in database
+	/* Create session in database */
 	query := `
 		INSERT INTO sessions (id, user_id, created_at, last_seen_at, user_agent_hash, ip_hash)
 		VALUES ($1, $2, $3, $4, $5, $6)
@@ -95,13 +95,13 @@ func (m *Manager) CreateSession(ctx context.Context, userID, userAgent, ip strin
 		return nil, "", fmt.Errorf("failed to create session: %w", err)
 	}
 
-	// Generate refresh token
+	/* Generate refresh token */
 	refreshToken, tokenString, err := m.generateRefreshToken(ctx, sessionID, nil)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to generate refresh token: %w", err)
 	}
 
-	// Store refresh token
+	/* Store refresh token */
 	refreshQuery := `
 		INSERT INTO refresh_tokens (id, session_id, token_hash, expires_at, created_at)
 		VALUES ($1, $2, $3, $4, $5)
@@ -116,7 +116,7 @@ func (m *Manager) CreateSession(ctx context.Context, userID, userAgent, ip strin
 	return session, tokenString, nil
 }
 
-// ValidateSession validates a session ID
+/* ValidateSession validates a session ID */
 func (m *Manager) ValidateSession(ctx context.Context, sessionID string) (*Session, error) {
 	var session Session
 	var revokedAt sql.NullTime
@@ -140,16 +140,16 @@ func (m *Manager) ValidateSession(ctx context.Context, sessionID string) (*Sessi
 		session.RevokedAt = &revokedAt.Time
 	}
 
-	// Update last seen
+	/* Update last seen */
 	updateQuery := `UPDATE sessions SET last_seen_at = $1 WHERE id = $2`
 	m.db.ExecContext(ctx, updateQuery, time.Now(), sessionID)
 
 	return &session, nil
 }
 
-// RefreshSession rotates refresh token and returns new access/refresh tokens
+/* RefreshSession rotates refresh token and returns new access/refresh tokens */
 func (m *Manager) RefreshSession(ctx context.Context, refreshTokenString string) (*Session, string, string, error) {
-	// Find refresh token by hash
+	/* Find refresh token by hash */
 	refreshTokenHash := hashToken(refreshTokenString)
 
 	var refreshToken RefreshToken
@@ -172,28 +172,28 @@ func (m *Manager) RefreshSession(ctx context.Context, refreshTokenString string)
 	}
 
 	if revokedAt.Valid {
-		// Token reuse detected - revoke all tokens for this session
+		/* Token reuse detected - revoke all tokens for this session */
 		m.RevokeSession(ctx, refreshToken.SessionID)
 		return nil, "", "", fmt.Errorf("refresh token reuse detected - session revoked")
 	}
 
-	// Get session
+	/* Get session */
 	session, err := m.ValidateSession(ctx, refreshToken.SessionID)
 	if err != nil {
 		return nil, "", "", fmt.Errorf("session invalid: %w", err)
 	}
 
-	// Revoke old refresh token
+	/* Revoke old refresh token */
 	revokeQuery := `UPDATE refresh_tokens SET revoked_at = $1 WHERE id = $2`
 	m.db.ExecContext(ctx, revokeQuery, time.Now(), refreshToken.ID)
 
-	// Generate new refresh token (rotation)
+	/* Generate new refresh token (rotation) */
 	newRefreshToken, newRefreshTokenString, err := m.generateRefreshToken(ctx, session.ID, &refreshToken.ID)
 	if err != nil {
 		return nil, "", "", fmt.Errorf("failed to generate new refresh token: %w", err)
 	}
 
-	// Store new refresh token
+	/* Store new refresh token */
 	insertQuery := `
 		INSERT INTO refresh_tokens (id, session_id, token_hash, rotated_from, expires_at, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6)
@@ -205,24 +205,24 @@ func (m *Manager) RefreshSession(ctx context.Context, refreshTokenString string)
 		return nil, "", "", fmt.Errorf("failed to store new refresh token: %w", err)
 	}
 
-	// Generate new access token (session ID)
+	/* Generate new access token (session ID) */
 	accessToken := session.ID
 
 	return session, accessToken, newRefreshTokenString, nil
 }
 
-// RevokeSession revokes a session and all its refresh tokens
+/* RevokeSession revokes a session and all its refresh tokens */
 func (m *Manager) RevokeSession(ctx context.Context, sessionID string) error {
 	now := time.Now()
 
-	// Revoke session
+	/* Revoke session */
 	sessionQuery := `UPDATE sessions SET revoked_at = $1 WHERE id = $2`
 	_, err := m.db.ExecContext(ctx, sessionQuery, now, sessionID)
 	if err != nil {
 		return fmt.Errorf("failed to revoke session: %w", err)
 	}
 
-	// Revoke all refresh tokens for this session
+	/* Revoke all refresh tokens for this session */
 	tokenQuery := `UPDATE refresh_tokens SET revoked_at = $1 WHERE session_id = $2 AND revoked_at IS NULL`
 	_, err = m.db.ExecContext(ctx, tokenQuery, now, sessionID)
 	if err != nil {
@@ -232,9 +232,9 @@ func (m *Manager) RevokeSession(ctx context.Context, sessionID string) error {
 	return nil
 }
 
-// SetCookies sets access and refresh token cookies
+/* SetCookies sets access and refresh token cookies */
 func (m *Manager) SetCookies(w http.ResponseWriter, accessToken, refreshToken string) {
-	// Access token cookie (short-lived)
+	/* Access token cookie (short-lived) */
 	http.SetCookie(w, &http.Cookie{
 		Name:     "access_token",
 		Value:    accessToken,
@@ -246,7 +246,7 @@ func (m *Manager) SetCookies(w http.ResponseWriter, accessToken, refreshToken st
 		SameSite: m.cookieSameSite,
 	})
 
-	// Refresh token cookie (long-lived)
+	/* Refresh token cookie (long-lived) */
 	http.SetCookie(w, &http.Cookie{
 		Name:     "refresh_token",
 		Value:    refreshToken,
@@ -259,7 +259,7 @@ func (m *Manager) SetCookies(w http.ResponseWriter, accessToken, refreshToken st
 	})
 }
 
-// ClearCookies clears session cookies
+/* ClearCookies clears session cookies */
 func (m *Manager) ClearCookies(w http.ResponseWriter) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "access_token",
@@ -284,7 +284,7 @@ func (m *Manager) ClearCookies(w http.ResponseWriter) {
 	})
 }
 
-// GetAccessTokenFromRequest extracts access token from cookie
+/* GetAccessTokenFromRequest extracts access token from cookie */
 func (m *Manager) GetAccessTokenFromRequest(r *http.Request) string {
 	cookie, err := r.Cookie("access_token")
 	if err != nil {
@@ -293,7 +293,7 @@ func (m *Manager) GetAccessTokenFromRequest(r *http.Request) string {
 	return cookie.Value
 }
 
-// GetRefreshTokenFromRequest extracts refresh token from cookie
+/* GetRefreshTokenFromRequest extracts refresh token from cookie */
 func (m *Manager) GetRefreshTokenFromRequest(r *http.Request) string {
 	cookie, err := r.Cookie("refresh_token")
 	if err != nil {
@@ -302,10 +302,10 @@ func (m *Manager) GetRefreshTokenFromRequest(r *http.Request) string {
 	return cookie.Value
 }
 
-// Helper functions
+/* Helper functions */
 
 func (m *Manager) generateRefreshToken(ctx context.Context, sessionID string, rotatedFrom *string) (*RefreshToken, string, error) {
-	// Generate random token
+	/* Generate random token */
 	tokenBytes := make([]byte, 32)
 	if _, err := rand.Read(tokenBytes); err != nil {
 		return nil, "", fmt.Errorf("failed to generate token: %w", err)
@@ -337,11 +337,11 @@ func hashString(s string) string {
 	return base64.URLEncoding.EncodeToString(h[:])
 }
 
-// SessionMiddleware provides session-based authentication middleware
+/* SessionMiddleware provides session-based authentication middleware */
 func (m *Manager) SessionMiddleware() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Skip auth for public endpoints
+			/* Skip auth for public endpoints */
 			publicPaths := []string{
 				"/health",
 				"/api/v1/health",
@@ -359,42 +359,42 @@ func (m *Manager) SessionMiddleware() func(http.Handler) http.Handler {
 				}
 			}
 
-			// Try to get access token from cookie
+			/* Try to get access token from cookie */
 			accessToken := m.GetAccessTokenFromRequest(r)
 			if accessToken == "" {
-				// Try refresh token
+				/* Try refresh token */
 				refreshToken := m.GetRefreshTokenFromRequest(r)
 				if refreshToken == "" {
 					http.Error(w, "Unauthorized", http.StatusUnauthorized)
 					return
 				}
 
-				// Attempt refresh
+				/* Attempt refresh */
 				session, newAccessToken, newRefreshToken, err := m.RefreshSession(r.Context(), refreshToken)
 				if err != nil {
 					http.Error(w, "Unauthorized", http.StatusUnauthorized)
 					return
 				}
 
-				// Set new cookies
+				/* Set new cookies */
 				m.SetCookies(w, newAccessToken, newRefreshToken)
 				accessToken = newAccessToken
 
-				// Add session to context
+				/* Add session to context */
 				ctx := context.WithValue(r.Context(), "session", session)
 				ctx = context.WithValue(ctx, "user_id", session.UserID)
 				next.ServeHTTP(w, r.WithContext(ctx))
 				return
 			}
 
-			// Validate session
+			/* Validate session */
 			session, err := m.ValidateSession(r.Context(), accessToken)
 			if err != nil {
 				http.Error(w, "Unauthorized", http.StatusUnauthorized)
 				return
 			}
 
-			// Add session to context
+			/* Add session to context */
 			ctx := context.WithValue(r.Context(), "session", session)
 			ctx = context.WithValue(ctx, "user_id", session.UserID)
 			next.ServeHTTP(w, r.WithContext(ctx))
@@ -402,13 +402,13 @@ func (m *Manager) SessionMiddleware() func(http.Handler) http.Handler {
 	}
 }
 
-// GetSessionFromContext gets session from context
+/* GetSessionFromContext gets session from context */
 func GetSessionFromContext(ctx context.Context) (*Session, bool) {
 	session, ok := ctx.Value("session").(*Session)
 	return session, ok
 }
 
-// GetUserIDFromContext gets user ID from context
+/* GetUserIDFromContext gets user ID from context */
 func GetUserIDFromContext(ctx context.Context) (string, bool) {
 	userID, ok := ctx.Value("user_id").(string)
 	return userID, ok

@@ -1,5 +1,5 @@
 import axios, { AxiosError } from 'axios'
-import { getErrorMessage } from './errors'
+import { getErrorMessage, showErrorToast } from './errors'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081/api/v1'
 
@@ -48,23 +48,30 @@ api.interceptors.response.use(
         error.message = data.message
       } else if (error.response.status === 401) {
         error.message = 'Authentication required. Your session may have expired. Please log in again.'
-        // Try to refresh session first
-        if (typeof window !== 'undefined') {
-          // Attempt silent refresh
+        // Show toast for auth errors
+        if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+          showErrorToast(error, error.message)
+          // Try to refresh session first
           api.post('/api/v1/auth/refresh').catch(() => {
             // Refresh failed, clear any stored tokens and redirect
             localStorage.removeItem('neurondesk_auth_token')
-            if (!window.location.pathname.includes('/login')) {
-              setTimeout(() => {
-                window.location.href = '/login'
-              }, 1000)
-            }
+            setTimeout(() => {
+              window.location.href = '/login'
+            }, 1000)
           })
         }
       } else if (error.response.status === 403) {
         error.message = 'Access denied. You do not have permission to perform this action.'
+        // Show toast for permission errors
+        if (typeof window !== 'undefined') {
+          showErrorToast(error, error.message)
+        }
       } else if (error.response.status >= 500) {
         error.message = 'Server error. Please try again later.'
+        // Show toast for server errors
+        if (typeof window !== 'undefined') {
+          showErrorToast(error, error.message)
+        }
       }
     } else if (error.request) {
       // Network error - check if it might be CORS or auth issue
@@ -177,6 +184,19 @@ export const profilesAPI = {
   create: (profile: Partial<Profile>) => api.post<Profile>('/profiles', profile),
   update: (id: string, profile: Partial<Profile>) => api.put<Profile>(`/profiles/${id}`, profile),
   delete: (id: string) => api.delete(`/profiles/${id}`),
+  export: async (id: string) => {
+    const response = await api.get(`/profiles/${id}/export`, { responseType: 'blob' })
+    const blob = new Blob([response.data], { type: 'application/json' })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `profile-${id}.json`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+  },
+  import: (data: any) => api.post<Profile>('/profiles/import', data),
 }
 
 // MCP API
@@ -280,6 +300,24 @@ export const agentAPI = {
   getAgent: (profileId: string, agentId: string) => api.get<Agent>(`/profiles/${profileId}/agent/agents/${agentId}`),
   createAgent: (profileId: string, request: CreateAgentRequest) =>
     api.post<Agent>(`/profiles/${profileId}/agent/agents`, request),
+  updateAgent: (profileId: string, agentId: string, request: CreateAgentRequest) =>
+    api.put<Agent>(`/profiles/${profileId}/agent/agents/${agentId}`, request),
+  deleteAgent: (profileId: string, agentId: string) =>
+    api.delete(`/profiles/${profileId}/agent/agents/${agentId}`),
+  exportAgent: async (profileId: string, agentId: string) => {
+    const response = await api.get(`/profiles/${profileId}/agent/agents/${agentId}/export`, { responseType: 'blob' })
+    const blob = new Blob([response.data], { type: 'application/json' })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `agent-${agentId}.json`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+  },
+  importAgent: (profileId: string, data: any) =>
+    api.post<Agent>(`/profiles/${profileId}/agent/agents/import`, data),
   listModels: (profileId: string) => api.get<{ models: Model[] }>(`/profiles/${profileId}/agent/models`),
   createSession: (profileId: string, agentId: string, externalUserId?: string) =>
     api.post<Session>(`/profiles/${profileId}/agent/sessions`, { agent_id: agentId, external_user_id: externalUserId }),
@@ -442,6 +480,53 @@ export interface DatabaseTestResponse {
 export const databaseTestAPI = {
   test: (request: DatabaseTestRequest) => 
     databaseTestApi.post<DatabaseTestResponse>('/database/test', request),
+}
+
+export interface Template {
+  id: string
+  name: string
+  description: string
+  category: string
+  configuration: any
+  workflow?: any
+}
+
+export const templateAPI = {
+  list: () => api.get<Template[]>('/templates'),
+  get: (id: string) => api.get<Template>(`/templates/${id}`),
+  deploy: (profileId: string, templateId: string, name: string) =>
+    api.post<Agent>(`/profiles/${profileId}/templates/${templateId}/deploy`, { name }),
+}
+
+export interface RequestLog {
+  id: string
+  profile_id?: string
+  endpoint: string
+  method: string
+  request_body?: any
+  response_body?: any
+  status_code: number
+  duration_ms: number
+  created_at: string
+}
+
+export const requestLogsAPI = {
+  listLogs: (profileId: string, params?: { limit?: number; status_code?: number; endpoint?: string; start_date?: string; end_date?: string }) => {
+    const queryParams = new URLSearchParams()
+    if (params?.limit) queryParams.append('limit', params.limit.toString())
+    if (params?.status_code) queryParams.append('status_code', params.status_code.toString())
+    if (params?.endpoint) queryParams.append('endpoint', params.endpoint)
+    if (params?.start_date) queryParams.append('start_date', params.start_date)
+    if (params?.end_date) queryParams.append('end_date', params.end_date)
+    const query = queryParams.toString()
+    return api.get<RequestLog[]>(`/profiles/${profileId}/logs${query ? '?' + query : ''}`)
+  },
+  getLog: (profileId: string, logId: string) => 
+    api.get<RequestLog>(`/profiles/${profileId}/logs/${logId}`),
+  deleteLog: (profileId: string, logId: string) => 
+    api.delete(`/profiles/${profileId}/logs/${logId}`),
+  exportLogs: (profileId: string, format: 'json' | 'csv' = 'json') => 
+    api.get(`/profiles/${profileId}/logs/export?format=${format}`, { responseType: 'blob' }),
 }
 
 export default api

@@ -1,18 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { agentAPI, profilesAPI, type Profile, type CreateAgentRequest } from '@/lib/api'
+import { agentAPI, profilesAPI, templateAPI, type Profile, type CreateAgentRequest, type Template } from '@/lib/api'
 import { PlusIcon, MagnifyingGlassIcon } from '@/components/Icons'
+import { showSuccessToast, showErrorToast } from '@/lib/errors'
 
-interface Template {
-  id: string
-  name: string
-  description: string
-  category: string
-  icon?: string
-}
-
-const TEMPLATES: Template[] = [
+const HARDCODED_TEMPLATES: Template[] = [
   {
     id: 'customer-support',
     name: 'Customer Support',
@@ -53,9 +46,12 @@ export default function TemplateGallery({ onSelect, onCancel }: { onSelect?: () 
   const [customizing, setCustomizing] = useState(false)
   const [loading, setLoading] = useState(false)
   const [agentName, setAgentName] = useState('')
+  const [templates, setTemplates] = useState<Template[]>([])
+  const [loadingTemplates, setLoadingTemplates] = useState(false)
 
   useEffect(() => {
     loadProfiles()
+    loadTemplates()
   }, [])
 
   const loadProfiles = async () => {
@@ -66,12 +62,30 @@ export default function TemplateGallery({ onSelect, onCancel }: { onSelect?: () 
         const defaultProfile = response.data.find((p: Profile) => p.is_default) || response.data[0]
         setSelectedProfile(defaultProfile.id)
       }
-    } catch (error) {
-      console.error('Failed to load profiles:', error)
+    } catch (error: any) {
+      showErrorToast('Failed to load profiles: ' + (error.response?.data?.error || error.message))
     }
   }
 
-  const filteredTemplates = TEMPLATES.filter(
+  const loadTemplates = async () => {
+    setLoadingTemplates(true)
+    try {
+      const response = await templateAPI.list()
+      if (response.data && response.data.length > 0) {
+        setTemplates(response.data)
+      } else {
+        // Fallback to hardcoded templates if API returns empty
+        setTemplates(HARDCODED_TEMPLATES)
+      }
+    } catch (error: any) {
+      // Fallback to hardcoded templates on error
+      setTemplates(HARDCODED_TEMPLATES)
+    } finally {
+      setLoadingTemplates(false)
+    }
+  }
+
+  const filteredTemplates = templates.filter(
     (template) =>
       template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       template.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -80,34 +94,65 @@ export default function TemplateGallery({ onSelect, onCancel }: { onSelect?: () 
 
   const handleDeploy = async (template: Template) => {
     if (!selectedProfile) {
-      alert('Please select a profile')
+      showErrorToast('Please select a profile')
       return
     }
 
     const defaultName = `${template.name.toLowerCase().replace(/\s+/g, '-')}-agent`
     const name = agentName.trim() || defaultName
 
+    if (!name) {
+      showErrorToast('Agent name is required')
+      return
+    }
+
     setLoading(true)
     try {
-      // Map template to agent configuration
-      const agentConfig: CreateAgentRequest = getTemplateConfig(template)
+      // Try to deploy from template API first
+      try {
+        const response = await templateAPI.deploy(selectedProfile, template.id, name)
+        showSuccessToast('Agent created successfully from template')
+        if (onSelect) onSelect()
+        return
+      } catch (templateError: any) {
+        // If template deployment fails, fall back to manual creation
+        if (templateError.response?.status !== 404) {
+          throw templateError
+        }
+      }
 
+      // Fallback: Map template to agent configuration and create manually
+      const agentConfig: CreateAgentRequest = getTemplateConfig(template)
       const response = await agentAPI.createAgent(selectedProfile, {
         ...agentConfig,
         name,
       })
 
-      console.log('Agent created:', response.data)
+      showSuccessToast('Agent created successfully')
       if (onSelect) onSelect()
     } catch (error: any) {
-      console.error('Failed to create agent:', error)
-      alert('Failed to create agent: ' + (error.response?.data?.error || error.message))
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || error.message || 'Failed to create agent'
+      showErrorToast('Failed to create agent: ' + errorMessage)
     } finally {
       setLoading(false)
     }
   }
 
   const getTemplateConfig = (template: Template): CreateAgentRequest => {
+    // If template has configuration from API, use it
+    if (template.configuration && typeof template.configuration === 'object') {
+      const config = template.configuration
+      return {
+        name: '',
+        description: config.description || template.description || '',
+        system_prompt: config.system_prompt || config.systemPrompt || '',
+        model_name: config.model?.name || config.model_name || 'gpt-4',
+        enabled_tools: config.tools || config.enabled_tools || [],
+        config: config.config || {},
+      }
+    }
+
+    // Fallback to hardcoded configs
     const configs: Record<string, CreateAgentRequest> = {
       'customer-support': {
         name: '',

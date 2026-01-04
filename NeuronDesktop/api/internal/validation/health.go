@@ -24,7 +24,7 @@ func ValidateHealthCheck(result HealthCheckResult) error {
 		return fmt.Errorf("health check returned unhealthy status: %s", result.Status)
 	}
 	
-	// Validate response time (should be under 5 seconds)
+	/* Validate response time (should be under 5 seconds) */
 	if result.ResponseTime > 5*time.Second {
 		return fmt.Errorf("health check response time too slow: %v", result.ResponseTime)
 	}
@@ -40,12 +40,12 @@ func ValidateHTTPStatus(statusCode int, expectedCodes ...int) error {
 		}
 	}
 	
-	// Check if it's a client error (4xx)
+	/* Check if it's a client error (4xx) */
 	if statusCode >= 400 && statusCode < 500 {
 		return fmt.Errorf("client error: HTTP %d", statusCode)
 	}
 	
-	// Check if it's a server error (5xx)
+	/* Check if it's a server error (5xx) */
 	if statusCode >= 500 {
 		return fmt.Errorf("server error: HTTP %d", statusCode)
 	}

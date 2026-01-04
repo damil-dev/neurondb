@@ -1,5 +1,5 @@
-//go:build test
-// +build test
+/* go:build test */
+/* +build test */
 
 package handlers
 
@@ -8,8 +8,8 @@ import (
 )
 
 func init() {
-	// Register server setup function to avoid import cycles
-	// This file is only compiled when building tests
+	/* Register server setup function to avoid import cycles */
+	/* This file is only compiled when building tests */
 	testing.DefaultServerSetup = SetupTestServer
 }
 

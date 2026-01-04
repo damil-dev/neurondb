@@ -9,13 +9,13 @@ import (
 	"github.com/neurondb/NeuronDesktop/api/internal/db"
 )
 
-// APIKeyHandlers handles API key management endpoints
+/* APIKeyHandlers handles API key management endpoints */
 type APIKeyHandlers struct {
 	keyManager *auth.APIKeyManager
 	queries    *db.Queries
 }
 
-// NewAPIKeyHandlers creates new API key handlers
+/* NewAPIKeyHandlers creates new API key handlers */
 func NewAPIKeyHandlers(keyManager *auth.APIKeyManager, queries *db.Queries) *APIKeyHandlers {
 	return &APIKeyHandlers{
 		keyManager: keyManager,
@@ -23,7 +23,7 @@ func NewAPIKeyHandlers(keyManager *auth.APIKeyManager, queries *db.Queries) *API
 	}
 }
 
-// GenerateAPIKey generates a new API key
+/* GenerateAPIKey generates a new API key */
 func (h *APIKeyHandlers) GenerateAPIKey(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		UserID    string `json:"user_id,omitempty"`
@@ -45,7 +45,7 @@ func (h *APIKeyHandlers) GenerateAPIKey(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Return the full key (only shown once)
+	/* Return the full key (only shown once) */
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"id":         apiKey.ID,
@@ -57,16 +57,16 @@ func (h *APIKeyHandlers) GenerateAPIKey(w http.ResponseWriter, r *http.Request) 
 	})
 }
 
-// ListAPIKeys lists all API keys
+/* ListAPIKeys lists all API keys */
 func (h *APIKeyHandlers) ListAPIKeys(w http.ResponseWriter, r *http.Request) {
-	// Query all API keys from database using queries helper
+	/* Query all API keys from database using queries helper */
 	keys, err := h.queries.GetAllAPIKeys(r.Context())
 	if err != nil {
 		WriteError(w, r, http.StatusInternalServerError, err, nil)
 		return
 	}
 
-	// Don't return full keys, only prefixes
+	/* Don't return full keys, only prefixes */
 	var response []map[string]interface{}
 	for _, key := range keys {
 		response = append(response, map[string]interface{}{
@@ -83,7 +83,7 @@ func (h *APIKeyHandlers) ListAPIKeys(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-// DeleteAPIKey deletes an API key
+/* DeleteAPIKey deletes an API key */
 func (h *APIKeyHandlers) DeleteAPIKey(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	keyID := vars["id"]

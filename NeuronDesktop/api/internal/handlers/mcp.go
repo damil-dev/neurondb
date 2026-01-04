@@ -14,17 +14,17 @@ import (
 	"github.com/neurondb/NeuronDesktop/api/internal/utils"
 )
 
-// MCPHandlers handles MCP-related endpoints
+/* MCPHandlers handles MCP-related endpoints */
 type MCPHandlers struct {
 	mcpManager *MCPManager
 }
 
-// NewMCPHandlers creates new MCP handlers
+/* NewMCPHandlers creates new MCP handlers */
 func NewMCPHandlers(mcpManager *MCPManager) *MCPHandlers {
 	return &MCPHandlers{mcpManager: mcpManager}
 }
 
-// ListTools lists tools from the MCP server
+/* ListTools lists tools from the MCP server */
 func (h *MCPHandlers) ListTools(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	profileID := vars["profile_id"]
@@ -45,7 +45,7 @@ func (h *MCPHandlers) ListTools(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(tools)
 }
 
-// CallTool calls a tool on the MCP server
+/* CallTool calls a tool on the MCP server */
 func (h *MCPHandlers) CallTool(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	profileID := vars["profile_id"]
@@ -60,7 +60,7 @@ func (h *MCPHandlers) CallTool(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate tool call
+	/* Validate tool call */
 	if errors := utils.ValidateToolCall(req.Name, req.Arguments); len(errors) > 0 {
 		WriteValidationErrors(w, r, errors)
 		return
@@ -81,7 +81,7 @@ func (h *MCPHandlers) CallTool(w http.ResponseWriter, r *http.Request) {
 	WriteSuccess(w, result, http.StatusOK)
 }
 
-// ListConnections lists active MCP connections
+/* ListConnections lists active MCP connections */
 func (h *MCPHandlers) ListConnections(w http.ResponseWriter, r *http.Request) {
 	connections := h.mcpManager.ListConnections()
 
@@ -89,7 +89,7 @@ func (h *MCPHandlers) ListConnections(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(connections)
 }
 
-// TestMCPConfig tests an MCP configuration without saving it
+/* TestMCPConfig tests an MCP configuration without saving it */
 func (h *MCPHandlers) TestMCPConfig(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Command string            `json:"command"`
@@ -102,7 +102,7 @@ func (h *MCPHandlers) TestMCPConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create temporary MCP config
+	/* Create temporary MCP config */
 	mcpConfig := mcp.MCPConfig{
 		Command: req.Command,
 		Args:    req.Args,
@@ -119,7 +119,7 @@ func (h *MCPHandlers) TestMCPConfig(w http.ResponseWriter, r *http.Request) {
 		mcpConfig.Env = make(map[string]string)
 	}
 
-	// Try to create and initialize client
+	/* Try to create and initialize client */
 	testClient, err := mcp.NewClient(mcpConfig)
 	if err != nil {
 		WriteError(w, r, http.StatusBadRequest, fmt.Errorf("failed to create MCP client: %w", err), nil)
@@ -127,7 +127,7 @@ func (h *MCPHandlers) TestMCPConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	defer testClient.Close()
 
-	// Try to list tools as a test
+	/* Try to list tools as a test */
 	_, err = testClient.ListTools()
 	if err != nil {
 		WriteError(w, r, http.StatusBadRequest, fmt.Errorf("failed to list tools: %w", err), nil)
@@ -140,14 +140,14 @@ func (h *MCPHandlers) TestMCPConfig(w http.ResponseWriter, r *http.Request) {
 	}, http.StatusOK)
 }
 
-// MCPManager manages MCP client connections
+/* MCPManager manages MCP client connections */
 type MCPManager struct {
 	clients map[string]*mcp.Client
 	mu      sync.RWMutex
 	queries *db.Queries
 }
 
-// NewMCPManager creates a new MCP manager
+/* NewMCPManager creates a new MCP manager */
 func NewMCPManager(queries *db.Queries) *MCPManager {
 	return &MCPManager{
 		clients: make(map[string]*mcp.Client),
@@ -155,12 +155,12 @@ func NewMCPManager(queries *db.Queries) *MCPManager {
 	}
 }
 
-// GetMCPManager returns the MCP manager (for use in websocket handler)
+/* GetMCPManager returns the MCP manager (for use in websocket handler) */
 func (h *MCPHandlers) GetMCPManager() *MCPManager {
 	return h.mcpManager
 }
 
-// GetClient gets or creates an MCP client for a profile
+/* GetClient gets or creates an MCP client for a profile */
 func (m *MCPManager) GetClient(ctx context.Context, profileID string) (*mcp.Client, error) {
 	m.mu.RLock()
 	client, ok := m.clients[profileID]
@@ -170,7 +170,7 @@ func (m *MCPManager) GetClient(ctx context.Context, profileID string) (*mcp.Clie
 		return client, nil
 	}
 
-	// Get profile
+	/* Get profile */
 	profile, err := m.queries.GetProfile(ctx, profileID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get profile: %w", err)
@@ -180,18 +180,18 @@ func (m *MCPManager) GetClient(ctx context.Context, profileID string) (*mcp.Clie
 		return nil, fmt.Errorf("profile not found: %s", profileID)
 	}
 
-	// Parse MCP config
+	/* Parse MCP config */
 	mcpConfig := mcp.MCPConfig{
 		Command: "/home/pge/pge/neurondb/NeuronMCP/bin/neurondb-mcp", // Default full path
 		Args:    []string{},
 		Env:     make(map[string]string),
 	}
 
-	// Set default database environment variables from profile's NeuronDB DSN
+	/* Set default database environment variables from profile's NeuronDB DSN */
 	if profile.NeuronDBDSN != "" {
-		// Use the same database connection as the profile's NeuronDB
-		// This ensures MCP can connect to the same database
-		// MCP server expects NEURONDB_CONNECTION_STRING (not NEURONDB_DSN)
+		/* Use the same database connection as the profile's NeuronDB */
+		/* This ensures MCP can connect to the same database */
+		/* MCP server expects NEURONDB_CONNECTION_STRING (not NEURONDB_DSN) */
 		mcpConfig.Env["NEURONDB_CONNECTION_STRING"] = profile.NeuronDBDSN
 	}
 
@@ -215,7 +215,7 @@ func (m *MCPManager) GetClient(ctx context.Context, profileID string) (*mcp.Clie
 		}
 	}
 
-	// Create new client
+	/* Create new client */
 	newClient, err := mcp.NewClient(mcpConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create MCP client: %w", err)
@@ -229,7 +229,7 @@ func (m *MCPManager) GetClient(ctx context.Context, profileID string) (*mcp.Clie
 	return client, nil
 }
 
-// ListConnections lists all active connections
+/* ListConnections lists all active connections */
 func (m *MCPManager) ListConnections() []map[string]interface{} {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -245,14 +245,14 @@ func (m *MCPManager) ListConnections() []map[string]interface{} {
 	return connections
 }
 
-// ListThreads lists all chat threads for a profile
+/* ListThreads lists all chat threads for a profile */
 func (h *MCPHandlers) ListThreads(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	profileID := vars["profile_id"]
 
 	threads, err := h.mcpManager.queries.ListMCPThreads(r.Context(), profileID)
 	if err != nil {
-		// Check if it's a "table doesn't exist" error
+		/* Check if it's a "table doesn't exist" error */
 		errStr := err.Error()
 		if strings.Contains(errStr, "does not exist") || strings.Contains(errStr, "relation") || strings.Contains(errStr, "mcp_chat_threads") {
 			WriteError(w, r, http.StatusInternalServerError, fmt.Errorf("database tables not found. Please run migration: psql -d neurondb -f NeuronDesktop/api/migrations/007_mcp_chat_threads.sql"), nil)
@@ -265,7 +265,7 @@ func (h *MCPHandlers) ListThreads(w http.ResponseWriter, r *http.Request) {
 	WriteSuccess(w, threads, http.StatusOK)
 }
 
-// CreateThread creates a new chat thread
+/* CreateThread creates a new chat thread */
 func (h *MCPHandlers) CreateThread(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	profileID := vars["profile_id"]
@@ -293,11 +293,11 @@ func (h *MCPHandlers) CreateThread(w http.ResponseWriter, r *http.Request) {
 	WriteSuccess(w, thread, http.StatusCreated)
 }
 
-// GetThread gets a thread with its messages
+/* GetThread gets a thread with its messages */
 func (h *MCPHandlers) GetThread(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	threadID := vars["thread_id"]
-	// profileID is available but not needed for this query
+	/* profileID is available but not needed for this query */
 
 	thread, err := h.mcpManager.queries.GetMCPThread(r.Context(), threadID)
 	if err != nil {
@@ -324,7 +324,7 @@ func (h *MCPHandlers) GetThread(w http.ResponseWriter, r *http.Request) {
 	WriteSuccess(w, response, http.StatusOK)
 }
 
-// UpdateThread updates a thread (e.g., title)
+/* UpdateThread updates a thread (e.g., title) */
 func (h *MCPHandlers) UpdateThread(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	threadID := vars["thread_id"]
@@ -347,7 +347,7 @@ func (h *MCPHandlers) UpdateThread(w http.ResponseWriter, r *http.Request) {
 	WriteSuccess(w, thread, http.StatusOK)
 }
 
-// DeleteThread deletes a thread
+/* DeleteThread deletes a thread */
 func (h *MCPHandlers) DeleteThread(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	threadID := vars["thread_id"]
@@ -360,7 +360,7 @@ func (h *MCPHandlers) DeleteThread(w http.ResponseWriter, r *http.Request) {
 	WriteSuccess(w, map[string]interface{}{"success": true}, http.StatusOK)
 }
 
-// AddMessage adds a message to a thread
+/* AddMessage adds a message to a thread */
 func (h *MCPHandlers) AddMessage(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	threadID := vars["thread_id"]

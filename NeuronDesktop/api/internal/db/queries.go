@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -12,24 +13,22 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// Queries provides database operations
+/* Queries provides database operations */
 type Queries struct {
 	db *sql.DB
 }
 
-// NewQueries creates a new Queries instance
+/* NewQueries creates a new Queries instance */
 func NewQueries(db *sql.DB) *Queries {
 	return &Queries{db: db}
 }
 
-// GetDB returns the underlying database connection
+/* GetDB returns the underlying database connection */
 func (q *Queries) GetDB() *sql.DB {
 	return q.db
 }
 
-// Profile operations
-
-// CreateProfile creates a new profile
+/* CreateProfile creates a new profile */
 func (q *Queries) CreateProfile(ctx context.Context, profile *Profile) error {
 	if profile.ID == "" {
 		profile.ID = uuid.New().String()
@@ -52,7 +51,7 @@ func (q *Queries) CreateProfile(ctx context.Context, profile *Profile) error {
 	return err
 }
 
-// GetProfile gets a profile by ID
+/* GetProfile gets a profile by ID */
 func (q *Queries) GetProfile(ctx context.Context, id string) (*Profile, error) {
 	var profile Profile
 	var mcpConfigJSON []byte
@@ -92,7 +91,7 @@ func (q *Queries) GetProfile(ctx context.Context, id string) (*Profile, error) {
 	return &profile, nil
 }
 
-// ListProfiles lists profiles for a user
+/* ListProfiles lists profiles for a user */
 func (q *Queries) ListProfiles(ctx context.Context, userID string) ([]Profile, error) {
 	query := `
 		SELECT id, name, user_id, profile_username, mcp_config, neurondb_dsn, agent_endpoint, agent_api_key, default_collection, is_default, created_at, updated_at
@@ -144,7 +143,7 @@ func (q *Queries) ListProfiles(ctx context.Context, userID string) ([]Profile, e
 	return profiles, nil
 }
 
-// ListAllProfiles lists all profiles (admin only)
+/* ListAllProfiles lists all profiles (admin only) */
 func (q *Queries) ListAllProfiles(ctx context.Context) ([]Profile, error) {
 	query := `
 		SELECT id, name, user_id, profile_username, mcp_config, neurondb_dsn, agent_endpoint, agent_api_key, default_collection, is_default, created_at, updated_at
@@ -195,7 +194,7 @@ func (q *Queries) ListAllProfiles(ctx context.Context) ([]Profile, error) {
 	return profiles, nil
 }
 
-// GetProfileByUsernameAndPassword gets a profile by username and password
+/*GetProfileByUsernameAndPassword gets a profile by username and password*/
 func (q *Queries) GetProfileByUsernameAndPassword(ctx context.Context, username, password string) (*Profile, error) {
 	var profile Profile
 	var mcpConfigJSON []byte
@@ -220,7 +219,6 @@ func (q *Queries) GetProfileByUsernameAndPassword(ctx context.Context, username,
 		profile.ProfileUsername = profileUsername.String
 	}
 
-	// Verify password
 	if !profilePasswordHash.Valid {
 		return nil, fmt.Errorf("profile has no password set")
 	}
@@ -246,7 +244,7 @@ func (q *Queries) GetProfileByUsernameAndPassword(ctx context.Context, username,
 	return &profile, nil
 }
 
-// UpdateProfile updates a profile
+/*UpdateProfile updates a profile*/
 func (q *Queries) UpdateProfile(ctx context.Context, profile *Profile) error {
 	profile.UpdatedAt = time.Now()
 	mcpConfigJSON, _ := json.Marshal(profile.MCPConfig)
@@ -263,16 +261,15 @@ func (q *Queries) UpdateProfile(ctx context.Context, profile *Profile) error {
 	return err
 }
 
-// DeleteProfile deletes a profile
+/*DeleteProfile deletes a profile*/
 func (q *Queries) DeleteProfile(ctx context.Context, id string) error {
 	query := `DELETE FROM profiles WHERE id = $1`
 	_, err := q.db.ExecContext(ctx, query, id)
 	return err
 }
 
-// API Key operations
 
-// CreateAPIKey creates a new API key
+/*CreateAPIKey creates a new API key*/
 func (q *Queries) CreateAPIKey(ctx context.Context, apiKey *APIKey) error {
 	if apiKey.ID == "" {
 		apiKey.ID = uuid.New().String()
@@ -291,7 +288,7 @@ func (q *Queries) CreateAPIKey(ctx context.Context, apiKey *APIKey) error {
 	return err
 }
 
-// GetAPIKeyByPrefix gets an API key by prefix
+/*GetAPIKeyByPrefix gets an API key by prefix*/
 func (q *Queries) GetAPIKeyByPrefix(ctx context.Context, prefix string) (*APIKey, error) {
 	var apiKey APIKey
 
@@ -310,21 +307,21 @@ func (q *Queries) GetAPIKeyByPrefix(ctx context.Context, prefix string) (*APIKey
 	return &apiKey, nil
 }
 
-// UpdateAPIKeyLastUsed updates the last used timestamp
+/*UpdateAPIKeyLastUsed updates the last used timestamp*/
 func (q *Queries) UpdateAPIKeyLastUsed(ctx context.Context, id string) error {
 	query := `UPDATE api_keys SET last_used_at = $1 WHERE id = $2`
 	_, err := q.db.ExecContext(ctx, query, time.Now(), id)
 	return err
 }
 
-// DeleteAPIKey deletes an API key
+/*DeleteAPIKey deletes an API key*/
 func (q *Queries) DeleteAPIKey(ctx context.Context, id string) error {
 	query := `DELETE FROM api_keys WHERE id = $1`
 	_, err := q.db.ExecContext(ctx, query, id)
 	return err
 }
 
-// GetAllAPIKeys gets all API keys (for admin purposes)
+/*GetAllAPIKeys gets all API keys (for admin purposes)*/
 func (q *Queries) GetAllAPIKeys(ctx context.Context) ([]APIKey, error) {
 	query := `
 		SELECT id, key_hash, key_prefix, user_id, profile_id, rate_limit, last_used_at, created_at
@@ -362,9 +359,112 @@ func (q *Queries) GetAllAPIKeys(ctx context.Context) ([]APIKey, error) {
 	return keys, nil
 }
 
-// RequestLog operations
+/* CreateAuditLog creates a new audit log entry */
+func (q *Queries) CreateAuditLog(ctx context.Context, log *AuditLog) error {
+	if log.ID == "" {
+		log.ID = uuid.New().String()
+	}
+	if log.CreatedAt.IsZero() {
+		log.CreatedAt = time.Now()
+	}
 
-// CreateRequestLog creates a new request log
+	detailsJSON, _ := json.Marshal(log.Details)
+
+	query := `
+		INSERT INTO audit_logs (id, user_id, action, resource_type, resource_id, details, ip_address, user_agent, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+	`
+	_, err := q.db.ExecContext(ctx, query,
+		log.ID, log.UserID, log.Action, log.ResourceType, log.ResourceID,
+		detailsJSON, log.IPAddress, log.UserAgent, log.CreatedAt)
+	return err
+}
+
+/* ListAuditLogs lists audit logs with filtering */
+func (q *Queries) ListAuditLogs(ctx context.Context, userID *string, action *string, resourceType *string, limit int) ([]AuditLog, error) {
+	var query string
+	var rows *sql.Rows
+	var err error
+
+	conditions := []string{}
+	args := []interface{}{}
+	argIndex := 1
+
+	if userID != nil {
+		conditions = append(conditions, fmt.Sprintf("user_id = $%d", argIndex))
+		args = append(args, *userID)
+		argIndex++
+	}
+
+	if action != nil {
+		conditions = append(conditions, fmt.Sprintf("action = $%d", argIndex))
+		args = append(args, *action)
+		argIndex++
+	}
+
+	if resourceType != nil {
+		conditions = append(conditions, fmt.Sprintf("resource_type = $%d", argIndex))
+		args = append(args, *resourceType)
+		argIndex++
+	}
+
+	whereClause := ""
+	if len(conditions) > 0 {
+		whereClause = "WHERE " + strings.Join(conditions, " AND ")
+	}
+
+	query = fmt.Sprintf(`
+		SELECT id, user_id, action, resource_type, resource_id, details, ip_address, user_agent, created_at
+		FROM audit_logs
+		%s
+		ORDER BY created_at DESC
+		LIMIT $%d
+	`, whereClause, argIndex)
+
+	args = append(args, limit)
+	rows, err = q.db.QueryContext(ctx, query, args...)
+
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var logs []AuditLog
+	for rows.Next() {
+		var log AuditLog
+		var detailsJSON []byte
+		var resourceID, ipAddress, userAgent sql.NullString
+
+		err := rows.Scan(
+			&log.ID, &log.UserID, &log.Action, &log.ResourceType, &resourceID,
+			&detailsJSON, &ipAddress, &userAgent, &log.CreatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		if resourceID.Valid {
+			log.ResourceID = &resourceID.String
+		}
+		if ipAddress.Valid {
+			log.IPAddress = &ipAddress.String
+		}
+		if userAgent.Valid {
+			log.UserAgent = &userAgent.String
+		}
+
+		if len(detailsJSON) > 0 {
+			json.Unmarshal(detailsJSON, &log.Details)
+		}
+
+		logs = append(logs, log)
+	}
+
+	return logs, nil
+}
+
+
+/*CreateRequestLog creates a new request log*/
 func (q *Queries) CreateRequestLog(ctx context.Context, log *RequestLog) error {
 	if log.ID == "" {
 		log.ID = uuid.New().String()
@@ -386,7 +486,7 @@ func (q *Queries) CreateRequestLog(ctx context.Context, log *RequestLog) error {
 	return err
 }
 
-// ListRequestLogs lists request logs
+/*ListRequestLogs lists request logs*/
 func (q *Queries) ListRequestLogs(ctx context.Context, profileID *string, limit int) ([]RequestLog, error) {
 	var query string
 	var rows *sql.Rows
@@ -445,9 +545,8 @@ func (q *Queries) ListRequestLogs(ctx context.Context, profileID *string, limit 
 	return logs, nil
 }
 
-// ModelConfig operations
 
-// CreateModelConfig creates a new model configuration
+/*CreateModelConfig creates a new model configuration*/
 func (q *Queries) CreateModelConfig(ctx context.Context, config *ModelConfig) error {
 	if config.ID == "" {
 		config.ID = uuid.New().String()
@@ -470,7 +569,7 @@ func (q *Queries) CreateModelConfig(ctx context.Context, config *ModelConfig) er
 	return err
 }
 
-// GetModelConfig gets a model configuration by ID
+/*GetModelConfig gets a model configuration by ID*/
 func (q *Queries) GetModelConfig(ctx context.Context, id string, includeAPIKey bool) (*ModelConfig, error) {
 	var config ModelConfig
 	var metadataJSON []byte
@@ -510,7 +609,7 @@ func (q *Queries) GetModelConfig(ctx context.Context, id string, includeAPIKey b
 	return &config, nil
 }
 
-// ListModelConfigs lists model configurations for a profile
+/*ListModelConfigs lists model configurations for a profile*/
 func (q *Queries) ListModelConfigs(ctx context.Context, profileID string, includeAPIKey bool) ([]ModelConfig, error) {
 	var query string
 	if includeAPIKey {
@@ -562,7 +661,7 @@ func (q *Queries) ListModelConfigs(ctx context.Context, profileID string, includ
 	return configs, nil
 }
 
-// UpdateModelConfig updates a model configuration
+/*UpdateModelConfig updates a model configuration*/
 func (q *Queries) UpdateModelConfig(ctx context.Context, config *ModelConfig) error {
 	config.UpdatedAt = time.Now()
 	metadataJSON, _ := json.Marshal(config.Metadata)
@@ -578,14 +677,14 @@ func (q *Queries) UpdateModelConfig(ctx context.Context, config *ModelConfig) er
 	return err
 }
 
-// DeleteModelConfig deletes a model configuration
+/*DeleteModelConfig deletes a model configuration*/
 func (q *Queries) DeleteModelConfig(ctx context.Context, id string) error {
 	query := `DELETE FROM model_configs WHERE id = $1`
 	_, err := q.db.ExecContext(ctx, query, id)
 	return err
 }
 
-// SetDefaultModelConfig sets a model as default (unsetting others)
+/*SetDefaultModelConfig sets a model as default (unsetting others)*/
 func (q *Queries) SetDefaultModelConfig(ctx context.Context, profileID string, modelID string) error {
 	tx, err := q.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -593,13 +692,11 @@ func (q *Queries) SetDefaultModelConfig(ctx context.Context, profileID string, m
 	}
 	defer tx.Rollback()
 
-	// Unset all defaults for this profile
 	_, err = tx.ExecContext(ctx, `UPDATE model_configs SET is_default = false WHERE profile_id = $1`, profileID)
 	if err != nil {
 		return err
 	}
 
-	// Set the specified model as default
 	_, err = tx.ExecContext(ctx, `UPDATE model_configs SET is_default = true WHERE id = $1`, modelID)
 	if err != nil {
 		return err
@@ -608,7 +705,7 @@ func (q *Queries) SetDefaultModelConfig(ctx context.Context, profileID string, m
 	return tx.Commit()
 }
 
-// GetDefaultModelConfig gets the default model for a profile
+/*GetDefaultModelConfig gets the default model for a profile*/
 func (q *Queries) GetDefaultModelConfig(ctx context.Context, profileID string) (*ModelConfig, error) {
 	var config ModelConfig
 	var metadataJSON []byte
@@ -634,7 +731,7 @@ func (q *Queries) GetDefaultModelConfig(ctx context.Context, profileID string) (
 	return &config, nil
 }
 
-// GetDefaultProfile gets the default profile
+/*GetDefaultProfile gets the default profile*/
 func (q *Queries) GetDefaultProfile(ctx context.Context) (*Profile, error) {
 	var profile Profile
 	var mcpConfigJSON []byte
@@ -671,7 +768,7 @@ func (q *Queries) GetDefaultProfile(ctx context.Context) (*Profile, error) {
 	return &profile, nil
 }
 
-// GetDefaultProfileForUser gets the "current" profile for a user (default if set, otherwise most recent)
+/*GetDefaultProfileForUser gets the "current" profile for a user (default if set, otherwise most recent)*/
 func (q *Queries) GetDefaultProfileForUser(ctx context.Context, userID string) (*Profile, error) {
 	var profile Profile
 	var mcpConfigJSON []byte
@@ -714,7 +811,7 @@ func (q *Queries) GetDefaultProfileForUser(ctx context.Context, userID string) (
 	return &profile, nil
 }
 
-// SetDefaultProfile sets a profile as default (unsetting others)
+/*SetDefaultProfile sets a profile as default (unsetting others)*/
 func (q *Queries) SetDefaultProfile(ctx context.Context, profileID string) error {
 	tx, err := q.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -722,13 +819,11 @@ func (q *Queries) SetDefaultProfile(ctx context.Context, profileID string) error
 	}
 	defer tx.Rollback()
 
-	// Unset all defaults
 	_, err = tx.ExecContext(ctx, `UPDATE profiles SET is_default = false`)
 	if err != nil {
 		return err
 	}
 
-	// Set the specified profile as default
 	_, err = tx.ExecContext(ctx, `UPDATE profiles SET is_default = true WHERE id = $1`, profileID)
 	if err != nil {
 		return err
@@ -737,9 +832,8 @@ func (q *Queries) SetDefaultProfile(ctx context.Context, profileID string) error
 	return tx.Commit()
 }
 
-// App Setting operations
 
-// GetSetting gets an app setting by key
+/*GetSetting gets an app setting by key*/
 func (q *Queries) GetSetting(ctx context.Context, key string) (*AppSetting, error) {
 	var setting AppSetting
 	var valueJSON []byte
@@ -762,7 +856,7 @@ func (q *Queries) GetSetting(ctx context.Context, key string) (*AppSetting, erro
 	return &setting, nil
 }
 
-// UpsertSetting upserts an app setting
+/*UpsertSetting upserts an app setting*/
 func (q *Queries) UpsertSetting(ctx context.Context, key string, value map[string]interface{}) error {
 	valueJSON, _ := json.Marshal(value)
 
@@ -778,9 +872,8 @@ func (q *Queries) UpsertSetting(ctx context.Context, key string, value map[strin
 	return err
 }
 
-// User operations
 
-// CreateUser creates a new user
+/*CreateUser creates a new user*/
 func (q *Queries) CreateUser(ctx context.Context, user *User) error {
 	if user.ID == "" {
 		user.ID = uuid.New().String()
@@ -799,7 +892,7 @@ func (q *Queries) CreateUser(ctx context.Context, user *User) error {
 	return err
 }
 
-// GetUserByUsername gets a user by username
+/*GetUserByUsername gets a user by username*/
 func (q *Queries) GetUserByUsername(ctx context.Context, username string) (*User, error) {
 	var user User
 
@@ -818,7 +911,7 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (*User
 	return &user, nil
 }
 
-// GetUserByID gets a user by ID
+/*GetUserByID gets a user by ID*/
 func (q *Queries) GetUserByID(ctx context.Context, id string) (*User, error) {
 	var user User
 
@@ -837,7 +930,7 @@ func (q *Queries) GetUserByID(ctx context.Context, id string) (*User, error) {
 	return &user, nil
 }
 
-// UpdateUserPassword updates a user's password
+/*UpdateUserPassword updates a user's password*/
 func (q *Queries) UpdateUserPassword(ctx context.Context, userID string, passwordHash string) error {
 	query := `
 		UPDATE users
@@ -848,9 +941,8 @@ func (q *Queries) UpdateUserPassword(ctx context.Context, userID string, passwor
 	return err
 }
 
-// MCP Chat Thread operations
 
-// MCPThread represents a chat thread
+/*MCPThread represents a chat thread*/
 type MCPThread struct {
 	ID        string    `json:"id"`
 	ProfileID string    `json:"profile_id"`
@@ -859,7 +951,7 @@ type MCPThread struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-// MCPMessage represents a chat message
+/*MCPMessage represents a chat message*/
 type MCPMessage struct {
 	ID        string                 `json:"id"`
 	ThreadID  string                 `json:"thread_id"`
@@ -870,7 +962,7 @@ type MCPMessage struct {
 	CreatedAt time.Time              `json:"created_at"`
 }
 
-// MarshalJSON customizes JSON marshaling for MCPMessage to handle sql.NullString properly
+/*MarshalJSON customizes JSON marshaling for MCPMessage to handle sql.NullString properly*/
 func (m MCPMessage) MarshalJSON() ([]byte, error) {
 	aux := struct {
 		ID        string                 `json:"id"`
@@ -894,7 +986,7 @@ func (m MCPMessage) MarshalJSON() ([]byte, error) {
 	return json.Marshal(aux)
 }
 
-// ListMCPThreads lists all threads for a profile
+/*ListMCPThreads lists all threads for a profile*/
 func (q *Queries) ListMCPThreads(ctx context.Context, profileID string) ([]MCPThread, error) {
 	query := `
 		SELECT id, profile_id, title, created_at, updated_at
@@ -920,7 +1012,7 @@ func (q *Queries) ListMCPThreads(ctx context.Context, profileID string) ([]MCPTh
 	return threads, rows.Err()
 }
 
-// CreateMCPThread creates a new thread
+/*CreateMCPThread creates a new thread*/
 func (q *Queries) CreateMCPThread(ctx context.Context, profileID, title string) (*MCPThread, error) {
 	threadID := uuid.New().String()
 	query := `
@@ -937,7 +1029,7 @@ func (q *Queries) CreateMCPThread(ctx context.Context, profileID, title string) 
 	return &thread, nil
 }
 
-// GetMCPThread gets a thread by ID
+/*GetMCPThread gets a thread by ID*/
 func (q *Queries) GetMCPThread(ctx context.Context, threadID string) (*MCPThread, error) {
 	query := `
 		SELECT id, profile_id, title, created_at, updated_at
@@ -956,7 +1048,7 @@ func (q *Queries) GetMCPThread(ctx context.Context, threadID string) (*MCPThread
 	return &thread, nil
 }
 
-// UpdateMCPThread updates a thread's title and updated_at
+/*UpdateMCPThread updates a thread's title and updated_at*/
 func (q *Queries) UpdateMCPThread(ctx context.Context, threadID, title string) (*MCPThread, error) {
 	query := `
 		UPDATE mcp_chat_threads
@@ -973,14 +1065,14 @@ func (q *Queries) UpdateMCPThread(ctx context.Context, threadID, title string) (
 	return &thread, nil
 }
 
-// DeleteMCPThread deletes a thread (cascade deletes messages)
+/*DeleteMCPThread deletes a thread (cascade deletes messages)*/
 func (q *Queries) DeleteMCPThread(ctx context.Context, threadID string) error {
 	query := `DELETE FROM mcp_chat_threads WHERE id = $1`
 	_, err := q.db.ExecContext(ctx, query, threadID)
 	return err
 }
 
-// ListMCPMessages lists all messages for a thread
+/*ListMCPMessages lists all messages for a thread*/
 func (q *Queries) ListMCPMessages(ctx context.Context, threadID string) ([]MCPMessage, error) {
 	query := `
 		SELECT id, thread_id, role, content, tool_name, data, created_at
@@ -1018,7 +1110,7 @@ func (q *Queries) ListMCPMessages(ctx context.Context, threadID string) ([]MCPMe
 	return messages, rows.Err()
 }
 
-// CreateMCPMessage creates a new message and updates thread's updated_at
+/*CreateMCPMessage creates a new message and updates thread's updated_at*/
 func (q *Queries) CreateMCPMessage(ctx context.Context, threadID, role, content, toolName string, data map[string]interface{}) (*MCPMessage, error) {
 	messageID := uuid.New().String()
 
@@ -1027,7 +1119,6 @@ func (q *Queries) CreateMCPMessage(ctx context.Context, threadID, role, content,
 		dataJSON, _ = json.Marshal(data)
 	}
 
-	// Update thread's updated_at when adding a message
 	_, err := q.db.ExecContext(ctx, `UPDATE mcp_chat_threads SET updated_at = NOW() WHERE id = $1`, threadID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update thread: %w", err)
@@ -1040,7 +1131,6 @@ func (q *Queries) CreateMCPMessage(ctx context.Context, threadID, role, content,
 
 	var dataJSONNull interface{}
 	if len(dataJSON) > 0 {
-		// Pass as string for JSONB casting - PostgreSQL will parse it
 		dataJSONNull = string(dataJSON)
 	} else {
 		dataJSONNull = nil

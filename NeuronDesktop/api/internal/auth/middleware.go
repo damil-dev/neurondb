@@ -7,11 +7,10 @@ import (
 	"github.com/neurondb/NeuronDesktop/api/internal/db"
 )
 
-// Middleware provides API key authentication middleware
+/* Middleware provides API key authentication middleware */
 func Middleware(keyManager *APIKeyManager) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Skip auth for health check
 			if r.URL.Path == "/health" || r.URL.Path == "/api/v1/health" {
 				next.ServeHTTP(w, r)
 				return
@@ -35,7 +34,6 @@ func Middleware(keyManager *APIKeyManager) func(http.Handler) http.Handler {
 				return
 			}
 
-			// Add API key info to context
 			ctx := context.WithValue(r.Context(), "api_key", apiKey)
 			ctx = context.WithValue(ctx, "user_id", apiKey.UserID)
 
@@ -44,11 +42,11 @@ func Middleware(keyManager *APIKeyManager) func(http.Handler) http.Handler {
 	}
 }
 
-// GetAPIKeyFromContext gets the API key from context
+/* GetAPIKeyFromContext gets the API key from context */
 func GetAPIKeyFromContext(ctx context.Context) (*db.APIKey, bool) {
 	key, ok := ctx.Value("api_key").(*db.APIKey)
 	return key, ok
 }
 
-// NOTE: GetUserIDFromContext is now in middleware_jwt.go for JWT authentication
-// This file is kept for API key functionality if needed for backwards compatibility
+/* NOTE: GetUserIDFromContext is now in middleware_jwt.go for JWT authentication
+This file is kept for API key functionality if needed for backwards compatibility */

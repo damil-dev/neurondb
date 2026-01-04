@@ -10,19 +10,19 @@ import (
 	"github.com/neurondb/NeuronDesktop/api/internal/metrics"
 )
 
-// SystemMetricsHandlers handles system metrics endpoints
+/* SystemMetricsHandlers handles system metrics endpoints */
 type SystemMetricsHandlers struct {
 	logger *logging.Logger
 }
 
-// NewSystemMetricsHandlers creates new system metrics handlers
+/* NewSystemMetricsHandlers creates new system metrics handlers */
 func NewSystemMetricsHandlers(logger *logging.Logger) *SystemMetricsHandlers {
 	return &SystemMetricsHandlers{
 		logger: logger,
 	}
 }
 
-// GetSystemMetrics returns current system metrics
+/* GetSystemMetrics returns current system metrics */
 func (h *SystemMetricsHandlers) GetSystemMetrics(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -37,7 +37,7 @@ func (h *SystemMetricsHandlers) GetSystemMetrics(w http.ResponseWriter, r *http.
 	json.NewEncoder(w).Encode(systemMetrics)
 }
 
-// SystemMetricsWebSocket streams system metrics via WebSocket
+/* SystemMetricsWebSocket streams system metrics via WebSocket */
 func (h *SystemMetricsHandlers) SystemMetricsWebSocket(w http.ResponseWriter, r *http.Request) {
 	upgrader := websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
@@ -56,7 +56,7 @@ func (h *SystemMetricsHandlers) SystemMetricsWebSocket(w http.ResponseWriter, r 
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
-	// Send initial metrics
+	/* Send initial metrics */
 	systemMetrics, err := metrics.CollectSystemMetrics(ctx)
 	if err == nil {
 		conn.WriteJSON(systemMetrics)
