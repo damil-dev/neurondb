@@ -19,10 +19,13 @@ package tools
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
+	"syscall"
 	"time"
 )
 
@@ -56,16 +59,50 @@ const (
 
 /* EnhancedSandbox provides enhanced sandboxing capabilities */
 type EnhancedSandbox struct {
-	config SandboxConfig
-	base   *Sandbox
+	config      SandboxConfig
+	base        *Sandbox
+	dockerClient DockerClient
+	mu          sync.Mutex
+	containers  map[string]string /* containerID -> containerName mapping for cleanup */
+}
+
+/* DockerClient interface for Docker operations */
+type DockerClient interface {
+	CreateContainer(ctx context.Context, config ContainerConfig) (string, error)
+	StartContainer(ctx context.Context, containerID string) error
+	WaitContainer(ctx context.Context, containerID string) error
+	GetContainerLogs(ctx context.Context, containerID string) ([]byte, error)
+	RemoveContainer(ctx context.Context, containerID string) error
+	ContainerExists(ctx context.Context, containerID string) (bool, error)
+}
+
+/* ContainerConfig defines container configuration */
+type ContainerConfig struct {
+	Image       string
+	Command     []string
+	WorkingDir  string
+	Env         []string
+	MemoryLimit int64  /* bytes */
+	CPULimit    float64 /* percentage */
+	NetworkMode string
+	Volumes     map[string]string /* hostPath -> containerPath */
+	AutoRemove  bool
 }
 
 /* NewEnhancedSandbox creates a new enhanced sandbox */
 func NewEnhancedSandbox(config SandboxConfig) *EnhancedSandbox {
-	return &EnhancedSandbox{
-		config: config,
-		base:   NewSandbox("", config.MaxMemory, int(config.MaxCPU)),
+	sandbox := &EnhancedSandbox{
+		config:     config,
+		base:       NewSandbox("", config.MaxMemory, int(config.MaxCPU)),
+		containers: make(map[string]string),
 	}
+
+	/* Initialize Docker client if container isolation is enabled */
+	if config.Isolation == IsolationContainer {
+		sandbox.dockerClient = NewDockerClient()
+	}
+
+	return sandbox
 }
 
 /* ExecuteCommand executes a command in the sandbox */
@@ -105,11 +142,14 @@ func (s *EnhancedSandbox) ExecuteCommand(ctx context.Context, command string, ar
 	/* Apply isolation based on type */
 	switch s.config.Isolation {
 	case IsolationChroot:
-		/* TODO: Apply chroot isolation */
-		/* Requires root privileges */
+		/* Apply chroot isolation if possible */
+		if err := s.applyChrootIsolation(cmd, workingDir); err != nil {
+			/* Log warning but continue - chroot may not be available */
+			fmt.Printf("Warning: chroot isolation failed: %v\n", err)
+		}
 	case IsolationContainer:
-		/* TODO: Execute in container */
-		/* Would need Docker/container runtime integration */
+		/* Execute in Docker container */
+		return s.executeInContainer(ctx, command, args, workingDir)
 	}
 
 	/* Execute command */
@@ -189,8 +229,75 @@ func (s *EnhancedSandbox) ValidateNetworkAccess(host string) error {
 
 	/* Check allowed IPs */
 	if len(s.config.NetworkRules.AllowedIPs) > 0 {
-		/* TODO: Parse IP/CIDR and validate */
-		/* Would need net package for IP matching */
+		hostIP, err := net.LookupIP(host)
+		if err != nil {
+			return fmt.Errorf("failed to resolve host IP: %w", err)
+		}
+
+		allowed := false
+		for _, allowedIPStr := range s.config.NetworkRules.AllowedIPs {
+			/* Try parsing as CIDR */
+			_, ipNet, err := net.ParseCIDR(allowedIPStr)
+			if err == nil {
+				/* It's a CIDR, check if host IP is in range */
+				for _, ip := range hostIP {
+					if ipNet.Contains(ip) {
+						allowed = true
+						break
+					}
+				}
+				if allowed {
+					break
+				}
+			} else {
+				/* Try parsing as single IP */
+				allowedIP := net.ParseIP(allowedIPStr)
+				if allowedIP != nil {
+					for _, ip := range hostIP {
+						if ip.Equal(allowedIP) {
+							allowed = true
+							break
+						}
+					}
+					if allowed {
+						break
+					}
+				}
+			}
+		}
+
+		if !allowed {
+			return fmt.Errorf("IP not in allowed list: %s", host)
+		}
+	}
+
+	return nil
+}
+
+/* applyChrootIsolation applies chroot isolation to command */
+func (s *EnhancedSandbox) applyChrootIsolation(cmd *exec.Cmd, workingDir string) error {
+	/* Chroot requires root privileges or CAP_SYS_CHROOT capability */
+	/* Check if we have the capability */
+	if os.Geteuid() != 0 {
+		/* Not root, chroot won't work */
+		return fmt.Errorf("chroot requires root privileges")
+	}
+
+	/* Create isolated directory if workingDir is set */
+	chrootDir := workingDir
+	if chrootDir == "" {
+		/* Create temporary chroot directory */
+		tmpDir, err := os.MkdirTemp("", "sandbox-chroot-*")
+		if err != nil {
+			return fmt.Errorf("failed to create chroot directory: %w", err)
+		}
+		chrootDir = tmpDir
+		defer os.RemoveAll(tmpDir)
+	}
+
+	/* Set up chroot in command */
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Chroot: chrootDir,
 	}
 
 	return nil
@@ -213,6 +320,86 @@ func (s *EnhancedSandbox) ApplyFileAllowlist(cmd *exec.Cmd) error {
 	if len(s.config.AllowedDirs) > 0 {
 		allowedDirsStr := strings.Join(s.config.AllowedDirs, ":")
 		cmd.Env = append(cmd.Env, "SANDBOX_ALLOWED_DIRS="+allowedDirsStr)
+	}
+
+	return nil
+}
+
+/* executeInContainer executes command in Docker container */
+func (s *EnhancedSandbox) executeInContainer(ctx context.Context, command string, args []string, workingDir string) ([]byte, error) {
+	if s.dockerClient == nil {
+		return nil, fmt.Errorf("Docker client not initialized")
+	}
+
+	/* Prepare container configuration */
+	containerConfig := ContainerConfig{
+		Image:       "alpine:latest", /* Default base image */
+		Command:     append([]string{command}, args...),
+		WorkingDir:  workingDir,
+		MemoryLimit: s.config.MaxMemory,
+		CPULimit:    s.config.MaxCPU,
+		NetworkMode: "none", /* Isolated network by default */
+		AutoRemove:  true,
+	}
+
+	/* Set network mode based on rules */
+	if !s.config.NetworkRules.BlockAll {
+		containerConfig.NetworkMode = "bridge" /* Allow network access */
+	}
+
+	/* Create container */
+	containerID, err := s.dockerClient.CreateContainer(ctx, containerConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create container: %w", err)
+	}
+
+	/* Track container for cleanup */
+	s.mu.Lock()
+	s.containers[containerID] = containerID
+	s.mu.Unlock()
+
+	/* Ensure cleanup */
+	defer func() {
+		s.mu.Lock()
+		delete(s.containers, containerID)
+		s.mu.Unlock()
+		_ = s.dockerClient.RemoveContainer(context.Background(), containerID)
+	}()
+
+	/* Start container */
+	if err := s.dockerClient.StartContainer(ctx, containerID); err != nil {
+		return nil, fmt.Errorf("failed to start container: %w", err)
+	}
+
+	/* Wait for container to complete */
+	if err := s.dockerClient.WaitContainer(ctx, containerID); err != nil {
+		return nil, fmt.Errorf("container execution failed: %w", err)
+	}
+
+	/* Get container logs */
+	logs, err := s.dockerClient.GetContainerLogs(ctx, containerID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get container logs: %w", err)
+	}
+
+	return logs, nil
+}
+
+/* CleanupContainers removes all tracked containers */
+func (s *EnhancedSandbox) CleanupContainers(ctx context.Context) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	var errors []string
+	for containerID := range s.containers {
+		if err := s.dockerClient.RemoveContainer(ctx, containerID); err != nil {
+			errors = append(errors, fmt.Sprintf("failed to remove container %s: %v", containerID, err))
+		}
+		delete(s.containers, containerID)
+	}
+
+	if len(errors) > 0 {
+		return fmt.Errorf("cleanup errors: %s", strings.Join(errors, "; "))
 	}
 
 	return nil

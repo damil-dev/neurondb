@@ -604,6 +604,11 @@ func (r *Runtime) HierMemory() *HierarchicalMemoryManager {
 	return r.hierMemory
 }
 
+/* EventStream returns the event stream manager */
+func (r *Runtime) EventStream() *EventStreamManager {
+	return r.eventStream
+}
+
 /* Verifier returns the verification agent */
 func (r *Runtime) Verifier() *VerificationAgent {
 	return r.verifier
@@ -686,4 +691,161 @@ func (r *Runtime) executeAsync(ctx context.Context, sessionID uuid.UUID, userMes
 		UserMessage: userMessage,
 		FinalAnswer: fmt.Sprintf("Task queued for asynchronous execution. Task ID: %s. Use GET /api/v1/async-tasks/%s to check status.", task.ID.String(), task.ID.String()),
 	}, nil
+}
+
+/* StreamCallback is called for each chunk of streamed output */
+type StreamCallback func(chunk string, eventType string) error
+
+/* streamWriter implements io.Writer and calls callback for each write */
+type streamWriter struct {
+	builder  *strings.Builder
+	callback StreamCallback
+}
+
+func (w *streamWriter) Write(p []byte) (n int, err error) {
+	chunk := string(p)
+	w.builder.WriteString(chunk)
+	if w.callback != nil {
+		if err := w.callback(chunk, "chunk"); err != nil {
+			return len(p), err
+		}
+	}
+	return len(p), nil
+}
+
+/* ExecuteStream executes agent with streaming support */
+func (r *Runtime) ExecuteStream(ctx context.Context, sessionID uuid.UUID, userMessage string, callback StreamCallback) (*ExecutionState, error) {
+	/* Validate input */
+	if userMessage == "" {
+		return nil, fmt.Errorf("agent execution failed: session_id='%s', user_message_empty=true", sessionID.String())
+	}
+	if len(userMessage) > 100000 {
+		return nil, fmt.Errorf("agent execution failed: session_id='%s', user_message_too_large=true, length=%d, max_length=100000",
+			sessionID.String(), len(userMessage))
+	}
+
+	state := &ExecutionState{
+		SessionID:   sessionID,
+		UserMessage: userMessage,
+	}
+
+	/* Log user message to event stream */
+	if r.eventStream != nil {
+		r.eventStream.LogEvent(ctx, sessionID, "user_message", "user", userMessage, map[string]interface{}{})
+	}
+
+	/* Step 1: Load agent and session */
+	session, err := r.queries.GetSession(ctx, sessionID)
+	if err != nil {
+		return nil, fmt.Errorf("agent execution failed at step 1 (load session): session_id='%s', user_message_length=%d, error=%w",
+			sessionID.String(), len(userMessage), err)
+	}
+	state.AgentID = session.AgentID
+
+	agent, err := r.queries.GetAgentByID(ctx, session.AgentID)
+	if err != nil {
+		return nil, fmt.Errorf("agent execution failed at step 1 (load agent): session_id='%s', agent_id='%s', user_message_length=%d, error=%w",
+			sessionID.String(), session.AgentID.String(), len(userMessage), err)
+	}
+
+	/* Step 2: Load context */
+	contextLoader := NewContextLoader(r.queries, r.memory, r.llm)
+	agentContext, err := contextLoader.Load(ctx, sessionID, agent.ID, userMessage, 20, 5)
+	if err != nil {
+		return nil, fmt.Errorf("agent execution failed at step 2 (load context): session_id='%s', agent_id='%s', agent_name='%s', user_message_length=%d, max_messages=20, max_memory_chunks=5, error=%w",
+			sessionID.String(), agent.ID.String(), agent.Name, len(userMessage), err)
+	}
+
+	state.Context = agentContext
+
+	/* Step 3: Build prompt */
+	prompt, err := r.prompt.Build(agent, agentContext, userMessage)
+	if err != nil {
+		messageCount := len(agentContext.Messages)
+		memoryChunkCount := len(agentContext.MemoryChunks)
+		return nil, fmt.Errorf("agent execution failed at step 3 (build prompt): session_id='%s', agent_id='%s', agent_name='%s', user_message_length=%d, context_message_count=%d, context_memory_chunk_count=%d, error=%w",
+			sessionID.String(), agent.ID.String(), agent.Name, len(userMessage), messageCount, memoryChunkCount, err)
+	}
+
+	/* Step 4: Stream LLM response */
+	var fullResponse strings.Builder
+	sw := &streamWriter{
+		builder:  &fullResponse,
+		callback: callback,
+	}
+
+	err = r.llm.GenerateStream(ctx, agent.ModelName, prompt, agent.Config, sw)
+	if err != nil {
+		promptTokens := EstimateTokens(prompt)
+		return nil, fmt.Errorf("agent execution failed at step 4 (LLM streaming): session_id='%s', agent_id='%s', agent_name='%s', model_name='%s', prompt_length=%d, prompt_tokens=%d, user_message_length=%d, error=%w",
+			sessionID.String(), agent.ID.String(), agent.Name, agent.ModelName, len(prompt), promptTokens, len(userMessage), err)
+	}
+
+	responseContent := fullResponse.String()
+	state.FinalAnswer = responseContent
+
+	/* Parse tool calls from response */
+	toolCalls, err := ParseToolCalls(responseContent)
+	if err == nil && len(toolCalls) > 0 {
+		state.ToolCalls = toolCalls
+		/* Notify about tool calls */
+		if callback != nil {
+			toolCallsJSON, _ := json.Marshal(toolCalls)
+			_ = callback(string(toolCallsJSON), "tool_calls")
+		}
+
+		/* Execute tools */
+		toolCtx := WithSessionID(WithAgentID(ctx, agent.ID), sessionID)
+		toolResults, err := r.executeTools(toolCtx, agent, toolCalls, sessionID)
+		if err != nil {
+			return nil, fmt.Errorf("tool execution failed: %w", err)
+		}
+		state.ToolResults = toolResults
+
+		/* Notify about tool results */
+		if callback != nil {
+			toolResultsJSON, _ := json.Marshal(toolResults)
+			_ = callback(string(toolResultsJSON), "tool_results")
+		}
+
+		/* Build final prompt with tool results */
+		finalPrompt, err := r.prompt.BuildWithToolResults(agent, agentContext, userMessage, &LLMResponse{Content: responseContent}, toolResults)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build final prompt: %w", err)
+		}
+
+		/* Stream final response */
+		var finalResponseBuilder strings.Builder
+		finalSW := &streamWriter{
+			builder:  &finalResponseBuilder,
+			callback: callback,
+		}
+
+		err = r.llm.GenerateStream(ctx, agent.ModelName, finalPrompt, agent.Config, finalSW)
+		if err != nil {
+			return nil, fmt.Errorf("final LLM streaming failed: %w", err)
+		}
+
+		state.FinalAnswer = finalResponseBuilder.String()
+	}
+
+	/* Estimate token usage */
+	state.TokensUsed = EstimateTokens(prompt) + EstimateTokens(state.FinalAnswer)
+
+	/* Store messages */
+	_ = r.storeMessages(ctx, sessionID, userMessage, state.FinalAnswer, state.ToolCalls, state.ToolResults, state.TokensUsed)
+
+	/* Store memory chunks (async) */
+	go func() {
+		bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		r.memory.StoreChunks(bgCtx, agent.ID, sessionID, state.FinalAnswer, state.ToolResults)
+	}()
+
+	/* Notify completion */
+	if callback != nil {
+		_ = callback("", "done")
+	}
+
+	return state, nil
 }

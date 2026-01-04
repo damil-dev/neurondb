@@ -50,7 +50,7 @@ func (h *Handlers) CreateAgent(w http.ResponseWriter, r *http.Request) {
 	endpoint := r.URL.Path
 	method := r.Method
 
-	// Validate request body size (max 1MB)
+	/* Validate request body size (max 1MB) */
 	const maxBodySize = 1024 * 1024
 	bodyBytes, err := validation.ReadAndValidateBody(r, maxBodySize)
 	if err != nil {
@@ -99,7 +99,6 @@ func (h *Handlers) GetAgent(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	requestID := GetRequestID(r.Context())
 
-	// Validate UUID
 	if err := validation.ValidateUUIDRequired(vars["id"], "agent_id"); err != nil {
 		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid agent ID", err, requestID, r.URL.Path, r.Method, "agent", "", nil))
 		return
@@ -150,7 +149,6 @@ func (h *Handlers) UpdateAgent(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	requestID := GetRequestID(r.Context())
 
-	// Validate UUID
 	if err := validation.ValidateUUIDRequired(vars["id"], "agent_id"); err != nil {
 		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid agent ID", err, requestID, r.URL.Path, r.Method, "agent", "", nil))
 		return
@@ -162,7 +160,7 @@ func (h *Handlers) UpdateAgent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate request body size (max 1MB)
+	/* Validate request body size (max 1MB) */
 	const maxBodySize = 1024 * 1024
 	bodyBytes, err := validation.ReadAndValidateBody(r, maxBodySize)
 	if err != nil {
@@ -211,7 +209,6 @@ func (h *Handlers) DeleteAgent(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	requestID := GetRequestID(r.Context())
 
-	// Validate UUID
 	if err := validation.ValidateUUIDRequired(vars["id"], "agent_id"); err != nil {
 		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid agent ID", err, requestID, r.URL.Path, r.Method, "agent", "", nil))
 		return
@@ -237,7 +234,7 @@ func (h *Handlers) DeleteAgent(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) CreateSession(w http.ResponseWriter, r *http.Request) {
 	requestID := GetRequestID(r.Context())
 
-	// Validate request body size (max 1MB)
+	/* Validate request body size (max 1MB) */
 	const maxBodySize = 1024 * 1024
 	bodyBytes, err := validation.ReadAndValidateBody(r, maxBodySize)
 	if err != nil {
@@ -252,7 +249,6 @@ func (h *Handlers) CreateSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate agent_id UUID
 	if err := validation.ValidateUUIDRequired(req.AgentID.String(), "agent_id"); err != nil {
 		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid agent ID", err, requestID, r.URL.Path, r.Method, "session", "", nil))
 		return
@@ -286,7 +282,6 @@ func (h *Handlers) GetSession(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	requestID := GetRequestID(r.Context())
 
-	// Validate UUID
 	if err := validation.ValidateUUIDRequired(vars["id"], "session_id"); err != nil {
 		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid session ID", err, requestID, r.URL.Path, r.Method, "session", "", nil))
 		return
@@ -312,7 +307,6 @@ func (h *Handlers) ListSessions(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	requestID := GetRequestID(r.Context())
 
-	// Validate UUID
 	if err := validation.ValidateUUIDRequired(vars["agent_id"], "agent_id"); err != nil {
 		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid agent ID", err, requestID, r.URL.Path, r.Method, "session", "", nil))
 		return
@@ -388,7 +382,6 @@ func (h *Handlers) UpdateSession(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	requestID := GetRequestID(r.Context())
 
-	// Validate UUID
 	if err := validation.ValidateUUIDRequired(vars["id"], "session_id"); err != nil {
 		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid session ID", err, requestID, r.URL.Path, r.Method, "session", "", nil))
 		return
@@ -407,7 +400,7 @@ func (h *Handlers) UpdateSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate request body size (max 1MB)
+	/* Validate request body size (max 1MB) */
 	const maxBodySize = 1024 * 1024
 	bodyBytes, err := validation.ReadAndValidateBody(r, maxBodySize)
 	if err != nil {
@@ -447,7 +440,6 @@ func (h *Handlers) DeleteSession(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	requestID := GetRequestID(r.Context())
 
-	// Validate UUID
 	if err := validation.ValidateUUIDRequired(vars["id"], "session_id"); err != nil {
 		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid session ID", err, requestID, r.URL.Path, r.Method, "session", "", nil))
 		return
@@ -475,7 +467,6 @@ func (h *Handlers) SendMessage(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	requestID := GetRequestID(r.Context())
 
-	// Validate UUID
 	if err := validation.ValidateUUIDRequired(vars["session_id"], "session_id"); err != nil {
 		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid session ID", err, requestID, r.URL.Path, r.Method, "message", "", nil))
 		return
@@ -487,7 +478,7 @@ func (h *Handlers) SendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate request body size (max 10MB for messages with potentially large content)
+	/* Validate request body size (max 10MB for messages with potentially large content) */
 	const maxBodySize = 10 * 1024 * 1024
 	bodyBytes, err := validation.ReadAndValidateBody(r, maxBodySize)
 	if err != nil {
@@ -550,17 +541,52 @@ func (h *Handlers) GetMessages(w http.ResponseWriter, r *http.Request) {
 	offset := 0
 	/* Parse query parameters */
 	if l := r.URL.Query().Get("limit"); l != "" {
-		_, _ = fmt.Sscanf(l, "%d", &limit)
+		if _, err := fmt.Sscanf(l, "%d", &limit); err != nil {
+			requestID := GetRequestID(r.Context())
+			respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid limit parameter", err, requestID, r.URL.Path, r.Method, "message", "", nil))
+			return
+		}
 	}
 	if o := r.URL.Query().Get("offset"); o != "" {
-		_, _ = fmt.Sscanf(o, "%d", &offset)
+		if _, err := fmt.Sscanf(o, "%d", &offset); err != nil {
+			requestID := GetRequestID(r.Context())
+			respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid offset parameter", err, requestID, r.URL.Path, r.Method, "message", "", nil))
+			return
+		}
 	}
 
-	var messages []db.Message
+	/* Validate pagination */
+	if err := ValidatePaginationParams(limit, offset); err != nil {
+		requestID := GetRequestID(r.Context())
+		respondError(w, NewErrorWithContext(http.StatusBadRequest, "pagination validation failed", err, requestID, r.URL.Path, r.Method, "message", "", nil))
+		return
+	}
+
+	/* Get query parameters */
 	role := r.URL.Query().Get("role")
 	contentSearch := r.URL.Query().Get("search")
 	startDate := r.URL.Query().Get("start_date")
 	endDate := r.URL.Query().Get("end_date")
+
+	/* Validate date range if provided */
+	if startDate != "" || endDate != "" {
+		if err := ValidateDateRange(startDate, endDate); err != nil {
+			requestID := GetRequestID(r.Context())
+			respondError(w, NewErrorWithContext(http.StatusBadRequest, "date range validation failed", err, requestID, r.URL.Path, r.Method, "message", "", nil))
+			return
+		}
+	}
+
+	/* Validate search query if provided */
+	if contentSearch != "" {
+		if err := ValidateSearchQuery(contentSearch, 1000); err != nil {
+			requestID := GetRequestID(r.Context())
+			respondError(w, NewErrorWithContext(http.StatusBadRequest, "search query validation failed", err, requestID, r.URL.Path, r.Method, "message", "", nil))
+			return
+		}
+	}
+
+	var messages []db.Message
 
 	if role != "" || contentSearch != "" || startDate != "" || endDate != "" {
 		var rolePtr, contentSearchPtr *string

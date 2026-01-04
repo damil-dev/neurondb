@@ -30,32 +30,32 @@ func RunWizard(apiClient *client.Client) error {
 
 	agentConfig := &config.AgentConfig{}
 
-	// Step 1: Basic Information
+	/* Step 1: Basic Information */
 	if err := stepBasicInfo(agentConfig); err != nil {
 		return err
 	}
 
-	// Step 2: Agent Profile
+	/* Step 2: Agent Profile */
 	if err := stepProfile(agentConfig); err != nil {
 		return err
 	}
 
-	// Step 3: Tools Selection
+	/* Step 3: Tools Selection */
 	if err := stepTools(agentConfig); err != nil {
 		return err
 	}
 
-	// Step 4: Workflow Configuration
+	/* Step 4: Workflow Configuration */
 	if err := stepWorkflow(agentConfig); err != nil {
 		return err
 	}
 
-	// Step 5: Memory Settings
+	/* Step 5: Memory Settings */
 	if err := stepMemory(agentConfig); err != nil {
 		return err
 	}
 
-	// Step 6: Review & Create
+	/* Step 6: Review & Create */
 	return stepReview(apiClient, agentConfig)
 }
 
@@ -120,7 +120,7 @@ func stepTools(cfg *config.AgentConfig) error {
 	fmt.Println("───────────────────────────────────────────────────────────")
 	fmt.Println("Available tools:")
 	tools := []string{"sql", "http", "code", "shell", "browser"}
-	
+
 	for i, tool := range tools {
 		fmt.Printf("  %d. %s\n", i+1, strings.ToUpper(tool))
 	}
@@ -225,4 +225,3 @@ func stepReview(apiClient *client.Client, cfg *config.AgentConfig) error {
 	fmt.Printf("Name: %s\n", agent.Name)
 	return nil
 }
-

@@ -14,24 +14,50 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 
 	"github.com/google/uuid"
 	"github.com/neurondb/NeuronAgent/internal/db"
+	"github.com/neurondb/NeuronAgent/internal/validation"
 )
 
-/* BatchCreateAgents creates multiple agents */
+/* BatchCreateAgents creates multiple agents with comprehensive validation */
 func (h *Handlers) BatchCreateAgents(w http.ResponseWriter, r *http.Request) {
+	requestID := GetRequestID(r.Context())
+
+	/* Validate request body size (max 10MB for batch operations) */
+	const maxBodySize = 10 * 1024 * 1024
+	bodyBytes, err := validation.ReadAndValidateBody(r, maxBodySize)
+	if err != nil {
+		respondError(w, NewErrorWithContext(http.StatusBadRequest, "request body validation failed", err, requestID, r.URL.Path, r.Method, "agent", "", nil))
+		return
+	}
+	r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+
 	var reqs []CreateAgentRequest
 	if err := json.NewDecoder(r.Body).Decode(&reqs); err != nil {
-		requestID := GetRequestID(r.Context())
 		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid request body", err, requestID, r.URL.Path, r.Method, "agent", "", nil))
 		return
 	}
 
+	/* Validate batch size */
+	if len(reqs) == 0 {
+		respondError(w, NewErrorWithContext(http.StatusBadRequest, "batch request must contain at least one agent", nil, requestID, r.URL.Path, r.Method, "agent", "", nil))
+		return
+	}
+	if len(reqs) > 100 {
+		respondError(w, NewErrorWithContext(http.StatusBadRequest, "batch request must not exceed 100 agents", nil, requestID, r.URL.Path, r.Method, "agent", "", nil))
+		return
+	}
+
 	results := make([]BatchResult, 0, len(reqs))
+	var agent *db.Agent
 	for i, req := range reqs {
+		/* Validate each request */
 		if err := ValidateCreateAgentRequest(&req); err != nil {
 			results = append(results, BatchResult{
 				Index:   i,
@@ -41,7 +67,19 @@ func (h *Handlers) BatchCreateAgents(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		agent := &db.Agent{
+		/* Check for duplicate names in batch */
+		for j := 0; j < i; j++ {
+			if reqs[j].Name == req.Name {
+				results = append(results, BatchResult{
+					Index:   i,
+					Success: false,
+					Error:   fmt.Sprintf("duplicate agent name in batch: %s", req.Name),
+				})
+				goto next
+			}
+		}
+
+		agent = &db.Agent{
 			Name:         req.Name,
 			Description:  req.Description,
 			SystemPrompt: req.SystemPrompt,
@@ -65,6 +103,7 @@ func (h *Handlers) BatchCreateAgents(w http.ResponseWriter, r *http.Request) {
 			Success: true,
 			Data:    toAgentResponse(agent),
 		})
+	next:
 	}
 
 	respondJSON(w, http.StatusOK, map[string]interface{}{
@@ -75,15 +114,43 @@ func (h *Handlers) BatchCreateAgents(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-/* BatchDeleteAgents deletes multiple agents */
+/* BatchDeleteAgents deletes multiple agents with validation */
 func (h *Handlers) BatchDeleteAgents(w http.ResponseWriter, r *http.Request) {
+	requestID := GetRequestID(r.Context())
+
+	/* Validate request body size (max 1MB) */
+	const maxBodySize = 1024 * 1024
+	bodyBytes, err := validation.ReadAndValidateBody(r, maxBodySize)
+	if err != nil {
+		respondError(w, NewErrorWithContext(http.StatusBadRequest, "request body validation failed", err, requestID, r.URL.Path, r.Method, "agent", "", nil))
+		return
+	}
+	r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+
 	var req struct {
 		IDs []uuid.UUID `json:"ids"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		requestID := GetRequestID(r.Context())
 		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid request body", err, requestID, r.URL.Path, r.Method, "agent", "", nil))
 		return
+	}
+
+	/* Validate batch size */
+	if len(req.IDs) == 0 {
+		respondError(w, NewErrorWithContext(http.StatusBadRequest, "batch request must contain at least one agent ID", nil, requestID, r.URL.Path, r.Method, "agent", "", nil))
+		return
+	}
+	if len(req.IDs) > 100 {
+		respondError(w, NewErrorWithContext(http.StatusBadRequest, "batch request must not exceed 100 agent IDs", nil, requestID, r.URL.Path, r.Method, "agent", "", nil))
+		return
+	}
+
+	/* Validate UUIDs */
+	for i, id := range req.IDs {
+		if id == uuid.Nil {
+			respondError(w, NewErrorWithContext(http.StatusBadRequest, fmt.Sprintf("invalid UUID at index %d", i), nil, requestID, r.URL.Path, r.Method, "agent", "", nil))
+			return
+		}
 	}
 
 	results := make([]BatchResult, 0, len(req.IDs))
@@ -111,15 +178,43 @@ func (h *Handlers) BatchDeleteAgents(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-/* BatchDeleteMessages deletes multiple messages */
+/* BatchDeleteMessages deletes multiple messages with validation */
 func (h *Handlers) BatchDeleteMessages(w http.ResponseWriter, r *http.Request) {
+	requestID := GetRequestID(r.Context())
+
+	/* Validate request body size (max 1MB) */
+	const maxBodySize = 1024 * 1024
+	bodyBytes, err := validation.ReadAndValidateBody(r, maxBodySize)
+	if err != nil {
+		respondError(w, NewErrorWithContext(http.StatusBadRequest, "request body validation failed", err, requestID, r.URL.Path, r.Method, "message", "", nil))
+		return
+	}
+	r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+
 	var req struct {
 		IDs []int64 `json:"ids"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		requestID := GetRequestID(r.Context())
 		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid request body", err, requestID, r.URL.Path, r.Method, "message", "", nil))
 		return
+	}
+
+	/* Validate batch size */
+	if len(req.IDs) == 0 {
+		respondError(w, NewErrorWithContext(http.StatusBadRequest, "batch request must contain at least one message ID", nil, requestID, r.URL.Path, r.Method, "message", "", nil))
+		return
+	}
+	if len(req.IDs) > 100 {
+		respondError(w, NewErrorWithContext(http.StatusBadRequest, "batch request must not exceed 100 message IDs", nil, requestID, r.URL.Path, r.Method, "message", "", nil))
+		return
+	}
+
+	/* Validate IDs */
+	for i, id := range req.IDs {
+		if id <= 0 {
+			respondError(w, NewErrorWithContext(http.StatusBadRequest, fmt.Sprintf("invalid message ID at index %d: must be positive", i), nil, requestID, r.URL.Path, r.Method, "message", "", nil))
+			return
+		}
 	}
 
 	results := make([]BatchResult, 0, len(req.IDs))
@@ -147,15 +242,47 @@ func (h *Handlers) BatchDeleteMessages(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-/* BatchDeleteTools deletes multiple tools */
+/* BatchDeleteTools deletes multiple tools with validation */
 func (h *Handlers) BatchDeleteTools(w http.ResponseWriter, r *http.Request) {
+	requestID := GetRequestID(r.Context())
+
+	/* Validate request body size (max 1MB) */
+	const maxBodySize = 1024 * 1024
+	bodyBytes, err := validation.ReadAndValidateBody(r, maxBodySize)
+	if err != nil {
+		respondError(w, NewErrorWithContext(http.StatusBadRequest, "request body validation failed", err, requestID, r.URL.Path, r.Method, "tool", "", nil))
+		return
+	}
+	r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+
 	var req struct {
 		Names []string `json:"names"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		requestID := GetRequestID(r.Context())
 		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid request body", err, requestID, r.URL.Path, r.Method, "tool", "", nil))
 		return
+	}
+
+	/* Validate batch size */
+	if len(req.Names) == 0 {
+		respondError(w, NewErrorWithContext(http.StatusBadRequest, "batch request must contain at least one tool name", nil, requestID, r.URL.Path, r.Method, "tool", "", nil))
+		return
+	}
+	if len(req.Names) > 100 {
+		respondError(w, NewErrorWithContext(http.StatusBadRequest, "batch request must not exceed 100 tool names", nil, requestID, r.URL.Path, r.Method, "tool", "", nil))
+		return
+	}
+
+	/* Validate tool names */
+	for i, name := range req.Names {
+		if name == "" {
+			respondError(w, NewErrorWithContext(http.StatusBadRequest, fmt.Sprintf("empty tool name at index %d", i), nil, requestID, r.URL.Path, r.Method, "tool", "", nil))
+			return
+		}
+		if len(name) > 100 {
+			respondError(w, NewErrorWithContext(http.StatusBadRequest, fmt.Sprintf("tool name at index %d exceeds maximum length", i), nil, requestID, r.URL.Path, r.Method, "tool", "", nil))
+			return
+		}
 	}
 
 	results := make([]BatchResult, 0, len(req.Names))

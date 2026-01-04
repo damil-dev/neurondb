@@ -22,17 +22,23 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/neurondb/NeuronAgent/internal/agent"
 	"github.com/neurondb/NeuronAgent/internal/db"
 )
 
+/* HierarchicalMemoryInterface defines the interface for hierarchical memory operations */
+/* This interface is used to avoid import cycles between tools and agent packages */
+type HierarchicalMemoryInterface interface {
+	RetrieveHierarchical(ctx context.Context, agentID uuid.UUID, query string, tiers []string, topK int) ([]map[string]interface{}, error)
+	StoreSTM(ctx context.Context, agentID, sessionID uuid.UUID, content string, importance float64) (uuid.UUID, error)
+}
+
 /* MemoryTool provides hierarchical memory operations for agents */
 type MemoryTool struct {
-	hierMemory *agent.HierarchicalMemoryManager
+	hierMemory HierarchicalMemoryInterface
 }
 
 /* NewMemoryTool creates a new memory tool */
-func NewMemoryTool(hierMemory *agent.HierarchicalMemoryManager) *MemoryTool {
+func NewMemoryTool(hierMemory HierarchicalMemoryInterface) *MemoryTool {
 	return &MemoryTool{
 		hierMemory: hierMemory,
 	}

@@ -32,11 +32,14 @@ import (
 	"github.com/neurondb/NeuronAgent/internal/config"
 	"github.com/neurondb/NeuronAgent/internal/db"
 	"github.com/neurondb/NeuronAgent/internal/jobs"
+	"github.com/neurondb/NeuronAgent/internal/eval"
 	"github.com/neurondb/NeuronAgent/internal/metrics"
 	"github.com/neurondb/NeuronAgent/internal/multimodal"
 	"github.com/neurondb/NeuronAgent/internal/notifications"
+	"github.com/neurondb/NeuronAgent/internal/replay"
 	"github.com/neurondb/NeuronAgent/internal/session"
 	"github.com/neurondb/NeuronAgent/internal/tools"
+	"github.com/neurondb/NeuronAgent/internal/workflow"
 	"github.com/neurondb/NeuronAgent/internal/worker"
 	"github.com/neurondb/NeuronAgent/pkg/neurondb"
 )
@@ -211,11 +214,30 @@ func main() {
 	browserCleanup.Start()
 	defer browserCleanup.Stop()
 
+	/* Initialize workflow engine */
+	workflowEngine := workflow.NewEngine(queries)
+	workflowEngine.SetRuntime(runtime)
+	workflowEngine.SetToolRegistry(toolRegistry)
+	workflowEngine.SetEmailService(emailService)
+	workflowEngine.SetWebhookService(webhookService)
+	workflowEngine.SetBaseURL(fmt.Sprintf("http://%s:%d", cfg.Server.Host, cfg.Server.Port))
+
+	/* Initialize evaluation and replay services */
+	evaluator := eval.NewEvaluator(queries, runtime)
+	replayManager := replay.NewReplayManager(queries, runtime)
+
 	/* Initialize API */
 	handlers := api.NewHandlers(queries, runtime)
 	collabHandlers := api.NewCollaborationHandlers(queries, workspaceManager)
 	asyncTasksHandlers := api.NewAsyncTasksHandlers(queries, asyncExecutor)
 	alertPrefsHandlers := api.NewAlertPreferencesHandlers(queries)
+	workflowHandlers := api.NewWorkflowHandlers(queries, workflowEngine)
+	eventStreamHandlers := api.NewEventStreamHandlers(queries, runtime)
+	verificationHandlers := api.NewVerificationHandlers(queries, runtime)
+	vfsHandlers := api.NewVFSHandlers(queries, runtime)
+	evaluationHandlers := api.NewEvaluationHandlers(queries, evaluator)
+	replayHandlers := api.NewReplayHandlers(queries, replayManager, runtime)
+	specializationHandlers := api.NewSpecializationHandlers(queries)
 	keyManager := auth.NewAPIKeyManager(queries)
 	principalManager := auth.NewPrincipalManager(queries)
 	rateLimiter := auth.NewRateLimiter()
@@ -295,7 +317,7 @@ func main() {
 	apiRouter.HandleFunc("/tools/{name}/analytics", handlers.GetToolAnalytics).Methods("GET")
 	apiRouter.HandleFunc("/memory/{id}/summarize", handlers.SummarizeMemory).Methods("POST")
 	apiRouter.HandleFunc("/analytics/overview", handlers.GetAnalyticsOverview).Methods("GET")
-	apiRouter.HandleFunc("/ws", api.HandleWebSocket(runtime)).Methods("GET")
+	apiRouter.HandleFunc("/ws", api.HandleWebSocket(runtime, keyManager)).Methods("GET")
 
 	/* Collaboration workspace routes */
 	apiRouter.HandleFunc("/workspaces", collabHandlers.CreateWorkspace).Methods("POST")
@@ -312,6 +334,76 @@ func main() {
 	apiRouter.HandleFunc("/alert-preferences", alertPrefsHandlers.SetAlertPreferences).Methods("POST")
 	apiRouter.HandleFunc("/alert-preferences", alertPrefsHandlers.GetAlertPreferences).Methods("GET")
 	apiRouter.HandleFunc("/agents/{agent_id}/alert-preferences", alertPrefsHandlers.GetAlertPreferences).Methods("GET")
+
+	/* Workflow routes */
+	apiRouter.HandleFunc("/workflows", workflowHandlers.CreateWorkflow).Methods("POST")
+	apiRouter.HandleFunc("/workflows", workflowHandlers.ListWorkflows).Methods("GET")
+	apiRouter.HandleFunc("/workflows/{id}", workflowHandlers.GetWorkflow).Methods("GET")
+	apiRouter.HandleFunc("/workflows/{id}", workflowHandlers.UpdateWorkflow).Methods("PUT")
+	apiRouter.HandleFunc("/workflows/{id}", workflowHandlers.DeleteWorkflow).Methods("DELETE")
+	apiRouter.HandleFunc("/workflows/{workflow_id}/steps", workflowHandlers.CreateWorkflowStep).Methods("POST")
+	apiRouter.HandleFunc("/workflows/{workflow_id}/steps", workflowHandlers.ListWorkflowSteps).Methods("GET")
+	apiRouter.HandleFunc("/workflows/{workflow_id}/execute", workflowHandlers.ExecuteWorkflow).Methods("POST")
+	apiRouter.HandleFunc("/workflows/{workflow_id}/executions", workflowHandlers.ListWorkflowExecutions).Methods("GET")
+	apiRouter.HandleFunc("/workflow-executions/{execution_id}", workflowHandlers.GetWorkflowExecution).Methods("GET")
+
+	/* Event Stream routes */
+	apiRouter.HandleFunc("/sessions/{session_id}/events", eventStreamHandlers.LogEvent).Methods("POST")
+	apiRouter.HandleFunc("/sessions/{session_id}/events", eventStreamHandlers.GetEventHistory).Methods("GET")
+	apiRouter.HandleFunc("/sessions/{session_id}/events/summarize", eventStreamHandlers.SummarizeEvents).Methods("POST")
+	apiRouter.HandleFunc("/sessions/{session_id}/events/context", eventStreamHandlers.GetContextWindow).Methods("GET")
+	apiRouter.HandleFunc("/sessions/{session_id}/events/count", eventStreamHandlers.GetEventCount).Methods("GET")
+
+	/* Verification routes */
+	apiRouter.HandleFunc("/agents/{agent_id}/verifications", verificationHandlers.QueueVerification).Methods("POST")
+	apiRouter.HandleFunc("/verifications/{queue_id}/results", verificationHandlers.GetVerificationResults).Methods("GET")
+	apiRouter.HandleFunc("/agents/{agent_id}/verification-rules", verificationHandlers.ListVerificationRules).Methods("GET")
+	apiRouter.HandleFunc("/agents/{agent_id}/verification-rules", verificationHandlers.CreateVerificationRule).Methods("POST")
+	apiRouter.HandleFunc("/verification-rules/{rule_id}", verificationHandlers.UpdateVerificationRule).Methods("PUT")
+	apiRouter.HandleFunc("/verification-rules/{rule_id}", verificationHandlers.DeleteVerificationRule).Methods("DELETE")
+
+	/* Virtual Filesystem routes */
+	apiRouter.HandleFunc("/agents/{agent_id}/files", vfsHandlers.CreateFile).Methods("POST")
+	apiRouter.HandleFunc("/agents/{agent_id}/files", vfsHandlers.ListFiles).Methods("GET")
+	apiRouter.HandleFunc("/agents/{agent_id}/files/{path:.*}", vfsHandlers.ReadFile).Methods("GET")
+	apiRouter.HandleFunc("/agents/{agent_id}/files/{path:.*}", vfsHandlers.WriteFile).Methods("PUT")
+	apiRouter.HandleFunc("/agents/{agent_id}/files/{path:.*}", vfsHandlers.DeleteFile).Methods("DELETE")
+	apiRouter.HandleFunc("/agents/{agent_id}/files/{path:.*}/copy", vfsHandlers.CopyFile).Methods("POST")
+	apiRouter.HandleFunc("/agents/{agent_id}/files/{path:.*}/move", vfsHandlers.MoveFile).Methods("POST")
+
+	/* Evaluation framework routes */
+	apiRouter.HandleFunc("/eval/tasks", evaluationHandlers.CreateEvalTask).Methods("POST")
+	apiRouter.HandleFunc("/eval/tasks", evaluationHandlers.ListEvalTasks).Methods("GET")
+	apiRouter.HandleFunc("/eval/tasks/{id}", evaluationHandlers.GetEvalTask).Methods("GET")
+	apiRouter.HandleFunc("/eval/runs", evaluationHandlers.CreateEvalRun).Methods("POST")
+	apiRouter.HandleFunc("/eval/runs", evaluationHandlers.ListEvalRuns).Methods("GET")
+	apiRouter.HandleFunc("/eval/runs/{id}", evaluationHandlers.GetEvalRun).Methods("GET")
+	apiRouter.HandleFunc("/eval/runs/{id}", evaluationHandlers.UpdateEvalRun).Methods("PUT")
+	apiRouter.HandleFunc("/eval/runs/{run_id}/execute", evaluationHandlers.ExecuteEvalRun).Methods("POST")
+	apiRouter.HandleFunc("/eval/runs/{run_id}/results", evaluationHandlers.GetEvalRunResults).Methods("GET")
+	apiRouter.HandleFunc("/eval/runs/{run_id}/results/{result_id}/retrieval", evaluationHandlers.CreateEvalRetrievalResult).Methods("POST")
+
+	/* Execution snapshots and replay routes */
+	apiRouter.HandleFunc("/sessions/{session_id}/snapshots", replayHandlers.CreateSnapshot).Methods("POST")
+	apiRouter.HandleFunc("/sessions/{session_id}/snapshots", replayHandlers.ListSnapshotsBySession).Methods("GET")
+	apiRouter.HandleFunc("/agents/{agent_id}/snapshots", replayHandlers.ListSnapshotsByAgent).Methods("GET")
+	apiRouter.HandleFunc("/snapshots/{id}", replayHandlers.GetSnapshot).Methods("GET")
+	apiRouter.HandleFunc("/snapshots/{id}/replay", replayHandlers.ReplaySnapshot).Methods("POST")
+	apiRouter.HandleFunc("/snapshots/{id}", replayHandlers.DeleteSnapshot).Methods("DELETE")
+
+	/* Workflow schedule routes */
+	apiRouter.HandleFunc("/workflows/{workflow_id}/schedule", workflowHandlers.CreateWorkflowSchedule).Methods("POST")
+	apiRouter.HandleFunc("/workflows/{workflow_id}/schedule", workflowHandlers.GetWorkflowSchedule).Methods("GET")
+	apiRouter.HandleFunc("/workflows/{workflow_id}/schedule", workflowHandlers.UpdateWorkflowSchedule).Methods("PUT")
+	apiRouter.HandleFunc("/workflows/{workflow_id}/schedule", workflowHandlers.DeleteWorkflowSchedule).Methods("DELETE")
+	apiRouter.HandleFunc("/workflow-schedules", workflowHandlers.ListWorkflowSchedules).Methods("GET")
+
+	/* Agent specialization routes */
+	apiRouter.HandleFunc("/agents/{agent_id}/specialization", specializationHandlers.CreateSpecialization).Methods("POST")
+	apiRouter.HandleFunc("/agents/{agent_id}/specialization", specializationHandlers.GetSpecialization).Methods("GET")
+	apiRouter.HandleFunc("/agents/{agent_id}/specialization", specializationHandlers.UpdateSpecialization).Methods("PUT")
+	apiRouter.HandleFunc("/agents/{agent_id}/specialization", specializationHandlers.DeleteSpecialization).Methods("DELETE")
+	apiRouter.HandleFunc("/specializations", specializationHandlers.ListSpecializations).Methods("GET")
 
 	/* Health check */
 	router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {

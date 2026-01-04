@@ -49,34 +49,37 @@ func StreamResponse(w http.ResponseWriter, r *http.Request, runtime *agent.Runti
 	}
 
 	/* Execute agent with streaming */
-	/* Note: This is a simplified version - full implementation would stream LLM output */
-	state, err := runtime.Execute(r.Context(), sessionID, userMessage)
+	callback := func(chunk string, eventType string) error {
+		/* Check if client disconnected */
+		if r.Context().Err() != nil {
+			return r.Context().Err()
+		}
+
+		switch eventType {
+		case "chunk":
+			sendSSE(w, flusher, "chunk", map[string]interface{}{
+				"content": chunk,
+			})
+		case "tool_calls":
+			sendSSE(w, flusher, "tool_calls", map[string]interface{}{
+				"data": chunk,
+			})
+		case "tool_results":
+			sendSSE(w, flusher, "tool_results", map[string]interface{}{
+				"data": chunk,
+			})
+		case "done":
+			/* Done will be sent after ExecuteStream completes */
+		}
+		return nil
+	}
+
+	state, err := runtime.ExecuteStream(r.Context(), sessionID, userMessage, callback)
 	if err != nil {
 		sendSSE(w, flusher, "error", map[string]interface{}{
 			"error": err.Error(),
 		})
 		return
-	}
-
-	/* Stream response in chunks */
-	response := state.FinalAnswer
-	chunkSize := 50 /* Characters per chunk */
-
-	for i := 0; i < len(response); i += chunkSize {
-		end := i + chunkSize
-		if end > len(response) {
-			end = len(response)
-		}
-
-		chunk := response[i:end]
-		sendSSE(w, flusher, "chunk", map[string]interface{}{
-			"content": chunk,
-		})
-
-		/* Check if client disconnected */
-		if r.Context().Err() != nil {
-			return
-		}
 	}
 
 	/* Send completion */

@@ -41,14 +41,13 @@ func ReadAndValidateBody(r *http.Request, maxSize int64) ([]byte, error) {
 		return nil, fmt.Errorf("request body is nil")
 	}
 
-	// Create a limited reader to prevent DoS
+	/* Create a limited reader to prevent DoS */
 	limitedReader := io.LimitReader(r.Body, maxSize+1)
 	bodyBytes, err := io.ReadAll(limitedReader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read request body: %w", err)
 	}
 
-	// Check if body exceeded size limit
 	if int64(len(bodyBytes)) > maxSize {
 		return nil, fmt.Errorf("request body size %d exceeds maximum %d bytes", len(bodyBytes), maxSize)
 	}

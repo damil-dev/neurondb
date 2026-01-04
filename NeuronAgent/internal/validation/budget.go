@@ -53,7 +53,7 @@ func ValidateRequestCount(count int64, budget BudgetLimits) error {
 
 /* EstimateCost estimates cost based on tokens and model */
 func EstimateCost(tokens int64, modelName string) float64 {
-	// Rough cost estimates per 1K tokens (as of 2024)
+	/* Rough cost estimates per 1K tokens (as of 2024) */
 	costPer1K := map[string]float64{
 		"gpt-4":           0.03,
 		"gpt-4-turbo":     0.01,

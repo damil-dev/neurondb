@@ -42,10 +42,25 @@ func (h *Handlers) ListReflections(w http.ResponseWriter, r *http.Request) {
 	limit := 50
 	offset := 0
 	if l := r.URL.Query().Get("limit"); l != "" {
-		fmt.Sscanf(l, "%d", &limit)
+		if _, err := fmt.Sscanf(l, "%d", &limit); err != nil {
+			requestID := GetRequestID(r.Context())
+			respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid limit parameter", err, requestID, r.URL.Path, r.Method, "reflection", "", nil))
+			return
+		}
 	}
 	if o := r.URL.Query().Get("offset"); o != "" {
-		fmt.Sscanf(o, "%d", &offset)
+		if _, err := fmt.Sscanf(o, "%d", &offset); err != nil {
+			requestID := GetRequestID(r.Context())
+			respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid offset parameter", err, requestID, r.URL.Path, r.Method, "reflection", "", nil))
+			return
+		}
+	}
+
+	/* Validate pagination */
+	if err := ValidatePaginationParams(limit, offset); err != nil {
+		requestID := GetRequestID(r.Context())
+		respondError(w, NewErrorWithContext(http.StatusBadRequest, "pagination validation failed", err, requestID, r.URL.Path, r.Method, "reflection", "", nil))
+		return
 	}
 
 	reflections, err := h.queries.ListReflections(r.Context(), agentID, sessionID, limit, offset)

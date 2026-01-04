@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/neurondb/NeuronAgent/internal/agent"
 	"github.com/neurondb/NeuronAgent/internal/auth"
 	"github.com/neurondb/NeuronAgent/internal/db"
 )
@@ -80,7 +79,7 @@ func (t *SQLTool) Execute(ctx context.Context, tool *db.Tool, args map[string]in
 	}
 
 	/* Check for dangerous keywords - comprehensive list to prevent bypasses */
-	// Include variations and subqueries that could be used to bypass restrictions
+	/* Include variations and subqueries that could be used to bypass restrictions */
 	dangerous := []string{
 		"DROP", "DELETE", "UPDATE", "INSERT", "ALTER", "CREATE", "TRUNCATE",
 		"INTO", "RETURNING", "EXEC", "EXECUTE", "CALL", "COPY", "GRANT", "REVOKE",
@@ -88,9 +87,9 @@ func (t *SQLTool) Execute(ctx context.Context, tool *db.Tool, args map[string]in
 	}
 	var foundKeywords []string
 	for _, keyword := range dangerous {
-		// Use word boundary matching to avoid false positives in strings/comments
-		// This is more accurate than simple Contains() but still not perfect
-		// For production, a proper SQL parser would be better
+		/* Use word boundary matching to avoid false positives in strings/comments */
+		/* This is more accurate than simple Contains() but still not perfect */
+		/* For production, a proper SQL parser would be better */
 		pattern := "\\b" + keyword + "\\b"
 		if matched, _ := regexp.MatchString(pattern, queryUpper); matched {
 			foundKeywords = append(foundKeywords, keyword)
@@ -117,8 +116,8 @@ func (t *SQLTool) Execute(ctx context.Context, tool *db.Tool, args map[string]in
 	}
 
 	/* Apply data permissions: row filters and check permissions */
-	agentID, _ := agent.GetAgentIDFromContext(ctx)
-	sessionID, _ := agent.GetSessionIDFromContext(ctx)
+	agentID, _ := GetAgentIDFromContext(ctx)
+	sessionID, _ := GetSessionIDFromContext(ctx)
 
 	/* Try to extract schema and table name from query (simple case) */
 	schemaName, tableName := extractTableFromQuery(query)
@@ -130,8 +129,21 @@ func (t *SQLTool) Execute(ctx context.Context, tool *db.Tool, args map[string]in
 	var columnMask map[string]string
 
 	if schemaName != "" || tableName != "" {
-		/* TODO: Get principal from context - for now skip if not available */
-		/* This would require passing principal through context from API layer */
+		/* Extract principal from context */
+		principal := GetPrincipalFromContext(ctx)
+		if principal != nil {
+			/* Get row filter for this principal and table */
+			rowFilterStr, err := t.dataPermChecker.GetRowFilterForTable(ctx, principal.ID, schemaName, tableName)
+			if err == nil && rowFilterStr != "" {
+				rowFilter = rowFilterStr
+			}
+
+			/* Get column mask for this principal and table */
+			columnMaskMap, err := t.dataPermChecker.GetColumnMaskForTable(ctx, principal.ID, schemaName, tableName)
+			if err == nil && columnMaskMap != nil {
+				columnMask = columnMaskMap
+			}
+		}
 	}
 
 	/* Apply row filter if available */
@@ -216,8 +228,8 @@ func (t *SQLTool) Execute(ctx context.Context, tool *db.Tool, args map[string]in
 	resultStr := string(jsonResult)
 
 	/* Audit log SQL statement */
-	agentID, _ = agent.GetAgentIDFromContext(ctx)
-	sessionID, _ = agent.GetSessionIDFromContext(ctx)
+	agentID, _ = GetAgentIDFromContext(ctx)
+	sessionID, _ = GetSessionIDFromContext(ctx)
 
 	outputs := map[string]interface{}{
 		"row_count":     rowCount,
