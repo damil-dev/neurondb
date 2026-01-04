@@ -26,6 +26,11 @@ type Config struct {
 	Database DatabaseConfig `yaml:"database"`
 	Auth     AuthConfig     `yaml:"auth"`
 	Logging  LoggingConfig  `yaml:"logging"`
+	Workflow WorkflowConfig `yaml:"workflow"`
+}
+
+type WorkflowConfig struct {
+	BaseURL string `yaml:"base_url"`
 }
 
 type ServerConfig struct {

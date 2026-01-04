@@ -17,6 +17,7 @@ package connectors
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -153,6 +154,30 @@ func (g *GitLabConnector) List(ctx context.Context, path string) ([]string, erro
 		return nil, fmt.Errorf("GitLab list failed with status %d", resp.StatusCode)
 	}
 
-	/* TODO: Parse JSON response */
-	return nil, fmt.Errorf("GitLab list parsing not fully implemented")
+	/* Parse JSON response and extract file paths */
+	var treeItems []struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+		Type string `json:"type"`
+		Path string `json:"path"`
+		Mode string `json:"mode"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&treeItems); err != nil {
+		return nil, fmt.Errorf("failed to parse GitLab API response: %w", err)
+	}
+
+	/* Extract file paths */
+	result := make([]string, 0, len(treeItems))
+	for _, item := range treeItems {
+		if item.Type == "blob" {
+			/* It's a file */
+			result = append(result, item.Path)
+		} else if item.Type == "tree" {
+			/* It's a directory, include with trailing slash */
+			result = append(result, item.Path+"/")
+		}
+	}
+
+	return result, nil
 }

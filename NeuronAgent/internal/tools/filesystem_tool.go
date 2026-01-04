@@ -21,19 +21,46 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
-	"github.com/neurondb/NeuronAgent/internal/agent"
 	"github.com/neurondb/NeuronAgent/internal/db"
 )
 
+/* VirtualFileSystemInterface defines the interface for virtual file system operations */
+/* This interface is used to avoid import cycles between tools and agent packages */
+type VirtualFileSystemInterface interface {
+	CreateFile(ctx context.Context, agentID, sessionID uuid.UUID, path string, content []byte, mimeType string) (uuid.UUID, error)
+	ReadFile(ctx context.Context, agentID uuid.UUID, path string) (*VirtualFile, error)
+	WriteFile(ctx context.Context, agentID uuid.UUID, path string, content []byte) error
+	DeleteFile(ctx context.Context, agentID uuid.UUID, path string) error
+	ListFiles(ctx context.Context, agentID uuid.UUID, sessionID *uuid.UUID, dirPath string) ([]VirtualFile, error)
+	CopyFile(ctx context.Context, agentID uuid.UUID, srcPath, dstPath string) error
+	MoveFile(ctx context.Context, agentID uuid.UUID, srcPath, dstPath string) error
+}
+
+/* VirtualFile represents a file in the virtual file system */
+type VirtualFile struct {
+	ID             uuid.UUID
+	AgentID        uuid.UUID
+	SessionID      *uuid.UUID
+	Path           string
+	Content        []byte
+	MimeType       string
+	Size           int64
+	Compressed     bool
+	StorageBackend string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+}
+
 /* FileSystemTool provides file system operations for agents */
 type FileSystemTool struct {
-	vfs *agent.VirtualFileSystem
+	vfs VirtualFileSystemInterface
 }
 
 /* NewFileSystemTool creates a new file system tool */
-func NewFileSystemTool(vfs *agent.VirtualFileSystem) *FileSystemTool {
+func NewFileSystemTool(vfs VirtualFileSystemInterface) *FileSystemTool {
 	return &FileSystemTool{
 		vfs: vfs,
 	}

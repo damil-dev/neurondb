@@ -274,3 +274,62 @@ func (c *Client) makeRequest(method, path string, body io.Reader) (*http.Respons
 	return resp, nil
 }
 
+type Workflow struct {
+	ID            string                 `json:"id"`
+	Name          string                 `json:"name"`
+	DAGDefinition map[string]interface{} `json:"dag_definition"`
+	Status        string                 `json:"status"`
+	CreatedAt     string                 `json:"created_at,omitempty"`
+	UpdatedAt     string                 `json:"updated_at,omitempty"`
+}
+
+func (c *Client) CreateWorkflow(workflowConfig map[string]interface{}) (*Workflow, error) {
+	body, err := json.Marshal(workflowConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	resp, err := c.makeRequest("POST", "/api/v1/workflows", bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var workflow Workflow
+	if err := json.NewDecoder(resp.Body).Decode(&workflow); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &workflow, nil
+}
+
+func (c *Client) ListWorkflows(limit, offset int) ([]Workflow, error) {
+	path := fmt.Sprintf("/api/v1/workflows?limit=%d&offset=%d", limit, offset)
+	resp, err := c.makeRequest("GET", path, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var workflows []Workflow
+	if err := json.NewDecoder(resp.Body).Decode(&workflows); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return workflows, nil
+}
+
+func (c *Client) GetWorkflow(workflowID string) (*Workflow, error) {
+	resp, err := c.makeRequest("GET", fmt.Sprintf("/api/v1/workflows/%s", workflowID), nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var workflow Workflow
+	if err := json.NewDecoder(resp.Body).Decode(&workflow); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &workflow, nil
+}

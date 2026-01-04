@@ -16,11 +16,11 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/spf13/cobra"
-	"github.com/neurondb/NeuronAgent/cli/pkg/config"
-	"github.com/neurondb/NeuronAgent/cli/pkg/wizard"
 	"github.com/neurondb/NeuronAgent/cli/pkg/client"
+	"github.com/neurondb/NeuronAgent/cli/pkg/config"
 	"github.com/neurondb/NeuronAgent/cli/pkg/templates"
+	"github.com/neurondb/NeuronAgent/cli/pkg/wizard"
+	"github.com/spf13/cobra"
 )
 
 var (
@@ -55,22 +55,21 @@ func init() {
 func runCreate(cmd *cobra.Command, args []string) error {
 	apiClient := client.NewClient(apiURL, apiKey)
 
-	// Interactive mode
+	/* Interactive mode */
 	if createInteractive {
 		return wizard.RunWizard(apiClient)
 	}
 
-	// Template mode
+	/* Template mode */
 	if createTemplate != "" {
 		return createFromTemplate(apiClient, createTemplate)
 	}
 
-	// Config file mode
+	/* Config file mode */
 	if createConfig != "" {
 		return createFromConfig(apiClient, createConfig)
 	}
 
-	// Quick create with flags
 	if createName == "" {
 		return fmt.Errorf("agent name is required (use --name or --interactive)")
 	}
@@ -84,7 +83,7 @@ func runCreate(cmd *cobra.Command, args []string) error {
 		Tools: createTools,
 	}
 
-	// Load workflow if provided
+	/* Load workflow if provided */
 	if createWorkflow != "" {
 		workflow, err := config.LoadWorkflow(createWorkflow)
 		if err != nil {
@@ -93,7 +92,6 @@ func runCreate(cmd *cobra.Command, args []string) error {
 		agentConfig.Workflow = workflow
 	}
 
-	// Create agent
 	agent, err := apiClient.CreateAgent(agentConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create agent: %w", err)
@@ -107,7 +105,7 @@ func runCreate(cmd *cobra.Command, args []string) error {
 
 func createFromTemplate(apiClient *client.Client, templateName string) error {
 	fmt.Printf("📋 Loading template: %s\n", templateName)
-	
+
 	template, err := templates.LoadTemplate(templateName)
 	if err != nil {
 		return fmt.Errorf("failed to load template: %w", err)
@@ -116,7 +114,7 @@ func createFromTemplate(apiClient *client.Client, templateName string) error {
 	fmt.Printf("✅ Template loaded: %s\n", template.Name)
 	fmt.Printf("Description: %s\n", template.Description)
 
-	// If name is provided, use it; otherwise use template name
+	/* If name is provided, use it; otherwise use template name */
 	agentName := createName
 	if agentName == "" {
 		agentName = template.Name + "-instance"
@@ -154,4 +152,3 @@ func createFromConfig(apiClient *client.Client, configPath string) error {
 	fmt.Printf("Name: %s\n", agent.Name)
 	return nil
 }
-

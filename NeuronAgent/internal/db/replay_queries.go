@@ -44,6 +44,8 @@ const (
 		WHERE agent_id = $1 
 		ORDER BY created_at DESC
 		LIMIT $2 OFFSET $3`
+
+	deleteExecutionSnapshotQuery = `DELETE FROM neurondb_agent.execution_snapshots WHERE id = $1`
 )
 
 /* Execution snapshot methods */
@@ -93,4 +95,12 @@ func (q *Queries) ListExecutionSnapshotsByAgent(ctx context.Context, agentID uui
 		return nil, q.formatQueryError("SELECT", listExecutionSnapshotsByAgentQuery, len(params), "neurondb_agent.execution_snapshots", err)
 	}
 	return snapshots, nil
+}
+
+func (q *Queries) DeleteExecutionSnapshot(ctx context.Context, id uuid.UUID) error {
+	_, err := q.DB.ExecContext(ctx, deleteExecutionSnapshotQuery, id)
+	if err != nil {
+		return fmt.Errorf("execution snapshot deletion failed: %w", err)
+	}
+	return nil
 }

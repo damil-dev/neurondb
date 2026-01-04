@@ -32,7 +32,6 @@ func (h *Handlers) CloneAgent(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	requestID := GetRequestID(r.Context())
 
-	// Validate UUID
 	if err := validation.ValidateUUIDRequired(vars["id"], "agent_id"); err != nil {
 		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid agent ID", err, requestID, r.URL.Path, r.Method, "agent", "", nil))
 		return
@@ -77,7 +76,6 @@ func (h *Handlers) GeneratePlan(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	requestID := GetRequestID(r.Context())
 
-	// Validate UUID
 	if err := validation.ValidateUUIDRequired(vars["id"], "agent_id"); err != nil {
 		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid agent ID", err, requestID, r.URL.Path, r.Method, "agent", "", nil))
 		return
@@ -96,7 +94,7 @@ func (h *Handlers) GeneratePlan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate request body size (max 1MB)
+	/* Validate request body size (max 1MB) */
 	const maxBodySize = 1024 * 1024
 	bodyBytes, err := validation.ReadAndValidateBody(r, maxBodySize)
 	if err != nil {
@@ -114,7 +112,6 @@ func (h *Handlers) GeneratePlan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate task
 	if err := validation.ValidateRequired(req.Task, "task"); err != nil {
 		respondError(w, NewErrorWithContext(http.StatusBadRequest, "task validation failed", err, requestID, r.URL.Path, r.Method, "agent", id.String(), nil))
 		return

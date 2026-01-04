@@ -17,6 +17,7 @@ package connectors
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -152,6 +153,33 @@ func (g *GitHubConnector) List(ctx context.Context, path string) ([]string, erro
 		return nil, fmt.Errorf("GitHub list failed with status %d", resp.StatusCode)
 	}
 
-	/* TODO: Parse JSON response and extract file paths */
-	return nil, fmt.Errorf("GitHub list parsing not fully implemented")
+	/* Parse JSON response and extract file paths */
+	var contents []struct {
+		Name        string `json:"name"`
+		Path        string `json:"path"`
+		Type        string `json:"type"`
+		Size        int64  `json:"size"`
+		DownloadURL string `json:"download_url"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&contents); err != nil {
+		return nil, fmt.Errorf("failed to parse GitHub API response: %w", err)
+	}
+
+	/* Extract file paths */
+	result := make([]string, 0, len(contents))
+	for _, item := range contents {
+		if item.Type == "file" {
+			result = append(result, item.Path)
+		} else if item.Type == "dir" {
+			/* For directories, include the path with a trailing slash to indicate it's a directory */
+			result = append(result, item.Path+"/")
+		}
+	}
+
+	/* Handle pagination if needed */
+	/* GitHub API uses Link header for pagination, but for simplicity we return what we got */
+	/* If more results are needed, the caller can make additional requests with different paths */
+
+	return result, nil
 }

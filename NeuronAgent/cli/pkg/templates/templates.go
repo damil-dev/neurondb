@@ -25,19 +25,19 @@ import (
 )
 
 type Template struct {
-	Name        string                 `yaml:"name" json:"name"`
-	Description string                 `yaml:"description" json:"description"`
-	Category    string                 `yaml:"category" json:"category"`
-	Profile     string                 `yaml:"profile,omitempty" json:"profile,omitempty"`
-	SystemPrompt string                `yaml:"system_prompt,omitempty" json:"system_prompt,omitempty"`
-	Model       config.ModelConfig     `yaml:"model,omitempty" json:"model,omitempty"`
-	Tools       []string               `yaml:"tools,omitempty" json:"tools,omitempty"`
-	Config      map[string]interface{} `yaml:"config,omitempty" json:"config,omitempty"`
-	Workflow    *config.WorkflowConfig `yaml:"workflow,omitempty" json:"workflow,omitempty"`
+	Name         string                 `yaml:"name" json:"name"`
+	Description  string                 `yaml:"description" json:"description"`
+	Category     string                 `yaml:"category" json:"category"`
+	Profile      string                 `yaml:"profile,omitempty" json:"profile,omitempty"`
+	SystemPrompt string                 `yaml:"system_prompt,omitempty" json:"system_prompt,omitempty"`
+	Model        config.ModelConfig     `yaml:"model,omitempty" json:"model,omitempty"`
+	Tools        []string               `yaml:"tools,omitempty" json:"tools,omitempty"`
+	Config       map[string]interface{} `yaml:"config,omitempty" json:"config,omitempty"`
+	Workflow     *config.WorkflowConfig `yaml:"workflow,omitempty" json:"workflow,omitempty"`
 }
 
 func getTemplatesDir() string {
-	// Check if templates directory exists next to CLI binary
+	/* Check if templates directory exists next to CLI binary */
 	if exe, err := os.Executable(); err == nil {
 		dir := filepath.Dir(exe)
 		templatesDir := filepath.Join(dir, "templates")
@@ -46,21 +46,20 @@ func getTemplatesDir() string {
 		}
 	}
 
-	// Fallback to cli/templates in source
+	/* Fallback to cli/templates in source */
 	cliDir := filepath.Join("cli", "templates")
 	if _, err := os.Stat(cliDir); err == nil {
 		return cliDir
 	}
 
-	// Return default
 	return "templates"
 }
 
 func ListTemplates() ([]Template, error) {
 	templatesDir := getTemplatesDir()
-	
+
 	var templates []Template
-	
+
 	err := filepath.Walk(templatesDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -88,8 +87,8 @@ func ListTemplates() ([]Template, error) {
 
 func LoadTemplate(name string) (*Template, error) {
 	templatesDir := getTemplatesDir()
-	
-	// Try different paths
+
+	/* Try different paths */
 	paths := []string{
 		filepath.Join(templatesDir, name+".yaml"),
 		filepath.Join(templatesDir, name+".yml"),
@@ -162,7 +161,7 @@ func AgentToTemplate(agent *client.Agent, templateName string) *Template {
 		Model: config.ModelConfig{
 			Name: agent.ModelName,
 		},
-		Tools: agent.EnabledTools,
+		Tools:  agent.EnabledTools,
 		Config: agent.Config,
 	}
 
@@ -181,14 +180,14 @@ func AgentToTemplate(agent *client.Agent, templateName string) *Template {
 
 func SaveTemplate(tmpl *Template) error {
 	templatesDir := getTemplatesDir()
-	
+
 	// Create directory if it doesn't exist
 	if err := os.MkdirAll(templatesDir, 0755); err != nil {
 		return fmt.Errorf("failed to create templates directory: %w", err)
 	}
 
 	path := filepath.Join(templatesDir, tmpl.Name+".yaml")
-	
+
 	data, err := yaml.Marshal(tmpl)
 	if err != nil {
 		return fmt.Errorf("failed to marshal template: %w", err)
@@ -200,4 +199,3 @@ func SaveTemplate(tmpl *Template) error {
 
 	return nil
 }
-

@@ -44,6 +44,9 @@ func DefaultConfig() *Config {
 			Level:  "info",
 			Format: "json",
 		},
+		Workflow: WorkflowConfig{
+			BaseURL: "http://localhost:8080",
+		},
 	}
 }
 

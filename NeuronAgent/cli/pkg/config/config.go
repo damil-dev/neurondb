@@ -41,17 +41,17 @@ type ModelConfig struct {
 }
 
 type MemoryConfig struct {
-	Enabled         bool   `yaml:"enabled,omitempty" json:"enabled,omitempty"`
-	Hierarchical    bool   `yaml:"hierarchical,omitempty" json:"hierarchical,omitempty"`
-	RetentionDays   int    `yaml:"retention_days,omitempty" json:"retention_days,omitempty"`
-	VectorDimension int    `yaml:"vector_dimension,omitempty" json:"vector_dimension,omitempty"`
+	Enabled         bool `yaml:"enabled,omitempty" json:"enabled,omitempty"`
+	Hierarchical    bool `yaml:"hierarchical,omitempty" json:"hierarchical,omitempty"`
+	RetentionDays   int  `yaml:"retention_days,omitempty" json:"retention_days,omitempty"`
+	VectorDimension int  `yaml:"vector_dimension,omitempty" json:"vector_dimension,omitempty"`
 }
 
 type WorkflowConfig struct {
-	Name        string          `yaml:"name" json:"name"`
-	Description string          `yaml:"description,omitempty" json:"description,omitempty"`
-	Type        string          `yaml:"type" json:"type"`
-	Steps       []WorkflowStep  `yaml:"steps" json:"steps"`
+	Name        string            `yaml:"name" json:"name"`
+	Description string            `yaml:"description,omitempty" json:"description,omitempty"`
+	Type        string            `yaml:"type" json:"type"`
+	Steps       []WorkflowStep    `yaml:"steps" json:"steps"`
 	Triggers    []WorkflowTrigger `yaml:"triggers,omitempty" json:"triggers,omitempty"`
 }
 
@@ -71,10 +71,10 @@ type RetryConfig struct {
 }
 
 type WorkflowTrigger struct {
-	Type    string                 `yaml:"type" json:"type"`
-	Cron    string                 `yaml:"cron,omitempty" json:"cron,omitempty"`
-	Path    string                 `yaml:"path,omitempty" json:"path,omitempty"`
-	Config  map[string]interface{} `yaml:"config,omitempty" json:"config,omitempty"`
+	Type   string                 `yaml:"type" json:"type"`
+	Cron   string                 `yaml:"cron,omitempty" json:"cron,omitempty"`
+	Path   string                 `yaml:"path,omitempty" json:"path,omitempty"`
+	Config map[string]interface{} `yaml:"config,omitempty" json:"config,omitempty"`
 }
 
 func LoadAgentConfig(path string) (*AgentConfig, error) {
@@ -122,7 +122,7 @@ func ValidateWorkflow(workflow *WorkflowConfig) error {
 		return fmt.Errorf("workflow must have at least one step")
 	}
 
-	// Check for cycles in dependencies
+	/* Check for cycles in dependencies */
 	stepMap := make(map[string]bool)
 	for _, step := range workflow.Steps {
 		if step.ID == "" {
@@ -134,7 +134,7 @@ func ValidateWorkflow(workflow *WorkflowConfig) error {
 		stepMap[step.ID] = true
 	}
 
-	// Validate dependencies
+	/* Validate dependencies */
 	for _, step := range workflow.Steps {
 		for _, dep := range step.DependsOn {
 			if !stepMap[dep] {
@@ -143,7 +143,7 @@ func ValidateWorkflow(workflow *WorkflowConfig) error {
 		}
 	}
 
-	// Simple cycle detection (DFS)
+	/* Simple cycle detection (DFS) */
 	visited := make(map[string]bool)
 	recStack := make(map[string]bool)
 
@@ -197,4 +197,3 @@ func GetWorkflowTemplates() []string {
 		"report-generator",
 	}
 }
-

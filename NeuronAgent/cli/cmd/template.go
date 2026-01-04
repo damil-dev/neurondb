@@ -16,9 +16,9 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/spf13/cobra"
-	"github.com/neurondb/NeuronAgent/cli/pkg/templates"
 	"github.com/neurondb/NeuronAgent/cli/pkg/client"
+	"github.com/neurondb/NeuronAgent/cli/pkg/templates"
+	"github.com/spf13/cobra"
 )
 
 var templateListCmd = &cobra.Command{
@@ -87,7 +87,7 @@ func listTemplates(cmd *cobra.Command, args []string) error {
 
 	fmt.Println("\n📋 Available Templates:")
 	fmt.Println("─────────────────────────────────────────────────────────")
-	
+
 	for _, tmpl := range tmplList {
 		fmt.Printf("  %-30s %s\n", tmpl.Name, tmpl.Description)
 		fmt.Printf("    Category: %s\n", tmpl.Category)
@@ -99,7 +99,7 @@ func listTemplates(cmd *cobra.Command, args []string) error {
 
 func showTemplate(cmd *cobra.Command, args []string) error {
 	templateName := args[0]
-	
+
 	tmpl, err := templates.LoadTemplate(templateName)
 	if err != nil {
 		return fmt.Errorf("failed to load template: %w", err)
@@ -110,11 +110,11 @@ func showTemplate(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Description: %s\n", tmpl.Description)
 	fmt.Printf("Category: %s\n", tmpl.Category)
 	fmt.Printf("Profile: %s\n", tmpl.Profile)
-	
+
 	if len(tmpl.Tools) > 0 {
 		fmt.Printf("Tools: %v\n", tmpl.Tools)
 	}
-	
+
 	if tmpl.Model.Name != "" {
 		fmt.Printf("Model: %s\n", tmpl.Model.Name)
 	}
@@ -132,7 +132,7 @@ func showTemplate(cmd *cobra.Command, args []string) error {
 
 func searchTemplates(cmd *cobra.Command, args []string) error {
 	query := args[0]
-	
+
 	tmplList, err := templates.SearchTemplates(query)
 	if err != nil {
 		return fmt.Errorf("failed to search templates: %w", err)
@@ -145,7 +145,7 @@ func searchTemplates(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("\n🔍 Templates matching '%s':\n", query)
 	fmt.Println("─────────────────────────────────────────────────────────")
-	
+
 	for _, tmpl := range tmplList {
 		fmt.Printf("  %-30s %s\n", tmpl.Name, tmpl.Description)
 	}
@@ -159,7 +159,7 @@ func deployTemplate(cmd *cobra.Command, args []string) error {
 	apiClient := client.NewClient(apiURL, apiKey)
 
 	fmt.Printf("📋 Loading template: %s\n", templateName)
-	
+
 	template, err := templates.LoadTemplate(templateName)
 	if err != nil {
 		return fmt.Errorf("failed to load template: %w", err)
@@ -185,7 +185,7 @@ func saveTemplate(cmd *cobra.Command, args []string) error {
 	apiClient := client.NewClient(apiURL, apiKey)
 
 	fmt.Printf("📥 Fetching agent: %s\n", agentID)
-	
+
 	agent, err := apiClient.GetAgent(agentID)
 	if err != nil {
 		return fmt.Errorf("failed to get agent: %w", err)
@@ -200,7 +200,7 @@ func saveTemplate(cmd *cobra.Command, args []string) error {
 	}
 
 	template := templates.AgentToTemplate(agent, templateName)
-	
+
 	if err := templates.SaveTemplate(template); err != nil {
 		return fmt.Errorf("failed to save template: %w", err)
 	}
@@ -208,4 +208,3 @@ func saveTemplate(cmd *cobra.Command, args []string) error {
 	fmt.Printf("✅ Template saved: %s\n", templateName)
 	return nil
 }
-

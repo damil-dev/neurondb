@@ -19,6 +19,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -35,6 +36,19 @@ const (
 	listWorkflowsQuery = `
 		SELECT * FROM neurondb_agent.workflows 
 		WHERE ($1::text IS NULL OR status = $1)
+		ORDER BY created_at DESC`
+
+	updateWorkflowQuery = `
+		UPDATE neurondb_agent.workflows 
+		SET name = $2, dag_definition = $3::jsonb, status = $4, updated_at = NOW()
+		WHERE id = $1
+		RETURNING updated_at`
+
+	deleteWorkflowQuery = `DELETE FROM neurondb_agent.workflows WHERE id = $1`
+
+	listWorkflowsByStatusQuery = `
+		SELECT * FROM neurondb_agent.workflows 
+		WHERE status = $1
 		ORDER BY created_at DESC`
 )
 
@@ -64,11 +78,21 @@ const (
 
 	updateWorkflowExecutionQuery = `
 		UPDATE neurondb_agent.workflow_executions 
-		SET status = $2, outputs = $3::jsonb, error_message = $4, completed_at = NOW(), updated_at = NOW()
+		SET status = $2, outputs = $3::jsonb, error_message = $4, updated_at = NOW()
 		WHERE id = $1
 		RETURNING updated_at`
 
 	getWorkflowExecutionByIDQuery = `SELECT * FROM neurondb_agent.workflow_executions WHERE id = $1`
+
+	listWorkflowExecutionsQuery = `
+		SELECT * FROM neurondb_agent.workflow_executions 
+		WHERE workflow_id = $1 
+		ORDER BY created_at DESC`
+
+	listWorkflowExecutionsByStatusQuery = `
+		SELECT * FROM neurondb_agent.workflow_executions 
+		WHERE workflow_id = $1 AND status = $2
+		ORDER BY created_at DESC`
 )
 
 /* Workflow step execution queries */
@@ -90,6 +114,44 @@ const (
 	getWorkflowStepExecutionByIdempotencyKeyQuery = `
 		SELECT * FROM neurondb_agent.workflow_step_executions 
 		WHERE idempotency_key = $1 AND status = 'completed'`
+)
+
+/* Workflow schedule queries */
+const (
+	createWorkflowScheduleQuery = `
+		INSERT INTO neurondb_agent.workflow_schedules 
+		(workflow_id, cron_expression, timezone, enabled, next_run_at)
+		VALUES ($1, $2, $3, $4, $5)
+		ON CONFLICT (workflow_id) 
+		DO UPDATE SET cron_expression = EXCLUDED.cron_expression, 
+		              timezone = EXCLUDED.timezone, 
+		              enabled = EXCLUDED.enabled, 
+		              next_run_at = EXCLUDED.next_run_at, 
+		              updated_at = NOW()
+		RETURNING id, created_at, updated_at`
+
+	getWorkflowScheduleByWorkflowIDQuery = `SELECT * FROM neurondb_agent.workflow_schedules WHERE workflow_id = $1`
+
+	getWorkflowScheduleByIDQuery = `SELECT * FROM neurondb_agent.workflow_schedules WHERE id = $1`
+
+	updateWorkflowScheduleQuery = `
+		UPDATE neurondb_agent.workflow_schedules 
+		SET cron_expression = $2, timezone = $3, enabled = $4, next_run_at = $5, last_run_at = $6, updated_at = NOW()
+		WHERE id = $1
+		RETURNING updated_at`
+
+	deleteWorkflowScheduleQuery = `DELETE FROM neurondb_agent.workflow_schedules WHERE id = $1`
+
+	deleteWorkflowScheduleByWorkflowIDQuery = `DELETE FROM neurondb_agent.workflow_schedules WHERE workflow_id = $1`
+
+	listWorkflowSchedulesQuery = `
+		SELECT * FROM neurondb_agent.workflow_schedules 
+		ORDER BY created_at DESC`
+
+	listWorkflowSchedulesByNextRunQuery = `
+		SELECT * FROM neurondb_agent.workflow_schedules 
+		WHERE enabled = true AND next_run_at IS NOT NULL AND next_run_at <= $1
+		ORDER BY next_run_at ASC`
 )
 
 /* Workflow methods */
@@ -119,13 +181,51 @@ func (q *Queries) GetWorkflowByID(ctx context.Context, id uuid.UUID) (*Workflow,
 	return &workflow, nil
 }
 
-func (q *Queries) ListWorkflows(ctx context.Context, status *string) ([]Workflow, error) {
+func (q *Queries) ListWorkflows(ctx context.Context) ([]Workflow, error) {
 	var workflows []Workflow
-	err := q.DB.SelectContext(ctx, &workflows, listWorkflowsQuery, status)
+	err := q.DB.SelectContext(ctx, &workflows, listWorkflowsQuery, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list workflows: %w", err)
 	}
 	return workflows, nil
+}
+
+func (q *Queries) ListWorkflowsByStatus(ctx context.Context, status string) ([]Workflow, error) {
+	var workflows []Workflow
+	err := q.DB.SelectContext(ctx, &workflows, listWorkflowsByStatusQuery, status)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list workflows by status: %w", err)
+	}
+	return workflows, nil
+}
+
+func (q *Queries) UpdateWorkflow(ctx context.Context, workflow *Workflow) error {
+	dagDefValue, err := workflow.DAGDefinition.Value()
+	if err != nil {
+		return fmt.Errorf("failed to convert dag_definition: %w", err)
+	}
+
+	params := []interface{}{workflow.ID, workflow.Name, dagDefValue, workflow.Status}
+	err = q.DB.GetContext(ctx, workflow, updateWorkflowQuery, params...)
+	if err != nil {
+		return fmt.Errorf("workflow update failed: %w", err)
+	}
+	return nil
+}
+
+func (q *Queries) DeleteWorkflow(ctx context.Context, id uuid.UUID) error {
+	result, err := q.DB.ExecContext(ctx, deleteWorkflowQuery, id)
+	if err != nil {
+		return fmt.Errorf("workflow deletion failed: %w", err)
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("workflow not found")
+	}
+	return nil
 }
 
 /* Workflow step methods */
@@ -221,6 +321,24 @@ func (q *Queries) GetWorkflowExecutionByID(ctx context.Context, id uuid.UUID) (*
 	return &execution, nil
 }
 
+func (q *Queries) ListWorkflowExecutions(ctx context.Context, workflowID uuid.UUID) ([]WorkflowExecution, error) {
+	var executions []WorkflowExecution
+	err := q.DB.SelectContext(ctx, &executions, listWorkflowExecutionsQuery, workflowID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list workflow executions: %w", err)
+	}
+	return executions, nil
+}
+
+func (q *Queries) ListWorkflowExecutionsByStatus(ctx context.Context, workflowID uuid.UUID, status string) ([]WorkflowExecution, error) {
+	var executions []WorkflowExecution
+	err := q.DB.SelectContext(ctx, &executions, listWorkflowExecutionsByStatusQuery, workflowID, status)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list workflow executions by status: %w", err)
+	}
+	return executions, nil
+}
+
 /* Workflow step execution methods */
 func (q *Queries) CreateWorkflowStepExecution(ctx context.Context, stepExecution *WorkflowStepExecution) error {
 	inputsValue, err := stepExecution.Inputs.Value()
@@ -272,4 +390,95 @@ func (q *Queries) GetWorkflowStepExecutionByIdempotencyKey(ctx context.Context, 
 		return nil, fmt.Errorf("failed to get workflow step execution by idempotency key: %w", err)
 	}
 	return &stepExecution, nil
+}
+
+/* Workflow schedule methods */
+func (q *Queries) CreateWorkflowSchedule(ctx context.Context, schedule *WorkflowSchedule) error {
+	params := []interface{}{schedule.WorkflowID, schedule.CronExpression, schedule.Timezone, schedule.Enabled, schedule.NextRunAt}
+	err := q.DB.GetContext(ctx, schedule, createWorkflowScheduleQuery, params...)
+	if err != nil {
+		return fmt.Errorf("workflow schedule creation failed: %w", err)
+	}
+	return nil
+}
+
+func (q *Queries) GetWorkflowScheduleByWorkflowID(ctx context.Context, workflowID uuid.UUID) (*WorkflowSchedule, error) {
+	var schedule WorkflowSchedule
+	err := q.DB.GetContext(ctx, &schedule, getWorkflowScheduleByWorkflowIDQuery, workflowID)
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("workflow schedule not found: %w", err)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get workflow schedule: %w", err)
+	}
+	return &schedule, nil
+}
+
+func (q *Queries) GetWorkflowScheduleByID(ctx context.Context, id uuid.UUID) (*WorkflowSchedule, error) {
+	var schedule WorkflowSchedule
+	err := q.DB.GetContext(ctx, &schedule, getWorkflowScheduleByIDQuery, id)
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("workflow schedule not found: %w", err)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get workflow schedule: %w", err)
+	}
+	return &schedule, nil
+}
+
+func (q *Queries) UpdateWorkflowSchedule(ctx context.Context, schedule *WorkflowSchedule) error {
+	params := []interface{}{schedule.ID, schedule.CronExpression, schedule.Timezone, schedule.Enabled, schedule.NextRunAt, schedule.LastRunAt}
+	err := q.DB.GetContext(ctx, schedule, updateWorkflowScheduleQuery, params...)
+	if err != nil {
+		return fmt.Errorf("workflow schedule update failed: %w", err)
+	}
+	return nil
+}
+
+func (q *Queries) DeleteWorkflowSchedule(ctx context.Context, id uuid.UUID) error {
+	result, err := q.DB.ExecContext(ctx, deleteWorkflowScheduleQuery, id)
+	if err != nil {
+		return fmt.Errorf("workflow schedule deletion failed: %w", err)
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("workflow schedule not found")
+	}
+	return nil
+}
+
+func (q *Queries) DeleteWorkflowScheduleByWorkflowID(ctx context.Context, workflowID uuid.UUID) error {
+	result, err := q.DB.ExecContext(ctx, deleteWorkflowScheduleByWorkflowIDQuery, workflowID)
+	if err != nil {
+		return fmt.Errorf("workflow schedule deletion failed: %w", err)
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("workflow schedule not found")
+	}
+	return nil
+}
+
+func (q *Queries) ListWorkflowSchedules(ctx context.Context) ([]WorkflowSchedule, error) {
+	var schedules []WorkflowSchedule
+	err := q.DB.SelectContext(ctx, &schedules, listWorkflowSchedulesQuery)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list workflow schedules: %w", err)
+	}
+	return schedules, nil
+}
+
+func (q *Queries) ListWorkflowSchedulesByNextRun(ctx context.Context, beforeTime time.Time) ([]WorkflowSchedule, error) {
+	var schedules []WorkflowSchedule
+	err := q.DB.SelectContext(ctx, &schedules, listWorkflowSchedulesByNextRunQuery, beforeTime)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list workflow schedules by next run: %w", err)
+	}
+	return schedules, nil
 }

@@ -31,7 +31,6 @@ func (h *Handlers) ListMemoryChunks(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	requestID := GetRequestID(r.Context())
 
-	// Validate UUID
 	if err := validation.ValidateUUIDRequired(vars["id"], "agent_id"); err != nil {
 		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid agent ID", err, requestID, r.URL.Path, r.Method, "memory", "", nil))
 		return
@@ -47,7 +46,6 @@ func (h *Handlers) ListMemoryChunks(w http.ResponseWriter, r *http.Request) {
 	offset := 0
 	if l := r.URL.Query().Get("limit"); l != "" {
 		fmt.Sscanf(l, "%d", &limit)
-		// Validate limit
 		if err := validation.ValidateLimit(limit); err != nil {
 			respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid limit parameter", err, requestID, r.URL.Path, r.Method, "memory", agentID.String(), nil))
 			return
@@ -55,7 +53,6 @@ func (h *Handlers) ListMemoryChunks(w http.ResponseWriter, r *http.Request) {
 	}
 	if o := r.URL.Query().Get("offset"); o != "" {
 		fmt.Sscanf(o, "%d", &offset)
-		// Validate offset
 		if err := validation.ValidateOffset(offset); err != nil {
 			respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid offset parameter", err, requestID, r.URL.Path, r.Method, "memory", agentID.String(), nil))
 			return
@@ -116,7 +113,6 @@ func (h *Handlers) SearchMemory(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	requestID := GetRequestID(r.Context())
 
-	// Validate UUID
 	if err := validation.ValidateUUIDRequired(vars["id"], "agent_id"); err != nil {
 		respondError(w, NewErrorWithContext(http.StatusBadRequest, "invalid agent ID", err, requestID, r.URL.Path, r.Method, "memory", "", nil))
 		return
@@ -128,7 +124,7 @@ func (h *Handlers) SearchMemory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate request body size (max 1MB)
+	/* Validate request body size (max 1MB) */
 	const maxBodySize = 1024 * 1024
 	bodyBytes, err := validation.ReadAndValidateBody(r, maxBodySize)
 	if err != nil {
@@ -147,7 +143,6 @@ func (h *Handlers) SearchMemory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate query
 	if err := validation.ValidateRequired(req.Query, "query"); err != nil {
 		respondError(w, NewErrorWithContext(http.StatusBadRequest, "query validation failed", err, requestID, r.URL.Path, r.Method, "memory", agentID.String(), nil))
 		return

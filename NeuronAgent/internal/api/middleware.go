@@ -114,23 +114,16 @@ func AuthMiddleware(keyManager *auth.APIKeyManager, principalManager *auth.Princ
 /* SecurityHeadersMiddleware adds security headers to all HTTP responses */
 func SecurityHeadersMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Prevent MIME type sniffing
-		w.Header().Set("X-Content-Type-Options", "nosniff")
-		// Enable XSS protection
-		w.Header().Set("X-XSS-Protection", "1; mode=block")
-		// Prevent clickjacking
-		w.Header().Set("X-Frame-Options", "DENY")
-		// Enforce HTTPS in production (Strict-Transport-Security)
-		// Note: Only set if request is already HTTPS to avoid issues
+		w.Header().Set("X-Content-Type-Options", "nosniff") /* Prevent MIME type sniffing */
+		w.Header().Set("X-XSS-Protection", "1; mode=block") /* Enable XSS protection */
+		w.Header().Set("X-Frame-Options", "DENY")           /* Prevent clickjacking */
+		/* Enforce HTTPS in production - only set if request is already HTTPS to avoid issues */
 		if r.TLS != nil {
 			w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 		}
-		// Content Security Policy - restrictive by default
-		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'")
-		// Referrer Policy
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'") /* Restrictive by default */
 		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
-		// Permissions Policy (formerly Feature-Policy)
-		w.Header().Set("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
+		w.Header().Set("Permissions-Policy", "geolocation=(), microphone=(), camera=()") /* Formerly Feature-Policy */
 
 		next.ServeHTTP(w, r)
 	})

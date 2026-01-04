@@ -20,11 +20,43 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/neurondb/NeuronAgent/internal/agent"
 	"github.com/neurondb/NeuronAgent/internal/auth"
 	"github.com/neurondb/NeuronAgent/internal/collaboration"
 	"github.com/neurondb/NeuronAgent/internal/db"
 	"github.com/neurondb/NeuronAgent/pkg/neurondb"
+)
+
+/* Context key types (duplicated from agent to avoid import cycle) */
+type contextKey string
+
+const (
+	agentIDContextKey   contextKey = "agent_id"
+	sessionIDContextKey contextKey = "session_id"
+)
+
+/* GetAgentIDFromContext gets agent ID from context (duplicated from agent to avoid import cycle) */
+func GetAgentIDFromContext(ctx context.Context) (uuid.UUID, bool) {
+	agentID, ok := ctx.Value(agentIDContextKey).(uuid.UUID)
+	return agentID, ok
+}
+
+/* GetSessionIDFromContext gets session ID from context (duplicated from agent to avoid import cycle) */
+func GetSessionIDFromContext(ctx context.Context) (uuid.UUID, bool) {
+	sessionID, ok := ctx.Value(sessionIDContextKey).(uuid.UUID)
+	return sessionID, ok
+}
+
+/* GetPrincipalFromContext gets principal from context (duplicated from agent to avoid import cycle) */
+func GetPrincipalFromContext(ctx context.Context) *db.Principal {
+	principal, ok := ctx.Value(principalContextKey).(*db.Principal)
+	if !ok {
+		return nil
+	}
+	return principal
+}
+
+const (
+	principalContextKey contextKey = "principal"
 )
 
 /* Registry manages tool registration and execution */
@@ -67,7 +99,7 @@ func NewRegistryWithVFS(queries *db.Queries, database *db.DB, vfs interface{}) *
 	registry := NewRegistry(queries, database)
 
 	/* Register filesystem tool if VFS is provided */
-	if vfsInstance, ok := vfs.(*agent.VirtualFileSystem); ok {
+	if vfsInstance, ok := vfs.(VirtualFileSystemInterface); ok {
 		registry.RegisterHandler("filesystem", NewFileSystemTool(vfsInstance))
 	}
 
@@ -79,12 +111,12 @@ func NewRegistryWithAllFeatures(queries *db.Queries, database *db.DB, vfs interf
 	registry := NewRegistry(queries, database)
 
 	/* Register filesystem tool if VFS is provided */
-	if vfsInstance, ok := vfs.(*agent.VirtualFileSystem); ok {
+	if vfsInstance, ok := vfs.(VirtualFileSystemInterface); ok {
 		registry.RegisterHandler("filesystem", NewFileSystemTool(vfsInstance))
 	}
 
 	/* Register memory tool if hierarchical memory is provided */
-	if hierMemoryInstance, ok := hierMemory.(*agent.HierarchicalMemoryManager); ok {
+	if hierMemoryInstance, ok := hierMemory.(HierarchicalMemoryInterface); ok {
 		registry.RegisterHandler("memory", NewMemoryTool(hierMemoryInstance))
 	}
 
@@ -194,8 +226,8 @@ func (r *Registry) ExecuteTool(ctx context.Context, tool *db.Tool, args map[stri
 	result, err := handler.Execute(ctx, tool, args)
 
 	/* Audit log tool execution */
-	agentID, _ := agent.GetAgentIDFromContext(ctx)
-	sessionID, _ := agent.GetSessionIDFromContext(ctx)
+	agentID, _ := GetAgentIDFromContext(ctx)
+	sessionID, _ := GetSessionIDFromContext(ctx)
 
 	outputs := make(map[string]interface{})
 	if err == nil {

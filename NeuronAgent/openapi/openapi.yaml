@@ -29,6 +29,14 @@ tags:
     description: Memory and context operations
   - name: Webhooks
     description: Webhook management
+  - name: Evaluation
+    description: Evaluation framework operations
+  - name: Replay
+    description: Execution snapshots and replay operations
+  - name: Workflows
+    description: Workflow management operations
+  - name: Specializations
+    description: Agent specialization management
   - name: Health
     description: Health check endpoints
 
@@ -41,7 +49,239 @@ paths:
       description: Check if the service is healthy
       operationId: healthCheck
       security: []
-      responses:
+    
+    EvalTask:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        task_type:
+          type: string
+        input:
+          type: string
+        expected_output:
+          type: string
+          nullable: true
+        expected_tool_sequence:
+          type: object
+        golden_sql_side_effects:
+          type: object
+        metadata:
+          type: object
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateEvalTaskRequest:
+      type: object
+      required:
+        - task_type
+        - input
+      properties:
+        task_type:
+          type: string
+          enum: [tool_sequence, sql_side_effect, retrieval, end_to_end]
+        input:
+          type: string
+        expected_output:
+          type: string
+        expected_tool_sequence:
+          type: object
+        golden_sql_side_effects:
+          type: object
+        metadata:
+          type: object
+
+    EvalRun:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        dataset_version:
+          type: string
+        agent_id:
+          type: string
+          format: uuid
+          nullable: true
+        started_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        score:
+          type: number
+          nullable: true
+        total_tasks:
+          type: integer
+        passed_tasks:
+          type: integer
+        failed_tasks:
+          type: integer
+        metadata:
+          type: object
+        created_at:
+          type: string
+          format: date-time
+
+    CreateEvalRunRequest:
+      type: object
+      required:
+        - dataset_version
+      properties:
+        dataset_version:
+          type: string
+        agent_id:
+          type: string
+          format: uuid
+        total_tasks:
+          type: integer
+        metadata:
+          type: object
+
+    EvalTaskResult:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        eval_run_id:
+          type: string
+          format: uuid
+        eval_task_id:
+          type: string
+          format: uuid
+        session_id:
+          type: string
+          format: uuid
+          nullable: true
+        passed:
+          type: boolean
+        actual_output:
+          type: string
+          nullable: true
+        actual_tool_sequence:
+          type: object
+        actual_sql_side_effects:
+          type: object
+        score:
+          type: number
+          nullable: true
+        error_message:
+          type: string
+          nullable: true
+        metadata:
+          type: object
+        created_at:
+          type: string
+          format: date-time
+
+    Snapshot:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        session_id:
+          type: string
+          format: uuid
+        agent_id:
+          type: string
+          format: uuid
+        user_message:
+          type: string
+        execution_state:
+          type: object
+        deterministic_mode:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    ReplayResponse:
+      type: object
+      properties:
+        session_id:
+          type: string
+          format: uuid
+        agent_id:
+          type: string
+          format: uuid
+        user_message:
+          type: string
+        final_answer:
+          type: string
+        tool_calls:
+          type: array
+          items:
+            type: object
+        tool_results:
+          type: array
+          items:
+            type: object
+        tokens_used:
+          type: integer
+
+    WorkflowSchedule:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        workflow_id:
+          type: string
+          format: uuid
+        cron_expression:
+          type: string
+        timezone:
+          type: string
+        enabled:
+          type: boolean
+        next_run_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_run_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Specialization:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        agent_id:
+          type: string
+          format: uuid
+        specialization_type:
+          type: string
+          enum: [planning, research, coding, execution, analysis, general]
+        capabilities:
+          type: array
+          items:
+            type: string
+        config:
+          type: object
+        created_at:
+          type: string
+        updated_at:
+          type: string
+
+  responses:
         '200':
           description: Service is healthy
           content:
@@ -448,6 +688,565 @@ paths:
           $ref: '#/components/responses/NotFound'
         '500':
           $ref: '#/components/responses/InternalServerError'
+
+  /eval/tasks:
+    post:
+      tags:
+        - Evaluation
+      summary: Create evaluation task
+      operationId: createEvalTask
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateEvalTaskRequest'
+      responses:
+        '201':
+          description: Evaluation task created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvalTask'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    get:
+      tags:
+        - Evaluation
+      summary: List evaluation tasks
+      operationId: listEvalTasks
+      parameters:
+        - name: task_type
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+        - name: offset
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of evaluation tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EvalTask'
+
+  /eval/tasks/{id}:
+    get:
+      tags:
+        - Evaluation
+      summary: Get evaluation task
+      operationId: getEvalTask
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Evaluation task
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvalTask'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /eval/runs:
+    post:
+      tags:
+        - Evaluation
+      summary: Create evaluation run
+      operationId: createEvalRun
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateEvalRunRequest'
+      responses:
+        '201':
+          description: Evaluation run created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvalRun'
+
+    get:
+      tags:
+        - Evaluation
+      summary: List evaluation runs
+      operationId: listEvalRuns
+      parameters:
+        - name: dataset_version
+          in: query
+          schema:
+            type: string
+        - name: agent_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: List of evaluation runs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EvalRun'
+
+  /eval/runs/{id}:
+    get:
+      tags:
+        - Evaluation
+      summary: Get evaluation run
+      operationId: getEvalRun
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvalRun'
+
+    put:
+      tags:
+        - Evaluation
+      summary: Update evaluation run
+      operationId: updateEvalRun
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                score:
+                  type: number
+                passed_tasks:
+                  type: integer
+                failed_tasks:
+                  type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvalRun'
+
+  /eval/runs/{run_id}/execute:
+    post:
+      tags:
+        - Evaluation
+      summary: Execute evaluation run
+      operationId: executeEvalRun
+      parameters:
+        - name: run_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvalRun'
+
+  /eval/runs/{run_id}/results:
+    get:
+      tags:
+        - Evaluation
+      summary: Get evaluation run results
+      operationId: getEvalRunResults
+      parameters:
+        - name: run_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EvalTaskResult'
+
+  /sessions/{session_id}/snapshots:
+    post:
+      tags:
+        - Replay
+      summary: Create execution snapshot
+      operationId: createSnapshot
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_message:
+                  type: string
+                deterministic_mode:
+                  type: boolean
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Snapshot'
+
+    get:
+      tags:
+        - Replay
+      summary: List snapshots for session
+      operationId: listSnapshotsBySession
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Snapshot'
+
+  /agents/{agent_id}/snapshots:
+    get:
+      tags:
+        - Replay
+      summary: List snapshots for agent
+      operationId: listSnapshotsByAgent
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Snapshot'
+
+  /snapshots/{id}:
+    get:
+      tags:
+        - Replay
+      summary: Get snapshot
+      operationId: getSnapshot
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Snapshot'
+
+    delete:
+      tags:
+        - Replay
+      summary: Delete snapshot
+      operationId: deleteSnapshot
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Snapshot deleted
+
+  /snapshots/{id}/replay:
+    post:
+      tags:
+        - Replay
+      summary: Replay execution from snapshot
+      operationId: replaySnapshot
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReplayResponse'
+
+  /workflows/{workflow_id}/schedule:
+    post:
+      tags:
+        - Workflows
+      summary: Create or update workflow schedule
+      operationId: createWorkflowSchedule
+      parameters:
+        - name: workflow_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cron_expression:
+                  type: string
+                timezone:
+                  type: string
+                enabled:
+                  type: boolean
+                next_run_at:
+                  type: string
+                  format: date-time
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowSchedule'
+
+    get:
+      tags:
+        - Workflows
+      summary: Get workflow schedule
+      operationId: getWorkflowSchedule
+      parameters:
+        - name: workflow_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowSchedule'
+
+    put:
+      tags:
+        - Workflows
+      summary: Update workflow schedule
+      operationId: updateWorkflowSchedule
+      parameters:
+        - name: workflow_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowSchedule'
+
+    delete:
+      tags:
+        - Workflows
+      summary: Delete workflow schedule
+      operationId: deleteWorkflowSchedule
+      parameters:
+        - name: workflow_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Schedule deleted
+
+  /workflow-schedules:
+    get:
+      tags:
+        - Workflows
+      summary: List workflow schedules
+      operationId: listWorkflowSchedules
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/WorkflowSchedule'
+
+  /agents/{agent_id}/specialization:
+    post:
+      tags:
+        - Specializations
+      summary: Create agent specialization
+      operationId: createSpecialization
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                specialization_type:
+                  type: string
+                  enum: [planning, research, coding, execution, analysis, general]
+                capabilities:
+                  type: array
+                  items:
+                    type: string
+                config:
+                  type: object
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Specialization'
+
+    get:
+      tags:
+        - Specializations
+      summary: Get agent specialization
+      operationId: getSpecialization
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Specialization'
+
+    put:
+      tags:
+        - Specializations
+      summary: Update agent specialization
+      operationId: updateSpecialization
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Specialization'
+
+    delete:
+      tags:
+        - Specializations
+      summary: Delete agent specialization
+      operationId: deleteSpecialization
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Specialization deleted
+
+  /specializations:
+    get:
+      tags:
+        - Specializations
+      summary: List specializations
+      operationId: listSpecializations
+      parameters:
+        - name: specialization_type
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Specialization'
 
 components:
   securitySchemes:

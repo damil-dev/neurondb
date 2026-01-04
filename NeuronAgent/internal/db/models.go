@@ -197,3 +197,13 @@ type ExecutionSnapshot struct {
 	DeterministicMode bool      `db:"deterministic_mode"`
 	CreatedAt         time.Time `db:"created_at"`
 }
+
+type AgentSpecialization struct {
+	ID                 uuid.UUID  `db:"id"`
+	AgentID            uuid.UUID  `db:"agent_id"`
+	SpecializationType string     `db:"specialization_type"`
+	Capabilities       pq.StringArray `db:"capabilities"`
+	Config             JSONBMap   `db:"config"`
+	CreatedAt          time.Time  `db:"created_at"`
+	UpdatedAt          time.Time  `db:"updated_at"`
+}

@@ -17,9 +17,21 @@ import (
 	"context"
 	"fmt"
 	"sync"
-
-	"github.com/neurondb/NeuronAgent/internal/agent"
 )
+
+/* ToolCall represents a tool call (duplicated from agent to avoid import cycle) */
+type ToolCall struct {
+	ID        string
+	Name      string
+	Arguments map[string]interface{}
+}
+
+/* ToolResult represents the result of a tool call (duplicated from agent to avoid import cycle) */
+type ToolResult struct {
+	ToolCallID string
+	Content    string
+	Error      error
+}
 
 type ToolComposer struct {
 	registry *Registry
@@ -31,13 +43,13 @@ func NewToolComposer(registry *Registry) *ToolComposer {
 }
 
 /* Compose executes multiple tools in sequence */
-func (c *ToolComposer) Compose(ctx context.Context, tools []agent.ToolCall) ([]agent.ToolResult, error) {
-	results := make([]agent.ToolResult, len(tools))
+func (c *ToolComposer) Compose(ctx context.Context, tools []ToolCall) ([]ToolResult, error) {
+	results := make([]ToolResult, len(tools))
 
-	for i, call := range tools {
+		for i, call := range tools {
 		tool, err := c.registry.Get(ctx, call.Name)
 		if err != nil {
-			results[i] = agent.ToolResult{
+			results[i] = ToolResult{
 				ToolCallID: call.ID,
 				Error:      err,
 			}
@@ -46,7 +58,7 @@ func (c *ToolComposer) Compose(ctx context.Context, tools []agent.ToolCall) ([]a
 
 		result, err := c.registry.ExecuteTool(ctx, tool, call.Arguments)
 		if err != nil {
-			results[i] = agent.ToolResult{
+			results[i] = ToolResult{
 				ToolCallID: call.ID,
 				Content:    result,
 				Error:      err,
@@ -54,7 +66,7 @@ func (c *ToolComposer) Compose(ctx context.Context, tools []agent.ToolCall) ([]a
 			continue
 		}
 
-		results[i] = agent.ToolResult{
+		results[i] = ToolResult{
 			ToolCallID: call.ID,
 			Content:    result,
 			Error:      nil,
@@ -72,20 +84,20 @@ func (c *ToolComposer) Compose(ctx context.Context, tools []agent.ToolCall) ([]a
 }
 
 /* ComposeParallel executes multiple tools in parallel */
-func (c *ToolComposer) ComposeParallel(ctx context.Context, tools []agent.ToolCall) ([]agent.ToolResult, error) {
-	results := make([]agent.ToolResult, len(tools))
+func (c *ToolComposer) ComposeParallel(ctx context.Context, tools []ToolCall) ([]ToolResult, error) {
+	results := make([]ToolResult, len(tools))
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 
 	for i, call := range tools {
 		wg.Add(1)
-		go func(idx int, toolCall agent.ToolCall) {
+		go func(idx int, toolCall ToolCall) {
 			defer wg.Done()
 
 			tool, err := c.registry.Get(ctx, toolCall.Name)
 			if err != nil {
 				mu.Lock()
-				results[idx] = agent.ToolResult{
+				results[idx] = ToolResult{
 					ToolCallID: toolCall.ID,
 					Error:      err,
 				}
@@ -95,7 +107,7 @@ func (c *ToolComposer) ComposeParallel(ctx context.Context, tools []agent.ToolCa
 
 			result, err := c.registry.ExecuteTool(ctx, tool, toolCall.Arguments)
 			mu.Lock()
-			results[idx] = agent.ToolResult{
+			results[idx] = ToolResult{
 				ToolCallID: toolCall.ID,
 				Content:    result,
 				Error:      err,
@@ -109,8 +121,8 @@ func (c *ToolComposer) ComposeParallel(ctx context.Context, tools []agent.ToolCa
 }
 
 /* ComposeConditional executes tools conditionally based on previous results */
-func (c *ToolComposer) ComposeConditional(ctx context.Context, tools []ConditionalToolCall) ([]agent.ToolResult, error) {
-	var results []agent.ToolResult
+func (c *ToolComposer) ComposeConditional(ctx context.Context, tools []ConditionalToolCall) ([]ToolResult, error) {
+	var results []ToolResult
 
 	for _, call := range tools {
 		/* Check condition */
@@ -126,7 +138,7 @@ func (c *ToolComposer) ComposeConditional(ctx context.Context, tools []Condition
 
 		tool, err := c.registry.Get(ctx, call.ToolCall.Name)
 		if err != nil {
-			results = append(results, agent.ToolResult{
+			results = append(results, ToolResult{
 				ToolCallID: call.ToolCall.ID,
 				Error:      err,
 			})
@@ -134,7 +146,7 @@ func (c *ToolComposer) ComposeConditional(ctx context.Context, tools []Condition
 		}
 
 		result, err := c.registry.ExecuteTool(ctx, tool, call.ToolCall.Arguments)
-		results = append(results, agent.ToolResult{
+		results = append(results, ToolResult{
 			ToolCallID: call.ToolCall.ID,
 			Content:    result,
 			Error:      err,
@@ -145,7 +157,7 @@ func (c *ToolComposer) ComposeConditional(ctx context.Context, tools []Condition
 }
 
 /* evaluateCondition evaluates a condition based on previous results */
-func (c *ToolComposer) evaluateCondition(condition map[string]interface{}, previousResults []agent.ToolResult) (bool, error) {
+func (c *ToolComposer) evaluateCondition(condition map[string]interface{}, previousResults []ToolResult) (bool, error) {
 	/* Simple condition evaluation */
 	/* In production, this would support more complex logic */
 	if op, ok := condition["operator"].(string); ok {
@@ -177,6 +189,6 @@ func containsString(s, substr string) bool {
 }
 
 type ConditionalToolCall struct {
-	ToolCall  agent.ToolCall
+	ToolCall  ToolCall
 	Condition map[string]interface{}
 }
