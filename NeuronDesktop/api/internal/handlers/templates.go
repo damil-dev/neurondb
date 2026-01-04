@@ -28,13 +28,13 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// TemplateHandlers handles agent template endpoints
+/* TemplateHandlers handles agent template endpoints */
 type TemplateHandlers struct {
 	queries *db.Queries
 	logger  *logging.Logger
 }
 
-// NewTemplateHandlers creates new template handlers
+/* NewTemplateHandlers creates new template handlers */
 func NewTemplateHandlers(queries *db.Queries, logger *logging.Logger) *TemplateHandlers {
 	return &TemplateHandlers{
 		queries: queries,
@@ -51,7 +51,7 @@ type Template struct {
 	Workflow     map[string]interface{} `json:"workflow,omitempty"`
 }
 
-// ListTemplates lists all available agent templates
+/* ListTemplates lists all available agent templates */
 func (h *TemplateHandlers) ListTemplates(w http.ResponseWriter, r *http.Request) {
 	templates, err := h.loadTemplates()
 	if err != nil {
@@ -63,7 +63,7 @@ func (h *TemplateHandlers) ListTemplates(w http.ResponseWriter, r *http.Request)
 	WriteSuccess(w, templates, http.StatusOK)
 }
 
-// GetTemplate gets a specific template by ID
+/* GetTemplate gets a specific template by ID */
 func (h *TemplateHandlers) GetTemplate(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	templateID := vars["id"]
@@ -82,7 +82,7 @@ func (h *TemplateHandlers) GetTemplate(w http.ResponseWriter, r *http.Request) {
 	WriteSuccess(w, template, http.StatusOK)
 }
 
-// DeployTemplate creates an agent from a template
+/* DeployTemplate creates an agent from a template */
 func (h *TemplateHandlers) DeployTemplate(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	profileID := vars["profile_id"]
@@ -97,7 +97,7 @@ func (h *TemplateHandlers) DeployTemplate(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Load template
+	/* Load template */
 	template, err := h.loadTemplate(templateID)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -109,10 +109,10 @@ func (h *TemplateHandlers) DeployTemplate(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Convert template to agent creation request
+	/* Convert template to agent creation request */
 	agentConfig := h.templateToAgentConfig(template, req.Name)
 
-	// Get profile to get agent endpoint
+	/* Get profile to get agent endpoint */
 	profile, err := h.queries.GetProfile(r.Context(), profileID)
 	if err != nil {
 		h.logger.Error("Failed to get profile", err, nil)
@@ -125,7 +125,7 @@ func (h *TemplateHandlers) DeployTemplate(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Create agent via NeuronAgent API
+	/* Create agent via NeuronAgent API */
 	agentClient := agent.NewClient(profile.AgentEndpoint, profile.AgentAPIKey)
 	createdAgent, err := agentClient.CreateAgent(r.Context(), agentConfig)
 	if err != nil {
@@ -170,7 +170,7 @@ func (h *TemplateHandlers) loadTemplates() ([]Template, error) {
 func (h *TemplateHandlers) loadTemplate(templateID string) (*Template, error) {
 	templateDir := h.getTemplateDir()
 	
-	// Try different paths
+	/* Try different paths */
 	paths := []string{
 		filepath.Join(templateDir, templateID+".yaml"),
 		filepath.Join(templateDir, templateID+".yml"),
@@ -194,9 +194,9 @@ func (h *TemplateHandlers) loadTemplateFromFile(path string) (*Template, error) 
 	}
 
 	var templateData map[string]interface{}
-	// Try YAML first (templates are YAML)
+	/* Try YAML first (templates are YAML) */
 	if err := yaml.Unmarshal(data, &templateData); err != nil {
-		// Fallback to JSON
+		/* Fallback to JSON */
 		if err2 := json.Unmarshal(data, &templateData); err2 != nil {
 			return nil, fmt.Errorf("failed to parse template (YAML: %v, JSON: %v)", err, err2)
 		}
@@ -224,7 +224,7 @@ func (h *TemplateHandlers) loadTemplateFromFile(path string) (*Template, error) 
 }
 
 func (h *TemplateHandlers) getTemplateDir() string {
-	// Try multiple locations
+	/* Try multiple locations */
 	possibleDirs := []string{
 		"templates",
 		"../../NeuronAgent/cli/templates",
@@ -237,7 +237,7 @@ func (h *TemplateHandlers) getTemplateDir() string {
 		}
 	}
 
-	// Default
+	/* Default */
 	return "templates"
 }
 
@@ -246,7 +246,7 @@ func (h *TemplateHandlers) templateToAgentConfig(template *Template, name string
 		Name: name,
 	}
 
-	// Copy relevant fields from template configuration
+	/* Copy relevant fields from template configuration */
 	tmplConfig := template.Configuration
 
 	if desc, ok := tmplConfig["description"].(string); ok {

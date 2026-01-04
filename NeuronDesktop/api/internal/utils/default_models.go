@@ -10,7 +10,7 @@ import (
 	"github.com/neurondb/NeuronDesktop/api/internal/db"
 )
 
-// DefaultModelConfig represents a default model configuration template
+/* DefaultModelConfig represents a default model configuration template */
 type DefaultModelConfig struct {
 	ModelProvider string
 	ModelName     string
@@ -19,15 +19,14 @@ type DefaultModelConfig struct {
 	RequiresKey   bool
 }
 
-// GetDefaultModels returns a list of default model configurations to create for new profiles
+/* GetDefaultModels returns a list of default model configurations to create for new profiles */
 func GetDefaultModels() []DefaultModelConfig {
 	return []DefaultModelConfig{
-		// OpenAI Models
 		{
 			ModelProvider: "openai",
 			ModelName:     "gpt-4o",
 			IsFree:        false,
-			IsDefault:     true, // First one is default
+			IsDefault:     true,
 			RequiresKey:   true,
 		},
 		{
@@ -51,7 +50,6 @@ func GetDefaultModels() []DefaultModelConfig {
 			IsDefault:     false,
 			RequiresKey:   true,
 		},
-		// Anthropic Models
 		{
 			ModelProvider: "anthropic",
 			ModelName:     "claude-3-5-sonnet-20241022",
@@ -80,7 +78,6 @@ func GetDefaultModels() []DefaultModelConfig {
 			IsDefault:     false,
 			RequiresKey:   true,
 		},
-		// Google Models
 		{
 			ModelProvider: "google",
 			ModelName:     "gemini-1.5-pro",
@@ -95,7 +92,6 @@ func GetDefaultModels() []DefaultModelConfig {
 			IsDefault:     false,
 			RequiresKey:   true,
 		},
-		// Ollama (Free) - Optional local model
 		{
 			ModelProvider: "ollama",
 			ModelName:     "llama2",
@@ -106,7 +102,7 @@ func GetDefaultModels() []DefaultModelConfig {
 	}
 }
 
-// CreateDefaultModelsForProfile creates default model configurations for a new profile
+/* CreateDefaultModelsForProfile creates default model configurations for a new profile */
 func CreateDefaultModelsForProfile(ctx context.Context, queries *db.Queries, profileID string) error {
 	defaultModels := GetDefaultModels()
 
@@ -118,8 +114,8 @@ func CreateDefaultModelsForProfile(ctx context.Context, queries *db.Queries, pro
 			ProfileID:     profileID,
 			ModelProvider: modelTemplate.ModelProvider,
 			ModelName:     modelTemplate.ModelName,
-			APIKey:        "", // User will set this in settings
-			BaseURL:       "", // Use default URLs
+			APIKey:        "",
+			BaseURL:       "",
 			IsDefault:     modelTemplate.IsDefault,
 			IsFree:        modelTemplate.IsFree,
 			Metadata:      make(map[string]interface{}),
@@ -127,7 +123,6 @@ func CreateDefaultModelsForProfile(ctx context.Context, queries *db.Queries, pro
 			UpdatedAt:     time.Now(),
 		}
 
-		// Set default base URL for Ollama
 		if modelTemplate.ModelProvider == "ollama" {
 			modelConfig.BaseURL = "http://localhost:11434"
 		}
@@ -141,10 +136,8 @@ func CreateDefaultModelsForProfile(ctx context.Context, queries *db.Queries, pro
 		}
 	}
 
-	// Set the first model (gpt-4o) as default if we created models
 	if defaultModelID != "" {
 		if err := queries.SetDefaultModelConfig(ctx, profileID, defaultModelID); err != nil {
-			// Log error but don't fail - models are created
 			fmt.Fprintf(os.Stderr, "Warning: Failed to set default model configuration for profile %s (models created successfully): %v\n", profileID, err)
 		}
 	}

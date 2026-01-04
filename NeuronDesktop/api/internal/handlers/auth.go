@@ -12,39 +12,39 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// AuthHandlers handles authentication requests
+/* AuthHandlers handles authentication requests */
 type AuthHandlers struct {
 	queries *db.Queries
 }
 
-// NewAuthHandlers creates a new auth handlers instance
+/* NewAuthHandlers creates a new auth handlers instance */
 func NewAuthHandlers(queries *db.Queries) *AuthHandlers {
 	return &AuthHandlers{queries: queries}
 }
 
-// RegisterRequest is the request to register a new user
+/* RegisterRequest is the request to register a new user */
 type RegisterRequest struct {
 	Username    string `json:"username"`
 	Password    string `json:"password"`
-	NeuronDBDSN string `json:"neurondb_dsn,omitempty"` // Optional: if not provided, uses default from env
+	NeuronDBDSN string `json:"neurondb_dsn,omitempty"`
 }
 
-// LoginRequest is the request to login
+/* LoginRequest is the request to login */
 type LoginRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 }
 
-// AuthResponse is the response for auth operations
+/* AuthResponse is the response for auth operations */
 type AuthResponse struct {
 	Token     string  `json:"token"`
 	UserID    string  `json:"user_id"`
 	Username  string  `json:"username"`
 	IsAdmin   bool    `json:"is_admin"`
-	ProfileID *string `json:"profile_id,omitempty"` // Profile ID if login matched a profile
+	ProfileID *string `json:"profile_id,omitempty"`
 }
 
-// Register registers a new user
+/* Register registers a new user */
 func (h *AuthHandlers) Register(w http.ResponseWriter, r *http.Request) {
 	var req RegisterRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -52,7 +52,6 @@ func (h *AuthHandlers) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate input
 	if req.Username == "" || req.Password == "" {
 		WriteError(w, r, http.StatusBadRequest, fmt.Errorf("username and password are required"), nil)
 		return
@@ -63,21 +62,18 @@ func (h *AuthHandlers) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if user already exists
 	_, err := h.queries.GetUserByUsername(r.Context(), req.Username)
 	if err == nil {
 		WriteError(w, r, http.StatusConflict, fmt.Errorf("username already exists"), nil)
 		return
 	}
 
-	// Hash password
 	passwordHash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		WriteError(w, r, http.StatusInternalServerError, fmt.Errorf("failed to hash password"), nil)
 		return
 	}
 
-	// Create user
 	user := &db.User{
 		Username:     req.Username,
 		PasswordHash: string(passwordHash),
@@ -88,26 +84,22 @@ func (h *AuthHandlers) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Automatically create a profile for the new user
-	// Use the same password for profile credentials
 	profilePasswordHash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		WriteError(w, r, http.StatusInternalServerError, fmt.Errorf("Failed to hash profile password"), nil)
 		return
 	}
 
-	// Get database configuration - use provided DSN or default
 	neurondbDSN := req.NeuronDBDSN
 	if neurondbDSN == "" {
 		neurondbDSN = utils.GetDefaultNeuronDBDSN()
 	}
 	mcpConfig := utils.GetDefaultMCPConfig()
 
-	// Create user profile with same username/password
 	userProfile := &db.Profile{
 		UserID:          user.ID,
-		Name:            req.Username, // Use username as profile name
-		ProfileUsername: req.Username, // Profile login uses same username
+		Name:            req.Username,
+		ProfileUsername: req.Username,
 		ProfilePassword: string(profilePasswordHash),
 		NeuronDBDSN:     neurondbDSN,
 		MCPConfig:       mcpConfig,
@@ -115,23 +107,19 @@ func (h *AuthHandlers) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.queries.CreateProfile(r.Context(), userProfile); err != nil {
-		// Log error but don't fail registration - user can still log in
 		fmt.Fprintf(os.Stderr, "Warning: Failed to create default profile for user '%s' during registration (user can still log in): %v\n", user.Username, err)
 	} else {
-		// Create default model configurations for this profile
 		if err := utils.CreateDefaultModelsForProfile(r.Context(), h.queries, userProfile.ID); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: Failed to create default model configurations for profile %s (models can be added manually): %v\n", userProfile.ID, err)
 		}
 	}
 
-	// Generate token
 	token, err := auth.GenerateToken(user.ID, user.Username, user.IsAdmin)
 	if err != nil {
 		WriteError(w, r, http.StatusInternalServerError, fmt.Errorf("Failed to generate token"), nil)
 		return
 	}
 
-	// Return response with profile ID if created
 	response := AuthResponse{
 		Token:    token,
 		UserID:   user.ID,
@@ -146,7 +134,7 @@ func (h *AuthHandlers) Register(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-// Login logs in a user
+/* Login logs in a user */
 func (h *AuthHandlers) Login(w http.ResponseWriter, r *http.Request) {
 	var req LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -154,20 +142,15 @@ func (h *AuthHandlers) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate input
 	if req.Username == "" || req.Password == "" {
 		WriteError(w, r, http.StatusBadRequest, fmt.Errorf("Username and password are required"), nil)
 		return
 	}
 
-	// First, try to find a profile with matching credentials
 	profile, profileErr := h.queries.GetProfileByUsernameAndPassword(r.Context(), req.Username, req.Password)
 	if profileErr == nil && profile != nil {
-		// Profile credentials matched - use the profile's user_id
 		user, err := h.queries.GetUserByID(r.Context(), profile.UserID)
 		if err != nil {
-			// If profile user doesn't exist, create a token for the profile's user_id
-			// This allows profile-based login even if user account doesn't exist
 			token, err := auth.GenerateToken(profile.UserID, req.Username, false)
 			if err != nil {
 				WriteError(w, r, http.StatusInternalServerError, fmt.Errorf("Failed to generate token"), nil)
@@ -185,7 +168,6 @@ func (h *AuthHandlers) Login(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Generate token for the user
 		token, err := auth.GenerateToken(user.ID, user.Username, user.IsAdmin)
 		if err != nil {
 			WriteError(w, r, http.StatusInternalServerError, fmt.Errorf("Failed to generate token"), nil)
@@ -204,28 +186,24 @@ func (h *AuthHandlers) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// If no profile match, try regular user login
 	user, err := h.queries.GetUserByUsername(r.Context(), req.Username)
 	if err != nil {
 		WriteError(w, r, http.StatusUnauthorized, fmt.Errorf("Invalid username or password"), nil)
 		return
 	}
 
-	// Verify password
 	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password))
 	if err != nil {
 		WriteError(w, r, http.StatusUnauthorized, fmt.Errorf("Invalid username or password"), nil)
 		return
 	}
 
-	// Generate token
 	token, err := auth.GenerateToken(user.ID, user.Username, user.IsAdmin)
 	if err != nil {
 		WriteError(w, r, http.StatusInternalServerError, fmt.Errorf("Failed to generate token"), nil)
 		return
 	}
 
-	// Return response
 	response := AuthResponse{
 		Token:    token,
 		UserID:   user.ID,
@@ -233,7 +211,6 @@ func (h *AuthHandlers) Login(w http.ResponseWriter, r *http.Request) {
 		IsAdmin:  user.IsAdmin,
 	}
 
-	// Always include profile_id so the UI can land on the correct profile without selection
 	if p, err := h.queries.GetDefaultProfileForUser(r.Context(), user.ID); err == nil && p != nil {
 		response.ProfileID = &p.ID
 	}
@@ -242,7 +219,7 @@ func (h *AuthHandlers) Login(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-// GetCurrentUser returns the current authenticated user
+/* GetCurrentUser returns the current authenticated user */
 func (h *AuthHandlers) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
 	userID, ok := auth.GetUserIDFromContext(r.Context())
 	if !ok {

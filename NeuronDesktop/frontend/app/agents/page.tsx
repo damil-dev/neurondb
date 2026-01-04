@@ -10,8 +10,11 @@ import {
   PencilIcon,
   ChatBubbleLeftRightIcon,
   CpuChipIcon,
-  SparklesIcon
+  SparklesIcon,
+  ArrowDownTrayIcon,
+  ArrowUpTrayIcon
 } from '@/components/Icons'
+import { showSuccessToast, showErrorToast } from '@/lib/errors'
 import AgentPlayground from '@/components/AgentPlayground'
 
 export default function AgentsPage() {
@@ -62,8 +65,8 @@ export default function AgentsPage() {
         const defaultProfile = response.data.find((p: Profile) => p.is_default)
         setSelectedProfile(defaultProfile ? defaultProfile.id : response.data[0].id)
       }
-    } catch (error) {
-      console.error('Failed to load profiles:', error)
+    } catch (error: any) {
+      showErrorToast('Failed to load profiles: ' + (error.response?.data?.error || error.message))
     }
   }
 
@@ -73,8 +76,8 @@ export default function AgentsPage() {
     try {
       const response = await agentAPI.listAgents(selectedProfile)
       setAgents(response.data)
-    } catch (error) {
-      console.error('Failed to load agents:', error)
+    } catch (error: any) {
+      showErrorToast('Failed to load agents: ' + (error.response?.data?.error || error.message))
     } finally {
       setLoading(false)
     }
@@ -85,14 +88,13 @@ export default function AgentsPage() {
     try {
       const response = await agentAPI.listModels(selectedProfile)
       setModels(response.data.models)
-    } catch (error) {
-      console.error('Failed to load models:', error)
+    } catch (error: any) {
+      showErrorToast('Failed to load models: ' + (error.response?.data?.error || error.message))
     }
   }
 
   const handleCreateAgent = async () => {
     if (!selectedProfile) {
-      console.warn('Cannot create agent: no profile selected')
       return
     }
     
@@ -106,23 +108,23 @@ export default function AgentsPage() {
         '3. Configure the Agent Endpoint (e.g., http://localhost:8080)\n' +
         '4. Save the configuration\n\n' +
         'Then try creating the agent again.'
-      alert(message)
+      showErrorToast(message)
       return
     }
     
     if (!formData.name.trim()) {
-      alert('Agent name is required')
+      showErrorToast('Agent name is required')
       return
     }
     
     if (selectedModelType === 'custom' && !customModelName.trim()) {
-      alert('Custom model name is required')
+      showErrorToast('Custom model name is required')
       return
     }
     
     const finalModelName = selectedModelType === 'custom' ? customModelName.trim() : formData.model_name
     if (!finalModelName) {
-      alert('Model name is required')
+      showErrorToast('Model name is required')
       return
     }
     
@@ -132,35 +134,20 @@ export default function AgentsPage() {
         ...formData,
         model_name: finalModelName,
       }
-      console.log('Creating agent:', { profileId: selectedProfile, request })
       const response = await agentAPI.createAgent(selectedProfile, request)
-      console.log('Agent created successfully:', response.data)
       setShowCreateModal(false)
       resetForm()
       loadAgents()
     } catch (error: any) {
-      console.error('Failed to create agent:', error)
-      console.error('Error details:', {
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data,
-        message: error.message,
-      })
       let errorMessage = error.response?.data?.message || error.response?.data?.error || error.message || 'Failed to create agent'
       
       // Provide more helpful error message for endpoint configuration issues
       if (errorMessage.toLowerCase().includes('agent endpoint not configured') || 
           errorMessage.toLowerCase().includes('endpoint not configured')) {
-        errorMessage = 'Agent endpoint is not configured for this profile.\n\n' +
-          'Please configure the Agent Endpoint in Settings:\n' +
-          '1. Go to Settings page\n' +
-          '2. Select this profile\n' +
-          '3. Configure the Agent Endpoint (e.g., http://localhost:8080)\n' +
-          '4. Save the configuration\n\n' +
-          'Then try creating the agent again.'
+        errorMessage = 'Agent endpoint is not configured for this profile. Please configure it in Settings.'
       }
       
-      alert('Failed to create agent: ' + errorMessage)
+      showErrorToast('Failed to create agent: ' + errorMessage)
     } finally {
       setLoading(false)
     }
@@ -172,14 +159,52 @@ export default function AgentsPage() {
     
     setLoading(true)
     try {
-      // Note: Delete endpoint needs to be added to backend
-      // For now, we'll show an error
-      alert('Delete agent functionality requires backend endpoint. Please use the NeuronAgent API directly.')
-      // await agentAPI.deleteAgent(selectedProfile, agentId)
-      // loadAgents()
+      await agentAPI.deleteAgent(selectedProfile, agentId)
+      showSuccessToast('Agent deleted successfully')
+      loadAgents()
     } catch (error: any) {
-      console.error('Failed to delete agent:', error)
-      alert('Failed to delete agent: ' + (error.response?.data?.error || error.message))
+      showErrorToast('Failed to delete agent: ' + (error.response?.data?.error || error.response?.data?.message || error.message))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleUpdateAgent = async () => {
+    if (!selectedProfile || !editingAgent) {
+      showErrorToast('Cannot update agent: no profile selected or no agent being edited')
+      return
+    }
+    
+    if (!formData.name.trim()) {
+      showErrorToast('Agent name is required')
+      return
+    }
+    
+    if (selectedModelType === 'custom' && !customModelName.trim()) {
+      showErrorToast('Custom model name is required')
+      return
+    }
+    
+    const finalModelName = selectedModelType === 'custom' ? customModelName.trim() : formData.model_name
+    if (!finalModelName) {
+      showErrorToast('Model name is required')
+      return
+    }
+    
+    setLoading(true)
+    try {
+      const request: CreateAgentRequest = {
+        ...formData,
+        model_name: finalModelName,
+      }
+      const response = await agentAPI.updateAgent(selectedProfile, editingAgent.id, request)
+      showSuccessToast('Agent updated successfully')
+      setShowCreateModal(false)
+      resetForm()
+      loadAgents()
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || error.message || 'Failed to update agent'
+      showErrorToast('Failed to update agent: ' + errorMessage)
     } finally {
       setLoading(false)
     }
@@ -286,8 +311,8 @@ export default function AgentsPage() {
           </div>
         </div>
       ) : loading ? (
-        <div className="card text-center py-12">
-          <p className="text-gray-700 dark:text-slate-400">Loading agents...</p>
+        <div className="space-y-4">
+          <SkeletonList count={3} />
         </div>
       ) : agents.length === 0 ? (
         <div className="card text-center py-12">
@@ -316,6 +341,21 @@ export default function AgentsPage() {
                   )}
                 </div>
                 <div className="flex gap-2">
+                  <button
+                    onClick={async () => {
+                      if (!selectedProfile) return
+                      try {
+                        await agentAPI.exportAgent(selectedProfile, agent.id)
+                        showSuccessToast(`Agent "${agent.name}" exported successfully`)
+                      } catch (error: any) {
+                        showErrorToast('Failed to export agent: ' + (error.response?.data?.error || error.message))
+                      }
+                    }}
+                    className="p-2 text-gray-600 dark:text-slate-400 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded"
+                    title="Export Agent"
+                  >
+                    <ArrowDownTrayIcon className="w-4 h-4" />
+                  </button>
                   <button
                     onClick={() => {
                       setPlaygroundAgentId(agent.id)
@@ -504,11 +544,11 @@ export default function AgentsPage() {
                 Cancel
               </button>
               <button
-                onClick={handleCreateAgent}
+                onClick={editingAgent ? handleUpdateAgent : handleCreateAgent}
                 disabled={loading || !formData.name || (selectedModelType === 'custom' && !customModelName)}
                 className="btn btn-primary"
               >
-                {loading ? 'Creating...' : editingAgent ? 'Update' : 'Create'}
+                {loading ? (editingAgent ? 'Updating...' : 'Creating...') : editingAgent ? 'Update' : 'Create'}
               </button>
             </div>
           </div>

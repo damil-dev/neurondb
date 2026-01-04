@@ -1,13 +1,18 @@
 package config
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
+
+	"gopkg.in/yaml.v3"
 )
 
-// Config holds application configuration
+/* Config holds application configuration */
 type Config struct {
 	Database DatabaseConfig
 	Server   ServerConfig
@@ -18,7 +23,7 @@ type Config struct {
 	Security SecurityConfig
 }
 
-// DatabaseConfig holds database configuration
+/* DatabaseConfig holds database configuration */
 type DatabaseConfig struct {
 	Host            string
 	Port            string
@@ -30,7 +35,7 @@ type DatabaseConfig struct {
 	ConnMaxLifetime time.Duration
 }
 
-// ServerConfig holds server configuration
+/* ServerConfig holds server configuration */
 type ServerConfig struct {
 	Host         string
 	Port         string
@@ -38,21 +43,21 @@ type ServerConfig struct {
 	WriteTimeout time.Duration
 }
 
-// LoggingConfig holds logging configuration
+/* LoggingConfig holds logging configuration */
 type LoggingConfig struct {
 	Level  string
 	Format string
 	Output string
 }
 
-// CORSConfig holds CORS configuration
+/* CORSConfig holds CORS configuration */
 type CORSConfig struct {
 	AllowedOrigins []string
 	AllowedMethods []string
 	AllowedHeaders []string
 }
 
-// AuthConfig holds authentication configuration
+/* AuthConfig holds authentication configuration */
 type AuthConfig struct {
 	Mode            string // "oidc", "jwt", "hybrid"
 	OIDC            OIDCConfig
@@ -60,7 +65,7 @@ type AuthConfig struct {
 	EnableLocalAuth bool
 }
 
-// OIDCConfig holds OIDC configuration
+/* OIDCConfig holds OIDC configuration */
 type OIDCConfig struct {
 	IssuerURL    string
 	ClientID     string
@@ -69,7 +74,7 @@ type OIDCConfig struct {
 	Scopes       []string
 }
 
-// SessionConfig holds session configuration
+/* SessionConfig holds session configuration */
 type SessionConfig struct {
 	CookieDomain   string
 	CookieSecure   bool
@@ -78,14 +83,32 @@ type SessionConfig struct {
 	RefreshTTL     time.Duration
 }
 
-// SecurityConfig holds security-related configuration
+/* SecurityConfig holds security-related configuration */
 type SecurityConfig struct {
-	EnableSQLConsole bool // Enable arbitrary SQL execution endpoint (default: false)
+	EnableSQLConsole      bool   // Enable arbitrary SQL execution endpoint (default: false)
+	LogRetentionDays      int    // Number of days to retain request logs (default: 30)
+	MaxRequestSize        int64  // Maximum request body size in bytes (default: 10MB)
+	EnablePIISanitization bool   // Enable PII sanitization in logs (default: true)
 }
 
-// Load loads configuration from environment variables
+/* Load loads configuration from environment variables and optionally from a config file */
 func Load() *Config {
-	return &Config{
+	return LoadFromFile("")
+}
+
+/* LoadFromFile loads configuration from a file (if provided) and environment variables (which override file values) */
+func LoadFromFile(configPath string) *Config {
+	var fileCfg *Config
+
+	/* Load from file if provided */
+	if configPath != "" {
+		if fc, err := loadFromFile(configPath); err == nil {
+			fileCfg = fc
+		}
+	}
+
+	/* Load from environment variables */
+	envCfg := &Config{
 		Database: DatabaseConfig{
 			Host:            getEnv("DB_HOST", "localhost"),
 			Port:            getEnv("DB_PORT", "5432"),
@@ -132,9 +155,19 @@ func Load() *Config {
 			RefreshTTL:     getEnvDuration("SESSION_REFRESH_TTL", 30*24*time.Hour),
 		},
 		Security: SecurityConfig{
-			EnableSQLConsole: getEnv("ENABLE_SQL_CONSOLE", "false") == "true",
+			EnableSQLConsole:      getEnv("ENABLE_SQL_CONSOLE", "false") == "true",
+			LogRetentionDays:      getEnvInt("LOG_RETENTION_DAYS", 30),
+			MaxRequestSize:        int64(getEnvInt("MAX_REQUEST_SIZE_MB", 10)) * 1024 * 1024,
+			EnablePIISanitization: getEnv("ENABLE_PII_SANITIZATION", "true") == "true",
 		},
 	}
+
+	/* Merge file config with env config (env takes precedence) */
+	if fileCfg != nil {
+		return mergeConfig(fileCfg, envCfg)
+	}
+
+	return envCfg
 }
 
 func getEnv(key, defaultValue string) string {
@@ -164,7 +197,6 @@ func getEnvDuration(key string, defaultValue time.Duration) time.Duration {
 
 func getEnvSlice(key string, defaultValue []string) []string {
 	if value := os.Getenv(key); value != "" {
-		// Simple comma-separated parsing
 		parts := []string{}
 		for _, part := range splitString(value, ",") {
 			parts = append(parts, trimSpace(part))
@@ -207,7 +239,149 @@ func trimSpace(s string) string {
 	return s[start:end]
 }
 
-// DSN returns the database connection string
+/* loadFromFile loads configuration from a YAML or JSON file */
+func loadFromFile(configPath string) (*Config, error) {
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read config file: %w", err)
+	}
+
+	cfg := &Config{}
+
+	/* Try YAML first, then JSON */
+	ext := strings.ToLower(filepath.Ext(configPath))
+	if ext == ".yaml" || ext == ".yml" {
+		if err := yaml.Unmarshal(data, cfg); err != nil {
+			return nil, fmt.Errorf("failed to parse YAML config: %w", err)
+		}
+	} else if ext == ".json" {
+		if err := json.Unmarshal(data, cfg); err != nil {
+			return nil, fmt.Errorf("failed to parse JSON config: %w", err)
+		}
+	} else {
+		/* Try both formats */
+		if err := yaml.Unmarshal(data, cfg); err != nil {
+			if err2 := json.Unmarshal(data, cfg); err2 != nil {
+				return nil, fmt.Errorf("failed to parse config (tried YAML and JSON): %w, %w", err, err2)
+			}
+		}
+	}
+
+	return cfg, nil
+}
+
+/* mergeConfig merges file config with environment variables (env takes precedence) */
+func mergeConfig(fileCfg, envCfg *Config) *Config {
+	merged := *fileCfg
+
+	/* Database */
+	if envCfg.Database.Host != "" {
+		merged.Database.Host = envCfg.Database.Host
+	}
+	if envCfg.Database.Port != "" {
+		merged.Database.Port = envCfg.Database.Port
+	}
+	if envCfg.Database.User != "" {
+		merged.Database.User = envCfg.Database.User
+	}
+	if envCfg.Database.Password != "" {
+		merged.Database.Password = envCfg.Database.Password
+	}
+	if envCfg.Database.Name != "" {
+		merged.Database.Name = envCfg.Database.Name
+	}
+	if envCfg.Database.MaxOpenConns > 0 {
+		merged.Database.MaxOpenConns = envCfg.Database.MaxOpenConns
+	}
+	if envCfg.Database.MaxIdleConns > 0 {
+		merged.Database.MaxIdleConns = envCfg.Database.MaxIdleConns
+	}
+	if envCfg.Database.ConnMaxLifetime > 0 {
+		merged.Database.ConnMaxLifetime = envCfg.Database.ConnMaxLifetime
+	}
+
+	/* Server */
+	if envCfg.Server.Host != "" {
+		merged.Server.Host = envCfg.Server.Host
+	}
+	if envCfg.Server.Port != "" {
+		merged.Server.Port = envCfg.Server.Port
+	}
+	if envCfg.Server.ReadTimeout > 0 {
+		merged.Server.ReadTimeout = envCfg.Server.ReadTimeout
+	}
+	if envCfg.Server.WriteTimeout > 0 {
+		merged.Server.WriteTimeout = envCfg.Server.WriteTimeout
+	}
+
+	/* Logging */
+	if envCfg.Logging.Level != "" {
+		merged.Logging.Level = envCfg.Logging.Level
+	}
+	if envCfg.Logging.Format != "" {
+		merged.Logging.Format = envCfg.Logging.Format
+	}
+	if envCfg.Logging.Output != "" {
+		merged.Logging.Output = envCfg.Logging.Output
+	}
+
+	/* CORS */
+	if len(envCfg.CORS.AllowedOrigins) > 0 {
+		merged.CORS.AllowedOrigins = envCfg.CORS.AllowedOrigins
+	}
+	if len(envCfg.CORS.AllowedMethods) > 0 {
+		merged.CORS.AllowedMethods = envCfg.CORS.AllowedMethods
+	}
+	if len(envCfg.CORS.AllowedHeaders) > 0 {
+		merged.CORS.AllowedHeaders = envCfg.CORS.AllowedHeaders
+	}
+
+	/* Auth */
+	if envCfg.Auth.Mode != "" {
+		merged.Auth.Mode = envCfg.Auth.Mode
+	}
+	if envCfg.Auth.JWTSecret != "" {
+		merged.Auth.JWTSecret = envCfg.Auth.JWTSecret
+	}
+	merged.Auth.EnableLocalAuth = envCfg.Auth.EnableLocalAuth
+	if envCfg.Auth.OIDC.IssuerURL != "" {
+		merged.Auth.OIDC.IssuerURL = envCfg.Auth.OIDC.IssuerURL
+	}
+	if envCfg.Auth.OIDC.ClientID != "" {
+		merged.Auth.OIDC.ClientID = envCfg.Auth.OIDC.ClientID
+	}
+	if envCfg.Auth.OIDC.ClientSecret != "" {
+		merged.Auth.OIDC.ClientSecret = envCfg.Auth.OIDC.ClientSecret
+	}
+	if envCfg.Auth.OIDC.RedirectURL != "" {
+		merged.Auth.OIDC.RedirectURL = envCfg.Auth.OIDC.RedirectURL
+	}
+	if len(envCfg.Auth.OIDC.Scopes) > 0 {
+		merged.Auth.OIDC.Scopes = envCfg.Auth.OIDC.Scopes
+	}
+
+	/* Session */
+	if envCfg.Session.CookieDomain != "" {
+		merged.Session.CookieDomain = envCfg.Session.CookieDomain
+	}
+	merged.Session.CookieSecure = envCfg.Session.CookieSecure
+	if envCfg.Session.CookieSameSite != "" {
+		merged.Session.CookieSameSite = envCfg.Session.CookieSameSite
+	}
+	if envCfg.Session.AccessTTL > 0 {
+		merged.Session.AccessTTL = envCfg.Session.AccessTTL
+	}
+	if envCfg.Session.RefreshTTL > 0 {
+		merged.Session.RefreshTTL = envCfg.Session.RefreshTTL
+	}
+
+	/* Security */
+	merged.Security.EnableSQLConsole = envCfg.Security.EnableSQLConsole
+
+	return &merged
+}
+
+/* DSN returns the database connection string */
 func (c *DatabaseConfig) DSN() string {
 	return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
 		c.Host, c.Port, c.User, c.Password, c.Name)

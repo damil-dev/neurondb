@@ -32,7 +32,7 @@ func main() {
 		fmt.Sscanf(os.Args[3], "%d", &rateLimit)
 	}
 
-	// Connect to database
+	/* Connect to database */
 	db, err := sql.Open("pgx", dsn)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to connect to database: %v\n", err)
@@ -40,7 +40,6 @@ func main() {
 	}
 	defer db.Close()
 
-	// Test connection
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := db.PingContext(ctx); err != nil {
@@ -48,7 +47,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Generate API key
+	/* Generate API key */
 	keyBytes := make([]byte, 32)
 	if _, err := rand.Read(keyBytes); err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to generate key: %v\n", err)
@@ -58,7 +57,7 @@ func main() {
 	key := base64.URLEncoding.EncodeToString(keyBytes)
 	keyPrefix := key[:8]
 	
-	// Hash the key
+	/* Hash the key */
 	keyHash, err := bcrypt.GenerateFromPassword([]byte(key), bcrypt.DefaultCost)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to hash key: %v\n", err)
@@ -67,7 +66,7 @@ func main() {
 
 	keyID := uuid.New().String()
 
-	// Insert into database
+	/* Insert into database */
 	query := `
 		INSERT INTO api_keys (id, key_hash, key_prefix, user_id, rate_limit, created_at)
 		VALUES ($1, $2, $3, $4, $5, NOW())
@@ -82,7 +81,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Output the key
+	/* Output the key */
 	fmt.Println("=" + strings.Repeat("=", 70))
 	fmt.Println("API Key Generated Successfully!")
 	fmt.Println("=" + strings.Repeat("=", 70))

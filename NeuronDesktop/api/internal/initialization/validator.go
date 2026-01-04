@@ -11,26 +11,26 @@ import (
 	"github.com/neurondb/NeuronDesktop/api/internal/logging"
 )
 
-// Validator validates configuration and data
+/* Validator validates configuration and data */
 type Validator struct {
 	logger *logging.Logger
 }
 
-// NewValidator creates a new validator instance
+/* NewValidator creates a new validator instance */
 func NewValidator(logger *logging.Logger) *Validator {
 	return &Validator{
 		logger: logger,
 	}
 }
 
-// ValidationResult represents the result of validation
+/* ValidationResult represents the result of validation */
 type ValidationResult struct {
 	Valid    bool
 	Errors   []string
 	Warnings []string
 }
 
-// ValidateAdminUser validates admin user configuration
+/* ValidateAdminUser validates admin user configuration */
 func (v *Validator) ValidateAdminUser(ctx context.Context, queries *db.Queries) ValidationResult {
 	result := ValidationResult{
 		Valid:    true,
@@ -45,12 +45,10 @@ func (v *Validator) ValidateAdminUser(ctx context.Context, queries *db.Queries) 
 		return result
 	}
 
-	// Validate username
 	if adminUser.Username != "admin" {
 		result.Warnings = append(result.Warnings, fmt.Sprintf("Admin user has unexpected username: %s", adminUser.Username))
 	}
 
-	// Validate password hash exists
 	if adminUser.PasswordHash == "" {
 		result.Errors = append(result.Errors, "Admin user password hash is empty")
 		result.Valid = false
@@ -59,7 +57,7 @@ func (v *Validator) ValidateAdminUser(ctx context.Context, queries *db.Queries) 
 	return result
 }
 
-// ValidateProfile validates profile configuration
+/* ValidateProfile validates profile configuration */
 func (v *Validator) ValidateProfile(ctx context.Context, queries *db.Queries) ValidationResult {
 	result := ValidationResult{
 		Valid:    true,
@@ -74,13 +72,11 @@ func (v *Validator) ValidateProfile(ctx context.Context, queries *db.Queries) Va
 		return result
 	}
 
-	// Validate profile name
 	if profile.Name == "" {
 		result.Errors = append(result.Errors, "Profile name is empty")
 		result.Valid = false
 	}
 
-	// Validate DSN
 	dsnResult := v.ValidateDSN(profile.NeuronDBDSN)
 	if !dsnResult.Valid {
 		result.Errors = append(result.Errors, dsnResult.Errors...)
@@ -88,7 +84,6 @@ func (v *Validator) ValidateProfile(ctx context.Context, queries *db.Queries) Va
 	}
 	result.Warnings = append(result.Warnings, dsnResult.Warnings...)
 
-	// Validate user ID
 	if profile.UserID == "" {
 		result.Warnings = append(result.Warnings, "Profile user ID is empty")
 	}
@@ -96,7 +91,7 @@ func (v *Validator) ValidateProfile(ctx context.Context, queries *db.Queries) Va
 	return result
 }
 
-// ValidateDSN validates a PostgreSQL DSN
+/* ValidateDSN validates a PostgreSQL DSN */
 func (v *Validator) ValidateDSN(dsn string) ValidationResult {
 	result := ValidationResult{
 		Valid:    true,
@@ -110,7 +105,7 @@ func (v *Validator) ValidateDSN(dsn string) ValidationResult {
 		return result
 	}
 
-	// Try to parse as URL
+	/* Try to parse as URL */
 	parsed, err := url.Parse(dsn)
 	if err != nil {
 		result.Errors = append(result.Errors, fmt.Sprintf("Invalid DSN format: %v", err))
@@ -118,25 +113,25 @@ func (v *Validator) ValidateDSN(dsn string) ValidationResult {
 		return result
 	}
 
-	// Validate scheme
+	/* Validate scheme */
 	if parsed.Scheme != "postgres" && parsed.Scheme != "postgresql" {
 		result.Errors = append(result.Errors, fmt.Sprintf("Invalid DSN scheme: %s (expected postgres or postgresql)", parsed.Scheme))
 		result.Valid = false
 	}
 
-	// Validate host
+	/* Validate host */
 	if parsed.Hostname() == "" {
 		result.Errors = append(result.Errors, "DSN host is empty")
 		result.Valid = false
 	}
 
-	// Validate database name
+	/* Validate database name */
 	dbName := strings.TrimPrefix(parsed.Path, "/")
 	if dbName == "" {
 		result.Warnings = append(result.Warnings, "DSN database name is empty")
 	}
 
-	// Validate port (if specified)
+	/* Validate port (if specified) */
 	if parsed.Port() != "" {
 		if !isValidPort(parsed.Port()) {
 			result.Errors = append(result.Errors, fmt.Sprintf("Invalid port: %s", parsed.Port()))
@@ -147,7 +142,7 @@ func (v *Validator) ValidateDSN(dsn string) ValidationResult {
 	return result
 }
 
-// ValidateUsername validates a username
+/* ValidateUsername validates a username */
 func (v *Validator) ValidateUsername(username string) ValidationResult {
 	result := ValidationResult{
 		Valid:    true,
@@ -161,7 +156,7 @@ func (v *Validator) ValidateUsername(username string) ValidationResult {
 		return result
 	}
 
-	// Username should be 3-50 characters
+	/* Username should be 3-50 characters */
 	if len(username) < 3 {
 		result.Errors = append(result.Errors, "Username must be at least 3 characters")
 		result.Valid = false
@@ -172,7 +167,7 @@ func (v *Validator) ValidateUsername(username string) ValidationResult {
 		result.Valid = false
 	}
 
-	// Username should only contain alphanumeric and underscore
+	/* Username should only contain alphanumeric and underscore */
 	usernameRegex := regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
 	if !usernameRegex.MatchString(username) {
 		result.Errors = append(result.Errors, "Username can only contain letters, numbers, and underscores")
@@ -182,19 +177,19 @@ func (v *Validator) ValidateUsername(username string) ValidationResult {
 	return result
 }
 
-// isValidPort checks if a port string is valid
+/* isValidPort checks if a port string is valid */
 func isValidPort(port string) bool {
 	if port == "" {
 		return true // Port is optional
 	}
 
-	// Simple numeric check
+	/* Simple numeric check */
 	portRegex := regexp.MustCompile(`^[0-9]+$`)
 	if !portRegex.MatchString(port) {
 		return false
 	}
 
-	// Check range (1-65535)
+	/* Check range (1-65535) */
 	if len(port) > 5 {
 		return false
 	}
@@ -202,7 +197,7 @@ func isValidPort(port string) bool {
 	return true
 }
 
-// ValidateAll performs all validation checks
+/* ValidateAll performs all validation checks */
 func (v *Validator) ValidateAll(ctx context.Context, queries *db.Queries) ValidationResult {
 	result := ValidationResult{
 		Valid:    true,
@@ -210,7 +205,7 @@ func (v *Validator) ValidateAll(ctx context.Context, queries *db.Queries) Valida
 		Warnings: []string{},
 	}
 
-	// Validate admin user
+	/* Validate admin user */
 	adminResult := v.ValidateAdminUser(ctx, queries)
 	if !adminResult.Valid {
 		result.Valid = false
@@ -218,7 +213,7 @@ func (v *Validator) ValidateAll(ctx context.Context, queries *db.Queries) Valida
 	result.Errors = append(result.Errors, adminResult.Errors...)
 	result.Warnings = append(result.Warnings, adminResult.Warnings...)
 
-	// Validate profile
+	/* Validate profile */
 	profileResult := v.ValidateProfile(ctx, queries)
 	if !profileResult.Valid {
 		result.Valid = false

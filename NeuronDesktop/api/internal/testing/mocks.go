@@ -9,7 +9,7 @@ import (
 	"github.com/neurondb/NeuronDesktop/api/internal/mcp"
 )
 
-// MockMCPClient is a mock MCP client for testing
+/* MockMCPClient is a mock MCP client for testing */
 type MockMCPClient struct {
 	Tools      []mcp.ToolDefinition
 	CallResult *mcp.ToolResult
@@ -17,7 +17,7 @@ type MockMCPClient struct {
 	Connected  bool
 }
 
-// NewMockMCPClient creates a new mock MCP client
+/* NewMockMCPClient creates a new mock MCP client */
 func NewMockMCPClient() *MockMCPClient {
 	return &MockMCPClient{
 		Tools: []mcp.ToolDefinition{
@@ -46,7 +46,7 @@ func NewMockMCPClient() *MockMCPClient {
 	}
 }
 
-// ListTools returns mock tools
+/* ListTools returns mock tools */
 func (m *MockMCPClient) ListTools(ctx context.Context) ([]mcp.ToolDefinition, error) {
 	if !m.Connected {
 		return nil, fmt.Errorf("MCP server not connected")
@@ -54,7 +54,7 @@ func (m *MockMCPClient) ListTools(ctx context.Context) ([]mcp.ToolDefinition, er
 	return m.Tools, nil
 }
 
-// CallTool calls a mock tool
+/* CallTool calls a mock tool */
 func (m *MockMCPClient) CallTool(ctx context.Context, name string, arguments map[string]interface{}) (*mcp.ToolResult, error) {
 	if !m.Connected {
 		return nil, fmt.Errorf("MCP server not connected")
@@ -65,7 +65,7 @@ func (m *MockMCPClient) CallTool(ctx context.Context, name string, arguments map
 	if m.CallResult != nil {
 		return m.CallResult, nil
 	}
-	// Default mock response
+	/* Default mock response */
 	return &mcp.ToolResult{
 		Content: []mcp.ContentBlock{
 			{
@@ -77,25 +77,25 @@ func (m *MockMCPClient) CallTool(ctx context.Context, name string, arguments map
 	}, nil
 }
 
-// Close closes the mock client
+/* Close closes the mock client */
 func (m *MockMCPClient) Close() error {
 	m.Connected = false
 	return nil
 }
 
-// IsAlive checks if mock client is alive
+/* IsAlive checks if mock client is alive */
 func (m *MockMCPClient) IsAlive() bool {
 	return m.Connected
 }
 
-// Model represents a model in NeuronAgent (simplified for testing)
+/* Model represents a model in NeuronAgent (simplified for testing) */
 type Model struct {
 	Name     string `json:"name"`
 	Type     string `json:"type"`
 	Provider string `json:"provider"`
 }
 
-// MockAgentClient is a mock Agent client for testing
+/* MockAgentClient is a mock Agent client for testing */
 type MockAgentClient struct {
 	Agents      []agent.Agent
 	Sessions    []agent.Session
@@ -105,7 +105,7 @@ type MockAgentClient struct {
 	CallError   error
 }
 
-// NewMockAgentClient creates a new mock Agent client
+/* NewMockAgentClient creates a new mock Agent client */
 func NewMockAgentClient() *MockAgentClient {
 	return &MockAgentClient{
 		Agents: []agent.Agent{
@@ -131,7 +131,7 @@ func NewMockAgentClient() *MockAgentClient {
 	}
 }
 
-// ListAgents returns mock agents
+/* ListAgents returns mock agents */
 func (m *MockAgentClient) ListAgents(ctx context.Context) ([]agent.Agent, error) {
 	if m.CallError != nil {
 		return nil, m.CallError
@@ -139,7 +139,7 @@ func (m *MockAgentClient) ListAgents(ctx context.Context) ([]agent.Agent, error)
 	return m.Agents, nil
 }
 
-// CreateAgent creates a mock agent
+/* CreateAgent creates a mock agent */
 func (m *MockAgentClient) CreateAgent(ctx context.Context, req agent.CreateAgentRequest) (*agent.Agent, error) {
 	if m.CreateError != nil {
 		return nil, m.CreateError
@@ -154,7 +154,7 @@ func (m *MockAgentClient) CreateAgent(ctx context.Context, req agent.CreateAgent
 	return newAgent, nil
 }
 
-// GetAgent returns a mock agent
+/* GetAgent returns a mock agent */
 func (m *MockAgentClient) GetAgent(ctx context.Context, agentID string) (*agent.Agent, error) {
 	if m.CallError != nil {
 		return nil, m.CallError
@@ -167,7 +167,7 @@ func (m *MockAgentClient) GetAgent(ctx context.Context, agentID string) (*agent.
 	return nil, fmt.Errorf("agent not found")
 }
 
-// ListModels returns mock models
+/* ListModels returns mock models */
 func (m *MockAgentClient) ListModels(ctx context.Context) ([]Model, error) {
 	if m.CallError != nil {
 		return nil, m.CallError
@@ -175,7 +175,7 @@ func (m *MockAgentClient) ListModels(ctx context.Context) ([]Model, error) {
 	return m.Models, nil
 }
 
-// CreateSession creates a mock session
+/* CreateSession creates a mock session */
 func (m *MockAgentClient) CreateSession(ctx context.Context, req agent.CreateSessionRequest) (*agent.Session, error) {
 	if m.CreateError != nil {
 		return nil, m.CreateError
@@ -188,7 +188,7 @@ func (m *MockAgentClient) CreateSession(ctx context.Context, req agent.CreateSes
 	return newSession, nil
 }
 
-// ListSessions returns mock sessions
+/* ListSessions returns mock sessions */
 func (m *MockAgentClient) ListSessions(ctx context.Context, agentID string) ([]agent.Session, error) {
 	if m.CallError != nil {
 		return nil, m.CallError
@@ -202,7 +202,7 @@ func (m *MockAgentClient) ListSessions(ctx context.Context, agentID string) ([]a
 	return filtered, nil
 }
 
-// GetSession returns a mock session
+/* GetSession returns a mock session */
 func (m *MockAgentClient) GetSession(ctx context.Context, sessionID string) (*agent.Session, error) {
 	if m.CallError != nil {
 		return nil, m.CallError
@@ -215,7 +215,7 @@ func (m *MockAgentClient) GetSession(ctx context.Context, sessionID string) (*ag
 	return nil, fmt.Errorf("session not found")
 }
 
-// SendMessage sends a mock message
+/* SendMessage sends a mock message */
 func (m *MockAgentClient) SendMessage(ctx context.Context, sessionID string, req agent.SendMessageRequest) (*agent.Message, error) {
 	if m.CallError != nil {
 		return nil, m.CallError
@@ -230,7 +230,7 @@ func (m *MockAgentClient) SendMessage(ctx context.Context, sessionID string, req
 	return newMessage, nil
 }
 
-// GetMessages returns mock messages
+/* GetMessages returns mock messages */
 func (m *MockAgentClient) GetMessages(ctx context.Context, sessionID string) ([]agent.Message, error) {
 	if m.CallError != nil {
 		return nil, m.CallError
@@ -244,7 +244,7 @@ func (m *MockAgentClient) GetMessages(ctx context.Context, sessionID string) ([]
 	return filtered, nil
 }
 
-// MockNeuronDBClient is a mock NeuronDB client for testing
+/* MockNeuronDBClient is a mock NeuronDB client for testing */
 type MockNeuronDBClient struct {
 	Collections   []map[string]interface{}
 	SearchResults []map[string]interface{}
@@ -252,7 +252,7 @@ type MockNeuronDBClient struct {
 	CallError     error
 }
 
-// NewMockNeuronDBClient creates a new mock NeuronDB client
+/* NewMockNeuronDBClient creates a new mock NeuronDB client */
 func NewMockNeuronDBClient() *MockNeuronDBClient {
 	return &MockNeuronDBClient{
 		Collections: []map[string]interface{}{
@@ -277,7 +277,7 @@ func NewMockNeuronDBClient() *MockNeuronDBClient {
 	}
 }
 
-// ListCollections returns mock collections
+/* ListCollections returns mock collections */
 func (m *MockNeuronDBClient) ListCollections(ctx context.Context) ([]map[string]interface{}, error) {
 	if m.CallError != nil {
 		return nil, m.CallError
@@ -285,7 +285,7 @@ func (m *MockNeuronDBClient) ListCollections(ctx context.Context) ([]map[string]
 	return m.Collections, nil
 }
 
-// Search performs a mock search
+/* Search performs a mock search */
 func (m *MockNeuronDBClient) Search(ctx context.Context, collection, schema string, queryVector []float64, limit int, filter map[string]interface{}) ([]map[string]interface{}, error) {
 	if m.CallError != nil {
 		return nil, m.CallError
@@ -293,7 +293,7 @@ func (m *MockNeuronDBClient) Search(ctx context.Context, collection, schema stri
 	return m.SearchResults, nil
 }
 
-// ExecuteSQL executes a mock SQL query
+/* ExecuteSQL executes a mock SQL query */
 func (m *MockNeuronDBClient) ExecuteSQL(ctx context.Context, query string) ([]map[string]interface{}, error) {
 	if m.CallError != nil {
 		return nil, m.CallError
@@ -301,7 +301,7 @@ func (m *MockNeuronDBClient) ExecuteSQL(ctx context.Context, query string) ([]ma
 	return m.QueryResults, nil
 }
 
-// Helper function to create JSON-RPC request for MCP
+/* Helper function to create JSON-RPC request for MCP */
 func CreateMCPRequest(method string, params interface{}) ([]byte, error) {
 	request := map[string]interface{}{
 		"jsonrpc": "2.0",
@@ -314,7 +314,7 @@ func CreateMCPRequest(method string, params interface{}) ([]byte, error) {
 	return json.Marshal(request)
 }
 
-// Helper function to parse JSON-RPC response
+/* Helper function to parse JSON-RPC response */
 func ParseMCPResponse(data []byte) (map[string]interface{}, error) {
 	var response map[string]interface{}
 	if err := json.Unmarshal(data, &response); err != nil {

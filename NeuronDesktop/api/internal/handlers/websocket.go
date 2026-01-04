@@ -13,11 +13,11 @@ import (
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
-		return true // Allow all origins in development
+		return true /* Allow all origins in development */
 	},
 }
 
-// Helper functions
+/* Helper functions */
 func min(a, b int) int {
 	if a < b {
 		return a
@@ -33,7 +33,7 @@ func keys(m map[string]interface{}) []string {
 	return result
 }
 
-// MCPWebSocket handles WebSocket connections for MCP chat
+/* MCPWebSocket handles WebSocket connections for MCP chat */
 func (h *MCPHandlers) MCPWebSocket(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	profileID := vars["profile_id"]
@@ -49,7 +49,6 @@ func (h *MCPHandlers) MCPWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("WebSocket connection established for profile: %s", profileID)
 
-	// Get MCP client with detailed error handling
 	client, err := h.GetMCPManager().GetClient(r.Context(), profileID)
 	if err != nil {
 		log.Printf("Failed to get MCP client for profile %s: %v", profileID, err)
@@ -60,7 +59,6 @@ func (h *MCPHandlers) MCPWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Verify client is alive
 	if !client.IsAlive() {
 		conn.WriteJSON(map[string]interface{}{
 			"type":  "error",
@@ -69,37 +67,86 @@ func (h *MCPHandlers) MCPWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Send connection confirmation
 	conn.WriteJSON(map[string]interface{}{
 		"type":    "connected",
 		"message": "Connected to MCP server successfully",
 	})
 
-	// Read messages from WebSocket and forward to MCP
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("WebSocket reader panic recovered: %v", r)
+				conn.WriteJSON(map[string]interface{}{
+					"type":  "error",
+					"error": "Internal server error in WebSocket handler",
+				})
+			}
+		}()
+
+		conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+
 		for {
 			var msg map[string]interface{}
 			if err := conn.ReadJSON(&msg); err != nil {
+				if netErr, ok := err.(interface{ Timeout() bool }); ok && netErr.Timeout() {
+					log.Printf("WebSocket read timeout for profile %s", profileID)
+					conn.WriteJSON(map[string]interface{}{
+						"type":  "error",
+						"error": "Connection timeout. Please refresh the page.",
+					})
+					break
+				}
+
 				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-					log.Printf("WebSocket error: %v", err)
+					log.Printf("WebSocket unexpected close for profile %s: %v", profileID, err)
+					conn.WriteJSON(map[string]interface{}{
+						"type":  "error",
+						"error": fmt.Sprintf("WebSocket connection closed unexpectedly: %v", err),
+					})
+				} else if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
+					log.Printf("WebSocket closed normally for profile %s", profileID)
+				} else {
+					log.Printf("WebSocket read error for profile %s: %v", profileID, err)
+					conn.WriteJSON(map[string]interface{}{
+						"type":  "error",
+						"error": fmt.Sprintf("Failed to read message: %v", err),
+					})
 				}
 				break
 			}
 
+			conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+
 			log.Printf("WebSocket received message: type=%v", msg["type"])
 
-			// Handle different message types (MCP protocol like Claude Desktop)
 			msgType, _ := msg["type"].(string)
 			switch msgType {
 			case "tool_call":
 				name, _ := msg["name"].(string)
 				args, _ := msg["arguments"].(map[string]interface{})
 
-				result, err := client.CallTool(name, args)
-				if err != nil {
+				if name == "" {
 					conn.WriteJSON(map[string]interface{}{
 						"type":  "error",
-						"error": err.Error(),
+						"error": "Tool name is required for tool_call",
+					})
+					continue
+				}
+
+				if !client.IsAlive() {
+					conn.WriteJSON(map[string]interface{}{
+						"type":  "error",
+						"error": "MCP server connection lost. Please reconnect.",
+					})
+					continue
+				}
+
+				result, err := client.CallTool(name, args)
+				if err != nil {
+					log.Printf("Tool call error for %s: %v", name, err)
+					conn.WriteJSON(map[string]interface{}{
+						"type":  "error",
+						"error": fmt.Sprintf("Tool call failed: %v", err),
 					})
 				} else {
 					conn.WriteJSON(map[string]interface{}{
@@ -190,7 +237,6 @@ func (h *MCPHandlers) MCPWebSocket(w http.ResponseWriter, r *http.Request) {
 					}
 				}
 			case "chat":
-				// Chat messages using MCP sampling/createMessage (like Claude Desktop)
 				content, _ := msg["content"].(string)
 				modelID, _ := msg["model_id"].(string)
 
@@ -214,7 +260,6 @@ func (h *MCPHandlers) MCPWebSocket(w http.ResponseWriter, r *http.Request) {
 					continue
 				}
 
-				// Get model configuration to extract model name
 				log.Printf("Getting model config for ID: %s", modelID)
 				modelConfig, err := h.mcpManager.queries.GetModelConfig(r.Context(), modelID, false)
 				if err != nil {
@@ -228,7 +273,6 @@ func (h *MCPHandlers) MCPWebSocket(w http.ResponseWriter, r *http.Request) {
 
 				log.Printf("Model config retrieved: name=%s", modelConfig.ModelName)
 
-				// Build messages array for MCP protocol
 				messages := []map[string]interface{}{
 					{
 						"role":    "user",
@@ -236,7 +280,6 @@ func (h *MCPHandlers) MCPWebSocket(w http.ResponseWriter, r *http.Request) {
 					},
 				}
 
-				// Call MCP sampling/createMessage with model name (not ID)
 				log.Printf("Calling MCP CreateMessage with model=%s", modelConfig.ModelName)
 				result, err := client.CreateMessage(messages, modelConfig.ModelName, 0.7)
 				if err != nil {
@@ -250,13 +293,12 @@ func (h *MCPHandlers) MCPWebSocket(w http.ResponseWriter, r *http.Request) {
 
 				log.Printf("MCP CreateMessage result type: %T, value: %+v", result, result)
 
-				// Parse MCP response and forward to client
-				// The response can be in multiple formats:
-				// 1. Direct CreateMessageResponse with "content" as string
-				// 2. Wrapped in middleware with "content" as array of ContentBlock
+				/* Parse MCP response and forward to client
+				 * The response can be in multiple formats:
+				 * 1. Direct CreateMessageResponse with "content" as string
+				 * 2. Wrapped in middleware with "content" as array of ContentBlock */
 				resultMap, ok := result.(map[string]interface{})
 				if !ok {
-					// If result is not a map, try to convert it
 					log.Printf("Unexpected result type: %T, value: %v", result, result)
 					conn.WriteJSON(map[string]interface{}{
 						"type":    "assistant",
@@ -267,16 +309,13 @@ func (h *MCPHandlers) MCPWebSocket(w http.ResponseWriter, r *http.Request) {
 
 				var responseText string
 
-				// Try content as array of content blocks (middleware format)
 				if contentBlocks, ok := resultMap["content"].([]interface{}); ok {
 					for _, block := range contentBlocks {
 						if blockMap, ok := block.(map[string]interface{}); ok {
-							if text, ok := blockMap["text"].(string); ok {
-								log.Printf("Parsing text block: %s", text[:min(100, len(text))])
-								// Try to parse text as JSON in case it's a nested JSON string
-								var nestedContent map[string]interface{}
+								if text, ok := blockMap["text"].(string); ok {
+									log.Printf("Parsing text block: %s", text[:min(100, len(text))])
+									var nestedContent map[string]interface{}
 								if err := json.Unmarshal([]byte(text), &nestedContent); err == nil {
-									// Successfully parsed as JSON, extract the content field
 									log.Printf("Successfully parsed nested JSON, keys: %v", keys(nestedContent))
 									if contentVal, ok := nestedContent["content"].(string); ok {
 										log.Printf("Extracted content: %s", contentVal[:min(50, len(contentVal))])
@@ -286,12 +325,10 @@ func (h *MCPHandlers) MCPWebSocket(w http.ResponseWriter, r *http.Request) {
 										responseText += text
 									}
 								} else {
-									// Not JSON, use as-is
 									log.Printf("Text is not JSON (err: %v), using as-is", err)
 									responseText += text
 								}
 							} else if blockType, _ := blockMap["type"].(string); blockType == "text" {
-								// Handle text content directly
 								if textContent, ok := blockMap["content"].(string); ok {
 									responseText += textContent
 								}
@@ -299,12 +336,9 @@ func (h *MCPHandlers) MCPWebSocket(w http.ResponseWriter, r *http.Request) {
 						}
 					}
 				} else if contentStr, ok := resultMap["content"].(string); ok {
-					// Content as string (direct format)
 					responseText = contentStr
 				} else {
-					// Try to find content in nested structure or use entire result
 					log.Printf("Could not extract content from result: %+v", resultMap)
-					// Try to marshal the result as JSON and extract readable text
 					if resultJSON, err := json.Marshal(resultMap); err == nil {
 						responseText = string(resultJSON)
 					} else {
@@ -327,8 +361,6 @@ func (h *MCPHandlers) MCPWebSocket(w http.ResponseWriter, r *http.Request) {
 					"content": responseText,
 				})
 			case "pong":
-				// Respond to ping with pong (already handled by ping ticker, but acknowledge if received)
-				// No response needed for pong
 			default:
 				conn.WriteJSON(map[string]interface{}{
 					"type":  "error",
@@ -338,23 +370,35 @@ func (h *MCPHandlers) MCPWebSocket(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	// Keep connection alive
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
+
+	conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
 
 	for {
 		select {
 		case <-ticker.C:
+			if !client.IsAlive() {
+				log.Printf("MCP client not alive, closing WebSocket for profile %s", profileID)
+				conn.WriteJSON(map[string]interface{}{
+					"type":  "error",
+					"error": "MCP server connection lost",
+				})
+				return
+			}
+
+			conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
 			if err := conn.WriteJSON(map[string]interface{}{
 				"type": "ping",
 			}); err != nil {
+				log.Printf("Failed to send ping for profile %s: %v", profileID, err)
 				return
 			}
 		}
 	}
 }
 
-// AgentWebSocket handles WebSocket connections for NeuronAgent
+/* AgentWebSocket handles WebSocket connections for NeuronAgent */
 func (h *AgentHandlers) AgentWebSocket(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	profileID := vars["profile_id"]
@@ -372,7 +416,6 @@ func (h *AgentHandlers) AgentWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
-	// Get profile to construct URL
 	profile, err := h.GetQueries().GetProfile(r.Context(), profileID)
 	if err != nil {
 		conn.WriteJSON(map[string]interface{}{
@@ -402,22 +445,38 @@ func (h *AgentHandlers) AgentWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 	defer agentConn.Close()
 
-	// Proxy messages both ways
+	done := make(chan struct{})
+
 	go func() {
+		defer close(done)
 		for {
 			var msg map[string]interface{}
 			if err := conn.ReadJSON(&msg); err != nil {
+				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+					log.Printf("Agent WebSocket client read error: %v", err)
+				}
 				break
 			}
-			agentConn.WriteJSON(msg)
+			if err := agentConn.WriteJSON(msg); err != nil {
+				log.Printf("Agent WebSocket write error: %v", err)
+				break
+			}
 		}
 	}()
 
 	for {
 		var msg map[string]interface{}
 		if err := agentConn.ReadJSON(&msg); err != nil {
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+				log.Printf("Agent WebSocket agent read error: %v", err)
+			}
 			break
 		}
-		conn.WriteJSON(msg)
+		if err := conn.WriteJSON(msg); err != nil {
+			log.Printf("Agent WebSocket client write error: %v", err)
+			break
+		}
 	}
+
+	<-done
 }

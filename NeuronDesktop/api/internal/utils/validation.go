@@ -7,7 +7,7 @@ import (
 	"unicode"
 )
 
-// ValidationError represents a validation error
+/* ValidationError represents a validation error */
 type ValidationError struct {
 	Field   string
 	Message string
@@ -17,11 +17,10 @@ func (e *ValidationError) Error() string {
 	return fmt.Sprintf("%s: %s", e.Field, e.Message)
 }
 
-// ValidateProfile validates a profile configuration
+/* ValidateProfile validates a profile configuration */
 func ValidateProfile(name, dsn string, mcpConfig map[string]interface{}) []error {
 	var errors []error
 
-	// Validate name
 	if strings.TrimSpace(name) == "" {
 		errors = append(errors, &ValidationError{
 			Field:   "name",
@@ -34,7 +33,6 @@ func ValidateProfile(name, dsn string, mcpConfig map[string]interface{}) []error
 		})
 	}
 
-	// Validate DSN
 	if strings.TrimSpace(dsn) == "" {
 		errors = append(errors, &ValidationError{
 			Field:   "neurondb_dsn",
@@ -47,7 +45,6 @@ func ValidateProfile(name, dsn string, mcpConfig map[string]interface{}) []error
 		})
 	}
 
-	// Validate MCP config
 	if mcpConfig != nil {
 		if command, ok := mcpConfig["command"].(string); ok {
 			if strings.TrimSpace(command) == "" {
@@ -62,7 +59,7 @@ func ValidateProfile(name, dsn string, mcpConfig map[string]interface{}) []error
 	return errors
 }
 
-// ValidateAPIKey validates an API key format
+/* ValidateAPIKey validates an API key format */
 func ValidateAPIKey(key string) error {
 	if len(key) < 32 {
 		return &ValidationError{
@@ -71,7 +68,6 @@ func ValidateAPIKey(key string) error {
 		}
 	}
 
-	// Check for valid base64 URL characters
 	base64URLRegex := regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
 	if !base64URLRegex.MatchString(key) {
 		return &ValidationError{
@@ -83,7 +79,7 @@ func ValidateAPIKey(key string) error {
 	return nil
 }
 
-// ValidateSearchRequest validates a search request
+/* ValidateSearchRequest validates a search request */
 func ValidateSearchRequest(collection string, limit int, distanceType string) []error {
 	var errors []error
 
@@ -119,11 +115,10 @@ func ValidateSearchRequest(collection string, limit int, distanceType string) []
 	return errors
 }
 
-// ValidateSQL validates SQL query for safety
+/* ValidateSQL validates SQL query for safety */
 func ValidateSQL(query string) error {
 	queryUpper := strings.ToUpper(strings.TrimSpace(query))
 
-	// Must start with SELECT
 	if !strings.HasPrefix(queryUpper, "SELECT") {
 		return &ValidationError{
 			Field:   "query",
@@ -131,7 +126,6 @@ func ValidateSQL(query string) error {
 		}
 	}
 
-	// Check for dangerous operations
 	dangerous := []string{
 		"DROP", "TRUNCATE", "DELETE", "UPDATE", "INSERT",
 		"ALTER", "CREATE", "GRANT", "REVOKE", "EXECUTE",
@@ -147,7 +141,6 @@ func ValidateSQL(query string) error {
 		}
 	}
 
-	// Check for SQL injection patterns
 	sqlInjectionPatterns := []string{
 		";--", "';--", "'; DROP", "'; DELETE",
 		"UNION SELECT", "OR 1=1", "OR '1'='1",
@@ -165,7 +158,7 @@ func ValidateSQL(query string) error {
 	return nil
 }
 
-// ValidateToolCall validates a tool call request
+/* ValidateToolCall validates a tool call request */
 func ValidateToolCall(toolName string, arguments map[string]interface{}) []error {
 	var errors []error
 
@@ -176,7 +169,6 @@ func ValidateToolCall(toolName string, arguments map[string]interface{}) []error
 		})
 	}
 
-	// Validate tool name format (alphanumeric, underscore, hyphen)
 	toolNameRegex := regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 	if !toolNameRegex.MatchString(toolName) {
 		errors = append(errors, &ValidationError{
@@ -188,10 +180,7 @@ func ValidateToolCall(toolName string, arguments map[string]interface{}) []error
 	return errors
 }
 
-// Helper functions
-
 func isValidDSN(dsn string) bool {
-	// Basic DSN validation - should contain host, user, dbname
 	required := []string{"host=", "user=", "dbname="}
 	dsnLower := strings.ToLower(dsn)
 	for _, req := range required {
@@ -210,9 +199,8 @@ func getKeys(m map[string]bool) []string {
 	return keys
 }
 
-// SanitizeString sanitizes a string input
+/* SanitizeString sanitizes a string input */
 func SanitizeString(s string, maxLength int) string {
-	// Remove control characters
 	var builder strings.Builder
 	for _, r := range s {
 		if unicode.IsPrint(r) || unicode.IsSpace(r) {
@@ -221,7 +209,6 @@ func SanitizeString(s string, maxLength int) string {
 	}
 	result := builder.String()
 
-	// Trim and limit length
 	result = strings.TrimSpace(result)
 	if maxLength > 0 && len(result) > maxLength {
 		result = result[:maxLength]
@@ -230,7 +217,7 @@ func SanitizeString(s string, maxLength int) string {
 	return result
 }
 
-// ValidateEmail validates an email address (basic)
+/* ValidateEmail validates an email address (basic) */
 func ValidateEmail(email string) error {
 	if email == "" {
 		return &ValidationError{
@@ -250,7 +237,7 @@ func ValidateEmail(email string) error {
 	return nil
 }
 
-// ValidateUUID validates a UUID string
+/* ValidateUUID validates a UUID string */
 func ValidateUUID(uuid string) error {
 	uuidRegex := regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 	if !uuidRegex.MatchString(strings.ToLower(uuid)) {

@@ -11,13 +11,13 @@ import (
 	"github.com/neurondb/NeuronDesktop/api/internal/logging"
 )
 
-// HealthChecker performs comprehensive health checks
+/*HealthChecker performs comprehensive health checks*/
 type HealthChecker struct {
 	queries *db.Queries
 	logger  *logging.Logger
 }
 
-// NewHealthChecker creates a new health checker instance
+/*NewHealthChecker creates a new health checker instance*/
 func NewHealthChecker(queries *db.Queries, logger *logging.Logger) *HealthChecker {
 	return &HealthChecker{
 		queries: queries,
@@ -25,7 +25,7 @@ func NewHealthChecker(queries *db.Queries, logger *logging.Logger) *HealthChecke
 	}
 }
 
-// HealthStatus represents the overall health status
+/*HealthStatus represents the overall health status*/
 type HealthStatus struct {
 	Status    string                 `json:"status"` // "healthy", "degraded", "unhealthy"
 	Timestamp time.Time              `json:"timestamp"`
@@ -34,7 +34,7 @@ type HealthStatus struct {
 	Version   string                 `json:"version,omitempty"`
 }
 
-// CheckResult represents the result of an individual health check
+/*CheckResult represents the result of an individual health check*/
 type CheckResult struct {
 	Status      string        `json:"status"` // "pass", "warn", "fail"
 	Message     string        `json:"message"`
@@ -42,25 +42,20 @@ type CheckResult struct {
 	LastChecked time.Time     `json:"last_checked"`
 }
 
-// CheckAll performs all health checks
+/*CheckAll performs all health checks*/
 func (hc *HealthChecker) CheckAll(ctx context.Context) HealthStatus {
 	checks := make(map[string]CheckResult)
 
-	// Database connectivity check
 	checks["database"] = hc.checkDatabase(ctx)
 
-	// Admin user check
 	checks["admin_user"] = hc.checkAdminUser(ctx)
 
-	// Default profile check
 	checks["default_profile"] = hc.checkDefaultProfile(ctx)
 
-	// Schema validation check
 	if profile, _ := hc.queries.GetDefaultProfile(ctx); profile != nil {
 		checks["profile_schema"] = hc.checkProfileSchema(ctx, profile)
 	}
 
-	// Determine overall status
 	overall := true
 	status := "healthy"
 	for _, check := range checks {
@@ -81,12 +76,10 @@ func (hc *HealthChecker) CheckAll(ctx context.Context) HealthStatus {
 	}
 }
 
-// checkDatabase checks database connectivity
+/*checkDatabase checks database connectivity*/
 func (hc *HealthChecker) checkDatabase(ctx context.Context) CheckResult {
 	start := time.Now()
 
-	// This would require access to the database connection
-	// For now, we'll check if we can query the users table
 	_, err := hc.queries.GetUserByUsername(ctx, "admin")
 	duration := time.Since(start)
 	_ = start // Prevent unused variable warning
@@ -108,7 +101,7 @@ func (hc *HealthChecker) checkDatabase(ctx context.Context) CheckResult {
 	}
 }
 
-// checkAdminUser checks if admin user exists
+/*checkAdminUser checks if admin user exists*/
 func (hc *HealthChecker) checkAdminUser(ctx context.Context) CheckResult {
 	start := time.Now()
 	_, err := hc.queries.GetUserByUsername(ctx, "admin")
@@ -131,7 +124,7 @@ func (hc *HealthChecker) checkAdminUser(ctx context.Context) CheckResult {
 	}
 }
 
-// checkDefaultProfile checks if default profile exists
+/*checkDefaultProfile checks if default profile exists*/
 func (hc *HealthChecker) checkDefaultProfile(ctx context.Context) CheckResult {
 	start := time.Now()
 	profile, err := hc.queries.GetDefaultProfile(ctx)
@@ -154,7 +147,7 @@ func (hc *HealthChecker) checkDefaultProfile(ctx context.Context) CheckResult {
 	}
 }
 
-// checkProfileSchema validates profile database schema
+/*checkProfileSchema validates profile database schema*/
 func (hc *HealthChecker) checkProfileSchema(ctx context.Context, profile *db.Profile) CheckResult {
 	start := time.Now()
 
@@ -169,7 +162,6 @@ func (hc *HealthChecker) checkProfileSchema(ctx context.Context, profile *db.Pro
 	}
 	defer conn.Close()
 
-	// Check if essential tables exist
 	requiredTables := []string{"profiles", "users", "model_configs"}
 	for _, table := range requiredTables {
 		var exists bool

@@ -12,7 +12,7 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
-// DatabaseTestRequest represents a database connection test request
+/* DatabaseTestRequest represents a database connection test request */
 type DatabaseTestRequest struct {
 	Host     string `json:"host"`
 	Port     string `json:"port"`
@@ -21,7 +21,7 @@ type DatabaseTestRequest struct {
 	Password string `json:"password"`
 }
 
-// DatabaseTestResponse represents the response from a database test
+/* DatabaseTestResponse represents the response from a database test */
 type DatabaseTestResponse struct {
 	Success       bool     `json:"success"`
 	Message       string   `json:"message"`
@@ -30,15 +30,15 @@ type DatabaseTestResponse struct {
 	DSN           string   `json:"dsn,omitempty"`
 }
 
-// DatabaseTestHandlers handles database connection testing
+/* DatabaseTestHandlers handles database connection testing */
 type DatabaseTestHandlers struct{}
 
-// NewDatabaseTestHandlers creates a new database test handlers instance
+/* NewDatabaseTestHandlers creates a new database test handlers instance */
 func NewDatabaseTestHandlers() *DatabaseTestHandlers {
 	return &DatabaseTestHandlers{}
 }
 
-// TestConnection tests a PostgreSQL database connection and checks for schema
+/* TestConnection tests a PostgreSQL database connection and checks for schema */
 func (h *DatabaseTestHandlers) TestConnection(w http.ResponseWriter, r *http.Request) {
 	var req DatabaseTestRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -46,16 +46,15 @@ func (h *DatabaseTestHandlers) TestConnection(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// Validate required fields
+	/* Validate required fields */
 	if req.Host == "" || req.Database == "" || req.User == "" {
 		WriteError(w, r, http.StatusBadRequest, fmt.Errorf("host, database, and user are required"), nil)
 		return
 	}
 
-	// Build DSN
+	/* Build DSN */
 	dsn := h.buildDSN(req)
 
-	// Test connection
 	conn, err := sql.Open("pgx", dsn)
 	if err != nil {
 		WriteError(w, r, http.StatusBadRequest, fmt.Errorf("failed to open database connection: %w", err), nil)
@@ -63,7 +62,7 @@ func (h *DatabaseTestHandlers) TestConnection(w http.ResponseWriter, r *http.Req
 	}
 	defer conn.Close()
 
-	// Test with context timeout
+	/* Test with context timeout */
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
@@ -72,7 +71,7 @@ func (h *DatabaseTestHandlers) TestConnection(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// Check if NeuronDesktop schema exists
+	/* Check if NeuronDesktop schema exists */
 	schemaExists, missingTables := h.checkSchema(ctx, conn)
 
 	response := DatabaseTestResponse{
@@ -91,7 +90,7 @@ func (h *DatabaseTestHandlers) TestConnection(w http.ResponseWriter, r *http.Req
 	WriteSuccess(w, response, http.StatusOK)
 }
 
-// buildDSN builds a PostgreSQL DSN from connection parameters
+/* buildDSN builds a PostgreSQL DSN from connection parameters */
 func (h *DatabaseTestHandlers) buildDSN(req DatabaseTestRequest) string {
 	if req.Port == "" {
 		req.Port = "5432"
@@ -112,12 +111,12 @@ func (h *DatabaseTestHandlers) buildDSN(req DatabaseTestRequest) string {
 		req.Database)
 }
 
-// encodeURIComponent encodes a string for use in a URI
+/* encodeURIComponent encodes a string for use in a URI */
 func encodeURIComponent(s string) string {
 	return url.QueryEscape(s)
 }
 
-// checkSchema checks if the NeuronDesktop schema exists
+/* checkSchema checks if the NeuronDesktop schema exists */
 func (h *DatabaseTestHandlers) checkSchema(ctx context.Context, conn *sql.DB) (bool, []string) {
 	requiredTables := []string{
 		"users",
@@ -135,7 +134,7 @@ func (h *DatabaseTestHandlers) checkSchema(ctx context.Context, conn *sql.DB) (b
 		var exists bool
 		query := "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = $1)"
 		if err := conn.QueryRowContext(ctx, query, table).Scan(&exists); err != nil {
-			// If we can't check, assume it doesn't exist
+			/* If we can't check, assume it doesn't exist */
 			exists = false
 		}
 

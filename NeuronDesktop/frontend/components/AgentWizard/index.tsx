@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { agentAPI, profilesAPI, type Profile, type CreateAgentRequest, type Model } from '@/lib/api'
 import { CheckIcon, XMarkIcon } from '@/components/Icons'
+import { showSuccessToast, showErrorToast } from '@/lib/errors'
 
 interface WizardStep {
   id: number
@@ -53,8 +54,8 @@ export default function AgentWizard({ onComplete, onCancel }: { onComplete?: () 
         const defaultProfile = response.data.find((p: Profile) => p.is_default) || response.data[0]
         setSelectedProfile(defaultProfile.id)
       }
-    } catch (error) {
-      console.error('Failed to load profiles:', error)
+    } catch (error: any) {
+      showErrorToast('Failed to load profiles: ' + (error.response?.data?.error || error.message))
     }
   }
 
@@ -63,8 +64,8 @@ export default function AgentWizard({ onComplete, onCancel }: { onComplete?: () 
     try {
       const response = await agentAPI.listModels(selectedProfile)
       setModels(response.data.models)
-    } catch (error) {
-      console.error('Failed to load models:', error)
+    } catch (error: any) {
+      showErrorToast('Failed to load models: ' + (error.response?.data?.error || error.message))
     }
   }
 
@@ -81,18 +82,29 @@ export default function AgentWizard({ onComplete, onCancel }: { onComplete?: () 
   }
 
   const handleCreate = async () => {
-    if (!selectedProfile || !formData.name) {
-      alert('Profile and agent name are required')
+    if (!selectedProfile) {
+      showErrorToast('Please select a profile first')
+      return
+    }
+    
+    if (!formData.name.trim()) {
+      showErrorToast('Agent name is required')
+      return
+    }
+    
+    if (!formData.model_name) {
+      showErrorToast('Please select a model')
       return
     }
 
     setLoading(true)
     try {
       await agentAPI.createAgent(selectedProfile, formData)
+      showSuccessToast('Agent created successfully')
       if (onComplete) onComplete()
     } catch (error: any) {
-      console.error('Failed to create agent:', error)
-      alert('Failed to create agent: ' + (error.response?.data?.error || error.message))
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || error.message || 'Failed to create agent'
+      showErrorToast('Failed to create agent: ' + errorMessage)
     } finally {
       setLoading(false)
     }

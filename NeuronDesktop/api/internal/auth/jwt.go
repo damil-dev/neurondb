@@ -15,15 +15,13 @@ var jwtSecret []byte
 func init() {
 	secret := os.Getenv("JWT_SECRET")
 	if secret == "" {
-		// Fail fast if JWT_SECRET is not set when JWT mode is used
-		// This will be checked in main.go based on AUTH_MODE
 		jwtSecret = nil
 	} else {
 		jwtSecret = []byte(secret)
 	}
 }
 
-// GetJWTSecret returns the JWT secret, or error if not configured
+/* GetJWTSecret returns the JWT secret, or error if not configured */
 func GetJWTSecret() ([]byte, error) {
 	if jwtSecret == nil {
 		return nil, fmt.Errorf("JWT_SECRET environment variable is required when using JWT authentication")
@@ -31,7 +29,7 @@ func GetJWTSecret() ([]byte, error) {
 	return jwtSecret, nil
 }
 
-// Claims represents JWT claims
+/* Claims represents JWT claims */
 type Claims struct {
 	UserID   string `json:"user_id"`
 	Username string `json:"username"`
@@ -39,14 +37,14 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
-// GenerateToken generates a JWT token for a user
+/* GenerateToken generates a JWT token for a user */
 func GenerateToken(userID, username string, isAdmin bool) (string, error) {
 	secret, err := GetJWTSecret()
 	if err != nil {
 		return "", err
 	}
 
-	expirationTime := time.Now().Add(24 * time.Hour) // Token expires in 24 hours
+	expirationTime := time.Now().Add(24 * time.Hour)
 
 	claims := &Claims{
 		UserID:   userID,
@@ -67,7 +65,7 @@ func GenerateToken(userID, username string, isAdmin bool) (string, error) {
 	return tokenString, nil
 }
 
-// ValidateToken validates a JWT token and returns the claims
+/* ValidateToken validates a JWT token and returns the claims */
 func ValidateToken(tokenString string) (*Claims, error) {
 	secret, err := GetJWTSecret()
 	if err != nil {
@@ -94,13 +92,12 @@ func ValidateToken(tokenString string) (*Claims, error) {
 	return claims, nil
 }
 
-// ExtractToken extracts the JWT token from an Authorization header
+/* ExtractToken extracts the JWT token from an Authorization header */
 func ExtractToken(authHeader string) (string, error) {
 	if authHeader == "" {
 		return "", errors.New("missing authorization header")
 	}
 
-	// Support both "Bearer <token>" and just "<token>"
 	parts := strings.Split(authHeader, " ")
 	if len(parts) == 2 && strings.ToLower(parts[0]) == "bearer" {
 		return parts[1], nil

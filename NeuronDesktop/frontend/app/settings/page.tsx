@@ -14,8 +14,11 @@ import {
   SparklesIcon,
   CpuIcon,
   CheckCircleIcon,
-  XCircleIcon
+  XCircleIcon,
+  ArrowDownTrayIcon,
+  ArrowUpTrayIcon
 } from '@/components/Icons'
+import { showSuccessToast, showErrorToast } from '@/lib/errors'
 
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme()
@@ -184,7 +187,7 @@ export default function SettingsPage() {
         setSelectedProfileForModels(defaultProfile ? defaultProfile.id : response.data[0].id)
       }
     } catch (error) {
-      console.error('Failed to load profiles:', error)
+      showErrorToast('Failed to load profiles: ' + (error.response?.data?.error || error.message))
     }
   }
 
@@ -195,7 +198,7 @@ export default function SettingsPage() {
       const response = await modelConfigAPI.list(selectedProfileForModels, true)
       setModelConfigs(response.data)
     } catch (error) {
-      console.error('Failed to load model configs:', error)
+      showErrorToast('Failed to load model configs: ' + (error.response?.data?.error || error.message))
     }
   }
 
@@ -206,7 +209,7 @@ export default function SettingsPage() {
       const response = await factoryAPI.getStatus()
       setConnectionStatus(response.data)
     } catch (error: any) {
-      console.error('Failed to load connection status:', error)
+      showErrorToast('Failed to load connection status: ' + (error.response?.data?.error || error.message))
       setStatusError(error.response?.data?.error || error.message || 'Failed to load connection status')
     } finally {
       setStatusLoading(false)
@@ -337,7 +340,7 @@ export default function SettingsPage() {
       setNewModelIsDefault(false)
       setNotice({ type: 'success', message: 'Model configuration created.' })
     } catch (error: any) {
-      console.error('Failed to create model config:', error)
+      showErrorToast('Failed to create model config: ' + (error.response?.data?.error || error.message))
       setNotice({ type: 'error', message: 'Failed to create model configuration: ' + (error.response?.data?.error || error.message) })
     }
   }
@@ -352,7 +355,7 @@ export default function SettingsPage() {
       await loadModelConfigs()
       setNotice({ type: 'success', message: 'Model configuration deleted.' })
     } catch (error: any) {
-      console.error('Failed to delete model config:', error)
+      showErrorToast('Failed to delete model config: ' + (error.response?.data?.error || error.message))
       setNotice({ type: 'error', message: 'Failed to delete model configuration: ' + (error.response?.data?.error || error.message) })
     }
   }
@@ -389,7 +392,7 @@ export default function SettingsPage() {
       setEditingModel(null)
       setNotice({ type: 'success', message: 'Model configuration updated.' })
     } catch (error: any) {
-      console.error('Failed to update model config:', error)
+      showErrorToast('Failed to update model config: ' + (error.response?.data?.error || error.message))
       setNotice({ type: 'error', message: 'Failed to update model configuration: ' + (error.response?.data?.error || error.message) })
     }
   }
@@ -402,7 +405,7 @@ export default function SettingsPage() {
       await loadModelConfigs()
       setNotice({ type: 'success', message: 'Default model updated.' })
     } catch (error: any) {
-      console.error('Failed to set default model:', error)
+      showErrorToast('Failed to set default model: ' + (error.response?.data?.error || error.message))
       setNotice({ type: 'error', message: 'Failed to set default model: ' + (error.response?.data?.error || error.message) })
     } finally {
       setSettingDefault(null)
@@ -421,7 +424,7 @@ export default function SettingsPage() {
       setInlineApiKey('')
       setNotice({ type: 'success', message: 'API key updated.' })
     } catch (error: any) {
-      console.error('Failed to update API key:', error)
+      showErrorToast('Failed to update API key: ' + (error.response?.data?.error || error.message))
       setNotice({ type: 'error', message: 'Failed to update API key: ' + (error.response?.data?.error || error.message) })
     } finally {
       setSavingApiKey(null)
@@ -444,7 +447,7 @@ export default function SettingsPage() {
       await loadModelConfigs()
       setNotice({ type: 'success', message: `Model ${!currentEnabled ? 'enabled' : 'disabled'}.` })
     } catch (error: any) {
-      console.error('Failed to toggle model enabled state:', error)
+      showErrorToast('Failed to toggle model enabled state: ' + (error.response?.data?.error || error.message))
       setNotice({ type: 'error', message: 'Failed to update model: ' + (error.response?.data?.error || error.message) })
     } finally {
       setTogglingEnabled(null)
@@ -567,7 +570,7 @@ export default function SettingsPage() {
       await loadProfiles()
       setNotice({ type: 'success', message: `MCP configuration saved to profile "${editingProfile.name}".` })
     } catch (error) {
-      console.error('Failed to save MCP config:', error)
+      showErrorToast('Failed to save MCP config: ' + (error.response?.data?.error || error.message))
       setNotice({ type: 'error', message: 'Failed to save MCP configuration.' })
     }
   }
@@ -586,7 +589,7 @@ export default function SettingsPage() {
       await loadProfiles()
       setNotice({ type: 'success', message: `Agent configuration saved to profile "${editingProfile.name}".` })
     } catch (error) {
-      console.error('Failed to save agent config:', error)
+      showErrorToast('Failed to save agent config: ' + (error.response?.data?.error || error.message))
       setNotice({ type: 'error', message: 'Failed to save agent configuration.' })
     }
   }
@@ -1220,8 +1223,23 @@ export default function SettingsPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <button 
+                      onClick={async () => {
+                        try {
+                          await profilesAPI.export(profile.id)
+                          showSuccessToast(`Profile "${profile.name}" exported successfully`)
+                        } catch (error: any) {
+                          showErrorToast('Failed to export profile: ' + (error.response?.data?.error || error.message))
+                        }
+                      }}
+                      className="p-2 text-slate-700 dark:text-slate-500 hover:text-green-600 dark:hover:text-green-400"
+                      title="Export Profile"
+                    >
+                      <ArrowDownTrayIcon className="w-4 h-4" />
+                    </button>
+                    <button 
                       onClick={() => handleEditProfile(profile)}
                       className="p-2 text-slate-700 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-400"
+                      title="Edit Profile"
                     >
                       <PencilIcon className="w-4 h-4" />
                     </button>
@@ -1235,14 +1253,14 @@ export default function SettingsPage() {
                               setExpandedProfile(null)
                               setEditingProfile(null)
                             }
-                            setNotice({ type: 'success', message: 'Profile deleted.' })
+                            showSuccessToast('Profile deleted successfully')
                           } catch (error: any) {
-                            console.error('Failed to delete profile:', error)
-                            setNotice({ type: 'error', message: 'Failed to delete profile: ' + (error.response?.data?.error || error.message) })
+                            showErrorToast('Failed to delete profile: ' + (error.response?.data?.error || error.message))
                           }
                         }
                       }}
                       className="p-2 text-slate-700 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-400"
+                      title="Delete Profile"
                     >
                       <TrashIcon className="w-4 h-4" />
                     </button>

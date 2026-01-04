@@ -7,7 +7,7 @@ import (
 	"github.com/neurondb/NeuronDesktop/api/internal/logging"
 )
 
-// ErrorResponse represents an error response (duplicated here to avoid circular import)
+/* ErrorResponse represents an error response (duplicated here to avoid circular import) */
 type ErrorResponse struct {
 	Error     string                 `json:"error"`
 	Message   string                 `json:"message,omitempty"`
@@ -16,7 +16,7 @@ type ErrorResponse struct {
 	RequestID string                 `json:"request_id,omitempty"`
 }
 
-// RecoveryMiddleware recovers from panics
+/* RecoveryMiddleware recovers from panics */
 func RecoveryMiddleware(logger *logging.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -29,7 +29,6 @@ func RecoveryMiddleware(logger *logging.Logger) func(http.Handler) http.Handler 
 						"request_id": requestID,
 					})
 
-					// Use standardized error response (without importing handlers)
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(http.StatusInternalServerError)
 

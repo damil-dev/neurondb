@@ -12,19 +12,18 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
-// Client provides access to NeuronDB via Postgres
+/* Client provides access to NeuronDB via Postgres */
 type Client struct {
 	db *sql.DB
 }
 
-// NewClient creates a new NeuronDB client
+/* NewClient creates a new NeuronDB client */
 func NewClient(dsn string) (*Client, error) {
 	db, err := sql.Open("pgx", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
-	// Test connection
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -36,12 +35,12 @@ func NewClient(dsn string) (*Client, error) {
 	return &Client{db: db}, nil
 }
 
-// Close closes the database connection
+/* Close closes the database connection */
 func (c *Client) Close() error {
 	return c.db.Close()
 }
 
-// CollectionInfo represents a collection (table) in NeuronDB
+/* CollectionInfo represents a collection (table) in NeuronDB */
 type CollectionInfo struct {
 	Name      string            `json:"name"`
 	Schema    string            `json:"schema"`
@@ -51,7 +50,7 @@ type CollectionInfo struct {
 	Metadata  map[string]string `json:"metadata,omitempty"`
 }
 
-// IndexInfo represents an index on a collection
+/* IndexInfo represents an index on a collection */
 type IndexInfo struct {
 	Name       string `json:"name"`
 	Type       string `json:"type"`
@@ -59,7 +58,7 @@ type IndexInfo struct {
 	Size       string `json:"size,omitempty"`
 }
 
-// ListCollections lists all tables that might contain vectors
+/* ListCollections lists all tables that might contain vectors */
 func (c *Client) ListCollections(ctx context.Context) ([]CollectionInfo, error) {
 	query := `
 		SELECT 
@@ -96,16 +95,13 @@ func (c *Client) ListCollections(ctx context.Context) ([]CollectionInfo, error) 
 			continue
 		}
 
-		// Get vector column name
 		vectorCol, err := c.getVectorColumn(ctx, schema, table)
 		if err != nil {
 			continue
 		}
 
-		// Get indexes
 		indexes, _ := c.getIndexes(ctx, schema, table)
 
-		// Get row count (schema and table are from system tables, safe)
 		var rowCount int64
 		if err := validateIdentifier(schema); err != nil {
 			continue
@@ -129,7 +125,7 @@ func (c *Client) ListCollections(ctx context.Context) ([]CollectionInfo, error) 
 	return collections, nil
 }
 
-// getVectorColumn finds the vector column in a table
+/* getVectorColumn finds the vector column in a table */
 func (c *Client) getVectorColumn(ctx context.Context, schema, table string) (string, error) {
 	query := `
 		SELECT column_name
@@ -145,7 +141,7 @@ func (c *Client) getVectorColumn(ctx context.Context, schema, table string) (str
 	return colName, err
 }
 
-// getIndexes gets indexes for a table
+/* getIndexes gets indexes for a table */
 func (c *Client) getIndexes(ctx context.Context, schema, table string) ([]IndexInfo, error) {
 	query := `
 		SELECT 
@@ -179,7 +175,7 @@ func (c *Client) getIndexes(ctx context.Context, schema, table string) ([]IndexI
 	return indexes, nil
 }
 
-// SearchRequest represents a vector search request
+/* SearchRequest represents a vector search request */
 type SearchRequest struct {
 	Collection   string                 `json:"collection"`
 	Schema       string                 `json:"schema,omitempty"`
@@ -190,7 +186,7 @@ type SearchRequest struct {
 	DistanceType string                 `json:"distance_type,omitempty"` // l2, cosine, inner_product
 }
 
-// SearchResult represents a single search result
+/* SearchResult represents a single search result */
 type SearchResult struct {
 	ID       interface{}            `json:"id"`
 	Score    float64                `json:"score"`
@@ -198,7 +194,7 @@ type SearchResult struct {
 	Data     map[string]interface{} `json:"data"`
 }
 
-// Search performs a vector search
+/* Search performs a vector search */
 func (c *Client) Search(ctx context.Context, req SearchRequest) ([]SearchResult, error) {
 	if req.Limit <= 0 {
 		req.Limit = 10
@@ -210,7 +206,7 @@ func (c *Client) Search(ctx context.Context, req SearchRequest) ([]SearchResult,
 		req.DistanceType = "cosine"
 	}
 
-	// Validate identifiers (prevent SQL injection)
+	/* Validate identifiers (prevent SQL injection) */
 	if err := validateIdentifier(req.Schema); err != nil {
 		return nil, fmt.Errorf("invalid schema name: %w", err)
 	}
@@ -218,21 +214,20 @@ func (c *Client) Search(ctx context.Context, req SearchRequest) ([]SearchResult,
 		return nil, fmt.Errorf("invalid collection name: %w", err)
 	}
 
-	// Get vector column (validates collection exists)
 	vectorCol, err := c.getVectorColumn(ctx, req.Schema, req.Collection)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find vector column: %w", err)
 	}
 
-	// Validate vector column name
+	/* Validate vector column name */
 	if err := validateIdentifier(vectorCol); err != nil {
 		return nil, fmt.Errorf("invalid vector column name: %w", err)
 	}
 
-	// Convert query vector to SQL array format (safe - numeric array)
+	/* Convert query vector to SQL array format (safe - numeric array) */
 	vectorStr := formatVector(req.QueryVector)
 
-	// Build distance operator (safe - hardcoded values)
+	/* Build distance operator (safe - hardcoded values) */
 	var distanceOp string
 	switch req.DistanceType {
 	case "l2":
@@ -245,9 +240,9 @@ func (c *Client) Search(ctx context.Context, req SearchRequest) ([]SearchResult,
 		distanceOp = "<=>" // Default to cosine
 	}
 
-	// Build query with validated identifiers
-	// Note: vectorStr is generated from numeric array, so safe to interpolate
-	// Identifiers are validated above, so safe to use in query
+	/* Build query with validated identifiers */
+	/* Note: vectorStr is generated from numeric array, so safe to interpolate */
+	/* Identifiers are validated above, so safe to use in query */
 	tableName := fmt.Sprintf("%s.%s", quoteIdentifier(req.Schema), quoteIdentifier(req.Collection))
 	query := fmt.Sprintf(`
 		SELECT *, 
@@ -258,14 +253,14 @@ func (c *Client) Search(ctx context.Context, req SearchRequest) ([]SearchResult,
 	`, quoteIdentifier(vectorCol), distanceOp, vectorStr, tableName,
 		quoteIdentifier(vectorCol), distanceOp, vectorStr)
 
-	// Execute query (limit is parameterized, vector is safe numeric string)
+	/* Execute query (limit is parameterized, vector is safe numeric string) */
 	rows, err := c.db.QueryContext(ctx, query, req.Limit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute search: %w", err)
 	}
 	defer rows.Close()
 
-	// Get column names
+	/* Get column names */
 	columns, err := rows.Columns()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get columns: %w", err)
@@ -273,7 +268,7 @@ func (c *Client) Search(ctx context.Context, req SearchRequest) ([]SearchResult,
 
 	var results []SearchResult
 	for rows.Next() {
-		// Create slice to hold values
+		/* Create slice to hold values */
 		values := make([]interface{}, len(columns))
 		valuePtrs := make([]interface{}, len(columns))
 		for i := range values {
@@ -284,7 +279,7 @@ func (c *Client) Search(ctx context.Context, req SearchRequest) ([]SearchResult,
 			continue
 		}
 
-		// Build result map
+		/* Build result map */
 		result := SearchResult{
 			Data: make(map[string]interface{}),
 		}
@@ -295,7 +290,7 @@ func (c *Client) Search(ctx context.Context, req SearchRequest) ([]SearchResult,
 			if col == "distance" {
 				if d, ok := val.(float64); ok {
 					result.Distance = d
-					// Convert distance to score (1 / (1 + distance) for cosine)
+					/* Convert distance to score (1 / (1 + distance) for cosine) */
 					if req.DistanceType == "cosine" {
 						result.Score = 1.0 - d
 					} else {
@@ -305,7 +300,7 @@ func (c *Client) Search(ctx context.Context, req SearchRequest) ([]SearchResult,
 			} else if col == "id" || strings.HasSuffix(col, "_id") {
 				result.ID = val
 			} else {
-				// Convert to JSON-serializable type
+				/* Convert to JSON-serializable type */
 				if bytes, ok := val.([]byte); ok {
 					var jsonVal interface{}
 					if err := json.Unmarshal(bytes, &jsonVal); err == nil {
@@ -325,9 +320,8 @@ func (c *Client) Search(ctx context.Context, req SearchRequest) ([]SearchResult,
 	return results, nil
 }
 
-// ExecuteSQL executes a SQL query with guardrails
+/* ExecuteSQL executes a SQL query with guardrails */
 func (c *Client) ExecuteSQL(ctx context.Context, query string) (interface{}, error) {
-	// Guardrails: prevent dangerous operations
 	queryUpper := strings.ToUpper(strings.TrimSpace(query))
 	dangerous := []string{"DROP", "TRUNCATE", "DELETE", "UPDATE", "ALTER", "CREATE", "GRANT", "REVOKE"}
 
@@ -337,7 +331,7 @@ func (c *Client) ExecuteSQL(ctx context.Context, query string) (interface{}, err
 		}
 	}
 
-	// Only allow SELECT statements
+	/* Only allow SELECT statements */
 	if !strings.HasPrefix(queryUpper, "SELECT") {
 		return nil, fmt.Errorf("only SELECT queries are allowed")
 	}
@@ -385,13 +379,13 @@ func (c *Client) ExecuteSQL(ctx context.Context, query string) (interface{}, err
 	return results, nil
 }
 
-// ExecuteSQLFull executes any SQL query (full database access)
-// This allows CREATE, INSERT, UPDATE, DELETE, DROP, etc.
-// Use with extreme caution - no safety checks are performed
+/* ExecuteSQLFull executes any SQL query (full database access) */
+/* This allows CREATE, INSERT, UPDATE, DELETE, DROP, etc. */
+/* Use with extreme caution - no safety checks are performed */
 func (c *Client) ExecuteSQLFull(ctx context.Context, query string) (interface{}, error) {
 	queryUpper := strings.ToUpper(strings.TrimSpace(query))
 
-	// Check if it's a SELECT query (return results)
+	/* Check if it's a SELECT query (return results) */
 	if strings.HasPrefix(queryUpper, "SELECT") {
 		rows, err := c.db.QueryContext(ctx, query)
 		if err != nil {
@@ -404,7 +398,7 @@ func (c *Client) ExecuteSQLFull(ctx context.Context, query string) (interface{},
 			return nil, fmt.Errorf("failed to get columns: %w", err)
 		}
 
-		// Initialize as empty array instead of nil to ensure JSON serialization as []
+		/* Initialize as empty array instead of nil to ensure JSON serialization as [] */
 		results := make([]map[string]interface{}, 0)
 		for rows.Next() {
 			values := make([]interface{}, len(columns))
@@ -437,8 +431,8 @@ func (c *Client) ExecuteSQLFull(ctx context.Context, query string) (interface{},
 		return results, nil
 	}
 
-	// For non-SELECT queries (INSERT, UPDATE, DELETE, CREATE, etc.)
-	// Execute the query and return affected rows count
+	/* For non-SELECT queries (INSERT, UPDATE, DELETE, CREATE, etc.) */
+	/* Execute the query and return affected rows count */
 	result, err := c.db.ExecContext(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("SQL execution failed: %w", err)
@@ -452,10 +446,10 @@ func (c *Client) ExecuteSQLFull(ctx context.Context, query string) (interface{},
 	}, nil
 }
 
-// Helper functions
+/* Helper functions */
 
-// validateIdentifier validates that an identifier is safe to use in SQL
-// Only allows alphanumeric, underscore, and must start with letter/underscore
+/* validateIdentifier validates that an identifier is safe to use in SQL */
+/* Only allows alphanumeric, underscore, and must start with letter/underscore */
 var identifierRegex = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
 
 func validateIdentifier(name string) error {

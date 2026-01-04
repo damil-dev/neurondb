@@ -5,51 +5,46 @@ import (
 	"time"
 )
 
-// Metrics collects application metrics
+/* Metrics collects application metrics */
 type Metrics struct {
 	mu sync.RWMutex
 
-	// Request metrics
 	TotalRequests      int64
 	SuccessfulRequests int64
 	FailedRequests     int64
 
-	// Response time metrics
 	TotalResponseTime time.Duration
 	MinResponseTime   time.Duration
 	MaxResponseTime   time.Duration
 
-	// Endpoint metrics
 	EndpointCounts map[string]int64
 	EndpointErrors map[string]int64
 
-	// Connection metrics
 	ActiveMCPConnections      int
 	ActiveNeuronDBConnections int
 	ActiveAgentConnections    int
 
-	// Error metrics
 	ErrorCounts map[string]int64
 }
 
 var globalMetrics = NewMetrics()
 
-// NewMetrics creates a new metrics instance
+/* NewMetrics creates a new metrics instance */
 func NewMetrics() *Metrics {
 	return &Metrics{
 		EndpointCounts:  make(map[string]int64),
 		EndpointErrors:  make(map[string]int64),
 		ErrorCounts:     make(map[string]int64),
-		MinResponseTime: time.Hour, // Initialize to large value
+		MinResponseTime: time.Hour, /* Initialize to large value */
 	}
 }
 
-// GetGlobalMetrics returns the global metrics instance
+/* GetGlobalMetrics returns the global metrics instance */
 func GetGlobalMetrics() *Metrics {
 	return globalMetrics
 }
 
-// RecordRequest records a request
+/* RecordRequest records a request */
 func (m *Metrics) RecordRequest(endpoint string, success bool, duration time.Duration) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -73,14 +68,14 @@ func (m *Metrics) RecordRequest(endpoint string, success bool, duration time.Dur
 	}
 }
 
-// RecordError records an error
+/* RecordError records an error */
 func (m *Metrics) RecordError(errorType string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.ErrorCounts[errorType]++
 }
 
-// SetActiveConnections sets active connection counts
+/* SetActiveConnections sets active connection counts */
 func (m *Metrics) SetActiveConnections(mcp, neurondb, agent int) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -89,7 +84,7 @@ func (m *Metrics) SetActiveConnections(mcp, neurondb, agent int) {
 	m.ActiveAgentConnections = agent
 }
 
-// GetStats returns current statistics
+/* GetStats returns current statistics */
 func (m *Metrics) GetStats() map[string]interface{} {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -120,7 +115,7 @@ func (m *Metrics) GetStats() map[string]interface{} {
 	}
 }
 
-// Reset resets all metrics
+/* Reset resets all metrics */
 func (m *Metrics) Reset() {
 	m.mu.Lock()
 	defer m.mu.Unlock()

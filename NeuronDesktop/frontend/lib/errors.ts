@@ -1,4 +1,5 @@
 import { AxiosError } from 'axios'
+import { toastManager } from './toast'
 
 /**
  * Extracts a user-friendly error message from an error object
@@ -92,6 +93,35 @@ export function getErrorMessage(error: unknown): string {
   
   // Fallback for unknown error types
   return 'An unexpected error occurred. Please try again.'
+}
+
+/**
+ * Shows an error toast notification
+ */
+export function showErrorToast(error: unknown, customMessage?: string) {
+  const message = customMessage || getErrorMessage(error)
+  toastManager.error(message)
+}
+
+/**
+ * Shows a success toast notification
+ */
+export function showSuccessToast(message: string) {
+  toastManager.success(message)
+}
+
+/**
+ * Shows a warning toast notification
+ */
+export function showWarningToast(message: string) {
+  toastManager.warning(message)
+}
+
+/**
+ * Shows an info toast notification
+ */
+export function showInfoToast(message: string) {
+  toastManager.info(message)
 }
 
 /**
