@@ -109,7 +109,7 @@ func (t *HybridSearchTool) Execute(ctx context.Context, params map[string]interf
 	vectorColumn, _ := params["vector_column"].(string)
 	textColumn, _ := params["text_column"].(string)
 
-	// Validate table (SQL identifier)
+	/* Validate table (SQL identifier) */
 	if err := validation.ValidateSQLIdentifierRequired(table, "table"); err != nil {
 		return Error(fmt.Sprintf("Invalid table parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "table",
@@ -118,7 +118,7 @@ func (t *HybridSearchTool) Execute(ctx context.Context, params map[string]interf
 		}), nil
 	}
 
-	// Validate vector_column (SQL identifier)
+	/* Validate vector_column (SQL identifier) */
 	if err := validation.ValidateSQLIdentifierRequired(vectorColumn, "vector_column"); err != nil {
 		return Error(fmt.Sprintf("Invalid vector_column parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "vector_column",
@@ -128,7 +128,7 @@ func (t *HybridSearchTool) Execute(ctx context.Context, params map[string]interf
 		}), nil
 	}
 
-	// Validate text_column (SQL identifier)
+	/* Validate text_column (SQL identifier) */
 	if err := validation.ValidateSQLIdentifierRequired(textColumn, "text_column"); err != nil {
 		return Error(fmt.Sprintf("Invalid text_column parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "text_column",
@@ -138,7 +138,7 @@ func (t *HybridSearchTool) Execute(ctx context.Context, params map[string]interf
 		}), nil
 	}
 
-	// Validate query_vector
+	/* Validate query_vector */
 	if err := validation.ValidateVectorRequired(queryVector, "query_vector", 1, 10000); err != nil {
 		return Error(fmt.Sprintf("Invalid query_vector parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "query_vector",
@@ -148,7 +148,7 @@ func (t *HybridSearchTool) Execute(ctx context.Context, params map[string]interf
 		}), nil
 	}
 
-	// Validate query_text
+	/* Validate query_text */
 	if err := validation.ValidateRequired(queryText, "query_text"); err != nil {
 		return Error(fmt.Sprintf("Invalid query_text parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "query_text",

@@ -89,7 +89,7 @@ func (t *CreateHNSWIndexTool) Execute(ctx context.Context, params map[string]int
 	vectorColumn, _ := params["vector_column"].(string)
 	indexName, _ := params["index_name"].(string)
 	
-	// Get index config defaults from database
+	/* Get index config defaults from database */
 	m := 16
 	efConstruction := 200
 	if indexConfig, err := t.configHelper.GetIndexConfig(ctx, table, vectorColumn); err == nil && indexConfig != nil {
@@ -107,7 +107,7 @@ func (t *CreateHNSWIndexTool) Execute(ctx context.Context, params map[string]int
 		})
 	}
 	
-	// Override with provided parameters
+	/* Override with provided parameters */
 	if mVal, ok := params["m"].(float64); ok {
 		m = int(mVal)
 	}
@@ -115,7 +115,7 @@ func (t *CreateHNSWIndexTool) Execute(ctx context.Context, params map[string]int
 		efConstruction = int(ef)
 	}
 
-	// Validate table name (SQL identifier)
+	/* Validate table name (SQL identifier) */
 	if err := validation.ValidateSQLIdentifierRequired(table, "table"); err != nil {
 		return Error(fmt.Sprintf("Invalid table parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "table",
@@ -124,7 +124,7 @@ func (t *CreateHNSWIndexTool) Execute(ctx context.Context, params map[string]int
 		}), nil
 	}
 
-	// Validate vector column (SQL identifier)
+	/* Validate vector column (SQL identifier) */
 	if err := validation.ValidateSQLIdentifierRequired(vectorColumn, "vector_column"); err != nil {
 		return Error(fmt.Sprintf("Invalid vector_column parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "vector_column",
@@ -134,7 +134,7 @@ func (t *CreateHNSWIndexTool) Execute(ctx context.Context, params map[string]int
 		}), nil
 	}
 
-	// Validate index name (SQL identifier)
+	/* Validate index name (SQL identifier) */
 	if err := validation.ValidateSQLIdentifierRequired(indexName, "index_name"); err != nil {
 		return Error(fmt.Sprintf("Invalid index_name parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter":     "index_name",
@@ -145,7 +145,7 @@ func (t *CreateHNSWIndexTool) Execute(ctx context.Context, params map[string]int
 		}), nil
 	}
 
-	// Validate HNSW parameters
+	/* Validate HNSW parameters */
 	if err := validation.ValidateIntRange(m, 2, 128, "m"); err != nil {
 		return Error(fmt.Sprintf("Invalid m parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter":     "m",
@@ -265,7 +265,7 @@ func (t *CreateIVFIndexTool) Execute(ctx context.Context, params map[string]inte
 	vectorColumn, _ := params["vector_column"].(string)
 	indexName, _ := params["index_name"].(string)
 	
-	// Get index config defaults from database
+	/* Get index config defaults from database */
 	numLists := 100
 	if indexConfig, err := t.configHelper.GetIndexConfig(ctx, table, vectorColumn); err == nil && indexConfig != nil {
 		if indexConfig.IVFLists != nil {
@@ -278,7 +278,7 @@ func (t *CreateIVFIndexTool) Execute(ctx context.Context, params map[string]inte
 		})
 	}
 	
-	// Override with provided parameters
+	/* Override with provided parameters */
 	if n, ok := params["num_lists"].(float64); ok {
 		numLists = int(n)
 	}
@@ -403,7 +403,7 @@ func (t *IndexStatusTool) Execute(ctx context.Context, params map[string]interfa
 	`
 	result, err := t.executor.ExecuteQueryOne(ctx, query, []interface{}{indexName})
 	if err != nil {
-		// Check if error is "no rows returned" - index doesn't exist
+		/* Check if error is "no rows returned" - index doesn't exist */
 		if strings.Contains(err.Error(), "no rows returned") {
 			return Success(map[string]interface{}{
 				"index_name": indexName,

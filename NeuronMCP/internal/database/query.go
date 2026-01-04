@@ -110,8 +110,8 @@ func (qb *QueryBuilder) VectorSearch(table, vectorColumn string, queryVector []f
 	params = append(params, limit)
 	limitParamIndex := paramIndex
 
-	// Use subquery to cast vector to text, then calculate distance in outer query using cast back to vector
-	// This ensures vector is scannable while allowing distance calculation
+	/* Use subquery to cast vector to text, then calculate distance in outer query using cast back to vector */
+	/* This ensures vector is scannable while allowing distance calculation */
 	subquerySelect := []string{}
 	if len(additionalColumns) > 0 {
 		for _, col := range additionalColumns {
@@ -119,11 +119,11 @@ func (qb *QueryBuilder) VectorSearch(table, vectorColumn string, queryVector []f
 		}
 		subquerySelect = append(subquerySelect, fmt.Sprintf("%s::text AS %s", EscapeIdentifier(vectorColumn), EscapeIdentifier(vectorColumn)))
 	} else {
-		// For *, we need to explicitly cast the vector column to text
-		// PostgreSQL doesn't support * EXCEPT column, so we'll handle it differently
-		// Select all columns with vector cast to text
+		/* For *, we need to explicitly cast the vector column to text */
+		/* PostgreSQL doesn't support * EXCEPT column, so we'll handle it differently */
+		/* Select all columns with vector cast to text */
 		subquerySelect = append(subquerySelect, "*")
-		// Note: This creates a duplicate, but we'll handle it by selecting explicitly in outer query
+		/* Note: This creates a duplicate, but we'll handle it by selecting explicitly in outer query */
 	}
 	
 	subquery := fmt.Sprintf("(SELECT %s FROM %s) AS %s",
@@ -131,8 +131,8 @@ func (qb *QueryBuilder) VectorSearch(table, vectorColumn string, queryVector []f
 		EscapeIdentifier(table),
 		tableAlias)
 
-	// Build final SELECT - calculate distance using vector cast, select all columns
-	// Distance calculation: cast the text vector back to vector type for distance calc
+	/* Build final SELECT - calculate distance using vector cast, select all columns */
+	/* Distance calculation: cast the text vector back to vector type for distance calc */
 	distanceExprWithCast := ""
 	switch distanceMetric {
 	case "cosine":
@@ -165,7 +165,7 @@ func (qb *QueryBuilder) VectorSearch(table, vectorColumn string, queryVector []f
 		}
 		selectColumns = append(selectColumns, fmt.Sprintf("%s.%s", tableAlias, EscapeIdentifier(vectorColumn)))
 	} else {
-		// Select all columns from subquery (vector is already text)
+		/* Select all columns from subquery (vector is already text) */
 		selectColumns = append(selectColumns, fmt.Sprintf("%s.*", tableAlias))
 	}
 	selectColumns = append(selectColumns, distanceExprWithCast)

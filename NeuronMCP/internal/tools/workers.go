@@ -83,7 +83,7 @@ func (t *WorkerManagementTool) Execute(ctx context.Context, params map[string]in
 
 	switch operation {
 	case "status":
-		// Try to get worker configs from database
+		/* Try to get worker configs from database */
 		workerConfigs := make(map[string]interface{})
 		workers := []string{"neuranq", "neuranmon", "neurandefrag"}
 		for _, workerName := range workers {
@@ -95,12 +95,12 @@ func (t *WorkerManagementTool) Execute(ctx context.Context, params map[string]in
 			}
 		}
 		
-		// Try neurondb.worker_status() first, fallback to checking if function exists
+		/* Try neurondb.worker_status() first, fallback to checking if function exists */
 		query = "SELECT * FROM neurondb.worker_status()"
 		queryParams = []interface{}{}
 		result, err := t.executor.ExecuteQueryOne(ctx, query, queryParams)
 		if err != nil {
-			// Function might not exist, return configs from database instead
+			/* Function might not exist, return configs from database instead */
 			t.logger.Warn("worker_status() function not found, returning configs from database", map[string]interface{}{
 				"error": err.Error(),
 			})
@@ -112,7 +112,7 @@ func (t *WorkerManagementTool) Execute(ctx context.Context, params map[string]in
 			}), nil
 		}
 		
-		// Merge database configs with status result
+		/* Merge database configs with status result */
 		result["configs"] = workerConfigs
 		
 		return Success(result, map[string]interface{}{

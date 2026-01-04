@@ -93,7 +93,7 @@ func (t *TrainModelTool) Execute(ctx context.Context, params map[string]interfac
 	featureCol, _ := params["feature_col"].(string)
 	labelCol, _ := params["label_col"].(string)
 
-	// Validate algorithm
+	/* Validate algorithm */
 	if err := validation.ValidateRequired(algorithm, "algorithm"); err != nil {
 		return Error(fmt.Sprintf("Invalid algorithm parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "algorithm",
@@ -109,7 +109,7 @@ func (t *TrainModelTool) Execute(ctx context.Context, params map[string]interfac
 		}), nil
 	}
 
-	// Validate table name (SQL identifier)
+	/* Validate table name (SQL identifier) */
 	if err := validation.ValidateSQLIdentifierRequired(table, "table"); err != nil {
 		return Error(fmt.Sprintf("Invalid table parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "table",
@@ -119,7 +119,7 @@ func (t *TrainModelTool) Execute(ctx context.Context, params map[string]interfac
 		}), nil
 	}
 
-	// Validate feature column (SQL identifier)
+	/* Validate feature column (SQL identifier) */
 	if err := validation.ValidateSQLIdentifierRequired(featureCol, "feature_col"); err != nil {
 		return Error(fmt.Sprintf("Invalid feature_col parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "feature_col",
@@ -130,7 +130,7 @@ func (t *TrainModelTool) Execute(ctx context.Context, params map[string]interfac
 		}), nil
 	}
 
-	// Validate label column (SQL identifier)
+	/* Validate label column (SQL identifier) */
 	if err := validation.ValidateSQLIdentifierRequired(labelCol, "label_col"); err != nil {
 		return Error(fmt.Sprintf("Invalid label_col parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter":  "label_col",
@@ -142,10 +142,10 @@ func (t *TrainModelTool) Execute(ctx context.Context, params map[string]interfac
 		}), nil
 	}
 
-	// Get ML defaults from database
+	/* Get ML defaults from database */
 	defaultParams := make(map[string]interface{})
 	if mlDefaults, err := t.configHelper.GetMLDefaults(ctx, algorithm); err == nil {
-		// Merge default hyperparameters
+		/* Merge default hyperparameters */
 		for k, v := range mlDefaults.Hyperparameters {
 			defaultParams[k] = v
 		}
@@ -155,7 +155,7 @@ func (t *TrainModelTool) Execute(ctx context.Context, params map[string]interfac
 		})
 	}
 	
-	// Override with provided parameters
+	/* Override with provided parameters */
 	if p, ok := params["params"].(map[string]interface{}); ok && len(p) > 0 {
 		for k, v := range p {
 			defaultParams[k] = v

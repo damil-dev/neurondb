@@ -140,14 +140,14 @@ func (t *DatasetLoadingTool) Execute(ctx context.Context, params map[string]inte
 		}), nil
 	}
 
-	// Get source path (preferred) or dataset_name (backward compatibility)
+	/* Get source path (preferred) or dataset_name (backward compatibility) */
 	sourcePath, _ := params["source_path"].(string)
 	datasetName, _ := params["dataset_name"].(string)
 	if sourcePath == "" && datasetName != "" {
 		sourcePath = datasetName
 	}
 	
-	// Validate source_path is required
+	/* Validate source_path is required */
 	if err := validation.ValidateRequired(sourcePath, "source_path"); err != nil {
 		return Error(fmt.Sprintf("Invalid source_path parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
 			"error":  err.Error(),
@@ -155,7 +155,7 @@ func (t *DatasetLoadingTool) Execute(ctx context.Context, params map[string]inte
 		}), nil
 	}
 	
-	// Validate source_path length
+	/* Validate source_path length */
 	if err := validation.ValidateMaxLength(sourcePath, "source_path", 2048); err != nil {
 		return Error(fmt.Sprintf("Invalid source_path parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
 			"error":  err.Error(),
@@ -163,13 +163,13 @@ func (t *DatasetLoadingTool) Execute(ctx context.Context, params map[string]inte
 		}), nil
 	}
 
-	// Get source type
+	/* Get source type */
 	sourceType := "huggingface"
 	if st, ok := params["source_type"].(string); ok && st != "" {
 		sourceType = st
 	}
 
-	// Get optional parameters
+	/* Get optional parameters */
 	split := "train"
 	if s, ok := params["split"].(string); ok && s != "" {
 		split = s
@@ -211,7 +211,7 @@ func (t *DatasetLoadingTool) Execute(ctx context.Context, params map[string]inte
 		streaming = s
 	}
 
-	// Get text columns if specified
+	/* Get text columns if specified */
 	var textColumns []string
 	if tc, ok := params["text_columns"].([]interface{}); ok {
 		textColumns = make([]string, 0, len(tc))
@@ -229,7 +229,7 @@ func (t *DatasetLoadingTool) Execute(ctx context.Context, params map[string]inte
 
 /* findDatasetLoaderScript finds the dataset loader Python script */
 func (t *DatasetLoadingTool) findDatasetLoaderScript() string {
-	// Try to find the dataset_loader.py script
+	/* Try to find the dataset_loader.py script */
 	possiblePaths := []string{
 		"internal/tools/dataset_loader.py",
 		"NeuronMCP/internal/tools/dataset_loader.py",
@@ -237,7 +237,7 @@ func (t *DatasetLoadingTool) findDatasetLoaderScript() string {
 		"../../internal/tools/dataset_loader.py",
 	}
 
-	// Try relative to current working directory
+	/* Try relative to current working directory */
 	cwd, _ := os.Getwd()
 	for dir := cwd; dir != "/"; dir = filepath.Dir(dir) {
 		testPath := filepath.Join(dir, "NeuronMCP", "internal", "tools", "dataset_loader.py")
@@ -250,7 +250,7 @@ func (t *DatasetLoadingTool) findDatasetLoaderScript() string {
 		}
 	}
 
-	// Try predefined paths
+	/* Try predefined paths */
 	for _, path := range possiblePaths {
 		if absPath, err := filepath.Abs(path); err == nil {
 			if _, err := os.Stat(absPath); err == nil {
@@ -266,14 +266,14 @@ func (t *DatasetLoadingTool) findDatasetLoaderScript() string {
 func (t *DatasetLoadingTool) loadDataset(ctx context.Context, sourceType, sourcePath, split string,
 	limit, batchSize int, autoEmbed bool, embeddingModel, schemaName, tableName string,
 	createIndexes bool, format string, streaming bool, textColumns []string) (*ToolResult, error) {
-	// Find the Python loader script
+	/* Find the Python loader script */
 	scriptPath := t.findDatasetLoaderScript()
 	if scriptPath == "" {
-		// Fallback: try to use inline Python code if script not found
+		/* Fallback: try to use inline Python code if script not found */
 		return t.loadGenericDatasetFallback(ctx, sourceType, sourcePath, split, limit)
 	}
 
-	// Build command arguments
+	/* Build command arguments */
 	args := []string{scriptPath}
 	args = append(args, "--source-type", sourceType)
 	args = append(args, "--source-path", sourcePath)
@@ -311,7 +311,7 @@ func (t *DatasetLoadingTool) loadDataset(ctx context.Context, sourceType, source
 		args = append(args, textColumns...)
 	}
 
-	// Set up environment
+	/* Set up environment */
 	cfgMgr := config.NewConfigManager()
 	cfgMgr.Load("")
 	dbCfg := cfgMgr.GetDatabaseConfig()
@@ -328,7 +328,7 @@ func (t *DatasetLoadingTool) loadDataset(ctx context.Context, sourceType, source
 		env = append(env, fmt.Sprintf("PGPASSWORD=%s", *pwd))
 	}
 
-	// Execute Python script
+	/* Execute Python script */
 	cmd := exec.CommandContext(ctx, "python3", args...)
 	cmd.Env = env
 
@@ -351,7 +351,7 @@ func (t *DatasetLoadingTool) loadDataset(ctx context.Context, sourceType, source
 		), nil
 	}
 
-	// Parse JSON output - look for the final result
+	/* Parse JSON output - look for the final result */
 	outputStr := strings.TrimSpace(string(output))
 	lines := strings.Split(outputStr, "\n")
 	
@@ -363,7 +363,7 @@ func (t *DatasetLoadingTool) loadDataset(ctx context.Context, sourceType, source
 	var embeddingColumnsResult []interface{}
 	var indexesCreated int
 
-	// Find the last JSON object (final result)
+	/* Find the last JSON object (final result) */
 	for i := len(lines) - 1; i >= 0; i-- {
 		line := strings.TrimSpace(lines[i])
 		if strings.HasPrefix(line, "{") && strings.HasSuffix(line, "}") {
@@ -397,7 +397,7 @@ func (t *DatasetLoadingTool) loadDataset(ctx context.Context, sourceType, source
 			indexesCreated = int(ic)
 		}
 	} else {
-		// Fallback: try to extract from any JSON in output
+		/* Fallback: try to extract from any JSON in output */
 		if strings.Contains(outputStr, "{") {
 			jsonStart := strings.Index(outputStr, "{")
 			jsonEnd := strings.LastIndex(outputStr, "}") + 1
@@ -437,8 +437,8 @@ func (t *DatasetLoadingTool) loadDataset(ctx context.Context, sourceType, source
 
 /* loadGenericDatasetFallback loads dataset using inline Python (fallback if script not found) */
 func (t *DatasetLoadingTool) loadGenericDatasetFallback(ctx context.Context, sourceType, sourcePath, split string, limit int) (*ToolResult, error) {
-	// This is a simplified fallback for backward compatibility
-	// Only supports HuggingFace for now
+	/* This is a simplified fallback for backward compatibility */
+	/* Only supports HuggingFace for now */
 	if sourceType != "huggingface" {
 		return Error(
 			fmt.Sprintf("Comprehensive loader script not found. Fallback only supports HuggingFace, but got: %s", sourceType),
@@ -450,7 +450,7 @@ func (t *DatasetLoadingTool) loadGenericDatasetFallback(ctx context.Context, sou
 		), nil
 	}
 
-	// Use the old inline Python approach for HuggingFace
+	/* Use the old inline Python approach for HuggingFace */
 	pythonCode := fmt.Sprintf(`
 import os
 import sys
@@ -564,7 +564,7 @@ except Exception as e:
     sys.exit(1)
 `, sourcePath, split, limit)
 
-	// Set up environment
+	/* Set up environment */
 	cfgMgr := config.NewConfigManager()
 	cfgMgr.Load("")
 	dbCfg := cfgMgr.GetDatabaseConfig()
@@ -601,7 +601,7 @@ except Exception as e:
 		), nil
 	}
 
-	// Parse JSON output
+	/* Parse JSON output */
 	outputStr := strings.TrimSpace(string(output))
 	rowsLoaded := 0
 	tableName := ""

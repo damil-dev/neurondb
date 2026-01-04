@@ -46,13 +46,13 @@ func (tb *TokenBucket) TryConsume(tokens float64) bool {
 	tb.mu.Lock()
 	defer tb.mu.Unlock()
 
-	// Refill tokens based on elapsed time
+	/* Refill tokens based on elapsed time */
 	now := time.Now()
 	elapsed := now.Sub(tb.lastRefillTime).Seconds()
 	tb.tokens = min(tb.capacity, tb.tokens+elapsed*tb.refillRate)
 	tb.lastRefillTime = now
 
-	// Try to consume tokens
+	/* Try to consume tokens */
 	if tb.tokens >= tokens {
 		tb.tokens -= tokens
 		return true
@@ -156,16 +156,16 @@ func (m *RateLimiterMiddleware) Execute(ctx context.Context, params map[string]i
 	m.stats.TotalRequests++
 	m.mu.Unlock()
 
-	// Calculate cost (can be based on tool complexity)
+	/* Calculate cost (can be based on tool complexity) */
 	cost := m.calculateCost(params)
 
-	// Check global rate limit
+	/* Check global rate limit */
 	if !m.globalBucket.TryConsume(cost) {
 		m.recordRejection()
 		return nil, fmt.Errorf("rate limit exceeded: global limit reached, please try again later")
 	}
 
-	// Check per-user rate limit
+	/* Check per-user rate limit */
 	if m.enablePerUser {
 		if userID, ok := params["_user_id"].(string); ok && userID != "" {
 			userBucket := m.getUserBucket(userID)
@@ -176,7 +176,7 @@ func (m *RateLimiterMiddleware) Execute(ctx context.Context, params map[string]i
 		}
 	}
 
-	// Check per-tool rate limit
+	/* Check per-tool rate limit */
 	if m.enablePerTool {
 		if toolName, ok := params["_tool_name"].(string); ok && toolName != "" {
 			toolBucket := m.getToolBucket(toolName)
@@ -187,7 +187,7 @@ func (m *RateLimiterMiddleware) Execute(ctx context.Context, params map[string]i
 		}
 	}
 
-	// Execute request
+	/* Execute request */
 	result, err := next(ctx, params)
 
 	m.mu.Lock()
@@ -210,7 +210,7 @@ func (m *RateLimiterMiddleware) calculateCost(params map[string]interface{}) flo
 		toolName = name
 	}
 
-	// Expensive operations cost more tokens
+	/* Expensive operations cost more tokens */
 	switch toolName {
 	case "load_dataset":
 		cost = 50.0
@@ -238,7 +238,7 @@ func (m *RateLimiterMiddleware) calculateCost(params map[string]interface{}) flo
 		cost = 1.0
 	}
 
-	// Apply batch size multiplier
+	/* Apply batch size multiplier */
 	if batchSize, ok := params["batch_size"].(float64); ok && batchSize > 100 {
 		cost *= (batchSize / 100.0)
 	}

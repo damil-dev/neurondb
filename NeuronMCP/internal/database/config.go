@@ -192,7 +192,7 @@ func (ch *ConfigHelper) GetIndexConfig(ctx context.Context, tableName, vectorCol
 	var resultJSON []byte
 	err := ch.db.QueryRow(ctx, query, tableName, vectorColumn).Scan(&resultJSON)
 	if err != nil {
-		// Return nil if no config found (not an error)
+		/* Return nil if no config found (not an error) */
 		return nil, nil
 	}
 	
@@ -294,7 +294,7 @@ func (ch *ConfigHelper) GetToolConfig(ctx context.Context, toolName string) (*To
 	var resultJSON []byte
 	err := ch.db.QueryRow(ctx, query, toolName).Scan(&resultJSON)
 	if err != nil {
-		// Return default config if not found
+		/* Return default config if not found */
 		return &ToolConfig{
 			ToolName:        toolName,
 			DefaultParams:   make(map[string]interface{}),

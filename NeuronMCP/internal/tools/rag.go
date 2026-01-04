@@ -101,7 +101,7 @@ func (t *ProcessDocumentTool) Execute(ctx context.Context, params map[string]int
 		generateEmbeddings = g
 	}
 
-	// Validate text is required
+	/* Validate text is required */
 	if err := validation.ValidateRequired(text, "text"); err != nil {
 		return Error(fmt.Sprintf("Invalid text parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "text",
@@ -110,7 +110,7 @@ func (t *ProcessDocumentTool) Execute(ctx context.Context, params map[string]int
 		}), nil
 	}
 
-	// Validate text length (max 10MB)
+	/* Validate text length (max 10MB) */
 	textLen := len(text)
 	if err := validation.ValidateMaxLength(text, "text", 10*1024*1024); err != nil {
 		return Error(fmt.Sprintf("Invalid text parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
@@ -120,7 +120,7 @@ func (t *ProcessDocumentTool) Execute(ctx context.Context, params map[string]int
 		}), nil
 	}
 
-	// Validate chunk_size
+	/* Validate chunk_size */
 	if err := validation.ValidatePositive(chunkSize, "chunk_size"); err != nil {
 		return Error(fmt.Sprintf("Invalid chunk_size parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter":   "chunk_size",
@@ -130,7 +130,7 @@ func (t *ProcessDocumentTool) Execute(ctx context.Context, params map[string]int
 		}), nil
 	}
 
-	// Validate overlap
+	/* Validate overlap */
 	if err := validation.ValidateNonNegative(overlap, "overlap"); err != nil {
 		return Error(fmt.Sprintf("Invalid overlap parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter":   "overlap",
@@ -141,7 +141,7 @@ func (t *ProcessDocumentTool) Execute(ctx context.Context, params map[string]int
 		}), nil
 	}
 
-	// Validate overlap < chunkSize
+	/* Validate overlap < chunkSize */
 	if overlap >= chunkSize {
 		return Error(fmt.Sprintf("overlap must be less than chunk_size: overlap=%d, chunk_size=%d", overlap, chunkSize), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter":   "overlap",

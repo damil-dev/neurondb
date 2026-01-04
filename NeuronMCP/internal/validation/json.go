@@ -37,7 +37,7 @@ func ValidateJSONSchema(value interface{}, schema map[string]interface{}) error 
 		return fmt.Errorf("value must be a map/object for schema validation")
 	}
 	
-	// Check required fields
+	/* Check required fields */
 	if required, ok := schema["required"].([]interface{}); ok {
 		for _, req := range required {
 			reqStr, ok := req.(string)
@@ -50,7 +50,7 @@ func ValidateJSONSchema(value interface{}, schema map[string]interface{}) error 
 		}
 	}
 	
-	// Validate each property
+	/* Validate each property */
 	for propName, propSchema := range props {
 		propSchemaMap, ok := propSchema.(map[string]interface{})
 		if !ok {
@@ -67,7 +67,7 @@ func ValidateJSONSchema(value interface{}, schema map[string]interface{}) error 
 		}
 	}
 	
-	// Check additionalProperties
+	/* Check additionalProperties */
 	if additionalProps, ok := schema["additionalProperties"].(bool); ok && !additionalProps {
 		for key := range valueMap {
 			if _, exists := props[key]; !exists {
@@ -81,14 +81,14 @@ func ValidateJSONSchema(value interface{}, schema map[string]interface{}) error 
 
 /* validateProperty validates a single property against its schema */
 func validateProperty(value interface{}, schema map[string]interface{}, fieldName string) error {
-	// Check type
+	/* Check type */
 	if typeStr, ok := schema["type"].(string); ok {
 		if err := validateType(value, typeStr, fieldName); err != nil {
 			return err
 		}
 	}
 	
-	// Validate string constraints
+	/* Validate string constraints */
 	if typeStr, _ := schema["type"].(string); typeStr == "string" {
 		strValue, ok := value.(string)
 		if !ok {
@@ -108,7 +108,7 @@ func validateProperty(value interface{}, schema map[string]interface{}, fieldNam
 		}
 	}
 	
-	// Validate number constraints
+	/* Validate number constraints */
 	if typeStr, _ := schema["type"].(string); typeStr == "number" || typeStr == "integer" {
 		var numValue float64
 		switch v := value.(type) {
@@ -139,7 +139,7 @@ func validateProperty(value interface{}, schema map[string]interface{}, fieldNam
 		}
 	}
 	
-	// Validate array constraints
+	/* Validate array constraints */
 	if typeStr, _ := schema["type"].(string); typeStr == "array" {
 		arrValue, ok := value.([]interface{})
 		if !ok {
@@ -159,7 +159,7 @@ func validateProperty(value interface{}, schema map[string]interface{}, fieldNam
 		}
 	}
 	
-	// Validate enum
+	/* Validate enum */
 	if enum, ok := schema["enum"].([]interface{}); ok {
 		valueJSON, _ := json.Marshal(value)
 		found := false
@@ -188,14 +188,14 @@ func validateType(value interface{}, expectedType, fieldName string) error {
 	case "number":
 		switch value.(type) {
 		case float64, float32, int, int32, int64:
-			// Valid number types
+			/* Valid number types */
 		default:
 			return fmt.Errorf("expected number, got %T", value)
 		}
 	case "integer":
 		switch value.(type) {
 		case int, int32, int64, float64, float32:
-			// Accept floats that are whole numbers
+			/* Accept floats that are whole numbers */
 			if reflect.TypeOf(value).Kind() == reflect.Float64 || reflect.TypeOf(value).Kind() == reflect.Float32 {
 				f := reflect.ValueOf(value).Float()
 				if f != float64(int64(f)) {

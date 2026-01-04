@@ -14,6 +14,8 @@
 package server
 
 import (
+	"time"
+
 	"github.com/neurondb/NeuronMCP/internal/audit"
 	"github.com/neurondb/NeuronMCP/internal/config"
 	"github.com/neurondb/NeuronMCP/internal/logging"
@@ -71,6 +73,41 @@ func setupBuiltInMiddleware(mgr *middleware.Manager, cfgMgr *config.ConfigManage
 	if serverCfg.Timeout != nil {
 		mgr.Register(builtin.NewTimeoutMiddleware(serverCfg.GetTimeout(), logger))
 	}
+
+  /* Retry middleware (order: 4) - with exponential backoff and circuit breaker */
+	retryConfig := &builtin.RetryConfig{
+		Enabled:         false, /* Disabled by default */
+		MaxRetries:      3,
+		InitialBackoff:  100 * time.Millisecond,
+		MaxBackoff:      5 * time.Second,
+		BackoffMultiplier: 2.0,
+		CircuitBreaker: &builtin.CircuitBreakerConfig{
+			Enabled:          false, /* Disabled by default */
+			FailureThreshold: 5,
+			SuccessThreshold: 2,
+			Timeout:          60 * time.Second,
+		},
+	}
+	mgr.Register(builtin.NewRetryMiddleware(retryConfig, logger))
+
+  /* Circuit breaker middleware (order: 6) - for fault tolerance */
+	circuitBreakerConfig := middleware.CircuitBreakerConfig{
+		FailureThreshold:     5,
+		SuccessThreshold:     2,
+		Timeout:              60 * time.Second,
+		EnablePerToolBreaker: false, /* Disabled by default */
+	}
+	mgr.Register(builtin.NewCircuitBreakerAdapter(logger, circuitBreakerConfig))
+
+  /* Resource quota middleware (order: 7) - for resource limits */
+	resourceQuotaConfig := middleware.ResourceQuotaConfig{
+		MaxMemoryMB:      1024,  /* 1GB default */
+		MaxVectorDim:     10000,
+		MaxBatchSize:     10000,
+		MaxConcurrent:    100,
+		EnableThrottling: false, /* Disabled by default */
+	}
+	mgr.Register(builtin.NewResourceQuotaAdapter(logger, resourceQuotaConfig))
 
   /* Error handling middleware (order: 100) - always last */
 	mgr.Register(builtin.NewErrorHandlingMiddleware(

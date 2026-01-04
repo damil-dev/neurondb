@@ -45,7 +45,6 @@ func NewTimeoutMiddleware(logger *logging.Logger, config TimeoutConfig) *Timeout
 		config.ToolTimeouts = make(map[string]time.Duration)
 	}
 	
-	// Set sensible defaults for expensive operations
 	if config.ToolTimeouts["load_dataset"] == 0 {
 		config.ToolTimeouts["load_dataset"] = 300 * time.Second // 5 minutes
 	}
@@ -72,21 +71,21 @@ func NewTimeoutMiddleware(logger *logging.Logger, config TimeoutConfig) *Timeout
 
 /* Execute enforces timeout for tool execution */
 func (m *TimeoutMiddleware) Execute(ctx context.Context, params map[string]interface{}, next MiddlewareFunc) (interface{}, error) {
-	// Determine timeout for this request
+	/* Determine timeout for this request */
 	timeout := m.defaultTimeout
 	
-	// Check for tool-specific timeout
+	/* Check for tool-specific timeout */
 	if toolName, ok := params["_tool_name"].(string); ok {
 		if toolTimeout, exists := m.toolTimeouts[toolName]; exists {
 			timeout = toolTimeout
 		}
 	}
 	
-	// Allow override via params if enabled
+	/* Allow override via params if enabled */
 	if m.enableOverrides {
 		if timeoutParam, ok := params["_timeout"].(float64); ok && timeoutParam > 0 {
 			requestedTimeout := time.Duration(timeoutParam) * time.Second
-			// Cap at 10 minutes for safety
+			/* Cap at 10 minutes for safety */
 			if requestedTimeout <= 600*time.Second {
 				timeout = requestedTimeout
 				m.logger.Debug("Using request-specified timeout", map[string]interface{}{
@@ -103,11 +102,11 @@ func (m *TimeoutMiddleware) Execute(ctx context.Context, params map[string]inter
 		}
 	}
 
-	// Create timeout context
+	/* Create timeout context */
 	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	// Execute with timeout
+	/* Execute with timeout */
 	resultChan := make(chan interface{}, 1)
 	errChan := make(chan error, 1)
 

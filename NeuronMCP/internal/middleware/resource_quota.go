@@ -91,7 +91,7 @@ func NewResourceQuotaMiddleware(logger *logging.Logger, config ResourceQuotaConf
 func (m *ResourceQuotaMiddleware) Execute(ctx context.Context, params map[string]interface{}, next MiddlewareFunc) (interface{}, error) {
 	start := time.Now()
 	
-	// Check concurrent operations limit
+	/* Check concurrent operations limit */
 	current := atomic.AddInt32(&m.concurrentOps, 1)
 	if current > m.maxConcurrent {
 		atomic.AddInt32(&m.concurrentOps, -1)
@@ -100,34 +100,34 @@ func (m *ResourceQuotaMiddleware) Execute(ctx context.Context, params map[string
 	}
 	defer atomic.AddInt32(&m.concurrentOps, -1)
 
-	// Validate vector parameters against quota
+	/* Validate vector parameters against quota */
 	if err := m.validateVectorParams(params); err != nil {
 		return nil, fmt.Errorf("resource quota validation failed: %w", err)
 	}
 
-	// Validate batch size
+	/* Validate batch size */
 	if err := m.validateBatchSize(params); err != nil {
 		return nil, fmt.Errorf("resource quota validation failed: %w", err)
 	}
 
-	// Track memory before execution
+	/* Track memory before execution */
 	var memBefore runtime.MemStats
 	runtime.ReadMemStats(&memBefore)
 
-	// Execute tool
+	/* Execute tool */
 	result, err := next(ctx, params)
 
-	// Track memory after execution
+	/* Track memory after execution */
 	var memAfter runtime.MemStats
 	runtime.ReadMemStats(&memAfter)
 
 	duration := time.Since(start)
 	memUsedMB := int64((memAfter.Alloc - memBefore.Alloc) / (1024 * 1024))
 
-	// Record stats
+	/* Record stats */
 	m.recordStats(params, duration, memUsedMB, err)
 
-	// Check if memory usage exceeded quota (log warning, don't fail)
+	/* Check if memory usage exceeded quota (log warning, don't fail) */
 	if memUsedMB > int64(m.quota.MaxMemoryBytes/(1024*1024)) {
 		m.logger.Warn("Tool execution exceeded memory quota", map[string]interface{}{
 			"memory_used_mb": memUsedMB,
@@ -142,14 +142,14 @@ func (m *ResourceQuotaMiddleware) Execute(ctx context.Context, params map[string
 
 /* validateVectorParams validates vector-related parameters against quota */
 func (m *ResourceQuotaMiddleware) validateVectorParams(params map[string]interface{}) error {
-	// Check query_vector
+	/* Check query_vector */
 	if queryVector, ok := params["query_vector"].([]interface{}); ok {
 		if err := validation.ValidateVectorSize(len(queryVector), *m.quota); err != nil {
 			return err
 		}
 	}
 
-	// Check embeddings
+	/* Check embeddings */
 	if embeddings, ok := params["embeddings"].([]interface{}); ok {
 		for i, emb := range embeddings {
 			if embVec, ok := emb.([]interface{}); ok {
@@ -160,7 +160,7 @@ func (m *ResourceQuotaMiddleware) validateVectorParams(params map[string]interfa
 		}
 	}
 
-	// Check dimension parameter
+	/* Check dimension parameter */
 	if dim, ok := params["dimension"].(float64); ok {
 		if int(dim) > m.quota.MaxVectorSize {
 			return fmt.Errorf("requested dimension %d exceeds maximum %d", int(dim), m.quota.MaxVectorSize)
@@ -209,7 +209,7 @@ func (m *ResourceQuotaMiddleware) recordStats(params map[string]interface{}, dur
 		stats.PeakMemoryMB = memUsedMB
 	}
 	
-	// Update rolling average
+	/* Update rolling average */
 	alpha := 0.2 // Exponential smoothing factor
 	stats.AverageMemoryMB = alpha*float64(memUsedMB) + (1-alpha)*stats.AverageMemoryMB
 

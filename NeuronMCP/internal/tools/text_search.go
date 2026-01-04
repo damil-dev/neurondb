@@ -99,7 +99,7 @@ func (t *TextSearchTool) Execute(ctx context.Context, params map[string]interfac
 		queryType = qt
 	}
 
-	// Validate table (SQL identifier)
+	/* Validate table (SQL identifier) */
 	if err := validation.ValidateSQLIdentifierRequired(table, "table"); err != nil {
 		return Error(fmt.Sprintf("Invalid table parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "table",
@@ -108,7 +108,7 @@ func (t *TextSearchTool) Execute(ctx context.Context, params map[string]interfac
 		}), nil
 	}
 
-	// Validate text_column (SQL identifier)
+	/* Validate text_column (SQL identifier) */
 	if err := validation.ValidateSQLIdentifier(textColumn, "text_column"); err != nil {
 		return Error(fmt.Sprintf("Invalid text_column parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "text_column",
@@ -118,7 +118,7 @@ func (t *TextSearchTool) Execute(ctx context.Context, params map[string]interfac
 		}), nil
 	}
 
-	// Validate query_text
+	/* Validate query_text */
 	if err := validation.ValidateRequired(queryText, "query_text"); err != nil {
 		return Error(fmt.Sprintf("Invalid query_text parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "query_text",
@@ -136,7 +136,7 @@ func (t *TextSearchTool) Execute(ctx context.Context, params map[string]interfac
 		}), nil
 	}
 
-	// Validate query_type
+	/* Validate query_type */
 	if err := validation.ValidateIn(queryType, "query_type", "plain", "to", "phrase"); err != nil {
 		return Error(fmt.Sprintf("Invalid query_type parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "query_type",

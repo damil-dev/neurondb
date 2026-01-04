@@ -63,8 +63,8 @@ func ValidateBatchSize(size int, quota ResourceQuota) error {
 
 /* EstimateVectorMemory estimates memory usage for a vector operation */
 func EstimateVectorMemory(vectorDim int, batchSize int) int64 {
-	// Estimate: 4 bytes per float32 * dimensions * batch size
-	// Plus overhead for metadata, results, etc. (2x multiplier)
+	/* Estimate: 4 bytes per float32 * dimensions * batch size */
+	/* Plus overhead for metadata, results, etc. (2x multiplier) */
 	return int64(vectorDim * batchSize * 4 * 2)
 }
 

@@ -102,9 +102,9 @@ func (m *Manager) CreateMessage(ctx context.Context, req SamplingRequest) (*Samp
 	if req.Temperature != nil {
 		temperature = *req.Temperature
 	}
-	// Increase default max_tokens to give model more room for complete responses
-	// Tool calls need space for JSON formatting
-	// Set to 8192 to allow for large prompts + complete tool call responses
+	/* Increase default max_tokens to give model more room for complete responses */
+	/* Tool calls need space for JSON formatting */
+	/* Set to 8192 to allow for large prompts + complete tool call responses */
 	maxTokens := 8192
 	if req.MaxTokens != nil {
 		maxTokens = *req.MaxTokens

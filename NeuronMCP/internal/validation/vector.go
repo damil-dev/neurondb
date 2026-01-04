@@ -38,7 +38,7 @@ func ValidateVector(vector []interface{}, fieldName string, minDim, maxDim int) 
 		return fmt.Errorf("%s dimension %d exceeds maximum %d", fieldName, len(vector), maxDim)
 	}
 	
-	// Validate all elements are numbers
+	/* Validate all elements are numbers */
 	for i, v := range vector {
 		switch val := v.(type) {
 		case float64:
@@ -56,7 +56,7 @@ func ValidateVector(vector []interface{}, fieldName string, minDim, maxDim int) 
 				return fmt.Errorf("%s contains Infinity at index %d", fieldName, i)
 			}
 		case int, int32, int64:
-			// Integers are fine, will be converted to float
+			/* Integers are fine, will be converted to float */
 		default:
 			return fmt.Errorf("%s contains non-numeric value at index %d: %T", fieldName, i, v)
 		}
