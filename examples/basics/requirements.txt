@@ -1,0 +1,13 @@
+# Requirements for NeuronDB Basics Examples
+# Install with: pip install -r requirements.txt
+
+# Database connection
+psycopg2-binary>=2.9.0
+
+# Embedding generation
+sentence-transformers>=2.2.0
+
+# Optional: For advanced examples
+# openai>=1.0.0  # For LLM integration
+# anthropic>=0.7.0  # For Claude integration
+

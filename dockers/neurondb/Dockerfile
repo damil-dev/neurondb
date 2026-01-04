@@ -146,7 +146,7 @@ RUN chmod +x /usr/local/bin/docker-entrypoint-neurondb.sh && \
 COPY NeuronMCP/sql/ /docker-entrypoint-initdb.d/neurondb_mcp/
 
 # Copy NeuronAgent migration files for auto-setup
-COPY NeuronAgent/migrations/ /docker-entrypoint-initdb.d/neurondb_agent/
+COPY NeuronAgent/sql/ /docker-entrypoint-initdb.d/neurondb_agent/
 
 # Volume declaration removed - let base postgres image handle it
 # docker-compose.yml mounts the volume at the correct path for each PG version
