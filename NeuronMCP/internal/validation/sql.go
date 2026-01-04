@@ -23,10 +23,10 @@ import (
 )
 
 var (
-	// SQL identifier regex: alphanumeric, underscore, dollar sign, must start with letter or underscore
+	/* SQL identifier regex: alphanumeric, underscore, dollar sign, must start with letter or underscore */
 	sqlIdentifierRegex = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_$]*$`)
 	
-	// Dangerous SQL keywords that should not appear in user input
+	/* Dangerous SQL keywords that should not appear in user input */
 	dangerousKeywords = map[string]bool{
 		"DROP": true, "TRUNCATE": true, "DELETE": true, "UPDATE": true,
 		"INSERT": true, "ALTER": true, "CREATE": true, "GRANT": true,
@@ -34,7 +34,7 @@ var (
 		"VACUUM": true, "ANALYZE": true, "REINDEX": true, "CLUSTER": true,
 	}
 	
-	// SQL injection patterns
+	/* SQL injection patterns */
 	sqlInjectionPatterns = []string{
 		";--", "';--", "'; DROP", "'; DELETE", "'; UPDATE",
 		"UNION SELECT", "OR 1=1", "OR '1'='1", "OR \"1\"=\"1",
@@ -50,23 +50,23 @@ func ValidateSQLIdentifier(identifier, fieldName string) error {
 	
 	identifier = strings.TrimSpace(identifier)
 	
-	// Check length (PostgreSQL limit is 63 bytes, but we'll be more conservative)
+	/* Check length (PostgreSQL limit is 63 bytes, but we'll be more conservative) */
 	if len(identifier) > 63 {
 		return fmt.Errorf("%s exceeds maximum length of 63 characters: %s", fieldName, identifier)
 	}
 	
-	// Check for SQL identifier format
+	/* Check for SQL identifier format */
 	if !sqlIdentifierRegex.MatchString(identifier) {
 		return fmt.Errorf("%s contains invalid characters: %s (must start with letter/underscore, followed by alphanumeric/underscore/dollar)", fieldName, identifier)
 	}
 	
-	// Check for reserved keywords (case-insensitive)
+	/* Check for reserved keywords (case-insensitive) */
 	upperIdentifier := strings.ToUpper(identifier)
 	if dangerousKeywords[upperIdentifier] {
 		return fmt.Errorf("%s is a reserved SQL keyword and cannot be used: %s", fieldName, identifier)
 	}
 	
-	// Check for SQL injection patterns
+	/* Check for SQL injection patterns */
 	upperIdentifierLower := strings.ToLower(identifier)
 	for _, pattern := range sqlInjectionPatterns {
 		if strings.Contains(upperIdentifierLower, strings.ToLower(pattern)) {
@@ -94,14 +94,13 @@ func ValidateSQLQuery(query string) error {
 	query = strings.TrimSpace(query)
 	queryUpper := strings.ToUpper(query)
 	
-	// Must start with SELECT for read-only queries
+	/* Must start with SELECT for read-only queries */
 	if !strings.HasPrefix(queryUpper, "SELECT") {
 		return fmt.Errorf("only SELECT queries are allowed, query must start with SELECT")
 	}
 	
-	// Check for dangerous operations
 	for keyword := range dangerousKeywords {
-		// Check for keyword as separate word (with spaces or newlines around it)
+		/* Check for keyword as separate word (with spaces or newlines around it) */
 		pattern := " " + keyword + " "
 		if strings.Contains(queryUpper, pattern) || 
 		   strings.Contains(queryUpper, "\n"+keyword+" ") ||
@@ -110,7 +109,7 @@ func ValidateSQLQuery(query string) error {
 		}
 	}
 	
-	// Check for SQL injection patterns
+	/* Check for SQL injection patterns */
 	queryLower := strings.ToLower(query)
 	for _, pattern := range sqlInjectionPatterns {
 		if strings.Contains(queryLower, pattern) {
@@ -123,7 +122,7 @@ func ValidateSQLQuery(query string) error {
 
 /* EscapeSQLIdentifier escapes a SQL identifier for safe use */
 func EscapeSQLIdentifier(identifier string) string {
-	// Remove any non-printable characters
+	/* Remove any non-printable characters */
 	var builder strings.Builder
 	for _, r := range identifier {
 		if unicode.IsPrint(r) {
@@ -132,7 +131,7 @@ func EscapeSQLIdentifier(identifier string) string {
 	}
 	result := builder.String()
 	
-	// PostgreSQL identifier escaping: wrap in double quotes
+	/* PostgreSQL identifier escaping: wrap in double quotes */
 	return fmt.Sprintf(`"%s"`, strings.ReplaceAll(result, `"`, `""`))
 }
 

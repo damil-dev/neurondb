@@ -19,12 +19,15 @@ package server
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/neurondb/NeuronMCP/internal/batch"
+	"github.com/neurondb/NeuronMCP/internal/cache"
 	"github.com/neurondb/NeuronMCP/internal/config"
 	"github.com/neurondb/NeuronMCP/internal/database"
 	"github.com/neurondb/NeuronMCP/internal/health"
 	"github.com/neurondb/NeuronMCP/internal/logging"
+	"github.com/neurondb/NeuronMCP/internal/metrics"
 	"github.com/neurondb/NeuronMCP/internal/middleware"
 	"github.com/neurondb/NeuronMCP/internal/progress"
 	"github.com/neurondb/NeuronMCP/internal/prompts"
@@ -49,6 +52,9 @@ type Server struct {
 	progress           *progress.Tracker
 	batch              *batch.Processor
 	capabilitiesManager *CapabilitiesManager
+	idempotencyCache   *cache.IdempotencyCache
+	metricsCollector   *metrics.Collector
+	prometheusExporter *metrics.PrometheusExporter
 }
 
 /* NewServer creates a new server */
@@ -123,6 +129,13 @@ func NewServerWithConfig(configPath string) (*Server, error) {
 	healthChecker := health.NewChecker(db, logger)
 	progressTracker := progress.NewTracker()
 	batchProcessor := batch.NewProcessor(db, toolRegistry, logger)
+	
+	/* Create idempotency cache with 1 hour TTL */
+	idempotencyCache := cache.NewIdempotencyCache(time.Hour)
+
+	/* Create metrics collector */
+	metricsCollector := metrics.NewCollectorWithDB(db)
+	prometheusExporter := metrics.NewPrometheusExporter(metricsCollector)
 
 	s := &Server{
 		mcpServer:          mcpServer,
@@ -138,6 +151,9 @@ func NewServerWithConfig(configPath string) (*Server, error) {
 		progress:           progressTracker,
 		batch:              batchProcessor,
 		capabilitiesManager: capabilitiesManager,
+		idempotencyCache:   idempotencyCache,
+		metricsCollector:   metricsCollector,
+		prometheusExporter: prometheusExporter,
 	}
 
 	s.setupHandlers()
@@ -192,25 +208,59 @@ func (s *Server) Start(ctx context.Context) error {
 func (s *Server) Stop() error {
 	s.logger.Info("Stopping Neurondb MCP server", nil)
 	
-	/* Wait for in-flight requests to complete */
-	/* Note: In a production environment, you might want to:
-	 * - Set a timeout for graceful shutdown
-	 * - Track in-flight requests
-	 * - Wait for them to complete
-	 * - Force shutdown after timeout
-	 */
-	
 	/* Close database connections */
 	if s.db != nil {
 		s.db.Close()
 	}
 	
-	/* Close any other resources */
-	/* TODO: Close HTTP server if running */
-	/* TODO: Close SSE connections */
-	/* TODO: Cleanup goroutines */
+	/* Close idempotency cache */
+	if s.idempotencyCache != nil {
+		s.idempotencyCache.Close()
+		s.idempotencyCache = nil
+	}
+	
+	/* Close other resources */
+	if s.progress != nil {
+		/* Progress tracker cleanup if needed */
+		s.progress = nil
+	}
+	
+	if s.batch != nil {
+		/* Batch processor cleanup if needed */
+		s.batch = nil
+	}
+	
+	/* Note: HTTP server and SSE connections are managed by transport manager
+	 * If HTTP transport is used, it should be shut down via transport manager:
+	 * transportManager.Shutdown(ctx)
+	 * Currently, the server uses stdio transport by default, so HTTP/SSE cleanup
+	 * is not needed unless HTTP transport is explicitly started.
+	 */
+	
+	/* Context cancellation will handle goroutine cleanup */
+	/* All goroutines should respect context cancellation */
 	
 	s.logger.Info("NeuronMCP server stopped", nil)
 	return nil
+}
+
+/* GetToolRegistry returns the tool registry (for testing) */
+func (s *Server) GetToolRegistry() *tools.ToolRegistry {
+	return s.toolRegistry
+}
+
+/* GetDatabase returns the database connection (for testing) */
+func (s *Server) GetDatabase() *database.Database {
+	return s.db
+}
+
+/* GetMetricsCollector returns the metrics collector */
+func (s *Server) GetMetricsCollector() *metrics.Collector {
+	return s.metricsCollector
+}
+
+/* GetPrometheusExporter returns the Prometheus exporter */
+func (s *Server) GetPrometheusExporter() *metrics.PrometheusExporter {
+	return s.prometheusExporter
 }
 

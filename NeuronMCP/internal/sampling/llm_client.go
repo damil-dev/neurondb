@@ -63,7 +63,7 @@ func (c *LLMClient) CallOllama(ctx context.Context, baseURL, model string, messa
 		baseURL = "http://localhost:11434"
 	}
 
-	// Use chat API if messages are provided
+	/* Use chat API if messages are provided */
 	endpoint := fmt.Sprintf("%s/api/chat", baseURL)
 	
 	req := OllamaRequest{
@@ -101,7 +101,7 @@ func (c *LLMClient) CallOllama(ctx context.Context, baseURL, model string, messa
 		return "", fmt.Errorf("failed to decode Ollama response: %w", err)
 	}
 
-	// Extract response text
+	/* Extract response text */
 	if ollamaResp.Message != nil && ollamaResp.Message.Content != "" {
 		return ollamaResp.Message.Content, nil
 	}

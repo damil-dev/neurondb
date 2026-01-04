@@ -40,7 +40,7 @@ func (m *ResponseValidationMiddleware) Execute(ctx context.Context, params map[s
 		return result, err
 	}
 
-	// Validate response is not nil
+	/* Validate response is not nil */
 	if result == nil {
 		m.logger.Warn("Response validation warning: nil result", map[string]interface{}{
 			"params": params,
@@ -48,10 +48,10 @@ func (m *ResponseValidationMiddleware) Execute(ctx context.Context, params map[s
 		return result, nil
 	}
 
-	// Validate response structure
+	/* Validate response structure */
 	switch r := result.(type) {
 	case map[string]interface{}:
-		// Validate content field exists for successful responses
+		/* Validate content field exists for successful responses */
 		if isError, ok := r["isError"].(bool); !ok || !isError {
 			if content, hasContent := r["content"]; !hasContent {
 				m.logger.Warn("Response validation warning: missing content field", map[string]interface{}{
@@ -59,7 +59,7 @@ func (m *ResponseValidationMiddleware) Execute(ctx context.Context, params map[s
 					"result": result,
 				})
 			} else {
-				// Validate content is not empty for successful responses
+				/* Validate content is not empty for successful responses */
 				if contentList, ok := content.([]interface{}); ok && len(contentList) == 0 {
 					m.logger.Warn("Response validation warning: empty content list", map[string]interface{}{
 						"params": params,
@@ -68,7 +68,7 @@ func (m *ResponseValidationMiddleware) Execute(ctx context.Context, params map[s
 			}
 		}
 
-		// Validate error responses have error field
+		/* Validate error responses have error field */
 		if isError, ok := r["isError"].(bool); ok && isError {
 			if _, hasError := r["error"]; !hasError {
 				m.logger.Error("Response validation failed: error response missing error field", nil, map[string]interface{}{
@@ -79,12 +79,12 @@ func (m *ResponseValidationMiddleware) Execute(ctx context.Context, params map[s
 			}
 		}
 
-		// Validate JSON content if present
+		/* Validate JSON content if present */
 		if content, ok := r["content"]; ok {
 			if contentList, ok := content.([]interface{}); ok {
 				for i, item := range contentList {
 					if itemMap, ok := item.(map[string]interface{}); ok {
-						// Validate text content
+						/* Validate text content */
 						if text, hasText := itemMap["text"]; hasText {
 							if textStr, ok := text.(string); ok {
 								if err := validation.ValidateNoNullBytes(textStr, fmt.Sprintf("content[%d].text", i)); err != nil {
@@ -102,7 +102,7 @@ func (m *ResponseValidationMiddleware) Execute(ctx context.Context, params map[s
 		}
 
 	case []interface{}:
-		// Validate array responses are not empty (warning only)
+		/* Validate array responses are not empty (warning only) */
 		if len(r) == 0 {
 			m.logger.Debug("Response validation: empty array result", map[string]interface{}{
 				"params": params,

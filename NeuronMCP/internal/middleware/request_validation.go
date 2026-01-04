@@ -35,13 +35,13 @@ func NewRequestValidationMiddleware(logger *logging.Logger) *RequestValidationMi
 
 /* Execute validates request parameters before tool execution */
 func (m *RequestValidationMiddleware) Execute(ctx context.Context, params map[string]interface{}, next MiddlewareFunc) (interface{}, error) {
-	// Validate context has not expired
+	/* Validate context has not expired */
 	if err := validation.ValidateContextDeadline(ctx); err != nil {
 		m.logger.Error("Request validation failed: context deadline exceeded", err, params)
 		return nil, fmt.Errorf("request timeout: %w", err)
 	}
 
-	// Validate request ID exists (for tracing)
+	/* Validate request ID exists (for tracing) */
 	if requestID, ok := params["_request_id"].(string); ok {
 		if err := validation.ValidateRequired(requestID, "request_id"); err != nil {
 			m.logger.Warn("Request missing request_id", map[string]interface{}{
@@ -50,7 +50,7 @@ func (m *RequestValidationMiddleware) Execute(ctx context.Context, params map[st
 		}
 	}
 
-	// Validate tool name
+	/* Validate tool name */
 	if toolName, ok := params["_tool_name"].(string); ok {
 		if err := validation.ValidateRequired(toolName, "tool_name"); err != nil {
 			m.logger.Error("Request validation failed: missing tool name", err, params)
@@ -62,7 +62,7 @@ func (m *RequestValidationMiddleware) Execute(ctx context.Context, params map[st
 		}
 	}
 
-	// Validate no null bytes in string parameters (security)
+	/* Validate no null bytes in string parameters (security) */
 	for key, value := range params {
 		if str, ok := value.(string); ok {
 			if err := validation.ValidateNoNullBytes(str, key); err != nil {

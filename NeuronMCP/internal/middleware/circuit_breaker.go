@@ -117,16 +117,16 @@ func (m *CircuitBreakerMiddleware) Execute(ctx context.Context, params map[strin
 		toolName = name
 	}
 
-	// Check circuit breaker state
+	/* Check circuit breaker state */
 	if !m.canExecute(toolName) {
 		m.recordRejection(toolName)
 		return nil, fmt.Errorf("circuit breaker is open for tool '%s': too many failures, retrying after %v", toolName, m.timeout)
 	}
 
-	// Execute request
+	/* Execute request */
 	result, err := next(ctx, params)
 
-	// Record success or failure
+	/* Record success or failure */
 	if err != nil {
 		m.recordFailure(toolName, err)
 		return result, err
@@ -152,9 +152,9 @@ func (m *CircuitBreakerMiddleware) canExecute(toolName string) bool {
 	case StateClosed:
 		return true
 	case StateOpen:
-		// Check if timeout has elapsed
+		/* Check if timeout has elapsed */
 		if time.Since(m.lastStateChange) >= m.timeout {
-			// Transition to half-open
+			/* Transition to half-open */
 			m.mu.RUnlock()
 			m.mu.Lock()
 			m.transitionTo(StateHalfOpen, toolName)
@@ -239,7 +239,7 @@ func (m *CircuitBreakerMiddleware) recordFailure(toolName string, err error) {
 	}
 
 	if currentState == StateHalfOpen {
-		// Immediately open on failure in half-open state
+		/* Immediately open on failure in half-open state */
 		m.transitionTo(StateOpen, toolName)
 		m.failureCount = 0
 	} else if m.failureCount >= m.failureThreshold {

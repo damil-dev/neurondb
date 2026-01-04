@@ -73,7 +73,7 @@ func (t *EmbedImageTool) Execute(ctx context.Context, params map[string]interfac
 		model = m
 	}
 
-	// Validate image_data is required
+	/* Validate image_data is required */
 	if err := validation.ValidateRequired(imageData, "image_data"); err != nil {
 		return Error(fmt.Sprintf("Invalid image_data parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "image_data",
@@ -82,7 +82,7 @@ func (t *EmbedImageTool) Execute(ctx context.Context, params map[string]interfac
 		}), nil
 	}
 
-	// Validate image_data length (max 10MB base64 encoded)
+	/* Validate image_data length (max 10MB base64 encoded) */
 	if err := validation.ValidateMaxLength(imageData, "image_data", 10*1024*1024); err != nil {
 		return Error(fmt.Sprintf("Invalid image_data parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "image_data",
@@ -91,7 +91,7 @@ func (t *EmbedImageTool) Execute(ctx context.Context, params map[string]interfac
 		}), nil
 	}
 
-	// Validate model name
+	/* Validate model name */
 	if err := validation.ValidateMaxLength(model, "model", 100); err != nil {
 		return Error(fmt.Sprintf("Invalid model parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "model",
@@ -116,7 +116,7 @@ func (t *EmbedImageTool) Execute(ctx context.Context, params map[string]interfac
 		}), nil
 	}
 
-	// Validate decoded image size (max 7.5MB decoded, typical for 10MB base64)
+	/* Validate decoded image size (max 7.5MB decoded, typical for 10MB base64) */
 	if len(imageBytes) > 7*1024*1024 {
 		return Error("Decoded image data exceeds maximum size of 7MB", "VALIDATION_ERROR", map[string]interface{}{
 			"parameter":    "image_data",

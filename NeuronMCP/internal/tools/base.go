@@ -229,8 +229,10 @@ func (b *BaseTool) ValidateParams(params map[string]interface{}, schema map[stri
 
 /* validatePattern validates a string against a regex pattern (simplified - full regex would use regexp package) */
 func validatePattern(value, pattern string) (bool, error) {
-	/* For now, return true - full regex validation would require importing regexp */
-	/* This is a placeholder for future enhancement */
+	/* Simplified pattern validation - returns true for now.
+	 * Full regex validation would require importing the regexp package and implementing
+	 * proper pattern matching. This is a future enhancement for strict pattern validation.
+	 */
 	return true, nil
 }
 

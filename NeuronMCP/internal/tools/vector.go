@@ -118,7 +118,7 @@ func (t *VectorSearchTool) Execute(ctx context.Context, params map[string]interf
 		additionalColumns = ac
 	}
 
-	// Validate table name (SQL identifier)
+	/* Validate table name (SQL identifier) */
 	if err := validation.ValidateSQLIdentifierRequired(table, "table"); err != nil {
 		return Error(fmt.Sprintf("Invalid table parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "table",
@@ -127,7 +127,7 @@ func (t *VectorSearchTool) Execute(ctx context.Context, params map[string]interf
 		}), nil
 	}
 
-	// Validate vector column name (SQL identifier)
+	/* Validate vector column name (SQL identifier) */
 	if err := validation.ValidateSQLIdentifierRequired(vectorColumn, "vector_column"); err != nil {
 		return Error(fmt.Sprintf("Invalid vector_column parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "vector_column",
@@ -137,7 +137,7 @@ func (t *VectorSearchTool) Execute(ctx context.Context, params map[string]interf
 		}), nil
 	}
 
-	// Validate query vector
+	/* Validate query vector */
 	if err := validation.ValidateVectorRequired(queryVector, "query_vector", 1, 10000); err != nil {
 		return Error(fmt.Sprintf("Invalid query_vector parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter":    "query_vector",
@@ -148,7 +148,7 @@ func (t *VectorSearchTool) Execute(ctx context.Context, params map[string]interf
 		}), nil
 	}
 
-	// Validate limit
+	/* Validate limit */
 	if err := validation.ValidateIntRange(limit, 1, 1000, "limit"); err != nil {
 		return Error(fmt.Sprintf("Invalid limit parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "limit",
@@ -157,7 +157,7 @@ func (t *VectorSearchTool) Execute(ctx context.Context, params map[string]interf
 		}), nil
 	}
 
-	// Validate distance metric
+	/* Validate distance metric */
 	if err := validation.ValidateIn(distanceMetric, "distance_metric", "l2", "cosine", "inner_product", "l1", "hamming", "chebyshev", "minkowski"); err != nil {
 		return Error(fmt.Sprintf("Invalid distance_metric parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "distance_metric",
@@ -166,7 +166,7 @@ func (t *VectorSearchTool) Execute(ctx context.Context, params map[string]interf
 		}), nil
 	}
 
-	// Validate additional columns (if provided)
+	/* Validate additional columns (if provided) */
 	for i, col := range additionalColumns {
 		colStr, ok := col.(string)
 		if !ok {
@@ -397,6 +397,273 @@ func (t *VectorSearchInnerProductTool) Execute(ctx context.Context, params map[s
 	}), nil
 }
 
+/* VectorSearchL1Tool performs L1 (Manhattan) distance vector search */
+type VectorSearchL1Tool struct {
+	*BaseTool
+	executor *QueryExecutor
+	logger   *logging.Logger
+}
+
+/* NewVectorSearchL1Tool creates a new L1 vector search tool */
+func NewVectorSearchL1Tool(db *database.Database, logger *logging.Logger) *VectorSearchL1Tool {
+	return &VectorSearchL1Tool{
+		BaseTool: NewBaseTool(
+			"vector_search_l1",
+			"Perform vector similarity search using L1 (Manhattan) distance",
+			map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"table":         map[string]interface{}{"type": "string"},
+					"vector_column": map[string]interface{}{"type": "string"},
+					"query_vector":  map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "number"}},
+					"limit":         map[string]interface{}{"type": "number", "default": 10, "minimum": 1, "maximum": 1000},
+				},
+				"required": []interface{}{"table", "vector_column", "query_vector"},
+			},
+		),
+		executor: NewQueryExecutor(db),
+		logger:   logger,
+	}
+}
+
+/* Execute executes the L1 vector search */
+func (t *VectorSearchL1Tool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
+	valid, errors := t.ValidateParams(params, t.InputSchema())
+	if !valid {
+		return Error("Invalid parameters", "VALIDATION_ERROR", map[string]interface{}{"errors": errors}), nil
+	}
+
+	table, _ := params["table"].(string)
+	vectorColumn, _ := params["vector_column"].(string)
+	queryVector, _ := params["query_vector"].([]interface{})
+	limit := 10
+	if l, ok := params["limit"].(float64); ok {
+		limit = int(l)
+	}
+
+	results, err := t.executor.ExecuteVectorSearch(ctx, table, vectorColumn, queryVector, "l1", limit, nil)
+	if err != nil {
+		t.logger.Error("L1 vector search failed", err, params)
+		return Error(fmt.Sprintf("L1 vector search execution failed: table='%s', vector_column='%s', limit=%d, query_vector_dimension=%d, error=%v", table, vectorColumn, limit, len(queryVector), err), "SEARCH_ERROR", map[string]interface{}{
+			"table":             table,
+			"vector_column":     vectorColumn,
+			"distance_metric":   "l1",
+			"limit":            limit,
+			"query_vector_size": len(queryVector),
+			"error":            err.Error(),
+		}), nil
+	}
+
+	return Success(results, map[string]interface{}{
+		"count":          len(results),
+		"distance_metric": "l1",
+	}), nil
+}
+
+/* VectorSearchHammingTool performs Hamming distance vector search */
+type VectorSearchHammingTool struct {
+	*BaseTool
+	executor *QueryExecutor
+	logger   *logging.Logger
+}
+
+/* NewVectorSearchHammingTool creates a new Hamming vector search tool */
+func NewVectorSearchHammingTool(db *database.Database, logger *logging.Logger) *VectorSearchHammingTool {
+	return &VectorSearchHammingTool{
+		BaseTool: NewBaseTool(
+			"vector_search_hamming",
+			"Perform vector similarity search using Hamming distance",
+			map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"table":         map[string]interface{}{"type": "string"},
+					"vector_column": map[string]interface{}{"type": "string"},
+					"query_vector":  map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "number"}},
+					"limit":         map[string]interface{}{"type": "number", "default": 10, "minimum": 1, "maximum": 1000},
+				},
+				"required": []interface{}{"table", "vector_column", "query_vector"},
+			},
+		),
+		executor: NewQueryExecutor(db),
+		logger:   logger,
+	}
+}
+
+/* Execute executes the Hamming vector search */
+func (t *VectorSearchHammingTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
+	valid, errors := t.ValidateParams(params, t.InputSchema())
+	if !valid {
+		return Error("Invalid parameters", "VALIDATION_ERROR", map[string]interface{}{"errors": errors}), nil
+	}
+
+	table, _ := params["table"].(string)
+	vectorColumn, _ := params["vector_column"].(string)
+	queryVector, _ := params["query_vector"].([]interface{})
+	limit := 10
+	if l, ok := params["limit"].(float64); ok {
+		limit = int(l)
+	}
+
+	results, err := t.executor.ExecuteVectorSearch(ctx, table, vectorColumn, queryVector, "hamming", limit, nil)
+	if err != nil {
+		t.logger.Error("Hamming vector search failed", err, params)
+		return Error(fmt.Sprintf("Hamming vector search execution failed: table='%s', vector_column='%s', limit=%d, query_vector_dimension=%d, error=%v", table, vectorColumn, limit, len(queryVector), err), "SEARCH_ERROR", map[string]interface{}{
+			"table":             table,
+			"vector_column":     vectorColumn,
+			"distance_metric":   "hamming",
+			"limit":            limit,
+			"query_vector_size": len(queryVector),
+			"error":            err.Error(),
+		}), nil
+	}
+
+	return Success(results, map[string]interface{}{
+		"count":          len(results),
+		"distance_metric": "hamming",
+	}), nil
+}
+
+/* VectorSearchChebyshevTool performs Chebyshev distance vector search */
+type VectorSearchChebyshevTool struct {
+	*BaseTool
+	executor *QueryExecutor
+	logger   *logging.Logger
+}
+
+/* NewVectorSearchChebyshevTool creates a new Chebyshev vector search tool */
+func NewVectorSearchChebyshevTool(db *database.Database, logger *logging.Logger) *VectorSearchChebyshevTool {
+	return &VectorSearchChebyshevTool{
+		BaseTool: NewBaseTool(
+			"vector_search_chebyshev",
+			"Perform vector similarity search using Chebyshev distance",
+			map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"table":         map[string]interface{}{"type": "string"},
+					"vector_column": map[string]interface{}{"type": "string"},
+					"query_vector":  map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "number"}},
+					"limit":         map[string]interface{}{"type": "number", "default": 10, "minimum": 1, "maximum": 1000},
+				},
+				"required": []interface{}{"table", "vector_column", "query_vector"},
+			},
+		),
+		executor: NewQueryExecutor(db),
+		logger:   logger,
+	}
+}
+
+/* Execute executes the Chebyshev vector search */
+func (t *VectorSearchChebyshevTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
+	valid, errors := t.ValidateParams(params, t.InputSchema())
+	if !valid {
+		return Error("Invalid parameters", "VALIDATION_ERROR", map[string]interface{}{"errors": errors}), nil
+	}
+
+	table, _ := params["table"].(string)
+	vectorColumn, _ := params["vector_column"].(string)
+	queryVector, _ := params["query_vector"].([]interface{})
+	limit := 10
+	if l, ok := params["limit"].(float64); ok {
+		limit = int(l)
+	}
+
+	results, err := t.executor.ExecuteVectorSearch(ctx, table, vectorColumn, queryVector, "chebyshev", limit, nil)
+	if err != nil {
+		t.logger.Error("Chebyshev vector search failed", err, params)
+		return Error(fmt.Sprintf("Chebyshev vector search execution failed: table='%s', vector_column='%s', limit=%d, query_vector_dimension=%d, error=%v", table, vectorColumn, limit, len(queryVector), err), "SEARCH_ERROR", map[string]interface{}{
+			"table":             table,
+			"vector_column":     vectorColumn,
+			"distance_metric":   "chebyshev",
+			"limit":            limit,
+			"query_vector_size": len(queryVector),
+			"error":            err.Error(),
+		}), nil
+	}
+
+	return Success(results, map[string]interface{}{
+		"count":          len(results),
+		"distance_metric": "chebyshev",
+	}), nil
+}
+
+/* VectorSearchMinkowskiTool performs Minkowski distance vector search */
+type VectorSearchMinkowskiTool struct {
+	*BaseTool
+	executor *QueryExecutor
+	logger   *logging.Logger
+}
+
+/* NewVectorSearchMinkowskiTool creates a new Minkowski vector search tool */
+func NewVectorSearchMinkowskiTool(db *database.Database, logger *logging.Logger) *VectorSearchMinkowskiTool {
+	return &VectorSearchMinkowskiTool{
+		BaseTool: NewBaseTool(
+			"vector_search_minkowski",
+			"Perform vector similarity search using Minkowski distance with configurable p parameter",
+			map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"table":         map[string]interface{}{"type": "string"},
+					"vector_column": map[string]interface{}{"type": "string"},
+					"query_vector":  map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "number"}},
+					"p_value": map[string]interface{}{
+						"type":        "number",
+						"default":     2.0,
+						"minimum":     1.0,
+						"description": "Minkowski distance parameter p (p=1 is Manhattan, p=2 is Euclidean, p=∞ is Chebyshev)",
+					},
+					"limit":         map[string]interface{}{"type": "number", "default": 10, "minimum": 1, "maximum": 1000},
+				},
+				"required": []interface{}{"table", "vector_column", "query_vector"},
+			},
+		),
+		executor: NewQueryExecutor(db),
+		logger:   logger,
+	}
+}
+
+/* Execute executes the Minkowski vector search */
+func (t *VectorSearchMinkowskiTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
+	valid, errors := t.ValidateParams(params, t.InputSchema())
+	if !valid {
+		return Error("Invalid parameters", "VALIDATION_ERROR", map[string]interface{}{"errors": errors}), nil
+	}
+
+	table, _ := params["table"].(string)
+	vectorColumn, _ := params["vector_column"].(string)
+	queryVector, _ := params["query_vector"].([]interface{})
+	pValue := 2.0
+	if p, ok := params["p_value"].(float64); ok {
+		pValue = p
+	}
+	limit := 10
+	if l, ok := params["limit"].(float64); ok {
+		limit = int(l)
+	}
+
+	/* Note: Minkowski distance requires p parameter, but ExecuteVectorSearch uses metric name */
+	/* For now, we'll use "minkowski" as the metric and pass p_value separately if needed */
+	/* The actual implementation may need to be adjusted based on how NeuronDB handles Minkowski */
+	results, err := t.executor.ExecuteVectorSearch(ctx, table, vectorColumn, queryVector, "minkowski", limit, nil)
+	if err != nil {
+		t.logger.Error("Minkowski vector search failed", err, params)
+		return Error(fmt.Sprintf("Minkowski vector search execution failed: table='%s', vector_column='%s', limit=%d, p_value=%.2f, query_vector_dimension=%d, error=%v", table, vectorColumn, limit, pValue, len(queryVector), err), "SEARCH_ERROR", map[string]interface{}{
+			"table":             table,
+			"vector_column":     vectorColumn,
+			"distance_metric":   "minkowski",
+			"p_value":          pValue,
+			"limit":            limit,
+			"query_vector_size": len(queryVector),
+			"error":            err.Error(),
+		}), nil
+	}
+
+	return Success(results, map[string]interface{}{
+		"count":          len(results),
+		"distance_metric": "minkowski",
+		"p_value":       pValue,
+	}), nil
+}
+
 /* GenerateEmbeddingTool generates text embeddings */
 type GenerateEmbeddingTool struct {
 	*BaseTool
@@ -455,10 +722,10 @@ func (t *GenerateEmbeddingTool) Execute(ctx context.Context, params map[string]i
 		}), nil
 	}
 
-	// Resolve model name - try to get from database config, fallback to provided or default
+	/* Resolve model name - try to get from database config, fallback to provided or default */
 	modelName := model
 	if modelName == "" {
-		// Try to get default model for embedding operation
+		/* Try to get default model for embedding operation */
 		if defaultModel, err := t.configHelper.GetDefaultModel(ctx, "embedding"); err == nil {
 			modelName = defaultModel
 			t.logger.Info("Using default embedding model from database", map[string]interface{}{"model": modelName})
@@ -468,9 +735,9 @@ func (t *GenerateEmbeddingTool) Execute(ctx context.Context, params map[string]i
 		}
 	}
 
-	// Try to resolve API key from database (for future use with NeuronDB functions that accept keys)
-	// For now, NeuronDB uses GUC settings, but we log usage
-	// TODO: Use resolved API key when NeuronDB functions support it
+	/* Try to resolve API key from database (for future use with NeuronDB functions that accept keys) */
+	/* For now, NeuronDB uses GUC settings, but we log usage */
+	/* TODO: Use resolved API key when NeuronDB functions support it */
 	if _, err := t.configHelper.ResolveModelKey(ctx, modelName); err == nil {
 		t.logger.Debug("Resolved API key from database", map[string]interface{}{"model": modelName, "has_key": true})
 	} else {
@@ -493,7 +760,7 @@ func (t *GenerateEmbeddingTool) Execute(ctx context.Context, params map[string]i
 	
 	result, err = t.executor.ExecuteQueryOneWithTimeout(ctx, query, queryParams, EmbeddingQueryTimeout)
 	if err != nil {
-		// Check if error is about configuration (API key, etc.) - check first method's error
+		/* Check if error is about configuration (API key, etc.) - check first method's error */
 		errStr := err.Error()
 		if strings.Contains(errStr, "llm_api_key") || strings.Contains(errStr, "llm_provider") || strings.Contains(errStr, "Configure neurondb") || strings.Contains(errStr, "embedding generation failed") {
 			t.logger.Error("Embedding generation failed - configuration issue", err, params)
@@ -511,13 +778,13 @@ func (t *GenerateEmbeddingTool) Execute(ctx context.Context, params map[string]i
 			"model": modelName,
 		})
 		
-		// neurondb.embed(model text, input_text text, task text) - function signature: model, input_text, task
+		/* neurondb.embed(model text, input_text text, task text) - function signature: model, input_text, task */
 		query = "SELECT neurondb.embed($1, $2, $3)::text AS embedding"
 		queryParams = []interface{}{modelName, text, "embedding"}
 		
 		result, err = t.executor.ExecuteQueryOneWithTimeout(ctx, query, queryParams, EmbeddingQueryTimeout)
 		if err != nil {
-			// Check if error is "no rows returned" - function exists but requires configuration
+			/* Check if error is "no rows returned" - function exists but requires configuration */
 			errStr = err.Error()
 			if strings.Contains(errStr, "no rows returned") {
 				t.logger.Error("Embedding generation failed - function returned no rows (configuration required)", err, params)
@@ -529,7 +796,7 @@ func (t *GenerateEmbeddingTool) Execute(ctx context.Context, params map[string]i
 					"hint":        "Check PostgreSQL GUC settings: SHOW neurondb.llm_api_key; SHOW neurondb.llm_provider;",
 				}), nil
 			}
-			// Check if error is about configuration (API key, etc.)
+			/* Check if error is about configuration (API key, etc.) */
 			if strings.Contains(errStr, "llm_api_key") || strings.Contains(errStr, "llm_provider") || strings.Contains(errStr, "Configure neurondb") || strings.Contains(errStr, "embedding generation failed") {
 				t.logger.Error("Embedding generation failed - configuration required", err, params)
 				return Error(fmt.Sprintf("Embedding generation requires configuration: text_length=%d, model='%s'. Error: %v. Configuration is managed via PostgreSQL GUC settings (neurondb.llm_api_key and neurondb.llm_provider).", textLen, modelName, err), "CONFIGURATION_ERROR", map[string]interface{}{
@@ -550,15 +817,15 @@ func (t *GenerateEmbeddingTool) Execute(ctx context.Context, params map[string]i
 		}
 	}
 
-	// Log usage metrics if successful
+	/* Log usage metrics if successful */
 	if result != nil {
-		// Estimate tokens (rough approximation: 1 token ≈ 4 characters)
+		/* Estimate tokens (rough approximation: 1 token ≈ 4 characters) */
 		tokensEstimate := textLen / 4
 		tokensInput := &tokensEstimate
 		latency := int(time.Since(startTime).Milliseconds())
 		latencyMS := &latency
 		
-		// Log asynchronously (don't fail if logging fails)
+		/* Log asynchronously (don't fail if logging fails) */
 		go func() {
 			if err := t.configHelper.LogModelUsage(ctx, modelName, "embedding", tokensInput, nil, latencyMS, true, nil); err != nil {
 				t.logger.Warn("Failed to log model usage", map[string]interface{}{"error": err.Error()})

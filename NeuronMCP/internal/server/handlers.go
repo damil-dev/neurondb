@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/neurondb/NeuronMCP/internal/middleware"
 	"github.com/neurondb/NeuronMCP/internal/tools"
@@ -48,6 +49,16 @@ func (s *Server) setupToolHandlers() {
 
 /* handleListTools handles the tools/list request */
 func (s *Server) handleListTools(ctx context.Context, params json.RawMessage) (interface{}, error) {
+	startTime := time.Now()
+	method := "tools/list"
+	
+	if s.metricsCollector != nil {
+		s.metricsCollector.IncrementRequest(method)
+		defer func() {
+			s.metricsCollector.AddDuration(time.Since(startTime))
+		}()
+	}
+	
 	definitions := s.toolRegistry.GetAllDefinitions()
 	filtered := s.filterToolsByFeatures(definitions)
 	
@@ -69,8 +80,20 @@ func (s *Server) handleListTools(ctx context.Context, params json.RawMessage) (i
 
 /* handleCallTool handles the tools/call request */
 func (s *Server) handleCallTool(ctx context.Context, params json.RawMessage) (interface{}, error) {
+	startTime := time.Now()
+	method := "tools/call"
+	
+	/* Track request */
+	if s.metricsCollector != nil {
+		s.metricsCollector.IncrementRequest(method)
+	}
+	
 	var req mcp.CallToolRequest
 	if err := json.Unmarshal(params, &req); err != nil {
+		if s.metricsCollector != nil {
+			s.metricsCollector.IncrementError(method, "PARSE_ERROR")
+			s.metricsCollector.AddDuration(time.Since(startTime))
+		}
 		return nil, fmt.Errorf("failed to parse tools/call request: params_length=%d, params_preview='%s', error=%w (invalid JSON format or missing required fields)", len(params), string(params[:min(100, len(params))]), err)
 	}
 
@@ -89,9 +112,27 @@ func (s *Server) handleCallTool(ctx context.Context, params json.RawMessage) (in
 		},
 	}
 
-	return s.middleware.Execute(ctx, mcpReq, func(ctx context.Context, _ *middleware.MCPRequest) (*middleware.MCPResponse, error) {
+	resp, err := s.middleware.Execute(ctx, mcpReq, func(ctx context.Context, _ *middleware.MCPRequest) (*middleware.MCPResponse, error) {
 		return s.executeTool(ctx, req.Name, req.Arguments, req.DryRun, req.IdempotencyKey, req.RequireConfirm)
 	})
+	
+	/* Track metrics */
+	if s.metricsCollector != nil {
+		duration := time.Since(startTime)
+		s.metricsCollector.AddDuration(duration)
+		s.metricsCollector.IncrementTool(req.Name)
+		if err != nil || (resp != nil && resp.IsError) {
+			errorType := "UNKNOWN_ERROR"
+			if resp != nil && resp.Metadata != nil {
+				if code, ok := resp.Metadata["error_code"].(string); ok {
+					errorType = code
+				}
+			}
+			s.metricsCollector.IncrementError(method, errorType)
+		}
+	}
+	
+	return resp, err
 }
 
 /* executeTool executes a tool and returns the response */
@@ -165,10 +206,38 @@ func (s *Server) executeTool(ctx context.Context, toolName string, arguments map
 		}
 	}
 
-	/* Handle idempotency - for now, log it (full implementation would check/store in database) */
+	/* Handle idempotency - check cache for existing result */
 	if idempotencyKey != "" {
 		s.logger.Debug(fmt.Sprintf("Tool execution with idempotency key: %s", idempotencyKey), nil)
-		/* TODO: Check if this idempotency key was already used and return cached result */
+		
+		/* Check if we have a cached result for this idempotency key */
+		if cachedResult, found := s.idempotencyCache.Get(idempotencyKey); found {
+			s.logger.Info("Returning cached result for idempotency key", map[string]interface{}{
+				"idempotency_key": idempotencyKey,
+				"tool_name":       toolName,
+			})
+			
+			/* Convert cached mcp.ToolResult to middleware.MCPResponse */
+			content := []middleware.ContentBlock{}
+			if cachedResult.Content != nil {
+				for _, c := range cachedResult.Content {
+					content = append(content, middleware.ContentBlock{
+						Type: c.Type,
+						Text: c.Text,
+					})
+				}
+			}
+			
+			return &middleware.MCPResponse{
+				Content:  content,
+				IsError:  cachedResult.IsError,
+				Metadata: map[string]interface{}{
+					"cached":        true,
+					"idempotency_key": idempotencyKey,
+					"tool":          toolName,
+				},
+			}, nil
+		}
 	}
 
 	result, err := tool.Execute(ctx, arguments)
@@ -181,7 +250,34 @@ func (s *Server) executeTool(ctx context.Context, toolName string, arguments map
 		}, nil
 	}
 
-	return s.formatToolResult(result)
+	/* Format the result */
+	response, formatErr := s.formatToolResult(result)
+	if formatErr != nil {
+		return response, formatErr
+	}
+	
+	/* Cache the result if idempotency key is provided */
+	if idempotencyKey != "" {
+		/* Convert middleware.MCPResponse to mcp.ToolResult for caching */
+		cachedResult := &mcp.ToolResult{
+			Content: make([]mcp.ContentBlock, len(response.Content)),
+			IsError: response.IsError,
+		}
+		for i, c := range response.Content {
+			cachedResult.Content[i] = mcp.ContentBlock{
+				Type: c.Type,
+				Text: c.Text,
+			}
+		}
+		
+		s.idempotencyCache.Set(idempotencyKey, cachedResult)
+		s.logger.Debug("Cached result for idempotency key", map[string]interface{}{
+			"idempotency_key": idempotencyKey,
+			"tool_name":       toolName,
+		})
+	}
+
+	return response, nil
 }
 
 /* formatToolResult formats a tool result as an MCP response */
@@ -191,7 +287,10 @@ func (s *Server) formatToolResult(result *tools.ToolResult) (*middleware.MCPResp
 	}
 
 	/* Validate output against schema if tool has output schema */
-	/* Note: This is a placeholder - full validation would check the tool's output schema */
+	/* Note: Basic validation is performed by the tool itself. Full schema validation
+	 * against the tool's OutputSchema would require additional JSON schema validation.
+	 * This is a future enhancement for strict output validation.
+	 */
 	
 	resultJSON, _ := json.MarshalIndent(result.Data, "", "  ")
 	return &middleware.MCPResponse{

@@ -25,6 +25,10 @@ func RegisterAllTools(registry *ToolRegistry, db *database.Database, logger *log
 	registry.Register(NewVectorSearchL2Tool(db, logger))
 	registry.Register(NewVectorSearchCosineTool(db, logger))
 	registry.Register(NewVectorSearchInnerProductTool(db, logger))
+	registry.Register(NewVectorSearchL1Tool(db, logger))
+	registry.Register(NewVectorSearchHammingTool(db, logger))
+	registry.Register(NewVectorSearchChebyshevTool(db, logger))
+	registry.Register(NewVectorSearchMinkowskiTool(db, logger))
 
   /* Embedding tools */
 	registry.Register(NewGenerateEmbeddingTool(db, logger))
@@ -131,7 +135,7 @@ func RegisterAllTools(registry *ToolRegistry, db *database.Database, logger *log
 	registry.Register(NewWorkerManagementTool(db, logger))
 	registry.Register(NewGPUMonitoringTool(db, logger))
 
-  /* PostgreSQL tools */
+  /* PostgreSQL tools - Server Information (8 tools) */
 	registry.Register(NewPostgreSQLVersionTool(db, logger))
 	registry.Register(NewPostgreSQLStatsTool(db, logger))
 	registry.Register(NewPostgreSQLDatabaseListTool(db, logger))
@@ -140,5 +144,32 @@ func RegisterAllTools(registry *ToolRegistry, db *database.Database, logger *log
 	registry.Register(NewPostgreSQLReplicationTool(db, logger))
 	registry.Register(NewPostgreSQLSettingsTool(db, logger))
 	registry.Register(NewPostgreSQLExtensionsTool(db, logger))
+
+  /* PostgreSQL tools - Database Object Management (8 tools) */
+	registry.Register(NewPostgreSQLTablesTool(db, logger))
+	registry.Register(NewPostgreSQLIndexesTool(db, logger))
+	registry.Register(NewPostgreSQLSchemasTool(db, logger))
+	registry.Register(NewPostgreSQLViewsTool(db, logger))
+	registry.Register(NewPostgreSQLSequencesTool(db, logger))
+	registry.Register(NewPostgreSQLFunctionsTool(db, logger))
+	registry.Register(NewPostgreSQLTriggersTool(db, logger))
+	registry.Register(NewPostgreSQLConstraintsTool(db, logger))
+
+  /* PostgreSQL tools - User and Role Management (3 tools) */
+	registry.Register(NewPostgreSQLUsersTool(db, logger))
+	registry.Register(NewPostgreSQLRolesTool(db, logger))
+	registry.Register(NewPostgreSQLPermissionsTool(db, logger))
+
+  /* PostgreSQL tools - Performance and Statistics (4 tools) */
+	registry.Register(NewPostgreSQLTableStatsTool(db, logger))
+	registry.Register(NewPostgreSQLIndexStatsTool(db, logger))
+	registry.Register(NewPostgreSQLActiveQueriesTool(db, logger))
+	registry.Register(NewPostgreSQLWaitEventsTool(db, logger))
+
+  /* PostgreSQL tools - Size and Storage (4 tools) */
+	registry.Register(NewPostgreSQLTableSizeTool(db, logger))
+	registry.Register(NewPostgreSQLIndexSizeTool(db, logger))
+	registry.Register(NewPostgreSQLBloatTool(db, logger))
+	registry.Register(NewPostgreSQLVacuumStatsTool(db, logger))
 }
 
