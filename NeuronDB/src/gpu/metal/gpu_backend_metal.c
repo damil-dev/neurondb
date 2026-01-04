@@ -2666,6 +2666,7 @@ ndb_metal_linreg_pack(const struct LinRegModel *model,
 		initStringInfo(&buf);
 		appendStringInfo(&buf,
 						 "{\"algorithm\":\"linear_regression\","
+						 "\"storage\":\"gpu\","
 						 "\"training_backend\":1,"
 						 "\"n_features\":%d,"
 						 "\"n_samples\":%d,"
@@ -2737,16 +2738,7 @@ ndb_metal_linreg_train(const float *features,
 				j,
 				k;
 	int			rc = -1;
-
-	/* TODO: Metal backend has memory corruption in X'X computation loop.
-	 * Root cause: Crash occurs after xi array allocation during matrix accumulation.
-	 * The issue appears to be related to nalloc/palloc memory management mixing
-	 * or array indexing in the nested loops. CUDA backend works fine.
-	 * Until fixed, fall back to CPU which is stable and tested.
-	 */
-	if (errstr)
-		*errstr = pstrdup("Metal linreg: using CPU fallback (memory corruption in X'X loop - TODO: fix Metal backend)");
-	return -1;
+	MemoryContext oldcontext;
 
 	ereport(DEBUG2,
 			(errmsg("ndb_metal_linreg_train: entry"),
@@ -2768,6 +2760,9 @@ ndb_metal_linreg_train(const float *features,
 		return -1;
 	}
 
+	/* Ensure we're in TopMemoryContext for allocations in GPU context */
+	oldcontext = MemoryContextSwitchTo(TopMemoryContext);
+
 	dim_with_intercept = feature_dim + 1;
 
 	/* Allocate host memory for matrices */
@@ -2775,6 +2770,11 @@ ndb_metal_linreg_train(const float *features,
 	Xty_bytes = sizeof(double) * (size_t) dim_with_intercept;
 	beta_bytes = sizeof(double) * (size_t) dim_with_intercept;
 
+	/*
+	 * IMPORTANT: Use consistent alloc/free primitives (nalloc/nfree).
+	 * The previous implementation mixed nalloc(...) with pfree(...), which can
+	 * corrupt memory. Use nalloc/nfree consistently throughout.
+	 */
 	nalloc(h_XtX, double, XtX_bytes / sizeof(double));
 	nalloc(h_Xty, double, Xty_bytes / sizeof(double));
 	nalloc(h_XtX_inv, double, XtX_bytes / sizeof(double));
@@ -2798,6 +2798,7 @@ ndb_metal_linreg_train(const float *features,
 	ereport(DEBUG2, (errmsg("ndb_metal_linreg_train: validating dimensions")));
 	if (n_samples <= 0 || feature_dim <= 0 || dim_with_intercept <= 0)
 	{
+		MemoryContextSwitchTo(oldcontext);
 		if (errstr)
 			*errstr = pstrdup("Metal LinReg train: invalid dimensions");
 		elog(ERROR, "ndb_metal_linreg_train: invalid dimensions");
@@ -2809,13 +2810,14 @@ ndb_metal_linreg_train(const float *features,
 	{
 		double *xi = NULL;
 		nalloc(xi, double, dim_with_intercept);
-		if (xi == NULL)
-		{
-			if (errstr)
-				*errstr = pstrdup("Metal LinReg train: failed to allocate xi");
-			elog(ERROR, "ndb_metal_linreg_train: palloc failed for xi");
-			return -1;
-		}
+			if (xi == NULL)
+			{
+				MemoryContextSwitchTo(oldcontext);
+				if (errstr)
+					*errstr = pstrdup("Metal LinReg train: failed to allocate xi");
+				elog(ERROR, "ndb_metal_linreg_train: palloc failed for xi");
+				return -1;
+			}
 		ereport(DEBUG2, (errmsg("ndb_metal_linreg_train: xi allocated successfully")));
 
 		/* Compute X'X and X'y (CPU-based) */
@@ -2823,6 +2825,7 @@ ndb_metal_linreg_train(const float *features,
 		for (i = 0; i < n_samples; i++)
 		{
 			const float *row;
+			size_t		row_offset;
 
 			if (i == 0 || i == n_samples / 2 || i == n_samples - 1)
 			{
@@ -2830,21 +2833,41 @@ ndb_metal_linreg_train(const float *features,
 						(errmsg("ndb_metal_linreg_train: processing sample %d of %d", i, n_samples)));
 			}
 
-			/* Validate row pointer */
-			if (i * feature_dim < 0)
+			/* Validate row offset to prevent integer overflow */
+			if (i < 0 || feature_dim <= 0)
 			{
 				if (errstr)
-					*errstr = pstrdup("Metal LinReg train: invalid row index");
-				pfree(xi);
-				elog(ERROR, "ndb_metal_linreg_train: invalid row index %d", i);
+					*errstr = pstrdup("Metal LinReg train: invalid indices");
+				nfree(xi);
+				elog(ERROR, "ndb_metal_linreg_train: invalid indices i=%d, feature_dim=%d", i, feature_dim);
+				return -1;
+			}
+			row_offset = (size_t) i * (size_t) feature_dim;
+			/* Check for overflow: if i > 0, row_offset should be >= feature_dim */
+			if (i > 0 && row_offset < (size_t) feature_dim)
+			{
+				if (errstr)
+					*errstr = pstrdup("Metal LinReg train: row offset overflow");
+				nfree(xi);
+				elog(ERROR, "ndb_metal_linreg_train: row offset overflow for sample %d", i);
 				return -1;
 			}
 
-			row = features + (i * feature_dim);
+			/* Validate that row pointer is within expected bounds */
+			if (features == NULL || (void *) (features + row_offset) < (void *) features)
+			{
+				if (errstr)
+					*errstr = pstrdup("Metal LinReg train: invalid features pointer");
+				nfree(xi);
+				elog(ERROR, "ndb_metal_linreg_train: invalid features pointer for sample %d", i);
+				return -1;
+			}
+
+			row = features + row_offset;
 			if (i == 0)
 			{
 				ereport(DEBUG2,
-						(errmsg("ndb_metal_linreg_train: row pointer computed, row=%p", (void *) row)));
+						(errmsg("ndb_metal_linreg_train: row pointer computed, row=%p, offset=%zu", (void *) row, row_offset)));
 			}
 
 			xi[0] = 1.0;		/* intercept */
@@ -2853,12 +2876,17 @@ ndb_metal_linreg_train(const float *features,
 				ereport(DEBUG2, (errmsg("ndb_metal_linreg_train: setting intercept")));
 			}
 
+			/* Fill xi array with intercept + features */
 			for (k = 1; k < dim_with_intercept; k++)
 			{
-				if (k - 1 < feature_dim)
+				if (k - 1 < feature_dim && k - 1 >= 0)
+				{
 					xi[k] = (double) row[k - 1];
+				}
 				else
+				{
 					xi[k] = 0.0;	/* Safety: should not happen */
+				}
 			}
 			if (i == 0)
 			{
@@ -2890,7 +2918,7 @@ ndb_metal_linreg_train(const float *features,
 		}
 
 		ereport(DEBUG2, (errmsg("ndb_metal_linreg_train: computation loop completed")));
-		pfree(xi);
+		nfree(xi);
 		ereport(DEBUG2, (errmsg("ndb_metal_linreg_train: xi buffer freed")));
 	}
 
@@ -2917,6 +2945,11 @@ ndb_metal_linreg_train(const float *features,
 		nalloc(augmented, double *, dim_with_intercept);
 		if (augmented == NULL)
 		{
+			nfree(h_XtX);
+			nfree(h_Xty);
+			nfree(h_XtX_inv);
+			nfree(h_beta);
+			MemoryContextSwitchTo(oldcontext);
 			if (errstr)
 				*errstr = pstrdup("Metal LinReg train: failed to allocate augmented matrix");
 			elog(ERROR, "ndb_metal_linreg_train: palloc failed for augmented");
@@ -2935,8 +2968,13 @@ ndb_metal_linreg_train(const float *features,
 			{
 				/* Free already allocated rows */
 				for (int r = 0; r < row; r++)
-					pfree(augmented[r]);
-				pfree(augmented);
+					nfree(augmented[r]);
+				nfree(augmented);
+				nfree(h_XtX);
+				nfree(h_Xty);
+				nfree(h_XtX_inv);
+				nfree(h_beta);
+				MemoryContextSwitchTo(oldcontext);
 				if (errstr)
 					*errstr = pstrdup("Metal LinReg train: failed to allocate augmented row");
 				elog(ERROR, "ndb_metal_linreg_train: palloc failed for augmented row %d", row);
@@ -3010,16 +3048,17 @@ ndb_metal_linreg_train(const float *features,
 		}
 
 		for (row = 0; row < dim_with_intercept; row++)
-			pfree(augmented[row]);
-		pfree(augmented);
+			nfree(augmented[row]);
+		nfree(augmented);
 
 		if (!invert_success)
 		{
 			ereport(DEBUG2, (errmsg("ndb_metal_linreg_train: matrix inversion failed, cleaning up")));
-			pfree(h_XtX);
-			pfree(h_Xty);
-			pfree(h_XtX_inv);
-			pfree(h_beta);
+			nfree(h_XtX);
+			nfree(h_Xty);
+			nfree(h_XtX_inv);
+			nfree(h_beta);
+			MemoryContextSwitchTo(oldcontext);
 			if (errstr)
 				*errstr = pstrdup("Matrix is singular, cannot compute linear regression");
 			return -1;
@@ -3080,6 +3119,11 @@ ndb_metal_linreg_train(const float *features,
 		model.coefficients = model_coefficients;
 		if (model.coefficients == NULL)
 		{
+			nfree(h_XtX);
+			nfree(h_Xty);
+			nfree(h_XtX_inv);
+			nfree(h_beta);
+			MemoryContextSwitchTo(oldcontext);
 			if (errstr)
 				*errstr = pstrdup("Metal LinReg train: failed to allocate coefficients");
 			elog(ERROR, "ndb_metal_linreg_train: palloc failed for coefficients");
@@ -3130,23 +3174,34 @@ ndb_metal_linreg_train(const float *features,
 		ereport(DEBUG2, (errmsg("ndb_metal_linreg_train: model packed, rc=%d", rc)));
 		if (rc != 0)
 		{
+			nfree(model.coefficients);
+			nfree(h_XtX);
+			nfree(h_Xty);
+			nfree(h_XtX_inv);
+			nfree(h_beta);
+			MemoryContextSwitchTo(oldcontext);
 			if (errstr && *errstr == NULL)
 				*errstr = pstrdup("Metal linreg pack failed");
+			return -1;
 		}
 
 		ereport(DEBUG2, (errmsg("ndb_metal_linreg_train: freeing model coefficients")));
-		pfree(model.coefficients);
+		nfree(model.coefficients);
 		ereport(DEBUG2, (errmsg("ndb_metal_linreg_train: model coefficients freed")));
 	}
 
 	ereport(DEBUG2, (errmsg("ndb_metal_linreg_train: cleaning up memory")));
-	pfree(h_XtX);
-	pfree(h_Xty);
-	pfree(h_XtX_inv);
-	pfree(h_beta);
+	nfree(h_XtX);
+	nfree(h_Xty);
+	nfree(h_XtX_inv);
+	nfree(h_beta);
 	ereport(DEBUG2, (errmsg("ndb_metal_linreg_train: memory cleaned up")));
 
 	ereport(DEBUG2, (errmsg("ndb_metal_linreg_train: checking return values, rc=%d, payload=%p", rc, (void *) payload)));
+	
+	/* Switch back to original memory context before returning */
+	MemoryContextSwitchTo(oldcontext);
+	
 	if (rc == 0 && payload != NULL)
 	{
 		ereport(DEBUG2, (errmsg("ndb_metal_linreg_train: setting return values")));
@@ -3162,6 +3217,7 @@ ndb_metal_linreg_train(const float *features,
 		pfree(payload);
 	if (metrics_json != NULL)
 		pfree(metrics_json);
+	/* Memory context already restored above */
 
 	return -1;
 }

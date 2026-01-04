@@ -244,7 +244,6 @@ ndb_gpu_try_train_model(const char *algorithm,
 		/* List of algorithms unsupported by Metal GPU */
 		if (strcmp(algorithm, "random_forest") == 0 ||
 			strcmp(algorithm, "logistic_regression") == 0 ||
-			strcmp(algorithm, "linear_regression") == 0 ||
 			strcmp(algorithm, "svm") == 0 ||
 			strcmp(algorithm, "decision_tree") == 0 ||
 			strcmp(algorithm, "ridge") == 0 ||

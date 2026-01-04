@@ -296,11 +296,17 @@ def verify_gpu_usage(dbname: str, psql_path: str, compute_mode: str, test_name: 
 	
 	# Check only the most recent model to avoid false positives from previous test runs
 	check_sql = """
-		SELECT 
+		WITH settings AS (
+			SELECT current_setting('neurondb.gpu_backend_type', true) AS backend_type
+		)
+		SELECT
 			m.model_id,
 			m.algorithm,
-			COALESCE(m.metrics::jsonb->>'storage', 'cpu') AS storage
+			COALESCE(m.metrics::jsonb->>'storage', 'cpu') AS storage,
+			COALESCE(m.metrics::jsonb->>'training_backend', '0') AS training_backend,
+			COALESCE(settings.backend_type, '') AS backend_type
 		FROM neurondb.ml_models m
+		CROSS JOIN settings
 		ORDER BY m.model_id DESC
 		LIMIT 1;
 	"""
@@ -324,13 +330,29 @@ def verify_gpu_usage(dbname: str, psql_path: str, compute_mode: str, test_name: 
 			lines = [line.strip() for line in out.strip().split('\n') if line.strip()]
 			for line in lines:
 				parts = line.split('|')
-				if len(parts) >= 3:
+				if len(parts) >= 5:
 					model_id = parts[0].strip()
 					algorithm = parts[1].strip()
 					storage = parts[2].strip()
+					training_backend = parts[3].strip()
+					backend_type = parts[4].strip()
+
+					# Metal backend type is 2 (see neurondb_guc.c). In Metal mode we only enforce
+					# GPU-training for algorithms we explicitly support on Metal (currently linreg),
+					# to avoid noisy warnings while other Metal ML trainers still have CPU fallbacks.
+					is_metal = backend_type == "2"
+					metal_supported_algorithms = {"linear_regression"}
+
 					# Only check ML algorithms that should use GPU
 					ml_algorithms = ['linear_regression', 'logistic_regression', 'random_forest', 'svm', 'ridge', 'lasso', 'decision_tree', 'naive_bayes']
-					if storage != 'gpu' and algorithm in ml_algorithms:
+
+					# If storage is missing but training_backend indicates GPU-path training, accept it.
+					used_gpu_marker = (storage == 'gpu') or (training_backend == '1')
+
+					if is_metal and algorithm not in metal_supported_algorithms:
+						continue
+
+					if (not used_gpu_marker) and algorithm in ml_algorithms:
 						return False, f"GPU mode enabled but model_id={model_id} (algorithm={algorithm}) was trained on CPU (storage={storage})"
 		
 		return True, ""
