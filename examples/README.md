@@ -6,6 +6,25 @@ This directory contains complete, production-ready examples showing how to build
 
 ---
 
+## 🚀 Quick Start for Beginners
+
+**New to NeuronDB? Start here:**
+
+1. **[Basics Examples](basics/)** - Simple, copy-paste friendly examples
+   - `01_basic_vectors.py` - Vector basics
+   - `02_simple_embeddings.py` - Text to embeddings
+   - `03_similarity_search.py` - Similarity search
+   - `04_basic_index.py` - Creating indexes
+   - `05_simple_rag.py` - Simple RAG system
+
+2. **[Features Examples](features/)** - Examples by feature
+   - Vector types, distance metrics, ML algorithms, indexing
+
+3. **[Modules Examples](modules/)** - Examples by module
+   - NeuronDB, NeuronAgent, NeuronMCP
+
+---
+
 ## 📚 Example Categories
 
 ### 1. 🔍 Semantic Search (`semantic-search-docs/`)
