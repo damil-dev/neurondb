@@ -5,7 +5,7 @@ version: '3.8'
 
 services:
   neurondb:
-    image: ${NEURONDB_IMAGE:-ghcr.io/neurondb/neurondb-postgres:1.0.0-pg17-cpu}
+    image: ${NEURONDB_IMAGE:-ghcr.io/neurondb/neurondb-postgres:2.0.0-pg17-cpu}
     container_name: neurondb-prod
     restart: unless-stopped
     environment:
@@ -35,7 +35,7 @@ services:
           cpus: '2'
 
   neuronagent:
-    image: ${NEURONAGENT_IMAGE:-ghcr.io/neurondb/neuronagent:1.0.0}
+    image: ${NEURONAGENT_IMAGE:-ghcr.io/neurondb/neuronagent:2.0.0}
     container_name: neuronagent-prod
     restart: unless-stopped
     environment:
@@ -67,7 +67,7 @@ services:
           cpus: '0.5'
 
   neurondb-mcp:
-    image: ${NEURONMCP_IMAGE:-ghcr.io/neurondb/neuronmcp:1.0.0}
+    image: ${NEURONMCP_IMAGE:-ghcr.io/neurondb/neuronmcp:2.0.0}
     container_name: neuronmcp-prod
     restart: unless-stopped
     environment:
@@ -92,7 +92,7 @@ services:
           cpus: '0.25'
 
   neurondesk-api:
-    image: ${NEURONDESKTOP_API_IMAGE:-ghcr.io/neurondb/neurondesktop-api:1.0.0}
+    image: ${NEURONDESKTOP_API_IMAGE:-ghcr.io/neurondb/neurondesktop-api:2.0.0}
     container_name: neurondesk-api-prod
     restart: unless-stopped
     environment:
@@ -126,7 +126,7 @@ services:
           cpus: '0.25'
 
   neurondesk-frontend:
-    image: ${NEURONDESKTOP_FRONTEND_IMAGE:-ghcr.io/neurondb/neurondesktop-frontend:1.0.0}
+    image: ${NEURONDESKTOP_FRONTEND_IMAGE:-ghcr.io/neurondb/neurondesktop-frontend:2.0.0}
     container_name: neurondesk-frontend-prod
     restart: unless-stopped
     environment:
