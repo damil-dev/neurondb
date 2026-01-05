@@ -15,7 +15,7 @@ DB_PORT="5434"
 SQL_DIR="ML/sql"
 OUT_DIR="ML/out"
 PG_CTL="/usr/local/pgsql.18/bin/pg_ctl"
-PG_DATA="/Users/pgedge/neurondb_data18"
+PG_DATA="${HOME}/neurondb_data"
 
 # Parse arguments
 for arg in "$@"; do

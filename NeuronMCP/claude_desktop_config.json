@@ -1,7 +1,7 @@
 {
   "mcpServers": {
     "neurondb": {
-      "command": "/Users/pgedge/pge/neurondb/NeuronMCP/bin/neurondb-mcp",
+      "command": "neurondb-mcp",
       "env": {
         "NEURONDB_HOST": "localhost",
         "NEURONDB_PORT": "5432",

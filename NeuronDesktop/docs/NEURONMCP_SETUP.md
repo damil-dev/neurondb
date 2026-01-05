@@ -9,13 +9,13 @@ NeuronMCP has been built and configured to work with NeuronDesktop.
 ### Profile Created
 - **Name:** NeuronMCP Profile
 - **Profile ID:** `ce91cab1-bbfb-4405-8d38-1b908eca0b6c`
-- **MCP Binary:** `/Users/pgedge/pge/neurondb/NeuronMCP/bin/neurondb-mcp`
+- **MCP Binary:** `neurondb-mcp` (or full path to binary)
 - **Database:** `postgresql://neurondb:neurondb@localhost:5432/neurondb`
 
 ### MCP Configuration
 ```json
 {
-  "command": "/Users/pgedge/pge/neurondb/NeuronMCP/bin/neurondb-mcp",
+  "command": "neurondb-mcp",
   "args": [],
   "env": {
     "NEURONDB_HOST": "localhost",
@@ -59,8 +59,8 @@ curl http://localhost:8081/api/v1/profiles/{profile-id}/mcp/tools \
 ## Troubleshooting
 
 ### MCP Server Not Starting
-- Check binary exists: `ls -lh /Users/pgedge/pge/neurondb/NeuronMCP/bin/neurondb-mcp`
-- Check binary is executable: `chmod +x /Users/pgedge/pge/neurondb/NeuronMCP/bin/neurondb-mcp`
+- Check binary exists: `which neurondb-mcp` or check your installation path
+- Check binary is executable: `chmod +x /path/to/neurondb-mcp`
 - Check database connection: `psql -d neurondb -c "SELECT 1;"`
 
 ### Connection Errors
@@ -78,7 +78,7 @@ curl http://localhost:8081/api/v1/profiles/{profile-id}/mcp/tools \
 If you need to rebuild NeuronMCP:
 
 ```bash
-cd /Users/pgedge/pge/neurondb/NeuronMCP
+cd /path/to/neurondb2/NeuronMCP
 go build -o bin/neurondb-mcp ./cmd/neurondb-mcp
 ```
 
@@ -88,7 +88,7 @@ go build -o bin/neurondb-mcp ./cmd/neurondb-mcp
 ```sql
 UPDATE profiles 
 SET mcp_config = '{
-  "command": "/Users/pgedge/pge/neurondb/NeuronMCP/bin/neurondb-mcp",
+  "command": "neurondb-mcp",
   "args": [],
   "env": {
     "NEURONDB_HOST": "localhost",
