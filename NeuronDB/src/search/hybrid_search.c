@@ -139,18 +139,20 @@ hybrid_search(PG_FUNCTION_ARGS)
 		float8		vector_weight;
 		int32		limit;
 
-		char	   *tbl_str = NULL;
-		char	   *txt_str = NULL;
-		char	   *filter_str = NULL;
-		StringInfoData sql;
-		StringInfoData vec_lit;
-		int			spi_ret;
-		int			i;
-		int			proc;
-		NdbSpiSession *session = NULL;
-		text *query_type = NULL;
-		char *qtype_str = NULL;
-		const char *query_func = NULL;
+	char	   *tbl_str = NULL;
+	char	   *txt_str = NULL;
+	char	   *filter_str = NULL;
+	StringInfoData sql;
+	StringInfoData vec_lit;
+	int			spi_ret;
+	int			i;
+	int			proc;
+	NdbSpiSession *session = NULL;
+	text *query_type = NULL;
+	char *qtype_str = NULL;
+	const char *query_func = NULL;
+	char *query_text_formatted = NULL;
+	char *query_text_to_use = NULL;
 
 		/* Validate argument count */
 		if (PG_NARGS() < 6 || PG_NARGS() > 7)
@@ -240,11 +242,11 @@ hybrid_search(PG_FUNCTION_ARGS)
 		}
 		appendStringInfoChar(&vec_lit, '}');
 
-		/* Determine query function based on query_type */
-		query_func = "plainto_tsquery";
-		char *query_text_formatted = NULL;
-		
-		if (strcmp(qtype_str, "to") == 0 || strcmp(qtype_str, "to_tsquery") == 0)
+	/* Determine query function based on query_type */
+	query_func = "plainto_tsquery";
+	query_text_formatted = NULL;
+	
+	if (strcmp(qtype_str, "to") == 0 || strcmp(qtype_str, "to_tsquery") == 0)
 		{
 			query_func = "to_tsquery";
 			/* Convert plain text to tsquery format (space-separated words -> word1 & word2) */
@@ -260,10 +262,10 @@ hybrid_search(PG_FUNCTION_ARGS)
 			query_text_formatted = NULL; /* Use original text for plainto_tsquery */
 		}
 
-		/* Use formatted text if available, otherwise use original */
-		char *query_text_to_use = query_text_formatted ? query_text_formatted : txt_str;
+	/* Use formatted text if available, otherwise use original */
+	query_text_to_use = query_text_formatted ? query_text_formatted : txt_str;
 
-		initStringInfo(&sql);
+	initStringInfo(&sql);
 
 		appendStringInfo(&sql,
 						 "WITH _hybrid_scores AS ("
