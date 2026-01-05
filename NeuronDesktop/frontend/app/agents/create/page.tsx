@@ -83,7 +83,7 @@ export default function AgentCreatePage() {
         <div className="mt-8 card bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
           <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-100 mb-2">💡 Quick Tips</h3>
           <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
-            <li>• Use templates for common use cases - they're production-ready and optimized</li>
+            <li>• Use templates for common use cases - they are well-tested defaults</li>
             <li>• The wizard is great for custom agents with specific requirements</li>
             <li>• You can always customize templates after deployment</li>
             <li>• Need help? Check the documentation or examples</li>

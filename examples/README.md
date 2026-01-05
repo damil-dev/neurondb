@@ -2,7 +2,7 @@
 
 **Professional, working examples demonstrating NeuronDB capabilities**
 
-This directory contains complete, production-ready examples showing how to build real-world applications with NeuronDB.
+This directory contains complete, practical examples showing how to build real-world applications with NeuronDB.
 
 ---
 
@@ -643,7 +643,7 @@ After exploring these examples:
 
 **Last Updated:** 2025-12-31  
 **Examples Version:** 2.0.0  
-**Status:** ✅ Production Ready
+**Status:** ✅ Maintained
 
 ---
 

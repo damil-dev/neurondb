@@ -33,7 +33,7 @@ IVF index overview and usage.
 
 ## More Examples
 
-For complete, production-ready examples, see:
+For complete, end-to-end examples, see:
 - `../basics/` - Beginner-friendly examples
 - `../semantic-search-docs/` - Full semantic search
 - `../rag-chatbot-pdfs/` - Complete RAG system
