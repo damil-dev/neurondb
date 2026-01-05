@@ -34,7 +34,7 @@ PostgreSQL stores vectors using vector types. Vector columns accept fixed dimens
 
 Create a table with vector and relational columns:
 
-\`\`\`sql
+```sql
 CREATE TABLE documents (
     id serial PRIMARY KEY,
     title text NOT NULL,
@@ -46,7 +46,7 @@ CREATE TABLE documents (
 
 CREATE INDEX idx_documents_embedding ON documents 
 USING hnsw (embedding vector_cosine_ops);
-\`\`\`
+```
 
 The embedding column uses vector type with 384 dimensions. The HNSW index accelerates similarity search. Relational columns store metadata. Queries combine vector similarity with relational filters.
 
@@ -56,7 +56,7 @@ PostgreSQL supports multiple methods for inserting vectors. The following exampl
 
 **Example 1: Inserting vectors from arrays**
 
-\`\`\`sql
+```sql
 -- Insert vectors using array_to_vector function
 INSERT INTO documents (title, content, embedding) VALUES
     ('Machine Learning Basics', 
@@ -71,11 +71,11 @@ INSERT INTO documents (title, content, embedding) VALUES
 
 -- Results:
 -- INSERT 0 3
-\`\`\`
+```
 
 **Example 2: Generating embeddings automatically**
 
-\`\`\`sql
+```sql
 -- Insert documents with automatic embedding generation
 INSERT INTO documents (title, content, embedding) VALUES
     ('PostgreSQL Performance', 
@@ -90,11 +90,11 @@ INSERT INTO documents (title, content, embedding) VALUES
 
 -- Results:
 -- INSERT 0 3
-\`\`\`
+```
 
 **Example 3: Batch insertion with COPY**
 
-\`\`\`sql
+```sql
 -- Prepare data file (example CSV format)
 -- documents.csv:
 -- title,content,embedding
@@ -108,11 +108,11 @@ WITH (FORMAT csv, HEADER true);
 
 -- Results:
 -- COPY 1000
-\`\`\`
+```
 
 **Example 4: Inserting with metadata**
 
-\`\`\`sql
+```sql
 -- Insert documents with rich metadata
 INSERT INTO documents (title, content, embedding, metadata) VALUES
     ('AI Research Paper',
@@ -126,11 +126,11 @@ INSERT INTO documents (title, content, embedding, metadata) VALUES
 
 -- Results:
 -- INSERT 0 2
-\`\`\`
+```
 
 **Example 5: Updating existing vectors**
 
-\`\`\`sql
+```sql
 -- Update embedding for existing document
 UPDATE documents
 SET embedding = embed_text('Updated content: ' || content, 'sentence-transformers/all-MiniLM-L6-v2')
@@ -138,7 +138,7 @@ WHERE id = 1;
 
 -- Results:
 -- UPDATE 1
-\`\`\`
+```
 
 Array-based insertion provides direct control. Automatic embedding generation eliminates external services. Batch insertion loads data efficiently. Metadata storage stores document attributes. Vector updates support content changes.
 
@@ -148,7 +148,7 @@ PostgreSQL supports multiple index types. HNSW indexes provide fast search with 
 
 The following example shows creating different index types:
 
-\`\`\`sql
+```sql
 -- HNSW index for high-performance similarity search
 CREATE INDEX idx_hnsw_embedding ON documents 
 USING hnsw (embedding vector_cosine_ops)
@@ -162,7 +162,7 @@ WITH (lists = 100);
 -- DiskANN index for billion-scale storage
 CREATE INDEX idx_diskann_embedding ON documents 
 USING diskann (embedding vector_cosine_ops);
-\`\`\`
+```
 
 HNSW indexes provide 5-8ms latency on 100 million vectors. IVFFlat indexes build faster. They suit frequent updates. DiskANN indexes store billions of vectors on disk. Query latency is 30-50ms. Choose indexes based on dataset size, update frequency, and latency requirements.
 
@@ -176,7 +176,7 @@ PostgreSQL processes vector queries through multiple stages. Query input accepts
 
 The following example shows a query that combines vector similarity with relational filters:
 
-\`\`\`sql
+```sql
 WITH query_vector AS (
     SELECT embed_text('machine learning algorithms') AS vec
 )
@@ -191,7 +191,7 @@ WHERE d.created_at > '2024-01-01'
   AND d.metadata->>'category' = 'technical'
 ORDER BY d.embedding <=> q.vec
 LIMIT 10;
-\`\`\`
+```
 
 The query combines vector similarity with relational filters. The WHERE clause filters by date and category. The ORDER BY clause ranks by cosine distance. Standalone vector databases do not support relational constraints.
 
@@ -321,7 +321,7 @@ Performance depends on index selection, dataset size, and query patterns. HNSW i
 
 The following benchmarks show capabilities:
 
-\`\`\`sql
+```sql
 -- Performance test: Query latency measurement
 EXPLAIN ANALYZE
 SELECT id, title, embedding <=> embed_text('query') AS distance
@@ -333,7 +333,7 @@ LIMIT 10;
 -- Planning Time: 0.123 ms
 -- Execution Time: 5.234 ms
 -- Index Scan using idx_hnsw_embedding: 5.234 ms
-\`\`\`
+```
 
 PostgreSQL achieves 5.2ms average query latency with HNSW indexing on 10 million vectors. Performance scales linearly up to 100 million vectors. DiskANN indexes maintain acceptable latency beyond that.
 
@@ -345,7 +345,7 @@ Index selection balances query performance, construction time, memory usage, and
 
 The following example demonstrates index creation with different parameters for various use cases:
 
-\`\`\`sql
+```sql
 -- High-performance index for production workloads
 CREATE INDEX idx_production ON documents 
 USING hnsw (embedding vector_cosine_ops)
@@ -368,7 +368,7 @@ WITH (
     max_degree = 64,     -- Maximum graph degree
     search_list_size = 100 -- Search list size
 );
-\`\`\`
+```
 
 Select index parameters based on workload. Production applications use HNSW with m=16 and ef_construction=64. Frequently updated datasets use IVFFlat with lists=100. Billion-scale datasets use DiskANN to maintain acceptable latency while storing data on disk.
 
@@ -378,7 +378,7 @@ PostgreSQL combines vector similarity with relational operations. Basic similari
 
 The following example demonstrates a filtered similarity search that combines vector similarity with relational filters:
 
-\`\`\`sql
+```sql
 WITH query AS (
     SELECT embed_text('database optimization') AS vec
 )
@@ -394,13 +394,13 @@ WHERE d.metadata->>'category' = 'database'
   AND d.embedding <=> q.vec < 0.3
 ORDER BY d.embedding <=> q.vec
 LIMIT 20;
-\`\`\`
+```
 
 The query combines vector similarity with multiple relational filters. The WHERE clause filters by category, date, and distance threshold. ORDER BY ranks by similarity. Standalone vector databases do not support relational filtering.
 
 Aggregation queries demonstrate PostgreSQL vector database capabilities for analytics workloads:
 
-\`\`\`sql
+```sql
 WITH query AS (
     SELECT embed_text('artificial intelligence') AS vec
 )
@@ -414,7 +414,7 @@ FROM documents d, query q
 WHERE d.embedding <=> q.vec < 0.5
 GROUP BY d.metadata->>'category'
 ORDER BY avg_distance;
-\`\`\`
+```
 
 The aggregation query computes statistics over results. It groups by category and calculates average, minimum, and maximum distances. PostgreSQL combines vector similarity with SQL aggregation functions.
 
@@ -424,7 +424,7 @@ PostgreSQL supports query patterns that combine vector similarity with relationa
 
 **Example 1: Multi-vector similarity search**
 
-\`\`\`sql
+```sql
 -- Find documents similar to multiple query vectors
 WITH queries AS (
     SELECT 
@@ -449,11 +449,11 @@ LIMIT 10;
 --  2 | Machine Learning Basics    |     0.234567
 --  8 | Neural Network Architecture|     0.345678
 -- (10 rows)
-\`\`\`
+```
 
 **Example 2: Vector similarity with JOIN operations**
 
-\`\`\`sql
+```sql
 -- Join vector search with related tables
 WITH query_vector AS (
     SELECT embed_text('database optimization') AS vec
@@ -479,11 +479,11 @@ LIMIT 20;
 -- 12 | Query Optimization   |  0.12345 | John Smith  | john@example.com      | Database
 -- 15 | Index Strategies     |  0.23456 | Jane Doe     | jane@example.com      | Performance
 -- (20 rows)
-\`\`\`
+```
 
 **Example 3: Time-based vector search**
 
-\`\`\`sql
+```sql
 -- Find recent documents similar to query
 WITH query_vector AS (
     SELECT embed_text('artificial intelligence') AS vec
@@ -506,11 +506,11 @@ LIMIT 15;
 -- 23 | AI Trends 2024          | 2024-12-15 10:30:00  |  0.12345 |     2.5
 -- 18 | Machine Learning Guide  | 2024-12-10 14:20:00  |  0.23456 |     7.3
 -- (15 rows)
-\`\`\`
+```
 
 **Example 4: Vector similarity with window functions**
 
-\`\`\`sql
+```sql
 -- Rank documents by similarity within categories
 WITH query_vector AS (
     SELECT embed_text('data science') AS vec
@@ -533,11 +533,11 @@ LIMIT 30;
 -- 52 | Statistics Basics    | tutorial |  0.23456 |                2
 -- 67 | ML Fundamentals      | research |  0.34567 |                1
 -- (30 rows)
-\`\`\`
+```
 
 **Example 5: Vector similarity with subqueries**
 
-\`\`\`sql
+```sql
 -- Find documents similar to a specific document
 SELECT 
     d2.id,
@@ -558,11 +558,11 @@ LIMIT 10;
 -- 12 | Related Topic A        |             0.12345 |          0.87655
 -- 18 | Related Topic B        |             0.23456 |          0.76544
 -- (10 rows)
-\`\`\`
+```
 
 **Example 6: Vector operations in CTEs**
 
-\`\`\`sql
+```sql
 -- Complex query using Common Table Expressions
 WITH 
     query_embedding AS (
@@ -601,7 +601,7 @@ ORDER BY r.rank;
 -- 25 | Vector Search Tutorial   |  0.12345 |    1 | tutorial
 -- 30 | PostgreSQL Guide         |  0.23456 |    2 | guide
 -- (10 rows)
-\`\`\`
+```
 
 Multi-vector search finds documents similar to multiple concepts simultaneously. JOIN operations combine vector similarity with relational data from multiple tables. Time-based filtering finds recent similar content. Window functions rank within categories. Subqueries find documents similar to specific references. CTEs support complex multi-step query logic. Standalone vector databases do not support this.
 
@@ -611,7 +611,7 @@ Migration requires data export, schema design, index creation, and query transla
 
 The following example shows migration steps:
 
-\`\`\`sql
+```sql
 -- Step 1: Create target table matching source schema
 CREATE TABLE migrated_documents (
     id serial PRIMARY KEY,
@@ -639,7 +639,7 @@ SELECT
     MIN(migrated_at) AS first_migration,
     MAX(migrated_at) AS last_migration
 FROM migrated_documents;
-\`\`\`
+```
 
 Verify migration by counting documents, verifying vector dimensions, and checking timestamps. Migration enables gradual transition while maintaining data consistency.
 
@@ -649,7 +649,7 @@ Scaling strategies support growth from thousands to billions of vectors. Horizon
 
 The following example shows horizontal scaling using table partitioning:
 
-\`\`\`sql
+```sql
 -- Partitioned table for horizontal scaling
 CREATE TABLE documents_partitioned (
     id serial,
@@ -675,13 +675,13 @@ USING hnsw (embedding vector_cosine_ops);
 CREATE INDEX idx_documents_q2_embedding ON documents_2024_q2 
 USING hnsw (embedding vector_cosine_ops);
 -- ... additional partition indexes
-\`\`\`
+```
 
 Partitioning limits searches to relevant partitions. This reduces index size per partition and improves query performance. Queries automatically prune irrelevant partitions. Each partition can have independent indexes optimized for its data characteristics.
 
 Performance optimization techniques improve query latency and throughput:
 
-\`\`\`sql
+```sql
 -- Optimize query with appropriate index hints
 SET enable_seqscan = off;  -- Force index usage
 SET work_mem = '256MB';    -- Increase work memory for sorting
@@ -702,7 +702,7 @@ LIMIT 10;  -- Limit result set
 -- Reset settings
 RESET enable_seqscan;
 RESET work_mem;
-\`\`\`
+```
 
 Query optimization techniques include forcing index usage, increasing work memory for sorting, applying early distance filtering, and limiting result sets. These optimizations improve query performance by 2-5x.
 
@@ -712,7 +712,7 @@ Production deployment requires hardware selection, index configuration, query op
 
 The following example shows production monitoring queries:
 
-\`\`\`sql
+```sql
 -- Monitor index usage and performance
 SELECT 
     schemaname,
@@ -736,7 +736,7 @@ FROM pg_stat_statements
 WHERE query LIKE '%<=>%'
 ORDER BY mean_exec_time DESC
 LIMIT 10;
-\`\`\`
+```
 
 Production monitoring enables identification of performance bottlenecks, index usage patterns, and optimization opportunities. Index usage statistics reveal which indexes provide value and which may be unnecessary. Query performance statistics identify slow queries requiring optimization. Regular monitoring ensures PostgreSQL vector database maintains acceptable performance as datasets grow and query patterns evolve.
 
@@ -746,7 +746,7 @@ PostgreSQL serves semantic search, recommendation systems, and AI applications. 
 
 The following example shows a semantic search application:
 
-\`\`\`sql
+```sql
 -- Semantic search for technical documentation
 WITH search_query AS (
     SELECT embed_text('database performance optimization') AS query_vec
@@ -763,13 +763,13 @@ WHERE d.metadata->>'type' = 'technical'
   AND d.embedding <=> s.query_vec < 0.5
 ORDER BY d.embedding <=> s.query_vec
 LIMIT 10;
-\`\`\`
+```
 
 The semantic search query finds technical documents similar to the search query by computing cosine distance. Results rank by similarity score. Lower scores indicate higher relevance. The query combines vector similarity with relational filters.
 
 Recommendation systems use vector similarity to identify similar items:
 
-\`\`\`sql
+```sql
 -- Product recommendation based on user preferences
 WITH user_profile AS (
     SELECT embedding FROM user_profiles WHERE user_id = 123
@@ -785,7 +785,7 @@ WHERE p.category = 'electronics'
   AND p.stock_quantity > 0
 ORDER BY p.embedding <=> u.embedding
 LIMIT 20;
-\`\`\`
+```
 
 The recommendation query finds products similar to a user profile by comparing embeddings. Results combine vector similarity with inventory availability and category filters.
 
@@ -795,7 +795,7 @@ PostgreSQL provides multi-vector search, hybrid search, temporal search, faceted
 
 The following example shows hybrid search combining vector similarity with full-text search:
 
-\`\`\`sql
+```sql
 -- Hybrid search: vector similarity + full-text search
 WITH query_vector AS (
     SELECT embed_text('machine learning algorithms') AS vec
@@ -812,13 +812,13 @@ WHERE d.content @@ to_tsquery('english', 'machine | learning | algorithm')
   AND d.embedding <=> q.vec < 0.6
 ORDER BY combined_score
 LIMIT 20;
-\`\`\`
+```
 
 The hybrid search query combines vector similarity with full-text search. It uses 70% weight for vector similarity and 30% weight for full-text search. This combines semantic meaning and keyword matching.
 
 Multi-vector search enables complex similarity queries:
 
-\`\`\`sql
+```sql
 -- Multi-vector search: find items similar to multiple queries
 WITH queries AS (
     SELECT 
@@ -835,7 +835,7 @@ SELECT
 FROM documents d, queries q
 ORDER BY avg_distance
 LIMIT 10;
-\`\`\`
+```
 
 The multi-vector search computes average distance to multiple query vectors. It finds documents similar to all queries simultaneously.
 

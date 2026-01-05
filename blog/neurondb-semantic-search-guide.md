@@ -23,7 +23,7 @@ What you will build:
 
 Install NeuronDB and run this query:
 
-\`\`\`sql
+```sql
 CREATE EXTENSION neurondb;
 
 -- Create a simple table
@@ -52,7 +52,7 @@ LIMIT 5;
 ------------------------------+------------
  PostgreSQL is a powerful relational database |     0.0000
 (1 row)
-\`\`\`
+```
 
 This query finds documents about **database systems** even though the document text says **relational database**. The system understands these concepts are related.
 
@@ -70,9 +70,9 @@ Semantic search uses embeddings. Embeddings are mathematical representations of 
 
 The process follows this pipeline:
 
-\`\`\`
+```
 Text → Embedding Model → Vector (384-1024 dimensions) → Similarity Search
-\`\`\`
+```
 
 You input text into an embedding model. The model processes text through neural network layers. It transforms text into a dense vector. This vector captures topic, sentiment, concept relationships, and context. The sentences "PostgreSQL is a database" and "Postgres offers data management" produce similar vectors despite different word choices.
 
@@ -84,9 +84,9 @@ The system measures distance between the query vector and document vectors. It u
 
 NeuronDB is a PostgreSQL extension. It works with [PostgreSQL 16](https://www.postgresql.org/docs/16/), [PostgreSQL 17](https://www.postgresql.org/docs/17/), and [PostgreSQL 18](https://www.postgresql.org/docs/18/). Download the binary package for your PostgreSQL version and operating system. Install the extension files. Enable it in your database:
 
-\`\`\`sql
+```sql
 CREATE EXTENSION neurondb;
-\`\`\`
+```
 
 This command registers NeuronDB with your PostgreSQL instance. It creates the necessary database objects, functions, and types. The extension is schema-aware. Install it in a specific schema if needed. The default public schema works for most use cases.
 
@@ -112,7 +112,7 @@ The workflow includes schema design, document chunking, embedding generation, in
 
 Define the database structure for storing documents and their chunks. Create two tables: one for complete documents with metadata, and another for document chunks that will store embeddings. We'll also create indexes to improve query performance. Run these commands to set up the schema:
 
-\`\`\`sql
+```sql
 -- Create documents table
 CREATE TABLE documents (
     doc_id SERIAL PRIMARY KEY,
@@ -149,7 +149,7 @@ CREATE INDEX idx_chunks_doc_id ON document_chunks(doc_id);
  public | documents                    | table    | postgres
  public | documents_doc_id_seq         | sequence | postgres
 (4 rows)
-\`\`\`
+```
 
 The verification query shows we created four database objects: the documents table, the document_chunks table, and their associated sequences for auto-incrementing IDs. The schema is ready to store documents and their chunks.
 
@@ -157,7 +157,7 @@ The verification query shows we created four database objects: the documents tab
 
 Add sample documents to the system. Insert technical documents with titles, content, source URLs, document types, and metadata. The metadata includes categories and tags that we'll use later for filtering. Run this INSERT statement to add the documents:
 
-\`\`\`sql
+```sql
 -- Insert sample technical documents
 INSERT INTO documents (title, content, source, doc_type, metadata) VALUES
 ('PostgreSQL Performance Tuning', 
@@ -193,7 +193,7 @@ FROM documents d;
       4 | Python Machine Learning Best Practices     |           5 |                      5
       5 | Database Sharding Strategies               |           3 |                      3
 (5 rows)
-\`\`\`
+```
 
 The verification query shows we inserted five documents. Each document has a doc_id, title, and metadata. The chunk_count and chunks_with_embeddings columns show zero because we haven't created chunks yet. We'll create chunks in the next step.
 
@@ -201,7 +201,7 @@ The verification query shows we inserted five documents. Each document has a doc
 
 Split long documents into smaller chunks for better search results. Large documents are harder to match precisely. Smaller chunks improve retrieval accuracy. We'll split documents by sentences, filter out very short chunks, and store each chunk with its position index. Run this query to create chunks:
 
-\`\`\`sql
+```sql
 -- Simple chunking strategy: Split by sentences
 INSERT INTO document_chunks (doc_id, chunk_index, chunk_text, chunk_tokens)
 SELECT 
@@ -234,7 +234,7 @@ ORDER BY doc_id;
       4 |           5
       5 |           3
 (5 rows)
-\`\`\`
+```
 
 The verification query shows chunks were created for each document. Document 1 has 5 chunks, document 2 has 4 chunks, document 3 has 3 chunks, document 4 has 5 chunks, and document 5 has 3 chunks. Each chunk is ready for embedding generation.
 
@@ -244,7 +244,7 @@ Convert chunk text into vector embeddings that capture semantic meaning. NeuronD
 
 NeuronDB supports multiple embedding models. Use [sentence-transformers/all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2), a fast and efficient 384-dimensional model:
 
-\`\`\`sql
+```sql
 -- Generate embeddings for all document chunks
 UPDATE document_chunks
 SET embedding = embed_text(
@@ -262,13 +262,13 @@ FROM document_chunks;
 --------------+------------------------
            20 |                     20
 (1 row)
-\`\`\`
+```
 
 The verification query confirms all 20 chunks now have embeddings. Each chunk has a 384-dimensional vector that represents its semantic content. These embeddings enable similarity search. We can now find chunks that are semantically similar to user queries.
 
 ### Create Vector Index
 
-*Note*: The function signature is \`embed_text(text, model)\`. The model parameter is optional. If omitted, it defaults to [sentence-transformers/all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2).
+*Note*: The function signature is `embed_text(text, model)`. The model parameter is optional. If omitted, it defaults to [sentence-transformers/all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2).
 
 **Available Embedding Models:**
 
@@ -290,7 +290,7 @@ NeuronDB supports embedding models from [Hugging Face](https://huggingface.co/):
 
 For fast similarity search on large datasets, create an HNSW index. HNSW indexes provide sub-10ms query performance even with millions of vectors. The index uses cosine distance for similarity calculations. We'll create the index with parameters that balance query speed and index build time. Run this CREATE INDEX statement:
 
-\`\`\`sql
+```sql
 CREATE INDEX idx_chunks_embedding ON document_chunks 
 USING hnsw (embedding vector_cosine_ops) 
 WITH (m = 16, ef_construction = 64);
@@ -308,7 +308,7 @@ WHERE tablename = 'document_chunks';
  idx_chunks_embedding_hnsw | CREATE INDEX idx_chunks_embedding_hnsw ON public.document_chunks USING hnsw (embedding)
  idx_chunks_fts            | CREATE INDEX idx_chunks_fts ON public.document_chunks USING gin (fts_vector)
 (4 rows)
-\`\`\`
+```
 
 The verification query shows four indexes exist on the document_chunks table. The HNSW index on the embedding column enables fast approximate nearest neighbor search. Queries will use this index to find similar vectors quickly. The system is ready for semantic search queries.
 
@@ -320,7 +320,7 @@ These queries demonstrate how semantic search works in practice. They use the do
 
 Semantic search finds relevant content even when exact keywords don't match. A user asks **How do database indexes work?** but the documents contain phrases like **B-tree indexes** and **indexing strategies** instead. The system understands these are related concepts. We'll run a query that converts the user's question into an embedding, then finds the most similar document chunks using vector distance:
 
-\`\`\`sql
+```sql
 WITH query_embedding AS (
     SELECT embed_text(
         'How do database indexes work?',
@@ -347,7 +347,7 @@ LIMIT 5;
         2 | PostgreSQL Performance Tuning | B-tree indexes are the default and work...     |           0.0000
         3 | PostgreSQL Performance Tuning | GiST indexes are useful for full-text...       |           0.0000
 (5 rows)
-\`\`\`
+```
 
 The query correctly identifies content about **B-tree indexes**, **GiST indexes**, and **indexing strategies** even though the exact phrase **database indexes work** doesn't appear in the documents. Results are ranked by cosine distance (lower distance = higher similarity).
 
@@ -355,7 +355,7 @@ The query correctly identifies content about **B-tree indexes**, **GiST indexes*
 
 Semantic search recognizes synonyms and related terms. A user asks **What is retrieval augmented generation?** but the documents use the acronym **RAG**. The system understands these refer to the same concept. We'll run a query that finds documents about **RAG** even when the query uses the full phrase:
 
-\`\`\`sql
+```sql
 WITH query_embedding AS (
     SELECT embed_text(
         'What is retrieval augmented generation?',
@@ -382,7 +382,7 @@ LIMIT 5;
         3 | PostgreSQL Performance Tuning | GiST indexes are useful for full-text...       |           0.0000
         1 | PostgreSQL Performance Tuning | PostgreSQL performance can be significantly... |           0.0000
 (5 rows)
-\`\`\`
+```
 
 Even though the query uses **retrieval augmented generation** while the documents mention **RAG**, the semantic search correctly finds the relevant content. The top result correctly identifies the **RAG** document chunk, demonstrating that NeuronDB understands synonyms and related concepts.
 
@@ -390,7 +390,7 @@ Even though the query uses **retrieval augmented generation** while the document
 
 Users can ask questions in natural language without knowing SQL or search syntax. A user asks **machine learning model training tips** and the system finds relevant content about ML best practices. We'll run a query that processes the natural language question and retrieves the most relevant document chunks:
 
-\`\`\`sql
+```sql
 WITH query_embedding AS (
     SELECT embed_text(
         'machine learning model training tips',
@@ -417,7 +417,7 @@ LIMIT 5;
         3 | PostgreSQL Performance Tuning | GiST indexes are useful for full-text...       |     0.0000
         1 | PostgreSQL Performance Tuning | PostgreSQL performance can be significantly... |     0.0000
 (5 rows)
-\`\`\`
+```
 
 Natural language queries work seamlessly with NeuronDB. The query finds relevant content about machine learning and embeddings, demonstrating that users can query using natural language without understanding SQL or search syntax.
 
@@ -427,7 +427,7 @@ Natural language queries work seamlessly with NeuronDB. The query finds relevant
 
 Sometimes you want the best of both worlds, semantic understanding plus exact keyword matching. NeuronDB supports hybrid search:
 
-\`\`\`sql
+```sql
 -- Add full-text search support
 ALTER TABLE document_chunks ADD COLUMN IF NOT EXISTS fts_vector tsvector;
 UPDATE document_chunks
@@ -502,13 +502,13 @@ LIMIT 5;
        19 | Database Sharding Strategies  | Common strategies include: Range-based...      |    0.7432 |     0.6456 |     0.009876
        11 | Retrieval-Augmented Generation Overview | The process involves: 1) Converting user...    |    0.7210 |     0.6123 |     0.009567
 (5 rows)
-\`\`\`
+```
 
 ### Filtered Semantic Search
 
 Combine semantic search with metadata filters:
 
-\`\`\`sql
+```sql
 WITH query_embedding AS (
     SELECT embed_text(
         'database optimization techniques',
@@ -536,7 +536,7 @@ LIMIT 5;
         3 | PostgreSQL Performance Tuning | GiST indexes are useful for full-text...       |           0.0000
         4 | PostgreSQL Performance Tuning | Hash indexes can be faster for equality...     |           0.0000
 (5 rows)
-\`\`\`
+```
 
 The filtered search returns only documents matching the metadata criteria. All results are from documents with **metadata->>'category' = 'database'**, demonstrating how semantic search can be combined with metadata filtering.
 
@@ -544,7 +544,7 @@ The filtered search returns only documents matching the metadata criteria. All r
 
 For better performance when processing many documents, use batch embedding generation:
 
-\`\`\`sql
+```sql
 -- Generate embeddings in batch (5x faster than individual calls)
 -- Process chunks in batches to avoid memory issues with very large datasets
 WITH chunk_batches AS (
@@ -576,11 +576,11 @@ UPDATE document_chunks dc
 SET embedding = u.embedding
 FROM unnested u
 WHERE dc.chunk_id = u.chunk_id;
-\`\`\`
+```
 
 *Note*: Batch processing groups chunks into batches of 100. Adjust the batch size (100) based on your available memory. For smaller datasets, you can process all chunks at once:
 
-\`\`\`sql
+```sql
 -- Process all chunks in a single batch (use for smaller datasets)
 WITH batch_data AS (
     SELECT 
@@ -602,7 +602,7 @@ UPDATE document_chunks dc
 SET embedding = u.embedding
 FROM unnested u
 WHERE dc.chunk_id = u.chunk_id;
-\`\`\`
+```
 
 ## Building a RAG Pipeline
 
@@ -612,7 +612,7 @@ WHERE dc.chunk_id = u.chunk_id;
 
 Store user queries in a table that tracks the RAG pipeline state. Create a table to hold queries, retrieved chunks, context text, and generated responses. We'll insert a sample query to demonstrate the pipeline. Run these commands to set up query processing:
 
-\`\`\`sql
+```sql
 CREATE TABLE rag_queries (
     query_id SERIAL PRIMARY KEY,
     user_query TEXT NOT NULL,
@@ -629,7 +629,7 @@ VALUES (
     'How can I improve PostgreSQL query performance?',
     '{"model": "gpt-4", "temperature": 0.7}'::jsonb
 );
-\`\`\`
+```
 
 The query processing table is created and a sample query is stored. The query includes metadata about the LLM model and parameters that will be used for response generation.
 
@@ -637,7 +637,7 @@ The query processing table is created and a sample query is stored. The query in
 
 Find the most relevant document chunks for the user's query using semantic search. Convert the query to an embedding, then find chunks with similar embeddings. Rank results by similarity score. We'll retrieve the top 5 most relevant chunks. Run this query to retrieve context:
 
-\`\`\`sql
+```sql
 WITH query_embedding AS (
     SELECT embed_text(
         'How can I improve PostgreSQL query performance?',
@@ -674,7 +674,7 @@ FROM relevant_chunks;
         2 | PostgreSQL Performance Tuning | B-tree indexes are the default and work...     | 0.0000 |    4
         3 | PostgreSQL Performance Tuning | GiST indexes are useful for full-text...       | 0.0000 |    5
 (5 rows)
-\`\`\`
+```
 
 The query retrieved five chunks ranked by similarity to the user's question. The top result is about PostgreSQL performance tuning, which directly answers the question. The chunks are ordered by relevance, with the most similar chunk ranked first. These chunks will be combined into context for the LLM.
 
@@ -682,7 +682,7 @@ The query retrieved five chunks ranked by similarity to the user's question. The
 
 Combine the retrieved chunks into a single context string that the LLM can use. Aggregate chunk IDs into an array and merge chunk text into a formatted context string. The context includes rank information so the LLM knows which chunks are most relevant. We'll build the context from the top 5 chunks. Run this query to build the context:
 
-\`\`\`sql
+```sql
 WITH query_embedding AS (
     SELECT embed_text(
         'How can I improve PostgreSQL query performance?',
@@ -729,7 +729,7 @@ Document 4: B-tree indexes are the default and work well for most queries. They 
 
 Document 5: GiST indexes are useful for full-text search and geometric data. They support custom operator classes for specialized data types.
 (1 row)
-\`\`\`
+```
 
 The query built a context string containing the top 5 relevant chunks. The chunk_ids array contains the IDs of chunks used in the context. The context string is formatted with rank information, making it ready to pass to an LLM for response generation.
 
@@ -741,12 +741,12 @@ Pass the context to an LLM such as [OpenAI GPT](https://platform.openai.com/docs
 
 For production systems with large datasets, vector indexes are essential. [HNSW](https://arxiv.org/abs/1603.09320) indexes provide fast approximate nearest neighbor search:
 
-\`\`\`sql
+```sql
 -- HNSW index for fast approximate nearest neighbor search
 CREATE INDEX idx_chunks_embedding ON document_chunks 
 USING hnsw (embedding vector_cosine_ops) 
 WITH (m = 16, ef_construction = 64);
-\`\`\`
+```
 
 The m parameter controls the number of connections per layer. The ef_construction parameter controls index quality during construction. Higher values improve recall but slow index creation.
 
@@ -754,10 +754,10 @@ The m parameter controls the number of connections per layer. The ef_constructio
 
 NeuronDB automatically caches embeddings to improve performance. Check cache statistics and available tables in the neurondb schema:
 
-\`\`\`sql
+```sql
 -- Check cache statistics
 SELECT * FROM neurondb.embedding_cache_stats;
-\`\`\`
+```
 
 *Note*: The exact cache statistics table name may vary by NeuronDB version.
 
@@ -765,10 +765,10 @@ SELECT * FROM neurondb.embedding_cache_stats;
 
 For high-throughput scenarios, enable GPU acceleration:
 
-\`\`\`sql
+```sql
 -- Enable GPU support (requires CUDA/ROCm/Metal)
 SET neurondb.gpu_enabled = true;
-\`\`\`
+```
 
 ## Best Practices
 
@@ -798,7 +798,7 @@ Use hybrid search when exact keyword matching matters alongside semantic underst
 
 Support teams handle questions in natural language. Users ask **How do I reset my password?** but articles might use phrases like **password recovery** or **account access reset**. Semantic search finds relevant articles even when exact keywords don't match. We'll search support articles by converting the user's question to an embedding and finding articles with similar meaning. Filter results by category to narrow the search scope. Run this query to find relevant support articles:
 
-\`\`\`sql
+```sql
 WITH query_embedding AS (
     SELECT embed_text(
         'How do I reset my password?',
@@ -823,13 +823,13 @@ LIMIT 3;
           8 | Account Access Reset              | If you've forgotten your password, use the... |     0.0000
          12 | Account Security Management       | Managing your account security includes...    |     0.0000
 (3 rows)
-\`\`\`
+```
 
 ### Legal Document Search
 
 Legal professionals need to find clauses and provisions across large document collections. Exact keyword matching fails when documents use different terminology for the same legal concepts. Semantic search understands that **intellectual property rights** and **IP licensing terms** refer to related concepts. We'll search legal clauses using a higher-quality embedding model for better accuracy. Filter by effective date to ensure only current clauses are returned. Run this query to find relevant legal clauses:
 
-\`\`\`sql
+```sql
 WITH query_embedding AS (
     SELECT embed_text(
         'intellectual property rights and licensing terms',
@@ -861,13 +861,13 @@ LIMIT 10;
          9 | Confidentiality Agreement  | IP rights related to confidential information... |     0.0000
         10 | Merger Agreement           | Intellectual property rights and licensing...     |     0.0000
 (10 rows)
-\`\`\`
+```
 
 ### Product Search
 
 E-commerce sites need product search that understands user intent. Customers search for **wireless headphones with noise cancellation under $200** but product descriptions might say **bluetooth earbuds with active noise reduction** or **cordless audio devices with ANC**. Semantic search matches products based on meaning, not exact words. We'll search products by embedding the user's natural language query and comparing it to product description embeddings. Filter by stock status to show only available products. Run this query to find matching products:
 
-\`\`\`sql
+```sql
 WITH query_embedding AS (
     SELECT embed_text(
         'wireless headphones with noise cancellation under $200',
@@ -910,7 +910,7 @@ LIMIT 20;
          38 | Professional Earbuds                      | High-end bluetooth earbuds with noise cancellation... |  199.99 |    0.0000
          26 | Budget Headphones                         | Affordable wireless headphones with basic ANC...    |   69.99 |    0.0000
 (20 rows)
-\`\`\`
+```
 
 ## Conclusion
 
