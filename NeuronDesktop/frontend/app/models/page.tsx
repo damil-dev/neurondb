@@ -1,88 +1,37 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { profilesAPI, modelConfigAPI, type Profile, type ModelConfig } from '@/lib/api'
+import { profilesAPI, neurondbAPI } from '@/lib/api'
+import { showSuccessToast, showErrorToast } from '@/lib/errors'
 import { 
-  KeyIcon,
-  PlusIcon,
+  PlusIcon, 
+  KeyIcon, 
+  EyeIcon, 
+  EyeSlashIcon,
   TrashIcon,
-  PencilIcon,
-  CheckCircleIcon,
-  XCircleIcon,
-  SparklesIcon
+  CheckIcon,
+  XMarkIcon
 } from '@/components/Icons'
 
-// Available model providers and their models
-const MODEL_PROVIDERS = {
-  openai: {
-    name: 'OpenAI',
-    models: [
-      { name: 'gpt-4', displayName: 'GPT-4' },
-      { name: 'gpt-4-turbo', displayName: 'GPT-4 Turbo' },
-      { name: 'gpt-4o', displayName: 'GPT-4o' },
-      { name: 'gpt-3.5-turbo', displayName: 'GPT-3.5 Turbo' },
-    ],
-    requiresKey: true,
-    requiresBaseUrl: false,
-  },
-  anthropic: {
-    name: 'Anthropic',
-    models: [
-      { name: 'claude-3-opus-20240229', displayName: 'Claude 3 Opus' },
-      { name: 'claude-3-sonnet-20240229', displayName: 'Claude 3 Sonnet' },
-      { name: 'claude-3-haiku-20240307', displayName: 'Claude 3 Haiku' },
-      { name: 'claude-3-5-sonnet-20241022', displayName: 'Claude 3.5 Sonnet' },
-    ],
-    requiresKey: true,
-    requiresBaseUrl: false,
-  },
-  google: {
-    name: 'Google',
-    models: [
-      { name: 'gemini-pro', displayName: 'Gemini Pro' },
-      { name: 'gemini-pro-vision', displayName: 'Gemini Pro Vision' },
-      { name: 'gemini-1.5-pro', displayName: 'Gemini 1.5 Pro' },
-    ],
-    requiresKey: true,
-    requiresBaseUrl: false,
-  },
-  ollama: {
-    name: 'Ollama (Free)',
-    models: [
-      { name: 'llama2', displayName: 'Llama 2' },
-      { name: 'llama2:13b', displayName: 'Llama 2 13B' },
-      { name: 'llama2:70b', displayName: 'Llama 2 70B' },
-      { name: 'mistral', displayName: 'Mistral' },
-      { name: 'codellama', displayName: 'Code Llama' },
-      { name: 'phi', displayName: 'Phi' },
-    ],
-    requiresKey: false,
-    requiresBaseUrl: true,
-    defaultBaseUrl: 'http://localhost:11434',
-  },
-  custom: {
-    name: 'Custom',
-    models: [],
-    requiresKey: true,
-    requiresBaseUrl: true,
-  },
+interface Model {
+  id: string
+  name: string
+  provider: string
+  model_type: string
+  api_key_set: boolean
+  config: any
 }
 
 export default function ModelsPage() {
-  const [profiles, setProfiles] = useState<Profile[]>([])
+  const [profiles, setProfiles] = useState<any[]>([])
   const [selectedProfile, setSelectedProfile] = useState<string>('')
-  const [modelConfigs, setModelConfigs] = useState<ModelConfig[]>([])
-  const [showCreateModal, setShowCreateModal] = useState(false)
-  const [editingConfig, setEditingConfig] = useState<ModelConfig | null>(null)
+  const [models, setModels] = useState<Model[]>([])
   const [loading, setLoading] = useState(false)
-
-  // Create form state
-  const [newProvider, setNewProvider] = useState<string>('openai')
-  const [newModelName, setNewModelName] = useState<string>('')
-  const [newApiKey, setNewApiKey] = useState<string>('')
-  const [newBaseUrl, setNewBaseUrl] = useState<string>('')
-  const [newIsDefault, setNewIsDefault] = useState(false)
-  const [showApiKey, setShowApiKey] = useState(false)
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [showKeyModal, setShowKeyModal] = useState(false)
+  const [selectedModel, setSelectedModel] = useState<Model | null>(null)
+  const [apiKey, setApiKey] = useState('')
+  const [showKey, setShowKey] = useState(false)
 
   useEffect(() => {
     loadProfiles()
@@ -90,7 +39,7 @@ export default function ModelsPage() {
 
   useEffect(() => {
     if (selectedProfile) {
-      loadModelConfigs()
+      loadModels()
     }
   }, [selectedProfile])
 
@@ -98,373 +47,328 @@ export default function ModelsPage() {
     try {
       const response = await profilesAPI.list()
       setProfiles(response.data)
-      if (response.data.length > 0 && !selectedProfile) {
-        setSelectedProfile(response.data[0].id)
+      if (response.data.length > 0) {
+        const defaultProfile = response.data.find((p: any) => p.is_default) || response.data[0]
+        setSelectedProfile(defaultProfile.id)
       }
-    } catch (error) {
-      console.error('Failed to load profiles:', error)
+    } catch (error: any) {
+      showErrorToast('Failed to load profiles: ' + (error.response?.data?.error || error.message))
     }
   }
 
-  const loadModelConfigs = async () => {
+  const loadModels = async () => {
     if (!selectedProfile) return
-    try {
-      const response = await modelConfigAPI.list(selectedProfile, false)
-      setModelConfigs(response.data)
-    } catch (error) {
-      console.error('Failed to load model configs:', error)
-    }
-  }
-
-  const handleCreate = async () => {
-    if (!selectedProfile) {
-      alert('Please select a profile first')
-      return
-    }
-
-    const provider = MODEL_PROVIDERS[newProvider as keyof typeof MODEL_PROVIDERS]
-    if (!provider) {
-      alert('Invalid provider')
-      return
-    }
-
-    if (provider.requiresKey && !newApiKey.trim()) {
-      alert('API key is required for this provider')
-      return
-    }
-
-    if (provider.requiresBaseUrl && !newBaseUrl.trim()) {
-      alert('Base URL is required for this provider')
-      return
-    }
-
-    if (!newModelName.trim()) {
-      alert('Model name is required')
-      return
-    }
-
     setLoading(true)
     try {
-      await modelConfigAPI.create(selectedProfile, {
-        model_provider: newProvider,
-        model_name: newModelName,
-        api_key: newApiKey || undefined,
-        base_url: newBaseUrl || (provider as any).defaultBaseUrl || undefined,
-        is_default: newIsDefault,
-        is_free: newProvider === 'ollama',
-      })
-      await loadModelConfigs()
-      setShowCreateModal(false)
-      resetForm()
-      alert('Model configuration created successfully!')
+      // This would call a models API endpoint
+      // For now, we'll use a placeholder
+      const response = await neurondbAPI.listModels(selectedProfile)
+      setModels(response.data || [])
     } catch (error: any) {
-      console.error('Failed to create model config:', error)
-      alert('Failed to create model configuration: ' + (error.response?.data?.error || error.message))
+      showErrorToast('Failed to load models: ' + (error.response?.data?.error || error.message))
     } finally {
       setLoading(false)
     }
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this model configuration?')) {
-      return
-    }
-
-    if (!selectedProfile) return
+  const handleAddModel = async (modelData: any) => {
+    setLoading(true)
     try {
-      await modelConfigAPI.delete(selectedProfile, id)
-      await loadModelConfigs()
-      alert('Model configuration deleted successfully!')
+      await neurondbAPI.addModel(selectedProfile, modelData)
+      showSuccessToast('Model added successfully')
+      setShowAddModal(false)
+      loadModels()
     } catch (error: any) {
-      console.error('Failed to delete model config:', error)
-      alert('Failed to delete model configuration: ' + (error.response?.data?.error || error.message))
+      showErrorToast('Failed to add model: ' + (error.response?.data?.error || error.message))
+    } finally {
+      setLoading(false)
     }
   }
 
-  const handleSetDefault = async (id: string) => {
-    if (!selectedProfile) return
+  const handleSetApiKey = async () => {
+    if (!selectedModel || !apiKey) return
+    setLoading(true)
     try {
-      await modelConfigAPI.setDefault(selectedProfile, id)
-      await loadModelConfigs()
-      alert('Default model updated!')
+      await neurondbAPI.setModelKey(selectedProfile, selectedModel.name, apiKey)
+      showSuccessToast('API key set successfully')
+      setShowKeyModal(false)
+      setApiKey('')
+      loadModels()
     } catch (error: any) {
-      console.error('Failed to set default model:', error)
-      alert('Failed to set default model: ' + (error.response?.data?.error || error.message))
+      showErrorToast('Failed to set API key: ' + (error.response?.data?.error || error.message))
+    } finally {
+      setLoading(false)
     }
   }
 
-  const resetForm = () => {
-    setNewProvider('openai')
-    setNewModelName('')
-    setNewApiKey('')
-    setNewBaseUrl('')
-    setNewIsDefault(false)
-    setShowApiKey(false)
-  }
-
-  const getProviderInfo = (provider: string) => {
-    return MODEL_PROVIDERS[provider as keyof typeof MODEL_PROVIDERS] || null
+  const handleDeleteModel = async (modelId: string) => {
+    if (!confirm('Are you sure you want to delete this model?')) return
+    setLoading(true)
+    try {
+      await neurondbAPI.deleteModel(selectedProfile, modelId)
+      showSuccessToast('Model deleted successfully')
+      loadModels()
+    } catch (error: any) {
+      showErrorToast('Failed to delete model: ' + (error.response?.data?.error || error.message))
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
-    <div className="h-full overflow-auto bg-[#1a1a1a]">
-      <div className="max-w-6xl mx-auto p-6">
-        <div className="flex items-center justify-between mb-8">
+    <div className="min-h-full bg-transparent p-6">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="mb-6 flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-[#e0e0e0] mb-2">Model Settings</h1>
-            <p className="text-[#999999]">Configure API keys and settings for AI models</p>
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">Model & Key Management</h1>
+            <p className="text-slate-600 dark:text-slate-400 mt-1">Manage LLM models and API keys</p>
           </div>
-          {selectedProfile && (
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="btn-primary flex items-center gap-2"
-            >
-              <PlusIcon className="w-4 h-4" />
-              Add Model
-            </button>
-          )}
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="btn btn-primary"
+          >
+            <PlusIcon className="w-5 h-5 mr-2" />
+            Add Model
+          </button>
         </div>
 
         {/* Profile Selector */}
-        <div className="card mb-6">
-          <label className="block text-sm font-medium text-[#c8c8c8] mb-2">
-            Profile
-          </label>
-          <select
-            value={selectedProfile}
-            onChange={(e) => setSelectedProfile(e.target.value)}
-            className="input w-full"
-          >
-            <option value="">Select a profile</option>
-            {profiles.map((profile) => (
-              <option key={profile.id} value={profile.id}>
-                {profile.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        {profiles.length > 0 && (
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Profile
+            </label>
+            <select
+              value={selectedProfile}
+              onChange={(e) => setSelectedProfile(e.target.value)}
+              className="input"
+            >
+              {profiles.map((profile) => (
+                <option key={profile.id} value={profile.id}>
+                  {profile.name} {profile.is_default && '(Default)'}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
-        {/* Model Configs List */}
-        {selectedProfile && (
-          <div className="space-y-4">
-            {modelConfigs.length === 0 ? (
-              <div className="card text-center py-12">
-                <SparklesIcon className="w-12 h-12 mx-auto mb-4 text-[#999999]" />
-                <p className="text-[#999999] mb-4">No model configurations yet</p>
-                <button
-                  onClick={() => setShowCreateModal(true)}
-                  className="btn-primary"
-                >
-                  Add Your First Model
-                </button>
-              </div>
-            ) : (
-              modelConfigs.map((config) => {
-                const provider = getProviderInfo(config.model_provider)
-                return (
-                  <div key={config.id} className="card">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <h3 className="text-lg font-semibold text-[#e0e0e0]">
-                            {provider?.name || config.model_provider} - {config.model_name}
-                          </h3>
-                          {config.is_default && (
-                            <span className="badge badge-success">Default</span>
-                          )}
-                          {config.is_free && (
-                            <span className="badge badge-info">Free</span>
-                          )}
-                        </div>
-                        <div className="space-y-1 text-sm text-[#999999]">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">Provider:</span>
-                            <span>{config.model_provider}</span>
-                          </div>
-                          {config.base_url && (
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium">Base URL:</span>
-                              <span className="font-mono text-xs">{config.base_url}</span>
-                            </div>
-                          )}
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">API Key:</span>
-                            <span>{config.api_key ? '✓ Set' : '✗ Not set'}</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {!config.is_default && (
-                          <button
-                            onClick={() => handleSetDefault(config.id)}
-                            className="px-3 py-1.5 text-sm border border-[#333333] rounded-lg hover:bg-[#2d2d2d] text-[#c8c8c8]"
-                            title="Set as default"
-                          >
-                            Set Default
-                          </button>
-                        )}
-                        <button
-                          onClick={() => handleDelete(config.id)}
-                          className="p-2 text-[#999999] hover:text-red-400"
-                          title="Delete"
-                        >
-                          <TrashIcon className="w-4 h-4" />
-                        </button>
-                      </div>
+        {/* Models List */}
+        {loading && models.length === 0 ? (
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto"></div>
+            <p className="text-slate-600 dark:text-slate-400 mt-4">Loading models...</p>
+          </div>
+        ) : models.length === 0 ? (
+          <div className="text-center py-12 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+            <p className="text-slate-600 dark:text-slate-400">No models configured</p>
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="btn btn-primary mt-4"
+            >
+              Add Your First Model
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {models.map((model) => (
+              <div
+                key={model.id}
+                className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-6 hover:shadow-lg transition-shadow"
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                      {model.name}
+                    </h3>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">{model.provider}</p>
+                  </div>
+                  <button
+                    onClick={() => handleDeleteModel(model.id)}
+                    className="text-red-600 hover:text-red-700"
+                  >
+                    <TrashIcon className="w-5 h-5" />
+                  </button>
+                </div>
+                
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-slate-600 dark:text-slate-400">API Key:</span>
+                    <div className="flex items-center gap-2">
+                      {model.api_key_set ? (
+                        <span className="flex items-center text-green-600">
+                          <CheckIcon className="w-4 h-4 mr-1" />
+                          Set
+                        </span>
+                      ) : (
+                        <span className="flex items-center text-red-600">
+                          <XMarkIcon className="w-4 h-4 mr-1" />
+                          Not Set
+                        </span>
+                      )}
                     </div>
                   </div>
-                )
-              })
-            )}
+                  
+                  <button
+                    onClick={() => {
+                      setSelectedModel(model)
+                      setShowKeyModal(true)
+                    }}
+                    className="btn btn-secondary w-full mt-4"
+                  >
+                    <KeyIcon className="w-4 h-4 mr-2" />
+                    {model.api_key_set ? 'Update Key' : 'Set API Key'}
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         )}
 
-        {!selectedProfile && (
-          <div className="card text-center py-12">
-            <KeyIcon className="w-12 h-12 mx-auto mb-4 text-[#999999]" />
-            <p className="text-[#999999]">Please select a profile to manage model configurations</p>
-          </div>
+        {/* Add Model Modal */}
+        {showAddModal && (
+          <AddModelModal
+            onClose={() => setShowAddModal(false)}
+            onAdd={handleAddModel}
+          />
+        )}
+
+        {/* Set API Key Modal */}
+        {showKeyModal && selectedModel && (
+          <SetApiKeyModal
+            model={selectedModel}
+            onClose={() => {
+              setShowKeyModal(false)
+              setSelectedModel(null)
+              setApiKey('')
+            }}
+            onSave={handleSetApiKey}
+            apiKey={apiKey}
+            setApiKey={setApiKey}
+            showKey={showKey}
+            setShowKey={setShowKey}
+          />
         )}
       </div>
-
-      {/* Create Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-[#252525] rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-[#333333]">
-              <h2 className="text-2xl font-bold text-[#e0e0e0]">Add Model Configuration</h2>
-            </div>
-
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-[#c8c8c8] mb-2">
-                  Provider *
-                </label>
-                <select
-                  value={newProvider}
-                  onChange={(e) => {
-                    setNewProvider(e.target.value)
-                    setNewModelName('')
-                    const provider = MODEL_PROVIDERS[e.target.value as keyof typeof MODEL_PROVIDERS]
-                    if ((provider as any)?.defaultBaseUrl) {
-                      setNewBaseUrl((provider as any).defaultBaseUrl)
-                    } else {
-                      setNewBaseUrl('')
-                    }
-                  }}
-                  className="input w-full"
-                >
-                  {Object.entries(MODEL_PROVIDERS).map(([key, provider]) => (
-                    <option key={key} value={key}>
-                      {provider.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-[#c8c8c8] mb-2">
-                  Model *
-                </label>
-                {newProvider === 'custom' ? (
-                  <input
-                    type="text"
-                    value={newModelName}
-                    onChange={(e) => setNewModelName(e.target.value)}
-                    className="input w-full"
-                    placeholder="Enter custom model name"
-                  />
-                ) : (
-                  <select
-                    value={newModelName}
-                    onChange={(e) => setNewModelName(e.target.value)}
-                    className="input w-full"
-                  >
-                    <option value="">Select a model</option>
-                    {MODEL_PROVIDERS[newProvider as keyof typeof MODEL_PROVIDERS]?.models.map((model) => (
-                      <option key={model.name} value={model.name}>
-                        {model.displayName}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-
-              {MODEL_PROVIDERS[newProvider as keyof typeof MODEL_PROVIDERS]?.requiresKey && (
-                <div>
-                  <label className="block text-sm font-medium text-[#c8c8c8] mb-2">
-                    API Key *
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type={showApiKey ? 'text' : 'password'}
-                      value={newApiKey}
-                      onChange={(e) => setNewApiKey(e.target.value)}
-                      className="input flex-1"
-                      placeholder="Enter API key"
-                    />
-                    <button
-                      onClick={() => setShowApiKey(!showApiKey)}
-                      className="px-4 py-2 border border-[#333333] rounded-lg hover:bg-[#2d2d2d]"
-                    >
-                      {showApiKey ? 'Hide' : 'Show'}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {MODEL_PROVIDERS[newProvider as keyof typeof MODEL_PROVIDERS]?.requiresBaseUrl && (
-                <div>
-                  <label className="block text-sm font-medium text-[#c8c8c8] mb-2">
-                    Base URL *
-                  </label>
-                  <input
-                    type="text"
-                    value={newBaseUrl}
-                    onChange={(e) => setNewBaseUrl(e.target.value)}
-                    className="input w-full"
-                    placeholder="http://localhost:11434"
-                  />
-                </div>
-              )}
-
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="isDefault"
-                  checked={newIsDefault}
-                  onChange={(e) => setNewIsDefault(e.target.checked)}
-                  className="w-4 h-4 rounded border-[#333333] bg-[#252525]"
-                />
-                <label htmlFor="isDefault" className="text-sm text-[#c8c8c8]">
-                  Set as default model for this profile
-                </label>
-              </div>
-            </div>
-
-            <div className="p-6 border-t border-[#333333] flex justify-end gap-3">
-              <button
-                onClick={() => {
-                  setShowCreateModal(false)
-                  resetForm()
-                }}
-                className="btn-secondary"
-                disabled={loading}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleCreate}
-                disabled={loading}
-                className="btn-primary"
-              >
-                {loading ? 'Creating...' : 'Create'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
 
+function AddModelModal({ onClose, onAdd }: { onClose: () => void; onAdd: (data: any) => void }) {
+  const [formData, setFormData] = useState({
+    name: '',
+    provider: 'openai',
+    model_type: 'text',
+    config: {},
+  })
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    onAdd(formData)
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white dark:bg-slate-800 rounded-lg p-6 max-w-md w-full">
+        <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-4">Add Model</h2>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Model Name
+            </label>
+            <input
+              type="text"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              className="input w-full"
+              placeholder="gpt-4"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Provider
+            </label>
+            <select
+              value={formData.provider}
+              onChange={(e) => setFormData({ ...formData, provider: e.target.value })}
+              className="input w-full"
+            >
+              <option value="openai">OpenAI</option>
+              <option value="anthropic">Anthropic</option>
+              <option value="huggingface">HuggingFace</option>
+              <option value="local">Local</option>
+            </select>
+          </div>
+          <div className="flex gap-2">
+            <button type="button" onClick={onClose} className="btn btn-secondary flex-1">
+              Cancel
+            </button>
+            <button type="submit" className="btn btn-primary flex-1">
+              Add Model
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function SetApiKeyModal({
+  model,
+  onClose,
+  onSave,
+  apiKey,
+  setApiKey,
+  showKey,
+  setShowKey,
+}: {
+  model: Model
+  onClose: () => void
+  onSave: () => void
+  apiKey: string
+  setApiKey: (key: string) => void
+  showKey: boolean
+  setShowKey: (show: boolean) => void
+}) {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white dark:bg-slate-800 rounded-lg p-6 max-w-md w-full">
+        <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-4">
+          Set API Key for {model.name}
+        </h2>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              API Key
+            </label>
+            <div className="relative">
+              <input
+                type={showKey ? 'text' : 'password'}
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                className="input w-full pr-10"
+                placeholder="sk-..."
+              />
+              <button
+                type="button"
+                onClick={() => setShowKey(!showKey)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-600 hover:text-slate-800"
+              >
+                {showKey ? <EyeSlashIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
+              </button>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button type="button" onClick={onClose} className="btn btn-secondary flex-1">
+              Cancel
+            </button>
+            <button type="button" onClick={onSave} className="btn btn-primary flex-1">
+              Save
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}

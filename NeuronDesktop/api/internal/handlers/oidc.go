@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -16,21 +17,19 @@ import (
 
 /* OIDCHandlers handles OIDC authentication */
 type OIDCHandlers struct {
-	provider      *oidc.Provider
-	sessionMgr    *session.Manager
-	queries       *db.Queries
-	issuer        string
-	loginAttempts map[string]*oidc.LoginAttempt
+	provider   *oidc.Provider
+	sessionMgr *session.Manager
+	queries    *db.Queries
+	issuer     string
 }
 
 /* NewOIDCHandlers creates new OIDC handlers */
 func NewOIDCHandlers(provider *oidc.Provider, sessionMgr *session.Manager, queries *db.Queries, issuer string) *OIDCHandlers {
 	return &OIDCHandlers{
-		provider:      provider,
-		sessionMgr:    sessionMgr,
-		queries:       queries,
-		issuer:        issuer,
-		loginAttempts: make(map[string]*oidc.LoginAttempt),
+		provider:   provider,
+		sessionMgr: sessionMgr,
+		queries:    queries,
+		issuer:     issuer,
 	}
 }
 
@@ -49,7 +48,18 @@ func (h *OIDCHandlers) StartOIDCFlow(w http.ResponseWriter, r *http.Request) {
 
 	attempt.RedirectURI = redirectURI
 
-	h.loginAttempts[attempt.State] = attempt
+	/* Store login attempt in database */
+	query := `
+		INSERT INTO login_attempts (id, state, nonce, code_verifier, redirect_uri, created_at, expires_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+	`
+	_, err = h.queries.GetDB().ExecContext(r.Context(), query,
+		attempt.ID, attempt.State, attempt.Nonce, attempt.CodeVerifier,
+		attempt.RedirectURI, attempt.CreatedAt, attempt.ExpiresAt)
+	if err != nil {
+		WriteError(w, r, http.StatusInternalServerError, fmt.Errorf("failed to store login attempt: %w", err), nil)
+		return
+	}
 
 	authURL, err := h.provider.AuthCodeURL(attempt.State, attempt.Nonce, attempt.CodeVerifier)
 	if err != nil {
@@ -83,13 +93,36 @@ func (h *OIDCHandlers) OIDCCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	attempt, ok := h.loginAttempts[state]
-	if !ok {
-		WriteError(w, r, http.StatusBadRequest, fmt.Errorf("invalid or expired state"), nil)
+	/* Retrieve login attempt from database */
+	var attempt oidc.LoginAttempt
+	var redirectURI string
+	query := `
+		SELECT id, state, nonce, code_verifier, created_at, expires_at
+		FROM login_attempts
+		WHERE state = $1 AND expires_at > NOW()
+	`
+	err := h.queries.GetDB().QueryRowContext(r.Context(), query, state).Scan(
+		&attempt.ID, &attempt.State, &attempt.Nonce, &attempt.CodeVerifier,
+		&attempt.CreatedAt, &attempt.ExpiresAt)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			WriteError(w, r, http.StatusBadRequest, fmt.Errorf("invalid or expired state"), nil)
+			return
+		}
+		WriteError(w, r, http.StatusInternalServerError, fmt.Errorf("failed to retrieve login attempt: %w", err), nil)
 		return
 	}
 
-	delete(h.loginAttempts, state)
+	/* Get redirect URI from database */
+	redirectQuery := `SELECT redirect_uri FROM login_attempts WHERE state = $1`
+	err = h.queries.GetDB().QueryRowContext(r.Context(), redirectQuery, state).Scan(&redirectURI)
+	if err == nil {
+		attempt.RedirectURI = redirectURI
+	}
+
+	/* Delete login attempt after use (one-time use) */
+	deleteQuery := `DELETE FROM login_attempts WHERE state = $1`
+	h.queries.GetDB().ExecContext(r.Context(), deleteQuery, state)
 
 	if time.Now().After(attempt.ExpiresAt) {
 		WriteError(w, r, http.StatusBadRequest, fmt.Errorf("login attempt expired"), nil)

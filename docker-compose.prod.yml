@@ -1,0 +1,178 @@
+version: '3.8'
+
+# Production Docker Compose configuration
+# Usage: docker compose -f docker-compose.prod.yml up -d
+
+services:
+  neurondb:
+    image: ${NEURONDB_IMAGE:-ghcr.io/neurondb/neurondb-postgres:1.0.0-pg17-cpu}
+    container_name: neurondb-prod
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-neurondb}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-neurondb}
+      POSTGRES_HOST_AUTH_METHOD: md5
+    volumes:
+      - neurondb-data:/var/lib/postgresql/data
+      - ./postgresql.conf:/etc/postgresql/postgresql.conf:ro
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    networks:
+      - neurondb-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-neurondb}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+          cpus: '4'
+        reservations:
+          memory: 4G
+          cpus: '2'
+
+  neuronagent:
+    image: ${NEURONAGENT_IMAGE:-ghcr.io/neurondb/neuronagent:1.0.0}
+    container_name: neuronagent-prod
+    restart: unless-stopped
+    environment:
+      DB_HOST: neurondb
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-neurondb}
+      DB_USER: ${POSTGRES_USER:-neurondb}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      SERVER_PORT: 8080
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      neurondb:
+        condition: service_healthy
+    networks:
+      - neurondb-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+
+  neurondb-mcp:
+    image: ${NEURONMCP_IMAGE:-ghcr.io/neurondb/neuronmcp:1.0.0}
+    container_name: neuronmcp-prod
+    restart: unless-stopped
+    environment:
+      NEURONDB_HOST: neurondb
+      NEURONDB_PORT: 5432
+      NEURONDB_DATABASE: ${POSTGRES_DB:-neurondb}
+      NEURONDB_USER: ${POSTGRES_USER:-neurondb}
+      NEURONDB_PASSWORD: ${POSTGRES_PASSWORD}
+      NEURONDB_LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      neurondb:
+        condition: service_healthy
+    networks:
+      - neurondb-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+
+  neurondesk-api:
+    image: ${NEURONDESKTOP_API_IMAGE:-ghcr.io/neurondb/neurondesktop-api:1.0.0}
+    container_name: neurondesk-api-prod
+    restart: unless-stopped
+    environment:
+      DB_HOST: neurondb
+      DB_PORT: 5432
+      DB_NAME: neurondesk
+      DB_USER: ${POSTGRES_USER:-neurondb}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      SERVER_PORT: 8081
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      SESSION_COOKIE_SECURE: "true"
+      SESSION_COOKIE_SAME_SITE: "Strict"
+    depends_on:
+      neurondb:
+        condition: service_healthy
+    networks:
+      - neurondb-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+
+  neurondesk-frontend:
+    image: ${NEURONDESKTOP_FRONTEND_IMAGE:-ghcr.io/neurondb/neurondesktop-frontend:1.0.0}
+    container_name: neurondesk-frontend-prod
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8081}
+    depends_on:
+      - neurondesk-api
+    networks:
+      - neurondb-network
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+
+  # Nginx reverse proxy
+  nginx:
+    image: nginx:alpine
+    container_name: neurondb-nginx-prod
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - neurondesk-frontend
+      - neurondesk-api
+      - neuronagent
+    networks:
+      - neurondb-network
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+
+volumes:
+  neurondb-data:
+    driver: local
+
+networks:
+  neurondb-network:
+    driver: bridge
+
