@@ -1,0 +1,77 @@
+name: NeuronDB - Build Matrix
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'NeuronDB/**'
+      - '.github/workflows/neurondb-build-matrix.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'NeuronDB/**'
+      - '.github/workflows/neurondb-build-matrix.yml'
+  workflow_dispatch:
+
+jobs:
+  build-test:
+    name: Build and Test (PG ${{ matrix.pg_version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        pg_version: [16, 17, 18]
+
+    services:
+      postgres:
+        image: postgres:${{ matrix.pg_version }}
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_DB: test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install PostgreSQL development packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-server-dev-${{ matrix.pg_version }} build-essential make libssl-dev libcurl4-openssl-dev
+
+      - name: Build NeuronDB extension
+        working-directory: NeuronDB
+        run: |
+          GPU_BACKENDS=none make clean
+          GPU_BACKENDS=none make
+
+      - name: Install extension
+        working-directory: NeuronDB
+        run: |
+          sudo GPU_BACKENDS=none make install
+
+      - name: Create extension in test database
+        run: |
+          PGPASSWORD=postgres psql -h localhost -U postgres -d test -c "CREATE EXTENSION neurondb;"
+
+      - name: Run extension tests
+        run: |
+          PGPASSWORD=postgres psql -h localhost -U postgres -d test -c "SELECT neurondb.version();"
+
+      - name: Check extension loads
+        run: |
+          PGPASSWORD=postgres psql -h localhost -U postgres -d test -c "SELECT * FROM pg_extension WHERE extname = 'neurondb';"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: neurondb-pg${{ matrix.pg_version }}-build
+          path: NeuronDB/neurondb.so
+          retention-days: 7
+
