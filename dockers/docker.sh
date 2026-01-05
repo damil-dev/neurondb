@@ -19,7 +19,8 @@ SCRIPT_VERSION="1.0.0"
 SCRIPT_NAME="docker.sh"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-COMPOSE_FILE="${SCRIPT_DIR}/docker-compose.yml"
+# Canonical compose file lives at repo root. We intentionally run that to avoid drift.
+COMPOSE_FILE="${PROJECT_ROOT}/docker-compose.yml"
 
 # Color output
 RED='\033[0;31m'

@@ -61,8 +61,8 @@ WORKDIR /app
 # Copy binary from builder
 COPY --from=builder /build/neuronagent .
 
-# Copy migrations
-COPY --from=builder /build/migrations ./migrations
+# Copy migrations (sql directory contains migration files)
+COPY --from=builder /build/sql ./migrations
 
 # Copy configs directory if it exists
 COPY --from=builder /build/configs ./configs

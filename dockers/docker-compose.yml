@@ -808,8 +808,10 @@ services:
     - default
     - cpu
     build:
+      # Build from repo root so the API image can also build/embed the NeuronMCP binary.
+      # This aligns behavior with the canonical root docker-compose.yml.
       context: ..
-      dockerfile: dockers/neurondesktop/Dockerfile
+      dockerfile: NeuronDesktop/api/Dockerfile
     container_name: neurondesk-api
     init: true
     labels:
@@ -820,6 +822,10 @@ services:
       neurondesk-init:
         condition: service_completed_successfully
       neurondb:
+        condition: service_healthy
+      neuronagent:
+        condition: service_healthy
+      neuronmcp:
         condition: service_healthy
     environment:
       DB_HOST: neurondb
@@ -838,6 +844,8 @@ services:
       NEURONDB_PASSWORD: ${NEURONDB_PASSWORD:-neurondb}
       NEURONAGENT_ENDPOINT: ${NEURONAGENT_ENDPOINT:-http://neuronagent:8080}
       NEURONAGENT_API_KEY: ${NEURONAGENT_API_KEY:-}
+      # NeuronMCP binary path inside the API container (copied in Dockerfile)
+      NEURONMCP_BINARY_PATH: /usr/local/bin/neurondb-mcp
     ports:
     - "8081:8081"
     healthcheck:
