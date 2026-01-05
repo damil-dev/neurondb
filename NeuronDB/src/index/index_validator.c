@@ -59,6 +59,17 @@
 #define HNSW_MAX_LEVEL 16
 #define HNSW_DEFAULT_M 16
 
+/* Safety validation helper - local version since hnswValidateLevelSafe is static in hnsw_am.c */
+static bool
+hnswValidateLevelSafe(int level)
+{
+	if (level < 0 || level >= HNSW_MAX_LEVEL)
+	{
+		return false;
+	}
+	return true;
+}
+
 /* IVF structures (from ivf_am.c) */
 typedef struct IvfCentroidData
 {
@@ -655,10 +666,10 @@ check_hnsw_connectivity(Relation index, ValidateResult * result)
 			}
 			else
 			{
-				elog(ERROR,
-					 (errcode(ERRCODE_INTERNAL_ERROR),
-					  errmsg("neurondb: queueTail %d out of bounds (queueSize=%d)",
-							 queueTail, queueSize)));
+				ereport(ERROR,
+						(errcode(ERRCODE_INTERNAL_ERROR),
+						 errmsg("neurondb: queueTail %d out of bounds (queueSize=%d)",
+								queueTail, queueSize)));
 			}
 			
 			/* Bounds check before accessing visited array */
@@ -667,14 +678,7 @@ check_hnsw_connectivity(Relation index, ValidateResult * result)
 
 			while (queueHead < queueTail)
 			{
-				/* Bounds check before accessing queue array */
-				if (queueHead < 0 || queueHead >= queueSize)
-				{
-					elog(WARNING, "neurondb: queueHead %d out of bounds (queueSize=%d), breaking",
-						 queueHead, queueSize);
-					break;
-				}
-				BlockNumber current = queue[queueHead++];
+				BlockNumber current;
 				Buffer		nodeBuf;
 				Page		nodePage;
 				HnswNode	node;
@@ -682,6 +686,15 @@ check_hnsw_connectivity(Relation index, ValidateResult * result)
 				int			level;
 				int16		neighborCount;
 				int			j;
+				
+				/* Bounds check before accessing queue array */
+				if (queueHead < 0 || queueHead >= queueSize)
+				{
+					elog(WARNING, "neurondb: queueHead %d out of bounds (queueSize=%d), breaking",
+						 queueHead, queueSize);
+					break;
+				}
+				current = queue[queueHead++];
 
 				nodeBuf = ReadBuffer(index, current);
 				if (!BufferIsValid(nodeBuf))
