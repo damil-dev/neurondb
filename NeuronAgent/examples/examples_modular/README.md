@@ -10,7 +10,7 @@ examples_modular/
 ├── 02_agent_profiles.py        # Using agent profiles
 ├── 03_conversation_manager.py # Conversation management
 ├── 04_streaming.py             # WebSocket streaming
-├── 05_production_patterns.py   # Production-ready patterns
+├── 05_production_patterns.py   # Reliability patterns
 ├── 06_advanced_agent_management.py  # Advanced agent operations
 └── readme.md                   # This file
 ```
@@ -65,7 +65,7 @@ python3 03_conversation_manager.py
 # Streaming
 python3 04_streaming.py
 
-# Production patterns
+# Reliability patterns
 python3 05_production_patterns.py
 
 # Advanced agent management
@@ -104,7 +104,7 @@ Demonstrates:
 - Completion callbacks
 
 ### 05_production_patterns.py
-Production-ready patterns:
+Reliability patterns:
 - Error handling
 - Retry logic
 - Metrics collection

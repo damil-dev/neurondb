@@ -1,6 +1,6 @@
 # NeuronAgent
 
-NeuronAgent is a production-ready AI agent runtime system providing REST API and WebSocket endpoints for building autonomous agent applications.
+NeuronAgent is an AI agent runtime system providing REST API and WebSocket endpoints for building autonomous agent applications.
 
 ## What it is
 

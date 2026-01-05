@@ -2,7 +2,7 @@
 
 ## Overview
 
-NeuronAgent is a production-ready AI agent runtime system that integrates with NeuronDB for LLM and vector operations.
+NeuronAgent is an AI agent runtime system that integrates with NeuronDB for LLM and vector operations.
 
 ## Components
 

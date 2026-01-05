@@ -1,7 +1,7 @@
 """
 NeuronAgent Python Client Library
 
-A modular, production-ready client library for NeuronAgent.
+A modular client library for NeuronAgent.
 
 Usage:
     from neurondb_client import NeuronAgentClient
