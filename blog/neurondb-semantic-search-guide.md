@@ -1,4 +1,4 @@
-![NeuronDB header](/blog/neurondb-semantic-search-guide/header.svg?v=7)
+![NeuronDB header](assets/neurondb-semantic-search-guide/header.svg)
 
 # Semantic Search Over Text with NeuronDB
 

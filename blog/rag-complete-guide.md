@@ -1,4 +1,4 @@
-![RAG header](/blog/rag-complete-guide/header.svg?v=7)
+![RAG header](assets/rag-complete-guide/header.svg)
 
 # RAG: Retrieval-Augmented Generation With PostgreSQL
 

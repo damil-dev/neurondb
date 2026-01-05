@@ -1,4 +1,4 @@
-![RAG Architectures header](/blog/rag-architectures-ai-builders-should-understand/header.svg?v=2)
+![RAG Architectures header](assets/rag-architectures-ai-builders-should-understand/header.svg)
 
 # RAG Architectures AI Builders Should Understand
 
@@ -12,7 +12,7 @@ Retrieval-Augmented Generation (RAG) closes the gap by designing an evidence pat
 
 At its simplest, RAG is two steps: **retrieval** finds evidence and **generation** writes an answer constrained by that evidence.
 
-![RAG in one picture: retrieve → generate](/blog/rag-architectures-ai-builders-should-understand/rag-pipeline.svg?v=1)
+![RAG in one picture: retrieve → generate](assets/rag-architectures-ai-builders-should-understand/rag-pipeline.svg)
 
 When you build RAG, you are designing the request path end-to-end: the system receives a question (often with conversation state and permissions), retrieves candidate evidence (chunks, entities, tickets, tables, logs), assembles context (dedupe, rank, filter, format, budget tokens), and produces an answer that is auditable (citations, traces, and metrics). That audit trail is the difference between “it answered” and “we can explain why it answered.”
 
@@ -38,7 +38,7 @@ Most RAG failures are predictable. The biggest levers are (1) how you chunk and 
 
 RAG is not one architecture. It is a family of patterns trading off **latency**, **cost**, **control**, and **correctness**. The best approach depends on what “failure” means in your product: a harmless mistake in a consumer chatbot is very different from a mistake in compliance, production troubleshooting, or internal decision-making.
 
-![The RAG pattern landscape](/blog/rag-architectures-ai-builders-should-understand/rag-pattern-landscape.svg?v=1)
+![The RAG pattern landscape](assets/rag-architectures-ai-builders-should-understand/rag-pattern-landscape.svg)
 
 ### Pattern comparison (fast way to decide)
 
@@ -68,7 +68,7 @@ The key is to treat rewriting as a retrieval tool, not a stylistic improvement. 
 
 Filtered RAG assumes retrieval returns a mixture of good and bad evidence and adds a quality gate before generation. Instead of trusting the first top-k, you typically retrieve broader (for recall), rerank (for precision), apply policy and access controls, and only then generate from the remaining evidence.
 
-![Filtered RAG: retrieve then rerank then answer](/blog/rag-architectures-ai-builders-should-understand/filtered-rag-rerank.svg?v=1)
+![Filtered RAG: retrieve then rerank then answer](assets/rag-architectures-ai-builders-should-understand/filtered-rag-rerank.svg)
 
 This pattern is the default choice when errors are expensive or the corpus is messy (duplicates, contradictory docs, comments mixed with canonical policies). The subtle risk is over-filtering: you can end up with empty evidence. Your generator must treat “no evidence” as a first-class outcome, either refusing, asking a clarifying question, or escalating to a human workflow depending on product needs.
 
@@ -88,7 +88,7 @@ The risk is bias: the draft can steer retrieval in the wrong direction. A practi
 
 Agent-driven RAG treats retrieval as a plan rather than a single search. The system decomposes the task, issues multiple retrieval calls, reads results, verifies gaps, and stops when evidence is sufficient. This is powerful for multi-step analysis (compare options and recommend), troubleshooting (diagnose, propose fix, validate), and research with branching paths.
 
-![Agent-driven RAG loop](/blog/rag-architectures-ai-builders-should-understand/agent-driven-rag-loop.svg?v=1)
+![Agent-driven RAG loop](assets/rag-architectures-ai-builders-should-understand/agent-driven-rag-loop.svg)
 
 The biggest engineering requirement here is a **stop condition**. Without a clear budget and diminishing-returns check, agents spiral into cost. Production systems use explicit ceilings (max tool calls, max tokens, max latency) plus an evidence threshold (“new evidence is no longer changing the answer”) to end the loop predictably.
 
@@ -96,7 +96,7 @@ The biggest engineering requirement here is a **stop condition**. Without a clea
 
 Graph-based RAG is for domains where relationships carry meaning: ownership, dependencies, citations, policy applicability, and lineage questions. Instead of retrieving only by similarity, you retrieve by traversal: identify starting entities, walk edges (depends_on, owned_by, authored_by, cites), and collect a subgraph as evidence. The output is often stronger because the system can explain *why* a source is relevant, not just that it is similar.
 
-![Graph-based RAG: traverse relations, then explain](/blog/rag-architectures-ai-builders-should-understand/graph-based-rag.svg?v=1)
+![Graph-based RAG: traverse relations, then explain](assets/rag-architectures-ai-builders-should-understand/graph-based-rag.svg)
 
 The operational risk is freshness and coverage. Graphs can encode bias and incompleteness. If edges are missing or stale, the reasoning chain breaks. You should monitor graph update lag and validate coverage for the entity types users ask about most.
 
@@ -104,13 +104,13 @@ The operational risk is freshness and coverage. Graphs can encode bias and incom
 
 Start with Basic RAG and make it measurable. Add conversational rewriting only when follow-ups are common. Add reranking and filtering when mistakes are expensive or the corpus is noisy. Use adaptive routing when you have mixed workloads and need to control cost. Choose hypothesis-driven retrieval when queries are vague and ambiguous. Use agents when multi-step work is the product, not an implementation detail. Use graphs when relationships must be explained and similarity search alone can’t answer “why.”
 
-![Picking the right RAG pattern](/blog/rag-architectures-ai-builders-should-understand/rag-pattern-picker.svg?v=1)
+![Picking the right RAG pattern](assets/rag-architectures-ai-builders-should-understand/rag-pattern-picker.svg)
 
 ## Operational reality: what makes RAG boring and reliable
 
 Most “RAG improvements” are operational. A working demo is not a working system. The difference is disciplined data preparation, evaluation, and observability.
 
-![RAG is architecture plus operations](/blog/rag-architectures-ai-builders-should-understand/rag-ops-loop.svg?v=1)
+![RAG is architecture plus operations](assets/rag-architectures-ai-builders-should-understand/rag-ops-loop.svg)
 
 Treat operations as part of the architecture. The checklist below is what keeps RAG systems stable as the corpus, traffic, and product expectations grow.
 

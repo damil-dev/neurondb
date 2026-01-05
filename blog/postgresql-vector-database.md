@@ -1,4 +1,4 @@
-![PostgreSQL as Vector Database header](/blog/postgresql-vector-database/header.svg?v=8)
+![PostgreSQL as Vector Database header](assets/postgresql-vector-database/header.svg)
 
 # PostgreSQL as a Vector Database
 
@@ -22,7 +22,7 @@ PostgreSQL with NeuronDB provides vector types, indexes, distance operators, and
 
 PostgreSQL stores vectors using native types. It indexes vectors using HNSW and IVFFlat. It computes distances in SQL queries. It optimizes vector and relational operations together.
 
-![PostgreSQL Vector Database Architecture](/blog/postgresql-vector-database/diagram-architecture.svg)
+![PostgreSQL Vector Database Architecture](assets/postgresql-vector-database/diagram-architecture.svg)
 
 PostgreSQL stores vectors and relational data in the same tables. Vector storage uses vector types. Relational storage uses standard types. Queries combine both types in single statements. The query planner optimizes both operations. HNSW and IVFFlat indexes accelerate similarity search.
 
@@ -170,7 +170,7 @@ HNSW indexes provide 5-8ms latency on 100 million vectors. IVFFlat indexes build
 
 PostgreSQL uses SQL with distance operators. The <-> operator computes L2 distance. The <=> operator computes cosine distance. The <#> operator computes inner product. Use these operators in WHERE clauses, ORDER BY clauses, and JOIN operations.
 
-![Vector Query Flow](/blog/postgresql-vector-database/diagram-query-flow.svg)
+![Vector Query Flow](assets/postgresql-vector-database/diagram-query-flow.svg)
 
 PostgreSQL processes vector queries through multiple stages. Query input accepts SQL with vector operators. The query planner selects indexes. Index scans use HNSW or IVFFlat structures. Filtering and ranking combine vector similarity with relational constraints. Results return ranked vectors with metadata. Query latency is under 10ms.
 
@@ -199,7 +199,7 @@ The query combines vector similarity with relational filters. The WHERE clause f
 
 PostgreSQL provides ACID transactions for vector data. It uses SQL for queries. It stores vectors and relational data in the same tables. It combines vector similarity with relational filters in single queries. It uses standard PostgreSQL monitoring, backup, and administration tools.
 
-![PostgreSQL vs Standalone Vector Databases](/blog/postgresql-vector-database/diagram-comparison.svg)
+![PostgreSQL vs Standalone Vector Databases](assets/postgresql-vector-database/diagram-comparison.svg)
 
 PostgreSQL provides ACID transactions, SQL querying, unified storage, and standard tooling. Standalone systems do not provide these capabilities.
 
@@ -209,7 +209,7 @@ ACID transactions ensure vector updates occur atomically with relational updates
 
 PostgreSQL with NeuronDB provides vector indexing, ML inference, embedding generation, and RAG pipelines. This section compares features across indexing, ML capabilities, performance, and operations.
 
-![Vector Database Feature Comparison](/blog/postgresql-vector-database/diagram-feature-comparison.svg)
+![Vector Database Feature Comparison](assets/postgresql-vector-database/diagram-feature-comparison.svg)
 
 PostgreSQL with NeuronDB combines vector search, ML inference, embedding generation, and RAG pipelines in one platform.
 
@@ -270,7 +270,7 @@ PostgreSQL with NeuronDB provides ACID transactions for vector data. Standalone 
 
 ### Performance Comparison
 
-![Performance Comparison](/blog/postgresql-vector-database/diagram-performance-comparison.svg)
+![Performance Comparison](assets/postgresql-vector-database/diagram-performance-comparison.svg)
 
 PostgreSQL + NeuronDB achieves 5-8ms average query latency. Index construction takes 15-30 minutes. GPU acceleration provides 10,000-15,000 QPS. These characteristics, combined with ACID transactions and SQL querying, suit production deployments.
 

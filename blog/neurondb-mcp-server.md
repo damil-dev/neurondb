@@ -1,4 +1,4 @@
-![MCP Server header](/blog/neurondb-mcp-server/header.svg?v=7)
+![MCP Server header](assets/neurondb-mcp-server/header.svg)
 
 # MCP Server: Model Context Protocol Explained
 
@@ -302,7 +302,7 @@ Error response:
 
 Claude Desktop is Anthropic's desktop application for Claude AI. It supports MCP servers through configuration files. Servers are configured in a settings file. Claude Desktop spawns server processes and communicates via stdio. The configuration file defines which MCP servers to use, how to start them, and what environment variables to set. Claude Desktop reads this configuration when it starts and automatically manages the server lifecycle throughout the session. For detailed setup instructions, see the [Claude Desktop configuration guide](/docs/neuronmcp).
 
-![Claude Desktop settings showing NeuronMCP server configuration](/blog/neurondb-mcp-server/claude-desktop-settings.png)
+![Claude Desktop settings showing NeuronMCP server configuration](assets/neurondb-mcp-server/claude-desktop-settings.png)
 
 ### Configuration
 
@@ -417,7 +417,7 @@ NeuronMCP implements the full MCP specification. It provides tools for vector op
 
 ### Architecture
 
-![NeuronMCP Architecture](/blog/neurondb-mcp-server/mcp-main.png)
+![NeuronMCP Architecture](assets/neurondb-mcp-server/mcp-main.png)
 
 NeuronMCP follows a modular architecture where the core server handles protocol communication, tool handlers implement specific operations, resource providers expose data sources, and middleware components enable custom processing.
 
@@ -545,7 +545,7 @@ Claude presents the results. Claude shows that the embedding is a 384-dimensiona
 
 Claude offers to store the embedding in a table. Claude can use the embedding for vector search operations. Claude can generate embeddings for multiple texts in batch operations.
 
-![Claude Desktop conversation showing embedding generation with NeuronMCP](/blog/neurondb-mcp-server/claude-embedding-example.png)
+![Claude Desktop conversation showing embedding generation with NeuronMCP](assets/neurondb-mcp-server/claude-embedding-example.png)
 
 ### Model Training Assistant
 
