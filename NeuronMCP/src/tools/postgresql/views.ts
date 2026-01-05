@@ -153,7 +153,7 @@ export class PostgreSQLViewsTool extends BaseTool {
 				count: views.length,
 				schema,
 				include_system: includeSystem,
-				include_definition,
+				include_definition: includeDefinition,
 			});
 
 			return this.success(

@@ -10,13 +10,13 @@ export interface LogEntry {
 }
 
 export class LogFormatter {
-	constructor(private format: "json" | "text") {}
+	constructor(private formatType: "json" | "text") {}
 
 	/**
 	 * Format log entry
 	 */
 	format(entry: LogEntry): string {
-		if (this.format === "json") {
+		if (this.formatType === "json") {
 			return JSON.stringify(entry) + "\n";
 		} else {
 			return this.formatText(entry);

@@ -125,7 +125,7 @@ class NeurondbMCPServer {
 			const enabledTools = allDefinitions.filter((tool) => {
 				// PostgreSQL tools - always enabled by default
 				if (tool.name.startsWith("postgresql_")) {
-					return features.postgresql?.enabled !== false;
+					return true;
 				}
 				if (tool.name.startsWith("vector_") || tool.name.startsWith("embed_")) {
 					return features.vector?.enabled !== false;
@@ -267,7 +267,7 @@ class NeurondbMCPServer {
 	}
 
 	private setupToolHandlers() {
-		this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+		this.server.setRequestHandler(CallToolRequestSchema, async (request, _extra) => {
 			return this.middleware.execute(
 				{
 					method: "tools/call",

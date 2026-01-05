@@ -116,8 +116,8 @@ export class ListEmbeddingModelConfigsTool extends BaseTool {
 			inputSchema: {
 				type: "object",
 				properties: {},
+				required: [],
 			},
-			required: [],
 		};
 	}
 

@@ -2,7 +2,7 @@
  * Configuration validator with comprehensive validation
  */
 
-import { ServerConfig, DatabaseConfig, FeaturesConfig } from "./schema.js";
+import { ServerConfig, DatabaseConfig, FeaturesConfig, ServerSettings, LoggingConfig } from "./schema.js";
 
 export class ConfigValidator {
 	/**

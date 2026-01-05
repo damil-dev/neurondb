@@ -35,7 +35,7 @@ NeuronMCP provides **29 comprehensive PostgreSQL administration and monitoring t
 - **Storage Management**: Size analysis, bloat detection, and vacuum recommendations
 - **Security Management**: Comprehensive user, role, and permission auditing
 - **NeuronDB Integration**: Seamless integration with NeuronDB vector search and ML capabilities
-- **Production Ready**: Enterprise-grade tools designed for production workloads
+- **Operational focus**: Designed for day-to-day administration and monitoring
 - **Easy to Use**: Simple, intuitive API accessible via MCP protocol
 
 ### Architecture

@@ -1,13 +1,5 @@
 import { Database } from "../db.js";
-<<<<<<< HEAD
-
-export class RerankingTools {
-	constructor(private db: Database) {}
-
-	/**
-	 * Rerank using MMR (Maximal Marginal Relevance)
-=======
-import { ToolDefinition } from "@modelcontextprotocol/sdk/types.js";
+import type { ToolDefinition } from "./registry.js";
 
 /**
  * RerankingTools - Comprehensive reranking support for NeuronDB
@@ -30,7 +22,6 @@ export class RerankingTools {
 	/**
 	 * Rerank using MMR (Maximal Marginal Relevance)
 	 * Balances relevance and diversity in search results
->>>>>>> 4d2acd8 (Fix MCP server: Complete reranking tools implementation and PostgreSQL configuration)
 	 */
 	async mmrRerank(
 		table: string,
@@ -38,11 +29,7 @@ export class RerankingTools {
 		vectorColumn: string,
 		lambda: number = 0.5,
 		topK: number = 10
-<<<<<<< HEAD
-	) {
-=======
 	): Promise<any[]> {
->>>>>>> 4d2acd8 (Fix MCP server: Complete reranking tools implementation and PostgreSQL configuration)
 		const vecStr = `[${queryVector.join(",")}]`;
 		const result = await this.db.query(
 			"SELECT * FROM neurondb.mmr_rerank_with_scores($1, $2::vector, $3, $4, $5)",
@@ -52,61 +39,32 @@ export class RerankingTools {
 	}
 
 	/**
-<<<<<<< HEAD
-	 * Rerank using cross-encoder
-=======
 	 * Rerank using Cross-Encoder neural model
 	 * Uses cross-encoder models for fine-grained relevance scoring
->>>>>>> 4d2acd8 (Fix MCP server: Complete reranking tools implementation and PostgreSQL configuration)
 	 */
 	async rerankCrossEncoder(
 		query: string,
 		documents: string[],
 		model?: string,
 		topK?: number
-<<<<<<< HEAD
-	) {
-		// Implementation depends on actual function signature
-		const modelName = model || "ms-marco-MiniLM-L-6-v2";
-		const k = topK || documents.length;
-
-		const result = await this.db.query(
-			"SELECT * FROM rerank_cross_encoder($1, $2::text[], $3, $4)",
-=======
 	): Promise<any[]> {
 		const modelName = model || "ms-marco-MiniLM-L-6-v2";
 		const k = topK || documents.length;
 		const result = await this.db.query(
 			"SELECT * FROM neurondb.rerank_cross_encoder($1, $2::text[], $3, $4)",
->>>>>>> 4d2acd8 (Fix MCP server: Complete reranking tools implementation and PostgreSQL configuration)
 			[query, documents, modelName, k]
 		);
 		return result.rows;
 	}
 
 	/**
-<<<<<<< HEAD
-	 * Rerank using LLM
-=======
 	 * Rerank using LLM completion API
 	 * GPT/Claude-powered reranking with full parameter support
->>>>>>> 4d2acd8 (Fix MCP server: Complete reranking tools implementation and PostgreSQL configuration)
 	 */
 	async rerankLLM(
 		query: string,
 		documents: string[],
 		model?: string,
-<<<<<<< HEAD
-		topK?: number
-	) {
-		const k = topK || documents.length;
-		const result = await this.db.query(
-			"SELECT * FROM rerank_llm($1, $2::text[], $3, $4)",
-			[query, documents, model, k]
-		);
-		return result.rows;
-	}
-=======
 		topK?: number,
 		promptTemplate?: string,
 		temperature?: number
@@ -566,6 +524,4 @@ export class RerankingTools {
 				throw new Error(`Unknown reranking tool: ${toolName}. Available tools: mmr_rerank, rerank_cross_encoder, rerank_llm, rerank_colbert, rerank_rrf, rerank_ensemble_weighted, rerank_ensemble_borda`);
 		}
 	}
->>>>>>> 4d2acd8 (Fix MCP server: Complete reranking tools implementation and PostgreSQL configuration)
 }
-
