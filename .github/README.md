@@ -109,31 +109,18 @@ gh workflow run security-scan.yml
 
 ## 📊 Coverage
 
-### PostgreSQL Versions
-- ✅ 16
-- ✅ 17
-- ✅ 18
+<details>
+<summary><strong>Platform & version support</strong></summary>
 
-### Go Versions
-- ✅ 1.21
-- ✅ 1.22
-- ✅ 1.23
-- ✅ 1.24
+| Category | Supported Versions |
+|---|---|
+| **PostgreSQL** | 16, 17, 18 |
+| **Go** | 1.21, 1.22, 1.23, 1.24 |
+| **Node.js** | 18 LTS, 20 LTS, 22 LTS |
+| **Operating Systems** | Ubuntu 20.04, Ubuntu 22.04, macOS 13 (Ventura), macOS 14 (Sonoma) |
+| **Architectures** | linux/amd64, linux/arm64 |
 
-### Node.js Versions
-- ✅ 18 LTS
-- ✅ 20 LTS
-- ✅ 22 LTS
-
-### Operating Systems
-- ✅ Ubuntu 20.04
-- ✅ Ubuntu 22.04
-- ✅ macOS 13 (Ventura)
-- ✅ macOS 14 (Sonoma)
-
-### Architectures
-- ✅ linux/amd64
-- ✅ linux/arm64
+</details>
 
 ## 🐳 Published Container Images
 
@@ -147,47 +134,6 @@ ghcr.io/OWNER/neuronagent:latest
 ghcr.io/OWNER/neuronmcp:latest
 ghcr.io/OWNER/neurondesktop:latest
 ```
-
-## ✅ Validation Status
-
-All workflows have been validated:
-- ✅ YAML syntax correct
-- ✅ All paths verified
-- ✅ Dependencies available
-- ✅ Versions compatible
-- ✅ Zero critical issues
-
-**Status:** PRODUCTION READY  
-**Confidence:** 100%  
-**Total Workflows:** 7  
-**Issues:** 0
-
-## 📚 Documentation
-
-- **Full Status:** [WORKFLOWS_STATUS.md](WORKFLOWS_STATUS.md)
-- **Validation Report:** [WORKFLOW_VALIDATION_REPORT.md](WORKFLOW_VALIDATION_REPORT.md)
-- **Summary:** [WORKFLOW_SUMMARY.md](WORKFLOW_SUMMARY.md)
-
-## 🔧 Maintenance
-
-### Adding a New Workflow
-1. Create workflow file in `.github/workflows/`
-2. Follow naming convention: `<module>-<action>-and-<action>.yml`
-3. Use clear display name: `Module - Action and Action`
-4. Add path-based triggers for efficiency
-5. Include proper cleanup with `if: always()`
-6. Set artifact retention to 7 days
-7. Validate with validation scripts
-
-### Workflow Naming Convention
-```
-<module>-<action>-and-<action>.yml
-```
-
-Examples:
-- `neurondb-build-and-test.yml`
-- `neuronagent-build-and-test.yml`
-- `publish-all-container-images.yml`
 
 ## 📈 Recent Changes
 
