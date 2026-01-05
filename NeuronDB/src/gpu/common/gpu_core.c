@@ -495,15 +495,20 @@ neurondb_gpu_rf_predict(const void *rf_hdr,
 #ifdef NDB_GPU_METAL
 	if (neurondb_gpu_is_available())
 	{
-		ok = neurondb_gpu_rf_predict_backend(rf_hdr,
-											 trees,
-											 nodes,
-											 node_capacity,
-											 x,
-											 n_features,
-											 class_out,
-											 errstr);
-		used_gpu = ok;
+		/* Use weak symbol - will be NULL if Metal backend not linked */
+		extern bool neurondb_gpu_rf_predict_backend(const void *, const void *, const void *, int, const float *, int, int *, char **) __attribute__((weak));
+		if (neurondb_gpu_rf_predict_backend)
+		{
+			ok = neurondb_gpu_rf_predict_backend(rf_hdr,
+												 trees,
+												 nodes,
+												 node_capacity,
+												 x,
+												 n_features,
+												 class_out,
+												 errstr);
+			used_gpu = ok;
+		}
 	}
 #endif
 out:
