@@ -444,19 +444,19 @@ Before building an agent, install required components. The setup requires Postgr
 
 PostgreSQL 16, 17, or 18 is recommended. Download and install PostgreSQL for your operating system. Verify installation by checking the version.
 
-\`\`\`bash
+```bash
 # Check PostgreSQL version
 psql --version
 
 # Expected output:
 # psql (PostgreSQL) 16.0
-\`\`\`
+```
 
 #### Step 2: Create Database
 
 Create a database for the agent system. The database stores agents, sessions, messages, and memories.
 
-\`\`\`bash
+```bash
 # Create database
 createdb neurondb
 
@@ -465,13 +465,13 @@ psql -d neurondb
 
 # Verify connection
 SELECT version();
-\`\`\`
+```
 
 #### Step 3: Install NeuronDB Extension
 
 NeuronDB provides vector search and embedding capabilities. Download the extension for your PostgreSQL version. Install the extension files. Enable the extension in the database.
 
-\`\`\`bash
+```bash
 # Install NeuronDB extension
 psql -d neurondb -c "CREATE EXTENSION neurondb;"
 
@@ -482,13 +482,13 @@ psql -d neurondb -c "SELECT * FROM pg_extension WHERE extname = 'neurondb';"
 # extname  | extversion | nspname
 #----------+------------+----------
 # neurondb | 1.0        | neurondb
-\`\`\`
+```
 
 #### Step 4: Install NeuronAgent Server
 
 NeuronAgent provides the agent runtime. Download the NeuronAgent binary. Extract the files. Configure the server. Start the server.
 
-\`\`\`bash
+```bash
 # Download NeuronAgent (example)
 # wget https://github.com/neurondb-ai/neurondb/releases/download/v1.0.0/neuronagent-linux-amd64
 # chmod +x neuronagent-linux-amd64
@@ -514,13 +514,13 @@ curl http://localhost:8080/health
 
 # Expected output:
 # {"status":"healthy"}
-\`\`\`
+```
 
 #### Step 5: Generate API Key
 
 API keys authenticate requests to NeuronAgent. Generate an API key for your application. Store the key securely.
 
-\`\`\`bash
+```bash
 # Generate API key
 ./bin/neuronagent generate-key
 
@@ -529,7 +529,7 @@ API keys authenticate requests to NeuronAgent. Generate an API key for your appl
 
 # Store the key securely
 export NEURONAGENT_API_KEY="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-\`\`\`
+```
 
 The setup creates the complete database schema. The schema includes agent tables for configurations. Session tables track conversations. Message tables store interactions. Memory tables enable long-term context. Indexes enable fast queries. Triggers maintain data consistency. The server provides REST API and WebSocket endpoints.
 
@@ -541,7 +541,7 @@ The database schema provides the foundation for agent systems. Understanding eac
 
 The agents table stores agent configurations. Each agent has a unique identifier. The name field identifies the agent. The system_prompt defines agent behavior. The model_name specifies the language model. The enabled_tools array lists available tools. The memory_table specifies where memories are stored. The config field stores additional settings.
 
-\`\`\`sql
+```sql
 -- Agents table stores agent configurations
 CREATE TABLE IF NOT EXISTS agents (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -563,7 +563,7 @@ CREATE TABLE IF NOT EXISTS agents (
 -- memory_table: Table name where agent memories are stored
 -- config: Additional configuration as JSON
 -- created_at: Timestamp when agent was created
-\`\`\`
+```
 
 The system_prompt is critical. It defines how the agent behaves. It specifies agent capabilities. It guides decision-making. It sets response style. It defines tool usage patterns.
 
@@ -571,7 +571,7 @@ The system_prompt is critical. It defines how the agent behaves. It specifies ag
 
 The sessions table tracks conversation sessions. Each session belongs to an agent. Sessions maintain conversation context. Sessions enable multi-turn conversations. Sessions persist across requests.
 
-\`\`\`sql
+```sql
 -- Sessions table stores conversation sessions
 CREATE TABLE IF NOT EXISTS sessions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -587,7 +587,7 @@ CREATE TABLE IF NOT EXISTS sessions (
 -- external_user_id: Optional identifier for external user systems
 -- metadata: Additional session metadata as JSON
 -- created_at: Timestamp when session was created
-\`\`\`
+```
 
 Sessions enable context continuity. Messages within a session share context. Agents remember previous messages. Agents build on past interactions. Sessions can be resumed after interruptions.
 
@@ -595,7 +595,7 @@ Sessions enable context continuity. Messages within a session share context. Age
 
 The messages table stores conversation messages. Each message belongs to a session. Messages have roles (user or assistant). Messages contain text content. Messages may include tool calls. Messages are ordered by timestamp.
 
-\`\`\`sql
+```sql
 -- Messages table stores conversation messages
 CREATE TABLE IF NOT EXISTS messages (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -613,7 +613,7 @@ CREATE TABLE IF NOT EXISTS messages (
 -- content: Text content of the message
 -- tool_calls: JSON array of tool calls made by the agent
 -- created_at: Timestamp when message was created
-\`\`\`
+```
 
 The role field indicates message origin. User messages come from users. Assistant messages come from agents. Tool calls are stored in the tool_calls field. Tool calls show which tools were used. Tool calls include parameters and results.
 
@@ -621,7 +621,7 @@ The role field indicates message origin. User messages come from users. Assistan
 
 The memory chunks table stores agent memories. Memories are converted to embeddings. Embeddings enable semantic search. Memories persist across sessions. Memories improve agent responses over time.
 
-\`\`\`sql
+```sql
 -- Memory chunks table stores agent memories
 CREATE TABLE IF NOT EXISTS memory_chunks (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -641,15 +641,15 @@ CREATE TABLE IF NOT EXISTS memory_chunks (
 -- embedding: Vector embedding of the content (384 dimensions)
 -- metadata: Additional metadata as JSON (tags, importance, etc.)
 -- created_at: Timestamp when memory was created
-\`\`\`
+```
 
-The embedding field stores vector representations. Embeddings are generated using language models. Embeddings enable semantic similarity search. The vector(384) type stores 384-dimensional vectors (common for \`all-MiniLM-L6-v2\`). Match the vector dimensions to the embedding model you use.
+The embedding field stores vector representations. Embeddings are generated using language models. Embeddings enable semantic similarity search. The vector(384) type stores 384-dimensional vectors (common for `all-MiniLM-L6-v2`). Match the vector dimensions to the embedding model you use.
 
 #### Indexes for Performance
 
 Indexes enable fast queries. Vector indexes enable fast similarity search. B-tree indexes enable fast lookups. Proper indexing is essential for performance.
 
-\`\`\`sql
+```sql
 -- Create vector index for memory search
 -- Indexing note: NeuronDB commonly provides helper functions (for example, hnsw_create_index)
 -- and also supports CREATE INDEX ... USING hnsw in many examples. Choose the approach
@@ -672,7 +672,7 @@ CREATE INDEX IF NOT EXISTS idx_memory_agent_id ON memory_chunks(agent_id);
 -- Explanation:
 -- These indexes enable fast filtering by agent_id and session_id
 -- Essential for retrieving session messages and agent memories
-\`\`\`
+```
 
 The HNSW index enables sub-10ms similarity search. It uses cosine distance for semantic similarity. The index parameters balance speed and accuracy. Higher values improve accuracy but slow queries.
 
@@ -682,7 +682,7 @@ The schema provides complete agent infrastructure. Agents store configurations f
 
 Create a research assistant agent. The agent uses SQL tools to query documents. The agent uses HTTP tools to fetch web content. The agent stores memories for future reference.
 
-\`\`\`python
+```python
 import requests
 import json
 
@@ -724,7 +724,7 @@ response = requests.post(
 
 agent = response.json()
 print(f"Agent created: {agent['id']}")
-\`\`\`
+```
 
 The agent configuration defines behavior. The system prompt guides agent actions. Enabled tools specify available functions. Memory table enables context storage.
 
@@ -732,7 +732,7 @@ The agent configuration defines behavior. The system prompt guides agent actions
 
 Create a conversation session. Sessions track individual conversations. Sessions maintain message history. Sessions enable context continuity.
 
-\`\`\`python
+```python
 # Create session for the agent
 session_data = {
     "agent_id": agent["id"],
@@ -751,7 +751,7 @@ response = requests.post(
 
 session = response.json()
 print(f"Session created: {session['id']}")
-\`\`\`
+```
 
 Sessions isolate conversations. Each user gets a separate session. Sessions persist across requests. Sessions enable multi-turn conversations.
 
@@ -759,7 +759,7 @@ Sessions isolate conversations. Each user gets a separate session. Sessions pers
 
 Send messages to the agent. The agent processes messages. The agent uses tools as needed. The agent generates responses.
 
-\`\`\`python
+```python
 # Send a research query
 message_data = {
     "content": "What are the key features of vector databases?",
@@ -775,7 +775,7 @@ response = requests.post(
 result = response.json()
 print(f"Response: {result['response']}")
 print(f"Tokens used: {result.get('tokens_used', 0)}")
-\`\`\`
+```
 
 The agent processes the query. The agent uses SQL tools to query documents. The agent retrieves relevant information. The agent generates a response.
 
@@ -783,7 +783,7 @@ The agent processes the query. The agent uses SQL tools to query documents. The 
 
 The agent uses SQL tools to query documents. This example shows tool execution flow.
 
-\`\`\`python
+```python
 # The agent automatically uses SQL tools when needed
 # Example: Agent receives query about vector databases
 # Agent generates SQL query:
@@ -804,7 +804,7 @@ FROM (
 # Agent executes query via SQL tool
 # Tool returns results
 # Agent uses results to generate response
-\`\`\`
+```
 
 Tool execution happens automatically. The agent identifies needed information. The agent selects appropriate tools. The agent formats tool calls. Tools execute and return results.
 
@@ -812,7 +812,7 @@ Tool execution happens automatically. The agent identifies needed information. T
 
 The agent stores important facts in memory. Memory enables future context retrieval.
 
-\`\`\`python
+```python
 # Agent automatically stores memories
 # Example: After answering about vector databases
 # Agent extracts key facts:
@@ -825,7 +825,7 @@ facts = [
 # Agent stores facts in memory_chunks table
 # Each fact is converted to embedding
 # Embeddings enable semantic retrieval
-\`\`\`
+```
 
 Memory storage happens automatically. The agent extracts important facts. Facts are converted to embeddings. Embeddings are stored in the database.
 
@@ -833,7 +833,7 @@ Memory storage happens automatically. The agent extracts important facts. Facts 
 
 The agent retrieves relevant memories for context. Memory retrieval uses semantic search.
 
-\`\`\`sql
+```sql
 -- Agent retrieves relevant memories for query context
 WITH query_embedding AS (
     SELECT embed_text(
@@ -849,7 +849,7 @@ CROSS JOIN query_embedding qe
 WHERE agent_id = 'agent-uuid-here'
 ORDER BY embedding <=> qe.embedding
 LIMIT 5;
-\`\`\`
+```
 
 Memory retrieval finds relevant context. Similarity search ranks memories. Top memories are added to context. Context improves response quality.
 
@@ -857,7 +857,7 @@ Memory retrieval finds relevant context. Similarity search ranks memories. Top m
 
 This complete example shows agent usage from start to finish.
 
-\`\`\`python
+```python
 #!/usr/bin/env python3
 """
 Complete NeuronAgent Example: Research Assistant
@@ -917,7 +917,7 @@ for query in queries:
     time.sleep(1)
 
 print("\\nExample completed!")
-\`\`\`
+```
 
 The complete example demonstrates full agent workflow. Agent creation sets up capabilities. Session creation starts conversations. Message sending triggers agent execution. Agent uses tools automatically. Agent stores memories automatically.
 
@@ -947,7 +947,7 @@ Optimization strategies include caching. Query embeddings are cached, tool resul
 
 Index optimization improves memory search. HNSW indexes enable fast similarity search. Index parameters affect query speed, and index maintenance ensures optimal performance.
 
-\`\`\`sql
+```sql
 -- Monitor memory search performance
 SELECT 
     COUNT(*) AS total_memories,
@@ -965,7 +965,7 @@ SELECT
     idx_tup_fetch
 FROM pg_stat_user_indexes
 WHERE tablename = 'memory_chunks';
-\`\`\`
+```
 
 Performance monitoring tracks system health. Query statistics show usage patterns. Index statistics show search efficiency. Size statistics show storage requirements.
 
@@ -977,12 +977,12 @@ Security measures include authentication. API keys authenticate requests, rate l
 
 Tool security includes validation. SQL tools restrict to read-only queries, HTTP tools validate URLs, code tools restrict file access, and shell tools restrict commands.
 
-\`\`\`sql
+```sql
 -- Example: Restrict SQL tool to read-only
 CREATE ROLE agent_user;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO agent_user;
 REVOKE INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM agent_user;
-\`\`\`
+```
 
 Security configuration limits agent capabilities. Read-only access prevents data modification. URL validation prevents malicious requests. Command restrictions prevent system access.
 
@@ -994,7 +994,7 @@ Key metrics include latency. Planning latency measures plan generation time, exe
 
 Error tracking identifies issues. Failed tool calls are logged, planning failures are recorded, memory retrieval errors are tracked, and state machine errors are monitored.
 
-\`\`\`sql
+```sql
 -- Track agent metrics
 CREATE TABLE agent_metrics (
     id SERIAL PRIMARY KEY,
@@ -1014,7 +1014,7 @@ CREATE TABLE tool_executions (
     error_message TEXT,
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-\`\`\`
+```
 
 Metrics tables track system performance. Agent metrics show usage patterns. Tool metrics show execution efficiency. Error metrics show failure rates.
 

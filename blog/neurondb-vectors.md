@@ -22,13 +22,13 @@ Tables with vector columns store high-dimensional embeddings alongside tradition
 
 The following example creates a documents table designed to store text documents along with their corresponding vector embeddings. The table structure includes an auto-incrementing primary key identifier, a text column for document titles, and a vector column configured with 384 dimensions to match common embedding model outputs. This schema supports storing documents and their semantic representations in a single table, enabling efficient querying of both metadata and vector data together.
 
-\`\`\`sql
+```sql
 CREATE TABLE documents (
     id serial PRIMARY KEY,
     title text,
     embedding vector(384)
 );
-\`\`\`
+```
 
 The CREATE TABLE statement establishes a documents table containing three columns with specific data types. The id column uses the serial type which automatically generates sequential integer values for each inserted row and serves as the primary key ensuring unique identification. The title column accepts text data for storing document names or descriptions. The embedding column uses the vector type with a fixed dimension of 384, meaning every vector stored in this column must contain exactly 384 floating-point values. The table structure is now ready to receive document data and corresponding embeddings. For more information on vector types, see the [vector types documentation](/docs/features/vector-types).
 
@@ -38,7 +38,7 @@ Vector insertion supports multiple input formats and methods, providing flexibil
 
 The following example demonstrates inserting multiple documents using different vector insertion methods. The first four documents use array_to_vector with explicit floating-point arrays, showing manual vector specification. Each array contains eight values representing a simplified 8-dimensional vector for demonstration purposes. The fifth document uses the embed_text function to automatically generate embeddings from text, which is the recommended approach for production systems as it ensures consistent embedding generation and handles model configuration automatically.
 
-\`\`\`sql
+```sql
 INSERT INTO documents (title, embedding) VALUES
     ('apple', array_to_vector(ARRAY[0.21, 0.15, 0.05, 0.6, 0.02, 0.0, 0.0, 0.1]::real[])),
     ('banana', array_to_vector(ARRAY[0.18, 0.12, 0.02, 0.55, 0.05, 0.0, 0.01, 0.12]::real[])),
@@ -47,13 +47,13 @@ INSERT INTO documents (title, embedding) VALUES
 
 INSERT INTO documents (title, embedding)
 VALUES ('orange', embed_text('orange'));
-\`\`\`
+```
 
 The INSERT statements successfully add five document records to the documents table, each containing a title and corresponding vector embedding. The first four insertions use the array_to_vector function with explicitly defined floating-point arrays, demonstrating manual vector construction where each array value represents a dimension in the vector space. The fifth insertion uses the embed_text function which automatically processes the text string through an embedding model and generates the corresponding vector representation. All documents now contain vector embeddings stored within the database, ready for similarity search operations.
 
 Verification occurs by querying all inserted documents and inspecting their vector dimensions to confirm successful storage and dimensional consistency.
 
-\`\`\`sql
+```sql
 SELECT id, title, vector_dims(embedding) AS dimensions
 FROM documents;
 
@@ -65,7 +65,7 @@ id |  title  | dimensions
  3 | car     |        384
  4 | vehicle |        384
  5 | orange  |        384
-\`\`\`
+```
 
 The verification query confirms that all five documents contain vector embeddings with exactly 384 dimensions, matching the table column definition. The vector_dims function extracts the dimension count from each stored vector, validating that all embeddings conform to the expected structure. Each row displays the document identifier, title, and dimension count, confirming successful insertion and proper vector storage. The data is now prepared for similarity search operations that can identify semantically similar documents based on vector distance calculations.
 
@@ -75,7 +75,7 @@ NeuronDB provides arithmetic operations for vector manipulation and computation,
 
 The following example demonstrates vector addition, showing how corresponding elements from two vectors combine to produce a new vector. Addition requires both input vectors to have identical dimensions, as each position in the first vector adds to the corresponding position in the second vector. The result maintains the same dimensionality as the input vectors, preserving the vector space structure while transforming the values through arithmetic combination.
 
-\`\`\`sql
+```sql
 SELECT 
     '[1,2,3]'::vector AS vec1,
     '[4,5,6]'::vector AS vec2,
@@ -85,13 +85,13 @@ SELECT
 vec1   |  vec2   |   sum
 -------+---------+--------
 [1,2,3] | [4,5,6] | [5,7,9]
-\`\`\`
+```
 
 The result demonstrates element-wise addition where each corresponding pair of elements adds together. The first dimension sums 1 and 4 to produce 5, the second dimension sums 2 and 5 to produce 7, and the third dimension sums 3 and 6 to produce 9. Vector addition preserves the dimension count while transforming values through arithmetic combination, making it useful for operations like averaging vectors, combining features, or computing vector differences.
 
 Scalar multiplication demonstrates how multiplying a vector by a constant value scales all elements proportionally while maintaining the vector's direction in space. This operation multiplies each vector element by the scalar factor, effectively changing the vector's magnitude without altering its orientation relative to the coordinate axes.
 
-\`\`\`sql
+```sql
 SELECT 
     '[1,2,3]'::vector AS original,
     '[1,2,3]'::vector * 2.0 AS multiplied;
@@ -100,13 +100,13 @@ SELECT
 original | multiplied
 ---------+------------
 [1,2,3]  | [2,4,6]
-\`\`\`
+```
 
 The result shows each element doubled through scalar multiplication. The original vector contains values 1, 2, and 3, while the multiplied vector contains values 2, 4, and 6. Scalar multiplication scales vector magnitude proportionally while preserving the directional relationship between dimensions, making it useful for adjusting vector weights in machine learning models or normalizing vector magnitudes.
 
 Vector norm computation calculates the magnitude or length of a vector in Euclidean space, providing a measure of how far the vector extends from the origin point. The norm represents the distance from the origin to the point defined by the vector's coordinates, calculated using the Pythagorean theorem extended to multiple dimensions.
 
-\`\`\`sql
+```sql
 SELECT 
     '[3,4]'::vector AS vector,
     vector_norm('[3,4]'::vector) AS norm;
@@ -115,13 +115,13 @@ SELECT
 vector | norm
 -------+-----
 [3,4]  |   5
-\`\`\`
+```
 
 The norm calculation produces a value of 5 for the vector [3,4], matching the Pythagorean calculation where the square root of 3 squared plus 4 squared equals the square root of 9 plus 16, which equals the square root of 25, resulting in 5. This demonstrates how vector norm measures the straight-line distance from the origin to the point represented by the vector coordinates.
 
 Vector normalization transforms vectors into unit vectors with magnitude equal to one, while preserving directional information. Normalization divides each vector element by the vector's norm, creating a standardized representation where magnitude is consistent across all vectors, enabling fair comparison of directional similarity independent of scale.
 
-\`\`\`sql
+```sql
 SELECT 
     '[3,4]'::vector AS original,
     vector_normalize('[3,4]'::vector) AS normalized,
@@ -131,7 +131,7 @@ SELECT
 original | normalized | normalized_norm
 ---------+------------+----------------
 [3,4]    | [0.6,0.8]  |              1
-\`\`\`
+```
 
 The normalized vector becomes [0.6,0.8], where each element divides by the original norm of 5. The normalized norm verification confirms the result has magnitude exactly 1, validating successful normalization. Normalized vectors are essential for cosine similarity calculations where directional alignment matters more than magnitude, and for machine learning applications requiring standardized feature representations.
 
@@ -141,7 +141,7 @@ Distance metrics quantify similarity between vectors by calculating numerical va
 
 The following example computes L2 distance between two vectors, demonstrating how Euclidean distance calculates straight-line geometric distance in vector space. L2 distance provides intuitive distance measurement where lower values indicate vectors that are closer together in the coordinate space, making it suitable for applications where geometric proximity matters.
 
-\`\`\`sql
+```sql
 SELECT 
     '[0,0]'::vector AS vec1,
     '[3,4]'::vector AS vec2,
@@ -151,13 +151,13 @@ SELECT
 vec1  |  vec2  | l2_distance
 ------+--------+-------------
 [0,0] | [3,4]  |          5
-\`\`\`
+```
 
 The L2 distance calculation produces 5, matching the vector norm calculation since the first vector represents the origin point. When one vector is at the origin [0,0], L2 distance equals the norm of the destination vector, as distance from origin to point [3,4] follows the same calculation as vector magnitude. This demonstrates how L2 distance measures geometric distance in vector space, providing intuitive similarity measurement for applications where spatial proximity indicates semantic similarity.
 
 Cosine distance computation measures the angle between vectors rather than their geometric separation, making it particularly effective for text similarity where document length varies but semantic meaning matters more. Cosine distance ignores vector magnitude and focuses solely on directional alignment, where identical directions produce zero distance and orthogonal directions produce maximum distance.
 
-\`\`\`sql
+```sql
 SELECT 
     '[1,0]'::vector AS vec1,
     '[1,0]'::vector AS vec2,
@@ -170,13 +170,13 @@ SELECT
 vec1  |  vec2  | cosine_distance_identical | vec3  | vec4  | cosine_distance_orthogonal
 ------+--------+--------------------------+-------+-------+---------------------------
 [1,0] | [1,0]  |                        0 | [1,0] | [0,1] |                         1
-\`\`\`
+```
 
 The cosine distance results show identical vectors produce zero distance, indicating perfect directional alignment. Orthogonal vectors produce distance of 1, representing perpendicular alignment in vector space. Cosine distance ranges from 0 to 2, where zero indicates identical direction, one indicates perpendicular direction, and two indicates opposite direction. This angular measurement makes cosine distance ideal for text embeddings where document length varies but semantic similarity depends on conceptual alignment rather than magnitude.
 
 Inner product calculation computes the dot product of two vectors, measuring how well vectors align in the same direction. Higher inner product values indicate greater alignment, especially when vectors are normalized, making inner product useful for similarity ranking when magnitude differences are irrelevant.
 
-\`\`\`sql
+```sql
 SELECT 
     '[1,2,3]'::vector AS vec1,
     '[4,5,6]'::vector AS vec2,
@@ -186,13 +186,13 @@ SELECT
 vec1     |  vec2     | inner_product
 ---------+-----------+---------------
 [1,2,3]  | [4,5,6]   |            32
-\`\`\`
+```
 
 The inner product calculation produces 32, computed as 1 times 4 plus 2 times 5 plus 3 times 6, which equals 4 plus 10 plus 18, resulting in 32. Inner product provides faster computation than cosine distance since it avoids normalization steps, but requires normalized vectors for accurate similarity comparison. This makes inner product suitable for high-performance applications where speed matters and vectors are pre-normalized.
 
 Distance metric comparison demonstrates how different metrics produce varying values for the same vector pairs, highlighting the importance of metric selection based on application requirements.
 
-\`\`\`sql
+```sql
 SELECT 
     'L2' AS metric,
     vector_l2_distance('[1,2,3]'::vector, '[4,5,6]'::vector) AS distance
@@ -216,7 +216,7 @@ L2            | 5.196152422707
 Cosine        | 0.025854289535
 Inner Product |            32
 L1            |             9
-\`\`\`
+```
 
 The comparison reveals significant differences between metrics for the same vector pair. L2 distance produces approximately 5.196, representing geometric Euclidean distance. Cosine distance produces approximately 0.026, representing small angular separation. Inner product produces 32, representing high alignment value. L1 distance produces 9, representing sum of absolute differences. Each metric serves different purposes with L2 and L1 measuring geometric distance, cosine measuring angular distance, and inner product measuring alignment. Metric selection depends on whether geometric proximity, angular similarity, or alignment strength matters most for the specific application.
 
@@ -226,7 +226,7 @@ Similarity search identifies vectors closest to a query vector by computing dist
 
 The following example performs similarity search using cosine distance to find documents most similar to a query about fruits. The query generates an embedding vector from the text 'fruit', then compares this query vector against all stored document embeddings using cosine distance. Results rank by ascending distance, meaning the most similar documents appear first with the lowest distance values.
 
-\`\`\`sql
+```sql
 WITH query AS (
     SELECT embed_text('fruit') AS query_vec
 )
@@ -245,13 +245,13 @@ id |  title  | cosine_distance | cosine_similarity
  5 | orange  |     0.123456789 |        0.876543211
  1 | apple   |     0.234567890 |        0.765432110
  2 | banana  |     0.345678901 |        0.654321099
-\`\`\`
+```
 
 The similarity search returns three documents ranked by cosine distance from the query. Orange achieves the lowest cosine distance of 0.123, indicating highest similarity to the fruit query. Apple follows with distance 0.235, representing moderate similarity. Banana appears third with distance 0.346, still indicating reasonable similarity but less than the previous results. Cosine similarity converts distance to similarity by subtracting from one, showing orange with 0.877 similarity, apple with 0.765 similarity, and banana with 0.654 similarity. The ranking demonstrates how vector embeddings capture semantic relationships, identifying fruit-related documents based on conceptual similarity rather than exact text matching.
 
 L2 distance similarity search provides an alternative approach using geometric distance measurement rather than angular distance.
 
-\`\`\`sql
+```sql
 WITH query AS (
     SELECT embed_text('vehicle') AS query_vec
 )
@@ -269,7 +269,7 @@ id |  title  | l2_distance
  4 | vehicle |   0.123456789
  3 | car     |   0.234567890
  1 | apple   |   2.987654321
-\`\`\`
+```
 
 The L2 distance search ranks vehicle first with distance 0.123, indicating closest geometric proximity to the query vector. Car ranks second with distance 0.235, showing moderate geometric similarity. Apple ranks third with distance 2.987, representing significant geometric separation from the vehicle query. The large distance gap between car and apple demonstrates how dissimilar concepts appear far apart in vector space, while related concepts like vehicle and car cluster closer together.
 
@@ -279,17 +279,17 @@ Indexes dramatically accelerate similarity search operations on large vector dat
 
 The following example creates an HNSW index optimized for fast similarity search on high-dimensional vectors. HNSW stands for Hierarchical Navigable Small World, a graph-based indexing algorithm that constructs multiple layers of connections between vectors, with each layer containing fewer connections and enabling faster navigation through vector space. The index configuration specifies distance operator class and construction parameters that balance build time, query speed, and search accuracy. For detailed indexing strategies, see the [indexing documentation](/docs/indexing).
 
-\`\`\`sql
+```sql
 CREATE INDEX documents_hnsw_idx
 ON documents USING hnsw (embedding vector_l2_ops)
 WITH (m = 16, ef_construction = 200);
-\`\`\`
+```
 
 The CREATE INDEX statement establishes an HNSW index named documents_hnsw_idx on the embedding column. The index uses the vector_l2_ops operator class, configuring it for L2 distance calculations. The m parameter set to 16 controls the number of bidirectional connections each vector maintains to neighboring vectors in the graph structure. Higher m values create denser graphs with more connections, improving search accuracy but increasing index size and build time. The ef_construction parameter set to 200 controls the search width during index construction, determining how many candidate vectors the algorithm explores when building connections. Higher ef_construction values improve index quality by exploring more candidates, but extend build time. This configuration balances build speed and search accuracy for production use.
 
 Index verification confirms successful creation and displays index metadata including schema, table, name, and complete definition.
 
-\`\`\`sql
+```sql
 SELECT 
     schemaname,
     tablename,
@@ -302,13 +302,13 @@ WHERE indexname = 'documents_hnsw_idx';
 schemaname | tablename |     indexname      |                  indexdef
 -----------+-----------+--------------------+-------------------------------------------
 public     | documents | documents_hnsw_idx | CREATE INDEX documents_hnsw_idx ON documents USING hnsw (embedding vector_l2_ops) WITH (m = 16, ef_construction = 200)
-\`\`\`
+```
 
 The verification query confirms the index exists in the public schema on the documents table with the specified name. The index definition shows it uses the HNSW access method with L2 distance operator class and the configured parameters. The index is ready to accelerate similarity search queries, with PostgreSQL query planner automatically selecting the index when performing distance-based searches on the embedding column.
 
 Similarity search queries automatically utilize the HNSW index when distance operators appear in ORDER BY clauses, enabling fast query execution even with large datasets.
 
-\`\`\`sql
+```sql
 WITH query AS (
     SELECT embed_text('transportation') AS query_vec
 )
@@ -326,7 +326,7 @@ id |  title  |   distance
  4 | vehicle | 0.987654321
  3 | car     | 1.123456789
  5 | orange  | 2.345678901
-\`\`\`
+```
 
 The indexed similarity search returns results quickly by navigating the HNSW graph structure rather than computing distances to all vectors. Vehicle ranks first with distance 0.988, indicating closest similarity to the transportation query. Car ranks second with distance 1.123, showing moderate similarity. Orange ranks third with distance 2.346, representing lower similarity. The index enables sub-millisecond query times even with millions of vectors, as the graph structure allows efficient navigation to nearest neighbors without exhaustive distance computation.
 
@@ -336,7 +336,7 @@ Quantization compresses vector representations to reduce storage requirements an
 
 The following example creates a Product Quantization index that compresses vectors while maintaining search accuracy. PQ divides each vector into multiple subvectors, then quantizes each subvector separately using a codebook that maps subvector patterns to discrete codes. During search, the system reconstructs approximate vectors from quantized codes and computes distances using these approximations, enabling faster distance calculations with reduced memory usage.
 
-\`\`\`sql
+```sql
 SELECT pq_create_index(
     'documents',
     'embedding',
@@ -349,13 +349,13 @@ SELECT pq_create_index(
 pq_create_index
 ---------------
 t
-\`\`\`
+```
 
 The pq_create_index function returns true, confirming successful creation of the Product Quantization index named documents_pq_idx. The function parameters specify the table name as documents, column name as embedding, index name as documents_pq_idx, number of subvectors as 8, and codebook size as 256. The index divides each 384-dimensional vector into 8 subvectors of 48 dimensions each. Each subvector maps to one of 256 codebook entries, achieving significant compression. The codebook size of 256 provides good quantization granularity, balancing compression ratio and reconstruction accuracy. This configuration achieves approximately 4x compression while maintaining high search accuracy, making it suitable for production systems requiring memory efficiency.
 
 Quantized index search operations automatically utilize the PQ index when available, providing faster queries with reduced memory overhead.
 
-\`\`\`sql
+```sql
 WITH query AS (
     SELECT embed_text('automobile') AS query_vec
 )
@@ -373,7 +373,7 @@ id |  title  |   distance
  3 | car     | 0.123456789
  4 | vehicle | 0.234567890
  1 | apple   | 2.987654321
-\`\`\`
+```
 
 The quantized index search returns results efficiently using compressed vector representations. Car ranks first with distance 0.123, indicating highest similarity to the automobile query. Vehicle ranks second with distance 0.235, showing strong similarity. Apple ranks third with distance 2.987, representing low similarity. The quantized index enables faster distance computations since the system works with compressed codes rather than full precision vectors, reducing memory bandwidth and computational requirements while maintaining ranking accuracy.
 
@@ -383,7 +383,7 @@ A complete semantic search system demonstrates end-to-end vector database functi
 
 The following schema creates an articles table designed for storing text articles with associated metadata and vector embeddings. The table includes standard relational columns for article identification, title, content, and categorization, plus a vector column for semantic representations that enable similarity search.
 
-\`\`\`sql
+```sql
 CREATE TABLE articles (
     id SERIAL PRIMARY KEY,
     title TEXT NOT NULL,
@@ -392,37 +392,37 @@ CREATE TABLE articles (
     embedding vector(384),
     created_at TIMESTAMP DEFAULT NOW()
 );
-\`\`\`
+```
 
 The CREATE TABLE statement defines an articles table with six columns supporting both traditional relational data and vector embeddings. The id column uses SERIAL type for automatic primary key generation, ensuring unique article identification. The title and content columns store article text with NOT NULL constraints preventing empty values. The category column provides optional text classification for filtering and grouping. The embedding column stores 384-dimensional vectors matching common embedding model outputs. The created_at column automatically records insertion timestamps. This schema enables combining relational queries with vector similarity search, supporting complex applications that need both structured metadata and semantic matching.
 
 Article insertion populates the table with sample content and automatically generates embeddings using the embed_text function, demonstrating how text content transforms into vector representations.
 
-\`\`\`sql
+```sql
 INSERT INTO articles (title, content, category, embedding) VALUES
     ('PostgreSQL Performance', 'PostgreSQL is a powerful relational database system...', 'Database', embed_text('PostgreSQL is a powerful relational database system')),
     ('Vector Search', 'Vector search enables semantic similarity matching...', 'AI', embed_text('Vector search enables semantic similarity matching')),
     ('Machine Learning Basics', 'Machine learning trains models on data...', 'AI', embed_text('Machine learning trains models on data'));
-\`\`\`
+```
 
 The INSERT statements add three articles to the table with titles, content excerpts, categories, and automatically generated embeddings. Each article uses the embed_text function to convert text content into vector embeddings, ensuring consistent embedding generation across all articles. The first article covers PostgreSQL performance in the Database category. The second article covers vector search in the AI category. The third article covers machine learning basics in the AI category. All embeddings use 384 dimensions, matching the table column definition and enabling efficient similarity search operations.
 
 HNSW index creation accelerates similarity search by organizing vectors in a graph structure optimized for nearest neighbor queries.
 
-\`\`\`sql
+```sql
 SELECT hnsw_create_index('articles', 'embedding', 'articles_idx', 16, 200);
 
 -- Results:
 hnsw_create_index
 -----------------
 t
-\`\`\`
+```
 
 The hnsw_create_index function returns true, confirming successful index creation on the articles table. The function creates an HNSW index named articles_idx on the embedding column with configuration parameters m=16 and ef_construction=200. The index uses 16 connections per layer in the graph structure, providing good balance between search accuracy and index size. The ef_construction value of 200 controls build-time search width, exploring 200 candidate vectors when constructing graph connections. This configuration balances build speed and search accuracy, suitable for production systems requiring fast queries on medium to large datasets.
 
 Semantic search queries demonstrate how natural language queries match relevant articles based on semantic similarity rather than exact text matching.
 
-\`\`\`sql
+```sql
 WITH query AS (
     SELECT embed_text('database optimization') AS query_vec
 )
@@ -442,13 +442,13 @@ id |        title         | category | cosine_distance | cosine_similarity
  1 | PostgreSQL Performance | Database |     0.123456789 |        0.876543211
  2 | Vector Search        | AI       |     0.876543210 |        0.123456790
  3 | Machine Learning...  | AI       |     0.987654321 |        0.012345679
-\`\`\`
+```
 
 The semantic search query finds articles similar to 'database optimization' using cosine distance ranking. PostgreSQL Performance achieves the highest similarity with distance 0.123 and similarity 0.877, correctly matching database-related content despite the query using different wording than the article title. Vector Search ranks second with distance 0.877, showing moderate relevance. Machine Learning Basics ranks third with distance 0.988, indicating lower relevance. The query successfully matches semantic concepts rather than exact text, demonstrating how vector embeddings capture meaning beyond keywords.
 
 Category-based analysis demonstrates how similarity varies across different content categories, enabling insights into content organization and retrieval patterns.
 
-\`\`\`sql
+```sql
 WITH query AS (
     SELECT embed_text('database systems') AS query_vec
 )
@@ -466,7 +466,7 @@ category | total_in_category | min_distance | avg_distance
 ---------+-------------------+--------------+--------------
 Database |                 1 |   0.12345678 |   0.12345678
 AI       |                 2 |   0.87654321 |   0.93209876
-\`\`\`
+```
 
 The category analysis groups articles by category and computes distance statistics for each group. The Database category contains one article with minimum distance 0.123 and average distance 0.123, indicating strong similarity to the database systems query. The AI category contains two articles with minimum distance 0.877 and average distance 0.932, indicating lower similarity. The grouping reveals category-based similarity patterns, showing how different content categories cluster at varying distances from queries, enabling category-aware search refinement and content organization strategies.
 
@@ -476,40 +476,40 @@ Vector search performance optimization involves configuring indexes for specific
 
 High-accuracy HNSW index configuration prioritizes search quality over build speed, suitable for production systems where query accuracy matters more than index construction time.
 
-\`\`\`sql
+```sql
 SELECT hnsw_create_index('articles', 'embedding', 'articles_high_accuracy_idx', 32, 400);
 
 -- Results:
 hnsw_create_index
 -----------------
 t
-\`\`\`
+```
 
 The high-accuracy index configuration uses m=32 and ef_construction=400, creating denser graph connections and exploring more candidates during construction. Higher m values create more connections per vector, improving search accuracy by providing more paths through the graph structure. Higher ef_construction values explore more candidate vectors during index building, creating better connections that improve query recall. This configuration achieves superior search accuracy but requires longer build times and larger index storage, making it ideal for production systems where query performance and accuracy are critical priorities.
 
 Fast-build HNSW index configuration prioritizes index construction speed over search accuracy, suitable for development environments or systems requiring frequent index rebuilding.
 
-\`\`\`sql
+```sql
 SELECT hnsw_create_index('articles', 'embedding', 'articles_fast_build_idx', 8, 100);
 
 -- Results:
 hnsw_create_index
 -----------------
 t
-\`\`\`
+```
 
 The fast-build index configuration uses m=8 and ef_construction=100, creating sparser graph connections and exploring fewer candidates during construction. Lower m values create fewer connections per vector, reducing index construction time and storage requirements. Lower ef_construction values explore fewer candidate vectors during building, speeding up construction but potentially reducing search accuracy. This configuration achieves faster index builds with slightly reduced search accuracy, making it suitable for development workflows, rapid prototyping, or scenarios where build speed constraints exist.
 
 Batch operations enable efficient bulk data insertion and embedding generation, reducing per-row overhead and improving overall throughput for large-scale data loading.
 
-\`\`\`sql
+```sql
 INSERT INTO articles (title, content, embedding)
 SELECT 
     'Article ' || i,
     'Content for article ' || i,
     embed_text('Content for article ' || i)
 FROM generate_series(1, 100) i;
-\`\`\`
+```
 
 The batch insert operation generates and inserts 100 articles using a single SQL statement with a subquery. The generate_series function produces integers from 1 to 100, which concatenate with text strings to create unique article titles and content. Each article's content automatically generates embeddings through the embed_text function during insertion. Batch operations eliminate per-row connection overhead and enable database optimizations like parallel processing and bulk loading. This pattern scales efficiently to large datasets containing thousands or millions of articles, as the database processes multiple rows in a single operation rather than executing individual insert statements.
 

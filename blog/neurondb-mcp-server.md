@@ -38,7 +38,7 @@ MCP communication follows this flow. The client sends a JSON-RPC request with a 
 
 The following diagram shows the detailed communication flow:
 
-\`\`\`
+```
         ┌──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
         │                                                       MCP Communication Flow                                                         │
         └──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
@@ -72,7 +72,7 @@ The following diagram shows the detailed communication flow:
                                                                 │   Executes      │
                                                                 │    Returns      │
                                                                 └─────────────────┘
-\`\`\`
+```
 
 **Detailed Step Breakdown:**
 
@@ -100,7 +100,7 @@ MCP Server implements the Model Context Protocol specification. It handles proto
 
 Initialization request:
 
-\`\`\`json
+```json
 {
   "jsonrpc": "2.0",
   "id": 1,
@@ -117,11 +117,11 @@ Initialization request:
     }
   }
 }
-\`\`\`
+```
 
 Initialization response:
 
-\`\`\`json
+```json
 {
   "jsonrpc": "2.0",
   "id": 1,
@@ -142,7 +142,7 @@ Initialization response:
     }
   }
 }
-\`\`\`
+```
 
 ### Tool Discovery
 
@@ -150,17 +150,17 @@ Clients discover available tools by calling the tools/list method. The server re
 
 Tool list request:
 
-\`\`\`json
+```json
 {
   "jsonrpc": "2.0",
   "id": 2,
   "method": "tools/list"
 }
-\`\`\`
+```
 
 Tool list response:
 
-\`\`\`json
+```json
 {
   "jsonrpc": "2.0",
   "id": 2,
@@ -193,7 +193,7 @@ Tool list response:
     ]
   }
 }
-\`\`\`
+```
 
 ### Tool Execution
 
@@ -201,7 +201,7 @@ Clients execute tools by calling the tools/call method with the tool name and ar
 
 Tool call request:
 
-\`\`\`json
+```json
 {
   "jsonrpc": "2.0",
   "id": 3,
@@ -215,11 +215,11 @@ Tool call request:
     }
   }
 }
-\`\`\`
+```
 
 Tool call response:
 
-\`\`\`json
+```json
 {
   "jsonrpc": "2.0",
   "id": 3,
@@ -240,7 +240,7 @@ Tool call response:
     "isError": false
   }
 }
-\`\`\`
+```
 
 ### Resource Access
 
@@ -248,7 +248,7 @@ Clients access resources by calling the resources/read method with the resource 
 
 Resource read request:
 
-\`\`\`json
+```json
 {
   "jsonrpc": "2.0",
   "id": 4,
@@ -257,11 +257,11 @@ Resource read request:
     "uri": "neurondb://table/documents"
   }
 }
-\`\`\`
+```
 
 Resource read response:
 
-\`\`\`json
+```json
 {
   "jsonrpc": "2.0",
   "id": 4,
@@ -275,7 +275,7 @@ Resource read response:
     ]
   }
 }
-\`\`\`
+```
 
 ### Error Handling
 
@@ -283,7 +283,7 @@ MCP uses standard JSON-RPC error codes where invalid requests return code -32600
 
 Error response:
 
-\`\`\`json
+```json
 {
   "jsonrpc": "2.0",
   "id": 5,
@@ -296,7 +296,7 @@ Error response:
     }
   }
 }
-\`\`\`
+```
 
 ## How MCP Works with Claude Desktop
 
@@ -314,7 +314,7 @@ To configure NeuronMCP, create or edit the configuration file for the platform. 
 
 Configuration example for NeuronMCP:
 
-\`\`\`json
+```json
 {
   "mcpServers": {
     "neurondb": {
@@ -330,13 +330,13 @@ Configuration example for NeuronMCP:
     }
   }
 }
-\`\`\`
+```
 
 Multiple servers can be configured in the same file. Each server entry has a unique name. The name appears in Claude Desktop's interface when tools are used. Server names should be descriptive and avoid conflicts with other configured servers.
 
 Configuration example with multiple servers:
 
-\`\`\`json
+```json
 {
   "mcpServers": {
     "neurondb": {
@@ -363,7 +363,7 @@ Configuration example with multiple servers:
     }
   }
 }
-\`\`\`
+```
 
 After saving the configuration file, restart Claude Desktop. Claude Desktop reads the configuration file on startup. If the configuration is invalid, Claude Desktop logs an error and skips the problematic server entries. Valid servers are started automatically. Server processes run in the background and remain active throughout the Claude Desktop session.
 
@@ -423,7 +423,7 @@ NeuronMCP follows a modular architecture where the core server handles protocol 
 
 Architecture components:
 
-\`\`\`
+```
 MCP Client (Claude Desktop)
     ↓
 JSON-RPC 2.0 Protocol Handler
@@ -433,7 +433,7 @@ Tool Router
 Tool Handlers (Vector, ML, Analytics, RAG)
     ↓
 NeuronDB Extension (PostgreSQL)
-\`\`\`
+```
 
 ### Protocol Implementation
 

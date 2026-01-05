@@ -32,7 +32,7 @@ NeuronDB provides vector optimization through quantization. Scalar quantization 
 
 Create a table with vector embeddings and perform similarity search:
 
-\`\`\`sql
+```sql
 CREATE EXTENSION neurondb;
 
 -- Create table with embeddings
@@ -69,7 +69,7 @@ LIMIT 5;
  Vector search enables semantic matching       |     0.7123
  Machine learning models process embeddings    |     0.6543
 (3 rows)
-\`\`\`
+```
 
 The query finds documents about database systems even when the document text uses different words. The system understands these concepts are related through vector similarity.
 
@@ -83,7 +83,7 @@ Inference modes include real-time embedding generation for query processing. Bat
 
 Generate embeddings using built-in functions:
 
-\`\`\`sql
+```sql
 -- Generate embeddings for text
 SELECT embed_text('PostgreSQL is a database', 'sentence-transformers/all-MiniLM-L6-v2') AS embedding;
 
@@ -115,7 +115,7 @@ SELECT * FROM neurondb.list_models();
  sentence-transformers/all-mpnet-base-v2 |        768 | text
  BAAI/bge-large-en-v1.5                |       1024 | text
 (50 rows)
-\`\`\`
+```
 
 The extension generates embeddings without external services. All operations run within PostgreSQL using SQL syntax.
 
@@ -127,7 +127,7 @@ Fusion algorithms combine search results. Reciprocal Rank Fusion combines rankin
 
 Perform hybrid search combining vector and full-text search:
 
-\`\`\`sql
+```sql
 -- Add full-text search column
 ALTER TABLE documents ADD COLUMN fts_vector tsvector;
 UPDATE documents SET fts_vector = to_tsvector('english', content);
@@ -183,7 +183,7 @@ LIMIT 5;
   2 | Vector search enables semantic matching       |    0.7123 |     0.0000 |     0.008765
   3 | Machine learning models process embeddings    |    0.6543 |     0.0000 |     0.007654
 (3 rows)
-\`\`\`
+```
 
 Hybrid search combines semantic understanding with exact keyword matching. Results rank higher when both methods agree.
 
@@ -199,7 +199,7 @@ Supported hardware includes NVIDIA RTX series GPUs such as RTX 3090, RTX 4090, a
 
 Enable GPU acceleration:
 
-\`\`\`sql
+```sql
 -- Enable GPU support
 SET neurondb.use_gpu = on;
 
@@ -217,7 +217,7 @@ SELECT * FROM neurondb.gpu_stats;
 -----------+-------------+--------------+-------------+-------------------
          0 | NVIDIA RTX 4090 | 24576 MB    | 1024 MB     | 8.9
 (1 row)
-\`\`\`
+```
 
 GPU acceleration provides 10x to 100x speedup for batch operations. The extension automatically falls back to CPU when GPU is unavailable.
 
@@ -238,7 +238,7 @@ All workers are tenant-aware with QPS and cost budgets. Workers integrate with P
 
 Configure background workers:
 
-\`\`\`sql
+```sql
 -- Configure neuranq worker
 SELECT neurondb.configure_worker('neuranq', 'enabled', true);
 SELECT neurondb.configure_worker('neuranq', 'max_concurrent_jobs', 10);
@@ -259,7 +259,7 @@ SELECT * FROM neurondb.worker_status;
  neurandefrag | true    | running   | 2024-01-15 10:30:02
  neuranllm   | true    | running   | 2024-01-15 10:30:03
 (4 rows)
-\`\`\`
+```
 
 Background workers handle maintenance and optimization tasks automatically. Operations run without manual intervention.
 
@@ -275,7 +275,7 @@ LLM integration supports multiple providers including OpenAI, Anthropic, and ope
 
 Build a RAG pipeline:
 
-\`\`\`sql
+```sql
 -- Create RAG tables
 CREATE TABLE rag_documents (
     doc_id SERIAL PRIMARY KEY,
@@ -325,7 +325,7 @@ FROM relevant_docs;
 -----------------+--------------------------------------------------------------------------------
  {1}             | PostgreSQL performance can be improved through indexing strategies.
 (1 row)
-\`\`\`
+```
 
 The RAG pipeline retrieves relevant context and formats it for LLM processing. All operations run within PostgreSQL using SQL.
 
@@ -373,7 +373,7 @@ NeuronDB requires PostgreSQL 16, 17, or 18. The extension works on Linux systems
 
 Install NeuronDB on Ubuntu or Debian:
 
-\`\`\`sql
+```sql
 -- Install dependencies
 sudo apt-get install -y postgresql-server-dev-all build-essential
 
@@ -394,11 +394,11 @@ SELECT * FROM neurondb.version();
 ---------+------------+-------------------
  1.0.0   | 2024-01-15 | 16.0
 (1 row)
-\`\`\`
+```
 
 Install NeuronDB on macOS:
 
-\`\`\`sql
+```sql
 -- Install with Homebrew
 brew install neurondb-ai/tap/neurondb
 
@@ -413,11 +413,11 @@ SELECT * FROM neurondb.version();
 ---------+------------+-------------------
  1.0.0   | 2024-01-15 | 16.0
 (1 row)
-\`\`\`
+```
 
 Build from source:
 
-\`\`\`sql
+```sql
 -- Clone repository
 git clone https://github.com/neurondb-ai/neurondb.git
 cd NeurondB
@@ -428,11 +428,11 @@ sudo make install
 
 -- Enable extension
 CREATE EXTENSION neurondb;
-\`\`\`
+```
 
 Configure GPU support:
 
-\`\`\`sql
+```sql
 -- Install CUDA toolkit (Ubuntu)
 wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.0-1_all.deb
 sudo dpkg -i cuda-keyring_1.0-1_all.deb
@@ -451,7 +451,7 @@ SELECT neurondb.gpu_available();
 -------------
  true
 (1 row)
-\`\`\`
+```
 
 ## Real-World Use Cases
 
@@ -467,7 +467,7 @@ Image search finds similar images based on visual features. Applications include
 
 Build a recommendation system:
 
-\`\`\`sql
+```sql
 -- Create user preferences table
 CREATE TABLE user_preferences (
     user_id INT PRIMARY KEY,
@@ -507,7 +507,7 @@ LIMIT 10;
        1 | Product A |      0.8765
        2 | Product B |      0.8123
 (3 rows)
-\`\`\`
+```
 
 The recommendation system finds items similar to user preferences using vector similarity. Results rank by similarity score.
 
@@ -523,7 +523,7 @@ Accuracy benchmarks show HNSW indexes with ef_search=100 achieve 98% to 99% reca
 
 Monitor performance:
 
-\`\`\`sql
+```sql
 -- Check index statistics
 SELECT * FROM neurondb.index_stats;
 
@@ -552,7 +552,7 @@ SELECT * FROM neurondb.gpu_stats;
 -----------+-------------+-------------+-------------
          0 |        85%  |     2048 MB  |    24576 MB
 (1 row)
-\`\`\`
+```
 
 Performance monitoring provides real-time metrics for optimization. The extension tracks query latency, GPU utilization, and index statistics.
 
@@ -568,7 +568,7 @@ Embedding model configuration controls which models are available. Model loading
 
 Configure vector indexes:
 
-\`\`\`sql
+```sql
 -- HNSW index with custom parameters
 CREATE INDEX ON vectors USING hnsw (embedding vector_cosine_ops)
 WITH (m = 16, ef_construction = 64);
@@ -581,11 +581,11 @@ CREATE INDEX ON vectors USING ivfflat (embedding vector_l2_ops)
 WITH (lists = 1000);
 
 SET neurondb.ivfflat_probes = 20;
-\`\`\`
+```
 
 Configure GPU acceleration:
 
-\`\`\`sql
+```sql
 -- Enable GPU acceleration
 SET neurondb.use_gpu = on;
 
@@ -594,11 +594,11 @@ SET neurondb.gpu_device_id = 0;
 
 -- Set batch size
 SET neurondb.gpu_batch_size = 1000;
-\`\`\`
+```
 
 Configure embedding models:
 
-\`\`\`sql
+```sql
 -- List available models
 SELECT * FROM neurondb.list_models();
 
@@ -607,7 +607,7 @@ SELECT neurondb.load_model('custom-bert', '/path/to/model.onnx');
 
 -- Set default model
 SET neurondb.default_model = 'all-MiniLM-L6-v2';
-\`\`\`
+```
 
 Configuration options allow fine-tuning performance for specific workloads. Parameters balance speed, accuracy, and resource usage.
 
@@ -619,7 +619,7 @@ Migration benefits include 10x to 100x faster queries with HNSW indexes. GPU acc
 
 Migrate from pgvector:
 
-\`\`\`sql
+```sql
 -- Existing pgvector table works as-is
 CREATE TABLE vectors (
     id SERIAL PRIMARY KEY,
@@ -641,7 +641,7 @@ LIMIT 10;
   2 | [0.2345, -0.6789, 0.0123, ...]
   3 | [0.3456, -0.7890, 0.1234, ...]
 (3 rows)
-\`\`\`
+```
 
 Migration requires no code changes. The extension provides drop-in compatibility with pgvector.
 
@@ -653,7 +653,7 @@ The extension supports Prometheus exporters for integration with monitoring syst
 
 Monitor system health:
 
-\`\`\`sql
+```sql
 -- Check extension statistics
 SELECT * FROM pg_stat_neurondb;
 
@@ -684,7 +684,7 @@ SELECT * FROM neurondb.cache_stats;
 ------------+------+--------+----------
  embedding  | 95000 | 5000  | 0.95
 (1 row)
-\`\`\`
+```
 
 Monitoring provides visibility into system performance and health. Metrics help identify bottlenecks and optimization opportunities.
 
@@ -694,7 +694,7 @@ NeuronDB provides security features including vector encryption, differential pr
 
 Configure security:
 
-\`\`\`sql
+```sql
 -- Enable vector encryption
 SET neurondb.encrypt_vectors = on;
 
@@ -714,7 +714,7 @@ SELECT * FROM neurondb.security_settings;
  differential_privacy_epsilon | 1.0
  audit_logging             | on
 (3 rows)
-\`\`\`
+```
 
 Security features protect data and ensure compliance with regulations. All features integrate with PostgreSQL's security model.
 
