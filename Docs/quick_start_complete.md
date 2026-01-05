@@ -213,7 +213,7 @@ netstat -tuln | grep -E "5432|8080|8081"
 
 - **Documentation**: `Docs/`
 - **Examples**: `examples/`
-- **API Reference**: `Docs/API_REFERENCE.md`
+- **API Reference**: `Docs/`
 - **SDKs**: `sdks/`
 
 ## Support
