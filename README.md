@@ -1,4 +1,4 @@
-# NeuronDB — PostgreSQL AI Ecosystem
+# NeuronDB — PostgreSQL AI ecosystem
 
 <div align="center">
   <img src="neurondb.png" alt="NeuronDB" width="360" />
@@ -6,6 +6,18 @@
   <p>
     <a href="https://www.postgresql.org/">
       <img alt="PostgreSQL 16/17/18" src="https://img.shields.io/badge/PostgreSQL-16%2C17%2C18-blue.svg" />
+    </a>
+    <a href="https://github.com/neurondb/neurondb/actions/workflows/neurondb-build-and-test.yml">
+      <img alt="CI: NeuronDB" src="https://github.com/neurondb/neurondb/actions/workflows/neurondb-build-and-test.yml/badge.svg?branch=main" />
+    </a>
+    <a href="https://github.com/neurondb/neurondb/actions/workflows/integration-tests-full-ecosystem.yml">
+      <img alt="CI: Integration" src="https://github.com/neurondb/neurondb/actions/workflows/integration-tests-full-ecosystem.yml/badge.svg?branch=main" />
+    </a>
+    <a href="https://github.com/neurondb/neurondb/actions/workflows/security-scan.yml">
+      <img alt="Security scan" src="https://github.com/neurondb/neurondb/actions/workflows/security-scan.yml/badge.svg?branch=main" />
+    </a>
+    <a href="https://github.com/neurondb/neurondb/actions/workflows/publish-all-container-images.yml">
+      <img alt="Containers" src="https://github.com/neurondb/neurondb/actions/workflows/publish-all-container-images.yml/badge.svg?branch=main" />
     </a>
     <a href="LICENSE">
       <img alt="License: Proprietary" src="https://img.shields.io/badge/license-proprietary-red.svg" />
@@ -15,11 +27,11 @@
     </a>
   </p>
 
-  <p><strong>Vector search, embeddings, and ML primitives inside PostgreSQL</strong> — plus optional services for <strong>agents</strong>, <strong>MCP</strong>, and a <strong>desktop UI</strong>.</p>
+  <p><strong>Vector search, embeddings, and ML primitives in PostgreSQL</strong>, with optional services for <strong>agents</strong>, <strong>MCP</strong>, and a <strong>desktop UI</strong>.</p>
 </div>
 
 > [!TIP]
-> New here? Start with [`Docs/getting-started/simple-start.md`](Docs/getting-started/simple-start.md) or jump straight to [`QUICKSTART.md`](QUICKSTART.md).
+> New here? Start with [`Docs/getting-started/simple-start.md`](Docs/getting-started/simple-start.md) or jump to [`QUICKSTART.md`](QUICKSTART.md).
 
 ## Table of contents
 
@@ -27,9 +39,8 @@
 - [Architecture](#architecture)
 - [Quick start (Docker)](#quick-start-docker)
 - [Service URLs & ports](#service-urls--ports)
-- [Choose your path](#choose-your-path)
+- [Documentation](#documentation)
 - [Repo layout](#repo-layout)
-- [Docs & examples](#docs--examples)
 - [Benchmarks](#benchmarks)
 - [GPU profiles (CUDA / ROCm / Metal)](#gpu-profiles-cuda--rocm--metal)
 - [Contributing / security / license](#contributing--security--license)
@@ -37,10 +48,10 @@
 
 ## What you can build
 
-- **Semantic / hybrid search**: vectors + SQL
-- **RAG**: store, retrieve, and serve context
-- **Agents**: API runtime backed by Postgres memory
-- **MCP integrations**: MCP clients talking to NeuronDB via tools/resources
+- **Semantic & hybrid search**: vector similarity + SQL filters + full-text search
+- **RAG pipelines**: store, retrieve, and serve context with Postgres-native primitives
+- **Agent backends**: durable memory and tool execution backed by PostgreSQL
+- **MCP integrations**: MCP clients connecting to NeuronDB via tools/resources
 
 ## Architecture
 
@@ -56,7 +67,7 @@ flowchart LR
 ```
 
 > [!NOTE]
-> The root `docker-compose.yml` brings up the ecosystem services together. You can also run each component independently (see component READMEs).
+> The root `docker-compose.yml` starts the ecosystem services together. You can also run each component independently (see component READMEs).
 
 ## Quick start (Docker)
 
@@ -70,7 +81,7 @@ docker compose up -d
 
 - [ ] Docker 20.10+ installed
 - [ ] Docker Compose 2.0+ installed
-- [ ] 4GB+ RAM available
+- [ ] 4 GB+ RAM available
 - [ ] Ports 5433, 8080, 8081, 3000 available
 
 </details>
@@ -87,14 +98,60 @@ docker compose up -d
 | NeuronDesktop UI | `http://localhost:3000` |
 | NeuronDesktop API | `http://localhost:8081/health` |
 
-## Choose your path
+## Documentation
 
-| You are... | Start here |
-|---|---|
-| New to the project | [`DOCUMENTATION.md`](DOCUMENTATION.md) — complete documentation index |
-| Want the easiest walkthrough | [`Docs/getting-started/simple-start.md`](Docs/getting-started/simple-start.md) — beginner-friendly guide |
-| Comfortable with Docker/CLI | [`QUICKSTART.md`](QUICKSTART.md) — technical quick start |
-| Looking for a specific component | See the component READMEs below |
+- **Start here**: [`DOCUMENTATION.md`](DOCUMENTATION.md) (documentation index)
+- **Beginner walkthrough**: [`Docs/getting-started/simple-start.md`](Docs/getting-started/simple-start.md)
+- **Technical quick start**: [`QUICKSTART.md`](QUICKSTART.md)
+- **Official docs**: [`neurondb.ai/docs`](https://www.neurondb.ai/docs)
+
+### Module-wise Documentation
+
+<details>
+<summary><strong>NeuronDB documentation</strong></summary>
+
+- **Getting Started**: [`installation.md`](NeuronDB/docs/getting-started/installation.md) • [`quickstart.md`](NeuronDB/docs/getting-started/quickstart.md)
+- **Vector Search**: [`indexing.md`](NeuronDB/docs/vector-search/indexing.md) • [`distance-metrics.md`](NeuronDB/docs/vector-search/distance-metrics.md) • [`quantization.md`](NeuronDB/docs/vector-search/quantization.md)
+- **Hybrid Search**: [`overview.md`](NeuronDB/docs/hybrid-search/overview.md) • [`multi-vector.md`](NeuronDB/docs/hybrid-search/multi-vector.md) • [`faceted-search.md`](NeuronDB/docs/hybrid-search/faceted-search.md)
+- **RAG Pipeline**: [`overview.md`](NeuronDB/docs/rag/overview.md) • [`document-processing.md`](NeuronDB/docs/rag/document-processing.md) • [`llm-integration.md`](NeuronDB/docs/rag/llm-integration.md)
+- **ML Algorithms**: [`clustering.md`](NeuronDB/docs/ml-algorithms/clustering.md) • [`classification.md`](NeuronDB/docs/ml-algorithms/classification.md) • [`regression.md`](NeuronDB/docs/ml-algorithms/regression.md)
+- **ML Embeddings**: [`embedding-generation.md`](NeuronDB/docs/ml-embeddings/embedding-generation.md) • [`model-management.md`](NeuronDB/docs/ml-embeddings/model-management.md)
+- **GPU Support**: [`cuda-support.md`](NeuronDB/docs/gpu/cuda-support.md) • [`rocm-support.md`](NeuronDB/docs/gpu/rocm-support.md) • [`metal-support.md`](NeuronDB/docs/gpu/metal-support.md)
+- **Operations**: [`troubleshooting.md`](NeuronDB/docs/troubleshooting.md) • [`configuration.md`](NeuronDB/docs/configuration.md) • [`playbook.md`](NeuronDB/docs/operations/playbook.md)
+
+</details>
+
+<details>
+<summary><strong>NeuronAgent documentation</strong></summary>
+
+- **Architecture**: [`ARCHITECTURE.md`](NeuronAgent/docs/ARCHITECTURE.md)
+- **API Reference**: [`API.md`](NeuronAgent/docs/API.md)
+- **CLI Guide**: [`CLI_GUIDE.md`](NeuronAgent/docs/CLI_GUIDE.md)
+- **Connectors**: [`CONNECTORS.md`](NeuronAgent/docs/CONNECTORS.md)
+- **Deployment**: [`DEPLOYMENT.md`](NeuronAgent/docs/DEPLOYMENT.md)
+- **Troubleshooting**: [`TROUBLESHOOTING.md`](NeuronAgent/docs/TROUBLESHOOTING.md)
+
+</details>
+
+<details>
+<summary><strong>NeuronMCP documentation</strong></summary>
+
+- **Setup Guide**: [`NEURONDB_MCP_SETUP.md`](NeuronMCP/docs/NEURONDB_MCP_SETUP.md)
+- **Tool & Resource Catalog**: [`tool-resource-catalog.md`](NeuronMCP/docs/tool-resource-catalog.md)
+- **Examples**: [`README.md`](NeuronMCP/docs/examples/README.md) • [`example-transcript.md`](NeuronMCP/docs/examples/example-transcript.md)
+
+</details>
+
+<details>
+<summary><strong>NeuronDesktop documentation</strong></summary>
+
+- **API Reference**: [`API.md`](NeuronDesktop/docs/API.md)
+- **Deployment**: [`DEPLOYMENT.md`](NeuronDesktop/docs/DEPLOYMENT.md)
+- **Integration**: [`INTEGRATION.md`](NeuronDesktop/docs/INTEGRATION.md)
+- **NeuronAgent Usage**: [`NEURONAGENT_USAGE.md`](NeuronDesktop/docs/NEURONAGENT_USAGE.md)
+- **NeuronMCP Setup**: [`NEURONMCP_SETUP.md`](NeuronDesktop/docs/NEURONMCP_SETUP.md)
+
+</details>
 
 ## Repo layout
 
@@ -112,25 +169,17 @@ docker compose up -d
 - [`NeuronMCP/README.md`](NeuronMCP/README.md)
 - [`NeuronDesktop/README.md`](NeuronDesktop/README.md)
 
-## Docs & examples
+### Examples
 
-**Docs**
-
-- **Complete documentation index**: [`DOCUMENTATION.md`](DOCUMENTATION.md)
-- **Quick start guide**: [`QUICKSTART.md`](QUICKSTART.md)
-- **Official docs**: [`neurondb.ai/docs`](https://www.neurondb.ai/docs)
-
-**Examples**
-
-- [Examples README](examples/README.md) — complete examples collection
-- [Semantic Search](examples/semantic-search-docs/) — document search
-- [RAG Chatbot](examples/rag-chatbot-pdfs/) — PDF-based RAG
-- [Agent Tools](examples/agent-tools/) — agent integrations
-- [MCP Integration](examples/mcp-integration/) — MCP client setup
+- [Examples index](examples/README.md)
+- [Semantic search docs example](examples/semantic-search-docs/)
+- [RAG chatbot (PDFs) example](examples/rag-chatbot-pdfs/)
+- [Agent tools example](examples/agent-tools/)
+- [MCP integration example](examples/mcp-integration/)
 
 ## Benchmarks
 
-NeuronDB includes a comprehensive benchmark suite to evaluate vector search, hybrid search, and RAG performance.
+NeuronDB includes a benchmark suite to evaluate vector search, hybrid search, and RAG performance.
 
 ### Quick start
 
@@ -141,11 +190,7 @@ cd NeuronDB/benchmark
 ./run_bm.sh
 ```
 
-This will:
-- ✅ Check PostgreSQL connection
-- ✅ Run **Vector** benchmark (SIFT-128 dataset, HNSW index)
-- ✅ Run **Hybrid** benchmark (BEIR nfcorpus dataset)
-- ✅ Run **RAG** benchmark (database verification)
+This validates connectivity and runs the vector/hybrid/RAG benchmark groups.
 
 ### Benchmark suite
 
@@ -154,20 +199,6 @@ This will:
 | **Vector** | Vector similarity search performance | SIFT-128, GIST-960, GloVe-100 | QPS, Recall, Latency (avg, p50, p95, p99) |
 | **Hybrid** | Combined vector + full-text search | BEIR (nfcorpus, msmarco, etc.) | NDCG, MAP, Recall, Precision |
 | **RAG** | End-to-end RAG pipeline quality | MTEB, BEIR, RAGAS | Faithfulness, Relevancy, Context Precision |
-
-### Sample results
-
-**Vector Benchmark** (SIFT-128-Euclidean, 1M vectors, HNSW index):
-- **Recall@10**: 100.00%
-- **QPS**: ~1.9 queries/second
-- **Avg Latency**: ~520ms
-- **P95 Latency**: ~545ms
-
-**Test Configuration**:
-- Dataset: SIFT-128-Euclidean (1,000,000 training vectors, 10,000 test queries)
-- Index: HNSW (m=16, ef_construction=200, ef_search=100)
-- K-value: 10
-- Vector dimension: 128
 
 <details>
 <summary><strong>Run individual benchmarks</strong></summary>
@@ -230,7 +261,7 @@ docker compose logs -f neurondb neuronagent neuronmcp neurondesk-api neurondesk-
 ## Project statistics
 
 <details>
-<summary><strong>Stats snapshot</strong></summary>
+<summary><strong>Stats snapshot (may change)</strong></summary>
 
 - **473 SQL functions** in NeuronDB extension
 - **52+ ML algorithms** supported
@@ -238,5 +269,18 @@ docker compose logs -f neurondb neuronagent neuronmcp neurondesk-api neurondesk-
 - **4 integrated components** working together
 - **3 PostgreSQL versions** supported (16, 17, 18)
 - **4 GPU platforms** supported (CPU, CUDA, ROCm, Metal)
+
+</details>
+
+<details>
+<summary><strong>Platform & version coverage</strong></summary>
+
+| Category | Supported Versions |
+|---|---|
+| **PostgreSQL** | 16, 17, 18 |
+| **Go** | 1.21, 1.22, 1.23, 1.24 |
+| **Node.js** | 18 LTS, 20 LTS, 22 LTS |
+| **Operating Systems** | Ubuntu 20.04, Ubuntu 22.04, macOS 13 (Ventura), macOS 14 (Sonoma) |
+| **Architectures** | linux/amd64, linux/arm64 |
 
 </details>
