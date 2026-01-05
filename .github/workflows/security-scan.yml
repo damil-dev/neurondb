@@ -36,6 +36,20 @@ jobs:
           sudo tar -xzf onnxruntime-linux-x64-1.17.0.tgz -C /usr/local/
           sudo mv /usr/local/onnxruntime-linux-x64-1.17.0 /usr/local/onnxruntime
 
+      - name: Setup LLVM/Clang for PostgreSQL LLVM bitcode
+        if: matrix.language == 'cpp'
+        run: |
+          # PostgreSQL PGXS expects versioned clang binary (e.g., clang-19)
+          # Extract major version from clang --version output
+          CLANG_VERSION=$(clang --version | head -1 | sed -n 's/.*version \([0-9]\+\).*/\1/p')
+          if [ -n "$CLANG_VERSION" ]; then
+            sudo ln -sf /usr/bin/clang /usr/bin/clang-${CLANG_VERSION}
+            # Create llvm-lto symlink if it exists
+            if command -v llvm-lto >/dev/null 2>&1; then
+              sudo ln -sf /usr/bin/llvm-lto /usr/bin/llvm-lto-${CLANG_VERSION}
+            fi
+          fi
+
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
