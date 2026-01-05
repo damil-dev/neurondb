@@ -30,11 +30,77 @@ jobs:
             libcurl4-openssl-dev \
             libssl-dev \
             build-essential \
-            wget
+            wget \
+            llvm
           # Install ONNX Runtime
           wget https://github.com/microsoft/onnxruntime/releases/download/v1.17.0/onnxruntime-linux-x64-1.17.0.tgz
           sudo tar -xzf onnxruntime-linux-x64-1.17.0.tgz -C /usr/local/
           sudo mv /usr/local/onnxruntime-linux-x64-1.17.0 /usr/local/onnxruntime
+
+      - name: Setup LLVM/Clang for PostgreSQL LLVM bitcode
+        if: matrix.language == 'cpp'
+        run: |
+          # PostgreSQL PGXS expects versioned clang binary (e.g., clang-19)
+          # First, try to find the actual clang binary (not a symlink)
+          CLANG_BINARY=$(command -v clang)
+          # Resolve symlinks to get actual binary
+          while [ -L "$CLANG_BINARY" ]; do
+            CLANG_BINARY=$(readlink "$CLANG_BINARY")
+            # If relative path, make it absolute
+            if [[ "$CLANG_BINARY" != /* ]]; then
+              CLANG_BINARY=$(dirname $(command -v clang))/$CLANG_BINARY
+            fi
+          done
+          echo "Clang binary: $CLANG_BINARY"
+          # Extract version from clang
+          CLANG_VERSION=$(clang --version | head -1 | grep -oE '[0-9]+\.[0-9]+' | head -1 | cut -d. -f1)
+          if [ -z "$CLANG_VERSION" ]; then
+            CLANG_VERSION=$(clang --version | head -1 | grep -oE '[0-9]+' | head -1)
+          fi
+          echo "Detected clang version: $CLANG_VERSION"
+          # Remove any existing problematic symlinks
+          sudo rm -f /usr/bin/clang-19 /usr/bin/clang-${CLANG_VERSION} 2>/dev/null || true
+          # Create direct symlinks to actual binary
+          sudo ln -sf "$CLANG_BINARY" /usr/bin/clang-19
+          if [ "$CLANG_VERSION" != "19" ]; then
+            sudo ln -sf "$CLANG_BINARY" /usr/bin/clang-${CLANG_VERSION}
+          fi
+            # Handle llvm-lto - find it in common locations
+            LLVM_LTO_BINARY=""
+            for path in /usr/bin/llvm-lto /usr/lib/llvm-*/bin/llvm-lto $(which llvm-lto 2>/dev/null); do
+              if [ -f "$path" ] && [ -x "$path" ]; then
+                LLVM_LTO_BINARY="$path"
+                break
+              fi
+            done
+            if [ -n "$LLVM_LTO_BINARY" ]; then
+              echo "Found llvm-lto: $LLVM_LTO_BINARY"
+              # Resolve symlinks
+              while [ -L "$LLVM_LTO_BINARY" ]; do
+                LLVM_LTO_BINARY=$(readlink "$LLVM_LTO_BINARY")
+                if [[ "$LLVM_LTO_BINARY" != /* ]]; then
+                  LLVM_LTO_BINARY=$(dirname "$path")/$LLVM_LTO_BINARY
+                fi
+              done
+              # PostgreSQL expects llvm-lto in /usr/lib/llvm-19/bin/
+              sudo mkdir -p /usr/lib/llvm-19/bin
+              sudo ln -sf "$LLVM_LTO_BINARY" /usr/lib/llvm-19/bin/llvm-lto
+              # Also create symlinks in /usr/bin for compatibility
+              sudo rm -f /usr/bin/llvm-lto-19 /usr/bin/llvm-lto-${CLANG_VERSION} 2>/dev/null || true
+              sudo ln -sf "$LLVM_LTO_BINARY" /usr/bin/llvm-lto-19
+              if [ "$CLANG_VERSION" != "19" ]; then
+                sudo ln -sf "$LLVM_LTO_BINARY" /usr/bin/llvm-lto-${CLANG_VERSION}
+              fi
+              echo "Created llvm-lto symlinks"
+            else
+              echo "Warning: llvm-lto not found, trying to install llvm package"
+              sudo apt-get update && sudo apt-get install -y llvm || echo "Could not install llvm package"
+            fi
+          # Verify symlinks
+          echo "Created symlinks:"
+          ls -la /usr/bin/clang-19 /usr/bin/clang-${CLANG_VERSION} 2>/dev/null || true
+          # Test that clang-19 works
+          /usr/bin/clang-19 --version || echo "Warning: clang-19 test failed"
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
