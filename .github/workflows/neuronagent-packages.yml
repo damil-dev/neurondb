@@ -42,10 +42,9 @@ jobs:
 
       - name: Build NeuronAgent DEB
         run: |
+          export PATH="$PATH:/usr/local/go/bin"
           cd packaging/deb/neuronagent
           VERSION=${{ steps.version.outputs.version }} ./build.sh
-        env:
-          PATH: $PATH:/usr/local/go/bin
 
       - name: Generate checksums
         run: |
