@@ -1,20 +1,6 @@
 name: NeuronDB - Docker
 
 on:
-  push:
-    branches: [main, develop]
-    tags:
-      - 'v*.*.*'
-    paths:
-      - 'NeuronDB/**'
-      - 'dockers/neurondb/**'
-      - '.github/workflows/neurondb-docker.yml'
-  pull_request:
-    branches: [main, develop]
-    paths:
-      - 'NeuronDB/**'
-      - 'dockers/neurondb/**'
-      - '.github/workflows/neurondb-docker.yml'
   workflow_dispatch:
     inputs:
       version:

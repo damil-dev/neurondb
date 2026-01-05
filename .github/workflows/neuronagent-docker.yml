@@ -1,20 +1,6 @@
 name: NeuronAgent - Docker
 
 on:
-  push:
-    branches: [main, develop]
-    tags:
-      - 'v*.*.*'
-    paths:
-      - 'NeuronAgent/**'
-      - 'dockers/neuronagent/**'
-      - '.github/workflows/neuronagent-docker.yml'
-  pull_request:
-    branches: [main, develop]
-    paths:
-      - 'NeuronAgent/**'
-      - 'dockers/neuronagent/**'
-      - '.github/workflows/neuronagent-docker.yml'
   workflow_dispatch:
     inputs:
       version:
