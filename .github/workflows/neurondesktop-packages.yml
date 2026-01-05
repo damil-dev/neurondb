@@ -1,9 +1,6 @@
 name: NeuronDesktop - Packages
 
 on:
-  push:
-    tags:
-      - 'v*.*.*'
   workflow_dispatch:
     inputs:
       version:

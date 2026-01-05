@@ -1,20 +1,6 @@
 name: NeuronMCP - Docker
 
 on:
-  push:
-    branches: [main, develop]
-    tags:
-      - 'v*.*.*'
-    paths:
-      - 'NeuronMCP/**'
-      - 'dockers/neuronmcp/**'
-      - '.github/workflows/neuronmcp-docker.yml'
-  pull_request:
-    branches: [main, develop]
-    paths:
-      - 'NeuronMCP/**'
-      - 'dockers/neuronmcp/**'
-      - '.github/workflows/neuronmcp-docker.yml'
   workflow_dispatch:
     inputs:
       version:

@@ -1,24 +1,6 @@
 name: Integration Tests (Full Ecosystem)
 
 on:
-  push:
-    branches: [main, develop]
-    paths:
-      - 'docker-compose.yml'
-      - 'NeuronDB/**'
-      - 'NeuronAgent/**'
-      - 'NeuronMCP/**'
-      - 'NeuronDesktop/**'
-      - '.github/workflows/integration-tests-full-ecosystem.yml'
-  pull_request:
-    branches: [main, develop]
-    paths:
-      - 'docker-compose.yml'
-      - 'NeuronDB/**'
-      - 'NeuronAgent/**'
-      - 'NeuronMCP/**'
-      - 'NeuronDesktop/**'
-      - '.github/workflows/integration-tests-full-ecosystem.yml'
   workflow_dispatch:
 
 jobs:

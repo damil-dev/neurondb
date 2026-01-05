@@ -1,20 +1,6 @@
 name: NeuronDesktop - Docker
 
 on:
-  push:
-    branches: [main, develop]
-    tags:
-      - 'v*.*.*'
-    paths:
-      - 'NeuronDesktop/**'
-      - 'dockers/neurondesktop/**'
-      - '.github/workflows/neurondesktop-docker.yml'
-  pull_request:
-    branches: [main, develop]
-    paths:
-      - 'NeuronDesktop/**'
-      - 'dockers/neurondesktop/**'
-      - '.github/workflows/neurondesktop-docker.yml'
   workflow_dispatch:
     inputs:
       version:

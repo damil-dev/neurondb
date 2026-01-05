@@ -1,16 +1,6 @@
 name: NeuronAgent - Build Matrix
 
 on:
-  push:
-    branches: [main, develop]
-    paths:
-      - 'NeuronAgent/**'
-      - '.github/workflows/neuronagent-build-matrix.yml'
-  pull_request:
-    branches: [main, develop]
-    paths:
-      - 'NeuronAgent/**'
-      - '.github/workflows/neuronagent-build-matrix.yml'
   workflow_dispatch:
 
 jobs:

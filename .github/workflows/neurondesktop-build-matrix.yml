@@ -1,16 +1,6 @@
 name: NeuronDesktop - Build Matrix
 
 on:
-  push:
-    branches: [main, develop]
-    paths:
-      - 'NeuronDesktop/**'
-      - '.github/workflows/neurondesktop-build-matrix.yml'
-  pull_request:
-    branches: [main, develop]
-    paths:
-      - 'NeuronDesktop/**'
-      - '.github/workflows/neurondesktop-build-matrix.yml'
   workflow_dispatch:
 
 jobs:
