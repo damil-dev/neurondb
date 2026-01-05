@@ -23,7 +23,7 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y dpkg-dev fakeroot build-essential libcurl4-openssl-dev
+          sudo apt-get install -y dpkg-dev fakeroot build-essential libcurl4-openssl-dev wget
           # Add PostgreSQL APT repository for PostgreSQL 17+
           sudo apt-get install -y curl ca-certificates
           sudo install -d /usr/share/postgresql-common/pgdg
@@ -32,6 +32,10 @@ jobs:
           sudo apt-get update
           # Install PostgreSQL server dev package (try 17, fallback to 16)
           sudo apt-get install -y postgresql-server-dev-17 || sudo apt-get install -y postgresql-server-dev-16
+          # Install ONNX Runtime
+          wget https://github.com/microsoft/onnxruntime/releases/download/v1.17.0/onnxruntime-linux-x64-1.17.0.tgz
+          sudo tar -xzf onnxruntime-linux-x64-1.17.0.tgz -C /usr/local/
+          sudo mv /usr/local/onnxruntime-linux-x64-1.17.0 /usr/local/onnxruntime
 
       - name: Set version
         id: version
