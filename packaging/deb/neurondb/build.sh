@@ -34,9 +34,8 @@ mkdir -p "$PKG_DIR/usr/share/doc/neurondb"
 
 # Build NeuronDB extension
 cd "$REPO_ROOT/NeuronDB"
-make clean || true
-GPU_BACKENDS=none make
-GPU_BACKENDS=none make DESTDIR="$PKG_DIR" install
+./build.sh
+make DESTDIR="$PKG_DIR" install
 
 # Create control file
 cat > "$PKG_DIR/DEBIAN/control" <<EOF

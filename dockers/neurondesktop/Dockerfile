@@ -3,12 +3,12 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+# Copy package files from NeuronDesktop/frontend
+COPY NeuronDesktop/frontend/package*.json ./
 RUN npm ci
 
 # Copy source code
-COPY . .
+COPY NeuronDesktop/frontend/ .
 
 # Build the application
 RUN npm run build
@@ -19,7 +19,7 @@ FROM node:20-alpine
 WORKDIR /app
 
 # Copy package files
-COPY package*.json ./
+COPY NeuronDesktop/frontend/package*.json ./
 RUN npm ci --only=production
 
 # Copy built application
