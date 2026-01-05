@@ -344,6 +344,14 @@ vecmap_add(PG_FUNCTION_ARGS)
 	a_values = VECMAP_VALUES(a);
 	b_indices = VECMAP_INDICES(b);
 	b_values = VECMAP_VALUES(b);
+	
+	/* Validate macro results are not null (macros now check, but double-check for safety) */
+	if (a_indices == NULL || a_values == NULL || b_indices == NULL || b_values == NULL)
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("neurondb: VECMAP macro returned NULL pointer")));
+	}
 
 	/* Maximum possible nnz is sum of both (if no overlap) */
 	max_nnz = a->nnz + b->nnz;

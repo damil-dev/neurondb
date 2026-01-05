@@ -178,6 +178,52 @@ typedef HnswNodeData * HnswNode;
 static inline BlockNumber *
 HnswGetNeighborsSafe(HnswNode node, int level, int m)
 {
+	/* Validate inputs before pointer arithmetic */
+	if (node == NULL)
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("hnsw: HnswGetNeighborsSafe called with NULL node")));
+		return NULL;
+	}
+	
+	if (level < 0 || level >= HNSW_MAX_LEVEL)
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("hnsw: HnswGetNeighborsSafe called with invalid level %d (max: %d)",
+						level, HNSW_MAX_LEVEL - 1)));
+		return NULL;
+	}
+	
+	if (m <= 0 || m > HNSW_MAX_M)
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("hnsw: HnswGetNeighborsSafe called with invalid m %d (max: %d)",
+						m, HNSW_MAX_M)));
+		return NULL;
+	}
+	
+	/* Validate dimension to prevent overflow in size calculation */
+	if (node->dim <= 0 || node->dim > 32767)
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("hnsw: HnswGetNeighborsSafe called with invalid dim %d",
+						node->dim)));
+		return NULL;
+	}
+	
+	/* Check for integer overflow in offset calculation */
+	if ((size_t) level > SIZE_MAX / (size_t) m / 2 / sizeof(BlockNumber))
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
+				 errmsg("hnsw: HnswGetNeighborsSafe offset calculation would overflow")));
+		return NULL;
+	}
+	
 	return (BlockNumber *)((char *)node + MAXALIGN(sizeof(HnswNodeData)) +
 						   HnswGetVectorSize(node->dim) +
 						   level * m * 2 * sizeof(BlockNumber));
@@ -640,13 +686,20 @@ hnswbulkdelete(IndexVacuumInfo * info,
 			ItemId		updateItemId;
 		
 		/* Handle backwards compatibility: if heaptidsLength is 0, treat as 1 */
-		if (node->heaptidsLength == 0 && ItemPointerIsValid(&node->heaptids[0]))
+		/* Validate heaptidsLength to prevent out-of-bounds access */
+		if (node->heaptidsLength > HNSW_HEAPTIDS)
+		{
+			elog(WARNING, "hnsw: corrupted heaptidsLength %d (max: %d), clamping to %d",
+				 node->heaptidsLength, HNSW_HEAPTIDS, HNSW_HEAPTIDS);
+			heaptidsLength = HNSW_HEAPTIDS;
+		}
+		else if (node->heaptidsLength == 0 && ItemPointerIsValid(&node->heaptids[0]))
 			heaptidsLength = 1;
 		else
 			heaptidsLength = node->heaptidsLength;
 		
 		/* Check each TID and collect alive ones */
-		for (tidIdx = 0; tidIdx < heaptidsLength; tidIdx++)
+		for (tidIdx = 0; tidIdx < heaptidsLength && tidIdx < HNSW_HEAPTIDS; tidIdx++)
 		{
 			if (callback(&node->heaptids[tidIdx], callback_state))
 			{
@@ -679,10 +732,21 @@ hnswbulkdelete(IndexVacuumInfo * info,
 					nalloc(neighborBlocksPerLevel, BlockNumber *, maxLevel + 1);
 					nalloc(neighborCountPerLevel, int, maxLevel + 1);
 
-					for (level = 0; level <= maxLevel; level++)
-					{
-						BlockNumber *tempNeighbors = HnswGetNeighborsSafe(node, level, meta->m);
-						int16		tempCount = node->neighborCount[level];
+			for (level = 0; level <= maxLevel; level++)
+			{
+				BlockNumber *tempNeighbors;
+				int16		tempCount;
+				
+				/* Validate level bounds BEFORE array access to prevent out-of-bounds read */
+				if (level < 0 || level >= HNSW_MAX_LEVEL)
+				{
+					elog(WARNING, "hnsw: invalid level %d in bulkdelete, skipping (max: %d)",
+						 level, HNSW_MAX_LEVEL - 1);
+					continue;
+				}
+				
+				tempNeighbors = HnswGetNeighborsSafe(node, level, meta->m);
+				tempCount = node->neighborCount[level];
 
 						/* Validate and clamp neighborCount */
 						tempCount = hnswValidateNeighborCount(tempCount, meta->m, level);
@@ -799,6 +863,14 @@ hnswbulkdelete(IndexVacuumInfo * info,
 					 level >= 0 && !foundNewEntry;
 					 level--)
 				{
+					/* Validate level bounds BEFORE array access to prevent out-of-bounds read */
+					if (level < 0 || level >= HNSW_MAX_LEVEL)
+					{
+						elog(WARNING, "hnsw: invalid level %d when finding new entry point, skipping (max: %d)",
+							 level, HNSW_MAX_LEVEL - 1);
+						continue;
+					}
+					
 					neighbors = HnswGetNeighborsSafe(node, level, meta->m);
 					neighborCount = node->neighborCount[level];
 
@@ -1120,7 +1192,6 @@ static bool
 hnswgettuple(IndexScanDesc scan, ScanDirection dir)
 {
 	HnswScanOpaque so = (HnswScanOpaque) scan->opaque;
-	Buffer		metaBuffer;
 	Page		metaPage;
 	HnswMetaPage meta;
 
@@ -1229,10 +1300,15 @@ hnswendscan(IndexScanDesc scan)
 	oldctx = MemoryContextSwitchTo(indexCxt);
 
 	/* Delete dedicated scan context (frees all allocations within it) */
+	/* NOTE: After this, so->results and so->distances are invalid - do NOT access them */
 	if (so->scanCtx != NULL)
 	{
 		MemoryContextDelete(so->scanCtx);
 		so->scanCtx = NULL;
+		/* Clear pointers to prevent accidental use-after-free */
+		so->results = NULL;
+		so->distances = NULL;
+		so->resultCount = 0;
 	}
 
 	/* results and distances are allocated in scanCtx, so they're already freed */
@@ -1240,6 +1316,7 @@ hnswendscan(IndexScanDesc scan)
 	if (so->query)
 	{
 		nfree(so->query);
+		so->query = NULL;
 	}
 
 	nfree(so);
@@ -1705,19 +1782,48 @@ hnswExtractVectorData(Datum value, Oid typeOid, int *out_dim, MemoryContext ctx)
 			int32	   *indices = VECMAP_INDICES(sv);
 			float4	   *values = VECMAP_VALUES(sv);
 
+			/* Validate pointers are not null (macros now check this, but double-check) */
+			if (indices == NULL || values == NULL)
+			{
+				if (needsFree)
+					pfree(sv);
+				ereport(ERROR,
+						(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+						 errmsg("hnsw: sparsevec indices or values pointer is NULL")));
+			}
+
 			*out_dim = sv->total_dim;
 			NDB_CHECK_ALLOC_SIZE((size_t) sv->total_dim * sizeof(float4), "sparsevec data");
 			nalloc(result, float4, sv->total_dim);
 			NDB_CHECK_ALLOC(result, "sparsevec data");
 
 			/* Zero-initialize buffer: sparsevec only stores non-zero entries */
+			/* Check for overflow in size calculation */
+			if (sv->total_dim > 0 && (size_t) sv->total_dim > SIZE_MAX / sizeof(float4))
+			{
+				if (needsFree)
+					pfree(sv);
+				ereport(ERROR,
+						(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
+						 errmsg("hnsw: sparsevec total_dim %d too large for memset", sv->total_dim)));
+			}
 			memset(result, 0, sv->total_dim * sizeof(float4));
 
-			/* Populate non-zero entries */
+			/* Populate non-zero entries with comprehensive bounds checking */
 			for (i = 0; i < sv->nnz; i++)
 			{
-				if (indices[i] >= 0 && indices[i] < sv->total_dim)
-					result[indices[i]] = values[i];
+				/* Validate index is within bounds - error on out-of-bounds to prevent silent corruption */
+				/* This ensures indices[i] is valid for both sv->total_dim and result array (which has same size) */
+				if (indices[i] < 0 || indices[i] >= sv->total_dim)
+				{
+					if (needsFree)
+						pfree(sv);
+					ereport(ERROR,
+							(errcode(ERRCODE_ARRAY_SUBSCRIPT_ERROR),
+							 errmsg("hnsw: sparsevec index %d out of bounds (dim=%d, nnz=%d)",
+									indices[i], sv->total_dim, sv->nnz)));
+				}
+				result[indices[i]] = values[i];
 			}
 		}
 
@@ -1978,22 +2084,32 @@ hnswSearch(Relation index,
 
 				currentDist = hnswComputeDistance(query, nodeVector, dim, strategy);
 
-				if (node->level >= level)
+			if (node->level >= level)
+			{
+				BlockNumber *neighborBlocks = NULL;
+				int			validNeighborCount = 0;
+				int maxNeighbors;
+				
+				/* Validate level bounds BEFORE array access to prevent out-of-bounds read */
+				if (level < 0 || level >= HNSW_MAX_LEVEL)
 				{
-					BlockNumber *neighborBlocks = NULL;
-					int			validNeighborCount = 0;
-					
-					neighbors = HnswGetNeighborsSafe(node, level, metaPage->m);
-					neighborCount = node->neighborCount[level];
+					elog(WARNING, "hnsw: invalid level %d in search, skipping (max: %d)",
+						 level, HNSW_MAX_LEVEL - 1);
+					UnlockReleaseBuffer(nodeBuf);
+					continue;
+				}
+				
+				neighbors = HnswGetNeighborsSafe(node, level, metaPage->m);
+				neighborCount = node->neighborCount[level];
 
-					elog(NOTICE, "[HNSW_SEARCH_LEVEL_READ] current=%u level=%d node->level=%d neighborCount=%d m=%d",
-						 current, level, node->level, neighborCount, metaPage->m);
+				elog(NOTICE, "[HNSW_SEARCH_LEVEL_READ] current=%u level=%d node->level=%d neighborCount=%d m=%d",
+					 current, level, node->level, neighborCount, metaPage->m);
 
-					/* Validate and clamp neighborCount BEFORE accessing neighbors array */
-					neighborCount = hnswValidateNeighborCount(neighborCount, metaPage->m, level);
-					
-					/* Additional safety: clamp to maximum possible neighbors */
-					int maxNeighbors = metaPage->m * 2;
+				/* Validate and clamp neighborCount BEFORE accessing neighbors array */
+				neighborCount = hnswValidateNeighborCount(neighborCount, metaPage->m, level);
+				
+				/* Additional safety: clamp to maximum possible neighbors */
+				maxNeighbors = metaPage->m * 2;
 					if (neighborCount > maxNeighbors)
 					{
 						elog(WARNING, "hnsw: neighborCount %d exceeds maximum %d at level %d, clamping",
@@ -2122,7 +2238,15 @@ hnswSearch(Relation index,
 		return;
 	}
 
-		candidates[0] = current;
+		/* Bounds check before accessing candidate array */
+		if (candidateCapacity > 0)
+		{
+			candidates[0] = current;
+		}
+		else
+		{
+			elog(ERROR, "hnsw: candidateCapacity is 0, cannot store entry point");
+		}
 		nodeBuf = HNSW_READBUFFER(index, current);
 		LockBuffer(nodeBuf, BUFFER_LOCK_SHARE);
 		nodePage = BufferGetPage(nodeBuf);
@@ -2186,29 +2310,52 @@ hnswSearch(Relation index,
 		return;
 	}
 
-		candidateDists[0] = hnswComputeDistance(query, nodeVector, dim, strategy);
-		candidates[0] = current;
-		candidateCount = 1;
-		visited[visitedCount++] = current;
+		/* Bounds check before accessing candidate arrays */
+		if (candidateCapacity > 0)
+		{
+			candidateDists[0] = hnswComputeDistance(query, nodeVector, dim, strategy);
+			candidates[0] = current;
+			candidateCount = 1;
+		}
+		else
+		{
+			elog(ERROR, "hnsw: candidateCapacity is 0, cannot store candidates");
+		}
+		/* Bounds check before accessing visited array */
+		if (visitedCount < visitedCapacity)
+		{
+			visited[visitedCount++] = current;
+		}
+		else
+		{
+			elog(WARNING, "hnsw: visited array at capacity %d, skipping initial entry", visitedCapacity);
+		}
 		if (visitedSet != NULL && current < numBlocks)
 			visitedSet[current] = true;
 		UnlockReleaseBuffer(nodeBuf);
 
-		/* Process candidates - use a fixed limit to avoid infinite loop */
+	/* Process candidates - use a fixed limit to avoid infinite loop */
+	{
+		int processedCount = 0;
+		int maxIterations = Min(efSearch * 2, candidateCapacity);  /* Limit iterations */
+		int maxNeighbors;
+		int jj;
+		
+		while (processedCount < candidateCount && processedCount < maxIterations)
 		{
-			int processedCount = 0;
-			int maxIterations = Min(efSearch * 2, candidateCapacity);  /* Limit iterations */
-			int maxNeighbors;
-			int j;
-			
-			while (processedCount < candidateCount && processedCount < maxIterations)
-			{
-				BlockNumber candidate;
-				BlockNumber *neighborBlocks = NULL;
-				int			validNeighborCount = 0;
-				BlockNumber *neighbors = NULL;
-				int16		neighborCount;
+			BlockNumber candidate;
+			BlockNumber *neighborBlocks = NULL;
+			int			validNeighborCount = 0;
+			BlockNumber *candNeighbors = NULL;
+			int16		candNeighborCount;
 
+				/* Bounds check before accessing candidates array */
+				if (processedCount >= candidateCount || processedCount >= candidateCapacity)
+				{
+					elog(WARNING, "hnsw: processedCount %d out of bounds (candidateCount=%d, candidateCapacity=%d), breaking",
+						 processedCount, candidateCount, candidateCapacity);
+					break;
+				}
 				candidate = candidates[processedCount];
 				processedCount++; /* Increment at start to avoid infinite loop */
 				
@@ -2244,53 +2391,54 @@ hnswSearch(Relation index,
 					continue;
 				}
 
-				neighbors = HnswGetNeighborsSafe(node, 0, metaPage->m);
-				neighborCount = node->neighborCount[0];
+			/* Validate level bounds BEFORE array access (level 0 is always valid) */
+			candNeighbors = HnswGetNeighborsSafe(node, 0, metaPage->m);
+			candNeighborCount = node->neighborCount[0];
 
-				/* Validate and clamp neighborCount BEFORE accessing neighbors array */
-				neighborCount = hnswValidateNeighborCount(neighborCount, metaPage->m, 0);
+			/* Validate and clamp neighborCount BEFORE accessing neighbors array */
+			candNeighborCount = hnswValidateNeighborCount(candNeighborCount, metaPage->m, 0);
+			
+			/* Additional safety: clamp to maximum possible neighbors */
+			maxNeighbors = metaPage->m * 2;
+			if (candNeighborCount > maxNeighbors)
+			{
+				elog(WARNING, "hnsw: neighborCount %d exceeds maximum %d at level 0, clamping",
+					 candNeighborCount, maxNeighbors);
+				candNeighborCount = maxNeighbors;
+			}
+			
+			/* Ensure neighborCount is non-negative */
+			if (candNeighborCount < 0)
+				candNeighborCount = 0;
+
+			/* Copy neighbor block numbers to avoid deadlock - unlock nodeBuf first */
+			/* Validate neighbors array bounds before accessing */
+			if (candNeighborCount > 0)
+			{
+				nalloc(neighborBlocks, BlockNumber, candNeighborCount);
+			for (jj = 0; jj < candNeighborCount; jj++)
+			{
+				BlockNumber neighborBlk = candNeighbors[jj];
 				
-				/* Additional safety: clamp to maximum possible neighbors */
-				maxNeighbors = metaPage->m * 2;
-				if (neighborCount > maxNeighbors)
+				/* Strict validation: must be valid block number and within index bounds */
+				if (neighborBlk == InvalidBlockNumber)
+					continue;
+				
+				/* Additional sanity check: block number should be reasonable */
+				if (neighborBlk > 1000000)  /* Sanity check for corrupted data */
 				{
-					elog(WARNING, "hnsw: neighborCount %d exceeds maximum %d at level 0, clamping",
-						 neighborCount, maxNeighbors);
-					neighborCount = maxNeighbors;
+					elog(WARNING, "hnsw: suspiciously large neighbor block %u at index %d, skipping",
+						 neighborBlk, jj);
+					continue;
 				}
 				
-				/* Ensure neighborCount is non-negative */
-				if (neighborCount < 0)
-					neighborCount = 0;
-
-				/* Copy neighbor block numbers to avoid deadlock - unlock nodeBuf first */
-				/* Validate neighbors array bounds before accessing */
-				if (neighborCount > 0)
+				/* Validate block number is within index bounds */
+				if (!hnswValidateBlockNumber(neighborBlk, index))
 				{
-					nalloc(neighborBlocks, BlockNumber, neighborCount);
-				for (j = 0; j < neighborCount; j++)
-				{
-					BlockNumber neighborBlk = neighbors[j];
-					
-					/* Strict validation: must be valid block number and within index bounds */
-					if (neighborBlk == InvalidBlockNumber)
-						continue;
-						
-						/* Additional sanity check: block number should be reasonable */
-						if (neighborBlk > 1000000)  /* Sanity check for corrupted data */
-						{
-							elog(WARNING, "hnsw: suspiciously large neighbor block %u at index %d, skipping",
-								 neighborBlk, j);
-							continue;
-						}
-						
-						/* Validate block number is within index bounds */
-						if (!hnswValidateBlockNumber(neighborBlk, index))
-						{
-							elog(WARNING, "hnsw: invalid neighbor block %u at index %d, skipping",
-								 neighborBlk, j);
-							continue;
-						}
+					elog(WARNING, "hnsw: invalid neighbor block %u at index %d, skipping",
+						 neighborBlk, jj);
+					continue;
+				}
 						
 						/* Check if already visited (if visitedSet is available) */
 						if (visitedSet != NULL && neighborBlk < numBlocks && visitedSet[neighborBlk])
@@ -2370,17 +2518,49 @@ hnswSearch(Relation index,
 					}
 					else
 					{
-						int newCapacity = Min(visitedCapacity * 2, HNSW_MAX_VISITED_CAPACITY);
+						/* Check for integer overflow in capacity calculation */
+						int newCapacity;
+						if (visitedCapacity > INT_MAX / 2)
+						{
+							/* Would overflow - cap at maximum */
+							newCapacity = HNSW_MAX_VISITED_CAPACITY;
+						}
+						else
+						{
+							newCapacity = Min(visitedCapacity * 2, HNSW_MAX_VISITED_CAPACITY);
+						}
+						
 						if (newCapacity > visitedCapacity)
 						{
-							visitedCapacity = newCapacity;
-							visited = (BlockNumber *) repalloc(visited,
-															   visitedCapacity * sizeof(BlockNumber));
+							/* Check for overflow in size calculation before repalloc */
+							size_t newSize = (size_t) newCapacity * sizeof(BlockNumber);
+							if (newSize / sizeof(BlockNumber) != (size_t) newCapacity)
+							{
+								elog(WARNING, "hnsw: visited array size calculation overflow, capping at current capacity");
+								newCapacity = visitedCapacity;
+							}
+							else
+							{
+								visitedCapacity = newCapacity;
+								visited = (BlockNumber *) repalloc(visited, newSize);
+								if (visited == NULL)
+								{
+									elog(ERROR, "hnsw: repalloc failed for visited array");
+								}
+							}
 						}
 					}
 				}
 
-						visited[visitedCount++] = nb;
+				/* Bounds check before writing to visited array */
+				if (visitedCount < visitedCapacity)
+				{
+					visited[visitedCount++] = nb;
+				}
+				else
+				{
+					elog(WARNING, "hnsw: visited array at capacity %d, skipping neighbor %u", visitedCapacity, nb);
+				}
 
 						/* Ensure candidateCount doesn't exceed candidateCapacity */
 						if (candidateCount < candidateCapacity)
@@ -2392,21 +2572,25 @@ hnswSearch(Relation index,
 						else
 						{
 							/* Find worst candidate to replace */
-							worstIdx = 0;
-							worstDist = candidateDists[0];
-							for (l = 1; l < candidateCount; l++)
+							if (candidateCount > 0 && candidateCount <= candidateCapacity)
 							{
-								if (candidateDists[l] > worstDist)
+								worstIdx = 0;
+								worstDist = candidateDists[0];
+								for (l = 1; l < candidateCount; l++)
 								{
-									worstDist = candidateDists[l];
-									worstIdx = l;
+									if (l < candidateCapacity && candidateDists[l] > worstDist)
+									{
+										worstDist = candidateDists[l];
+										worstIdx = l;
+									}
 								}
-							}
 
-							if (neighborDist < worstDist)
-							{
-								candidates[worstIdx] = neighborBlk;
-								candidateDists[worstIdx] = neighborDist;
+								/* Bounds check before writing */
+								if (worstIdx >= 0 && worstIdx < candidateCapacity && neighborDist < worstDist)
+								{
+									candidates[worstIdx] = neighborBlk;
+									candidateDists[worstIdx] = neighborDist;
+								}
 							}
 						}
 					}
@@ -2555,6 +2739,13 @@ hnswInsertNode(Relation index,
 		node->dim = dim;
 		for (i = 0; i < HNSW_MAX_LEVEL; i++)
 			node->neighborCount[i] = 0;
+		/* Check for overflow in memcpy size calculation */
+		if (dim > 0 && (size_t) dim > SIZE_MAX / sizeof(float4))
+		{
+			ereport(ERROR,
+					(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
+					 errmsg("hnsw: vector dimension %d too large for memcpy", dim)));
+		}
 		memcpy(HnswGetVector(node), vector, dim * sizeof(float4));
 
 		/* Initialize neighbor arrays to InvalidBlockNumber for safety */
@@ -2650,6 +2841,15 @@ hnswInsertNode(Relation index,
 
 				if (entryNode->level >= level)
 				{
+					/* Validate level bounds BEFORE array access to prevent out-of-bounds read */
+					if (level < 0 || level >= HNSW_MAX_LEVEL)
+					{
+						elog(WARNING, "hnsw: invalid level %d in insert entry search, skipping (max: %d)",
+							 level, HNSW_MAX_LEVEL - 1);
+						UnlockReleaseBuffer(entryBuf);
+						break;
+					}
+					
 					entryVector = HnswGetVector(entryNode);
 					if (entryVector == NULL)
 					{
@@ -2772,7 +2972,7 @@ hnswInsertNode(Relation index,
 				 errmsg("hnsw: not enough space for new node (needed %zu, available %zu)",
 						nodeSize, PageGetFreeSpace(page))));
 
-		elog(NOTICE, "[HNSW_INSERT_PRE_PAGEADD] blkno=%u nodeSize=%zu level=%d dim=%d m=%d heap=(%u,%u) heaptidsLength=%d",
+	elog(NOTICE, "[HNSW_INSERT_PRE_PAGEADD] blkno=%u nodeSize=%zu level=%d dim=%d m=%d heap=(%u,%u) heaptidsLength=%d",
 		 blkno, nodeSize, node->level, node->dim, metaPage->m,
 		 ItemPointerGetBlockNumber(&node->heaptids[0]), ItemPointerGetOffsetNumber(&node->heaptids[0]), node->heaptidsLength);
 	
@@ -2855,21 +3055,34 @@ hnswInsertNode(Relation index,
 					selectedDistances = NULL;
 				}
 
-				/* Sort by distance: select top m */
-				for (idx = 0; idx < selectedCount && candidates != NULL && candidateDistances != NULL; idx++)
+				/* Sort by distance: select top m with bounds checking */
+			for (idx = 0; idx < selectedCount && candidates != NULL && candidateDistances != NULL; idx++)
+			{
+				int			bestIdx;
+				float4		bestDist;
+				
+				/* Bounds check before accessing arrays */
+				if (idx >= candidateCount || idx < 0)
 				{
-					int			bestIdx = idx;
-					float4		bestDist = candidateDistances[idx];
+					elog(WARNING, "hnsw: sort index %d out of bounds (candidateCount=%d)", idx, candidateCount);
+					break;
+				}
+				
+				bestIdx = idx;
+				bestDist = candidateDistances[idx];
 
 					for (j = idx + 1; j < candidateCount; j++)
 					{
-						if (candidateDistances[j] < bestDist)
+						/* Bounds check in inner loop */
+						if (j >= 0 && j < candidateCount && candidateDistances[j] < bestDist)
 						{
 							bestDist = candidateDistances[j];
 							bestIdx = j;
 						}
 					}
-					if (bestIdx != idx)
+					
+					/* Bounds check before swap */
+					if (bestIdx != idx && bestIdx >= 0 && bestIdx < candidateCount && idx >= 0 && idx < candidateCount)
 					{
 						BlockNumber tempBlk = candidates[idx];
 						float4		tempDist = candidateDistances[idx];
@@ -2879,8 +3092,13 @@ hnswInsertNode(Relation index,
 						candidates[bestIdx] = tempBlk;
 						candidateDistances[bestIdx] = tempDist;
 					}
-					selectedNeighbors[idx] = candidates[idx];
-					selectedDistances[idx] = candidateDistances[idx];
+					
+					/* Bounds check before final assignment */
+					if (idx >= 0 && idx < candidateCount)
+					{
+						selectedNeighbors[idx] = candidates[idx];
+						selectedDistances[idx] = candidateDistances[idx];
+					}
 				}
 
 				/* Read the buffer we just inserted to link neighbors */
@@ -2940,10 +3158,21 @@ hnswInsertNode(Relation index,
 					BlockNumber *newNodeNeighbors = NULL;
 					int16		newNodeNeighborCount = 0;
 
-					/* Copy new node neighbor data while holding lock */
+				/* Copy new node neighbor data while holding lock */
+				{
+					BlockNumber *tempNeighbors;
+					int16		tempCount;
+					
+					/* Validate level bounds BEFORE array access to prevent out-of-bounds read */
+					if (currentLevel < 0 || currentLevel >= HNSW_MAX_LEVEL)
 					{
-						BlockNumber *tempNeighbors = HnswGetNeighborsSafe(newNode, currentLevel, m);
-						int16		tempCount = newNode->neighborCount[currentLevel];
+						elog(WARNING, "hnsw: invalid currentLevel %d in insert, skipping (max: %d)",
+							 currentLevel, HNSW_MAX_LEVEL - 1);
+						continue;
+					}
+					
+					tempNeighbors = HnswGetNeighborsSafe(newNode, currentLevel, m);
+					tempCount = newNode->neighborCount[currentLevel];
 
 						/* Validate and clamp */
 						tempCount = hnswValidateNeighborCount(tempCount, m, currentLevel);
@@ -2952,7 +3181,16 @@ hnswInsertNode(Relation index,
 						{
 							nalloc(newNodeNeighbors, BlockNumber, m * 2);
 							if (tempCount > 0)
+							{
+							/* Check for overflow in memcpy size calculation */
+							if ((size_t) tempCount > SIZE_MAX / sizeof(BlockNumber))
+							{
+								ereport(ERROR,
+										(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
+										 errmsg("hnsw: tempCount %d too large for memcpy", tempCount)));
+							}
 								memcpy(newNodeNeighbors, tempNeighbors, tempCount * sizeof(BlockNumber));
+							}
 							newNodeNeighborCount = tempCount;
 						}
 					}
@@ -3020,6 +3258,15 @@ hnswInsertNode(Relation index,
 							continue;
 						}
 
+						/* Validate level bounds BEFORE array access to prevent out-of-bounds read */
+						if (currentLevel < 0 || currentLevel >= HNSW_MAX_LEVEL)
+						{
+							elog(WARNING, "hnsw: invalid currentLevel %d when accessing neighbor, skipping (max: %d)",
+								 currentLevel, HNSW_MAX_LEVEL - 1);
+							UnlockReleaseBuffer(neighborBuf);
+							continue;
+						}
+						
 						neighborNeighbors = HnswGetNeighborsSafe(neighborNode, currentLevel, m);
 						neighborNeighborCount = neighborNode->neighborCount[currentLevel];
 
@@ -3085,6 +3332,13 @@ hnswInsertNode(Relation index,
 					 */
 					if (neighborVector != NULL && dim > 0)
 					{
+					/* Check for overflow in size calculation */
+					if ((size_t) dim > SIZE_MAX / sizeof(float4))
+					{
+						ereport(ERROR,
+								(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
+								 errmsg("hnsw: dimension %d too large for vector copy", dim)));
+					}
 						nalloc(neighborVectorCopy, float4, dim);
 						memcpy(neighborVectorCopy, neighborVector, dim * sizeof(float4));
 					}
@@ -3094,23 +3348,46 @@ hnswInsertNode(Relation index,
 					hasNeighborLock = false;
 					neighborBuf = InvalidBuffer;
 
-					nalloc(neighborDists, float4, validPruneCount);
-					nalloc(neighborIndices, int, validPruneCount);
+					/* Allocate arrays with bounds checking */
+					if (validPruneCount > 0)
+					{
+						nalloc(neighborIndices, int, validPruneCount);
+						nalloc(neighborDists, float4, validPruneCount);
+					}
+					else
+					{
+						neighborIndices = NULL;
+						neighborDists = NULL;
+					}
 
 					/* Process each neighbor for distance calculation */
+					
 					for (j = 0; j < validPruneCount; j++)
 					{
-						neighborIndices[j] = j;
-						if (pruneNeighborBlocks[j] == blkno)
-							neighborDists[j] = selectedDistances[idx];
-						else
+						/* Bounds check before array access */
+						if (j >= 0 && j < validPruneCount)
 						{
-							Buffer		otherBuf;
-							Page		otherPage;
-							HnswNode	otherNode;
-							float4 *otherVector = NULL;
+							neighborIndices[j] = j;
+							if (pruneNeighborBlocks[j] == blkno)
+							{
+								/* Bounds check before accessing selectedDistances */
+								if (idx >= 0 && idx < selectedCount)
+									neighborDists[j] = selectedDistances[idx];
+								else
+									neighborDists[j] = FLT_MAX;
+							}
+							else
+							{
+								Buffer		otherBuf;
+								Page		otherPage;
+								HnswNode	otherNode;
+								float4 *otherVector = NULL;
 
-							otherBuf = HNSW_READBUFFER(index, pruneNeighborBlocks[j]);
+								/* Bounds check before accessing pruneNeighborBlocks */
+								if (j >= 0 && j < validPruneCount)
+									otherBuf = HNSW_READBUFFER(index, pruneNeighborBlocks[j]);
+								else
+									continue;
 							LockBuffer(otherBuf, BUFFER_LOCK_SHARE);
 							otherPage = BufferGetPage(otherBuf);
 
@@ -3138,28 +3415,40 @@ hnswInsertNode(Relation index,
 								continue;
 							}
 
-							neighborDists[j] = hnswComputeDistance(neighborVectorCopy ? neighborVectorCopy : neighborVector,
-																  otherVector, dim, 1);
-							UnlockReleaseBuffer(otherBuf);
-						}
+						neighborDists[j] = hnswComputeDistance(neighborVectorCopy ? neighborVectorCopy : neighborVector,
+															  otherVector, dim, 1);
+						UnlockReleaseBuffer(otherBuf);
 					}
+				}
+			}
 
-					/* Sort by distance */
-					for (j = 0; j < validPruneCount - 1; j++)
+			/* Sort by distance with bounds checking */
+					if (validPruneCount > 1 && neighborDists != NULL && neighborIndices != NULL)
 					{
-						int			k;
-
-						for (k = j + 1; k < validPruneCount; k++)
+						for (j = 0; j < validPruneCount - 1; j++)
 						{
-							if (neighborDists[k] < neighborDists[j])
-							{
-								float4		tmpDist = neighborDists[j];
-								int			tmpIdx = neighborIndices[j];
+							int			k;
 
-								neighborDists[j] = neighborDists[k];
-								neighborIndices[j] = neighborIndices[k];
-								neighborDists[k] = tmpDist;
-								neighborIndices[k] = tmpIdx;
+							/* Bounds check before accessing arrays */
+							if (j < 0 || j >= validPruneCount)
+								break;
+							
+							for (k = j + 1; k < validPruneCount; k++)
+							{
+								/* Bounds check before accessing arrays */
+								if (k < 0 || k >= validPruneCount)
+									break;
+								
+								if (neighborDists[k] < neighborDists[j])
+								{
+									float4		tmpDist = neighborDists[j];
+									int			tmpIdx = neighborIndices[j];
+
+									neighborDists[j] = neighborDists[k];
+									neighborIndices[j] = neighborIndices[k];
+									neighborDists[k] = tmpDist;
+									neighborIndices[k] = tmpIdx;
+								}
 							}
 						}
 					}
@@ -3183,32 +3472,56 @@ hnswInsertNode(Relation index,
 					neighborPage = BufferGetPage(neighborBuf);
 					neighborNode = (HnswNode)
 						PageGetItem(neighborPage, PageGetItemId(neighborPage, FirstOffsetNumber));
-					if (neighborNode != NULL && hnswValidateLevelSafe(neighborNode->level))
+				if (neighborNode != NULL && hnswValidateLevelSafe(neighborNode->level))
+				{
+					/* Assert that selectedNeighbors[idx] is still valid */
+					if (selectedNeighbors[idx] >= RelationGetNumberOfBlocks(index))
 					{
-						/* Assert that selectedNeighbors[idx] is still valid */
-						if (selectedNeighbors[idx] >= RelationGetNumberOfBlocks(index))
-						{
-							elog(WARNING, "hnsw: selectedNeighbors[%d] = %u exceeds index size %u",
-								 idx, selectedNeighbors[idx], RelationGetNumberOfBlocks(index));
-							UnlockReleaseBuffer(neighborBuf);
-							hasNeighborLock = false;
-							neighborBuf = InvalidBuffer;
-						}
-						else
-						{
-							neighborNeighbors = HnswGetNeighborsSafe(neighborNode, currentLevel, m);
-							neighborNode->neighborCount[currentLevel] = Min(m * 2, validPruneCount);
-							for (j = 0; j < neighborNode->neighborCount[currentLevel]; j++)
-								neighborNeighbors[j] = pruneNeighborBlocks[neighborIndices[j]];
-							/* Clear remaining slots */
-							for (j = neighborNode->neighborCount[currentLevel]; j < m * 2; j++)
-								neighborNeighbors[j] = InvalidBlockNumber;
-							MarkBufferDirty(neighborBuf);
-							UnlockReleaseBuffer(neighborBuf);
-							hasNeighborLock = false;
-							neighborBuf = InvalidBuffer;
-						}
+						elog(WARNING, "hnsw: selectedNeighbors[%d] = %u exceeds index size %u",
+							 idx, selectedNeighbors[idx], RelationGetNumberOfBlocks(index));
+						UnlockReleaseBuffer(neighborBuf);
+						hasNeighborLock = false;
+						neighborBuf = InvalidBuffer;
 					}
+					else
+					{
+						int finalCount;
+						
+						neighborNeighbors = HnswGetNeighborsSafe(neighborNode, currentLevel, m);
+						if (neighborNeighbors == NULL)
+						{
+							ereport(ERROR,
+									(errcode(ERRCODE_INTERNAL_ERROR),
+									 errmsg("hnsw: HnswGetNeighborsSafe returned NULL")));
+						}
+						
+						finalCount = Min(m * 2, validPruneCount);
+						neighborNode->neighborCount[currentLevel] = finalCount;
+						
+						/* Bounds check before accessing arrays */
+						for (j = 0; j < finalCount && j < m * 2; j++)
+						{
+							/* Validate neighborIndices[j] is within bounds */
+							if (neighborIndices[j] >= 0 && neighborIndices[j] < validPruneCount)
+							{
+								neighborNeighbors[j] = pruneNeighborBlocks[neighborIndices[j]];
+							}
+							else
+							{
+								elog(WARNING, "hnsw: neighborIndices[%d]=%d out of bounds (validPruneCount=%d), using InvalidBlockNumber",
+									 j, neighborIndices[j], validPruneCount);
+								neighborNeighbors[j] = InvalidBlockNumber;
+							}
+						}
+						/* Clear remaining slots */
+						for (j = finalCount; j < m * 2; j++)
+							neighborNeighbors[j] = InvalidBlockNumber;
+						MarkBufferDirty(neighborBuf);
+						UnlockReleaseBuffer(neighborBuf);
+						hasNeighborLock = false;
+						neighborBuf = InvalidBuffer;
+					}
+				}
 					else
 					{
 						UnlockReleaseBuffer(neighborBuf);
@@ -3216,25 +3529,25 @@ hnswInsertNode(Relation index,
 						neighborBuf = InvalidBuffer;
 					}
 
-					pfree(neighborDists);
-					neighborDists = NULL;
-					pfree(neighborIndices);
-					neighborIndices = NULL;
-					if (pruneNeighborBlocks)
-						pfree(pruneNeighborBlocks);
-					if (neighborVectorCopy)
-						pfree(neighborVectorCopy);
-					}
-					else
-					{
-						/* No pruning needed - unlock neighborBuf since we locked it earlier */
-						if (hasNeighborLock)
-						{
-							UnlockReleaseBuffer(neighborBuf);
-							hasNeighborLock = false;
-							neighborBuf = InvalidBuffer;
-						}
-					}
+			pfree(neighborDists);
+			neighborDists = NULL;
+			pfree(neighborIndices);
+			neighborIndices = NULL;
+			if (pruneNeighborBlocks)
+				pfree(pruneNeighborBlocks);
+			if (neighborVectorCopy)
+				pfree(neighborVectorCopy);
+		}
+		else
+		{
+			/* No pruning needed - unlock neighborBuf since we locked it earlier */
+			if (hasNeighborLock)
+			{
+				UnlockReleaseBuffer(neighborBuf);
+				hasNeighborLock = false;
+				neighborBuf = InvalidBuffer;
+			}
+		}
 
 				/* Assert invariant: neighborBuf should not be locked at end of loop */
 				if (hasNeighborLock)
@@ -3277,6 +3590,13 @@ hnswInsertNode(Relation index,
 						newNode->neighborCount[currentLevel] = newNodeNeighborCount;
 						{
 							BlockNumber *neighbors = HnswGetNeighborsSafe(newNode, currentLevel, m);
+						/* Check for overflow in memcpy size calculation */
+						if (newNodeNeighborCount > 0 && (size_t) newNodeNeighborCount > SIZE_MAX / sizeof(BlockNumber))
+						{
+							ereport(ERROR,
+									(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
+									 errmsg("hnsw: newNodeNeighborCount %d too large for memcpy", newNodeNeighborCount)));
+						}
 							memcpy(neighbors, newNodeNeighbors, newNodeNeighborCount * sizeof(BlockNumber));
 						}
 						
@@ -3404,7 +3724,10 @@ hnswFindNodeByTid(Relation index,
 				bool		found = false;
 				int			tidIdx;
 				
-				for (tidIdx = 0; tidIdx < node->heaptidsLength; tidIdx++)
+				/* Validate heaptidsLength to prevent out-of-bounds access */
+				int validTidLength = (node->heaptidsLength > HNSW_HEAPTIDS) ? HNSW_HEAPTIDS : node->heaptidsLength;
+				
+				for (tidIdx = 0; tidIdx < validTidLength && tidIdx < HNSW_HEAPTIDS; tidIdx++)
 				{
 					if (ItemPointerEquals(&node->heaptids[tidIdx], tid))
 					{
@@ -3453,6 +3776,7 @@ hnswRemoveNodeFromNeighbor(Relation index,
 	int			i,
 				j;
 	bool		found = false;
+	int			m;
 
 	if (!hnswValidateBlockNumber(neighborBlkno, index))
 	{
@@ -3497,7 +3821,6 @@ hnswRemoveNodeFromNeighbor(Relation index,
 		Buffer		metaBuf;
 		Page		metaPage;
 		HnswMetaPage meta;
-		int			m;
 
 		metaBuf = HNSW_READBUFFER(index, 0);
 		LockBuffer(metaBuf, BUFFER_LOCK_SHARE);
@@ -3506,6 +3829,15 @@ hnswRemoveNodeFromNeighbor(Relation index,
 		m = meta->m;
 		UnlockReleaseBuffer(metaBuf);
 
+		/* Validate level bounds BEFORE array access to prevent out-of-bounds read */
+		if (level < 0 || level >= HNSW_MAX_LEVEL)
+		{
+			elog(WARNING, "hnsw: invalid level %d in removeNodeFromNeighbor, skipping (max: %d)",
+				 level, HNSW_MAX_LEVEL - 1);
+			UnlockReleaseBuffer(buf);
+			return;
+		}
+		
 		neighbors = HnswGetNeighborsSafe(neighbor, level, m);
 		neighborCount = neighbor->neighborCount[level];
 
@@ -3515,14 +3847,34 @@ hnswRemoveNodeFromNeighbor(Relation index,
 
 	for (i = 0; i < neighborCount; i++)
 	{
-		if (neighbors[i] == nodeBlkno)
-		{
-			found = true;
-			/* Shift remaining neighbors */
-			for (j = i; j < neighborCount - 1; j++)
-				neighbors[j] = neighbors[j + 1];
-			neighbors[neighborCount - 1] = InvalidBlockNumber;
-			neighbor->neighborCount[level]--;
+	if (neighbors[i] == nodeBlkno)
+	{
+		int maxNeighbors;
+		
+		found = true;
+		/* Shift remaining neighbors with bounds checking */
+		maxNeighbors = m * 2;
+			for (j = i; j < neighborCount - 1 && j + 1 < maxNeighbors; j++)
+			{
+				/* Bounds check before accessing neighbors[j + 1] */
+				if (j + 1 < neighborCount && j + 1 < maxNeighbors)
+					neighbors[j] = neighbors[j + 1];
+				else
+					break;
+			}
+			/* Bounds check before writing to last position */
+			if (neighborCount > 0 && neighborCount - 1 < maxNeighbors)
+				neighbors[neighborCount - 1] = InvalidBlockNumber;
+			/* Validate level bounds BEFORE array write to prevent out-of-bounds write */
+			if (level >= 0 && level < HNSW_MAX_LEVEL)
+			{
+				neighbor->neighborCount[level]--;
+			}
+			else
+			{
+				elog(WARNING, "hnsw: invalid level %d when decrementing neighborCount, skipping write (max: %d)",
+					 level, HNSW_MAX_LEVEL - 1);
+			}
 			break;
 		}
 	}
@@ -3590,6 +3942,14 @@ hnswdelete(Relation index,
 	 */
 	for (level = 0; level <= node->level; level++)
 	{
+		/* Validate level bounds BEFORE array access to prevent out-of-bounds read */
+		if (level < 0 || level >= HNSW_MAX_LEVEL)
+		{
+			elog(WARNING, "hnsw: invalid level %d in delete node cleanup, skipping (max: %d)",
+				 level, HNSW_MAX_LEVEL - 1);
+			continue;
+		}
+		
 		neighbors = HnswGetNeighborsSafe(node, level, meta->m);
 		neighborCount = node->neighborCount[level];
 
@@ -3614,6 +3974,14 @@ hnswdelete(Relation index,
 
 		for (level = node->level; level >= 0; level--)
 		{
+			/* Validate level bounds BEFORE array access to prevent out-of-bounds read */
+			if (level < 0 || level >= HNSW_MAX_LEVEL)
+			{
+				elog(WARNING, "hnsw: invalid level %d when finding new entry point, skipping (max: %d)",
+					 level, HNSW_MAX_LEVEL - 1);
+				continue;
+			}
+			
 			neighbors = HnswGetNeighborsSafe(node, level, meta->m);
 			neighborCount = node->neighborCount[level];
 
@@ -3750,8 +4118,16 @@ hnswAddHeapTid(HnswNode node, ItemPointer heaptid)
 {
 	int			i;
 
+	/* Validate heaptidsLength to prevent out-of-bounds access */
+	if (node->heaptidsLength > HNSW_HEAPTIDS)
+	{
+		elog(WARNING, "hnsw: corrupted heaptidsLength %d (max: %d), clamping to %d",
+			 node->heaptidsLength, HNSW_HEAPTIDS, HNSW_HEAPTIDS);
+		node->heaptidsLength = HNSW_HEAPTIDS;
+	}
+	
 	/* Check if already exists */
-	for (i = 0; i < node->heaptidsLength; i++)
+	for (i = 0; i < node->heaptidsLength && i < HNSW_HEAPTIDS; i++)
 	{
 		if (ItemPointerEquals(&node->heaptids[i], heaptid))
 			return;					/* Already exists, no-op */
@@ -3779,8 +4155,21 @@ static bool
 hnswNodeHasHeapTid(HnswNode node, ItemPointer heaptid)
 {
 	int			i;
+	int			validLength;
 
-	for (i = 0; i < node->heaptidsLength; i++)
+	/* Validate heaptidsLength to prevent out-of-bounds access */
+	if (node->heaptidsLength > HNSW_HEAPTIDS)
+	{
+		elog(WARNING, "hnsw: corrupted heaptidsLength %d (max: %d), clamping to %d",
+			 node->heaptidsLength, HNSW_HEAPTIDS, HNSW_HEAPTIDS);
+		validLength = HNSW_HEAPTIDS;
+	}
+	else
+	{
+		validLength = node->heaptidsLength;
+	}
+
+	for (i = 0; i < validLength && i < HNSW_HEAPTIDS; i++)
 	{
 		if (ItemPointerEquals(&node->heaptids[i], heaptid))
 			return true;

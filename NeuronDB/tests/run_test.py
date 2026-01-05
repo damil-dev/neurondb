@@ -1038,6 +1038,88 @@ def print_header_info(script_name: str, version: str, dbname: str, psql_path: st
 	print()
 
 
+def cleanup_corrupted_views(dbname: str, psql_path: str, host: Optional[str] = None, port: Optional[int] = None) -> bool:
+	"""
+	Clean up corrupted test views from previous test runs.
+	This prevents 'pg_attribute catalog is missing' errors.
+	Returns True if cleanup succeeded (or no cleanup needed), False on error.
+	"""
+	env = os.environ.copy()
+	if host:
+		env["PGHOST"] = host
+	if port:
+		env["PGPORT"] = str(port)
+	
+	cleanup_sql = """
+	DO $$
+	DECLARE
+		corrupted_oid bigint;
+		corrupted_name text;
+		corrupted_rule_oid bigint;
+	BEGIN
+		-- Find and delete corrupted views in neurondb schema
+		FOR corrupted_oid IN 
+			SELECT oid FROM pg_class 
+			WHERE relname LIKE '%test%view%' 
+			AND relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'neurondb')
+		LOOP
+			-- Delete dependencies first
+			DELETE FROM pg_depend WHERE objid = corrupted_oid OR refobjid = corrupted_oid;
+			-- Delete rules associated with the view
+			DELETE FROM pg_rewrite WHERE ev_class = corrupted_oid;
+			DELETE FROM pg_description WHERE objoid = corrupted_oid;
+			-- Delete the class entry
+			DELETE FROM pg_class WHERE oid = corrupted_oid;
+		END LOOP;
+		
+		-- Clean up ALL orphaned rules (rules without associated relations or with NULL ev_class)
+		FOR corrupted_rule_oid IN
+			SELECT oid FROM pg_rewrite
+			WHERE ev_class IS NULL 
+			   OR ev_class NOT IN (SELECT oid FROM pg_class)
+		LOOP
+			BEGIN
+				DELETE FROM pg_depend WHERE objid = corrupted_rule_oid OR refobjid = corrupted_rule_oid;
+				DELETE FROM pg_rewrite WHERE oid = corrupted_rule_oid;
+			EXCEPTION WHEN OTHERS THEN
+				-- Ignore errors during cleanup (best-effort)
+				NULL;
+			END;
+		END LOOP;
+		
+		-- Clean up pg_depend entries that reference non-existent rules
+		DELETE FROM pg_depend
+		WHERE classid = 'pg_rewrite'::regclass
+		AND objid NOT IN (SELECT oid FROM pg_rewrite);
+		
+		-- Clean up pg_depend entries that reference non-existent classes
+		DELETE FROM pg_depend
+		WHERE refobjid NOT IN (SELECT oid FROM pg_class)
+		AND refclassid = 'pg_class'::regclass;
+		
+		-- Delete associated types
+		FOR corrupted_name IN 
+			SELECT typname FROM pg_type 
+			WHERE typname LIKE '%test%view%'
+			AND typnamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'neurondb')
+		LOOP
+			DELETE FROM pg_type WHERE typname = corrupted_name 
+			AND typnamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'neurondb');
+		END LOOP;
+	END $$;
+	"""
+	
+	try:
+		cmd = [psql_path, "-d", dbname, "-w", "-c", cleanup_sql]
+		proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
+		out, err = proc.communicate()
+		# Cleanup is best-effort - don't fail if it doesn't work
+		return True
+	except Exception:
+		# Best-effort cleanup - don't fail tests if cleanup fails
+		return True
+
+
 def create_test_views(dbname: str, psql_path: str, num_rows: int, host: Optional[str] = None, port: Optional[int] = None) -> Tuple[bool, int]:
 	"""
 	Create test views with specified number of rows.
@@ -2731,6 +2813,16 @@ def main() -> int:
 		print(f"ERROR: Failed to restart PostgreSQL automatically: {restart_msg}", file=sys.stderr)
 		print(f"ALTER SYSTEM changes require a restart. Please restart PostgreSQL manually and re-run tests.", file=sys.stderr)
 		return 1
+	
+	# 2.9. Clean up corrupted views from previous test runs
+	when = datetime.now()
+	cleanup_start = time.perf_counter()
+	cleanup_ok = cleanup_corrupted_views(args.db, args.psql, args.host, args.port)
+	cleanup_elapsed = time.perf_counter() - cleanup_start
+	if cleanup_ok:
+		# Only print if verbose or if cleanup actually did something
+		if args.verbose:
+			print(format_status_line(True, when, f"Cleaning up corrupted views from previous test runs...", cleanup_elapsed))
 	
 	# 3. Create test views (this also creates test_settings table)
 	when = datetime.now()

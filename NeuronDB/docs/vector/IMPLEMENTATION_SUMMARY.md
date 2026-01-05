@@ -163,3 +163,4 @@ This document summarizes the improvements made to NeuronDB's vector subsystem as
 - **Size validation**: Detects corrupted varlena structures
 - **Integrity checks**: VectorCapsule provides tamper detection via checksums
 
+

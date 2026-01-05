@@ -18,3 +18,4 @@ class TestGitHubConnector:
         """Test accessing GitHub issues."""
         pytest.skip("GitHub connector requires API token")
 
+

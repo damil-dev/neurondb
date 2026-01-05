@@ -685,3 +685,4 @@ SET neurondb.compute_mode = 2;  -- Auto with fallback
 **Last Updated:** 2025-01-01  
 **Documentation Version:** 1.0.0
 
+

@@ -19,16 +19,16 @@ import (
 	"os"
 	"strings"
 
-	"github.com/neurondb/NeuronAgent/cli/pkg/client"
 	"github.com/spf13/cobra"
+	"github.com/neurondb/NeuronAgent/cli/pkg/client"
 )
 
 var (
-	testMessage  string
-	testWorkflow bool
-	testDebug    bool
-	testDryRun   bool
-	testConfig   string
+	testMessage    string
+	testWorkflow   bool
+	testDebug      bool
+	testDryRun     bool
+	testConfig     string
 )
 
 var testCmd = &cobra.Command{
@@ -50,11 +50,12 @@ func init() {
 func runTest(cmd *cobra.Command, args []string) error {
 	apiClient := client.NewClient(apiURL, apiKey)
 
-	/* Dry run mode - validate config */
+	// Dry run mode - validate config
 	if testDryRun && testConfig != "" {
 		return testConfigFile(testConfig)
 	}
 
+	// Need agent ID for testing
 	if len(args) == 0 {
 		return fmt.Errorf("agent ID is required (or use --config --dry-run to validate)")
 	}
@@ -62,17 +63,18 @@ func runTest(cmd *cobra.Command, args []string) error {
 	agentID := args[0]
 
 	if testMessage != "" {
-		/* Single message test */
+		// Single message test
 		return testSingleMessage(apiClient, agentID, testMessage)
 	}
 
-	/* Interactive test mode */
+	// Interactive test mode
 	return testInteractive(apiClient, agentID)
 }
 
 func testConfigFile(configPath string) error {
 	fmt.Printf("🔍 Validating configuration: %s\n", configPath)
-
+	
+	// TODO: Validate config file
 	fmt.Println("✅ Configuration file is valid")
 	return nil
 }
@@ -81,11 +83,13 @@ func testSingleMessage(apiClient *client.Client, agentID, message string) error 
 	fmt.Printf("🤖 Testing agent: %s\n", agentID)
 	fmt.Printf("💬 Message: %s\n\n", message)
 
+	// Create session
 	session, err := apiClient.CreateSession(agentID, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create session: %w", err)
 	}
 
+	// Send message
 	response, err := apiClient.SendMessage(session.ID, message, false)
 	if err != nil {
 		return fmt.Errorf("failed to send message: %w", err)
@@ -104,6 +108,7 @@ func testInteractive(apiClient *client.Client, agentID string) error {
 	fmt.Println("Type 'exit' or 'quit' to end the session")
 	fmt.Println("─────────────────────────────────────────────────────────\n")
 
+	// Create session
 	session, err := apiClient.CreateSession(agentID, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create session: %w", err)
@@ -112,7 +117,7 @@ func testInteractive(apiClient *client.Client, agentID string) error {
 	fmt.Printf("✅ Session created: %s\n\n", session.ID)
 
 	scanner := bufio.NewScanner(os.Stdin)
-
+	
 	for {
 		fmt.Print("You: ")
 		if !scanner.Scan() {
@@ -142,3 +147,5 @@ func testInteractive(apiClient *client.Client, agentID string) error {
 	fmt.Println("\n👋 Session ended")
 	return nil
 }
+
+

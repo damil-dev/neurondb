@@ -298,3 +298,4 @@ vector_capsule_validate_integrity(PG_FUNCTION_ARGS)
 	PG_RETURN_BOOL(vector_capsule_verify_checksum(vc));
 }
 
+

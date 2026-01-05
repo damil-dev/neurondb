@@ -68,3 +68,4 @@ class TestAsyncWorker:
                 # Error message column exists
                 assert True
 
+

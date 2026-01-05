@@ -22,3 +22,4 @@ class TestSecretsManagement:
         """Test secret rotation."""
         pytest.skip("Secrets management requires configuration")
 
+

@@ -1,0 +1,23 @@
+# Virtual environment
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Results and outputs
+results/
+*.json
+*.png
+*.log
+
+# BEIR datasets
+beir_data/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+

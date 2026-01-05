@@ -64,6 +64,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&apiKey, "key", getEnvOrDefault("NEURONAGENT_API_KEY", ""), "NeuronAgent API key (required)")
 	rootCmd.PersistentFlags().StringVar(&outputFormat, "format", "text", "Output format (text, json)")
 
+	// Add all subcommands
 	rootCmd.AddCommand(createCmd)
 	rootCmd.AddCommand(templateCmd)
 	rootCmd.AddCommand(workflowCmd)
@@ -88,3 +89,5 @@ func Execute() {
 		os.Exit(1)
 	}
 }
+
+

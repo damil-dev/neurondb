@@ -555,3 +555,4 @@ echo ""
 # For now, let's run the existing detailed test
 exec "$REPO_ROOT/scripts/test_neurondb_docker_detailed.sh" --variant="$VARIANT"
 
+

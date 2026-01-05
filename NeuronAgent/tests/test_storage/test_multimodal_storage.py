@@ -18,3 +18,4 @@ class TestMultimodalStorage:
         """Test storing and retrieving metadata for multimodal content."""
         pytest.skip("Multimodal storage requires configuration")
 
+

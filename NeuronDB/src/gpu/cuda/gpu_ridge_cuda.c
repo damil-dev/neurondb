@@ -355,8 +355,41 @@ ndb_cuda_ridge_train(const float *features,
 
 	/* Compute X'X and X'y on GPU */
 	{
-		/* Allocate device memory */
+		/* Allocate device memory with overflow checking */
+		if (n_samples > 0 && feature_dim > 0)
+		{
+			if ((size_t) n_samples > SIZE_MAX / sizeof(float) / (size_t) feature_dim)
+			{
+				if (errstr)
+					*errstr = psprintf("ndb_cuda_ridge_train: feature_bytes calculation would overflow (n_samples=%d, feature_dim=%d)",
+									   n_samples, feature_dim);
+				if (h_XtX)
+					pfree(h_XtX);
+				if (h_Xty)
+					pfree(h_Xty);
+				if (h_XtX_inv)
+					pfree(h_XtX_inv);
+				if (h_beta)
+					pfree(h_beta);
+				return -1;
+			}
+		}
 		feature_bytes = sizeof(float) * (size_t) n_samples * (size_t) feature_dim;
+		
+		if (n_samples > 0 && (size_t) n_samples > SIZE_MAX / sizeof(double))
+		{
+			if (errstr)
+				*errstr = psprintf("ndb_cuda_ridge_train: target_bytes calculation would overflow (n_samples=%d)", n_samples);
+			if (h_XtX)
+				pfree(h_XtX);
+			if (h_Xty)
+				pfree(h_Xty);
+			if (h_XtX_inv)
+				pfree(h_XtX_inv);
+			if (h_beta)
+				pfree(h_beta);
+			return -1;
+		}
 		target_bytes = sizeof(double) * (size_t) n_samples;
 
 
@@ -1093,7 +1126,17 @@ ndb_cuda_ridge_evaluate(const bytea * model_data,
 	if (n_samples > 0)
 		y_mean /= (double) n_samples;
 
-	/* Allocate GPU memory for features */
+	/* Allocate GPU memory for features with overflow checking */
+	if (n_samples > 0 && feature_dim > 0)
+	{
+		if ((size_t) n_samples > SIZE_MAX / sizeof(float) / (size_t) feature_dim)
+		{
+			if (errstr)
+				*errstr = psprintf("ndb_cuda_ridge_evaluate: feature_bytes calculation would overflow (n_samples=%d, feature_dim=%d)",
+								   n_samples, feature_dim);
+			return -1;
+		}
+	}
 	feature_bytes = sizeof(float) * (size_t) n_samples * (size_t) feature_dim;
 	cuda_err = cudaMalloc((void **) &d_features, feature_bytes);
 	if (cuda_err != cudaSuccess)

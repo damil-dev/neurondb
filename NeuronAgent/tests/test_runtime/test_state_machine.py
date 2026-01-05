@@ -5,13 +5,7 @@ Tests execution states, transitions, and state management.
 """
 import pytest
 import time
-import sys
-import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../examples'))
-try:
-    from neurondb_client import SessionManager
-except ImportError:
-    SessionManager = None
+from neurondb_client import SessionManager
 
 @pytest.mark.runtime
 @pytest.mark.requires_server

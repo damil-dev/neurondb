@@ -18,3 +18,4 @@ class TestSlackConnector:
         """Test Slack webhook integration."""
         pytest.skip("Slack connector requires webhook URL")
 
+

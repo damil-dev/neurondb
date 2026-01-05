@@ -224,3 +224,4 @@ prove t/001_basic_minimal.t
 
 **Status**: 1 of 3 bugs completely fixed, 2 require additional research into PostgreSQL's type system.
 
+
