@@ -92,7 +92,38 @@ COPY . .
 # Build NeuronDB with Metal support
 # Note: Metal framework is available on macOS host, but for Docker builds
 # we compile with Metal support flags. Actual Metal runtime requires macOS.
-RUN make clean && \
+# Generate configuration header first
+RUN cd NeuronDB && \
+    mkdir -p include && \
+    cat > include/neurondb_config.h <<'EOF'
+/*-------------------------------------------------------------------------
+ * neurondb_config.h - Auto-generated configuration header
+ * Generated for Docker Metal build
+ *-------------------------------------------------------------------------*/
+
+#ifndef NEURONDB_CONFIG_H
+#define NEURONDB_CONFIG_H
+
+#define NEURONDB_VERSION "1.0"
+#define NEURONDB_BUILD_DATE "20260105"
+#define NEURONDB_PLATFORM_MACOS 1
+
+/* GPU support - Metal */
+#define NDB_GPU_METAL 1
+
+/* ONNX Runtime support */
+#define HAVE_ONNX_RUNTIME 1
+#define ONNX_RUNTIME_PATH "/usr/local/onnxruntime"
+
+/* CPU fallback */
+#define NEURONDB_CPU_FALLBACK 1
+
+#endif /* NEURONDB_CONFIG_H */
+EOF
+
+# Build and install
+RUN cd NeuronDB && \
+    make clean && \
     make GPU_BACKENDS=metal ONNX_PATH=${ONNX_PATH} && \
     make install
 
