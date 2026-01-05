@@ -27,12 +27,32 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install PostgreSQL and dependencies (C/C++)
+        if: matrix.language == 'cpp'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            postgresql-server-dev-16 \
+            postgresql-16 \
+            libcurl4-openssl-dev \
+            libssl-dev \
+            build-essential
+
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
 
-      - name: Autobuild
+      - name: Build NeuronDB extension (C/C++)
+        if: matrix.language == 'cpp'
+        run: |
+          cd NeuronDB
+          ./build.sh
+        env:
+          PG_CONFIG: /usr/bin/pg_config
+
+      - name: Autobuild (other languages)
+        if: matrix.language != 'cpp'
         uses: github/codeql-action/autobuild@v3
 
       - name: Perform CodeQL Analysis

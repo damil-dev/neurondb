@@ -48,13 +48,14 @@ jobs:
       - name: Build NeuronDB extension
         working-directory: NeuronDB
         run: |
-          GPU_BACKENDS=none make clean
-          GPU_BACKENDS=none make
+          ./build.sh
+        env:
+          GPU_BACKENDS: none
 
       - name: Install extension
         working-directory: NeuronDB
         run: |
-          sudo GPU_BACKENDS=none make install
+          sudo make install
 
       - name: Create extension in test database
         run: |
