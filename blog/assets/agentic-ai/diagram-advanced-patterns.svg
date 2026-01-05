@@ -1,0 +1,113 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:svg xmlns:ns0="http://www.w3.org/2000/svg" width="1000" height="500" viewBox="0 0 1000 500">
+  <ns0:defs>
+    
+    <ns0:linearGradient id="boxGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <ns0:stop offset="0%" style="stop-color:#1e293b;stop-opacity:1" />
+      <ns0:stop offset="100%" style="stop-color:#0f172a;stop-opacity:1" />
+    </ns0:linearGradient>
+    <ns0:linearGradient id="cyanGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <ns0:stop offset="0%" style="stop-color:#06b6d4;stop-opacity:0.3" />
+      <ns0:stop offset="100%" style="stop-color:#0891b2;stop-opacity:0.2" />
+    </ns0:linearGradient>
+    <ns0:linearGradient id="purpleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <ns0:stop offset="0%" style="stop-color:#8b5cf6;stop-opacity:0.3" />
+      <ns0:stop offset="100%" style="stop-color:#7c3aed;stop-opacity:0.2" />
+    </ns0:linearGradient>
+    <ns0:linearGradient id="greenGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <ns0:stop offset="0%" style="stop-color:#10b981;stop-opacity:0.3" />
+      <ns0:stop offset="100%" style="stop-color:#059669;stop-opacity:0.2" />
+    </ns0:linearGradient>
+    <ns0:filter id="glow">
+      <ns0:feGaussianBlur stdDeviation="3" result="coloredBlur" />
+      <ns0:feMerge>
+        <ns0:feMergeNode in="coloredBlur" />
+        <ns0:feMergeNode in="SourceGraphic" />
+      </ns0:feMerge>
+    </ns0:filter>
+    <ns0:marker id="arrowhead" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <ns0:polygon points="0 0, 8 4, 0 8" fill="currentColor" opacity="0.9" />
+    </ns0:marker>
+  </ns0:defs>
+  
+  
+  
+  
+  <ns0:text x="500" y="40" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="28" font-weight="bold" fill="#facc15" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">Advanced Patterns</ns0:text>
+  
+  
+  <ns0:g transform="translate(50, 80)">
+    
+    <ns0:g>
+      <ns0:rect x="0" y="0" width="280" height="140" rx="8" fill="url(#boxGrad)" stroke="#8b5cf6" stroke-width="2" filter="url(#glow)" />
+      <ns0:rect x="5" y="5" width="270" height="130" rx="6" fill="url(#purpleGrad)" />
+      <ns0:text x="140" y="35" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="bold" fill="#ffffff" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">Multi-Agent</ns0:text>
+      <ns0:text x="140" y="60" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#cbd5e1" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">Research &amp; Analysis</ns0:text>
+      <ns0:text x="140" y="80" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#cbd5e1" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">Shared Memory</ns0:text>
+      <ns0:circle cx="140" cy="110" r="4" fill="#8b5cf6" />
+    </ns0:g>
+    
+    
+    <ns0:g transform="translate(320, 0)">
+      <ns0:rect x="0" y="0" width="280" height="140" rx="8" fill="url(#boxGrad)" stroke="#06b6d4" stroke-width="2" filter="url(#glow)" />
+      <ns0:rect x="5" y="5" width="270" height="130" rx="6" fill="url(#cyanGrad)" />
+      <ns0:text x="140" y="35" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="bold" fill="#ffffff" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">Orchestration</ns0:text>
+      <ns0:text x="140" y="60" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#cbd5e1" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">Route Tasks</ns0:text>
+      <ns0:text x="140" y="80" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#cbd5e1" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">Coordinate</ns0:text>
+      <ns0:circle cx="140" cy="110" r="4" fill="#06b6d4" />
+    </ns0:g>
+    
+    
+    <ns0:g transform="translate(590, 0)">
+      <ns0:rect x="0" y="0" width="280" height="140" rx="8" fill="url(#boxGrad)" stroke="#10b981" stroke-width="2" filter="url(#glow)" />
+      <ns0:rect x="5" y="5" width="270" height="130" rx="6" fill="url(#greenGrad)" />
+      <ns0:text x="140" y="35" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="bold" fill="#ffffff" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">Specialization</ns0:text>
+      <ns0:text x="140" y="60" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#cbd5e1" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">Research, Code</ns0:text>
+      <ns0:text x="140" y="80" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#cbd5e1" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">Analysis Agents</ns0:text>
+      <ns0:circle cx="140" cy="110" r="4" fill="#10b981" />
+    </ns0:g>
+  </ns0:g>
+  
+  
+  <ns0:g transform="translate(200, 300)">
+    
+    <ns0:g>
+      <ns0:rect x="0" y="0" width="180" height="100" rx="8" fill="url(#boxGrad)" stroke="#8b5cf6" stroke-width="2" filter="url(#glow)" />
+      <ns0:rect x="5" y="5" width="170" height="90" rx="6" fill="url(#purpleGrad)" />
+      <ns0:text x="90" y="35" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="bold" fill="#ffffff" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">Message</ns0:text>
+      <ns0:text x="90" y="60" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#cbd5e1" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">Passing</ns0:text>
+      <ns0:circle cx="90" cy="80" r="4" fill="#8b5cf6" />
+    </ns0:g>
+    
+    
+    <ns0:g transform="translate(220, 0)">
+      <ns0:rect x="0" y="0" width="180" height="100" rx="8" fill="url(#boxGrad)" stroke="#06b6d4" stroke-width="2" filter="url(#glow)" />
+      <ns0:rect x="5" y="5" width="170" height="90" rx="6" fill="url(#cyanGrad)" />
+      <ns0:text x="90" y="35" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="bold" fill="#ffffff" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">Workflow</ns0:text>
+      <ns0:text x="90" y="60" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#cbd5e1" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">Management</ns0:text>
+      <ns0:circle cx="90" cy="80" r="4" fill="#06b6d4" />
+    </ns0:g>
+    
+    
+    <ns0:g transform="translate(440, 0)">
+      <ns0:rect x="0" y="0" width="180" height="100" rx="8" fill="url(#boxGrad)" stroke="#10b981" stroke-width="2" filter="url(#glow)" />
+      <ns0:rect x="5" y="5" width="170" height="90" rx="6" fill="url(#greenGrad)" />
+      <ns0:text x="90" y="35" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="bold" fill="#ffffff" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">Domain</ns0:text>
+      <ns0:text x="90" y="60" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#cbd5e1" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">Expertise</ns0:text>
+      <ns0:circle cx="90" cy="80" r="4" fill="#10b981" />
+    </ns0:g>
+  </ns0:g>
+  
+  
+  <ns0:path d="M 190.0 220.0 V 260.0 H 290.0 V 300.0" fill="none" stroke="#8b5cf6" stroke-width="2" stroke-dasharray="4,4" marker-end="url(#arrowhead)" style="color: inherit;" opacity="0.8" />
+  <ns0:path d="M 510.0 220.0 V 260.0 H 510.0 V 300.0" fill="none" stroke="#06b6d4" stroke-width="2" stroke-dasharray="4,4" marker-end="url(#arrowhead)" style="color: inherit;" opacity="0.8" />
+  <ns0:path d="M 780.0 220.0 V 260.0 H 730.0 V 300.0" fill="none" stroke="#10b981" stroke-width="2" stroke-dasharray="4,4" marker-end="url(#arrowhead)" style="color: inherit;" opacity="0.8" />
+  
+  
+  <ns0:path d="M 380 350.0 H 420" fill="none" stroke="#06b6d4" stroke-width="2" marker-end="url(#arrowhead)" style="color: inherit;" opacity="0.8" />
+  <ns0:path d="M 600 350.0 H 640" fill="none" stroke="#10b981" stroke-width="2" marker-end="url(#arrowhead)" style="color: inherit;" opacity="0.8" />
+  
+  
+  <ns0:path d="M 650 150.0 H 640" fill="none" stroke="#06b6d4" stroke-width="2" marker-end="url(#arrowhead)" style="color: inherit;" opacity="0.8" />
+  <ns0:path d="M 330 150.0 H 370" fill="none" stroke="#8b5cf6" stroke-width="2" marker-end="url(#arrowhead)" style="color: inherit;" opacity="0.8" />
+</ns0:svg>

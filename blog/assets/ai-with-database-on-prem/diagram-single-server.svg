@@ -1,0 +1,257 @@
+<?xml version="1.0" ?>
+<ns0:svg xmlns:ns0="http://www.w3.org/2000/svg" width="1000" height="680" viewBox="0 0 1000 680" preserveAspectRatio="xMidYMid meet">
+  
+  
+  <ns0:defs>
+    
+    
+    <ns0:linearGradient id="boxGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      
+      
+      <ns0:stop offset="0%" style="stop-color:#1e293b;stop-opacity:1"/>
+      
+      
+      <ns0:stop offset="100%" style="stop-color:#0f172a;stop-opacity:1"/>
+      
+    
+    </ns0:linearGradient>
+    
+    
+    <ns0:linearGradient id="cyanGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      
+      
+      <ns0:stop offset="0%" style="stop-color:#06b6d4;stop-opacity:0.3"/>
+      
+      
+      <ns0:stop offset="100%" style="stop-color:#0891b2;stop-opacity:0.2"/>
+      
+    
+    </ns0:linearGradient>
+    
+    
+    <ns0:linearGradient id="purpleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      
+      
+      <ns0:stop offset="0%" style="stop-color:#8b5cf6;stop-opacity:0.3"/>
+      
+      
+      <ns0:stop offset="100%" style="stop-color:#7c3aed;stop-opacity:0.2"/>
+      
+    
+    </ns0:linearGradient>
+    
+    
+    <ns0:linearGradient id="greenGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      
+      
+      <ns0:stop offset="0%" style="stop-color:#10b981;stop-opacity:0.3"/>
+      
+      
+      <ns0:stop offset="100%" style="stop-color:#059669;stop-opacity:0.2"/>
+      
+    
+    </ns0:linearGradient>
+    
+    
+    <ns0:filter id="glow">
+      
+      
+      <ns0:feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      
+      
+      <ns0:feMerge>
+        
+        
+        <ns0:feMergeNode in="coloredBlur"/>
+        
+        
+        <ns0:feMergeNode in="SourceGraphic"/>
+        
+      
+      </ns0:feMerge>
+      
+    
+    </ns0:filter>
+    
+    
+    <ns0:marker id="arrowhead-cyan" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="strokeWidth">
+      
+      
+      <ns0:polygon points="0 0, 10 5, 0 10" fill="#06b6d4" opacity="0.9"/>
+      
+    
+    </ns0:marker>
+    
+    
+    <ns0:marker id="arrowhead-orange" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="strokeWidth">
+      
+      
+      <ns0:polygon points="0 0, 10 5, 0 10" fill="#f97316" opacity="0.9"/>
+      
+    
+    </ns0:marker>
+    
+    
+    <ns0:marker id="arrowhead-green" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="strokeWidth">
+      
+      
+      <ns0:polygon points="0 0, 10 5, 0 10" fill="#10b981" opacity="0.9"/>
+      
+    
+    </ns0:marker>
+    
+  
+  </ns0:defs>
+  
+  
+  
+  
+  <ns0:text x="500" y="40" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="28" font-weight="bold" fill="#facc15" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">Single-Server On-Premises Deployment</ns0:text>
+  
+  
+  
+  
+  <ns0:g transform="translate(300, 100)">
+    
+    
+    <ns0:rect x="0" y="0" width="400" height="480" rx="15" fill="url(#boxGrad)" stroke="#06b6d4" stroke-width="3" filter="url(#glow)"/>
+    
+    
+    <ns0:rect x="10" y="10" width="380" height="460" rx="12" fill="url(#cyanGrad)" opacity="0.2"/>
+    
+    
+    
+    
+    <ns0:text x="200" y="40" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="22" font-weight="bold" fill="#ffffff" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">On-Premises Server</ns0:text>
+    
+    
+    <ns0:line x1="50" y1="55" x2="350" y2="55" stroke="#06b6d4" stroke-width="1" opacity="0.5"/>
+    
+    
+    
+    
+    <ns0:g transform="translate(30, 80)">
+      
+      
+      <ns0:rect x="0" y="0" width="340" height="60" rx="8" fill="url(#boxGrad)" stroke="#06b6d4" stroke-width="2" opacity="0.8"/>
+      
+      
+      <ns0:text x="170" y="25" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="bold" fill="#ffffff" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">Application Layer</ns0:text>
+      
+      
+      <ns0:text x="170" y="45" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#cbd5e1" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">Web Apps, APIs, Batch Jobs</ns0:text>
+      
+    
+    </ns0:g>
+    
+    
+    
+    
+    <ns0:g transform="translate(30, 170)">
+      
+      
+      <ns0:rect x="0" y="0" width="340" height="100" rx="8" fill="url(#boxGrad)" stroke="#8b5cf6" stroke-width="2" filter="url(#glow)"/>
+      
+      
+      <ns0:rect x="5" y="5" width="330" height="90" rx="6" fill="url(#purpleGrad)"/>
+      
+      
+      <ns0:text x="170" y="30" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="bold" fill="#ffffff" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">PostgreSQL + NeuronDB</ns0:text>
+      
+      
+      <ns0:text x="80" y="55" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#cbd5e1" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">Vector Search</ns0:text>
+      
+      
+      <ns0:text x="170" y="55" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#cbd5e1" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">ML Inference</ns0:text>
+      
+      
+      <ns0:text x="260" y="55" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#cbd5e1" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">RAG Pipeline</ns0:text>
+      
+      
+      <ns0:text x="170" y="80" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#cbd5e1" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">All operations in-database</ns0:text>
+      
+    
+    </ns0:g>
+    
+    
+    
+    
+    <ns0:g transform="translate(30, 300)">
+      
+      
+      <ns0:rect x="0" y="0" width="340" height="80" rx="8" fill="url(#boxGrad)" stroke="#f97316" stroke-width="2"/>
+      
+      
+      <ns0:rect x="5" y="5" width="330" height="70" rx="6" fill="url(#boxGrad)" opacity="0.5"/>
+      
+      
+      <ns0:text x="170" y="30" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="bold" fill="#ffffff" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">Storage</ns0:text>
+      
+      
+      <ns0:text x="85" y="55" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#cbd5e1" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">NVMe SSD</ns0:text>
+      
+      
+      <ns0:text x="170" y="55" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#cbd5e1" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">HDD Array</ns0:text>
+      
+      
+      <ns0:text x="255" y="55" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#cbd5e1" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">Backup</ns0:text>
+      
+    
+    </ns0:g>
+    
+    
+    
+    
+    <ns0:g transform="translate(30, 410)">
+      
+      
+      <ns0:rect x="0" y="0" width="340" height="50" rx="8" fill="url(#boxGrad)" stroke="#10b981" stroke-width="2"/>
+      
+      
+      <ns0:rect x="5" y="5" width="330" height="40" rx="6" fill="url(#greenGrad)"/>
+      
+      
+      <ns0:text x="170" y="30" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">GPU Acceleration (Optional) - 10-100x Speedup</ns0:text>
+      
+    
+    </ns0:g>
+    
+  
+  </ns0:g>
+  
+  
+  
+  
+  <ns0:g transform="translate(50, 600)">
+    
+    
+    <ns0:rect x="0" y="0" width="900" height="60" rx="8" fill="url(#boxGrad)" stroke="#06b6d4" stroke-width="2" opacity="0.3"/>
+    
+    
+    <ns0:text x="450" y="25" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="bold" fill="#06b6d4" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">Internal Network Only</ns0:text>
+    
+    
+    <ns0:text x="200" y="50" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#cbd5e1" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">✓ No Internet Required</ns0:text>
+    
+    
+    <ns0:text x="450" y="50" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#cbd5e1" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">✓ All Data Local</ns0:text>
+    
+    
+    <ns0:text x="700" y="50" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#cbd5e1" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">✓ Simple Setup</ns0:text>
+    
+  
+  </ns0:g>
+  
+  
+  
+  
+  <ns0:path d="M 500 240 L 500 270" fill="none" stroke="#06b6d4" stroke-width="2" marker-end="url(#arrowhead-cyan)" opacity="0.6"/>
+  
+  
+  <ns0:path d="M 500 370 L 500 400" fill="none" stroke="#f97316" stroke-width="2" marker-end="url(#arrowhead-orange)" opacity="0.6"/>
+  
+  
+  <ns0:path d="M 500 480 L 500 510" fill="none" stroke="#10b981" stroke-width="2" marker-end="url(#arrowhead-green)" opacity="0.6"/>
+  
+
+</ns0:svg>

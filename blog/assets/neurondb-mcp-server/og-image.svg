@@ -1,0 +1,62 @@
+<?xml version="1.0" ?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#070d1a;stop-opacity:1"/>
+      <stop offset="50%" style="stop-color:#111827;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#1f2937;stop-opacity:1"/>
+    </linearGradient>
+    <linearGradient id="textGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#4f46e5;stop-opacity:1"/>
+      <stop offset="50%" style="stop-color:#06b6d4;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#10b981;stop-opacity:1"/>
+    </linearGradient>
+  </defs>
+  
+  <rect width="1200" height="630" fill="url(#bgGradient)"/>
+  
+  <!-- MCP connection visual -->
+  <g transform="translate(100, 200)" opacity="0.3">
+    <rect x="0" y="0" width="120" height="80" rx="10" fill="#1f2937" stroke="#06b6d4" stroke-width="2"/>
+    <rect x="15" y="15" width="90" height="20" rx="5" fill="#4f46e5" opacity="0.7"/>
+    <rect x="15" y="45" width="90" height="20" rx="5" fill="#06b6d4" opacity="0.7"/>
+    
+    <line x1="120" y1="40" x2="180" y2="40" stroke="#8b5cf6" stroke-width="2" opacity="0.5"/>
+    
+    <rect x="180" y="0" width="120" height="80" rx="10" fill="#1f2937" stroke="#10b981" stroke-width="2"/>
+    <rect x="195" y="15" width="90" height="20" rx="5" fill="#10b981" opacity="0.7"/>
+    <rect x="195" y="45" width="90" height="20" rx="5" fill="#8b5cf6" opacity="0.7"/>
+  </g>
+  
+  <!-- Title -->
+  <text x="600" y="250" font-family="system-ui, -apple-system, sans-serif" font-size="72" font-weight="700" fill="url(#textGradient)" text-anchor="middle">
+    NeuronMCP
+  </text>
+  
+  <text x="600" y="320" font-family="system-ui, -apple-system, sans-serif" font-size="48" font-weight="400" fill="#fff" text-anchor="middle" opacity="0.9">
+    Model Context Protocol Server
+  </text>
+  
+  <!-- Tags -->
+  <g transform="translate(300, 400)">
+    <rect x="0" y="0" width="180" height="40" rx="20" fill="#4f46e5" opacity="0.7"/>
+    <text x="90" y="27" fill="#fff" font-size="18" text-anchor="middle" font-weight="500" font-family="system-ui, sans-serif">MCP Protocol</text>
+  </g>
+  
+  <g transform="translate(510, 400)">
+    <rect x="0" y="0" width="180" height="40" rx="20" fill="#06b6d4" opacity="0.7"/>
+    <text x="90" y="27" fill="#fff" font-size="18" text-anchor="middle" font-weight="500" font-family="system-ui, sans-serif">Claude Desktop</text>
+  </g>
+  
+  <g transform="translate(720, 400)">
+    <rect x="0" y="0" width="180" height="40" rx="20" fill="#10b981" opacity="0.7"/>
+    <text x="90" y="27" fill="#fff" font-size="18" text-anchor="middle" font-weight="500" font-family="system-ui, sans-serif">PostgreSQL</text>
+  </g>
+  
+  <!-- Footer -->
+  <text x="600" y="560" font-family="system-ui, sans-serif" font-size="24" font-weight="300" fill="#fff" text-anchor="middle" opacity="0.6">
+    neurondb.ai
+  </text>
+</svg>
+
+

@@ -1,0 +1,439 @@
+<?xml version="1.0" ?>
+<ns0:svg xmlns:ns0="http://www.w3.org/2000/svg" width="960" height="512" viewBox="0 0 1200 640" preserveAspectRatio="xMidYMid meet">
+  
+  
+  <ns0:defs>
+    
+    
+    <ns0:linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      
+      
+      <ns0:stop offset="0" stop-color="#0a1b4e"/>
+      
+      
+      <ns0:stop offset="1" stop-color="#001635"/>
+      
+    
+    </ns0:linearGradient>
+    
+    
+    <ns0:linearGradient id="glowGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      
+      
+      <ns0:stop offset="0%" stop-color="#5fc4ff" stop-opacity="0.9"/>
+      
+      
+      <ns0:stop offset="100%" stop-color="#5ab5ff" stop-opacity="0.9"/>
+      
+    
+    </ns0:linearGradient>
+    
+    
+    <ns0:filter id="glow">
+      
+      
+      <ns0:feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      
+      
+      <ns0:feMerge>
+        
+        
+        <ns0:feMergeNode in="coloredBlur"/>
+        
+        
+        <ns0:feMergeNode in="SourceGraphic"/>
+        
+      
+      </ns0:feMerge>
+      
+    
+    </ns0:filter>
+    
+    
+    <ns0:style>
+      .title {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+        fill: #ffffff;
+        font-size: 32px;
+        font-weight: 600;
+      }
+      .label {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+        fill: #dce6ff;
+        font-size: 18px;
+        font-weight: 500;
+      }
+      .bubble {
+        fill: #0a264f;
+        stroke: #5fc4ff;
+        stroke-width: 2.5;
+      }
+      .bubble-icon {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+        fill: #ffffff;
+        font-size: 42px;
+        font-weight: 600;
+      }
+      .vs-circle {
+        fill: #0d2a60;
+        stroke: #5ab5ff;
+        stroke-width: 5;
+      }
+      .vs-text {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+        fill: #ffffff;
+        font-size: 40px;
+        font-weight: 700;
+      }
+      .small-icon {
+        fill: none;
+        stroke: #ffffff;
+        stroke-width: 3;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .panel {
+        fill: #10356a;
+        stroke: #5fc4ff;
+        stroke-width: 2;
+        rx: 12;
+      }
+      .connection-line {
+        fill: none;
+        stroke: #5fc4ff;
+        stroke-width: 2.5;
+        stroke-linecap: round;
+        opacity: 0.6;
+      }
+    </ns0:style>
+    
+  
+  </ns0:defs>
+  
+
+  
+    
+  
+  <ns0:g opacity="0.9">
+    
+    
+    <ns0:path d="M50 50 L200 150 M300 80 L450 180 M600 100 L750 200" stroke="#5fc4ff" stroke-width="0.5" stroke-dasharray="5,5"/>
+    
+    
+    <ns0:path d="M800 120 L950 220 M1050 140 L1200 240" stroke="#5fc4ff" stroke-width="0.5" stroke-dasharray="5,5"/>
+    
+    
+    <ns0:rect x="186.0" y="448.0" width="24" height="24" fill="none" stroke="#5fc4ff" stroke-width="0.5"/>
+    
+    
+    <ns0:rect x="266.0" y="488.0" width="24" height="24" fill="none" stroke="#5fc4ff" stroke-width="0.5"/>
+    
+    
+    <ns0:rect x="906.0" y="448.0" width="24" height="24" fill="none" stroke="#5fc4ff" stroke-width="0.5"/>
+    
+    
+    <ns0:rect x="986.0" y="488.0" width="24" height="24" fill="none" stroke="#5fc4ff" stroke-width="0.5"/>
+    
+  
+  </ns0:g>
+  
+
+  
+  
+  <ns0:line x1="600" y1="40" x2="600" y2="600" stroke="#6fa6ff" stroke-width="2" opacity="0.9"/>
+  
+
+  
+  
+  <ns0:circle cx="533.0" cy="320.0" r="70" class="vs-circle" filter="url(#glow)"/>
+  
+  
+  <ns0:text x="533.0" y="328.0" class="vs-text" text-anchor="middle" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" dominant-baseline="middle">VS</ns0:text>
+  
+
+  
+  
+  <ns0:g transform="translate(250,120)">
+    
+    
+    
+    <ns0:g>
+      
+      
+      
+      <ns0:circle cx="53.0" cy="64.0" r="75" fill="url(#glowGrad)" opacity="0.9" filter="url(#glow)"/>
+      
+      
+      
+      <ns0:path opacity="0.8"/>
+      
+      
+      
+      <ns0:circle cx="-15" cy="-20" r="18" fill="#0d2a60" stroke="#5fc4ff" stroke-width="0.5"/>
+      
+      
+      <ns0:text x="-15" y="-15" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="6" font-weight="normal" fill="#ffffff" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">AI</ns0:text>
+      
+      
+      
+      <ns0:g transform="translate(-80, -10)">
+        
+        
+        <ns0:circle cx="53.0" cy="64.0" r="20" fill="none" stroke="#8b5cf6" stroke-width="2.5"/>
+        
+        
+        <ns0:path d="M-8 -5 Q-5 -8 -2 -5 Q2 -8 5 -5 M-8 0 Q-5 3 -2 0 Q2 3 5 0 M-8 5 Q-5 8 -2 5 Q2 8 5 5" stroke="#8b5cf6" stroke-width="0.5" fill="none"/>
+        
+      
+      </ns0:g>
+      
+      
+      
+      <ns0:circle cx="-40" cy="-50" r="2" fill="#ffffff"/>
+      
+      
+      <ns0:circle cx="-30" cy="-55" r="1.5" fill="#ffffff"/>
+      
+      
+      <ns0:circle cx="-50" cy="-45" r="1.5" fill="#ffffff"/>
+      
+    
+    </ns0:g>
+    
+
+    
+    
+    <ns0:path class="connection-line" d="M-50 50 Q-30 80 -160 130"/>
+    
+    
+    <ns0:path class="connection-line" d="M0 50 Q0 80 0 130"/>
+    
+    
+    <ns0:path class="connection-line" d="M50 50 Q30 80 160 130"/>
+    
+
+    
+    
+    <ns0:g transform="translate(-160,130)">
+      
+      
+      <ns0:rect class="panel" x="106.0" y="128.0" width="88" height="80"/>
+      
+      
+      
+      <ns0:path d="M30 50 L55 35 L80 50 M55 35 L55 70" class="small-icon"/>
+      
+      
+      <ns0:text x="97.0" y="160.0" text-anchor="middle" class="label" font-size="6" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" dominant-baseline="middle">Travel</ns0:text>
+      
+    
+    </ns0:g>
+    
+
+    
+    <ns0:g transform="translate(0,130)">
+      
+      
+      <ns0:rect class="panel" x="106.0" y="128.0" width="88" height="80"/>
+      
+      
+      
+      <ns0:line x1="30" y1="70" x2="30" y2="40" class="small-icon"/>
+      
+      
+      <ns0:line x1="45" y1="70" x2="45" y2="50" class="small-icon"/>
+      
+      
+      <ns0:line x1="60" y1="70" x2="60" y2="30" class="small-icon"/>
+      
+      
+      <ns0:line x1="75" y1="70" x2="75" y2="45" class="small-icon"/>
+      
+      
+      <ns0:text x="94.0" y="88.0" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="6" font-weight="normal" fill="#ffffff" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">$</ns0:text>
+      
+      
+      <ns0:text x="97.0" y="94.0" text-anchor="middle" class="label" font-size="6" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" dominant-baseline="middle">Analytics</ns0:text>
+      
+    
+    </ns0:g>
+    
+
+    
+    <ns0:g transform="translate(160,130)">
+      
+      
+      <ns0:rect class="panel" x="106.0" y="128.0" width="88" height="80"/>
+      
+      
+      
+      <ns0:path d="M35 50 L35 40 Q35 35 40 35 L70 35 Q75 35 75 40 L75 50 M40 50 L40 70 Q40 75 45 75 L65 75 Q70 75 70 70 L70 50" class="small-icon"/>
+      
+      
+      <ns0:circle cx="93.0" cy="112.0" r="3" fill="#ffffff"/>
+      
+      
+      <ns0:circle cx="105.0" cy="112.0" r="3" fill="#ffffff"/>
+      
+      
+      <ns0:text x="97.0" y="160.0" text-anchor="middle" class="label" font-size="6" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" dominant-baseline="middle">Commerce</ns0:text>
+      
+    
+    </ns0:g>
+    
+
+    
+    
+    <ns0:text x="53.0" y="272.0" class="title" text-anchor="middle" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" dominant-baseline="middle">Agentic AI</ns0:text>
+    
+  
+  </ns0:g>
+  
+
+  
+  
+  <ns0:g transform="translate(950,120)">
+    
+    
+    
+    <ns0:g>
+      
+      
+      
+      <ns0:circle cx="53.0" cy="64.0" r="75" fill="url(#glowGrad)" opacity="0.9" filter="url(#glow)"/>
+      
+      
+      
+      <ns0:path opacity="0.8"/>
+      
+      
+      
+      <ns0:circle cx="65.0" cy="-20" r="18" fill="#0d2a60" stroke="#5fc4ff" stroke-width="0.5"/>
+      
+      
+      <ns0:text x="65.0" y="-15" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="6" font-weight="normal" fill="#ffffff" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">AI</ns0:text>
+      
+      
+      
+      <ns0:g transform="translate(80, -10)">
+        
+        
+        <ns0:circle cx="53.0" cy="-5" r="8" fill="none" stroke="#8b5cf6" stroke-width="2.5"/>
+        
+        
+        <ns0:path d="M-12 5 Q-8 8 -4 5 Q0 8 4 5 Q8 8 12 5" stroke="#8b5cf6" stroke-width="0.5" fill="none"/>
+        
+        
+        <ns0:circle cx="53.0" cy="64.0" r="6" fill="none" stroke="#8b5cf6" stroke-width="0.5"/>
+        
+        
+        <ns0:path d="M-6 -6 L-8 -8 M6 -6 L8 -8 M-6 6 L-8 8 M6 6 L8 8" stroke="#8b5cf6" stroke-width="0.5"/>
+        
+      
+      </ns0:g>
+      
+      
+      
+      <ns0:circle cx="85.0" cy="-50" r="2" fill="#ffffff"/>
+      
+      
+      <ns0:circle cx="77.0" cy="-55" r="1.5" fill="#ffffff"/>
+      
+      
+      <ns0:circle cx="93.0" cy="-45" r="1.5" fill="#ffffff"/>
+      
+    
+    </ns0:g>
+    
+
+    
+    
+    <ns0:path class="connection-line" d="M-50 50 Q-30 80 -160 130"/>
+    
+    
+    <ns0:path class="connection-line" d="M0 50 Q0 80 0 130"/>
+    
+    
+    <ns0:path class="connection-line" d="M50 50 Q30 80 160 130"/>
+    
+
+    
+    
+    <ns0:g transform="translate(-160,130)">
+      
+      
+      <ns0:rect class="panel" x="106.0" y="128.0" width="88" height="80"/>
+      
+      
+      
+      <ns0:path d="M30 50 Q30 40 40 40 L60 40 Q70 40 70 50 L70 65 Q70 75 60 75 L50 75 L40 85 L40 75 Q30 75 30 65 Z" class="small-icon"/>
+      
+      
+      <ns0:line x1="45" y1="55" x2="55" y2="55" class="small-icon"/>
+      
+      
+      <ns0:line x1="45" y1="62" x2="60" y2="62" class="small-icon"/>
+      
+      
+      <ns0:text x="97.0" y="160.0" text-anchor="middle" class="label" font-size="6" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" dominant-baseline="middle">Chat</ns0:text>
+      
+    
+    </ns0:g>
+    
+
+    
+    <ns0:g transform="translate(0,130)">
+      
+      
+      <ns0:rect class="panel" x="106.0" y="128.0" width="88" height="80"/>
+      
+      
+      
+      <ns0:path d="M25 70 L35 50 L45 60 L55 40 L65 50 L75 70 L75 80 L25 80 Z" class="small-icon"/>
+      
+      
+      <ns0:circle cx="85.0" cy="108.0" r="3" fill="#ffffff"/>
+      
+      
+      <ns0:text x="97.0" y="160.0" text-anchor="middle" class="label" font-size="6" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" dominant-baseline="middle">Images</ns0:text>
+      
+    
+    </ns0:g>
+    
+
+    
+    <ns0:g transform="translate(160,130)">
+      
+      
+      <ns0:rect class="panel" x="106.0" y="128.0" width="88" height="80"/>
+      
+      
+      
+      <ns0:rect x="134.0" y="160.0" width="32" height="18" fill="none" class="small-icon"/>
+      
+      
+      <ns0:line x1="40" y1="50" x2="70" y2="50" class="small-icon"/>
+      
+      
+      <ns0:line x1="40" y1="58" x2="70" y2="58" class="small-icon"/>
+      
+      
+      <ns0:line x1="40" y1="66" x2="65" y2="66" class="small-icon"/>
+      
+      
+      <ns0:text x="97.0" y="105.0" text-anchor="middle" class="label" font-size="6" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" dominant-baseline="middle">Text</ns0:text>
+      
+    
+    </ns0:g>
+    
+
+    
+    
+    <ns0:text x="53.0" y="272.0" class="title" text-anchor="middle" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" dominant-baseline="middle">Generative AI</ns0:text>
+    
+  
+  </ns0:g>
+  
+
+
+</ns0:svg>

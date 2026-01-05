@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="640" viewBox="0 0 1200 640" role="img" aria-label="Agent-driven RAG loop diagram">
+  <defs>
+    <linearGradient id="panel" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b1220"/>
+      <stop offset="1" stop-color="#111827"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="18" stdDeviation="16" flood-color="#000" flood-opacity="0.55"/>
+    </filter>
+    <marker id="arrow" markerWidth="6" markerHeight="6" refX="6" refY="3" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#fbbf24"/>
+    </marker>
+  </defs>
+
+  <rect x="40" y="40" width="1120" height="560" rx="28" fill="url(#panel)" stroke="#334155" filter="url(#shadow)"/>
+
+  <text x="100" y="98" fill="#e2e8f0" font-size="22" font-weight="900"
+        font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">
+    Agent‑Driven RAG: retrieval as a plan
+  </text>
+  <text x="100" y="128" fill="#94a3b8" font-size="14" font-weight="650"
+        font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">
+    The agent decides what to search next, when evidence is sufficient, and when to stop.
+  </text>
+
+  <!-- Loop -->
+  <circle cx="600" cy="360" r="200" fill="none" stroke="#334155" stroke-width="2" opacity="0.9"/>
+
+  <g font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">
+    <!-- Plan -->
+    <rect x="510" y="150" width="180" height="74" rx="16" fill="#0f172a" stroke="#f97316" stroke-opacity="0.7"/>
+    <text x="600" y="182" fill="#e2e8f0" font-size="14" font-weight="900" text-anchor="middle">Plan</text>
+    <text x="600" y="204" fill="#94a3b8" font-size="12" font-weight="650" text-anchor="middle">break into steps</text>
+
+    <!-- Search -->
+    <rect x="780" y="300" width="180" height="74" rx="16" fill="#0f172a" stroke="#22d3ee" stroke-opacity="0.55"/>
+    <text x="870" y="332" fill="#e2e8f0" font-size="14" font-weight="900" text-anchor="middle">Search</text>
+    <text x="870" y="354" fill="#94a3b8" font-size="12" font-weight="650" text-anchor="middle">retrieve evidence</text>
+
+    <!-- Read/Summarize -->
+    <rect x="650" y="470" width="220" height="74" rx="16" fill="#0f172a" stroke="#a78bfa" stroke-opacity="0.6"/>
+    <text x="760" y="502" fill="#e2e8f0" font-size="14" font-weight="900" text-anchor="middle">Read + summarize</text>
+    <text x="760" y="524" fill="#94a3b8" font-size="12" font-weight="650" text-anchor="middle">compress context</text>
+
+    <!-- Verify -->
+    <rect x="330" y="470" width="180" height="74" rx="16" fill="#0f172a" stroke="#34d399" stroke-opacity="0.6"/>
+    <text x="420" y="502" fill="#e2e8f0" font-size="14" font-weight="900" text-anchor="middle">Verify</text>
+    <text x="420" y="524" fill="#94a3b8" font-size="12" font-weight="650" text-anchor="middle">fill gaps</text>
+
+    <!-- Answer -->
+    <rect x="240" y="300" width="180" height="74" rx="16" fill="#0f172a" stroke="#fbbf24" stroke-opacity="0.75"/>
+    <text x="330" y="332" fill="#e2e8f0" font-size="14" font-weight="900" text-anchor="middle">Answer</text>
+    <text x="330" y="354" fill="#94a3b8" font-size="12" font-weight="650" text-anchor="middle">with citations</text>
+  </g>
+
+  <!-- arrows -->
+  <path d="M690 187 C760 210 820 250 850 300" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="1 3" stroke-dashoffset="1" stroke-linecap="round" fill="none" marker-end="url(#arrow)"/>
+  <path d="M870 374 C865 420 840 455 800 470" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="1 3" stroke-dashoffset="1" stroke-linecap="round" fill="none" marker-end="url(#arrow)"/>
+  <path d="M650 507 C590 535 520 535 470 520" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="1 3" stroke-dashoffset="1" stroke-linecap="round" fill="none" marker-end="url(#arrow)"/>
+  <path d="M420 470 C390 420 360 390 340 374" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="1 3" stroke-dashoffset="1" stroke-linecap="round" fill="none" marker-end="url(#arrow)"/>
+  <path d="M330 300 C370 250 430 210 510 188" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="1 3" stroke-dashoffset="1" stroke-linecap="round" fill="none" marker-end="url(#arrow)"/>
+
+  <!-- Stop rules callout -->
+  <g font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">
+    <rect x="860" y="150" width="260" height="110" rx="18" fill="#0b1220" stroke="#334155"/>
+    <text x="880" y="182" fill="#e2e8f0" font-size="13" font-weight="900">Stop rules</text>
+    <text x="880" y="206" fill="#94a3b8" font-size="12" font-weight="650">- evidence threshold</text>
+    <text x="880" y="226" fill="#94a3b8" font-size="12" font-weight="650">- max tool calls</text>
+    <text x="880" y="246" fill="#94a3b8" font-size="12" font-weight="650">- diminishing returns</text>
+  </g>
+</svg>
+
+

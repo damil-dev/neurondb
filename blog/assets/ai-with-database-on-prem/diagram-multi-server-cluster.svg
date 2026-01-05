@@ -1,0 +1,325 @@
+<?xml version="1.0" ?>
+<ns0:svg xmlns:ns0="http://www.w3.org/2000/svg" width="1200" height="700" viewBox="0 0 1200 700" preserveAspectRatio="xMidYMid meet">
+  
+  
+  <ns0:defs>
+    
+    
+    <ns0:linearGradient id="boxGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      
+      
+      <ns0:stop offset="0%" style="stop-color:#1e293b;stop-opacity:1"/>
+      
+      
+      <ns0:stop offset="100%" style="stop-color:#0f172a;stop-opacity:1"/>
+      
+    
+    </ns0:linearGradient>
+    
+    
+    <ns0:linearGradient id="cyanGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      
+      
+      <ns0:stop offset="0%" style="stop-color:#06b6d4;stop-opacity:0.3"/>
+      
+      
+      <ns0:stop offset="100%" style="stop-color:#0891b2;stop-opacity:0.2"/>
+      
+    
+    </ns0:linearGradient>
+    
+    
+    <ns0:linearGradient id="purpleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      
+      
+      <ns0:stop offset="0%" style="stop-color:#8b5cf6;stop-opacity:0.3"/>
+      
+      
+      <ns0:stop offset="100%" style="stop-color:#7c3aed;stop-opacity:0.2"/>
+      
+    
+    </ns0:linearGradient>
+    
+    
+    <ns0:linearGradient id="greenGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      
+      
+      <ns0:stop offset="0%" style="stop-color:#10b981;stop-opacity:0.3"/>
+      
+      
+      <ns0:stop offset="100%" style="stop-color:#059669;stop-opacity:0.2"/>
+      
+    
+    </ns0:linearGradient>
+    
+    
+    <ns0:linearGradient id="orangeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      
+      
+      <ns0:stop offset="0%" style="stop-color:#f97316;stop-opacity:0.3"/>
+      
+      
+      <ns0:stop offset="100%" style="stop-color:#ea580c;stop-opacity:0.2"/>
+      
+    
+    </ns0:linearGradient>
+    
+    
+    <ns0:filter id="glow">
+      
+      
+      <ns0:feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      
+      
+      <ns0:feMerge>
+        
+        
+        <ns0:feMergeNode in="coloredBlur"/>
+        
+        
+        <ns0:feMergeNode in="SourceGraphic"/>
+        
+      
+      </ns0:feMerge>
+      
+    
+    </ns0:filter>
+    
+    
+    <ns0:marker id="arrowhead-cyan" markerWidth="10" markerHeight="10" viewBox="0 0 10 10" refX="10" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+      <ns0:path d="M 0 0 L 10 5 L 0 10 Z" fill="#06b6d4" opacity="0.9"/>
+    </ns0:marker>
+    
+    
+    <ns0:marker id="arrowhead-green" markerWidth="10" markerHeight="10" viewBox="0 0 10 10" refX="10" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+      <ns0:path d="M 0 0 L 10 5 L 0 10 Z" fill="#10b981" opacity="0.9"/>
+    </ns0:marker>
+    
+    
+    <ns0:marker id="arrowhead-orange" markerWidth="10" markerHeight="10" viewBox="0 0 10 10" refX="10" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+      <ns0:path d="M 0 0 L 10 5 L 0 10 Z" fill="#f97316" opacity="0.9"/>
+    </ns0:marker>
+    
+  
+  </ns0:defs>
+  
+  
+  
+  
+  <ns0:text x="600" y="40" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="28" font-weight="bold" fill="#facc15" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">Multi-Server Cluster Architecture</ns0:text>
+  
+  
+  
+  
+  <ns0:g transform="translate(450, 80)">
+    
+    
+    <ns0:rect x="0" y="0" width="300" height="80" rx="10" fill="url(#boxGrad)" stroke="#06b6d4" stroke-width="3" filter="url(#glow)"/>
+    
+    
+    <ns0:rect x="5" y="5" width="290" height="70" rx="8" fill="url(#cyanGrad)"/>
+    
+    
+    <ns0:text x="150" y="35" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="20" font-weight="bold" fill="#ffffff" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">Load Balancer</ns0:text>
+    
+    
+    <ns0:text x="150" y="60" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#cbd5e1" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">Query Distribution &amp; Health Checks</ns0:text>
+    
+  
+  </ns0:g>
+  
+  
+  
+  
+  <ns0:g transform="translate(100, 220)">
+    
+    
+    <ns0:rect x="0" y="0" width="250" height="200" rx="10" fill="url(#boxGrad)" stroke="#8b5cf6" stroke-width="3" filter="url(#glow)"/>
+    
+    
+    <ns0:rect x="5" y="5" width="240" height="190" rx="8" fill="url(#purpleGrad)"/>
+    
+    
+    <ns0:text x="125" y="30" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="bold" fill="#ffffff" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">Primary Server</ns0:text>
+    
+    
+    <ns0:text x="125" y="55" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#cbd5e1" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">PostgreSQL + NeuronDB</ns0:text>
+    
+    
+    <ns0:text x="125" y="80" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#cbd5e1" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">Write Operations</ns0:text>
+    
+    
+    <ns0:text x="125" y="105" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#cbd5e1" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">Read Operations</ns0:text>
+    
+    
+    <ns0:rect x="20" y="130" width="210" height="50" rx="6" fill="url(#boxGrad)" stroke="#facc15" stroke-width="1" opacity="0.5"/>
+    
+    
+    <ns0:text x="125" y="155" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#facc15" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">PRIMARY</ns0:text>
+    
+    
+    <ns0:text x="125" y="175" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#cbd5e1" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">Active Writes</ns0:text>
+    
+  
+  </ns0:g>
+  
+  
+  
+  
+  <ns0:g transform="translate(400, 220)">
+    
+    
+    <ns0:rect x="0" y="0" width="250" height="200" rx="10" fill="url(#boxGrad)" stroke="#10b981" stroke-width="2"/>
+    
+    
+    <ns0:rect x="5" y="5" width="240" height="190" rx="8" fill="url(#greenGrad)"/>
+    
+    
+    <ns0:text x="125" y="30" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="bold" fill="#ffffff" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">Replica Server 1</ns0:text>
+    
+    
+    <ns0:text x="125" y="55" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#cbd5e1" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">PostgreSQL + NeuronDB</ns0:text>
+    
+    
+    <ns0:text x="125" y="80" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#cbd5e1" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">Read-Only</ns0:text>
+    
+    
+    <ns0:text x="125" y="105" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#cbd5e1" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">Query Scaling</ns0:text>
+    
+    
+    <ns0:rect x="20" y="130" width="210" height="50" rx="6" fill="url(#boxGrad)" stroke="#10b981" stroke-width="1" opacity="0.5"/>
+    
+    
+    <ns0:text x="125" y="155" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#10b981" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">REPLICA</ns0:text>
+    
+    
+    <ns0:text x="125" y="175" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#cbd5e1" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">Read Scaling</ns0:text>
+    
+  
+  </ns0:g>
+  
+  
+  
+  
+  <ns0:g transform="translate(700, 220)">
+    
+    
+    <ns0:rect x="0" y="0" width="250" height="200" rx="10" fill="url(#boxGrad)" stroke="#10b981" stroke-width="2"/>
+    
+    
+    <ns0:rect x="5" y="5" width="240" height="190" rx="8" fill="url(#greenGrad)"/>
+    
+    
+    <ns0:text x="125" y="30" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="bold" fill="#ffffff" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">Replica Server 2</ns0:text>
+    
+    
+    <ns0:text x="125" y="55" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#cbd5e1" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">PostgreSQL + NeuronDB</ns0:text>
+    
+    
+    <ns0:text x="125" y="80" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#cbd5e1" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">Read-Only</ns0:text>
+    
+    
+    <ns0:text x="125" y="105" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#cbd5e1" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">Query Scaling</ns0:text>
+    
+    
+    <ns0:rect x="20" y="130" width="210" height="50" rx="6" fill="url(#boxGrad)" stroke="#10b981" stroke-width="1" opacity="0.5"/>
+    
+    
+    <ns0:text x="125" y="155" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#10b981" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">REPLICA</ns0:text>
+    
+    
+    <ns0:text x="125" y="175" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#cbd5e1" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">Read Scaling</ns0:text>
+    
+  
+  </ns0:g>
+  
+  
+  
+  
+  <ns0:g transform="translate(400, 480)">
+    
+    
+    <ns0:rect x="0" y="0" width="400" height="120" rx="10" fill="url(#boxGrad)" stroke="#f97316" stroke-width="2" filter="url(#glow)"/>
+    
+    
+    <ns0:rect x="5" y="5" width="390" height="110" rx="8" fill="url(#orangeGrad)"/>
+    
+    
+    <ns0:text x="200" y="35" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="20" font-weight="bold" fill="#ffffff" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">Shared Storage</ns0:text>
+    
+    
+    <ns0:text x="100" y="65" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#cbd5e1" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">SAN / NFS</ns0:text>
+    
+    
+    <ns0:text x="200" y="65" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#cbd5e1" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">Data Consistency</ns0:text>
+    
+    
+    <ns0:text x="300" y="65" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#cbd5e1" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">Backup</ns0:text>
+    
+    
+    <ns0:text x="200" y="95" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#cbd5e1" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">Encrypted &amp; Replicated</ns0:text>
+    
+  
+  </ns0:g>
+  
+  
+  
+  
+  <ns0:path d="M 500 160 L 225 220" fill="none" stroke="#06b6d4" stroke-width="2" marker-end="url(#arrowhead-cyan)" opacity="0.7"/>
+  
+  
+  <ns0:path d="M 600 160 L 525 220" fill="none" stroke="#06b6d4" stroke-width="2" marker-end="url(#arrowhead-cyan)" opacity="0.7"/>
+  
+  
+  <ns0:path d="M 700 160 L 825 220" fill="none" stroke="#06b6d4" stroke-width="2" marker-end="url(#arrowhead-cyan)" opacity="0.7"/>
+  
+  
+  
+  
+  <ns0:path d="M 350 320 L 400 320 L 400 280" fill="none" stroke="#10b981" stroke-width="2" stroke-dasharray="5,5" marker-end="url(#arrowhead-green)" opacity="0.7"/>
+  
+  
+  <ns0:path d="M 350 320 L 700 320 L 700 280" fill="none" stroke="#10b981" stroke-width="2" stroke-dasharray="5,5" marker-end="url(#arrowhead-green)" opacity="0.7"/>
+  
+  
+  
+  
+  <ns0:path d="M 225 420 L 500 480" fill="none" stroke="#f97316" stroke-width="2" marker-end="url(#arrowhead-orange)" opacity="0.7"/>
+  
+  
+  <ns0:path d="M 525 420 L 500 480" fill="none" stroke="#f97316" stroke-width="2" marker-end="url(#arrowhead-orange)" opacity="0.7"/>
+  
+  
+  <ns0:path d="M 825 420 L 700 480" fill="none" stroke="#f97316" stroke-width="2" marker-end="url(#arrowhead-orange)" opacity="0.7"/>
+  
+  
+  
+  
+  <ns0:g transform="translate(50, 620)">
+    
+    
+    <ns0:rect x="0" y="0" width="1100" height="60" rx="8" fill="url(#boxGrad)" stroke="#10b981" stroke-width="2" opacity="0.3"/>
+    
+    
+    <ns0:text x="550" y="25" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="bold" fill="#10b981" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">Cluster Benefits</ns0:text>
+    
+    
+    <ns0:text x="200" y="50" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#cbd5e1" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">✓ High Availability</ns0:text>
+    
+    
+    <ns0:text x="400" y="50" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#cbd5e1" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">✓ Read Scaling</ns0:text>
+    
+    
+    <ns0:text x="600" y="50" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#cbd5e1" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">✓ Automatic Failover</ns0:text>
+    
+    
+    <ns0:text x="800" y="50" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#cbd5e1" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">✓ Load Distribution</ns0:text>
+    
+    
+    <ns0:text x="1000" y="50" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#cbd5e1" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">✓ Data Redundancy</ns0:text>
+    
+  
+  </ns0:g>
+  
+
+</ns0:svg>
