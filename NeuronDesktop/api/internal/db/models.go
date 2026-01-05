@@ -59,19 +59,6 @@ type AuditLog struct {
 	CreatedAt    time.Time              `json:"created_at"`
 }
 
-/* AuditLog represents an audit log entry */
-type AuditLog struct {
-	ID           string                 `json:"id"`
-	UserID       string                 `json:"user_id"`
-	Action       string                 `json:"action"`
-	ResourceType string                 `json:"resource_type"`
-	ResourceID   *string                `json:"resource_id,omitempty"`
-	Details      map[string]interface{} `json:"details,omitempty"`
-	IPAddress    *string                `json:"ip_address,omitempty"`
-	UserAgent    *string                `json:"user_agent,omitempty"`
-	CreatedAt    time.Time              `json:"created_at"`
-}
-
 /* ModelConfig represents a model configuration */
 type ModelConfig struct {
 	ID            string                 `json:"id"`

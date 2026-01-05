@@ -1,37 +1,43 @@
-# Build stage
-FROM golang:1.24-alpine AS builder
+# NeuronDesktop API Dockerfile
+# Built from repo root (see root docker-compose.yml) so we can also build NeuronMCP.
 
-WORKDIR /app
+# --- Build NeuronDesktop API ---
+FROM golang:1.24-alpine AS desktop_builder
 
-# Install build dependencies
+WORKDIR /src/NeuronDesktop/api
 RUN apk add --no-cache git
 
-# Copy go mod files
-COPY go.mod go.sum ./
+COPY NeuronDesktop/api/go.mod NeuronDesktop/api/go.sum ./
 RUN go mod download
 
-# Copy source code
-COPY . .
+COPY NeuronDesktop/api/ ./
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /out/neurondesktop ./cmd/server
 
-# Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o neurondesktop ./cmd/server
+# --- Build NeuronMCP binary (for NeuronDesktop to spawn via stdio) ---
+FROM golang:1.24-alpine AS mcp_builder
 
-# Final stage
+WORKDIR /src/NeuronMCP
+RUN apk add --no-cache git
+
+COPY NeuronMCP/go.mod NeuronMCP/go.sum ./
+RUN go mod download
+
+COPY NeuronMCP/ ./
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /out/neurondb-mcp ./cmd/neurondb-mcp
+
+# --- Runtime image ---
 FROM alpine:latest
 
 RUN apk --no-cache add ca-certificates tzdata
 
 WORKDIR /root/
 
-# Copy the binary from builder
-COPY --from=builder /app/neurondesktop .
+COPY --from=desktop_builder /out/neurondesktop ./neurondesktop
+COPY --from=mcp_builder /out/neurondb-mcp /usr/local/bin/neurondb-mcp
+RUN chmod +x /usr/local/bin/neurondb-mcp
 
-# Copy complete schema file
-COPY neurondesktop.sql ./neurondesktop.sql
+COPY NeuronDesktop/api/neurondesktop.sql ./neurondesktop.sql
 
-# Expose port
 EXPOSE 8081
-
-# Run the binary
 CMD ["./neurondesktop"]
 

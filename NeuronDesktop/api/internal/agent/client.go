@@ -10,6 +10,17 @@ import (
 	"time"
 )
 
+/* HTTPError represents an HTTP error response */
+type HTTPError struct {
+	StatusCode int
+	Message    string
+	Body       string
+}
+
+func (e *HTTPError) Error() string {
+	return fmt.Sprintf("HTTP %d: %s", e.StatusCode, e.Message)
+}
+
 /* Client provides HTTP access to NeuronAgent */
 type Client struct {
 	baseURL    string
@@ -307,7 +318,11 @@ func (c *Client) doRequest(req *http.Request, result interface{}) error {
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("API error: %s (status: %d)", string(body), resp.StatusCode)
+		return &HTTPError{
+			StatusCode: resp.StatusCode,
+			Message:    fmt.Sprintf("API error: %s", string(body)),
+			Body:       string(body),
+		}
 	}
 
 	if result != nil {
