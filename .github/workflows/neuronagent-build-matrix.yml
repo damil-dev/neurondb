@@ -1,56 +1,56 @@
-name: NeuronAgent - Build and Test
+name: NeuronAgent - Build Matrix
 
 on:
   push:
     branches: [main, develop]
     paths:
       - 'NeuronAgent/**'
-      - '.github/workflows/neuronagent-build-and-test.yml'
+      - '.github/workflows/neuronagent-build-matrix.yml'
   pull_request:
     branches: [main, develop]
     paths:
       - 'NeuronAgent/**'
-      - '.github/workflows/neuronagent-build-and-test.yml'
+      - '.github/workflows/neuronagent-build-matrix.yml'
   workflow_dispatch:
 
 jobs:
-  build-neuronagent:
-    name: Build NeuronAgent (Go ${{ matrix.go_version }}, ${{ matrix.os }})
+  build:
+    name: Build (Go ${{ matrix.go_version }}, ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         go_version: ["1.21", "1.22", "1.23", "1.24"]
         os: [ubuntu-latest, macos-latest]
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      
+
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.go_version }}
           cache-dependency-path: NeuronAgent/go.sum
-      
+
       - name: Verify dependencies
         working-directory: NeuronAgent
         run: |
           go mod download
           go mod verify
-      
+
       - name: Build NeuronAgent
         working-directory: NeuronAgent
         run: |
           go build -v -o neuronagent ./cmd/agent-server
           ./neuronagent --version || echo "Binary built successfully"
-      
+
       - name: Run Go tests
         working-directory: NeuronAgent
         run: |
           go test ./... -v -race -coverprofile=coverage.out
         continue-on-error: true
-      
+
       - name: Upload coverage
         if: matrix.go_version == '1.24' && matrix.os == 'ubuntu-latest'
         uses: actions/upload-artifact@v4
@@ -58,34 +58,34 @@ jobs:
           name: neuronagent-coverage
           path: NeuronAgent/coverage.out
           retention-days: 7
-      
+
       - name: Upload binary
         uses: actions/upload-artifact@v4
         with:
           name: neuronagent-go${{ matrix.go_version }}-${{ matrix.os }}
           path: NeuronAgent/neuronagent
           retention-days: 7
-      
+
       - name: Check binary info
         working-directory: NeuronAgent
         run: |
           file neuronagent
           ls -lh neuronagent
 
-  lint-neuronagent:
-    name: Lint NeuronAgent
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      
+
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: '1.24'
           cache-dependency-path: NeuronAgent/go.sum
-      
+
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v4
         with:
@@ -95,11 +95,11 @@ jobs:
         continue-on-error: true
 
   test-summary:
-    name: NeuronAgent Build Summary
+    name: Build Summary
     runs-on: ubuntu-latest
-    needs: [build-neuronagent, lint-neuronagent]
+    needs: [build, lint]
     if: always()
-    
+
     steps:
       - name: Generate summary
         run: |
