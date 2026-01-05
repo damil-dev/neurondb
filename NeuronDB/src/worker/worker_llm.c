@@ -170,11 +170,11 @@ neuranllm_main(Datum main_arg)
 
 			if (job_type != NULL)
 			{
-				pfree(job_type);
+				pfree((void *) job_type);
 			}
 			if (payload != NULL)
 			{
-				pfree(payload);
+				pfree((void *) payload);
 			}
 			}
 
@@ -207,11 +207,11 @@ neuranllm_main(Datum main_arg)
 				AbortCurrentTransaction();
 			if (job_type != NULL)
 			{
-				pfree(job_type);
+				pfree((void *) job_type);
 			}
 			if (payload != NULL)
 			{
-				pfree(payload);
+				pfree((void *) payload);
 			}
 			elog(LOG,
 				 "neurondb: LLM worker caught exception, all "
