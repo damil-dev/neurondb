@@ -186,7 +186,7 @@ export default function SettingsPage() {
         const defaultProfile = response.data.find(p => p.is_default)
         setSelectedProfileForModels(defaultProfile ? defaultProfile.id : response.data[0].id)
       }
-    } catch (error) {
+    } catch (error: any) {
       showErrorToast('Failed to load profiles: ' + (error.response?.data?.error || error.message))
     }
   }
@@ -197,7 +197,7 @@ export default function SettingsPage() {
       // Load with API keys for inline editing
       const response = await modelConfigAPI.list(selectedProfileForModels, true)
       setModelConfigs(response.data)
-    } catch (error) {
+    } catch (error: any) {
       showErrorToast('Failed to load model configs: ' + (error.response?.data?.error || error.message))
     }
   }
@@ -569,7 +569,7 @@ export default function SettingsPage() {
       await profilesAPI.update(editingProfile.id, updatedProfile)
       await loadProfiles()
       setNotice({ type: 'success', message: `MCP configuration saved to profile "${editingProfile.name}".` })
-    } catch (error) {
+    } catch (error: any) {
       showErrorToast('Failed to save MCP config: ' + (error.response?.data?.error || error.message))
       setNotice({ type: 'error', message: 'Failed to save MCP configuration.' })
     }
@@ -588,7 +588,7 @@ export default function SettingsPage() {
       await profilesAPI.update(editingProfile.id, updatedProfile)
       await loadProfiles()
       setNotice({ type: 'success', message: `Agent configuration saved to profile "${editingProfile.name}".` })
-    } catch (error) {
+    } catch (error: any) {
       showErrorToast('Failed to save agent config: ' + (error.response?.data?.error || error.message))
       setNotice({ type: 'error', message: 'Failed to save agent configuration.' })
     }

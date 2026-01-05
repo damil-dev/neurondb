@@ -207,7 +207,7 @@ export default function AgentPlayground({ agentId, onClose }: AgentPlaygroundPro
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: response.data.content || response.data.message || 'No response',
+        content: response.data.content || 'No response',
         timestamp: new Date(),
       }
 

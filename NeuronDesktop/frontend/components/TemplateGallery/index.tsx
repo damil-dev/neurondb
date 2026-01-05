@@ -11,30 +11,35 @@ const HARDCODED_TEMPLATES: Template[] = [
     name: 'Customer Support',
     description: 'Multi-tier customer support agent with escalation workflow',
     category: 'support',
+    configuration: {},
   },
   {
     id: 'data-pipeline',
     name: 'Data Pipeline',
     description: 'Data ingestion, processing, and analysis pipeline workflow',
     category: 'data',
+    configuration: {},
   },
   {
     id: 'research-assistant',
     name: 'Research Assistant',
     description: 'Multi-source research assistant with web search and document analysis',
     category: 'research',
+    configuration: {},
   },
   {
     id: 'document-qa',
     name: 'Document Q&A',
     description: 'RAG-based document Q&A agent with vector search',
     category: 'rag',
+    configuration: {},
   },
   {
     id: 'report-generator',
     name: 'Report Generator',
     description: 'Automated report generation workflow with data analysis and visualization',
     category: 'analytics',
+    configuration: {},
   },
 ]
 
