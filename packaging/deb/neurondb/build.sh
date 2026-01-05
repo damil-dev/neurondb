@@ -34,7 +34,7 @@ mkdir -p "$PKG_DIR/usr/share/doc/neurondb"
 
 # Build NeuronDB extension
 cd "$REPO_ROOT/NeuronDB"
-./build.sh
+ONNX_RUNTIME_PATH="${ONNX_RUNTIME_PATH:-/usr/local/onnxruntime}" GPU_BACKENDS=none ./build.sh
 make DESTDIR="$PKG_DIR" install
 
 # Create control file

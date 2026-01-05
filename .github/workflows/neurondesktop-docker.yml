@@ -63,7 +63,7 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ./NeuronDesktop/frontend
           file: dockers/neurondesktop/Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
           tags: |

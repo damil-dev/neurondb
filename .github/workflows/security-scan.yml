@@ -36,7 +36,12 @@ jobs:
             postgresql-16 \
             libcurl4-openssl-dev \
             libssl-dev \
-            build-essential
+            build-essential \
+            wget
+          # Install ONNX Runtime
+          wget https://github.com/microsoft/onnxruntime/releases/download/v1.17.0/onnxruntime-linux-x64-1.17.0.tgz
+          sudo tar -xzf onnxruntime-linux-x64-1.17.0.tgz -C /usr/local/
+          sudo mv /usr/local/onnxruntime-linux-x64-1.17.0 /usr/local/onnxruntime
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
@@ -50,6 +55,8 @@ jobs:
           ./build.sh
         env:
           PG_CONFIG: /usr/bin/pg_config
+          GPU_BACKENDS: none
+          ONNX_RUNTIME_PATH: /usr/local/onnxruntime
 
       - name: Autobuild (other languages)
         if: matrix.language != 'cpp'
