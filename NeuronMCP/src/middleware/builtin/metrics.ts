@@ -10,6 +10,7 @@ interface Metrics {
 	errorCount: number;
 	totalDuration: number;
 	methodCounts: Record<string, number>;
+	averageDuration?: number;
 }
 
 export class MetricsCollector {
