@@ -215,7 +215,7 @@ ORDER BY tablename, indexname;
 \echo '  - Name: Default'
 \echo '  - User: nbduser'
 \echo '  - Database: neurondb (localhost:5432)'
-\echo '  - MCP Server: /Users/pgedge/pge/neurondb/NeuronMCP/bin/neurondb-mcp'
+\echo '  - MCP Server: neurondb-mcp (from PATH)'
 \echo ''
 \echo 'Next Steps:'
 \echo '  1. Ensure NeuronDB database exists: createdb neurondb'
