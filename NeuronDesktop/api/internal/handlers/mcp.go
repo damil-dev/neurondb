@@ -181,8 +181,13 @@ func (m *MCPManager) GetClient(ctx context.Context, profileID string) (*mcp.Clie
 	}
 
 	/* Parse MCP config */
+	defaultCmd := utils.FindNeuronMCPBinary()
+	if defaultCmd == "" {
+		// Fallback to PATH lookup (in Docker we install to /usr/local/bin/neurondb-mcp)
+		defaultCmd = "neurondb-mcp"
+	}
 	mcpConfig := mcp.MCPConfig{
-		Command: "/home/pge/pge/neurondb/NeuronMCP/bin/neurondb-mcp", // Default full path
+		Command: defaultCmd,
 		Args:    []string{},
 		Env:     make(map[string]string),
 	}

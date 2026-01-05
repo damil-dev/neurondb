@@ -371,8 +371,12 @@ func (b *Bootstrap) verifyMCPConnection(ctx context.Context, profile *db.Profile
 	})
 
 	/* Create MCP config from profile */
+	defaultCmd := utils.FindNeuronMCPBinary()
+	if defaultCmd == "" {
+		defaultCmd = "neurondb-mcp"
+	}
 	mcpConfig := mcp.MCPConfig{
-		Command: "/home/pge/pge/neurondb/NeuronMCP/bin/neurondb-mcp", // Default
+		Command: defaultCmd,
 		Args:    []string{},
 		Env:     make(map[string]string),
 	}

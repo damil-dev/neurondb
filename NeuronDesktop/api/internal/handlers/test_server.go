@@ -23,7 +23,8 @@ func SetupTestServer(queries *db.Queries) *httptest.Server {
 	/* Apply middleware */
 	router.Use(middleware.RequestIDMiddleware())
 	router.Use(middleware.RecoveryMiddleware(nil))
-	router.Use(middleware.LoggingMiddleware(nil))
+	// LoggingMiddleware requires logger and queries - skip for test server
+	// router.Use(middleware.LoggingMiddleware(nil, nil))
 
 	/* Health check (no auth) */
 	router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
