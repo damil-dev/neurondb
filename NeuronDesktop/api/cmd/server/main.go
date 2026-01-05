@@ -318,6 +318,11 @@ func main() {
 		}
 		neurondbHandlers.ExecuteSQLFull(w, r)
 	}).Methods("POST", "OPTIONS")
+	
+	datasetHandlers := handlers.NewDatasetHandlers(queries)
+	apiRouter.HandleFunc("/profiles/{profile_id}/neurondb/ingest", datasetHandlers.IngestDataset).Methods("POST")
+	apiRouter.HandleFunc("/profiles/{profile_id}/neurondb/ingest/{job_id}", datasetHandlers.GetIngestStatus).Methods("GET")
+	apiRouter.HandleFunc("/profiles/{profile_id}/neurondb/ingest", datasetHandlers.ListIngestJobs).Methods("GET")
 
 	apiRouter.HandleFunc("/agent/test", agentHandlers.TestAgentConfig).Methods("POST")
 	apiRouter.HandleFunc("/profiles/{profile_id}/agent/agents", agentHandlers.ListAgents).Methods("GET")
@@ -340,15 +345,31 @@ func main() {
 	apiRouter.HandleFunc("/profiles/{profile_id}/templates/{id}/deploy", templateHandlers.DeployTemplate).Methods("POST")
 
 	modelConfigHandlers := handlers.NewModelConfigHandlers(queries)
+	modelHandlers := handlers.NewModelHandlers(queries)
+	
+	// Model configuration endpoints (profile-specific)
 	apiRouter.HandleFunc("/profiles/{profile_id}/models", modelConfigHandlers.ListModelConfigs).Methods("GET")
 	apiRouter.HandleFunc("/profiles/{profile_id}/models", modelConfigHandlers.CreateModelConfig).Methods("POST")
 	apiRouter.HandleFunc("/profiles/{profile_id}/models/{id}", modelConfigHandlers.UpdateModelConfig).Methods("PUT")
 	apiRouter.HandleFunc("/profiles/{profile_id}/models/{id}", modelConfigHandlers.DeleteModelConfig).Methods("DELETE")
 	apiRouter.HandleFunc("/profiles/{profile_id}/models/default", modelConfigHandlers.GetDefaultModelConfig).Methods("GET")
 	apiRouter.HandleFunc("/profiles/{profile_id}/models/{id}/set-default", modelConfigHandlers.SetDefaultModelConfig).Methods("POST")
+	
+	// LLM model management endpoints (NeuronDB models)
+	apiRouter.HandleFunc("/profiles/{profile_id}/llm-models", modelHandlers.ListModels).Methods("GET")
+	apiRouter.HandleFunc("/profiles/{profile_id}/llm-models", modelHandlers.AddModel).Methods("POST")
+	apiRouter.HandleFunc("/profiles/{profile_id}/llm-models/{model_id}", modelHandlers.GetModelInfo).Methods("GET")
+	apiRouter.HandleFunc("/profiles/{profile_id}/llm-models/{model_id}", modelHandlers.DeleteModel).Methods("DELETE")
+	apiRouter.HandleFunc("/profiles/{profile_id}/llm-models/{model_name}/key", modelHandlers.SetModelKey).Methods("POST")
 
 	apiRouter.HandleFunc("/metrics", metricsHandlers.GetMetrics).Methods("GET")
 	apiRouter.HandleFunc("/metrics/reset", metricsHandlers.ResetMetrics).Methods("POST")
+	
+	observabilityHandlers := handlers.NewObservabilityHandlers(queries)
+	apiRouter.HandleFunc("/profiles/{profile_id}/observability/db-health", observabilityHandlers.GetDBHealth).Methods("GET")
+	apiRouter.HandleFunc("/profiles/{profile_id}/observability/indexes", observabilityHandlers.GetIndexHealth).Methods("GET")
+	apiRouter.HandleFunc("/profiles/{profile_id}/observability/workers", observabilityHandlers.GetWorkerStatus).Methods("GET")
+	apiRouter.HandleFunc("/profiles/{profile_id}/observability/usage", observabilityHandlers.GetUsageStats).Methods("GET")
 
 	apiRouter.HandleFunc("/profiles/{profile_id}/analytics", analyticsHandlers.GetAnalytics).Methods("GET")
 	apiRouter.HandleFunc("/analytics", analyticsHandlers.GetAnalytics).Methods("GET")

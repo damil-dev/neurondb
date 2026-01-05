@@ -1,0 +1,95 @@
+name: Integration Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+jobs:
+  integration-tests:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: neurondb
+          POSTGRES_PASSWORD: neurondb
+          POSTGRES_DB: neurondb
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install NeuronDB extension
+        run: |
+          cd NeuronDB
+          make install
+          psql -h localhost -U neurondb -d neurondb -c "CREATE EXTENSION neurondb;"
+      
+      - name: Run NeuronAgent tests
+        run: |
+          cd NeuronAgent
+          go test ./... -v
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: neurondb
+          DB_USER: neurondb
+          DB_PASSWORD: neurondb
+      
+      - name: Run NeuronMCP tests
+        run: |
+          cd NeuronMCP
+          go test ./... -v
+        env:
+          NEURONDB_HOST: localhost
+          NEURONDB_PORT: 5432
+          NEURONDB_DATABASE: neurondb
+          NEURONDB_USER: neurondb
+          NEURONDB_PASSWORD: neurondb
+      
+      - name: Run NeuronDesktop API tests
+        run: |
+          cd NeuronDesktop/api
+          go test ./... -v
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: neurondesk
+          DB_USER: neurondb
+          DB_PASSWORD: neurondb
+      
+      - name: Run NeuronDesktop Frontend tests
+        run: |
+          cd NeuronDesktop/frontend
+          npm ci
+          npm run test
+      
+      - name: Run E2E tests
+        run: |
+          cd NeuronDesktop/frontend
+          npx playwright install
+          npm run test:e2e
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:8081
+

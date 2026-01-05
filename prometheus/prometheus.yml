@@ -1,0 +1,39 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'neurondb-local'
+    environment: 'development'
+
+rule_files:
+  - alerts.yml
+
+scrape_configs:
+  - job_name: 'neurondb-prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'neuronagent'
+    static_configs:
+      - targets: ['neuronagent:8080']
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+
+  - job_name: 'neurondesktop-api'
+    static_configs:
+      - targets: ['neurondesk-api:8081']
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+
+  - job_name: 'neurondb-postgres'
+    static_configs:
+      - targets: ['neurondb-cpu:5433']
+    # Custom exporter for PostgreSQL metrics
+    # Requires postgres_exporter or custom metrics endpoint
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+          # Configure Alertmanager if needed
+
