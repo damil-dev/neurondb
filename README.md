@@ -57,13 +57,13 @@
 
 ```mermaid
 flowchart LR
-  subgraph DB[NeuronDB (PostgreSQL)]
-    EXT[NeuronDB extension]
+  subgraph DB["NeuronDB PostgreSQL"]
+    EXT["NeuronDB extension"]
   end
-  AG[NeuronAgent] -->|SQL / Postgres| DB
-  MCP[NeuronMCP] -->|tools/resources| DB
-  UI[NeuronDesktop UI] --> API[NeuronDesktop API]
-  API -->|SQL / Postgres| DB
+  AG["NeuronAgent"] -->|SQL| DB
+  MCP["NeuronMCP"] -->|tools/resources| DB
+  UI["NeuronDesktop UI"] --> API["NeuronDesktop API"]
+  API -->|SQL| DB
 ```
 
 > [!NOTE]
