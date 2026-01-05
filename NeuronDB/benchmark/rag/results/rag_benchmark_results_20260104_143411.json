@@ -1,0 +1,30 @@
+{
+  "timestamp": "20260104_143411",
+  "configuration": {
+    "core_dump_path": "/tmp/cores",
+    "database": {
+      "host": "localhost",
+      "port": 5432,
+      "name": "neurondb",
+      "user": "pge"
+    },
+    "benchmarks_run": [
+      "mteb"
+    ]
+  },
+  "benchmarks": {
+    "mteb": {
+      "status": "failed",
+      "error": "Benchmark failed: MTEB.__init__() got an unexpected keyword argument 'task_types'",
+      "results": null
+    }
+  },
+  "crashes": [],
+  "summary": {
+    "total_benchmarks": 1,
+    "successful": 0,
+    "failed": 1,
+    "crashes": 0,
+    "total_time": 0.004216909408569336
+  }
+}

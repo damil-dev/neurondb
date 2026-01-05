@@ -188,3 +188,4 @@ func (h *Handlers) ActivateAgentVersion(w http.ResponseWriter, r *http.Request) 
 
 	respondJSON(w, http.StatusOK, version)
 }
+

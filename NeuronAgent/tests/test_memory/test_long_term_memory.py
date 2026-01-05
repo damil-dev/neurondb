@@ -6,14 +6,7 @@ Tests HNSW-based vector search for context retrieval.
 import pytest
 import time
 import psycopg2
-import sys
-import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../examples'))
-try:
-    from neurondb_client import SessionManager, AgentManager
-except ImportError:
-    SessionManager = None
-    AgentManager = None
+from neurondb_client import SessionManager, AgentManager
 
 @pytest.mark.memory
 @pytest.mark.requires_server

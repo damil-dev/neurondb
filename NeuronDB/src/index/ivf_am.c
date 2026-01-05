@@ -180,10 +180,18 @@ ivfExtractVectorData(Datum value, Oid typeOid, int *out_dim, MemoryContext ctx)
 		nalloc(result, float4, sv->total_dim);
 		/* Zero-initialize the result array */
 		memset(result, 0, sv->total_dim * sizeof(float4));
+		/* Populate non-zero entries with comprehensive bounds checking */
 		for (i = 0; i < sv->nnz; i++)
 		{
-			if (indices[i] >= 0 && indices[i] < sv->total_dim)
-				result[indices[i]] = values[i];
+			/* Validate index is within bounds - error on out-of-bounds to prevent silent corruption */
+			if (indices[i] < 0 || indices[i] >= sv->total_dim)
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_ARRAY_SUBSCRIPT_ERROR),
+						 errmsg("ivf: sparsevec index %d out of bounds (dim=%d, nnz=%d)",
+								indices[i], sv->total_dim, sv->nnz)));
+			}
+			result[indices[i]] = values[i];
 		}
 	}
 	else if (typeOid == bitOid)

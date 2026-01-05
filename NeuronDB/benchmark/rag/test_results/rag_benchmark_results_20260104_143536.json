@@ -1,0 +1,30 @@
+{
+  "timestamp": "20260104_143536",
+  "configuration": {
+    "core_dump_path": "/tmp/cores",
+    "database": {
+      "host": "localhost",
+      "port": 5432,
+      "name": "neurondb",
+      "user": "pge"
+    },
+    "benchmarks_run": [
+      "mteb"
+    ]
+  },
+  "benchmarks": {
+    "mteb": {
+      "status": "failed",
+      "error": "Benchmark failed: 'default'",
+      "results": null
+    }
+  },
+  "crashes": [],
+  "summary": {
+    "total_benchmarks": 1,
+    "successful": 0,
+    "failed": 1,
+    "crashes": 0,
+    "total_time": 1.3101415634155273
+  }
+}

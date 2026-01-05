@@ -16,9 +16,9 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/spf13/cobra"
 	"github.com/neurondb/NeuronAgent/cli/pkg/client"
 	"github.com/neurondb/NeuronAgent/cli/pkg/config"
-	"github.com/spf13/cobra"
 )
 
 var (
@@ -120,7 +120,7 @@ func showAgent(cmd *cobra.Command, args []string) error {
 
 func updateAgent(cmd *cobra.Command, args []string) error {
 	agentID := args[0]
-
+	
 	if updateConfig == "" {
 		return fmt.Errorf("--config flag is required for update")
 	}
@@ -149,7 +149,7 @@ func deleteAgent(cmd *cobra.Command, args []string) error {
 	apiClient := client.NewClient(apiURL, apiKey)
 
 	fmt.Printf("🗑️  Deleting agent: %s\n", agentID)
-
+	
 	if err := apiClient.DeleteAgent(agentID); err != nil {
 		return fmt.Errorf("failed to delete agent: %w", err)
 	}
@@ -174,7 +174,7 @@ func cloneAgent(cmd *cobra.Command, args []string) error {
 		Model: config.ModelConfig{
 			Name: sourceAgent.ModelName,
 		},
-		Tools:  sourceAgent.EnabledTools,
+		Tools: sourceAgent.EnabledTools,
 		Config: sourceAgent.Config,
 	}
 
@@ -189,3 +189,5 @@ func cloneAgent(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Name: %s\n", agent.Name)
 	return nil
 }
+
+

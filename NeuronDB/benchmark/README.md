@@ -63,7 +63,38 @@ SET neurondb.compute_mode = true;
 
 ### Running Benchmarks
 
-#### Basic Usage
+#### Quick Start: Run All Benchmarks
+
+The easiest way to run all benchmarks is using the provided script:
+
+```bash
+# Run all benchmarks with default settings
+./benchmark/run_all_benchmarks.sh
+
+# Run with custom database and settings
+./benchmark/run_all_benchmarks.sh -d mydb -c 20 -t 2000
+
+# Run each benchmark for a specific duration
+./benchmark/run_all_benchmarks.sh -T 60
+
+# Run only specific benchmark
+./benchmark/run_all_benchmarks.sh --only vector
+
+# Skip specific benchmarks
+./benchmark/run_all_benchmarks.sh --skip embedding --skip ml
+
+# See all options
+./benchmark/run_all_benchmarks.sh --help
+```
+
+The script will:
+- Test database connectivity
+- Verify NeuronDB extension is installed
+- Run all benchmarks in sequence
+- Save results to timestamped log files in `./results/`
+- Generate a summary report
+
+#### Manual Usage: Individual Benchmarks
 
 ```bash
 # Initialize pgbench (creates test tables)
@@ -103,6 +134,30 @@ for bench in vector embedding ml multimodal gpu; do
     pgbench -f benchmark/${bench}.sql -c 10 -j 2 -t 1000 -d your_database
 done
 ```
+
+#### Using the Automated Script
+
+The `run_all_benchmarks.sh` script provides additional features:
+
+- **Automatic Setup**: Checks database connection and NeuronDB extension
+- **Comprehensive Logging**: Saves detailed logs for each benchmark run
+- **Progress Tracking**: Shows real-time progress for each benchmark
+- **Flexible Configuration**: Supports command-line options and environment variables
+- **Error Handling**: Continues running even if individual benchmarks fail
+- **Summary Report**: Generates a summary of all benchmark results
+- **Selective Execution**: Run only specific benchmarks or skip unwanted ones
+
+**Environment Variables** (can be used instead of command-line options):
+- `PGDATABASE`: Database name
+- `PGHOST`: Database host
+- `PGPORT`: Database port
+- `PGUSER`: Database user
+- `BENCH_CLIENTS`: Number of concurrent clients
+- `BENCH_JOBS`: Number of worker threads
+- `BENCH_TRANSACTIONS`: Number of transactions per client
+- `BENCH_DURATION`: Duration in seconds (overrides transactions)
+- `BENCH_PROGRESS`: Progress report interval
+- `BENCH_LOG_DIR`: Directory for log files
 
 ### Command Line Options
 

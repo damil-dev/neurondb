@@ -119,3 +119,4 @@ SELECT vector_hash('[1,2,3]'::vector) != vector_hash('[1,2,4]'::vector) AS hash_
 \echo 'All correctness fix tests completed'
 \echo '=========================================================================='
 
+

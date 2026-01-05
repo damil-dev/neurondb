@@ -18,3 +18,4 @@ class TestGitLabConnector:
         """Test accessing GitLab merge requests."""
         pytest.skip("GitLab connector requires API token")
 
+

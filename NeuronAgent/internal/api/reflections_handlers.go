@@ -92,3 +92,4 @@ func (h *Handlers) GetReflection(w http.ResponseWriter, r *http.Request) {
 
 	respondJSON(w, http.StatusOK, reflection)
 }
+

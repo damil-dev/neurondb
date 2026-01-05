@@ -103,3 +103,4 @@ echo "OK: ecosystem DB setup completed."
 echo "Next: ./scripts/integration-test.sh --tier 0 (or run docker services if using Docker)"
 
 
+

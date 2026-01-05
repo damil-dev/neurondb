@@ -1,0 +1,24 @@
+# Requirements for NeuronDB RAG Benchmarks
+
+# Core dependencies
+numpy>=1.20.0
+psycopg2-binary>=2.9.0
+
+# MTEB framework for text embedding benchmarks
+mteb>=1.0.0
+
+# BEIR framework for retrieval evaluation
+beir>=1.0.0
+
+# RAGAS framework for RAG evaluation
+ragas>=0.1.0
+
+# Hugging Face dependencies
+transformers>=4.30.0
+datasets>=2.10.0
+sentence-transformers>=2.2.0
+
+# Progress bars and utilities
+tqdm>=4.64.0
+
+

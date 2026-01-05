@@ -66,3 +66,4 @@ workflow:
       config:
         response: "{{check_knowledge_base.output}}"
 
+

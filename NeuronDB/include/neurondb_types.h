@@ -103,8 +103,16 @@ typedef struct GraphEdge
 
 #define VECTORP_SIZE(dim) \
 	(offsetof(VectorPacked, data) + sizeof(float4) * (dim))
-#define VECMAP_INDICES(vm) ((int32 *)(((char *)(vm)) + sizeof(VectorMap)))
-#define VECMAP_VALUES(vm) ((float4 *)(VECMAP_INDICES(vm) + (vm)->nnz))
+/* VECMAP_INDICES: Get pointer to indices array in VectorMap
+ * Includes null check to prevent null pointer dereference
+ */
+#define VECMAP_INDICES(vm) \
+	((vm) ? ((int32 *)(((char *)(vm)) + sizeof(VectorMap))) : NULL)
+/* VECMAP_VALUES: Get pointer to values array in VectorMap
+ * Includes null check to prevent null pointer dereference before reading nnz field
+ */
+#define VECMAP_VALUES(vm) \
+	((vm) ? ((float4 *)(VECMAP_INDICES(vm) + (vm)->nnz)) : NULL)
 
 #define RTEXT_DATA(rt) ((char *)(((char *)(rt)) + sizeof(RetrievableText)))
 #define RTEXT_OFFSETS(rt) ((uint32 *)(RTEXT_DATA(rt) + (rt)->text_len))

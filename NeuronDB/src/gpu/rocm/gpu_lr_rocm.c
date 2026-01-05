@@ -411,8 +411,31 @@ ndb_rocm_lr_train(const float *features,
 		return -1;
 	}
 
-	/* Allocate GPU memory */
+	/* Allocate GPU memory with overflow checking */
+	/* Check for integer overflow before multiplication */
+	if (n_samples > 0 && feature_dim > 0)
+	{
+		if ((size_t) n_samples > SIZE_MAX / sizeof(float) / (size_t) feature_dim)
+		{
+			if (errstr)
+				*errstr = psprintf("ndb_rocm_lr_train: feature_bytes calculation would overflow (n_samples=%d, feature_dim=%d)",
+								   n_samples, feature_dim);
+			pfree(weights);
+			pfree(grad_weights);
+			return -1;
+		}
+	}
 	feature_bytes = sizeof(float) * (size_t) n_samples * (size_t) feature_dim;
+	
+	/* Check label_bytes overflow */
+	if (n_samples > 0 && (size_t) n_samples > SIZE_MAX / sizeof(double))
+	{
+		if (errstr)
+			*errstr = psprintf("ndb_rocm_lr_train: label_bytes calculation would overflow (n_samples=%d)", n_samples);
+		pfree(weights);
+		pfree(grad_weights);
+		return -1;
+	}
 	label_bytes = sizeof(double) * (size_t) n_samples;
 	pred_bytes = sizeof(double) * (size_t) n_samples;
 	z_bytes = sizeof(double) * (size_t) n_samples;
@@ -1700,7 +1723,17 @@ ndb_rocm_lr_evaluate(const bytea * model_data,
 
 	weights = (const float *) ((const char *) hdr + sizeof(NdbCudaLrModelHeader));
 
-	/* Allocate GPU memory for features */
+	/* Allocate GPU memory for features with overflow checking */
+	if (n_samples > 0 && feature_dim > 0)
+	{
+		if ((size_t) n_samples > SIZE_MAX / sizeof(float) / (size_t) feature_dim)
+		{
+			if (errstr)
+				*errstr = psprintf("ndb_rocm_lr_evaluate: feature_bytes calculation would overflow (n_samples=%d, feature_dim=%d)",
+								   n_samples, feature_dim);
+			return -1;
+		}
+	}
 	feature_bytes = sizeof(float) * (size_t) n_samples * (size_t) feature_dim;
 	cuda_err = hipMalloc((void **) &d_features, feature_bytes);
 	if (cuda_err != hipSuccess)

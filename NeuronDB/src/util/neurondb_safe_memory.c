@@ -53,6 +53,25 @@ ndb_ensure_memory_context(MemoryContext context)
 	return true;
 }
 
+/*
+ * ndb_safe_context_cleanup - Safely delete a memory context
+ *
+ * This function safely deletes a memory context, ensuring that:
+ * 1. The context is not NULL
+ * 2. The context is valid
+ * 3. If it's the current context, we switch to oldcontext first
+ *
+ * IMPORTANT: After calling this function, all pointers allocated in 'context'
+ * become invalid. Callers MUST NOT use any pointers allocated in 'context'
+ * after this call.
+ *
+ * The 'return' statement after elog(ERROR) is unreachable in PostgreSQL
+ * (ERROR longjmps), but is included for code clarity and static analysis.
+ *
+ * Parameters:
+ *   context - Memory context to delete (must be valid)
+ *   oldcontext - Context to switch to if context is current (must be valid if context is current)
+ */
 void
 ndb_safe_context_cleanup(MemoryContext context, MemoryContext oldcontext)
 {
@@ -72,12 +91,14 @@ ndb_safe_context_cleanup(MemoryContext context, MemoryContext oldcontext)
 		{
 			elog(ERROR,
 				 "neurondb: cannot delete current memory context without valid old context");
+			/* Unreachable after ERROR, but included for clarity */
 			return;
 		}
 		MemoryContextSwitchTo(oldcontext);
 	}
 
 	MemoryContextDelete(context);
+	/* NOTE: All pointers allocated in 'context' are now invalid */
 }
 
 #ifdef NDB_DEBUG_MEMORY

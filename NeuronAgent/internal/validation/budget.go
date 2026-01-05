@@ -70,3 +70,4 @@ func EstimateCost(tokens int64, modelName string) float64 {
 
 	return float64(tokens) / 1000.0 * cost
 }
+

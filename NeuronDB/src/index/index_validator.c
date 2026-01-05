@@ -625,8 +625,16 @@ check_hnsw_connectivity(Relation index, ValidateResult * result)
 		entryPoint = meta->entryPoint;
 		UnlockReleaseBuffer(metaBuf);
 
-		/* Allocate visited array */
+		/* Allocate visited array with overflow checking */
 		totalNodes = RelationGetNumberOfBlocks(index);
+		/* Check for integer overflow in size calculation */
+		if (totalNodes > 0 && (size_t) totalNodes > SIZE_MAX / sizeof(bool))
+		{
+			ereport(ERROR,
+					(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
+					 errmsg("neurondb: visited array size calculation would overflow (totalNodes=%u)",
+							totalNodes)));
+		}
 		visitedSize = totalNodes * sizeof(bool);
 		visited = (bool *) palloc0(visitedSize);
 
@@ -639,11 +647,33 @@ check_hnsw_connectivity(Relation index, ValidateResult * result)
 			int			queueSize = totalNodes;
 
 			nalloc(queue, BlockNumber, queueSize);
-			queue[queueTail++] = entryPoint;
-			visited[entryPoint] = true;
+			
+			/* Bounds check before accessing queue array */
+			if (queueTail >= 0 && queueTail < queueSize)
+			{
+				queue[queueTail++] = entryPoint;
+			}
+			else
+			{
+				elog(ERROR,
+					 (errcode(ERRCODE_INTERNAL_ERROR),
+					  errmsg("neurondb: queueTail %d out of bounds (queueSize=%d)",
+							 queueTail, queueSize)));
+			}
+			
+			/* Bounds check before accessing visited array */
+			if (entryPoint < totalNodes)
+				visited[entryPoint] = true;
 
 			while (queueHead < queueTail)
 			{
+				/* Bounds check before accessing queue array */
+				if (queueHead < 0 || queueHead >= queueSize)
+				{
+					elog(WARNING, "neurondb: queueHead %d out of bounds (queueSize=%d), breaking",
+						 queueHead, queueSize);
+					break;
+				}
 				BlockNumber current = queue[queueHead++];
 				Buffer		nodeBuf;
 				Page		nodePage;
@@ -673,20 +703,56 @@ check_hnsw_connectivity(Relation index, ValidateResult * result)
 											  PageGetItemId(nodePage, FirstOffsetNumber));
 
 				/* Visit neighbors at all levels */
-				for (level = 0; level <= node->level; level++)
+				/* Validate node level before accessing neighborCount array */
+				if (!hnswValidateLevelSafe(node->level))
 				{
+					UnlockReleaseBuffer(nodeBuf);
+					continue;
+				}
+				
+				for (level = 0; level <= node->level && level < HNSW_MAX_LEVEL; level++)
+				{
+					/* Validate level bounds before array access */
+					if (level < 0 || level >= HNSW_MAX_LEVEL)
+						continue;
+					
 					neighbors = HnswGetNeighbors(node, level);
 					neighborCount = node->neighborCount[level];
+					
+					/* Validate and clamp neighborCount to prevent out-of-bounds access */
+					if (neighborCount < 0)
+						neighborCount = 0;
+					if (neighborCount > HNSW_DEFAULT_M * 2)
+					{
+						elog(WARNING, "neurondb: neighborCount %d exceeds maximum %d at level %d, clamping",
+							 neighborCount, HNSW_DEFAULT_M * 2, level);
+						neighborCount = HNSW_DEFAULT_M * 2;
+					}
 
 					for (j = 0; j < neighborCount; j++)
 					{
-						if (neighbors[j] != InvalidBlockNumber
-							&& neighbors[j] < totalNodes
-							&& !visited[neighbors[j]])
+						/* Bounds check before accessing neighbors array */
+						if (j >= 0 && j < HNSW_DEFAULT_M * 2)
 						{
-							visited[neighbors[j]] = true;
-							if (queueTail < queueSize)
-								queue[queueTail++] = neighbors[j];
+							if (neighbors[j] != InvalidBlockNumber
+								&& neighbors[j] < totalNodes
+								&& !visited[neighbors[j]])
+							{
+								/* Bounds check before accessing visited array */
+								if (neighbors[j] < totalNodes)
+									visited[neighbors[j]] = true;
+								
+								/* Bounds check before accessing queue array */
+								if (queueTail >= 0 && queueTail < queueSize)
+								{
+									queue[queueTail++] = neighbors[j];
+								}
+								else
+								{
+									elog(WARNING, "neurondb: queueTail %d would exceed queueSize %d, dropping neighbor %u",
+										 queueTail, queueSize, neighbors[j]);
+								}
+							}
 						}
 					}
 				}

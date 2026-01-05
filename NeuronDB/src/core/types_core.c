@@ -341,8 +341,44 @@ vecmap_in(PG_FUNCTION_ARGS)
 	result->total_dim = dim;
 	result->nnz = nnz;
 
-	memcpy(VECMAP_INDICES(result), indices, sizeof(int32) * nnz);
-	memcpy(VECMAP_VALUES(result), values, sizeof(float4) * nnz);
+	/* Validate macro results before memcpy */
+	{
+		int32 *result_indices = VECMAP_INDICES(result);
+		float4 *result_values = VECMAP_VALUES(result);
+		
+		if (result_indices == NULL || result_values == NULL)
+		{
+			pfree(result);
+			pfree(indices);
+			pfree(values);
+			ereport(ERROR,
+					(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+					 errmsg("neurondb: VECMAP macro returned NULL pointer")));
+		}
+		
+		/* Check for overflow in memcpy size calculation */
+		if (nnz > 0 && (size_t) nnz > SIZE_MAX / sizeof(int32))
+		{
+			pfree(result);
+			pfree(indices);
+			pfree(values);
+			ereport(ERROR,
+					(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
+					 errmsg("neurondb: nnz %d too large for memcpy", nnz)));
+		}
+		if (nnz > 0 && (size_t) nnz > SIZE_MAX / sizeof(float4))
+		{
+			pfree(result);
+			pfree(indices);
+			pfree(values);
+			ereport(ERROR,
+					(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
+					 errmsg("neurondb: nnz %d too large for memcpy", nnz)));
+		}
+		
+		memcpy(result_indices, indices, sizeof(int32) * nnz);
+		memcpy(result_values, values, sizeof(float4) * nnz);
+	}
 
 	pfree(indices);
 	pfree(values);

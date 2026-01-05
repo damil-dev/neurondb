@@ -18,3 +18,4 @@ class TestS3Connector:
         """Test downloading via S3 connector."""
         pytest.skip("S3 connector requires AWS credentials")
 
+

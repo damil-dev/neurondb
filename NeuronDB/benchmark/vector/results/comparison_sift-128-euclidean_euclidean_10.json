@@ -1,0 +1,31 @@
+{
+  "dataset": "sift-128-euclidean",
+  "metric": "euclidean",
+  "k": 10,
+  "n_train": 100000,
+  "n_test": 1000,
+  "dimension": 128,
+  "neurondb": {
+    "qps": 2249.7165262260173,
+    "recall": 0.0,
+    "build_time": 292.68003129959106,
+    "avg_query_time": 0.00044450044631958005,
+    "index_type": "hnsw",
+    "index_params": {
+      "m": 16,
+      "ef_construction": 200
+    }
+  },
+  "faiss": {
+    "qps": 861.4847683936466,
+    "recall": 1.0,
+    "build_time": 0.008077144622802734,
+    "query_time": 1.1607866287231445,
+    "index_type": "flat",
+    "index_params": null
+  },
+  "ground_truth": {
+    "source": "FAISS Flat (exact search)",
+    "recall": 1.0
+  }
+}

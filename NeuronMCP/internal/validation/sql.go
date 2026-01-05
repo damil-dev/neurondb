@@ -150,3 +150,4 @@ func ValidateColumnName(columnName string) error {
 	return ValidateSQLIdentifier(columnName, "column_name")
 }
 
+

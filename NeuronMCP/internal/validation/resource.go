@@ -68,3 +68,4 @@ func EstimateVectorMemory(vectorDim int, batchSize int) int64 {
 	return int64(vectorDim * batchSize * 4 * 2)
 }
 
+

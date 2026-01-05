@@ -1,0 +1,13 @@
+# Requirements for NeuronDB Hybrid Search Benchmarks
+
+# Core dependencies
+numpy>=1.20.0
+psycopg2-binary>=2.9.0
+
+# BEIR framework for retrieval evaluation
+beir>=1.0.0
+
+# Progress bars and utilities
+tqdm>=4.64.0
+
+
