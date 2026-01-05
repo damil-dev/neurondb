@@ -36,7 +36,7 @@ mkdir -p "$PKG_DIR/usr/share/doc/neuronagent"
 
 # Build NeuronAgent binary
 cd "$REPO_ROOT/NeuronAgent"
-go build -o "$PKG_DIR/usr/bin/neuronagent" ./cmd/neuronagent
+go build -o "$PKG_DIR/usr/bin/neuronagent" ./cmd/agent-server
 
 # Copy migrations
 cp -r migrations/* "$PKG_DIR/usr/share/neuronagent/migrations/" 2>/dev/null || true
