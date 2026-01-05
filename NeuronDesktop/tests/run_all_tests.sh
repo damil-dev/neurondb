@@ -36,7 +36,7 @@ go test -v -coverprofile=coverage.out ./internal/handlers/... ./internal/db/... 
 echo ""
 
 echo -e "${YELLOW}Running integration tests...${NC}"
-go test -v -coverprofile=coverage_integration.out ./internal/mcp/... ./internal/neurondb/... ./internal/agent/... || {
+go test -v -tags=integration -coverprofile=coverage_integration.out ../tests/integration/... || {
     echo -e "${YELLOW}Warning: Some integration tests may fail if external services are not available${NC}"
 }
 echo ""

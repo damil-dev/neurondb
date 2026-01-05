@@ -6,15 +6,31 @@ This directory contains comprehensive tests for NeuronDesktop, including unit te
 
 ```
 tests/
+├── integration/            # Integration tests with external services
+│   ├── neurondb_integration_test.go
+│   ├── neurondb_search_test.go
+│   ├── neurondb_collections_test.go
+│   ├── mcp_integration_test.go
+│   ├── mcp_tools_test.go
+│   ├── mcp_websocket_test.go
+│   ├── mcp_threads_test.go
+│   ├── agent_integration_test.go
+│   ├── agent_crud_test.go
+│   ├── agent_sessions_test.go
+│   ├── agent_websocket_test.go
+│   ├── cross_component_test.go
+│   └── profile_integration_test.go
 ├── e2e/                    # End-to-end workflow tests
 │   ├── auth_flow_test.go
 │   ├── profile_workflow_test.go
 │   ├── model_config_workflow_test.go
-│   └── metrics_workflow_test.go
+│   ├── metrics_workflow_test.go
+│   └── frontend_integration_test.go
 ├── setup_test_env.sh      # Test environment setup script
 ├── cleanup_test_env.sh    # Test environment cleanup script
 ├── run_all_tests.sh       # Master test runner
-└── readme.md              # This file
+├── run_integration_tests.sh  # Integration test runner
+└── README.md              # This file
 ```
 
 ## Test Categories
@@ -38,11 +54,38 @@ Located in `api/internal/handlers/*_test.go` and `api/internal/db/*_test.go`
   - Query validation
 
 ### Integration Tests
-Located in `api/internal/mcp/client_test.go`, `api/internal/neurondb/client_test.go`, `api/internal/agent/client_test.go`
+Located in `tests/integration/*_test.go`
 
-- **MCP Client**: Test MCP server communication
-- **NeuronDB Client**: Test NeuronDB operations
-- **Agent Client**: Test NeuronAgent API communication
+- **NeuronDB Integration**: Test NeuronDB features through direct client
+  - Collection listing and management
+  - Vector search with various distance metrics
+  - SQL execution (SELECT and full access)
+  - Connection pooling and error handling
+  
+- **NeuronMCP Integration**: Test MCP server communication
+  - Process spawning and lifecycle
+  - Tool listing and calling
+  - WebSocket support (requires API server)
+  - Thread management (requires API server)
+  
+- **NeuronAgent Integration**: Test NeuronAgent API communication
+  - Agent CRUD operations
+  - Session management
+  - Message sending and retrieval
+  - Model listing
+  - WebSocket support (requires API server)
+  
+- **Cross-Component Integration**: Test interactions between services
+  - Shared database connections
+  - End-to-end workflows
+  - Concurrent operations
+  - Resource cleanup
+  
+- **Profile Integration**: Test profile-based configuration
+  - NeuronDB configuration
+  - MCP configuration
+  - Agent configuration
+  - All services configured together
 
 ### End-to-End Tests
 Located in `tests/e2e/*_test.go`
@@ -71,8 +114,15 @@ export TEST_DB_PASSWORD=neurondesk
 export TEST_DB_NAME=neurondesk_test
 
 # Optional: External service endpoints for integration tests
-export TEST_NEURONDB_DSN="host=localhost port=5432 user=neurondb dbname=neurondb"
-export TEST_AGENT_ENDPOINT="http://localhost:8080"
+export TEST_NEURONDB_DSN="host=localhost port=5432 user=neurondb dbname=neurondb sslmode=disable"
+export TEST_NEURONMCP_COMMAND="/path/to/neurondb-mcp"
+export TEST_NEURONAGENT_URL="http://localhost:8080"
+export TEST_NEURONAGENT_KEY="your-api-key"
+
+# Skip specific service tests if not available
+export SKIP_NEURONDB=true    # Skip NeuronDB tests
+export SKIP_NEURONMCP=true   # Skip NeuronMCP tests
+export SKIP_NEURONAGENT=true # Skip NeuronAgent tests
 ```
 
 ### Quick Start
@@ -94,14 +144,33 @@ go test ./internal/handlers/... ./internal/db/...
 
 **Integration tests only:**
 ```bash
+cd NeuronDesktop
+./tests/run_integration_tests.sh
+```
+
+Or manually:
+```bash
 cd api
-go test ./internal/mcp/... ./internal/neurondb/... ./internal/agent/...
+go test -v -tags=integration ../../tests/integration/...
 ```
 
 **End-to-end tests only:**
 ```bash
 cd api
-go test ../../tests/e2e/...
+go test -v ../../tests/e2e/...
+```
+
+**Specific integration test category:**
+```bash
+cd api
+# NeuronDB tests only
+go test -v -tags=integration ../../tests/integration/neurondb_*_test.go
+
+# MCP tests only
+go test -v -tags=integration ../../tests/integration/mcp_*_test.go
+
+# Agent tests only
+go test -v -tags=integration ../../tests/integration/agent_*_test.go
 ```
 
 **Specific test file:**
@@ -223,9 +292,14 @@ func TestMyClient_Operation(t *testing.T) {
 Integration tests may fail if external services (NeuronDB, NeuronAgent, NeuronMCP) are not running. This is expected and tests will skip gracefully.
 
 To run integration tests:
-1. Start NeuronDB: `docker compose up neurondb`
-2. Start NeuronAgent: `docker compose up neuronagent`
-3. Start NeuronMCP: Ensure `neurondb-mcp` binary is available
+1. Start NeuronDB: `docker compose up neurondb` (or ensure PostgreSQL with NeuronDB extension is running)
+2. Start NeuronAgent: `docker compose up neuronagent` (or ensure NeuronAgent is running on port 8080)
+3. Start NeuronMCP: Ensure `neurondb-mcp` binary is available and configured in `TEST_NEURONMCP_COMMAND`
+
+You can also skip specific service tests by setting environment variables:
+- `SKIP_NEURONDB=true` - Skip all NeuronDB tests
+- `SKIP_NEURONMCP=true` - Skip all NeuronMCP tests
+- `SKIP_NEURONAGENT=true` - Skip all NeuronAgent tests
 
 ### Tests Are Slow
 
