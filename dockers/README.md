@@ -58,19 +58,20 @@ The `docker.sh` script provides a clean interface for managing all services:
 
 ### Direct Docker Compose (Advanced)
 
-**Recommended:** Use the root `docker-compose.yml`:
+**Recommended:** Use the root `docker-compose.yml` (canonical):
 ```bash
 # From project root (recommended)
 docker compose up -d
 ```
 
-**Alternative:** Use this directory's compose file (for reference):
+**If you're currently in `dockers/`** and want to run the canonical compose without changing directories:
 ```bash
-# From project root
-cd /path/to/neurondb
+# From dockers/
+docker compose -f ../docker-compose.yml up -d
+```
 
-# CPU profile
-docker-compose -f dockers/docker-compose.yml --profile cpu up -d
+**Legacy/Reference:** `dockers/docker-compose.yml` exists for historical reasons, but it may lag behind the canonical root file.
+Prefer the root compose above to avoid configuration drift.
 
 # CUDA GPU profile
 docker-compose -f dockers/docker-compose.yml --profile cuda up -d
@@ -202,10 +203,10 @@ The script includes comprehensive validation:
 docker stop neurondb-cpu
 
 # Stop all services
-docker-compose -f dockers/docker-compose.yml down
+docker compose -f ../docker-compose.yml down
 
 # Stop and remove volumes
-docker-compose -f dockers/docker-compose.yml down -v
+docker compose -f ../docker-compose.yml down -v
 ```
 
 ### View Logs
@@ -216,7 +217,7 @@ docker logs neurondb-cpu
 docker logs -f neuronagent  # Follow logs
 
 # View compose logs
-docker-compose -f dockers/docker-compose.yml logs neurondb
+docker compose -f ../docker-compose.yml logs neurondb
 ```
 
 ### Health Checks
