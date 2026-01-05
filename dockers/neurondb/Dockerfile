@@ -79,6 +79,33 @@ COPY . .
 # Build and install ONLY the NeuronDB PostgreSQL extension into the builder image.
 # (Do not call the repo-root Makefile here: it builds the whole ecosystem and
 # requires Go/Node which are intentionally not part of this image.)
+# Generate configuration header before building
+RUN cd NeuronDB && \
+    mkdir -p include && \
+    cat > include/neurondb_config.h <<'EOF'
+/*-------------------------------------------------------------------------
+ * neurondb_config.h - Auto-generated configuration header
+ * Generated for Docker build
+ *-------------------------------------------------------------------------*/
+
+#ifndef NEURONDB_CONFIG_H
+#define NEURONDB_CONFIG_H
+
+#define NEURONDB_VERSION "1.0"
+#define NEURONDB_BUILD_DATE "20260105"
+#define NEURONDB_PLATFORM_LINUX 1
+
+/* CPU-only build */
+#define NEURONDB_CPU_FALLBACK 1
+
+/* ONNX Runtime support */
+#define HAVE_ONNX_RUNTIME 1
+#define ONNX_RUNTIME_PATH "/usr/local/onnxruntime"
+
+#endif /* NEURONDB_CONFIG_H */
+EOF
+
+# Build and install the extension
 RUN cd NeuronDB && \
     GPU_BACKENDS=none make clean && \
     GPU_BACKENDS=none make && \
