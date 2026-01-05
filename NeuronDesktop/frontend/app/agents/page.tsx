@@ -16,6 +16,7 @@ import {
 } from '@/components/Icons'
 import { showSuccessToast, showErrorToast } from '@/lib/errors'
 import AgentPlayground from '@/components/AgentPlayground'
+import { SkeletonList } from '@/components/Skeleton'
 
 export default function AgentsPage() {
   const [profiles, setProfiles] = useState<Profile[]>([])
