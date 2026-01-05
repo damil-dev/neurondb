@@ -253,7 +253,7 @@ func (s *ServerSettings) GetVersion() string {
 	if s.Version != nil {
 		return *s.Version
 	}
-	return "1.0.0"
+	return "2.0.0"
 }
 
 func (s *ServerSettings) GetTimeout() time.Duration {

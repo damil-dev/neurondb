@@ -40,7 +40,7 @@ func NewVectorSearchTool(db *database.Database, logger *logging.Logger) *VectorS
 	tool := NewBaseToolWithVersion(
 		"vector_search",
 		"Perform vector similarity search using L2, cosine, inner product, L1, Hamming, Chebyshev, or Minkowski distance",
-		"1.0.0",
+		"2.0.0",
 		map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{

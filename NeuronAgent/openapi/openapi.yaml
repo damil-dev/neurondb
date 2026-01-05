@@ -4,7 +4,7 @@ info:
   description: |
     REST API for NeuronAgent - AI agent runtime system providing agent state management,
     session handling, message processing, tool execution, and streaming capabilities.
-  version: 1.0.0
+  version: 2.0.0
   contact:
     name: NeuronDB Support
     email: support@neurondb.ai

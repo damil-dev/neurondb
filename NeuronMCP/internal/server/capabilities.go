@@ -53,8 +53,8 @@ func NewCapabilitiesManager(serverName, serverVersion string, toolRegistry *tool
 			"resource_catalog":  true,
 		},
 		modelVersions: map[string]string{
-			"default_embedding": "1.0.0",
-			"default_llm":       "1.0.0",
+			"default_embedding": "2.0.0",
+			"default_llm":       "2.0.0",
 		},
 	}
 }
