@@ -69,6 +69,7 @@ LIMIT 5;
  Vector search enables semantic matching       |     0.7123
  Machine learning models process embeddings    |     0.6543
 (3 rows)
+
 ```
 
 The query finds documents about database systems even when the document text uses different words. The system understands these concepts are related through vector similarity.
@@ -115,6 +116,7 @@ SELECT * FROM neurondb.list_models();
  sentence-transformers/all-mpnet-base-v2 |        768 | text
  BAAI/bge-large-en-v1.5                |       1024 | text
 (50 rows)
+
 ```
 
 The extension generates embeddings without external services. All operations run within PostgreSQL using SQL syntax.
@@ -183,6 +185,7 @@ LIMIT 5;
   2 | Vector search enables semantic matching       |    0.7123 |     0.0000 |     0.008765
   3 | Machine learning models process embeddings    |    0.6543 |     0.0000 |     0.007654
 (3 rows)
+
 ```
 
 Hybrid search combines semantic understanding with exact keyword matching. Results rank higher when both methods agree.
@@ -217,6 +220,7 @@ SELECT * FROM neurondb.gpu_stats;
 -----------+-------------+--------------+-------------+-------------------
          0 | NVIDIA RTX 4090 | 24576 MB    | 1024 MB     | 8.9
 (1 row)
+
 ```
 
 GPU acceleration provides 10x to 100x speedup for batch operations. The extension automatically falls back to CPU when GPU is unavailable.
@@ -259,6 +263,7 @@ SELECT * FROM neurondb.worker_status;
  neurandefrag | true    | running   | 2024-01-15 10:30:02
  neuranllm   | true    | running   | 2024-01-15 10:30:03
 (4 rows)
+
 ```
 
 Background workers handle maintenance and optimization tasks automatically. Operations run without manual intervention.
@@ -325,6 +330,7 @@ FROM relevant_docs;
 -----------------+--------------------------------------------------------------------------------
  {1}             | PostgreSQL performance can be improved through indexing strategies.
 (1 row)
+
 ```
 
 The RAG pipeline retrieves relevant context and formats it for LLM processing. All operations run within PostgreSQL using SQL.
@@ -394,6 +400,7 @@ SELECT * FROM neurondb.version();
 ---------+------------+-------------------
  1.0.0   | 2024-01-15 | 16.0
 (1 row)
+
 ```
 
 Install NeuronDB on macOS:
@@ -413,6 +420,7 @@ SELECT * FROM neurondb.version();
 ---------+------------+-------------------
  1.0.0   | 2024-01-15 | 16.0
 (1 row)
+
 ```
 
 Build from source:
@@ -428,6 +436,7 @@ sudo make install
 
 -- Enable extension
 CREATE EXTENSION neurondb;
+
 ```
 
 Configure GPU support:
@@ -451,6 +460,7 @@ SELECT neurondb.gpu_available();
 -------------
  true
 (1 row)
+
 ```
 
 ## Real-World Use Cases
@@ -507,6 +517,7 @@ LIMIT 10;
        1 | Product A |      0.8765
        2 | Product B |      0.8123
 (3 rows)
+
 ```
 
 The recommendation system finds items similar to user preferences using vector similarity. Results rank by similarity score.
@@ -552,6 +563,7 @@ SELECT * FROM neurondb.gpu_stats;
 -----------+-------------+-------------+-------------
          0 |        85%  |     2048 MB  |    24576 MB
 (1 row)
+
 ```
 
 Performance monitoring provides real-time metrics for optimization. The extension tracks query latency, GPU utilization, and index statistics.
@@ -581,6 +593,7 @@ CREATE INDEX ON vectors USING ivfflat (embedding vector_l2_ops)
 WITH (lists = 1000);
 
 SET neurondb.ivfflat_probes = 20;
+
 ```
 
 Configure GPU acceleration:
@@ -594,6 +607,7 @@ SET neurondb.gpu_device_id = 0;
 
 -- Set batch size
 SET neurondb.gpu_batch_size = 1000;
+
 ```
 
 Configure embedding models:
@@ -607,6 +621,7 @@ SELECT neurondb.load_model('custom-bert', '/path/to/model.onnx');
 
 -- Set default model
 SET neurondb.default_model = 'all-MiniLM-L6-v2';
+
 ```
 
 Configuration options allow fine-tuning performance for specific workloads. Parameters balance speed, accuracy, and resource usage.
@@ -641,6 +656,7 @@ LIMIT 10;
   2 | [0.2345, -0.6789, 0.0123, ...]
   3 | [0.3456, -0.7890, 0.1234, ...]
 (3 rows)
+
 ```
 
 Migration requires no code changes. The extension provides drop-in compatibility with pgvector.
@@ -684,6 +700,7 @@ SELECT * FROM neurondb.cache_stats;
 ------------+------+--------+----------
  embedding  | 95000 | 5000  | 0.95
 (1 row)
+
 ```
 
 Monitoring provides visibility into system performance and health. Metrics help identify bottlenecks and optimization opportunities.
@@ -714,6 +731,7 @@ SELECT * FROM neurondb.security_settings;
  differential_privacy_epsilon | 1.0
  audit_logging             | on
 (3 rows)
+
 ```
 
 Security features protect data and ensure compliance with regulations. All features integrate with PostgreSQL's security model.

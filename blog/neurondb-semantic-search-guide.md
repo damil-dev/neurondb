@@ -52,6 +52,7 @@ LIMIT 5;
 ------------------------------+------------
  PostgreSQL is a powerful relational database |     0.0000
 (1 row)
+
 ```
 
 This query finds documents about **database systems** even though the document text says **relational database**. The system understands these concepts are related.
@@ -86,6 +87,7 @@ NeuronDB is a PostgreSQL extension. It works with [PostgreSQL 16](https://www.po
 
 ```sql
 CREATE EXTENSION neurondb;
+
 ```
 
 This command registers NeuronDB with your PostgreSQL instance. It creates the necessary database objects, functions, and types. The extension is schema-aware. Install it in a specific schema if needed. The default public schema works for most use cases.
@@ -149,6 +151,7 @@ CREATE INDEX idx_chunks_doc_id ON document_chunks(doc_id);
  public | documents                    | table    | postgres
  public | documents_doc_id_seq         | sequence | postgres
 (4 rows)
+
 ```
 
 The verification query shows we created four database objects: the documents table, the document_chunks table, and their associated sequences for auto-incrementing IDs. The schema is ready to store documents and their chunks.
@@ -193,6 +196,7 @@ FROM documents d;
       4 | Python Machine Learning Best Practices     |           5 |                      5
       5 | Database Sharding Strategies               |           3 |                      3
 (5 rows)
+
 ```
 
 The verification query shows we inserted five documents. Each document has a doc_id, title, and metadata. The chunk_count and chunks_with_embeddings columns show zero because we haven't created chunks yet. We'll create chunks in the next step.
@@ -234,6 +238,7 @@ ORDER BY doc_id;
       4 |           5
       5 |           3
 (5 rows)
+
 ```
 
 The verification query shows chunks were created for each document. Document 1 has 5 chunks, document 2 has 4 chunks, document 3 has 3 chunks, document 4 has 5 chunks, and document 5 has 3 chunks. Each chunk is ready for embedding generation.
@@ -262,6 +267,7 @@ FROM document_chunks;
 --------------+------------------------
            20 |                     20
 (1 row)
+
 ```
 
 The verification query confirms all 20 chunks now have embeddings. Each chunk has a 384-dimensional vector that represents its semantic content. These embeddings enable similarity search. We can now find chunks that are semantically similar to user queries.
@@ -308,6 +314,7 @@ WHERE tablename = 'document_chunks';
  idx_chunks_embedding_hnsw | CREATE INDEX idx_chunks_embedding_hnsw ON public.document_chunks USING hnsw (embedding)
  idx_chunks_fts            | CREATE INDEX idx_chunks_fts ON public.document_chunks USING gin (fts_vector)
 (4 rows)
+
 ```
 
 The verification query shows four indexes exist on the document_chunks table. The HNSW index on the embedding column enables fast approximate nearest neighbor search. Queries will use this index to find similar vectors quickly. The system is ready for semantic search queries.
@@ -347,6 +354,7 @@ LIMIT 5;
         2 | PostgreSQL Performance Tuning | B-tree indexes are the default and work...     |           0.0000
         3 | PostgreSQL Performance Tuning | GiST indexes are useful for full-text...       |           0.0000
 (5 rows)
+
 ```
 
 The query correctly identifies content about **B-tree indexes**, **GiST indexes**, and **indexing strategies** even though the exact phrase **database indexes work** doesn't appear in the documents. Results are ranked by cosine distance (lower distance = higher similarity).
@@ -382,6 +390,7 @@ LIMIT 5;
         3 | PostgreSQL Performance Tuning | GiST indexes are useful for full-text...       |           0.0000
         1 | PostgreSQL Performance Tuning | PostgreSQL performance can be significantly... |           0.0000
 (5 rows)
+
 ```
 
 Even though the query uses **retrieval augmented generation** while the documents mention **RAG**, the semantic search correctly finds the relevant content. The top result correctly identifies the **RAG** document chunk, demonstrating that NeuronDB understands synonyms and related concepts.
@@ -417,6 +426,7 @@ LIMIT 5;
         3 | PostgreSQL Performance Tuning | GiST indexes are useful for full-text...       |     0.0000
         1 | PostgreSQL Performance Tuning | PostgreSQL performance can be significantly... |     0.0000
 (5 rows)
+
 ```
 
 Natural language queries work seamlessly with NeuronDB. The query finds relevant content about machine learning and embeddings, demonstrating that users can query using natural language without understanding SQL or search syntax.
@@ -502,6 +512,7 @@ LIMIT 5;
        19 | Database Sharding Strategies  | Common strategies include: Range-based...      |    0.7432 |     0.6456 |     0.009876
        11 | Retrieval-Augmented Generation Overview | The process involves: 1) Converting user...    |    0.7210 |     0.6123 |     0.009567
 (5 rows)
+
 ```
 
 ### Filtered Semantic Search
@@ -536,6 +547,7 @@ LIMIT 5;
         3 | PostgreSQL Performance Tuning | GiST indexes are useful for full-text...       |           0.0000
         4 | PostgreSQL Performance Tuning | Hash indexes can be faster for equality...     |           0.0000
 (5 rows)
+
 ```
 
 The filtered search returns only documents matching the metadata criteria. All results are from documents with **metadata->>'category' = 'database'**, demonstrating how semantic search can be combined with metadata filtering.
@@ -576,6 +588,7 @@ UPDATE document_chunks dc
 SET embedding = u.embedding
 FROM unnested u
 WHERE dc.chunk_id = u.chunk_id;
+
 ```
 
 *Note*: Batch processing groups chunks into batches of 100. Adjust the batch size (100) based on your available memory. For smaller datasets, you can process all chunks at once:
@@ -602,6 +615,7 @@ UPDATE document_chunks dc
 SET embedding = u.embedding
 FROM unnested u
 WHERE dc.chunk_id = u.chunk_id;
+
 ```
 
 ## Building a RAG Pipeline
@@ -629,6 +643,7 @@ VALUES (
     'How can I improve PostgreSQL query performance?',
     '{"model": "gpt-4", "temperature": 0.7}'::jsonb
 );
+
 ```
 
 The query processing table is created and a sample query is stored. The query includes metadata about the LLM model and parameters that will be used for response generation.
@@ -674,6 +689,7 @@ FROM relevant_chunks;
         2 | PostgreSQL Performance Tuning | B-tree indexes are the default and work...     | 0.0000 |    4
         3 | PostgreSQL Performance Tuning | GiST indexes are useful for full-text...       | 0.0000 |    5
 (5 rows)
+
 ```
 
 The query retrieved five chunks ranked by similarity to the user's question. The top result is about PostgreSQL performance tuning, which directly answers the question. The chunks are ordered by relevance, with the most similar chunk ranked first. These chunks will be combined into context for the LLM.
@@ -729,6 +745,7 @@ Document 4: B-tree indexes are the default and work well for most queries. They 
 
 Document 5: GiST indexes are useful for full-text search and geometric data. They support custom operator classes for specialized data types.
 (1 row)
+
 ```
 
 The query built a context string containing the top 5 relevant chunks. The chunk_ids array contains the IDs of chunks used in the context. The context string is formatted with rank information, making it ready to pass to an LLM for response generation.
@@ -746,6 +763,7 @@ For production systems with large datasets, vector indexes are essential. [HNSW]
 CREATE INDEX idx_chunks_embedding ON document_chunks 
 USING hnsw (embedding vector_cosine_ops) 
 WITH (m = 16, ef_construction = 64);
+
 ```
 
 The m parameter controls the number of connections per layer. The ef_construction parameter controls index quality during construction. Higher values improve recall but slow index creation.
@@ -757,6 +775,7 @@ NeuronDB automatically caches embeddings to improve performance. Check cache sta
 ```sql
 -- Check cache statistics
 SELECT * FROM neurondb.embedding_cache_stats;
+
 ```
 
 *Note*: The exact cache statistics table name may vary by NeuronDB version.
@@ -768,6 +787,7 @@ For high-throughput scenarios, enable GPU acceleration:
 ```sql
 -- Enable GPU support (requires CUDA/ROCm/Metal)
 SET neurondb.gpu_enabled = true;
+
 ```
 
 ## Best Practices
@@ -823,6 +843,7 @@ LIMIT 3;
           8 | Account Access Reset              | If you've forgotten your password, use the... |     0.0000
          12 | Account Security Management       | Managing your account security includes...    |     0.0000
 (3 rows)
+
 ```
 
 ### Legal Document Search
@@ -861,6 +882,7 @@ LIMIT 10;
          9 | Confidentiality Agreement  | IP rights related to confidential information... |     0.0000
         10 | Merger Agreement           | Intellectual property rights and licensing...     |     0.0000
 (10 rows)
+
 ```
 
 ### Product Search
@@ -910,6 +932,7 @@ LIMIT 20;
          38 | Professional Earbuds                      | High-end bluetooth earbuds with noise cancellation... |  199.99 |    0.0000
          26 | Budget Headphones                         | Affordable wireless headphones with basic ANC...    |   69.99 |    0.0000
 (20 rows)
+
 ```
 
 ## Conclusion
