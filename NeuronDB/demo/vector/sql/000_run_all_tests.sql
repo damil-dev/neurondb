@@ -91,7 +91,7 @@ UNION ALL SELECT 'Faceted Search', '❌ None', '✅ faceted_vector_search()'
 UNION ALL SELECT 'Temporal Search', '❌ None', '✅ temporal_vector_search()'
 UNION ALL SELECT '═══════════════════════════', '════════════', '════════════'
 UNION ALL SELECT 'TOTAL FUNCTIONS', '~20', '133+ functions'
-UNION ALL SELECT 'STATUS', 'Basic', 'ENTERPRISE-GRADE';
+UNION ALL SELECT 'STATUS', 'Basic', 'Advanced';
 
 \echo ''
 \echo '=========================================================================='
@@ -103,9 +103,9 @@ UNION ALL SELECT 'STATUS', 'Basic', 'ENTERPRISE-GRADE';
 \echo '  • 3.6x MORE distance metrics (11 vs 3)'
 \echo '  • GPU acceleration for compute-intensive operations'
 \echo '  • Advanced ML preprocessing built-in'
-\echo '  • Enterprise features (time travel, federation, replication)'
+\echo '  • Advanced features (time travel, federation, replication)'
 \echo '  • 100% PostgreSQL C coding standards'
-\echo '  • Production-ready with comprehensive testing'
+\echo '  • Comprehensive test coverage'
 \echo ''
 \echo '=========================================================================='
 

@@ -454,5 +454,5 @@ LIMIT 20;
 | neurandefrag | Maintenance | 5 minutes | Dead ratio, Last vacuum |
 | neuranllm | LLM Jobs | 1 second | Completion rate, Errors |
 
-All workers are production-ready, crash-safe, and fully integrated with PostgreSQL's background worker infrastructure.
+All workers are crash-safe and fully integrated with PostgreSQL's background worker infrastructure.
 

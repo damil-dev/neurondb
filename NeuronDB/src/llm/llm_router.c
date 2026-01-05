@@ -215,8 +215,6 @@ ndb_llm_route_complete(const NdbLLMConfig *cfg,
 			char	   *gpu_err = NULL;
 			char	   *gpu_text = NULL;
 			int			rc;
-			int32		token_length;
-			int32	   *token_ids = NULL;
 
 			rc = neurondb_gpu_hf_complete(cfg->model,
 										  prompt,
@@ -236,6 +234,9 @@ ndb_llm_route_complete(const NdbLLMConfig *cfg,
 				}
 
 #ifdef HAVE_ONNX_RUNTIME
+				int32		token_length;
+				int32	   *token_ids = NULL;
+
 				token_ids = neurondb_tokenize_with_model(prompt,
 														 2048,
 														 &token_length,

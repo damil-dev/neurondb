@@ -3,7 +3,7 @@
  * neurondb_index.h
  *		Index method definitions for NeuronDB
  *
- * Defines enterprise-grade index structures including tenant-aware HNSW,
+ * Defines advanced index structures including tenant-aware HNSW,
  * hybrid ANN+FTS, temporal vector index, consistent query HNSW,
  * and rerank-ready index.
  *

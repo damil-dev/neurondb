@@ -352,7 +352,7 @@ ORDER BY version;
 
 SELECT 
     'Outlier Detection (Z-score)' as algorithm,
-    'PRODUCTION READY' as status,
+    'READY' as status,
     '~3 seconds on 1.2M rows' as performance,
     'Excellent' as scalability,
     'Anomaly/rare event detection' as best_use_case,
