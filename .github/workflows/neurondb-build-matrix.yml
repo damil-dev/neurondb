@@ -39,7 +39,8 @@ jobs:
           sudo curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc --fail https://www.postgresql.org/media/keys/ACCC4CF8.asc
           sudo sh -c 'echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
           sudo apt-get update
-          sudo apt-get install -y postgresql-server-dev-${{ matrix.pg_version }} build-essential make libssl-dev libcurl4-openssl-dev
+          # Install both server-dev and server packages to ensure extension files go to correct location
+          sudo apt-get install -y postgresql-server-dev-${{ matrix.pg_version }} postgresql-${{ matrix.pg_version }} build-essential make libssl-dev libcurl4-openssl-dev
 
       - name: Install ONNX Runtime
         run: |
@@ -58,7 +59,56 @@ jobs:
       - name: Install extension
         working-directory: NeuronDB
         run: |
-          sudo make install
+          # Find the correct pg_config for the PostgreSQL version in use
+          PG_CONFIG_PATH=$(which pg_config || find /usr -name pg_config 2>/dev/null | head -1)
+          if [ -z "$PG_CONFIG_PATH" ]; then
+            PG_CONFIG_PATH=/usr/bin/pg_config
+          fi
+          echo "Using PG_CONFIG: $PG_CONFIG_PATH"
+          $PG_CONFIG_PATH --version
+          sudo make install PG_CONFIG=$PG_CONFIG_PATH
+        env:
+          PG_CONFIG: /usr/bin/pg_config
+
+      - name: Copy extension to Docker container
+        run: |
+          # Get the PostgreSQL container ID
+          CONTAINER_ID=$(docker ps --filter "ancestor=postgres:${{ matrix.pg_version }}" --format "{{.ID}}" | head -1)
+          if [ -z "$CONTAINER_ID" ]; then
+            echo "Warning: Could not find PostgreSQL container"
+            exit 1
+          fi
+          echo "Found PostgreSQL container: $CONTAINER_ID"
+          # Install required dependencies in the container
+          docker exec $CONTAINER_ID bash -c "apt-get update && apt-get install -y libcurl4 libssl3 || apt-get install -y libcurl4-openssl-dev libssl-dev || true"
+          # Copy extension files into the container
+          docker cp /usr/share/postgresql/${{ matrix.pg_version }}/extension/neurondb.control $CONTAINER_ID:/usr/share/postgresql/${{ matrix.pg_version }}/extension/ 2>/dev/null || true
+          docker cp /usr/share/postgresql/${{ matrix.pg_version }}/extension/neurondb--*.sql $CONTAINER_ID:/usr/share/postgresql/${{ matrix.pg_version }}/extension/ 2>/dev/null || true
+          docker cp /usr/lib/postgresql/${{ matrix.pg_version }}/lib/neurondb.so $CONTAINER_ID:/usr/lib/postgresql/${{ matrix.pg_version }}/lib/ 2>/dev/null || true
+          # Copy ONNX Runtime if it exists
+          if [ -d "/usr/local/onnxruntime" ]; then
+            docker exec $CONTAINER_ID mkdir -p /usr/local/onnxruntime
+            docker cp /usr/local/onnxruntime/. $CONTAINER_ID:/usr/local/onnxruntime/ 2>/dev/null || true
+          fi
+          # Configure shared_preload_libraries in PostgreSQL
+          docker exec $CONTAINER_ID bash -c "echo \"shared_preload_libraries = 'neurondb'\" >> /var/lib/postgresql/data/postgresql.conf" || \
+          docker exec $CONTAINER_ID bash -c "echo \"shared_preload_libraries = 'neurondb'\" >> \$(psql -U postgres -t -c 'SHOW config_file;' | tr -d ' ')" || \
+          docker exec $CONTAINER_ID bash -c "find /var/lib/postgresql -name postgresql.conf -exec sh -c 'echo \"shared_preload_libraries = '\''neurondb'\''\" >> {}' \\;"
+          # Restart PostgreSQL to load the configuration
+          docker restart $CONTAINER_ID
+          # Wait for PostgreSQL to be ready
+          sleep 5
+          for i in {1..30}; do
+            if docker exec $CONTAINER_ID pg_isready -U postgres >/dev/null 2>&1; then
+              echo "PostgreSQL is ready"
+              break
+            fi
+            echo "Waiting for PostgreSQL... ($i/30)"
+            sleep 2
+          done
+          # Verify files were copied
+          docker exec $CONTAINER_ID ls -la /usr/share/postgresql/${{ matrix.pg_version }}/extension/neurondb* || echo "Warning: Extension files not found in container"
+          docker exec $CONTAINER_ID ldd /usr/lib/postgresql/${{ matrix.pg_version }}/lib/neurondb.so || echo "Warning: Could not check library dependencies"
 
       - name: Create extension in test database
         run: |
