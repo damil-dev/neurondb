@@ -1,4 +1,4 @@
-<img src="/blog/ai-with-database-on-prem/header.svg?v=12" alt="Running AI on premises with Postgres header" />
+<img src="assets/ai-with-database-on-prem/header.svg" alt="Running AI on premises with Postgres header" />
 
 <h1>Running AI on premises with Postgres</h1>
 
@@ -20,19 +20,19 @@
 
 <h2>Cloud vs on premises, quick view</h2>
 
-<img src="/blog/ai-with-database-on-prem/quickreview.png" alt="On premises vs cloud AI comparison" />
+<img src="assets/ai-with-database-on-prem/quickreview.png" alt="On premises vs cloud AI comparison" />
 
 <p>Watch your data movement. In many systems you fetch documents in one place, run embeddings in another, and run vector search in a third place. Each hop adds latency and failure modes. If you keep these steps inside one network, you cut variance and you debug faster.</p>
 
 <h2>Architecture overview</h2>
 
-<img src="/blog/ai-with-database-on-prem/archtect.png" alt="On premises AI architecture overview" />
+<img src="assets/ai-with-database-on-prem/archtect.png" alt="On premises AI architecture overview" />
 
 <p>Keep the data plane local. Store documents and metadata in Postgres. Store embeddings next to the rows they describe. Build vector indexes in the same database. Run retrieval queries over private links. Expose results through your app services.</p>
 
 <p>Keep three paths clear. Ingest is write heavy. Retrieval is read heavy. Admin work is rare but sensitive. Split these paths by network rules and by roles.</p>
 
-<img src="/blog/ai-with-database-on-prem/diagram-on-prem-architecture.svg?v=3" alt="On premises architecture diagram" />
+<img src="assets/ai-with-database-on-prem/diagram-on-prem-architecture.svg" alt="On premises architecture diagram" />
 
 <p>Put ingestion on a schedule. Batch it. Keep queries stable. Do not let ad hoc scripts write to the main database. Use a queue or a worker process. Record each run.</p>
 
@@ -54,7 +54,7 @@
 
 <h3>Single server</h3>
 
-<img src="/blog/ai-with-database-on-prem/diagram-single-server.svg" alt="Single server deployment diagram" />
+<img src="assets/ai-with-database-on-prem/diagram-single-server.svg" alt="Single server deployment diagram" />
 
 <p>Use this for your first release. You get one host to secure. You get one Postgres instance to tune. You get clear failure handling. Add backups and dashboards before you add more servers.</p>
 
@@ -131,7 +131,7 @@ LIMIT 10;</code></pre>
 
 <h3>Primary and replicas</h3>
 
-<img src="/blog/ai-with-database-on-prem/diagram-multi-server-cluster.svg" alt="Multi server cluster diagram" />
+<img src="assets/ai-with-database-on-prem/diagram-multi-server-cluster.svg" alt="Multi server cluster diagram" />
 
 <p>Use this when you need uptime and read scale. Keep writes on the primary. Send retrieval reads to replicas. Use a pooler. Track replication lag. Set a rule for stale reads.</p>
 
@@ -191,7 +191,7 @@ FROM pg_stat_replication;</code></pre>
 
 <h2>Security</h2>
 
-<img src="/blog/ai-with-database-on-prem/diagram-security-architecture.svg" alt="Security architecture diagram" />
+<img src="assets/ai-with-database-on-prem/diagram-security-architecture.svg" alt="Security architecture diagram" />
 
 <p>Keep the database private. Restrict inbound. Restrict outbound. Limit roles. Log access. Keep backups protected.</p>
 
@@ -238,7 +238,7 @@ LIMIT 20;</code></pre>
 
 <h2>Migration from cloud</h2>
 
-<img src="/blog/ai-with-database-on-prem/diagram-migration.svg" alt="Cloud to on premises migration diagram" />
+<img src="assets/ai-with-database-on-prem/diagram-migration.svg" alt="Cloud to on premises migration diagram" />
 
 <p>Move the data plane first. Export docs and embeddings. Import into Postgres. Rebuild indexes. Mirror traffic. Compare answers and latency. Cut over with a rollback plan.</p>
 

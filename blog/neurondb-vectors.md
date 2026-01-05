@@ -1,4 +1,4 @@
-![NeuronDB header](/blog/neurondb-vectors/header.svg?v=7)
+![NeuronDB header](assets/neurondb-vectors/header.svg)
 
 # Vectors in PostgreSQL
 

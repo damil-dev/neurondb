@@ -1,4 +1,4 @@
-![Agentic AI header](/blog/agentic-ai/header.svg?v=8)
+![Agentic AI header](assets/agentic-ai/header.svg)
 
 # Agentic AI: Guide to Autonomous AI Agents
 
@@ -51,7 +51,7 @@ Agentic AI refers to systems that act autonomously to achieve goals. The term "a
 
 Agents are software systems that exhibit autonomous behavior. They differ from traditional programs in key ways.
 
-![Traditional Programs vs Agents](/blog/agentic-ai/traditional-programs-vs-agents.png)
+![Traditional Programs vs Agents](assets/agentic-ai/traditional-programs-vs-agents.png)
 
 The diagram illustrates the fundamental differences between traditional programs and agentic systems. Traditional programs follow fixed execution paths defined at development time, while agents adapt their behavior based on context and goals. This adaptive capability enables agents to handle situations that were not explicitly programmed, making them more flexible and powerful for complex, dynamic environments.
 
@@ -118,7 +118,7 @@ Agents follow a structured architecture. The architecture separates concerns, ea
 
 **User interface:** Sends messages to the agent. Messages include user queries and goals. The interface may be a web application or API, and messages are formatted as text or structured data.
 
-![Agent Architecture Diagram](/blog/agentic-ai/agent-main.png)
+![Agent Architecture Diagram](assets/agentic-ai/agent-main.png)
 
 The architecture diagram shows component relationships. User input flows to the runtime. The runtime queries the planner for execution plans. The planner generates steps and validates feasibility. Steps flow to the tool executor for action execution. Results flow to memory for storage. Memory feeds back to the planner for context. The state machine coordinates all transitions. The response generator formats final output.
 
@@ -153,7 +153,7 @@ Valid plans are ranked by quality. Ranking considers execution time, resource us
 
 Steps are extracted from the selected plan. Each step becomes an executable action. Steps are ordered by dependencies, include error handling, and are ready for execution.
 
-![Planning System Diagram](/blog/agentic-ai/diagram-planning-system.svg)
+![Planning System Diagram](assets/agentic-ai/diagram-planning-system.svg)
 
 The planning diagram shows the decision flow. Goals enter the planner for analysis. The planner queries available tools to understand capabilities. The planner generates candidate plans with step sequences. Plans are validated for feasibility and correctness. Valid plans are ranked by quality metrics. The best plan is selected based on scores. Steps are extracted for execution by the runtime.
 
@@ -201,7 +201,7 @@ The executor handles errors gracefully:
 - Reports permanent failures
 - Updates agent state
 
-![Tool Execution Diagram](/blog/agentic-ai/diagram-tool-execution.svg)
+![Tool Execution Diagram](assets/agentic-ai/diagram-tool-execution.svg)
 
 The tool execution diagram shows the interaction flow. The agent requests a tool call with parameters. The tool registry validates the request against tool metadata. The tool executor runs the action in the tool environment. Results are returned in structured format. The agent processes results for validation. The agent updates state with new information. The agent continues planning with updated context.
 
@@ -241,7 +241,7 @@ Memory retrieval uses vector similarity search:
 
 Vector search enables semantic retrieval. Memories are found by meaning, not keywords. Queries match conceptually similar content, synonyms and related concepts are handled automatically, and context retrieval improves response quality.
 
-![Memory System Diagram](/blog/agentic-ai/diagram-memory-system.svg)
+![Memory System Diagram](assets/agentic-ai/diagram-memory-system.svg)
 
 The memory diagram shows storage and retrieval processes. New memories are extracted from interactions. Text is converted to embeddings using language models. Embeddings are stored in vector databases with metadata. Queries are converted to embeddings for search. Similarity search finds relevant memories using vector distance. Matches are ranked by relevance scores. Top matches are returned as context for agent prompts.
 
@@ -263,7 +263,7 @@ State transitions follow rules:
 - **Waiting** → **Executing**: On result received
 - **Executing** → **Completed**: On goal achieved
 
-![State Machine Diagram](/blog/agentic-ai/diagram-state-machine.svg)
+![State Machine Diagram](assets/agentic-ai/diagram-state-machine.svg)
 
 The state machine diagram shows all states and transitions. States are represented as nodes. Transitions are represented as arrows. Each transition has a condition. Conditions trigger state changes. Error states handle failures. Recovery paths restore normal operation.
 
@@ -283,7 +283,7 @@ Planning works in three phases:
 Plans include step dependencies. Some steps require previous steps to complete. The planner orders steps correctly and handles parallel execution when possible.
 
 
-![Planning Component Diagram](/blog/agentic-ai/diagram-planning-component.svg)
+![Planning Component Diagram](assets/agentic-ai/diagram-planning-component.svg)
 
 The planning component diagram shows internal structure. Goals enter the analyzer. The analyzer queries available tools. The analyzer generates candidate steps. Steps are ordered by dependencies. The validator checks feasibility. Valid plans are output.
 
@@ -297,7 +297,7 @@ Tools are registered with metadata. Metadata includes tool name, description, pa
 
 Tool execution includes error handling. Tools may fail due to network issues or return invalid results. The registry handles errors gracefully and retries failed calls when appropriate.
 
-![Tool Registry Diagram](/blog/agentic-ai/diagram-tool-registry.svg)
+![Tool Registry Diagram](assets/agentic-ai/diagram-tool-registry.svg)
 
 The tool registry diagram shows tool management. Tools are registered with metadata. The registry maintains a catalog. Agents query the catalog. The registry validates requests. The registry executes tools. Results are returned to agents.
 
@@ -319,7 +319,7 @@ Memory retrieval uses semantic search:
 3. Results are ranked by relevance
 4. Top results are returned as context
 
-![Memory Component Diagram](/blog/agentic-ai/diagram-memory-component.svg)
+![Memory Component Diagram](assets/agentic-ai/diagram-memory-component.svg)
 
 The memory component diagram shows storage and retrieval. Text enters the embedding generator. Embeddings are stored in vector database. Queries are embedded. Similarity search finds matches. Matches are ranked and returned.
 
@@ -339,7 +339,7 @@ Error handling includes recovery paths:
 - Error states attempt recovery
 - Recovery may retry steps or adjust plans
 
-![State Machine Component Diagram](/blog/agentic-ai/diagram-state-machine-component.svg)
+![State Machine Component Diagram](assets/agentic-ai/diagram-state-machine-component.svg)
 
 The state machine diagram shows state management. States are stored in database. Transitions are triggered by events. Error states have recovery paths. Completed states trigger cleanup.
 
@@ -358,7 +358,7 @@ Agent execution follows this cycle. The cycle starts with user input, ends with 
 - **Step five updates memory**: Important facts are extracted, converted to embeddings, stored in memory, and memory indexes are updated.
 - **Step six generates response**: The response generator formats output. Output includes execution results, explanations, and is returned to user.
 
-![Execution Flow Diagram](/blog/agentic-ai/diagram-execution-flow.svg)
+![Execution Flow Diagram](assets/agentic-ai/diagram-execution-flow.svg)
 
 The execution flow diagram shows the complete cycle. Input flows through planning. Planning flows to execution. Execution flows to memory. Memory flows to response. Response flows to user.
 
@@ -382,7 +382,7 @@ Step failures require recovery:
 - Error handling may adjust plans
 - Error handling may skip steps
 
-![Multi-Step Execution Diagram](/blog/agentic-ai/diagram-multi-step-execution.svg)
+![Multi-Step Execution Diagram](assets/agentic-ai/diagram-multi-step-execution.svg)
 
 The multi-step diagram shows step coordination. Steps are ordered by dependencies. Execution follows the order. Results flow between steps. Failures trigger recovery.
 
@@ -405,7 +405,7 @@ Recovery strategies include retries:
 - Retries have maximum attempts
 - Permanent errors skip retries
 
-![Error Handling Diagram](/blog/agentic-ai/diagram-error-handling.svg)
+![Error Handling Diagram](assets/agentic-ai/diagram-error-handling.svg)
 
 The error handling diagram shows recovery flow. Errors are detected. Errors are categorized. Recovery strategies are selected. Strategies are executed. Success restores normal flow.
 
@@ -413,7 +413,7 @@ Robust error handling is essential for production agent systems. Errors can occu
 
 ## Building an Agent with NeuronDB and NeuronAgent
 
-![Agent, MCP, and NeuronDB Integration](/blog/agentic-ai/agent-mcp-ndb.png)
+![Agent, MCP, and NeuronDB Integration](assets/agentic-ai/agent-mcp-ndb.png)
 
 The integration diagram illustrates how NeuronDB, NeuronAgent, and the Model Context Protocol work together to create a complete agent system. NeuronDB provides the underlying vector database and embedding capabilities. NeuronAgent supplies the runtime environment and agent framework. The MCP server enables integration with external tools and services. Together, these components create a powerful platform for building production-ready agent applications.
 
@@ -931,7 +931,7 @@ Agent orchestration manages agent workflows. Orchestrators route tasks to agents
 
 Specialized agents focus on specific domains. Research agents handle information retrieval. Code agents handle programming tasks. Analysis agents handle data processing.
 
-![Advanced Patterns Diagram](/blog/agentic-ai/diagram-advanced-patterns.svg)
+![Advanced Patterns Diagram](assets/agentic-ai/diagram-advanced-patterns.svg)
 
 The advanced patterns diagram shows system architectures. Multi-agent systems show agent coordination. Orchestration shows workflow management. Specialization shows domain-specific agents.
 

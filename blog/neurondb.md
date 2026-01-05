@@ -1,4 +1,4 @@
-![NeuronDB header](/blog/neurondb/header.svg?v=7)
+![NeuronDB header](assets/neurondb/header.svg)
 
 # NeuronDB a PostgreSQL AI Extension
 
