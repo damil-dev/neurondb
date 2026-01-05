@@ -445,6 +445,188 @@ else
 fi
 
 # ============================================================================
+# PHASE 6: RAG Pipeline Testing
+# ============================================================================
+test_section "PHASE 6: RAG Pipeline Integration"
+
+# Check RAG functions
+test_info "Checking RAG functions..."
+RAG_CHUNK=$(psql -d "$DB_NAME" -U "$DB_USER" -h "$DB_HOST" -p "$DB_PORT" -t -c "SELECT EXISTS(SELECT 1 FROM pg_proc WHERE proname = 'neurondb_chunk_text');" | xargs)
+if [ "$RAG_CHUNK" = "t" ]; then
+    test_pass "neurondb_chunk_text function exists"
+else
+    test_warn "neurondb_chunk_text function not found"
+fi
+
+RAG_RERANK=$(psql -d "$DB_NAME" -U "$DB_USER" -h "$DB_HOST" -p "$DB_PORT" -t -c "SELECT EXISTS(SELECT 1 FROM pg_proc WHERE proname = 'neurondb_rerank_results');" | xargs)
+if [ "$RAG_RERANK" = "t" ]; then
+    test_pass "neurondb_rerank_results function exists"
+else
+    test_warn "neurondb_rerank_results function not found"
+fi
+
+RAG_GENERATE=$(psql -d "$DB_NAME" -U "$DB_USER" -h "$DB_HOST" -p "$DB_PORT" -t -c "SELECT EXISTS(SELECT 1 FROM pg_proc WHERE proname = 'neurondb_generate_answer');" | xargs)
+if [ "$RAG_GENERATE" = "t" ]; then
+    test_pass "neurondb_generate_answer function exists"
+else
+    test_warn "neurondb_generate_answer function not found"
+fi
+
+# ============================================================================
+# PHASE 7: Hybrid Search Testing
+# ============================================================================
+test_section "PHASE 7: Hybrid Search Integration"
+
+# Check hybrid search functions
+test_info "Checking hybrid search functions..."
+HYBRID_SEARCH=$(psql -d "$DB_NAME" -U "$DB_USER" -h "$DB_HOST" -p "$DB_PORT" -t -c "SELECT EXISTS(SELECT 1 FROM pg_proc WHERE proname = 'neurondb_hybrid_search');" | xargs)
+if [ "$HYBRID_SEARCH" = "t" ]; then
+    test_pass "neurondb_hybrid_search function exists"
+else
+    test_warn "neurondb_hybrid_search function not found"
+fi
+
+RRF=$(psql -d "$DB_NAME" -U "$DB_USER" -h "$DB_HOST" -p "$DB_PORT" -t -c "SELECT EXISTS(SELECT 1 FROM pg_proc WHERE proname = 'neurondb_reciprocal_rank_fusion');" | xargs)
+if [ "$RRF" = "t" ]; then
+    test_pass "neurondb_reciprocal_rank_fusion function exists"
+else
+    test_warn "neurondb_reciprocal_rank_fusion function not found"
+fi
+
+# ============================================================================
+# PHASE 8: Reranking Testing
+# ============================================================================
+test_section "PHASE 8: Reranking Integration"
+
+# Check reranking functions
+test_info "Checking reranking functions..."
+RERANK_CROSS=$(psql -d "$DB_NAME" -U "$DB_USER" -h "$DB_HOST" -p "$DB_PORT" -t -c "SELECT EXISTS(SELECT 1 FROM pg_proc WHERE proname = 'neurondb_rerank_cross_encoder');" | xargs)
+if [ "$RERANK_CROSS" = "t" ]; then
+    test_pass "neurondb_rerank_cross_encoder function exists"
+else
+    test_warn "neurondb_rerank_cross_encoder function not found"
+fi
+
+RERANK_LLM=$(psql -d "$DB_NAME" -U "$DB_USER" -h "$DB_HOST" -p "$DB_PORT" -t -c "SELECT EXISTS(SELECT 1 FROM pg_proc WHERE proname = 'neurondb_rerank_llm');" | xargs)
+if [ "$RERANK_LLM" = "t" ]; then
+    test_pass "neurondb_rerank_llm function exists"
+else
+    test_warn "neurondb_rerank_llm function not found"
+fi
+
+# ============================================================================
+# PHASE 9: ML Operations Testing
+# ============================================================================
+test_section "PHASE 9: ML Operations Integration"
+
+# Check ML functions
+test_info "Checking ML functions..."
+ML_TRAIN=$(psql -d "$DB_NAME" -U "$DB_USER" -h "$DB_HOST" -p "$DB_PORT" -t -c "SELECT EXISTS(SELECT 1 FROM pg_proc WHERE proname = 'train' AND pronamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'neurondb'));" | xargs)
+if [ "$ML_TRAIN" = "t" ]; then
+    test_pass "neurondb.train function exists"
+else
+    test_warn "neurondb.train function not found"
+fi
+
+ML_PREDICT=$(psql -d "$DB_NAME" -U "$DB_USER" -h "$DB_HOST" -p "$DB_PORT" -t -c "SELECT EXISTS(SELECT 1 FROM pg_proc WHERE proname = 'predict' AND pronamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'neurondb'));" | xargs)
+if [ "$ML_PREDICT" = "t" ]; then
+    test_pass "neurondb.predict function exists"
+else
+    test_warn "neurondb.predict function not found"
+fi
+
+# Check ML models table
+test_info "Checking ML models table..."
+ML_TABLE=$(psql -d "$DB_NAME" -U "$DB_USER" -h "$DB_HOST" -p "$DB_PORT" -t -c "SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema = 'neurondb' AND table_name = 'ml_models');" | xargs)
+if [ "$ML_TABLE" = "t" ]; then
+    test_pass "neurondb.ml_models table exists"
+else
+    test_warn "neurondb.ml_models table not found"
+fi
+
+# ============================================================================
+# PHASE 10: Analytics Testing
+# ============================================================================
+test_section "PHASE 10: Analytics Integration"
+
+# Check analytics functions
+test_info "Checking analytics functions..."
+ANALYTICS_CLUSTER=$(psql -d "$DB_NAME" -U "$DB_USER" -h "$DB_HOST" -p "$DB_PORT" -t -c "SELECT EXISTS(SELECT 1 FROM pg_proc WHERE proname = 'neurondb_cluster');" | xargs)
+if [ "$ANALYTICS_CLUSTER" = "t" ]; then
+    test_pass "neurondb_cluster function exists"
+else
+    test_warn "neurondb_cluster function not found"
+fi
+
+ANALYTICS_OUTLIER=$(psql -d "$DB_NAME" -U "$DB_USER" -h "$DB_HOST" -p "$DB_PORT" -t -c "SELECT EXISTS(SELECT 1 FROM pg_proc WHERE proname = 'neurondb_detect_outliers');" | xargs)
+if [ "$ANALYTICS_OUTLIER" = "t" ]; then
+    test_pass "neurondb_detect_outliers function exists"
+else
+    test_warn "neurondb_detect_outliers function not found"
+fi
+
+# ============================================================================
+# PHASE 11: Hierarchical Memory Testing
+# ============================================================================
+test_section "PHASE 11: Hierarchical Memory Integration"
+
+# Check hierarchical memory tables
+test_info "Checking hierarchical memory tables..."
+MEMORY_STM=$(psql -d "$DB_NAME" -U "$DB_USER" -h "$DB_HOST" -p "$DB_PORT" -t -c "SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema = 'neurondb_agent' AND table_name = 'memory_stm');" | xargs)
+if [ "$MEMORY_STM" = "t" ]; then
+    test_pass "memory_stm table exists"
+    
+    # Check embedding column type
+    STM_EMBED_TYPE=$(psql -d "$DB_NAME" -U "$DB_USER" -h "$DB_HOST" -p "$DB_PORT" -t -c "SELECT data_type FROM information_schema.columns WHERE table_schema = 'neurondb_agent' AND table_name = 'memory_stm' AND column_name = 'embedding';" | xargs)
+    if echo "$STM_EMBED_TYPE" | grep -qi "neurondb_vector\|USER-DEFINED"; then
+        test_pass "memory_stm.embedding column is neurondb_vector type"
+    else
+        test_warn "memory_stm.embedding column type: $STM_EMBED_TYPE"
+    fi
+else
+    test_warn "memory_stm table not found (hierarchical memory not available)"
+fi
+
+MEMORY_MTM=$(psql -d "$DB_NAME" -U "$DB_USER" -h "$DB_HOST" -p "$DB_PORT" -t -c "SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema = 'neurondb_agent' AND table_name = 'memory_mtm');" | xargs)
+if [ "$MEMORY_MTM" = "t" ]; then
+    test_pass "memory_mtm table exists"
+else
+    test_warn "memory_mtm table not found"
+fi
+
+MEMORY_LPM=$(psql -d "$DB_NAME" -U "$DB_USER" -h "$DB_HOST" -p "$DB_PORT" -t -c "SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema = 'neurondb_agent' AND table_name = 'memory_lpm');" | xargs)
+if [ "$MEMORY_LPM" = "t" ]; then
+    test_pass "memory_lpm table exists"
+else
+    test_warn "memory_lpm table not found"
+fi
+
+# ============================================================================
+# PHASE 12: Vector Operators Testing
+# ============================================================================
+test_section "PHASE 12: Vector Operators Testing"
+
+# Test L2 distance operator
+test_info "Testing L2 distance operator (<->)..."
+L2_DIST=$(psql -d "$DB_NAME" -U "$DB_USER" -h "$DB_HOST" -p "$DB_PORT" -t -c "SELECT '[1,0,0]'::vector(3) <-> '[0,1,0]'::vector(3) AS distance;" 2>&1)
+if echo "$L2_DIST" | grep -qE "^[0-9\.]+$" || echo "$L2_DIST" | grep -qE "^[[:space:]]*[0-9\.]+"; then
+    DISTANCE=$(echo "$L2_DIST" | tr -d '[:space:]')
+    test_pass "L2 distance operator (<->) works, distance: $DISTANCE"
+else
+    test_fail "L2 distance operator failed: $L2_DIST"
+fi
+
+# Test inner product operator
+test_info "Testing inner product operator (<#>)..."
+INNER_PROD=$(psql -d "$DB_NAME" -U "$DB_USER" -h "$DB_HOST" -p "$DB_PORT" -t -c "SELECT '[1,0,0]'::vector(3) <#> '[1,0,0]'::vector(3) AS product;" 2>&1)
+if echo "$INNER_PROD" | grep -qE "^[0-9\.]+$" || echo "$INNER_PROD" | grep -qE "^[[:space:]]*[0-9\.]+"; then
+    PRODUCT=$(echo "$INNER_PROD" | tr -d '[:space:]')
+    test_pass "Inner product operator (<#>) works, product: $PRODUCT"
+else
+    test_fail "Inner product operator failed: $INNER_PROD"
+fi
+
+# ============================================================================
 # FINAL SUMMARY
 # ============================================================================
 test_section "TEST SUMMARY"
