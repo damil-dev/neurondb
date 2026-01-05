@@ -49,10 +49,9 @@ jobs:
 
       - name: Build NeuronMCP DEB
         run: |
+          export PATH="$PATH:/usr/local/go/bin"
           cd packaging/deb/neuronmcp
           VERSION=${{ steps.version.outputs.version }} ./build.sh
-        env:
-          PATH: $PATH:/usr/local/go/bin
 
       - name: Generate checksums
         run: |
