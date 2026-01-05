@@ -13,20 +13,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - DEB and RPM package builds
 - Comprehensive documentation
 
-## [1.0.0] - TBD
+## [1.0.0] - 2025-01-XX
 
 ### Added
-- PostgreSQL extension for vector search (HNSW, IVF indexes)
-- 473+ SQL functions
-- 52+ ML algorithms (classification, regression, clustering)
-- GPU acceleration (CUDA, ROCm, Metal)
-- Embedding generation and RAG pipelines
-- Hybrid search (vector + full-text search)
-- NeuronAgent: REST/WebSocket API for agent runtime
-- NeuronMCP: MCP protocol server with 100+ tools
-- NeuronDesktop: Web UI for ecosystem management
-- Benchmark suite (Vector, Hybrid, RAG)
-- Comprehensive documentation
+- PostgreSQL extension for vector search with HNSW and IVF indexes
+- 473+ SQL functions for vector operations, ML, and embeddings
+- 52+ ML algorithms (classification, regression, clustering, dimensionality reduction)
+- GPU acceleration support for CUDA, ROCm, and Metal backends
+- Embedding generation with multiple provider support (OpenAI, HuggingFace, local models)
+- RAG (Retrieval-Augmented Generation) pipelines with document processing
+- Hybrid search combining vector similarity with full-text search
+- NeuronAgent: REST/WebSocket API for agent runtime with workflow engine
+- NeuronMCP: MCP protocol server with 100+ tools and resources
+- NeuronDesktop: Web UI for ecosystem management and visualization
+- Comprehensive benchmark suite (Vector, Hybrid, RAG benchmarks)
+- Support for multiple vector types: vector, vectorp, vecmap, vgraph, rtext
+- Product Quantization (PQ) and Optimized PQ (OPQ) for vector compression
+- Multi-vector and faceted search capabilities
+- Background workers for index maintenance and monitoring
+- Comprehensive documentation and examples
+
+### Changed
+- Improved index build performance for large datasets
+- Enhanced GPU memory management
+- Optimized distance calculation performance
+
+### Fixed
+- Memory leaks in long-running queries
+- Index corruption issues under high concurrency
+- GPU initialization errors on some systems
 
 ### Supported Platforms
 - PostgreSQL: 16, 17, 18

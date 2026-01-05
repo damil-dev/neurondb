@@ -448,6 +448,205 @@ max_connections = sum_of_all_pools + 20  # +20 for admin connections
 - [ ] **Performance:** Baseline metrics established
 - [ ] **Disaster recovery:** Plan tested and documented
 
+## Vacuum and Index Maintenance
+
+### Vector Index Vacuum
+
+Vector indexes (HNSW and IVF) require periodic maintenance to reclaim space and maintain performance.
+
+#### When to Vacuum
+
+**Regular vacuum (weekly):**
+- After bulk inserts or updates
+- When dead tuples exceed 10% of table size
+- Before index rebuilds
+
+**Full vacuum (monthly or as needed):**
+- After large data deletions
+- When table bloat exceeds 20%
+- Before major index operations
+
+#### Vacuum Commands
+
+```sql
+-- Analyze table statistics
+ANALYZE documents;
+
+-- Regular vacuum (non-blocking)
+VACUUM ANALYZE documents;
+
+-- Full vacuum (requires exclusive lock)
+VACUUM FULL documents;
+
+-- Vacuum with verbose output
+VACUUM VERBOSE ANALYZE documents;
+```
+
+#### Vacuum Configuration
+
+```ini
+# postgresql.conf
+autovacuum = on
+autovacuum_vacuum_scale_factor = 0.1  # Vacuum when 10% of table changed
+autovacuum_analyze_scale_factor = 0.05  # Analyze when 5% changed
+autovacuum_max_workers = 3
+```
+
+### Index Reindex
+
+Vector indexes may need rebuilding after:
+- Large data changes
+- Index corruption (rare)
+- Performance degradation
+- Version upgrades
+
+#### HNSW Index Rebuild
+
+**Cost:** High - requires full index rebuild
+**Time:** Depends on data size (hours for large datasets)
+**Lock:** Exclusive lock on table during rebuild
+
+```sql
+-- Rebuild HNSW index
+REINDEX INDEX CONCURRENTLY documents_hnsw_idx;
+
+-- If CONCURRENTLY not supported, use:
+DROP INDEX documents_hnsw_idx;
+CREATE INDEX documents_hnsw_idx 
+ON documents 
+USING hnsw (embedding vector_cosine_ops)
+WITH (m = 16, ef_construction = 200);
+```
+
+**Rebuild time estimates:**
+- 1M vectors (128 dims): ~10-15 minutes
+- 10M vectors (128 dims): ~2-3 hours
+- 100M vectors (128 dims): ~20-30 hours
+
+#### IVF Index Rebuild
+
+**Cost:** Medium - faster than HNSW
+**Time:** Typically 30-50% faster than HNSW
+**Lock:** Exclusive lock on table during rebuild
+
+```sql
+-- Rebuild IVF index
+REINDEX INDEX CONCURRENTLY documents_ivf_idx;
+
+-- Or recreate:
+DROP INDEX documents_ivf_idx;
+CREATE INDEX documents_ivf_idx 
+ON documents 
+USING ivf (embedding vector_cosine_ops)
+WITH (lists = 1024);
+```
+
+### Index Build Costs
+
+#### HNSW Index Build
+
+**Memory requirements:**
+- Build phase: ~4-5x vector data size
+- Runtime: ~3-4x vector data size
+
+**Disk I/O:**
+- Sequential writes during build
+- Temporary space: ~2x final index size
+
+**CPU:**
+- Single-threaded build (PostgreSQL limitation)
+- Can parallelize with multiple indexes
+
+**Example:**
+- 10M vectors × 768 dims = ~30GB data
+- Build memory: ~120-150GB
+- Build time: ~2-3 hours (CPU-bound)
+- Final index size: ~90-120GB
+
+#### IVF Index Build
+
+**Memory requirements:**
+- Build phase: ~2-3x vector data size
+- Runtime: ~1.5-2x vector data size
+
+**Disk I/O:**
+- Sequential writes during build
+- Temporary space: ~1.5x final index size
+
+**CPU:**
+- Faster than HNSW (simpler algorithm)
+- Can parallelize with multiple indexes
+
+**Example:**
+- 10M vectors × 768 dims = ~30GB data
+- Build memory: ~60-90GB
+- Build time: ~1-1.5 hours (CPU-bound)
+- Final index size: ~45-60GB
+
+### Index Maintenance Schedule
+
+**Daily:**
+- Monitor index usage statistics
+- Check for index bloat
+
+**Weekly:**
+- Run `VACUUM ANALYZE` on active tables
+- Review index performance metrics
+
+**Monthly:**
+- Full `VACUUM` if needed
+- Consider index rebuild if performance degrades
+- Review and adjust index parameters
+
+**Quarterly:**
+- Comprehensive index health check
+- Rebuild indexes if necessary
+- Review capacity planning
+
+### Maintenance Best Practices
+
+1. **Schedule during low-traffic periods:** Index rebuilds are resource-intensive
+2. **Use CONCURRENTLY when possible:** Reduces lock time
+3. **Monitor build progress:** Use `pg_stat_progress_create_index`
+4. **Test on staging first:** Verify rebuild procedures
+5. **Have rollback plan:** Keep old indexes until new ones are verified
+6. **Monitor disk space:** Ensure sufficient space for rebuilds
+
+### Monitoring Index Health
+
+```sql
+-- Check index size
+SELECT 
+  schemaname,
+  tablename,
+  indexname,
+  pg_size_pretty(pg_relation_size(indexname::regclass)) AS index_size
+FROM pg_indexes
+WHERE indexname LIKE '%hnsw%' OR indexname LIKE '%ivf%';
+
+-- Check index usage
+SELECT 
+  schemaname,
+  tablename,
+  indexname,
+  idx_scan,
+  idx_tup_read,
+  idx_tup_fetch
+FROM pg_stat_user_indexes
+WHERE indexname LIKE '%hnsw%' OR indexname LIKE '%ivf%';
+
+-- Check table bloat
+SELECT 
+  schemaname,
+  tablename,
+  n_live_tup,
+  n_dead_tup,
+  ROUND(100.0 * n_dead_tup / NULLIF(n_live_tup + n_dead_tup, 0), 2) AS dead_pct
+FROM pg_stat_user_tables
+WHERE schemaname = 'public'
+ORDER BY dead_pct DESC;
+```
+
 ## Related Documentation
 
 - [Configuration Guide](configuration.md) - All configuration parameters

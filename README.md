@@ -80,6 +80,18 @@ LIMIT 3;
 EOF
 ```
 
+**Expected output:**
+```
+ id |              content               |     distance      
+----+------------------------------------+-------------------
+  1 | Machine learning algorithms       | 0.173205080756888
+  2 | Neural networks and deep learning | 0.141421356237309
+  3 | Natural language processing        | 0.173205080756888
+(3 rows)
+```
+
+The query returns actual document IDs (1, 2, 3) with similarity distances. Lower distance values indicate higher similarity.
+
 > [!SECURITY]
 > The default password (`neurondb`) is for development only. **Always change it in production** by setting `POSTGRES_PASSWORD` in your `.env` file. See [Service URLs & ports](#service-urls--ports) for connection details.
 
@@ -118,6 +130,8 @@ EOF
 | **Desktop UI** | NeuronDesktop included | Build your own |
 | **ML algorithms** | 52+ algorithms (classification, regression, clustering) | Extension only (limited) |
 | **SQL functions** | 473+ functions | Typically <100 |
+
+> **[Compare NeuronDB vs pgvector](Docs/comparison/NEURONDB_VS_PGVECTOR.md)** - Detailed feature comparison matrix and migration guide.
 
 ## Architecture
 
@@ -203,12 +217,38 @@ Install the NeuronDB extension directly into your existing PostgreSQL installati
 - PostgreSQL 16, 17, or 18 development headers
 - C compiler (gcc or clang)
 - Make
+- CMake (for ML library dependencies)
 
-**Build:**
+**Option 1: Automated Build Script (Recommended)**
+
+```bash
+cd NeuronDB
+./build.sh
+```
+
+This script automatically:
+- Installs ML library prerequisites (XGBoost, LightGBM, CatBoost)
+- Builds the NeuronDB extension
+- Shows installation status
+
+**Option 2: Manual Build**
+
 ```bash
 cd NeuronDB
 make
 sudo make install
+```
+
+**Verify Installation:**
+
+```bash
+# Check that extension files are installed
+pg_config --sharedir
+# Should show neurondb extension files in: <sharedir>/extension/
+
+# Verify in PostgreSQL
+psql -c "CREATE EXTENSION neurondb;"
+psql -c "SELECT neurondb_version();"
 ```
 
 **Enable extension:**
@@ -245,6 +285,21 @@ SELECT extversion FROM pg_extension WHERE extname = 'neurondb';
 
 -- Upgrade to latest
 ALTER EXTENSION neurondb UPDATE;
+```
+
+**Package Installation (Future):**
+
+DEB and RPM packages are planned for future releases. Currently, build from source is required.
+
+**Checksum Verification:**
+
+When downloading source tarballs from releases, verify checksums:
+```bash
+# Download checksum file
+wget https://github.com/neurondb/neurondb/releases/download/v1.0.0/SHA256SUMS
+
+# Verify tarball
+sha256sum -c SHA256SUMS
 ```
 
 </details>
@@ -304,6 +359,15 @@ No additional services, ports, or configuration required!
 - **Beginner walkthrough**: [`Docs/getting-started/simple-start.md`](Docs/getting-started/simple-start.md)
 - **Technical quick start**: [`QUICKSTART.md`](QUICKSTART.md)
 - **Official docs**: [`neurondb.ai/docs`](https://www.neurondb.ai/docs)
+
+### Key Resources
+
+- **[Benchmark Results](Docs/benchmarks/BENCHMARK_RESULTS.md)** - Published performance numbers
+- **[NeuronDB vs pgvector](Docs/comparison/NEURONDB_VS_PGVECTOR.md)** - Feature comparison and migration guide
+- **[Top 20 Functions](Docs/reference/TOP_FUNCTIONS.md)** - Most commonly used SQL functions
+- **[API Stability](Docs/reference/API_STABILITY.md)** - Version compatibility and deprecation policy
+- **[Embedding Compatibility](Docs/reference/EMBEDDING_COMPATIBILITY.md)** - Supported dimensions and limits
+- **[GPU Feature Matrix](Docs/gpu/GPU_FEATURE_MATRIX.md)** - CUDA, ROCm, Metal support matrix
 
 ### Module-wise Documentation
 
@@ -371,7 +435,33 @@ No additional services, ports, or configuration required!
 
 ### Examples
 
-- [Examples index](examples/README.md)
+**[Complete Examples Collection](examples/README.md)** - Working examples with copy-paste code.
+
+**Quick Start Examples:**
+
+1. **[Semantic Search](examples/semantic-search-docs/)** - Search documents with embeddings
+   ```bash
+   cd examples/semantic-search-docs
+   python semantic_search.py demo
+   ```
+   **Expected Output:** Returns top 3 most similar documents with similarity scores.
+
+2. **[RAG Chatbot](examples/rag-chatbot-pdfs/)** - Q&A over PDF documents
+   ```bash
+   cd examples/rag-chatbot-pdfs
+   python rag_chatbot.py demo
+   ```
+   **Expected Output:** Interactive chat interface with context-aware answers.
+
+3. **[MCP Integration](examples/mcp-integration/)** - Connect Claude Desktop to NeuronDB
+   ```bash
+   cd examples/mcp-integration
+   python test_mcp_connection.py
+   ```
+   **Expected Output:** Lists 100+ available MCP tools and resources.
+
+**All Examples:**
+- [Examples index](examples/README.md) - Complete collection with walkthroughs
 - [Semantic search docs example](examples/semantic-search-docs/)
 - [RAG chatbot (PDFs) example](examples/rag-chatbot-pdfs/)
 - [Agent tools example](examples/agent-tools/)
@@ -380,6 +470,10 @@ No additional services, ports, or configuration required!
 ## Benchmarks
 
 NeuronDB includes a benchmark suite to evaluate vector search, hybrid search, and RAG performance.
+
+### Published Results
+
+**[View Benchmark Results](Docs/benchmarks/BENCHMARK_RESULTS.md)** - Published performance numbers with QPS, recall, and latency metrics for HNSW and IVF indexes on CPU and GPU.
 
 ### Quick start
 
@@ -422,7 +516,7 @@ cd NeuronDB/benchmark/vector
 ```
 
 > [!NOTE]
-> Baseline benchmark results are available in [`NeuronDB/benchmark/README.md`](NeuronDB/benchmark/README.md). For detailed performance numbers by dataset, index type, and hardware profile, see the benchmark documentation.
+> Baseline benchmark results are available in [`NeuronDB/benchmark/README.md`](NeuronDB/benchmark/README.md). For detailed performance numbers by dataset, index type, and hardware profile, see [Benchmark Results](Docs/benchmarks/BENCHMARK_RESULTS.md).
 
 <details>
 <summary><strong>Run individual benchmarks</strong></summary>
@@ -488,10 +582,16 @@ Key operational considerations for production:
 
 - **Contributing**: [`CONTRIBUTING.md`](CONTRIBUTING.md)
 - **Security**: [`SECURITY.md`](SECURITY.md) - Report security issues to security@neurondb.ai
-- **License**: [`LICENSE`](LICENSE) (proprietary)
+- **License**: [`LICENSE`](LICENSE) - Free for personal/non-commercial use. Commercial licensing available. See [License Terms](#license-terms) below.
 - **Changelog**: [`CHANGELOG.md`](CHANGELOG.md) - See what's new
 - **Roadmap**: [`ROADMAP.md`](ROADMAP.md) - Planned features
 - **Releases**: [`RELEASE.md`](RELEASE.md) - Release process
+
+### License Terms
+
+NeuronDB is **free for personal and non-commercial use**. Commercial use requires a license. For commercial licensing inquiries, contact [support@neurondb.ai](mailto:support@neurondb.ai).
+
+See [`LICENSE`](LICENSE) for full terms and conditions.
 
 ## Project statistics
 
