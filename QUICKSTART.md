@@ -39,8 +39,16 @@ Start the complete NeuronDB ecosystem with a single command:
 
 ```bash
 # From the repository root
+# Option 1: Use published images (recommended if available)
+docker compose pull
 docker compose up -d
+
+# Option 2: Build from source
+docker compose up -d --build
 ```
+
+> [!NOTE]
+> Published images from GitHub Container Registry (GHCR) are available starting with v1.0.0. See [Container Images documentation](Docs/deployment/container-images.md) for image names and tags.
 
 This command will:
 

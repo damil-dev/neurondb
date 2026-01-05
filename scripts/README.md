@@ -2,7 +2,7 @@
 
 **Professional automation scripts for the NeuronDB ecosystem**
 
-This directory contains production-ready scripts for managing, deploying, monitoring, and maintaining all NeuronDB components.
+This directory contains practical scripts for managing, deploying, monitoring, and maintaining NeuronDB components.
 
 ---
 

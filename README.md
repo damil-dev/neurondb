@@ -7,8 +7,11 @@
     <a href="https://www.postgresql.org/">
       <img alt="PostgreSQL 16/17/18" src="https://img.shields.io/badge/PostgreSQL-16%2C17%2C18-blue.svg" />
     </a>
-    <a href="https://github.com/neurondb/neurondb/actions/workflows/neurondb-build-and-test.yml">
-      <img alt="CI: NeuronDB" src="https://github.com/neurondb/neurondb/actions/workflows/neurondb-build-and-test.yml/badge.svg?branch=main" />
+    <a href="https://github.com/neurondb/neurondb/actions/workflows/neurondb-build-matrix.yml">
+      <img alt="CI: NeuronDB" src="https://github.com/neurondb/neurondb/actions/workflows/neurondb-build-matrix.yml/badge.svg?branch=main" />
+    </a>
+    <a href="https://github.com/neurondb/neurondb/actions/workflows/neuronmcp-build-matrix.yml">
+      <img alt="CI: NeuronMCP" src="https://github.com/neurondb/neurondb/actions/workflows/neuronmcp-build-matrix.yml/badge.svg?branch=main" />
     </a>
     <a href="https://github.com/neurondb/neurondb/actions/workflows/integration-tests-full-ecosystem.yml">
       <img alt="CI: Integration" src="https://github.com/neurondb/neurondb/actions/workflows/integration-tests-full-ecosystem.yml/badge.svg?branch=main" />
@@ -16,8 +19,8 @@
     <a href="https://github.com/neurondb/neurondb/actions/workflows/security-scan.yml">
       <img alt="Security scan" src="https://github.com/neurondb/neurondb/actions/workflows/security-scan.yml/badge.svg?branch=main" />
     </a>
-    <a href="https://github.com/neurondb/neurondb/actions/workflows/publish-all-container-images.yml">
-      <img alt="Docker Images" src="https://github.com/neurondb/neurondb/actions/workflows/publish-all-container-images.yml/badge.svg?branch=main" />
+    <a href="https://github.com/neurondb/neurondb/actions/workflows/neurondb-docker.yml">
+      <img alt="Docker" src="https://github.com/neurondb/neurondb/actions/workflows/neurondb-docker.yml/badge.svg?branch=main" />
     </a>
   </p>
   <p>
@@ -33,10 +36,52 @@
   </p>
 
   <p><strong>Vector search, embeddings, and ML primitives in PostgreSQL</strong>, with optional services for <strong>agents</strong>, <strong>MCP</strong>, and a <strong>desktop UI</strong>.</p>
+
+  <p>
+    <!-- Screenshots will be added here when available -->
+    <!-- <img src="Docs/assets/neurondesktop-ui.png" alt="NeuronDesktop UI" width="600" /> -->
+    <!-- <img src="Docs/assets/search-demo.gif" alt="Vector search demo" width="600" /> -->
+  </p>
 </div>
 
 > [!TIP]
 > New here? Start with [`Docs/getting-started/simple-start.md`](Docs/getting-started/simple-start.md) or jump to [`QUICKSTART.md`](QUICKSTART.md).
+
+## Hello NeuronDB (60 seconds)
+
+Get vector search working in under a minute:
+
+```bash
+# 1. Start PostgreSQL with NeuronDB
+docker compose up -d neurondb
+
+# 2. Connect and create extension
+psql "postgresql://neurondb:neurondb@localhost:5433/neurondb" -c "CREATE EXTENSION IF NOT EXISTS neurondb;"
+
+# 3. Create table, insert vectors, create index, and search
+psql "postgresql://neurondb:neurondb@localhost:5433/neurondb" <<EOF
+CREATE TABLE documents (
+  id SERIAL PRIMARY KEY,
+  content TEXT,
+  embedding vector(384)
+);
+
+INSERT INTO documents (content, embedding) VALUES
+  ('Machine learning algorithms', '[0.1,0.2,0.3]'::vector),
+  ('Neural networks and deep learning', '[0.2,0.3,0.4]'::vector),
+  ('Natural language processing', '[0.3,0.4,0.5]'::vector);
+
+CREATE INDEX ON documents USING hnsw (embedding vector_cosine_ops);
+
+SELECT id, content, embedding <=> '[0.15,0.25,0.35]'::vector AS distance
+FROM documents
+ORDER BY embedding <=> '[0.15,0.25,0.35]'::vector
+LIMIT 3;
+EOF
+```
+
+> [!SECURITY]
+> The default password (`neurondb`) is for development only. **Always change it in production** by setting `POSTGRES_PASSWORD` in your `.env` file. See [Service URLs & ports](#service-urls--ports) for connection details.
 
 ## Table of contents
 
@@ -61,6 +106,19 @@
 - **Agent backends**: durable memory and tool execution backed by PostgreSQL
 - **MCP integrations**: MCP clients connecting to NeuronDB via tools/resources
 
+## What's different
+
+| Feature | NeuronDB | Alternatives |
+|---|---|---|
+| **Index types** | HNSW, IVF, PQ, hybrid, multi-vector | Limited (e.g., pgvector: HNSW/IVFFlat only) |
+| **GPU acceleration** | CUDA, ROCm, Metal (3 backends) | Single backend or CPU-only |
+| **Benchmark coverage** | RAGAS, MTEB, BEIR integrated | Manual setup required |
+| **Agent runtime** | NeuronAgent included (REST API, workflows) | External services needed |
+| **MCP server** | NeuronMCP included (100+ tools) | Separate integration required |
+| **Desktop UI** | NeuronDesktop included | Build your own |
+| **ML algorithms** | 52+ algorithms (classification, regression, clustering) | Extension only (limited) |
+| **SQL functions** | 473+ functions | Typically <100 |
+
 ## Architecture
 
 ```mermaid
@@ -79,10 +137,42 @@ flowchart LR
 
 ## Installation
 
+### Pick one component
+
+Choose what you need:
+
+| Component Setup | Command | What you get |
+|---|---|---|
+| **NeuronDB only** (extension) | `docker compose up -d neurondb` | Vector search, ML algorithms, embeddings in PostgreSQL |
+| **NeuronDB + NeuronMCP** | `docker compose up -d neurondb neuronmcp` | Above + MCP server for Claude Desktop, etc. |
+| **NeuronDB + NeuronAgent** | `docker compose up -d neurondb neuronagent` | Above + Agent runtime with REST API |
+| **Full stack** | `docker compose up -d` | All components including NeuronDesktop UI |
+
+> [!NOTE]
+> All components run independently. The root `docker-compose.yml` starts everything together for convenience, but you can run individual services as needed.
+
 ### Quick start (Docker)
 
+**Option 1: Use published images (recommended)**
+
+Pull pre-built images from GitHub Container Registry:
+
 ```bash
+# Pull latest images
+docker compose pull
+
+# Start services
 docker compose up -d
+./scripts/health-check.sh
+```
+
+> [!TIP]
+> For specific versions, see [Container Images documentation](Docs/deployment/container-images.md). Published images are available starting with v1.0.0.
+
+**Option 2: Build from source**
+
+```bash
+docker compose up -d --build
 ./scripts/health-check.sh
 ```
 
@@ -98,6 +188,9 @@ docker compose up -d
 
 > [!IMPORTANT]
 > Prefer a step-by-step guide? See [`QUICKSTART.md`](QUICKSTART.md).
+
+> [!SECURITY]
+> Default credentials are for **development only**. In production, set strong passwords via environment variables or `.env` file.
 
 ### Native install
 
@@ -195,12 +288,15 @@ No additional services, ports, or configuration required!
 
 ## Service URLs & ports
 
-| Service | How to reach it |
-|---|---|
-| NeuronDB (PostgreSQL) | `postgresql://neurondb:neurondb@localhost:5433/neurondb` |
-| NeuronAgent | `http://localhost:8080/health` |
-| NeuronDesktop UI | `http://localhost:3000` |
-| NeuronDesktop API | `http://localhost:8081/health` |
+| Service | How to reach it | Default credentials |
+|---|---|---|
+| NeuronDB (PostgreSQL) | `postgresql://neurondb:neurondb@localhost:5433/neurondb` | User: `neurondb`, Password: `neurondb` ⚠️ **Dev only** |
+| NeuronAgent | `http://localhost:8080/health` | API key required for endpoints |
+| NeuronDesktop UI | `http://localhost:3000` | No auth (development) |
+| NeuronDesktop API | `http://localhost:8081/health` | No auth (development) |
+
+> [!WARNING]
+> **Production Security**: The default credentials shown above are for development only. Always use strong, unique passwords in production. Set `POSTGRES_PASSWORD` and other secrets via environment variables or a `.env` file (see [`env.example`](env.example)).
 
 ## Documentation
 
@@ -304,6 +400,30 @@ This validates connectivity and runs the vector/hybrid/RAG benchmark groups.
 | **Hybrid** | Combined vector + full-text search | BEIR (nfcorpus, msmarco, etc.) | NDCG, MAP, Recall, Precision |
 | **RAG** | End-to-end RAG pipeline quality | MTEB, BEIR, RAGAS | Faithfulness, Relevancy, Context Precision |
 
+### Reproducible benchmarks
+
+To reproduce benchmark results:
+
+```bash
+# Use exact Docker image tags (see releases)
+docker pull ghcr.io/neurondb/neurondb-postgres:v1.0.0-pg17-cpu
+
+# Run with documented hardware profile
+cd NeuronDB/benchmark
+./run_bm.sh --hardware-profile "cpu-8core-16gb"
+
+# Individual benchmark with exact parameters
+cd NeuronDB/benchmark/vector
+./run_bm.py --prepare --load --run \
+  --datasets sift-128-euclidean \
+  --max-queries 1000 \
+  --index hnsw \
+  --ef-search 40
+```
+
+> [!NOTE]
+> Baseline benchmark results are available in [`NeuronDB/benchmark/README.md`](NeuronDB/benchmark/README.md). For detailed performance numbers by dataset, index type, and hardware profile, see the benchmark documentation.
+
 <details>
 <summary><strong>Run individual benchmarks</strong></summary>
 
@@ -356,11 +476,22 @@ docker compose logs -f neurondb neuronagent neuronmcp neurondesk-api neurondesk-
 
 </details>
 
+## Operations
+
+Key operational considerations for production:
+
+- **Vacuum and bloat**: Vector indexes require periodic maintenance. See [`NeuronDB/docs/operations/playbook.md`](NeuronDB/docs/operations/playbook.md)
+- **Index rebuild guidance**: When and how to rebuild HNSW/IVF indexes. See [`NeuronDB/docs/troubleshooting.md`](NeuronDB/docs/troubleshooting.md)
+- **Memory configuration**: Tune `neurondb.maintenance_work_mem` and index-specific parameters. See [`NeuronDB/docs/configuration.md`](NeuronDB/docs/configuration.md)
+
 ## Contributing / security / license
 
 - **Contributing**: [`CONTRIBUTING.md`](CONTRIBUTING.md)
-- **Security**: [`SECURITY.md`](SECURITY.md)
+- **Security**: [`SECURITY.md`](SECURITY.md) - Report security issues to security@neurondb.ai
 - **License**: [`LICENSE`](LICENSE) (proprietary)
+- **Changelog**: [`CHANGELOG.md`](CHANGELOG.md) - See what's new
+- **Roadmap**: [`ROADMAP.md`](ROADMAP.md) - Planned features
+- **Releases**: [`RELEASE.md`](RELEASE.md) - Release process
 
 ## Project statistics
 

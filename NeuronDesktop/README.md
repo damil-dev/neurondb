@@ -2,7 +2,7 @@
 
 **Unified web interface for MCP servers, NeuronDB, and NeuronAgent**
 
-NeuronDesktop is a comprehensive, production-ready web application that provides a unified interface for managing and interacting with:
+NeuronDesktop is a full-featured web application that provides a unified interface for managing and interacting with:
 - **MCP Servers** - Model Context Protocol servers with tool inspection and testing
 - **NeuronDB** - Vector database with semantic search and collection management
 - **NeuronAgent** - AI agent runtime with session management
@@ -22,7 +22,7 @@ NeuronDesktop is a comprehensive, production-ready web application that provides
 ### 🔧 Technical Features
 
 - **Modular Architecture** - Clean separation of concerns, easy to extend
-- **Production Ready** - Error handling, graceful shutdown, connection pooling
+- **Operational readiness** - Error handling, graceful shutdown, connection pooling
 - **Docker Support** - Complete Docker Compose setup for easy deployment
 - **Type Safety** - Full TypeScript frontend, strongly-typed Go backend
 - **Validation** - Comprehensive input validation and SQL injection protection
@@ -282,7 +282,7 @@ npm test
 
 See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for detailed deployment instructions.
 
-### Production Checklist
+### Deployment checklist
 
 - [ ] Set strong database passwords
 - [ ] Configure CORS allowed origins

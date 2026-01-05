@@ -239,7 +239,7 @@ Note: Port 5432 is the internal container port when using Docker network. Use po
 **Advantages:**
 - Better isolation
 - Service discovery via container names
-- Production-ready setup
+- Deployment-focused setup
 
 **Disadvantages:**
 - Requires network configuration
