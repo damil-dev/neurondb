@@ -1047,19 +1047,20 @@ ivf_knn_search_gpu(PG_FUNCTION_ARGS)
 			Buffer		centroidsBuf;
 			Page		centroidsPage;
 			OffsetNumber maxoff;
-			float4 *centroids = NULL;
-			float4 *centroid_distances = NULL;
-			int *selected_clusters = NULL;
-			float4 *candidate_vectors = NULL;
-			ItemPointerData *candidate_tids = NULL;
-			int			candidate_count = 0;
-			int			i,
-						j;
-			int			max_candidates = k * nprobe * 10;	/* Collect more
-															 * candidates than
-															 * needed */
-			int			actual_nlists = 0;	/* Track actual number of centroids copied */
-			int			*centroid_page_offsets = NULL;	/* Map compacted index to page offset */
+		float4 *centroids = NULL;
+		float4 *centroid_distances = NULL;
+		int *selected_clusters = NULL;
+		float4 *candidate_vectors = NULL;
+		ItemPointerData *candidate_tids = NULL;
+		int			candidate_count = 0;
+		int			i,
+					j;
+		int			max_candidates = k * nprobe * 10;	/* Collect more
+														 * candidates than
+														 * needed */
+		int			actual_nlists = 0;	/* Track actual number of centroids copied */
+		int			actual_nprobe = 0;
+		int			*centroid_page_offsets = NULL;	/* Map compacted index to page offset */
 
 			/* Step 1: Load centroids to GPU memory */
 			centroidsBuf = ReadBuffer(indexRel, meta->centroidsBlock);
@@ -1154,9 +1155,9 @@ ivf_knn_search_gpu(PG_FUNCTION_ARGS)
 					}
 				}
 
-				/* Select nprobe closest clusters */
-				int			actual_nprobe = 0;
-				for (i = 0; i < nprobe && actual_nprobe < actual_nlists; i++)
+			/* Select nprobe closest clusters */
+			actual_nprobe = 0;
+			for (i = 0; i < nprobe && actual_nprobe < actual_nlists; i++)
 				{
 					int			best_idx = -1;
 					float		best_dist = FLT_MAX;
@@ -1389,18 +1390,18 @@ ivf_knn_search_gpu(PG_FUNCTION_ARGS)
 				distances = NULL;
 			}
 
-			if (centroids)
-				pfree(centroids);
-			if (centroid_distances)
-				pfree(centroid_distances);
-				if (selected_clusters)
-					pfree(selected_clusters);
-				if (centroid_page_offsets)
-					pfree(centroid_page_offsets);
-				if (candidate_vectors)
-					pfree(candidate_vectors);
-				if (candidate_tids)
-					pfree(candidate_tids);
+		if (centroids)
+			pfree(centroids);
+		if (centroid_distances)
+			pfree(centroid_distances);
+		if (selected_clusters)
+			pfree(selected_clusters);
+		if (centroid_page_offsets)
+			pfree(centroid_page_offsets);
+		if (candidate_vectors)
+			pfree(candidate_vectors);
+		if (candidate_tids)
+			pfree(candidate_tids);
 			}
 		}
 		else
