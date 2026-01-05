@@ -1,0 +1,257 @@
+<?xml version="1.0" ?>
+<ns0:svg xmlns:ns0="http://www.w3.org/2000/svg" width="1200" height="400" viewBox="0 0 1200 400" preserveAspectRatio="xMidYMid meet">
+  
+  
+  <ns0:defs>
+    
+    
+    
+    <ns0:linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      
+      
+      <ns0:stop offset="0%" style="stop-color:#030609;stop-opacity:1"/>
+      
+      
+      <ns0:stop offset="25%" style="stop-color:#0a0f17;stop-opacity:1"/>
+      
+      
+      <ns0:stop offset="50%" style="stop-color:#151b25;stop-opacity:1"/>
+      
+      
+      <ns0:stop offset="75%" style="stop-color:#242a35;stop-opacity:1"/>
+      
+      
+      <ns0:stop offset="100%" style="stop-color:#343942;stop-opacity:1"/>
+      
+    
+    </ns0:linearGradient>
+    
+    
+    <ns0:linearGradient id="overlayGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      
+      
+      <ns0:stop offset="0%" style="stop-color:#4f46e5;stop-opacity:0.25"/>
+      
+      
+      <ns0:stop offset="50%" style="stop-color:#06b6d4;stop-opacity:0.25"/>
+      
+      
+      <ns0:stop offset="100%" style="stop-color:#10b981;stop-opacity:0.25"/>
+      
+    
+    </ns0:linearGradient>
+    
+    
+    <ns0:linearGradient id="textGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      
+      
+      <ns0:stop offset="0%" style="stop-color:#4f46e5;stop-opacity:1"/>
+      
+      
+      <ns0:stop offset="50%" style="stop-color:#06b6d4;stop-opacity:1"/>
+      
+      
+      <ns0:stop offset="100%" style="stop-color:#10b981;stop-opacity:1"/>
+      
+    
+    </ns0:linearGradient>
+    
+    
+    <ns0:linearGradient id="protocolGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+      
+      
+      <ns0:stop offset="0%" style="stop-color:#8b5cf6;stop-opacity:0.8"/>
+      
+      
+      <ns0:stop offset="50%" style="stop-color:#06b6d4;stop-opacity:0.6"/>
+      
+      
+      <ns0:stop offset="100%" style="stop-color:#10b981;stop-opacity:0.8"/>
+      
+    
+    </ns0:linearGradient>
+    
+  
+  </ns0:defs>
+  
+  
+  
+  
+  <ns0:rect width="1200" height="400" fill="url(#bgGradient)"/>
+  
+  
+  <ns0:rect width="1200" height="400" fill="url(#overlayGradient)"/>
+  
+  
+  
+  
+  <ns0:g opacity="0.1">
+    
+    
+    <ns0:circle cx="100" cy="100" r="3" fill="#fff"/>
+    
+    
+    <ns0:circle cx="150" cy="150" r="2" fill="#fff"/>
+    
+    
+    <ns0:circle cx="200" cy="80" r="2.5" fill="#fff"/>
+    
+    
+    <ns0:circle cx="1000" cy="300" r="3" fill="#fff"/>
+    
+    
+    <ns0:circle cx="1100" cy="200" r="2" fill="#fff"/>
+    
+    
+    <ns0:circle cx="900" cy="250" r="2.5" fill="#fff"/>
+    
+  
+  </ns0:g>
+  
+  
+  
+  
+  <ns0:g transform="translate(100, 80)">
+    
+    
+    
+    <ns0:g opacity="0.8">
+      
+      
+      
+      <ns0:rect x="0" y="60" width="120" height="80" rx="8" fill="url(#protocolGlow)" stroke="#06b6d4" stroke-width="2" opacity="0.3"/>
+      
+      
+      <ns0:text x="60" y="105" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="bold" fill="#06b6d4" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">Client</ns0:text>
+      
+      
+      <ns0:text x="60" y="125" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#06b6d4" text-anchor="middle" opacity="0.8" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">Claude Desktop</ns0:text>
+      
+      
+      
+      
+      <ns0:rect x="980" y="60" width="120" height="80" rx="8" fill="url(#protocolGlow)" stroke="#10b981" stroke-width="2" opacity="0.3"/>
+      
+      
+      <ns0:text x="1040" y="105" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="bold" fill="#10b981" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">Server</ns0:text>
+      
+      
+      <ns0:text x="1040" y="125" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#10b981" text-anchor="middle" opacity="0.8" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">NeuronMCP</ns0:text>
+      
+      
+      
+      
+      <ns0:path d="M 120 100 L 980 100" stroke="#4f46e5" stroke-width="3" fill="none" opacity="0.6" marker-end="url(#arrowhead)"/>
+      
+      
+      <ns0:path d="M 980 140 L 120 140" stroke="#06b6d4" stroke-width="3" fill="none" opacity="0.6" marker-end="url(#arrowheadReverse)"/>
+      
+      
+      
+      
+      <ns0:g transform="translate(200, 85)">
+        
+        
+        <ns0:rect x="0" y="0" width="180" height="30" rx="4" fill="#1e293b" stroke="#4f46e5" stroke-width="1" opacity="0.8"/>
+        
+        
+        <ns0:text x="90" y="20" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#06b6d4" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">JSON-RPC Request</ns0:text>
+        
+      
+      </ns0:g>
+      
+      
+      
+      <ns0:g transform="translate(820, 125)">
+        
+        
+        <ns0:rect x="0" y="0" width="180" height="30" rx="4" fill="#1e293b" stroke="#10b981" stroke-width="1" opacity="0.8"/>
+        
+        
+        <ns0:text x="90" y="20" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#10b981" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">JSON-RPC Response</ns0:text>
+        
+      
+      </ns0:g>
+      
+    
+    </ns0:g>
+    
+    
+    
+    
+    <ns0:g transform="translate(450, 180)">
+      
+      
+      
+      <ns0:circle cx="0" cy="0" r="25" fill="url(#protocolGlow)" stroke="#4f46e5" stroke-width="2" opacity="0.4">
+        
+        
+        <ns0:animate attributeName="r" values="25;28;25" dur="3s" repeatCount="indefinite"/>
+        
+      
+      </ns0:circle>
+      
+      
+      <ns0:text x="0" y="5" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="bold" fill="#4f46e5" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">Tools</ns0:text>
+      
+      
+      
+      
+      <ns0:circle cx="300" cy="0" r="25" fill="url(#protocolGlow)" stroke="#06b6d4" stroke-width="2" opacity="0.4">
+        
+        
+        <ns0:animate attributeName="r" values="25;28;25" dur="3s" begin="1s" repeatCount="indefinite"/>
+        
+      
+      </ns0:circle>
+      
+      
+      <ns0:text x="300" y="5" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="bold" fill="#06b6d4" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">Resources</ns0:text>
+      
+      
+      
+      
+      <ns0:line x1="25" y1="0" x2="275" y2="0" stroke="#4f46e5" stroke-width="2" opacity="0.3"/>
+      
+    
+    </ns0:g>
+    
+  
+  </ns0:g>
+  
+  
+  
+  
+  <ns0:text x="600" y="320" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="48" font-weight="bold" fill="url(#textGradient)" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">MCP Server</ns0:text>
+  
+  
+  <ns0:text x="600" y="360" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="24" fill="#e5e7eb" text-anchor="middle" opacity="0.9" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">Model Context Protocol Explained</ns0:text>
+  
+  
+  
+  
+  <ns0:defs>
+    
+    
+    <ns0:marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      
+      
+      <ns0:polygon points="0 0, 10 3, 0 6" fill="#4f46e5" opacity="0.6"/>
+      
+    
+    </ns0:marker>
+    
+    
+    <ns0:marker id="arrowheadReverse" markerWidth="10" markerHeight="10" refX="1" refY="3" orient="auto">
+      
+      
+      <ns0:polygon points="10 0, 0 3, 10 6" fill="#06b6d4" opacity="0.6"/>
+      
+    
+    </ns0:marker>
+    
+  
+  </ns0:defs>
+  
+
+</ns0:svg>

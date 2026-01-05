@@ -1,0 +1,209 @@
+<svg width="1200" height="800" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" style="shape-rendering: geometricPrecision; text-rendering: optimizeLegibility;">
+  <defs>
+    <linearGradient id="boxGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1e293b;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0f172a;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="cyanGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#06b6d4;stop-opacity:0.3" />
+      <stop offset="100%" style="stop-color:#0891b2;stop-opacity:0.2" />
+    </linearGradient>
+    <linearGradient id="purpleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8b5cf6;stop-opacity:0.3" />
+      <stop offset="100%" style="stop-color:#7c3aed;stop-opacity:0.2" />
+    </linearGradient>
+    <linearGradient id="greenGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#10b981;stop-opacity:0.3" />
+      <stop offset="100%" style="stop-color:#059669;stop-opacity:0.2" />
+    </linearGradient>
+    <linearGradient id="orangeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#f97316;stop-opacity:0.3" />
+      <stop offset="100%" style="stop-color:#ea580c;stop-opacity:0.2" />
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <!-- Arrowheads: explicit fills so arrowheads reliably match each arrow's stroke across browsers -->
+    <marker id="arrowhead-cyan" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="strokeWidth">
+      <polygon points="0 0, 10 5, 0 10" fill="#06b6d4" opacity="0.9"/>
+    </marker>
+    <marker id="arrowhead-orange" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="strokeWidth">
+      <polygon points="0 0, 10 5, 0 10" fill="#f97316" opacity="0.9"/>
+    </marker>
+    <marker id="arrowhead-green" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="strokeWidth">
+      <polygon points="0 0, 10 5, 0 10" fill="#10b981" opacity="0.9"/>
+    </marker>
+    <marker id="arrowhead-red" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="strokeWidth">
+      <polygon points="0 0, 10 5, 0 10" fill="#ef4444" opacity="0.9"/>
+    </marker>
+  </defs>
+  
+  <!-- Title -->
+  <text x="600" y="40" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="32" font-weight="700" fill="#facc15" text-anchor="middle" style="text-rendering: optimizeLegibility; shape-rendering: geometricPrecision; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">On-Premises AI Database Architecture</text>
+  
+  <!-- Top Layer: Applications -->
+  <g transform="translate(50, 80)">
+    <rect x="0" y="0" width="1100" height="100" rx="10" fill="url(#boxGrad)" stroke="#06b6d4" stroke-width="2" opacity="0.3"/>
+    <text x="550" y="30" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" style="text-rendering: optimizeLegibility; shape-rendering: geometricPrecision; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;" font-size="20" font-weight="700" fill="#06b6d4" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">Application Layer</text>
+    
+    <!-- Application Boxes -->
+    <g transform="translate(50, 50)">
+      <rect x="0" y="0" width="180" height="40" rx="6" fill="url(#cyanGrad)" stroke="#06b6d4" stroke-width="1"/>
+      <text x="90" y="25" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" style="text-rendering: optimizeLegibility; shape-rendering: geometricPrecision; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;" font-size="14" fill="#ffffff" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">Web Application</text>
+    </g>
+    
+    <g transform="translate(280, 50)">
+      <rect x="0" y="0" width="180" height="40" rx="6" fill="url(#cyanGrad)" stroke="#06b6d4" stroke-width="1"/>
+      <text x="90" y="25" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" style="text-rendering: optimizeLegibility; shape-rendering: geometricPrecision; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;" font-size="14" fill="#ffffff" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">API Services</text>
+    </g>
+    
+    <g transform="translate(510, 50)">
+      <rect x="0" y="0" width="180" height="40" rx="6" fill="url(#cyanGrad)" stroke="#06b6d4" stroke-width="1"/>
+      <text x="90" y="25" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" style="text-rendering: optimizeLegibility; shape-rendering: geometricPrecision; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;" font-size="14" fill="#ffffff" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">Batch Processing</text>
+    </g>
+    
+    <g transform="translate(740, 50)">
+      <rect x="0" y="0" width="180" height="40" rx="6" fill="url(#cyanGrad)" stroke="#06b6d4" stroke-width="1"/>
+      <text x="90" y="25" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" style="text-rendering: optimizeLegibility; shape-rendering: geometricPrecision; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;" font-size="14" fill="#ffffff" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">Analytics Tools</text>
+    </g>
+  </g>
+  
+  <!-- Middle Layer: Database & AI Engine -->
+  <g transform="translate(200, 250)">
+    <!-- PostgreSQL with NeuronDB -->
+    <g>
+      <rect x="0" y="0" width="350" height="200" rx="10" fill="url(#boxGrad)" stroke="#8b5cf6" stroke-width="3" filter="url(#glow)"/>
+      <rect x="5" y="5" width="340" height="190" rx="8" fill="url(#purpleGrad)"/>
+      <text x="175" y="35" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" style="text-rendering: optimizeLegibility; shape-rendering: geometricPrecision; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;" font-size="22" font-weight="700" fill="#ffffff" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">PostgreSQL + NeuronDB</text>
+      
+      <!-- Components inside -->
+      <g transform="translate(20, 60)">
+        <rect x="0" y="0" width="140" height="50" rx="6" fill="url(#boxGrad)" stroke="#06b6d4" stroke-width="1" opacity="0.8"/>
+        <text x="70" y="20" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" style="text-rendering: optimizeLegibility; shape-rendering: geometricPrecision; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;" font-size="12" fill="#ffffff" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">Vector Search</text>
+        <text x="70" y="35" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" style="text-rendering: optimizeLegibility; shape-rendering: geometricPrecision; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;" font-size="11" fill="#cbd5e1" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">HNSW, IVFFlat</text>
+      </g>
+      
+      <g transform="translate(180, 60)">
+        <rect x="0" y="0" width="140" height="50" rx="6" fill="url(#boxGrad)" stroke="#10b981" stroke-width="1" opacity="0.8"/>
+        <text x="70" y="20" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" style="text-rendering: optimizeLegibility; shape-rendering: geometricPrecision; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;" font-size="12" fill="#ffffff" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">ML Inference</text>
+        <text x="70" y="35" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" style="text-rendering: optimizeLegibility; shape-rendering: geometricPrecision; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;" font-size="11" fill="#cbd5e1" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">ONNX Models</text>
+      </g>
+      
+      <g transform="translate(20, 120)">
+        <rect x="0" y="0" width="140" height="50" rx="6" fill="url(#boxGrad)" stroke="#f97316" stroke-width="1" opacity="0.8"/>
+        <text x="70" y="20" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" style="text-rendering: optimizeLegibility; shape-rendering: geometricPrecision; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;" font-size="12" fill="#ffffff" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">Embeddings</text>
+        <text x="70" y="35" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" style="text-rendering: optimizeLegibility; shape-rendering: geometricPrecision; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;" font-size="11" fill="#cbd5e1" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">In-Database</text>
+      </g>
+      
+      <g transform="translate(180, 120)">
+        <rect x="0" y="0" width="140" height="50" rx="6" fill="url(#boxGrad)" stroke="#8b5cf6" stroke-width="1" opacity="0.8"/>
+        <text x="70" y="20" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" style="text-rendering: optimizeLegibility; shape-rendering: geometricPrecision; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;" font-size="12" fill="#ffffff" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">RAG Pipeline</text>
+        <text x="70" y="35" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" style="text-rendering: optimizeLegibility; shape-rendering: geometricPrecision; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;" font-size="11" fill="#cbd5e1" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">Complete</text>
+      </g>
+    </g>
+    
+    <!-- GPU Acceleration -->
+    <g transform="translate(400, 0)">
+      <rect x="0" y="0" width="200" height="200" rx="10" fill="url(#boxGrad)" stroke="#10b981" stroke-width="2" filter="url(#glow)"/>
+      <rect x="5" y="5" width="190" height="190" rx="8" fill="url(#greenGrad)"/>
+      <text x="100" y="35" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" style="text-rendering: optimizeLegibility; shape-rendering: geometricPrecision; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;" font-size="20" font-weight="700" fill="#ffffff" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">GPU Acceleration</text>
+      <text x="100" y="70" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" style="text-rendering: optimizeLegibility; shape-rendering: geometricPrecision; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;" font-size="14" fill="#cbd5e1" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">CUDA / ROCm / Metal</text>
+      <text x="100" y="100" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" style="text-rendering: optimizeLegibility; shape-rendering: geometricPrecision; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;" font-size="14" fill="#cbd5e1" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">10-100x Speedup</text>
+      <text x="100" y="130" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" style="text-rendering: optimizeLegibility; shape-rendering: geometricPrecision; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;" font-size="14" fill="#cbd5e1" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">Batch Processing</text>
+      <circle cx="100" cy="170" r="30" fill="#10b981" opacity="0.3"/>
+      <text x="100" y="175" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" style="text-rendering: optimizeLegibility; shape-rendering: geometricPrecision; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;" font-size="16" fill="#ffffff" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">GPU</text>
+    </g>
+    
+    <!-- Storage -->
+    <g transform="translate(650, 0)">
+      <rect x="0" y="0" width="300" height="200" rx="10" fill="url(#boxGrad)" stroke="#f97316" stroke-width="2" filter="url(#glow)"/>
+      <rect x="5" y="5" width="290" height="190" rx="8" fill="url(#orangeGrad)"/>
+      <text x="150" y="35" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" style="text-rendering: optimizeLegibility; shape-rendering: geometricPrecision; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;" font-size="20" font-weight="700" fill="#ffffff" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">Storage Layer</text>
+      
+      <g transform="translate(20, 60)">
+        <rect x="0" y="0" width="120" height="50" rx="6" fill="url(#boxGrad)" stroke="#f97316" stroke-width="1" opacity="0.8"/>
+        <text x="60" y="20" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" style="text-rendering: optimizeLegibility; shape-rendering: geometricPrecision; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;" font-size="12" fill="#ffffff" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">NVMe SSD</text>
+        <text x="60" y="35" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" style="text-rendering: optimizeLegibility; shape-rendering: geometricPrecision; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;" font-size="11" fill="#cbd5e1" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">Hot Data</text>
+      </g>
+      
+      <g transform="translate(160, 60)">
+        <rect x="0" y="0" width="120" height="50" rx="6" fill="url(#boxGrad)" stroke="#f97316" stroke-width="1" opacity="0.8"/>
+        <text x="60" y="20" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" style="text-rendering: optimizeLegibility; shape-rendering: geometricPrecision; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;" font-size="12" fill="#ffffff" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">HDD Array</text>
+        <text x="60" y="35" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" style="text-rendering: optimizeLegibility; shape-rendering: geometricPrecision; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;" font-size="11" fill="#cbd5e1" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">Cold Data</text>
+      </g>
+      
+      <g transform="translate(90, 120)">
+        <rect x="0" y="0" width="120" height="50" rx="6" fill="url(#boxGrad)" stroke="#f97316" stroke-width="1" opacity="0.8"/>
+        <text x="60" y="20" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#ffffff" text-anchor="middle" style="text-rendering: optimizeLegibility; shape-rendering: geometricPrecision; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">Backup</text>
+        <text x="60" y="35" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#cbd5e1" text-anchor="middle" style="text-rendering: optimizeLegibility; shape-rendering: geometricPrecision; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">Encrypted</text>
+      </g>
+    </g>
+  </g>
+  
+  <!-- Bottom Layer: Security & Management -->
+  <g transform="translate(50, 550)">
+    <rect x="0" y="0" width="1100" height="180" rx="10" fill="url(#boxGrad)" stroke="#06b6d4" stroke-width="2" opacity="0.3"/>
+    <text x="550" y="30" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" style="text-rendering: optimizeLegibility; shape-rendering: geometricPrecision; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;" font-size="20" font-weight="700" fill="#06b6d4" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">Security &amp; Management Layer</text>
+    
+    <!-- Security Components -->
+    <g transform="translate(50, 50)">
+      <rect x="0" y="0" width="200" height="100" rx="8" fill="url(#boxGrad)" stroke="#ef4444" stroke-width="2"/>
+      <rect x="5" y="5" width="190" height="90" rx="6" fill="url(#boxGrad)" opacity="0.5"/>
+      <text x="100" y="30" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" style="text-rendering: optimizeLegibility; shape-rendering: geometricPrecision; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;" font-size="16" font-weight="700" fill="#ffffff" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">Encryption</text>
+      <text x="100" y="55" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" style="text-rendering: optimizeLegibility; shape-rendering: geometricPrecision; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;" font-size="12" fill="#cbd5e1" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">AES-GCM</text>
+      <text x="100" y="75" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" style="text-rendering: optimizeLegibility; shape-rendering: geometricPrecision; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;" font-size="12" fill="#cbd5e1" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">TLS/SSL</text>
+    </g>
+    
+    <g transform="translate(300, 50)">
+      <rect x="0" y="0" width="200" height="100" rx="8" fill="url(#boxGrad)" stroke="#ef4444" stroke-width="2"/>
+      <rect x="5" y="5" width="190" height="90" rx="6" fill="url(#boxGrad)" opacity="0.5"/>
+      <text x="100" y="30" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" style="text-rendering: optimizeLegibility; shape-rendering: geometricPrecision; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;" font-size="16" font-weight="700" fill="#ffffff" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">Access Control</text>
+      <text x="100" y="55" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" style="text-rendering: optimizeLegibility; shape-rendering: geometricPrecision; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;" font-size="12" fill="#cbd5e1" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">RBAC</text>
+      <text x="100" y="75" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" style="text-rendering: optimizeLegibility; shape-rendering: geometricPrecision; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;" font-size="12" fill="#cbd5e1" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">Row-Level Security</text>
+    </g>
+    
+    <g transform="translate(550, 50)">
+      <rect x="0" y="0" width="200" height="100" rx="8" fill="url(#boxGrad)" stroke="#ef4444" stroke-width="2"/>
+      <rect x="5" y="5" width="190" height="90" rx="6" fill="url(#boxGrad)" opacity="0.5"/>
+      <text x="100" y="30" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" style="text-rendering: optimizeLegibility; shape-rendering: geometricPrecision; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;" font-size="16" font-weight="700" fill="#ffffff" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">Audit Logging</text>
+      <text x="100" y="55" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" style="text-rendering: optimizeLegibility; shape-rendering: geometricPrecision; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;" font-size="12" fill="#cbd5e1" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">All Operations</text>
+      <text x="100" y="75" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" style="text-rendering: optimizeLegibility; shape-rendering: geometricPrecision; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;" font-size="12" fill="#cbd5e1" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">Compliance Ready</text>
+    </g>
+    
+    <g transform="translate(800, 50)">
+      <rect x="0" y="0" width="200" height="100" rx="8" fill="url(#boxGrad)" stroke="#ef4444" stroke-width="2"/>
+      <rect x="5" y="5" width="190" height="90" rx="6" fill="url(#boxGrad)" opacity="0.5"/>
+      <text x="100" y="30" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" style="text-rendering: optimizeLegibility; shape-rendering: geometricPrecision; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;" font-size="16" font-weight="700" fill="#ffffff" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">Monitoring</text>
+      <text x="100" y="55" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" style="text-rendering: optimizeLegibility; shape-rendering: geometricPrecision; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;" font-size="12" fill="#cbd5e1" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">Performance</text>
+      <text x="100" y="75" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" style="text-rendering: optimizeLegibility; shape-rendering: geometricPrecision; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;" font-size="12" fill="#cbd5e1" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">Health Checks</text>
+    </g>
+  </g>
+  
+  <!-- Arrows: Application to Database -->
+  <!-- Spread endpoints across the DB box so arrowheads don't overlap -->
+  <path d="M 140 180 L 270 250" fill="none" stroke="#06b6d4" stroke-width="2" marker-end="url(#arrowhead-cyan)" opacity="0.7"/>
+  <path d="M 370 180 L 330 250" fill="none" stroke="#06b6d4" stroke-width="2" marker-end="url(#arrowhead-cyan)" opacity="0.7"/>
+  <path d="M 600 180 L 420 250" fill="none" stroke="#06b6d4" stroke-width="2" marker-end="url(#arrowhead-cyan)" opacity="0.7"/>
+  <path d="M 830 180 L 480 250" fill="none" stroke="#06b6d4" stroke-width="2" marker-end="url(#arrowhead-cyan)" opacity="0.7"/>
+  
+  <!-- Arrows: Database to Storage -->
+  <path d="M 550 350 L 800 450" fill="none" stroke="#f97316" stroke-width="2" marker-end="url(#arrowhead-orange)" opacity="0.7"/>
+  
+  <!-- Arrows: Database to GPU -->
+  <path d="M 550 350 L 500 450" fill="none" stroke="#10b981" stroke-width="2" marker-end="url(#arrowhead-green)" opacity="0.7"/>
+  
+  <!-- Arrows: Database to Security -->
+  <path d="M 375 450 L 150 550" fill="none" stroke="#ef4444" stroke-width="2" marker-end="url(#arrowhead-red)" opacity="0.7"/>
+  <path d="M 375 450 L 400 550" fill="none" stroke="#ef4444" stroke-width="2" marker-end="url(#arrowhead-red)" opacity="0.7"/>
+  <path d="M 375 450 L 650 550" fill="none" stroke="#ef4444" stroke-width="2" marker-end="url(#arrowhead-red)" opacity="0.7"/>
+  <path d="M 375 450 L 900 550" fill="none" stroke="#ef4444" stroke-width="2" marker-end="url(#arrowhead-red)" opacity="0.7"/>
+  
+  <!-- On-Premises Label -->
+  <rect x="50" y="750" width="1100" height="40" rx="8" fill="url(#boxGrad)" stroke="#facc15" stroke-width="2" opacity="0.5"/>
+  <text x="600" y="775" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" style="text-rendering: optimizeLegibility; shape-rendering: geometricPrecision; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;" font-size="18" font-weight="700" fill="#facc15" text-anchor="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round" dominant-baseline="middle">✓ Complete Data Sovereignty | ✓ No Cloud Dependencies | ✓ Full Control | ✓ Regulatory Compliance</text>
+</svg>
+

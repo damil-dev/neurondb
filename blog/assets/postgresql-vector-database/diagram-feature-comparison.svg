@@ -1,0 +1,395 @@
+<?xml version="1.0" ?>
+<ns0:svg xmlns:ns0="http://www.w3.org/2000/svg" width="1100" height="800" viewBox="0 0 1100 800" preserveAspectRatio="xMidYMid meet">
+  
+  
+  <ns0:defs>
+    
+    
+    <ns0:linearGradient id="boxGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      
+      
+      <ns0:stop offset="0%" style="stop-color:#1e293b;stop-opacity:1"/>
+      
+      
+      <ns0:stop offset="100%" style="stop-color:#0f172a;stop-opacity:1"/>
+      
+    
+    </ns0:linearGradient>
+    
+    
+    <ns0:linearGradient id="greenGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      
+      
+      <ns0:stop offset="0%" style="stop-color:#10b981;stop-opacity:0.3"/>
+      
+      
+      <ns0:stop offset="100%" style="stop-color:#059669;stop-opacity:0.2"/>
+      
+    
+    </ns0:linearGradient>
+    
+    
+    <ns0:linearGradient id="cyanGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      
+      
+      <ns0:stop offset="0%" style="stop-color:#06b6d4;stop-opacity:0.3"/>
+      
+      
+      <ns0:stop offset="100%" style="stop-color:#0891b2;stop-opacity:0.2"/>
+      
+    
+    </ns0:linearGradient>
+    
+    
+    <ns0:linearGradient id="yellowGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      
+      
+      <ns0:stop offset="0%" style="stop-color:#facc15;stop-opacity:0.3"/>
+      
+      
+      <ns0:stop offset="100%" style="stop-color:#eab308;stop-opacity:0.2"/>
+      
+    
+    </ns0:linearGradient>
+    
+    
+    <ns0:linearGradient id="redGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      
+      
+      <ns0:stop offset="0%" style="stop-color:#ef4444;stop-opacity:0.3"/>
+      
+      
+      <ns0:stop offset="100%" style="stop-color:#dc2626;stop-opacity:0.2"/>
+      
+    
+    </ns0:linearGradient>
+    
+    
+    <ns0:linearGradient id="purpleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      
+      
+      <ns0:stop offset="0%" style="stop-color:#8b5cf6;stop-opacity:0.3"/>
+      
+      
+      <ns0:stop offset="100%" style="stop-color:#7c3aed;stop-opacity:0.2"/>
+      
+    
+    </ns0:linearGradient>
+    
+    
+    <ns0:filter id="glow">
+      
+      
+      <ns0:feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      
+      
+      <ns0:feMerge>
+        
+        
+        <ns0:feMergeNode in="coloredBlur"/>
+        
+        
+        <ns0:feMergeNode in="SourceGraphic"/>
+        
+      
+      </ns0:feMerge>
+      
+    
+    </ns0:filter>
+    
+  
+  </ns0:defs>
+  
+  
+  
+  
+  <ns0:text x="550" y="40" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="28" font-weight="bold" fill="#facc15" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">Vector Database Feature Comparison</ns0:text>
+  
+  
+  
+  
+  <ns0:g transform="translate(50, 80)">
+    
+    
+    <ns0:rect x="0" y="0" width="180" height="200" rx="8" fill="url(#boxGrad)" stroke="#10b981" stroke-width="3" filter="url(#glow)"/>
+    
+    
+    <ns0:rect x="5" y="5" width="170" height="190" rx="6" fill="url(#greenGrad)"/>
+    
+    
+    <ns0:text x="90" y="35" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="bold" fill="#10b981" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">PostgreSQL</ns0:text>
+    
+    
+    <ns0:text x="90" y="55" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="bold" fill="#10b981" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">+ NeuronDB</ns0:text>
+    
+    
+    <ns0:text x="90" y="85" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">✓ ACID</ns0:text>
+    
+    
+    <ns0:text x="90" y="105" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">✓ SQL</ns0:text>
+    
+    
+    <ns0:text x="90" y="125" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">✓ ML Inference</ns0:text>
+    
+    
+    <ns0:text x="90" y="145" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">✓ Embeddings</ns0:text>
+    
+    
+    <ns0:text x="90" y="165" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">✓ RAG Pipeline</ns0:text>
+    
+    
+    <ns0:text x="90" y="185" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">✓ GPU Support</ns0:text>
+    
+  
+  </ns0:g>
+  
+  
+  
+  
+  <ns0:g transform="translate(250, 80)">
+    
+    
+    <ns0:rect x="0" y="0" width="180" height="200" rx="8" fill="url(#boxGrad)" stroke="#06b6d4" stroke-width="2" filter="url(#glow)"/>
+    
+    
+    <ns0:rect x="5" y="5" width="170" height="190" rx="6" fill="url(#cyanGrad)"/>
+    
+    
+    <ns0:text x="90" y="35" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="bold" fill="#06b6d4" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">pgvector</ns0:text>
+    
+    
+    <ns0:text x="90" y="85" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">✓ ACID</ns0:text>
+    
+    
+    <ns0:text x="90" y="105" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">✓ SQL</ns0:text>
+    
+    
+    <ns0:text x="90" y="125" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#ef4444" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">✗ ML Inference</ns0:text>
+    
+    
+    <ns0:text x="90" y="145" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#ef4444" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">✗ Embeddings</ns0:text>
+    
+    
+    <ns0:text x="90" y="165" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#ef4444" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">✗ RAG Pipeline</ns0:text>
+    
+    
+    <ns0:text x="90" y="185" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#ef4444" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">✗ GPU Support</ns0:text>
+    
+  
+  </ns0:g>
+  
+  
+  
+  
+  <ns0:g transform="translate(450, 80)">
+    
+    
+    <ns0:rect x="0" y="0" width="180" height="200" rx="8" fill="url(#boxGrad)" stroke="#facc15" stroke-width="2" filter="url(#glow)"/>
+    
+    
+    <ns0:rect x="5" y="5" width="170" height="190" rx="6" fill="url(#yellowGrad)"/>
+    
+    
+    <ns0:text x="90" y="35" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="bold" fill="#facc15" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">Pinecone</ns0:text>
+    
+    
+    <ns0:text x="90" y="85" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#ef4444" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">✗ ACID</ns0:text>
+    
+    
+    <ns0:text x="90" y="105" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#ef4444" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">✗ SQL</ns0:text>
+    
+    
+    <ns0:text x="90" y="125" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#ef4444" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">✗ ML Inference</ns0:text>
+    
+    
+    <ns0:text x="90" y="145" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#ef4444" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">✗ Embeddings</ns0:text>
+    
+    
+    <ns0:text x="90" y="165" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">✓ Managed</ns0:text>
+    
+    
+    <ns0:text x="90" y="185" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#ef4444" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">✗ GPU Support</ns0:text>
+    
+  
+  </ns0:g>
+  
+  
+  
+  
+  <ns0:g transform="translate(650, 80)">
+    
+    
+    <ns0:rect x="0" y="0" width="180" height="200" rx="8" fill="url(#boxGrad)" stroke="#8b5cf6" stroke-width="2" filter="url(#glow)"/>
+    
+    
+    <ns0:rect x="5" y="5" width="170" height="190" rx="6" fill="url(#purpleGrad)"/>
+    
+    
+    <ns0:text x="90" y="35" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="bold" fill="#8b5cf6" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">Weaviate</ns0:text>
+    
+    
+    <ns0:text x="90" y="85" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#ef4444" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">✗ ACID</ns0:text>
+    
+    
+    <ns0:text x="90" y="105" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#ef4444" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">✗ SQL</ns0:text>
+    
+    
+    <ns0:text x="90" y="125" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#ef4444" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">✗ ML Inference</ns0:text>
+    
+    
+    <ns0:text x="90" y="145" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">✓ GraphQL</ns0:text>
+    
+    
+    <ns0:text x="90" y="165" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">✓ Graph DB</ns0:text>
+    
+    
+    <ns0:text x="90" y="185" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#ef4444" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">✗ GPU Support</ns0:text>
+    
+  
+  </ns0:g>
+  
+  
+  
+  
+  <ns0:g transform="translate(850, 80)">
+    
+    
+    <ns0:rect x="0" y="0" width="180" height="200" rx="8" fill="url(#boxGrad)" stroke="#06b6d4" stroke-width="2" filter="url(#glow)"/>
+    
+    
+    <ns0:rect x="5" y="5" width="170" height="190" rx="6" fill="url(#cyanGrad)"/>
+    
+    
+    <ns0:text x="90" y="35" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="bold" fill="#06b6d4" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">Qdrant</ns0:text>
+    
+    
+    <ns0:text x="90" y="85" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#ef4444" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">✗ ACID</ns0:text>
+    
+    
+    <ns0:text x="90" y="105" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#ef4444" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">✗ SQL</ns0:text>
+    
+    
+    <ns0:text x="90" y="125" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#ef4444" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">✗ ML Inference</ns0:text>
+    
+    
+    <ns0:text x="90" y="145" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">✓ High Perf</ns0:text>
+    
+    
+    <ns0:text x="90" y="165" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">✓ Rust-based</ns0:text>
+    
+    
+    <ns0:text x="90" y="185" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#ef4444" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">✗ GPU Support</ns0:text>
+    
+  
+  </ns0:g>
+  
+  
+  
+  
+  <ns0:g transform="translate(50, 320)">
+    
+    
+    <ns0:rect x="0" y="0" width="1000" height="200" rx="8" fill="url(#boxGrad)" stroke="#06b6d4" stroke-width="2" filter="url(#glow)"/>
+    
+    
+    <ns0:rect x="5" y="5" width="990" height="190" rx="6" fill="url(#cyanGrad)"/>
+    
+    
+    <ns0:text x="500" y="35" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="20" font-weight="bold" fill="#ffffff" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">Performance Comparison (10M vectors, 768 dims)</ns0:text>
+    
+    
+    
+    
+    <ns0:text x="100" y="70" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="bold" fill="#facc15" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">Query Latency:</ns0:text>
+    
+    
+    <ns0:text x="100" y="95" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#cbd5e1" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">PostgreSQL+NeuronDB: 5-8ms</ns0:text>
+    
+    
+    <ns0:text x="100" y="115" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#cbd5e1" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">pgvector: 8-15ms</ns0:text>
+    
+    
+    <ns0:text x="100" y="135" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#cbd5e1" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">Pinecone: 10-50ms</ns0:text>
+    
+    
+    <ns0:text x="100" y="155" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#cbd5e1" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">Weaviate: 5-20ms</ns0:text>
+    
+    
+    <ns0:text x="100" y="175" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#cbd5e1" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">Qdrant: 5-15ms</ns0:text>
+    
+    
+    
+    
+    <ns0:text x="500" y="70" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="bold" fill="#facc15" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">Throughput (QPS):</ns0:text>
+    
+    
+    <ns0:text x="500" y="95" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#cbd5e1" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">PostgreSQL+NeuronDB: 1K-2K (CPU)</ns0:text>
+    
+    
+    <ns0:text x="500" y="115" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#cbd5e1" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">PostgreSQL+NeuronDB: 10K-15K (GPU)</ns0:text>
+    
+    
+    <ns0:text x="500" y="135" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#cbd5e1" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">pgvector: 10K-50K</ns0:text>
+    
+    
+    <ns0:text x="500" y="155" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#cbd5e1" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">Pinecone: 100-500</ns0:text>
+    
+    
+    <ns0:text x="500" y="175" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#cbd5e1" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">Qdrant: 1K-5K</ns0:text>
+    
+  
+  </ns0:g>
+  
+  
+  
+  
+  <ns0:g transform="translate(50, 560)">
+    
+    
+    <ns0:rect x="0" y="0" width="1000" height="200" rx="8" fill="url(#boxGrad)" stroke="#10b981" stroke-width="2" filter="url(#glow)"/>
+    
+    
+    <ns0:rect x="5" y="5" width="990" height="190" rx="6" fill="url(#greenGrad)"/>
+    
+    
+    <ns0:text x="500" y="35" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="20" font-weight="bold" fill="#ffffff" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">PostgreSQL + NeuronDB Key Advantages</ns0:text>
+    
+    
+    
+    <ns0:text x="100" y="70" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="bold" fill="#facc15" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">✓ Complete Feature Set</ns0:text>
+    
+    
+    <ns0:text x="100" y="95" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#cbd5e1" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">• 473 SQL functions, 52 ML algorithms, 4 background workers</ns0:text>
+    
+    
+    <ns0:text x="100" y="115" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#cbd5e1" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">• In-database embedding generation and ML inference</ns0:text>
+    
+    
+    
+    <ns0:text x="100" y="145" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="bold" fill="#facc15" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">✓ Production Ready</ns0:text>
+    
+    
+    <ns0:text x="100" y="170" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#cbd5e1" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">• ACID transactions, SQL interface, standard PostgreSQL tooling</ns0:text>
+    
+    
+    
+    <ns0:text x="500" y="70" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="bold" fill="#facc15" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">✓ Unified Platform</ns0:text>
+    
+    
+    <ns0:text x="500" y="95" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#cbd5e1" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">• Vector + relational data in single database</ns0:text>
+    
+    
+    <ns0:text x="500" y="115" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#cbd5e1" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">• Hybrid queries combining vector and SQL</ns0:text>
+    
+    
+    
+    <ns0:text x="500" y="145" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="bold" fill="#facc15" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">✓ GPU Acceleration</ns0:text>
+    
+    
+    <ns0:text x="500" y="170" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#cbd5e1" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">• CUDA, ROCm, Metal support for 10x throughput</ns0:text>
+    
+  
+  </ns0:g>
+  
+
+</ns0:svg>

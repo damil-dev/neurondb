@@ -1,0 +1,205 @@
+<?xml version="1.0" ?>
+<ns0:svg xmlns:ns0="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" preserveAspectRatio="xMidYMid meet">
+  
+  
+  <ns0:defs>
+    
+    
+    <ns0:linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      
+      
+      <ns0:stop offset="0%" style="stop-color:#070d1a;stop-opacity:1"/>
+      
+      
+      <ns0:stop offset="25%" style="stop-color:#111827;stop-opacity:1"/>
+      
+      
+      <ns0:stop offset="50%" style="stop-color:#1f2937;stop-opacity:1"/>
+      
+      
+      <ns0:stop offset="75%" style="stop-color:#374151;stop-opacity:1"/>
+      
+      
+      <ns0:stop offset="100%" style="stop-color:#4b5563;stop-opacity:1"/>
+      
+    
+    </ns0:linearGradient>
+    
+    
+    <ns0:linearGradient id="overlayGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      
+      
+      <ns0:stop offset="0%" style="stop-color:#4f46e5;stop-opacity:0.2"/>
+      
+      
+      <ns0:stop offset="50%" style="stop-color:#06b6d4;stop-opacity:0.2"/>
+      
+      
+      <ns0:stop offset="100%" style="stop-color:#10b981;stop-opacity:0.2"/>
+      
+    
+    </ns0:linearGradient>
+    
+    
+    <ns0:linearGradient id="textGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      
+      
+      <ns0:stop offset="0%" style="stop-color:#4f46e5;stop-opacity:1"/>
+      
+      
+      <ns0:stop offset="50%" style="stop-color:#06b6d4;stop-opacity:1"/>
+      
+      
+      <ns0:stop offset="100%" style="stop-color:#10b981;stop-opacity:1"/>
+      
+    
+    </ns0:linearGradient>
+    
+  
+  </ns0:defs>
+  
+  
+  
+  <ns0:rect width="1200" height="630" fill="url(#bgGradient)"/>
+  
+  
+  <ns0:rect width="1200" height="630" fill="url(#overlayGradient)"/>
+  
+  
+  
+  
+  <ns0:g transform="translate(100, 180)" opacity="0.4">
+    
+    
+    <ns0:circle cx="50" cy="50" r="8" fill="#06b6d4"/>
+    
+    
+    <ns0:circle cx="50" cy="100" r="8" fill="#06b6d4"/>
+    
+    
+    <ns0:circle cx="50" cy="150" r="8" fill="#06b6d4"/>
+    
+    
+    <ns0:circle cx="150" cy="75" r="10" fill="#8b5cf6"/>
+    
+    
+    <ns0:circle cx="150" cy="125" r="10" fill="#8b5cf6"/>
+    
+    
+    <ns0:circle cx="250" cy="100" r="12" fill="#10b981"/>
+    
+    
+    
+    <ns0:line x1="58" y1="50" x2="142" y2="75" stroke="#06b6d4" stroke-width="1" opacity="0.5"/>
+    
+    
+    <ns0:line x1="58" y1="100" x2="142" y2="75" stroke="#06b6d4" stroke-width="1" opacity="0.5"/>
+    
+    
+    <ns0:line x1="58" y1="100" x2="142" y2="125" stroke="#06b6d4" stroke-width="1" opacity="0.5"/>
+    
+    
+    <ns0:line x1="58" y1="150" x2="142" y2="125" stroke="#06b6d4" stroke-width="1" opacity="0.5"/>
+    
+    
+    <ns0:line x1="160" y1="75" x2="238" y2="100" stroke="#8b5cf6" stroke-width="1" opacity="0.5"/>
+    
+    
+    <ns0:line x1="160" y1="125" x2="238" y2="100" stroke="#8b5cf6" stroke-width="1" opacity="0.5"/>
+    
+  
+  </ns0:g>
+  
+  
+  
+  
+  <ns0:g transform="translate(900, 200)" opacity="0.4">
+    
+    
+    <ns0:rect x="0" y="0" width="150" height="100" rx="10" fill="#1f2937" stroke="#06b6d4" stroke-width="2"/>
+    
+    
+    <ns0:rect x="15" y="15" width="120" height="25" rx="5" fill="#4f46e5" opacity="0.7"/>
+    
+    
+    <ns0:rect x="15" y="45" width="120" height="25" rx="5" fill="#06b6d4" opacity="0.7"/>
+    
+    
+    <ns0:rect x="15" y="75" width="120" height="10" rx="5" fill="#10b981" opacity="0.7"/>
+    
+  
+  </ns0:g>
+  
+  
+  
+  
+  <ns0:text x="600" y="280" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="96" font-weight="300" fill="url(#textGradient)" text-anchor="middle" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">
+    NeuronDB
+  </ns0:text>
+  
+  
+  
+  
+  <ns0:text x="600" y="340" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="32" font-weight="300" fill="#fff" text-anchor="middle" opacity="0.9" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">
+    PostgreSQL AI Vector Database Extension
+  </ns0:text>
+  
+  
+  
+  
+  <ns0:g transform="translate(220, 400)">
+    
+    
+    <ns0:rect x="0" y="0" width="160" height="40" rx="20" fill="#4f46e5" opacity="0.7"/>
+    
+    
+    <ns0:text x="80" y="27" fill="#fff" font-size="18" text-anchor="middle" font-weight="500" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">Vector Search</ns0:text>
+    
+  
+  </ns0:g>
+  
+  
+  <ns0:g transform="translate(400, 400)">
+    
+    
+    <ns0:rect x="0" y="0" width="160" height="40" rx="20" fill="#06b6d4" opacity="0.7"/>
+    
+    
+    <ns0:text x="80" y="27" fill="#fff" font-size="18" text-anchor="middle" font-weight="500" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">ML Inference</ns0:text>
+    
+  
+  </ns0:g>
+  
+  
+  <ns0:g transform="translate(580, 400)">
+    
+    
+    <ns0:rect x="0" y="0" width="160" height="40" rx="20" fill="#10b981" opacity="0.7"/>
+    
+    
+    <ns0:text x="80" y="27" fill="#fff" font-size="18" text-anchor="middle" font-weight="500" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">GPU Accel</ns0:text>
+    
+  
+  </ns0:g>
+  
+  
+  <ns0:g transform="translate(760, 400)">
+    
+    
+    <ns0:rect x="0" y="0" width="160" height="40" rx="20" fill="#8b5cf6" opacity="0.7"/>
+    
+    
+    <ns0:text x="80" y="27" fill="#fff" font-size="18" text-anchor="middle" font-weight="500" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">RAG Ready</ns0:text>
+    
+  
+  </ns0:g>
+  
+  
+  
+  
+  <ns0:text x="600" y="560" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="24" font-weight="300" fill="#fff" text-anchor="middle" opacity="0.6" dominant-baseline="middle" stroke="#0f172a" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">
+    neurondb.ai
+  </ns0:text>
+  
+
+</ns0:svg>
