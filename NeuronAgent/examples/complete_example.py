@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-Complete NeuronAgent Example - Production Ready
+Complete NeuronAgent Example
 
-This is a comprehensive, production-ready example that demonstrates:
+This is a comprehensive example that demonstrates:
 1. Proper error handling and retries
 2. Session management
 3. Memory and context handling
 4. Tool usage
 5. Streaming responses
 6. Logging and monitoring
-7. Best practices for production use
+7. Practical patterns for real deployments
 """
 
 import json
@@ -30,9 +30,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-class ProductionNeuronAgentClient:
+class RobustNeuronAgentClient:
     """
-    Production-ready NeuronAgent client with:
+    Robust NeuronAgent client with:
     - Retry logic
     - Connection pooling
     - Error handling
@@ -196,7 +196,7 @@ class ConversationManager:
     - Error recovery
     """
     
-    def __init__(self, client: ProductionNeuronAgentClient, agent_id: str):
+    def __init__(self, client: RobustNeuronAgentClient, agent_id: str):
         self.client = client
         self.agent_id = agent_id
         self.session = None
@@ -239,11 +239,11 @@ class ConversationManager:
 
 
 def main():
-    """Main example demonstrating production patterns"""
+    """Main example demonstrating reliability patterns"""
     
     # Initialize client
     logger.info("Initializing NeuronAgent client...")
-    client = ProductionNeuronAgentClient()
+    client = RobustNeuronAgentClient()
     
     # Health check
     if not client.health_check():
@@ -254,7 +254,7 @@ def main():
     # Create a specialized agent
     logger.info("Creating research assistant agent...")
     agent = client.create_agent(
-        name="production-research-assistant",
+        name="research-assistant",
         system_prompt="""You are a research assistant. Your role is to:
 1. Answer questions accurately using available tools
 2. Provide citations and sources when possible
@@ -263,7 +263,7 @@ def main():
 
 Always verify information and provide reliable answers.""",
         model_name="gpt-4",
-        description="Production research assistant",
+        description="Research assistant",
         enabled_tools=['http', 'sql'],
         config={
             'temperature': 0.5,
@@ -275,7 +275,7 @@ Always verify information and provide reliable answers.""",
     # Create conversation manager
     logger.info("Starting conversation...")
     conversation = ConversationManager(client, agent['id'])
-    conversation.start(external_user_id="production-user-001")
+    conversation.start(external_user_id="user-001")
     
     # Example conversation
     queries = [

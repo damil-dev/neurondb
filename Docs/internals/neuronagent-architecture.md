@@ -2,7 +2,7 @@
 
 ## Overview
 
-NeuronAgent is a production-ready AI agent runtime system that integrates with NeuronDB PostgreSQL extension to provide comprehensive agent capabilities including long-term memory, tool execution, planning, reflection, and advanced features like browser automation, collaboration, and hierarchical memory.
+NeuronAgent is an AI agent runtime system that integrates with the NeuronDB PostgreSQL extension to provide agent capabilities including long-term memory, tool execution, planning, reflection, and advanced features like browser automation, collaboration, and hierarchical memory.
 
 ## System Architecture
 

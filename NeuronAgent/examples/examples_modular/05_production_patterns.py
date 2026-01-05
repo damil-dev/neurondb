@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Example 5: Production Patterns
+Example 5: Reliability Patterns
 
-Demonstrates production-ready patterns including:
+Demonstrates reliability patterns including:
 - Error handling
 - Retry logic
 - Metrics collection
@@ -31,7 +31,7 @@ from neurondb_client.utils.metrics import MetricsCollector
 setup_logging(level="INFO")
 
 def main():
-    # Initialize with production settings
+    # Initialize with robust defaults
     client = NeuronAgentClient(
         max_retries=3,
         timeout=30,
@@ -58,8 +58,8 @@ def main():
         print("\n Creating agent...")
         try:
             agent = agent_mgr.create(
-                name="production-example-agent",
-                system_prompt="You are a production-ready assistant.",
+                name="reliability-example-agent",
+                system_prompt="You are a helpful assistant.",
                 model_name="gpt-4",
                 enabled_tools=['sql', 'http'],
                 config={
@@ -79,7 +79,7 @@ def main():
         conversation = ConversationManager(
             client=client,
             agent_id=agent['id'],
-            external_user_id="production-user-001"
+            external_user_id="user-001"
         )
         
         try:
