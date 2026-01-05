@@ -60,8 +60,33 @@ jobs:
       
       - name: Install PostgreSQL development headers
         run: |
+          # Add PostgreSQL APT repository for newer versions
           sudo apt-get update
-          sudo apt-get install -y postgresql-server-dev-${{ matrix.pg_version }} build-essential
+          sudo apt-get install -y wget gnupg lsb-release ca-certificates
+          
+          # Modern method for adding GPG key (apt-key is deprecated)
+          sudo mkdir -p /etc/apt/keyrings
+          wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/keyrings/postgresql.gpg
+          sudo chmod 644 /etc/apt/keyrings/postgresql.gpg
+          
+          # Add PostgreSQL repository
+          echo "deb [signed-by=/etc/apt/keyrings/postgresql.gpg] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          
+          # Update package lists
+          sudo apt-get update
+          
+          # Verify package is available before installing
+          if ! apt-cache show postgresql-server-dev-${{ matrix.pg_version }} > /dev/null 2>&1; then
+            echo "Package postgresql-server-dev-${{ matrix.pg_version }} not found. Available packages:"
+            apt-cache search postgresql-server-dev | grep -E "postgresql-server-dev-[0-9]+" || true
+            echo "Attempting to install postgresql-${{ matrix.pg_version }}-dev as fallback..."
+            sudo apt-get install -y postgresql-${{ matrix.pg_version }}-dev build-essential || {
+              echo "Failed to install PostgreSQL dev packages"
+              exit 1
+            }
+          else
+            sudo apt-get install -y postgresql-server-dev-${{ matrix.pg_version }} build-essential
+          fi
       
       - name: Build and install NeuronDB extension
         working-directory: NeuronDB
