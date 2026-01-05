@@ -138,6 +138,7 @@ static int	ndb_metal_stream_create(ndb_stream_t * stream);
 static int	ndb_metal_stream_destroy(ndb_stream_t stream);
 static int	ndb_metal_stream_synchronize(ndb_stream_t stream);
 
+__attribute__((weak))
 bool		neurondb_gpu_rf_predict_backend(const void *rf_hdr,
 											const void *trees,
 											const void *nodes,
