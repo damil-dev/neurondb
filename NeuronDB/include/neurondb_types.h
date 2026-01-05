@@ -3,7 +3,7 @@
  * neurondb_types.h
  *		Core data type definitions for NeuronDB
  *
- * Defines enterprise-grade data types including vectorp (packed SIMD),
+ * Defines high-performance data types including vectorp (packed SIMD),
  * vecmap (sparse high-dimensional), rtext (retrievable text with tokens),
  * and vgraph (compact graph storage).
  *

@@ -586,8 +586,12 @@ vector_to_sparsevec(PG_FUNCTION_ARGS)
 	result->total_dim = v->dim;
 	result->nnz = nnz;
 
+	/* Suppress nonnull warning - result is guaranteed non-null after palloc0 */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wnonnull"
 	memcpy(VECMAP_INDICES(result), indices, sizeof(int32) * nnz);
 	memcpy(VECMAP_VALUES(result), values, sizeof(float4) * nnz);
+#pragma GCC diagnostic pop
 
 	pfree(indices);
 	pfree(values);

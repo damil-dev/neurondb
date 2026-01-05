@@ -4151,7 +4151,7 @@ hnswAddHeapTid(HnswNode node, ItemPointer heaptid)
 /*
  * hnswNodeHasHeapTid - Check if a node has a specific heap TID
  */
-static bool
+static bool __attribute__((unused))
 hnswNodeHasHeapTid(HnswNode node, ItemPointer heaptid)
 {
 	int			i;
@@ -4185,7 +4185,7 @@ hnswNodeHasHeapTid(HnswNode node, ItemPointer heaptid)
  * heaptids[0] would contain what was previously heapPtr.
  * For version 2+ nodes, heaptidsLength should be >= 1.
  */
-static bool
+static bool __attribute__((unused))
 hnswIsNodeCompatible(HnswNode node, uint32 version)
 {
 	if (version >= 2)

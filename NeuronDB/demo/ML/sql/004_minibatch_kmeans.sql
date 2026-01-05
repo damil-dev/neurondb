@@ -322,14 +322,14 @@ SELECT array_length(cluster_minibatch_kmeans('batch_test', 'features', 7, 30, 25
 \echo ''
 
 -- ============================================================================
--- STEP 9: Production Readiness Check
+-- STEP 9: Readiness Check
 -- ============================================================================
-\echo 'STEP 9: Production readiness validation...'
+\echo 'STEP 9: Readiness validation...'
 \echo ''
 
 SELECT 
     'Mini-batch K-means' as algorithm,
-    'PRODUCTION READY' as status,
+    'READY' as status,
     '3-4 seconds on 1.2M rows' as performance,
     'Excellent scalability' as scalability,
     'Stochastic, may vary slightly' as consistency,

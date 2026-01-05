@@ -423,8 +423,12 @@ vecmap_add(PG_FUNCTION_ARGS)
 	result->total_dim = a->total_dim;
 	result->nnz = result_nnz;
 
+	/* Suppress nonnull warning - result is guaranteed non-null after palloc0 */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wnonnull"
 	memcpy(VECMAP_INDICES(result), result_indices, sizeof(int32) * result_nnz);
 	memcpy(VECMAP_VALUES(result), result_values, sizeof(float4) * result_nnz);
+#pragma GCC diagnostic pop
 
 	pfree(result_indices);
 	pfree(result_values);
@@ -527,8 +531,12 @@ vecmap_sub(PG_FUNCTION_ARGS)
 	result->total_dim = a->total_dim;
 	result->nnz = result_nnz;
 
+	/* Suppress nonnull warning - result is guaranteed non-null after palloc0 */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wnonnull"
 	memcpy(VECMAP_INDICES(result), result_indices, sizeof(int32) * result_nnz);
 	memcpy(VECMAP_VALUES(result), result_values, sizeof(float4) * result_nnz);
+#pragma GCC diagnostic pop
 
 	pfree(result_indices);
 	pfree(result_values);

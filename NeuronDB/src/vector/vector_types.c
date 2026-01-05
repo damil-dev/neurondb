@@ -316,8 +316,12 @@ vecmap_in(PG_FUNCTION_ARGS)
 	result->total_dim = dim;
 	result->nnz = nnz;
 
+	/* Suppress nonnull warning - result is guaranteed non-null after palloc0 */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wnonnull"
 	memcpy(VECMAP_INDICES(result), indices, sizeof(int32) * nnz);
 	memcpy(VECMAP_VALUES(result), values, sizeof(float4) * nnz);
+#pragma GCC diagnostic pop
 
 	pfree(indices);
 	pfree(values);
@@ -537,8 +541,12 @@ sparsevec_in(PG_FUNCTION_ARGS)
 	result->total_dim = dim;
 	result->nnz = nnz;
 
+	/* Suppress nonnull warning - result is guaranteed non-null after palloc0 */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wnonnull"
 	memcpy(VECMAP_INDICES(result), indices, sizeof(int32) * nnz);
 	memcpy(VECMAP_VALUES(result), values, sizeof(float4) * nnz);
+#pragma GCC diagnostic pop
 
 	pfree(indices);
 	pfree(values);
@@ -866,7 +874,11 @@ sparsevec_l2_normalize(PG_FUNCTION_ARGS)
 	result_indices = VECMAP_INDICES(result);
 	result_values = VECMAP_VALUES(result);
 
+	/* Suppress nonnull warning - result and v are guaranteed non-null */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wnonnull"
 	memcpy(result_indices, VECMAP_INDICES(v), sizeof(int32) * v->nnz);
+#pragma GCC diagnostic pop
 	for (i = 0; i < v->nnz; i++)
 		result_values[i] = (float4) ((double) values[i] / norm);
 

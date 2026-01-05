@@ -6,7 +6,7 @@ NeuronDB classifies all SQL functions, operators, types, and configuration param
 
 ### Stable
 
-**Definition:** Functions marked as `stable` are production-ready and guaranteed to maintain backward compatibility across minor and patch releases. The API contract (signature, behavior, and return types) will not change in breaking ways.
+**Definition:** Functions marked as `stable` are intended for general use and guaranteed to maintain backward compatibility across minor and patch releases. The API contract (signature, behavior, and return types) will not change in breaking ways.
 
 **Guarantees:**
 - Function signatures (parameter names, types, order) remain constant
