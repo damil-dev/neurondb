@@ -160,7 +160,7 @@ export default function LogsPage() {
             <ProfileSelector
               profiles={profiles}
               selectedProfile={selectedProfile}
-              onSelectProfile={setSelectedProfile}
+              onSelect={setSelectedProfile}
             />
             {selectedProfile && (
               <div className="flex gap-2">
