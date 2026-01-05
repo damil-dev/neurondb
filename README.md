@@ -5,11 +5,11 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/neurondb/NeurondB/actions/workflows/build-matrix.yml">
-    <img alt="Build Status" src="https://img.shields.io/github/actions/workflow/status/neurondb/NeurondB/build-matrix.yml?branch=main&label=build" />
+  <a href="https://github.com/neurondb/NeurondB/actions/workflows/neurondb-build-and-test.yml">
+    <img alt="Build Status" src="https://img.shields.io/github/actions/workflow/status/neurondb/NeurondB/neurondb-build-and-test.yml?branch=main&label=build" />
   </a>
-  <a href="https://github.com/neurondb/NeurondB/actions/workflows/integration-tests.yml">
-    <img alt="Tests" src="https://img.shields.io/github/actions/workflow/status/neurondb/NeurondB/integration-tests.yml?branch=main&label=tests" />
+  <a href="https://github.com/neurondb/NeurondB/actions/workflows/integration-tests-full-ecosystem.yml">
+    <img alt="Ecosystem Tests" src="https://img.shields.io/github/actions/workflow/status/neurondb/NeurondB/integration-tests-full-ecosystem.yml?branch=main&label=ecosystem%20tests" />
   </a>
   <a href="https://codecov.io/gh/neurondb/NeurondB">
     <img alt="Coverage" src="https://img.shields.io/codecov/c/github/neurondb/NeurondB?label=coverage" />
@@ -74,7 +74,9 @@ All versions are tested in CI/CD and supported for production use. The extension
 **Get running in under 5 minutes**
 
 ```bash
-docker compose up -d
+# IMPORTANT: This repo uses Docker Compose profiles.
+# For a full local stack (all modules) use the CPU profile:
+docker compose --profile cpu up -d
 ./scripts/health-check.sh
 ```
 
@@ -101,6 +103,117 @@ Prefer a step-by-step guide? See [`QUICKSTART.md`](QUICKSTART.md)
 | NeuronDesktop API | `http://localhost:8081/health` |
 
 </details>
+
+## Docker (all modules, step-by-step, copy/paste)
+
+These steps start the **full ecosystem** on a single machine using the repo-root
+[`docker-compose.yml`](docker-compose.yml): **NeuronDB**, **NeuronAgent**,
+**NeuronMCP**, and **NeuronDesktop**.
+
+### 0) One-time setup
+
+```bash
+cd /path/to/neurondb2
+cp env.example .env
+```
+
+Edit `.env` and set **matching** values for:
+
+- `POSTGRES_PASSWORD`
+- `DB_PASSWORD` (NeuronAgent)
+- `NEURONDB_PASSWORD` (NeuronMCP)
+
+### 1) Start the full stack (CPU)
+
+```bash
+docker compose --profile cpu up -d
+docker compose ps
+```
+
+If you want only one module, you can start it explicitly:
+
+```bash
+# NeuronDB only
+docker compose --profile cpu up -d neurondb
+
+# NeuronAgent only (will also start NeuronDB if needed)
+docker compose --profile cpu up -d neuronagent
+
+# NeuronMCP only (will also start NeuronDB if needed)
+docker compose --profile cpu up -d neuronmcp
+
+# NeuronDesktop (API + UI) (will also start dependencies)
+docker compose --profile cpu up -d neurondesk-api neurondesk-frontend
+```
+
+### 2) Verify everything is healthy
+
+```bash
+docker compose ps
+docker compose logs -f --tail=200 neurondb neuronagent neuronmcp neurondesk-api neurondesk-frontend
+```
+
+Smoke checks:
+
+```bash
+# NeuronDB extension responds
+docker compose exec neurondb psql -U neurondb -d neurondb -c "SELECT neurondb.version();"
+
+# NeuronAgent health
+curl -fsS http://localhost:8080/health
+
+# NeuronDesktop API health
+curl -fsS http://localhost:8081/health
+```
+
+### 3) Connect to NeuronDB from your host (PostgreSQL)
+
+CPU profile maps NeuronDB to host port **5433** by default (configurable via
+`POSTGRES_PORT` in `.env`).
+
+```bash
+psql "postgresql://neurondb:$(grep -E '^POSTGRES_PASSWORD=' .env | cut -d= -f2)@localhost:5433/neurondb"
+```
+
+If you’re unsure what port is mapped, ask Docker:
+
+```bash
+docker compose port neurondb 5432
+```
+
+### 4) Start a GPU-backed NeuronDB (plus Agent + MCP)
+
+The GPU profiles in the repo-root compose file start **NeuronDB + NeuronAgent +
+NeuronMCP**. NeuronDesktop is currently wired to the CPU profile in
+`docker-compose.yml`, so GPU profiles do not start NeuronDesktop.
+
+```bash
+# CUDA (NVIDIA)
+docker compose --profile cuda up -d
+
+# ROCm (AMD)
+docker compose --profile rocm up -d
+
+# Metal (Apple Silicon)
+docker compose --profile metal up -d
+```
+
+GPU profiles map PostgreSQL to different host ports by default:
+
+- CPU: `POSTGRES_PORT=5433`
+- CUDA: `POSTGRES_CUDA_PORT=5434`
+- ROCm: `POSTGRES_ROCM_PORT=5435`
+- Metal: `POSTGRES_METAL_PORT=5436`
+
+### 5) Stop / reset
+
+```bash
+# Stop containers (keep volumes)
+docker compose down
+
+# Stop containers and delete volumes (destructive)
+docker compose down -v
+```
 
 ## System Requirements & Dependencies
 
@@ -156,6 +269,10 @@ docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi
 docker compose --profile cuda up -d
 ```
 
+This starts the GPU-backed NeuronDB stack (NeuronDB + NeuronAgent + NeuronMCP).
+For the full ecosystem including NeuronDesktop, use the CPU profile as described
+above.
+
 </details>
 
 <details>
@@ -180,6 +297,10 @@ ls -la /dev/kfd /dev/dri
 docker compose --profile rocm up -d
 ```
 
+This starts the GPU-backed NeuronDB stack (NeuronDB + NeuronAgent + NeuronMCP).
+For the full ecosystem including NeuronDesktop, use the CPU profile as described
+above.
+
 </details>
 
 <details>
@@ -194,6 +315,10 @@ docker compose --profile rocm up -d
 ```bash
 docker compose --profile metal up -d
 ```
+
+This starts the GPU-backed NeuronDB stack (NeuronDB + NeuronAgent + NeuronMCP).
+For the full ecosystem including NeuronDesktop, use the CPU profile as described
+above.
 
 **Note:** Metal support is built into macOS, no additional drivers needed.
 
