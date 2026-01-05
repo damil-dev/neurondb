@@ -17,7 +17,12 @@
       <img alt="Security scan" src="https://github.com/neurondb/neurondb/actions/workflows/security-scan.yml/badge.svg?branch=main" />
     </a>
     <a href="https://github.com/neurondb/neurondb/actions/workflows/publish-all-container-images.yml">
-      <img alt="Containers" src="https://github.com/neurondb/neurondb/actions/workflows/publish-all-container-images.yml/badge.svg?branch=main" />
+      <img alt="Docker Images" src="https://github.com/neurondb/neurondb/actions/workflows/publish-all-container-images.yml/badge.svg?branch=main" />
+    </a>
+  </p>
+  <p>
+    <a href="#gpu-profiles-cuda--rocm--metal">
+      <img alt="GPU Backends" src="https://img.shields.io/badge/GPU-CUDA%20%7C%20ROCm%20%7C%20Metal-green.svg" />
     </a>
     <a href="LICENSE">
       <img alt="License: Proprietary" src="https://img.shields.io/badge/license-proprietary-red.svg" />
@@ -37,7 +42,10 @@
 
 - [What you can build](#what-you-can-build)
 - [Architecture](#architecture)
-- [Quick start (Docker)](#quick-start-docker)
+- [Installation](#installation)
+  - [Quick start (Docker)](#quick-start-docker)
+  - [Native install](#native-install)
+  - [Minimal mode (extension only)](#minimal-mode-extension-only)
 - [Service URLs & ports](#service-urls--ports)
 - [Documentation](#documentation)
 - [Repo layout](#repo-layout)
@@ -69,7 +77,9 @@ flowchart LR
 > [!NOTE]
 > The root `docker-compose.yml` starts the ecosystem services together. You can also run each component independently (see component READMEs).
 
-## Quick start (Docker)
+## Installation
+
+### Quick start (Docker)
 
 ```bash
 docker compose up -d
@@ -88,6 +98,100 @@ docker compose up -d
 
 > [!IMPORTANT]
 > Prefer a step-by-step guide? See [`QUICKSTART.md`](QUICKSTART.md).
+
+### Native install
+
+Install the NeuronDB extension directly into your existing PostgreSQL installation.
+
+<details>
+<summary><strong>Build and install steps</strong></summary>
+
+**Prerequisites:**
+- PostgreSQL 16, 17, or 18 development headers
+- C compiler (gcc or clang)
+- Make
+
+**Build:**
+```bash
+cd NeuronDB
+make
+sudo make install
+```
+
+**Enable extension:**
+```sql
+CREATE EXTENSION neurondb;
+```
+
+**Configure (if needed):**
+
+Some features require preloading. Add to `postgresql.conf`:
+```ini
+shared_preload_libraries = 'neurondb'
+```
+
+Then restart PostgreSQL:
+```bash
+sudo systemctl restart postgresql
+```
+
+**Configuration parameters (GUCs):**
+```ini
+# Vector index settings
+neurondb.hnsw_ef_search = 40          # HNSW search quality
+neurondb.enable_seqscan = on          # Allow sequential scans
+
+# Memory settings
+neurondb.maintenance_work_mem = 256MB # Index build memory
+```
+
+**Upgrade path:**
+```sql
+-- Check current version
+SELECT extversion FROM pg_extension WHERE extname = 'neurondb';
+
+-- Upgrade to latest
+ALTER EXTENSION neurondb UPDATE;
+```
+
+</details>
+
+For detailed installation instructions, see [`NeuronDB/INSTALL.md`](NeuronDB/INSTALL.md).
+
+### Minimal mode (extension only)
+
+Use NeuronDB as a PostgreSQL extension only, without the Agent, MCP, or Desktop services.
+
+**Benefits:**
+- ✅ No extra services or ports
+- ✅ Minimal resource footprint
+- ✅ Full vector search, ML algorithms, and embeddings
+- ✅ Works with any PostgreSQL client
+
+**Installation:**
+
+Follow the [Native install](#native-install) steps above. That's it! You now have vector search and ML capabilities in PostgreSQL.
+
+**Usage:**
+```sql
+-- Create a table with vectors
+CREATE TABLE documents (
+  id SERIAL PRIMARY KEY,
+  content TEXT,
+  embedding VECTOR(1536)
+);
+
+-- Create HNSW index
+CREATE INDEX ON documents USING hnsw (embedding vector_cosine_ops);
+
+-- Vector similarity search
+SELECT id, content
+FROM documents
+ORDER BY embedding <=> '[0.1, 0.2, ...]'::vector
+LIMIT 10;
+```
+
+No additional services, ports, or configuration required!
 
 ## Service URLs & ports
 
