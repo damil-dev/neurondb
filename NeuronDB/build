@@ -762,7 +762,6 @@ build_neurondb() {
     local make_args="PG_CONFIG=$pgc"
     [[ -n "${CUDA_PATH:-}" ]] && make_args="$make_args CUDA_PATH=$CUDA_PATH"
     [[ -n "${ROCM_PATH:-}" ]] && make_args="$make_args ROCM_PATH=$ROCM_PATH"
-    make_args="$make_args GPU_MODE=$GPU_MODE"
     
     log_info "Compiling NeurondB..."
     
