@@ -2,6 +2,68 @@
 
 This directory contains custom SQL benchmark files for testing NeuronDB performance using `pgbench`.
 
+# NeuronDB Benchmark Results
+
+**Last Updated:** 2026-01-06 16:17:17 UTC
+
+## Overview
+
+This report consolidates benchmark results from Vector Search, Hybrid Search, and RAG Pipeline benchmarks.
+
+## Vector Search Benchmarks
+
+**Status:** completed
+
+### Performance Metrics
+
+| Metric | Value |
+|--------|-------|
+| Dataset | sift-128-euclidean |
+| Index Type | hnsw |
+| Recall@10 | 1.000 |
+| Recall@100 | 0.000 |
+| QPS | 1.90 |
+| Avg Latency | 525.62 ms |
+| p50 Latency | 524.68 ms |
+| p95 Latency | 546.62 ms |
+| p99 Latency | 555.52 ms |
+
+## Hybrid Search Benchmarks
+
+**Status:** not_run
+
+No results available. Run the hybrid benchmark to generate results.
+
+## RAG Pipeline Benchmarks
+
+**Status:** completed
+
+### Configuration
+
+| Setting | Value |
+|---------|-------|
+| Model | unknown |
+| Timestamp | 20260104_143411 |
+
+See `rag/results/` for detailed RAG benchmark results.
+
+## Running Benchmarks
+
+To regenerate these results, run:
+
+```bash
+cd NeuronDB/benchmark
+./run_bm.sh
+```
+
+## Detailed Reports
+
+For more detailed reports, see:
+- Vector: `vector/results/`
+- Hybrid: `hybrid/benchmark_summary.txt`
+- RAG: `rag/results/`
+
+
 ## Available Benchmarks
 
 ### `vector.sql`
