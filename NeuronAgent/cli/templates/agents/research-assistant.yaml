@@ -52,3 +52,4 @@ workflow:
         query: "INSERT INTO research_results (topic, summary) VALUES ('{{input.topic}}', '{{analyze_results.output}}')"
 
 
+
