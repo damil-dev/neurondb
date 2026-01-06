@@ -5,7 +5,7 @@ A developer-friendly Python interface for NeuronDB PostgreSQL extension.
 Provides high-level APIs for vector search, ML model training, and RAG pipelines.
 """
 
-__version__ = "1.0.0"
+__version__ = "2.0.0"
 
 from neurondb.client import Client
 from neurondb.models import Model
