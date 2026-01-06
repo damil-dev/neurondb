@@ -26,6 +26,18 @@ func NewEnhancedModelHandlers(queries *db.Queries) *EnhancedModelHandlers {
 	return &EnhancedModelHandlers{queries: queries}
 }
 
+/* Model represents a model in the database */
+type Model struct {
+	ID        string                 `json:"id"`
+	Name      string                 `json:"name"`
+	Provider  string                 `json:"provider"`
+	ModelType string                 `json:"model_type"`
+	APIKeySet bool                   `json:"api_key_set"`
+	Config    map[string]interface{} `json:"config,omitempty"`
+	CreatedAt time.Time              `json:"created_at"`
+	UpdatedAt time.Time              `json:"updated_at"`
+}
+
 /* ModelRequest represents a model creation/update request with validation */
 type ModelRequest struct {
 	Name        string                 `json:"name"`
@@ -161,10 +173,10 @@ func (h *EnhancedModelHandlers) ListModelsEnhanced(w http.ResponseWriter, r *htt
 
 	// Get user context for audit logging
 	userID, _ := auth.GetUserIDFromContext(r.Context())
-	requestID := r.Context().Value("request_id").(string)
+	_ = r.Context().Value("request_id") // requestID for future use
 
 	// Validate profile access
-	profile, err := h.queries.GetProfile(r.Context(), profileID)
+	_, err := h.queries.GetProfile(r.Context(), profileID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			WriteError(w, r, http.StatusNotFound, fmt.Errorf("profile not found"), map[string]interface{}{
@@ -253,7 +265,7 @@ func (h *EnhancedModelHandlers) ListModelsEnhanced(w http.ResponseWriter, r *htt
 
 	if modelType != "" {
 		countQuery += fmt.Sprintf(" AND model_type = $%d", countArgIndex)
-		countArgs = append(countType, modelType)
+		countArgs = append(countArgs, modelType)
 		countArgIndex++
 	}
 
@@ -332,10 +344,10 @@ func (h *EnhancedModelHandlers) AddModelEnhanced(w http.ResponseWriter, r *http.
 
 	// Get user context
 	userID, _ := auth.GetUserIDFromContext(r.Context())
-	requestID := r.Context().Value("request_id").(string)
+	_ = r.Context().Value("request_id") // requestID for future use
 
 	// Validate profile access
-	profile, err := h.queries.GetProfile(r.Context(), profileID)
+	_, err := h.queries.GetProfile(r.Context(), profileID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			WriteError(w, r, http.StatusNotFound, fmt.Errorf("profile not found"), nil)
