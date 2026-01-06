@@ -248,7 +248,17 @@ export const neurondbAPI = {
     api.post(`/profiles/${profileId}/neurondb/sql`, { query }),
   executeSQLFull: (profileId: string, query: string) =>
     api.post(`/profiles/${profileId}/neurondb/sql/execute`, { query }),
-  ingestDataset: (profileId: string, data: { source: string; source_type: string; collection?: string; format?: string }) =>
+  ingestDataset: (profileId: string, data: { 
+    source_type: string; 
+    source_path?: string; 
+    source?: string;
+    collection?: string; 
+    format?: string;
+    table_name?: string;
+    auto_embed?: boolean;
+    embedding_model?: string;
+    create_index?: boolean;
+  }) =>
     api.post(`/profiles/${profileId}/neurondb/datasets/ingest`, data),
 }
 
