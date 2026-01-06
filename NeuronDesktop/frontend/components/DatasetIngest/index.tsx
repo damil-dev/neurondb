@@ -105,7 +105,8 @@ export default function DatasetIngest({
       clearInterval(progressInterval)
       setProgress(100)
 
-      showSuccessToast(`Dataset ingestion started: ${response.job_id}`)
+      const jobId = response.data?.job_id || response.data?.id || 'unknown'
+      showSuccessToast(`Dataset ingestion started: ${jobId}`)
       
       setTimeout(() => {
         setLoading(false)
