@@ -780,6 +780,28 @@ build_neurondb() {
     fi
     
     verify_build_output
+    
+    # Ensure SQL file is generated after build (needed for installation)
+    if [[ ! -f neurondb--1.0.sql ]] && [[ ! -f neurondb--1.0.sql.linux ]] && [[ ! -f neurondb--1.0.sql.macos ]]; then
+        log_info "Generating SQL file after build..."
+        if [[ -f neurondb--1.0.sql.in ]]; then
+            # Generate platform-specific SQL file
+            if [[ "$UNAME_S" == "Darwin" ]]; then
+                make neurondb--1.0.sql.macos || log_warn "Could not generate macOS SQL file"
+                [[ -f neurondb--1.0.sql.macos ]] && cp neurondb--1.0.sql.macos neurondb--1.0.sql
+            else
+                make neurondb--1.0.sql.linux || log_warn "Could not generate Linux SQL file"
+                [[ -f neurondb--1.0.sql.linux ]] && cp neurondb--1.0.sql.linux neurondb--1.0.sql
+            fi
+        else
+            log_warn "Template file neurondb--1.0.sql.in not found, SQL file may not be generated"
+        fi
+    elif [[ -f neurondb--1.0.sql.linux ]] && [[ ! -f neurondb--1.0.sql ]]; then
+        cp neurondb--1.0.sql.linux neurondb--1.0.sql
+    elif [[ -f neurondb--1.0.sql.macos ]] && [[ ! -f neurondb--1.0.sql ]]; then
+        cp neurondb--1.0.sql.macos neurondb--1.0.sql
+    fi
+    
     log_success "NeurondB built successfully"
 }
 
