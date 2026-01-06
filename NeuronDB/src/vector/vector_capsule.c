@@ -299,3 +299,4 @@ vector_capsule_validate_integrity(PG_FUNCTION_ARGS)
 }
 
 
+
