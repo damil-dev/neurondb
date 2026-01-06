@@ -89,6 +89,7 @@ CREATE TABLE rag_queries (
 CREATE INDEX idx_chunks_doc_id ON document_chunks(doc_id);
 CREATE INDEX idx_chunks_embedding ON document_chunks USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
 CREATE INDEX idx_queries_created_at ON rag_queries(created_at);
+
 ```
 
 The schema includes four tables. The documents table stores source documents. The document_chunks table stores text chunks with embeddings. The rag_queries table tracks queries and responses. Indexes enable fast retrieval.
@@ -127,6 +128,7 @@ FROM documents;
       2 | Vector Search Fundamentals                 |           312
       3 | Machine Learning in Databases              |           287
 (3 rows)
+
 ```
 
 The verification query shows three documents inserted. Each document has a unique ID, title, and content. Documents are ready for chunking.
@@ -167,6 +169,7 @@ ORDER BY doc_id;
       2 |           5 |         38
       3 |           4 |         42
 (3 rows)
+
 ```
 
 The verification query shows chunks created for each document. Document 1 has 8 chunks. Document 2 has 5 chunks. Document 3 has 4 chunks. Average chunk size is 40 tokens.
@@ -196,6 +199,7 @@ LIMIT 1;
 --------------+------------------------+---------------
            17 |                     17 |           384
 (1 row)
+
 ```
 
 The verification query confirms all 17 chunks have embeddings. Each embedding has 384 dimensions. Embeddings enable similarity search.
@@ -217,6 +221,7 @@ RETURNING query_id;
 ----------
         1
 (1 row)
+
 ```
 
 The query is stored with ID 1. The system will process this query through the RAG pipeline.
@@ -261,6 +266,7 @@ FROM relevant_chunks;
         4 | Vector Search Fundamentals                 | Vector search finds similar items using...      |     0.7123 |    4
         5 | Machine Learning in Databases              | In-database machine learning enables...        |     0.6987 |    5
 (5 rows)
+
 ```
 
 The retrieval query found 5 relevant chunks. The top 3 chunks are from the PostgreSQL Performance Optimization document. Similarity scores range from 0.82 to 0.69. These chunks will form the context.
@@ -310,6 +316,7 @@ FROM context_build;
 
 [Document 2] B-tree indexes work well for most queries...
 (1 row)
+
 ```
 
 The context contains 5 chunks with total length 1245 characters. Chunk IDs are stored in an array. The context is formatted with rank information.
@@ -357,6 +364,7 @@ RETURNING query_id, array_length(retrieved_chunk_ids, 1) AS num_chunks, length(c
 ----------+------------+-------------
         1 |          5 |        1245
 (1 row)
+
 ```
 
 The query record is updated with 5 retrieved chunks and 1245 characters of context. The context is ready for language model processing.
@@ -467,6 +475,7 @@ LIMIT 5;
         4 | Vector search finds similar items using...    |        0.7123 |       0.6543 |    4 |          4
         5 | In-database machine learning enables...       |        0.6987 |       0.6234 |    5 |          5
 (5 rows)
+
 ```
 
 Reranking reorders results by relevance score. Chunk 2 moves from rank 2 to rank 1 after reranking. Rerank scores are higher than initial similarity scores. Final ranking improves precision.
@@ -526,6 +535,7 @@ LIMIT 5;
         4 | Materialized views cache query results...     |     0.7987 |             2
         5 | Vector search finds similar items using...    |     0.7654 |             1
 (5 rows)
+
 ```
 
 Multi-step retrieval finds more relevant chunks. Chunk 1 matches all 4 expanded queries. Query matches indicate broad relevance. Results have higher similarity scores.
@@ -594,6 +604,7 @@ LIMIT 5;
         4 | Materialized views cache query results...     |    0.7432 |     0.6543 |     0.009876
         5 | Vector search finds similar items using...    |    0.7210 |     0.6123 |     0.009567
 (5 rows)
+
 ```
 
 Hybrid search combines vector and keyword results. Chunk 2 has high keyword score but lower vector score. RRF combines both scores. Final ranking balances semantic and exact matches.
@@ -665,6 +676,7 @@ FROM retrieved;
           1 | Password Recovery Guide | To reset your password, go to the login page... |     0.9234 |    1
           2 | Account Access Reset    | If you have forgotten your password, use the... |     0.8876 |    2
 (2 rows)
+
 ```
 
 The system retrieves 2 relevant articles. Article 1 has similarity 0.92. Article 2 has similarity 0.88. Both articles are about password reset.
@@ -732,6 +744,7 @@ FROM retrieved;
        1 | HNSW Index Configuration | HNSW indexes require two parameters: m and ef_construction. Parameter m controls the number of connections per layer. Higher m values improve recall but increase index size. Recommended m is 16 for most use cases. Parameter ef_construction controls index quality during construction. Higher ef_construction improves recall but slows index creation. Recommended ef_construction is 64. |     0.9456 |    1
        2 | Vector Index Tuning     | Vector index performance depends on parameter selection. HNSW m parameter affects query speed and index size. IVFFlat lists parameter affects memory usage. Tune parameters based on data size and query patterns. |     0.8765 |    2
 (2 rows)
+
 ```
 
 The system retrieves 2 relevant pages. Page 1 has similarity 0.94. Page 2 has similarity 0.87. Both pages are about index configuration.
@@ -803,6 +816,7 @@ FROM retrieved;
          1 | Software License Agreement   | The licensor grants the licensee intellectual... |     0.9123 |    1
          2 | IP Assignment Contract       | All intellectual property rights, including...   |     0.8876 |    2
 (2 rows)
+
 ```
 
 The system retrieves 2 relevant clauses. Clause 1 has similarity 0.91. Clause 2 has similarity 0.88. Both clauses are about IP licensing.
@@ -838,6 +852,7 @@ LIMIT 5;
  Planning Time: 0.123 ms
  Execution Time: 2.456 ms
 (4 rows)
+
 ```
 
 The index scan completes in 2.456 milliseconds. The HNSW index enables fast similarity search. Query performance meets production requirements.
@@ -859,6 +874,7 @@ FROM neurondb.embedding_cache_stats;
 ------------+--------------+----------------
        1245 |          234 |         0.8418
 (1 row)
+
 ```
 
 The cache has 84% hit rate. Cache hits avoid 1,245 embedding generations. Cache improves query performance.
@@ -888,6 +904,7 @@ SET embedding = be.embeddings[array_position((SELECT texts FROM batch_texts), dc
 FROM batch_texts bt, batch_embeddings be
 WHERE dc.chunk_text = ANY(bt.texts)
 AND dc.embedding IS NULL;
+
 ```
 
 Batch processing generates 100 embeddings in one operation. Batch processing is 5x faster than individual embeddings. Memory usage is optimized.
@@ -915,6 +932,7 @@ CROSS JOIN query_embedding qe
 WHERE d.metadata->>'category' = 'database'
 ORDER BY dc.embedding <=> qe.embedding
 LIMIT 5;
+
 ```
 
 The query filters by category before similarity search. Filtering reduces search space. Query performance improves.
@@ -936,6 +954,7 @@ SELECT
 FROM document_chunks
 ORDER BY embedding <=> embed_text('query text', 'sentence-transformers/all-MiniLM-L6-v2')
 LIMIT 10;
+
 ```
 
 Vector search finds relevant chunks. Similarity scores rank results. Top K chunks are selected.
@@ -952,6 +971,7 @@ SET embedding = embed_text(
     'sentence-transformers/all-MiniLM-L6-v2'
 )
 WHERE embedding IS NULL;
+
 ```
 
 Embeddings are generated for all chunks. Model is loaded once. Cache improves subsequent queries.
@@ -965,6 +985,7 @@ NeuronDB supports HNSW and IVFFlat indexes. HNSW indexes provide sub-10ms querie
 CREATE INDEX idx_chunks_embedding ON document_chunks 
 USING hnsw (embedding vector_cosine_ops) 
 WITH (m = 16, ef_construction = 64);
+
 ```
 
 HNSW index enables fast similarity search. Query performance meets production requirements.
@@ -986,6 +1007,7 @@ SELECT
 FROM document_chunks
 ORDER BY rerank_score DESC
 LIMIT 5;
+
 ```
 
 Reranking improves result precision. Cross-encoder models provide accurate relevance scores.
@@ -1020,6 +1042,7 @@ FROM (
 ) combined
 ORDER BY rrf_score DESC
 LIMIT 5;
+
 ```
 
 Hybrid search combines semantic and exact matches. RRF scores balance both methods. Results improve.

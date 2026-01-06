@@ -10,7 +10,7 @@ neurondb:
   enabled: true
   image:
     repository: ghcr.io/neurondb/neurondb-postgres
-    tag: "1.0.0-pg17-cpu"
+    tag: "2.0.0-pg17-cpu"
     pullPolicy: IfNotPresent
   
   postgresql:
@@ -42,7 +42,7 @@ neuronagent:
   enabled: true
   image:
     repository: ghcr.io/neurondb/neuronagent
-    tag: "1.0.0"
+    tag: "2.0.0"
     pullPolicy: IfNotPresent
   
   replicas: 2
@@ -70,7 +70,7 @@ neuronmcp:
   enabled: true
   image:
     repository: ghcr.io/neurondb/neuronmcp
-    tag: "1.0.0"
+    tag: "2.0.0"
     pullPolicy: IfNotPresent
   
   replicas: 1
@@ -89,7 +89,7 @@ neurondesktop:
   api:
     image:
       repository: ghcr.io/neurondb/neurondesktop-api
-      tag: "1.0.0"
+      tag: "2.0.0"
       pullPolicy: IfNotPresent
     
     replicas: 2
@@ -109,7 +109,7 @@ neurondesktop:
   frontend:
     image:
       repository: ghcr.io/neurondb/neurondesktop-frontend
-      tag: "1.0.0"
+      tag: "2.0.0"
       pullPolicy: IfNotPresent
     
     replicas: 2

@@ -46,6 +46,7 @@ CREATE TABLE documents (
 
 CREATE INDEX idx_documents_embedding ON documents 
 USING hnsw (embedding vector_cosine_ops);
+
 ```
 
 The embedding column uses vector type with 384 dimensions. The HNSW index accelerates similarity search. Relational columns store metadata. Queries combine vector similarity with relational filters.
@@ -71,6 +72,7 @@ INSERT INTO documents (title, content, embedding) VALUES
 
 -- Results:
 -- INSERT 0 3
+
 ```
 
 **Example 2: Generating embeddings automatically**
@@ -90,6 +92,7 @@ INSERT INTO documents (title, content, embedding) VALUES
 
 -- Results:
 -- INSERT 0 3
+
 ```
 
 **Example 3: Batch insertion with COPY**
@@ -108,6 +111,7 @@ WITH (FORMAT csv, HEADER true);
 
 -- Results:
 -- COPY 1000
+
 ```
 
 **Example 4: Inserting with metadata**
@@ -126,6 +130,7 @@ INSERT INTO documents (title, content, embedding, metadata) VALUES
 
 -- Results:
 -- INSERT 0 2
+
 ```
 
 **Example 5: Updating existing vectors**
@@ -138,6 +143,7 @@ WHERE id = 1;
 
 -- Results:
 -- UPDATE 1
+
 ```
 
 Array-based insertion provides direct control. Automatic embedding generation eliminates external services. Batch insertion loads data efficiently. Metadata storage stores document attributes. Vector updates support content changes.
@@ -162,6 +168,7 @@ WITH (lists = 100);
 -- DiskANN index for billion-scale storage
 CREATE INDEX idx_diskann_embedding ON documents 
 USING diskann (embedding vector_cosine_ops);
+
 ```
 
 HNSW indexes provide 5-8ms latency on 100 million vectors. IVFFlat indexes build faster. They suit frequent updates. DiskANN indexes store billions of vectors on disk. Query latency is 30-50ms. Choose indexes based on dataset size, update frequency, and latency requirements.
@@ -191,6 +198,7 @@ WHERE d.created_at > '2024-01-01'
   AND d.metadata->>'category' = 'technical'
 ORDER BY d.embedding <=> q.vec
 LIMIT 10;
+
 ```
 
 The query combines vector similarity with relational filters. The WHERE clause filters by date and category. The ORDER BY clause ranks by cosine distance. Standalone vector databases do not support relational constraints.
@@ -333,6 +341,7 @@ LIMIT 10;
 -- Planning Time: 0.123 ms
 -- Execution Time: 5.234 ms
 -- Index Scan using idx_hnsw_embedding: 5.234 ms
+
 ```
 
 PostgreSQL achieves 5.2ms average query latency with HNSW indexing on 10 million vectors. Performance scales linearly up to 100 million vectors. DiskANN indexes maintain acceptable latency beyond that.
@@ -368,6 +377,7 @@ WITH (
     max_degree = 64,     -- Maximum graph degree
     search_list_size = 100 -- Search list size
 );
+
 ```
 
 Select index parameters based on workload. Production applications use HNSW with m=16 and ef_construction=64. Frequently updated datasets use IVFFlat with lists=100. Billion-scale datasets use DiskANN to maintain acceptable latency while storing data on disk.
@@ -394,6 +404,7 @@ WHERE d.metadata->>'category' = 'database'
   AND d.embedding <=> q.vec < 0.3
 ORDER BY d.embedding <=> q.vec
 LIMIT 20;
+
 ```
 
 The query combines vector similarity with multiple relational filters. The WHERE clause filters by category, date, and distance threshold. ORDER BY ranks by similarity. Standalone vector databases do not support relational filtering.
@@ -414,6 +425,7 @@ FROM documents d, query q
 WHERE d.embedding <=> q.vec < 0.5
 GROUP BY d.metadata->>'category'
 ORDER BY avg_distance;
+
 ```
 
 The aggregation query computes statistics over results. It groups by category and calculates average, minimum, and maximum distances. PostgreSQL combines vector similarity with SQL aggregation functions.
@@ -449,6 +461,7 @@ LIMIT 10;
 --  2 | Machine Learning Basics    |     0.234567
 --  8 | Neural Network Architecture|     0.345678
 -- (10 rows)
+
 ```
 
 **Example 2: Vector similarity with JOIN operations**
@@ -479,6 +492,7 @@ LIMIT 20;
 -- 12 | Query Optimization   |  0.12345 | John Smith  | john@example.com      | Database
 -- 15 | Index Strategies     |  0.23456 | Jane Doe     | jane@example.com      | Performance
 -- (20 rows)
+
 ```
 
 **Example 3: Time-based vector search**
@@ -506,6 +520,7 @@ LIMIT 15;
 -- 23 | AI Trends 2024          | 2024-12-15 10:30:00  |  0.12345 |     2.5
 -- 18 | Machine Learning Guide  | 2024-12-10 14:20:00  |  0.23456 |     7.3
 -- (15 rows)
+
 ```
 
 **Example 4: Vector similarity with window functions**
@@ -533,6 +548,7 @@ LIMIT 30;
 -- 52 | Statistics Basics    | tutorial |  0.23456 |                2
 -- 67 | ML Fundamentals      | research |  0.34567 |                1
 -- (30 rows)
+
 ```
 
 **Example 5: Vector similarity with subqueries**
@@ -558,6 +574,7 @@ LIMIT 10;
 -- 12 | Related Topic A        |             0.12345 |          0.87655
 -- 18 | Related Topic B        |             0.23456 |          0.76544
 -- (10 rows)
+
 ```
 
 **Example 6: Vector operations in CTEs**
@@ -601,6 +618,7 @@ ORDER BY r.rank;
 -- 25 | Vector Search Tutorial   |  0.12345 |    1 | tutorial
 -- 30 | PostgreSQL Guide         |  0.23456 |    2 | guide
 -- (10 rows)
+
 ```
 
 Multi-vector search finds documents similar to multiple concepts simultaneously. JOIN operations combine vector similarity with relational data from multiple tables. Time-based filtering finds recent similar content. Window functions rank within categories. Subqueries find documents similar to specific references. CTEs support complex multi-step query logic. Standalone vector databases do not support this.
@@ -639,6 +657,7 @@ SELECT
     MIN(migrated_at) AS first_migration,
     MAX(migrated_at) AS last_migration
 FROM migrated_documents;
+
 ```
 
 Verify migration by counting documents, verifying vector dimensions, and checking timestamps. Migration enables gradual transition while maintaining data consistency.
@@ -675,6 +694,7 @@ USING hnsw (embedding vector_cosine_ops);
 CREATE INDEX idx_documents_q2_embedding ON documents_2024_q2 
 USING hnsw (embedding vector_cosine_ops);
 -- ... additional partition indexes
+
 ```
 
 Partitioning limits searches to relevant partitions. This reduces index size per partition and improves query performance. Queries automatically prune irrelevant partitions. Each partition can have independent indexes optimized for its data characteristics.
@@ -702,6 +722,7 @@ LIMIT 10;  -- Limit result set
 -- Reset settings
 RESET enable_seqscan;
 RESET work_mem;
+
 ```
 
 Query optimization techniques include forcing index usage, increasing work memory for sorting, applying early distance filtering, and limiting result sets. These optimizations improve query performance by 2-5x.
@@ -736,6 +757,7 @@ FROM pg_stat_statements
 WHERE query LIKE '%<=>%'
 ORDER BY mean_exec_time DESC
 LIMIT 10;
+
 ```
 
 Production monitoring enables identification of performance bottlenecks, index usage patterns, and optimization opportunities. Index usage statistics reveal which indexes provide value and which may be unnecessary. Query performance statistics identify slow queries requiring optimization. Regular monitoring ensures PostgreSQL vector database maintains acceptable performance as datasets grow and query patterns evolve.
@@ -763,6 +785,7 @@ WHERE d.metadata->>'type' = 'technical'
   AND d.embedding <=> s.query_vec < 0.5
 ORDER BY d.embedding <=> s.query_vec
 LIMIT 10;
+
 ```
 
 The semantic search query finds technical documents similar to the search query by computing cosine distance. Results rank by similarity score. Lower scores indicate higher relevance. The query combines vector similarity with relational filters.
@@ -785,6 +808,7 @@ WHERE p.category = 'electronics'
   AND p.stock_quantity > 0
 ORDER BY p.embedding <=> u.embedding
 LIMIT 20;
+
 ```
 
 The recommendation query finds products similar to a user profile by comparing embeddings. Results combine vector similarity with inventory availability and category filters.
@@ -812,6 +836,7 @@ WHERE d.content @@ to_tsquery('english', 'machine | learning | algorithm')
   AND d.embedding <=> q.vec < 0.6
 ORDER BY combined_score
 LIMIT 20;
+
 ```
 
 The hybrid search query combines vector similarity with full-text search. It uses 70% weight for vector similarity and 30% weight for full-text search. This combines semantic meaning and keyword matching.
@@ -835,6 +860,7 @@ SELECT
 FROM documents d, queries q
 ORDER BY avg_distance
 LIMIT 10;
+
 ```
 
 The multi-vector search computes average distance to multiple query vectors. It finds documents similar to all queries simultaneously.

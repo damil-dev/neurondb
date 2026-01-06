@@ -37,7 +37,7 @@ func NewIngestDocumentsTool(db *database.Database, logger *logging.Logger) *Inge
 		BaseTool: NewBaseToolWithVersion(
 			"ingest_documents",
 			"Composite tool: Ingest documents into a collection with automatic chunking and embedding",
-			"1.0.0",
+			"2.0.0",
 			map[string]interface{}{
 				"type": "object",
 				"properties": map[string]interface{}{
@@ -196,7 +196,7 @@ func NewAnswerWithCitationsTool(db *database.Database, logger *logging.Logger) *
 		BaseTool: NewBaseToolWithVersion(
 			"answer_with_citations",
 			"Composite tool: Answer a question using RAG with source citations",
-			"1.0.0",
+			"2.0.0",
 			map[string]interface{}{
 				"type": "object",
 				"properties": map[string]interface{}{
