@@ -134,3 +134,4 @@ func ValidateVectorNormalized(vector []interface{}, fieldName string, tolerance 
 }
 
 
+
