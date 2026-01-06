@@ -56,7 +56,7 @@ packaging/
 
 ```bash
 cd packaging/deb/neurondb
-VERSION=1.0.0 ./build.sh
+VERSION=2.0.0 ./build.sh
 
 # Output: neurondb_1.0.0_amd64.deb
 ```
@@ -65,7 +65,7 @@ VERSION=1.0.0 ./build.sh
 
 ```bash
 cd packaging/deb/neuronagent
-VERSION=1.0.0 ./build.sh
+VERSION=2.0.0 ./build.sh
 
 # Output: neuronagent_1.0.0_amd64.deb
 ```
@@ -74,7 +74,7 @@ VERSION=1.0.0 ./build.sh
 
 ```bash
 cd packaging/deb/neuronmcp
-VERSION=1.0.0 ./build.sh
+VERSION=2.0.0 ./build.sh
 
 # Output: neuronmcp_1.0.0_amd64.deb
 ```
@@ -83,7 +83,7 @@ VERSION=1.0.0 ./build.sh
 
 Each `build.sh` script should:
 
-1. Accept `VERSION` environment variable (defaults to `1.0.0.beta` if not set)
+1. Accept `VERSION` environment variable (defaults to `2.0.0.beta` if not set)
 2. Build the component from source (or use pre-built binaries)
 3. Create package metadata (control files, spec files)
 4. Generate the package file (`.deb` or `.rpm`)

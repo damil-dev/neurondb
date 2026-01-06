@@ -117,6 +117,7 @@ Initialization request:
     }
   }
 }
+
 ```
 
 Initialization response:
@@ -142,6 +143,7 @@ Initialization response:
     }
   }
 }
+
 ```
 
 ### Tool Discovery
@@ -156,6 +158,7 @@ Tool list request:
   "id": 2,
   "method": "tools/list"
 }
+
 ```
 
 Tool list response:
@@ -193,6 +196,7 @@ Tool list response:
     ]
   }
 }
+
 ```
 
 ### Tool Execution
@@ -215,6 +219,7 @@ Tool call request:
     }
   }
 }
+
 ```
 
 Tool call response:
@@ -240,6 +245,7 @@ Tool call response:
     "isError": false
   }
 }
+
 ```
 
 ### Resource Access
@@ -257,6 +263,7 @@ Resource read request:
     "uri": "neurondb://table/documents"
   }
 }
+
 ```
 
 Resource read response:
@@ -275,6 +282,7 @@ Resource read response:
     ]
   }
 }
+
 ```
 
 ### Error Handling
@@ -296,6 +304,7 @@ Error response:
     }
   }
 }
+
 ```
 
 ## How MCP Works with Claude Desktop
@@ -330,6 +339,7 @@ Configuration example for NeuronMCP:
     }
   }
 }
+
 ```
 
 Multiple servers can be configured in the same file. Each server entry has a unique name. The name appears in Claude Desktop's interface when tools are used. Server names should be descriptive and avoid conflicts with other configured servers.
@@ -363,6 +373,7 @@ Configuration example with multiple servers:
     }
   }
 }
+
 ```
 
 After saving the configuration file, restart Claude Desktop. Claude Desktop reads the configuration file on startup. If the configuration is invalid, Claude Desktop logs an error and skips the problematic server entries. Valid servers are started automatically. Server processes run in the background and remain active throughout the Claude Desktop session.
