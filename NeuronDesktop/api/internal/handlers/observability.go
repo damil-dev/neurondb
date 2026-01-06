@@ -88,25 +88,32 @@ func (h *ObservabilityHandlers) GetDBHealth(w http.ResponseWriter, r *http.Reque
 		Metrics: make(map[string]interface{}),
 	}
 
-	if len(rows) > 0 && len(rows[0]) > 0 {
-		if version, ok := rows[0]["version"].(string); ok {
+	rowsList, ok := rows.([]map[string]interface{})
+	if ok && len(rowsList) > 0 && len(rowsList[0]) > 0 {
+		if version, ok := rowsList[0]["version"].(string); ok {
 			health.Version = version
 		}
-		if conns, ok := rows[0]["connections"].(int64); ok {
+		if conns, ok := rowsList[0]["connections"].(int64); ok {
 			health.Connections = int(conns)
 		}
 	}
 
 	// Check NeuronDB extension
 	extQuery := `SELECT extversion FROM pg_extension WHERE extname = 'neurondb'`
-	extRows, err := client.ExecuteSQL(r.Context(), extQuery)
-	if err != nil || len(extRows) == 0 {
+	extRowsResult, err := client.ExecuteSQL(r.Context(), extQuery)
+	if err != nil {
 		health.Status = "degraded"
 		health.Metrics["extension"] = "not_loaded"
 	} else {
-		health.Metrics["extension"] = "loaded"
-		if version, ok := extRows[0]["extversion"].(string); ok {
-			health.Metrics["extension_version"] = version
+		extRowsList, ok := extRowsResult.([]map[string]interface{})
+		if !ok || len(extRowsList) == 0 {
+			health.Status = "degraded"
+			health.Metrics["extension"] = "not_loaded"
+		} else {
+			health.Metrics["extension"] = "loaded"
+			if version, ok := extRowsList[0]["extversion"].(string); ok {
+				health.Metrics["extension_version"] = version
+			}
 		}
 	}
 
@@ -145,14 +152,20 @@ func (h *ObservabilityHandlers) GetIndexHealth(w http.ResponseWriter, r *http.Re
 		ORDER BY tablename, indexname
 	`
 
-	rows, err := client.ExecuteSQL(r.Context(), query)
+	rowsResult, err := client.ExecuteSQL(r.Context(), query)
 	if err != nil {
 		WriteError(w, r, http.StatusInternalServerError, fmt.Errorf("failed to query indexes: %w", err), nil)
 		return
 	}
 
+	rowsList, ok := rowsResult.([]map[string]interface{})
+	if !ok {
+		WriteError(w, r, http.StatusInternalServerError, fmt.Errorf("unexpected result type from ExecuteSQL"), nil)
+		return
+	}
+
 	var indexes []IndexHealth
-	for _, row := range rows {
+	for _, row := range rowsList {
 		idx := IndexHealth{
 			Status: "healthy",
 		}
@@ -211,15 +224,22 @@ func (h *ObservabilityHandlers) GetWorkerStatus(w http.ResponseWriter, r *http.R
 		ORDER BY worker_name
 	`
 
-	rows, err := client.ExecuteSQL(r.Context(), query)
+	rowsResult, err := client.ExecuteSQL(r.Context(), query)
 	if err != nil {
 		// Workers table might not exist, return empty list
 		WriteSuccess(w, []WorkerStatus{}, http.StatusOK)
 		return
 	}
 
+	rowsList, ok := rowsResult.([]map[string]interface{})
+	if !ok {
+		// Return empty list if unexpected type
+		WriteSuccess(w, []WorkerStatus{}, http.StatusOK)
+		return
+	}
+
 	var workers []WorkerStatus
-	for _, row := range rows {
+	for _, row := range rowsList {
 		w := WorkerStatus{
 			Status: "unknown",
 		}
@@ -261,13 +281,21 @@ func (h *ObservabilityHandlers) GetUsageStats(w http.ResponseWriter, r *http.Req
 		AND created_at > NOW() - INTERVAL '30 days'
 	`
 
-	var stats map[string]interface{}
+	stats := make(map[string]interface{})
+	var totalRequests, errors, totalTokens int64
+	var avgDurationMs float64
 	err := h.queries.GetDB().QueryRowContext(r.Context(), query, profileID).Scan(
-		&stats["total_requests"],
-		&stats["errors"],
-		&stats["avg_duration_ms"],
-		&stats["total_tokens"],
+		&totalRequests,
+		&errors,
+		&avgDurationMs,
+		&totalTokens,
 	)
+	if err == nil {
+		stats["total_requests"] = totalRequests
+		stats["errors"] = errors
+		stats["avg_duration_ms"] = avgDurationMs
+		stats["total_tokens"] = totalTokens
+	}
 	if err != nil {
 		// Table might not exist or no data
 		stats = map[string]interface{}{

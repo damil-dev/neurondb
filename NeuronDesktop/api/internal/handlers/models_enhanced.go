@@ -453,7 +453,7 @@ func (h *EnhancedModelHandlers) SetModelKeyEnhanced(w http.ResponseWriter, r *ht
 	userID, _ := auth.GetUserIDFromContext(r.Context())
 
 	// Validate profile access
-	profile, err := h.queries.GetProfile(r.Context(), profileID)
+	_, err := h.queries.GetProfile(r.Context(), profileID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			WriteError(w, r, http.StatusNotFound, fmt.Errorf("profile not found"), nil)

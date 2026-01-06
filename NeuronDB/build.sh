@@ -819,6 +819,20 @@ install_neurondb() {
     
     section "Installing NeurondB"
     
+    # Ensure SQL file is generated before installation
+    if [[ ! -f neurondb--1.0.sql ]]; then
+        log_info "Generating neurondb--1.0.sql file..."
+        if [[ -f neurondb--1.0.sql.linux ]]; then
+            cp neurondb--1.0.sql.linux neurondb--1.0.sql
+        elif [[ -f neurondb--1.0.sql.macos ]]; then
+            cp neurondb--1.0.sql.macos neurondb--1.0.sql
+        else
+            # Try to generate it via make
+            log_info "Attempting to generate SQL file via make..."
+            make neurondb--1.0.sql || log_warn "Could not generate SQL file, installation may fail"
+        fi
+    fi
+    
     local pgc="$SELECTED_PG_CONFIG"
     local sudo_cmd=""
     [[ "$PLATFORM" != "macos" ]] && [[ "$(id -u)" != "0" ]] && sudo_cmd="sudo"
