@@ -1,0 +1,53 @@
+suite: test neurondb statefulset
+templates:
+  - statefulset-neurondb.yaml
+tests:
+  - it: should create statefulset when enabled
+    set:
+      neurondb:
+        enabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: StatefulSet
+      - isAPIVersion:
+          of: apps/v1
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-neurondb-neurondb
+
+  - it: should not create statefulset when external postgres enabled
+    set:
+      neurondb:
+        enabled: true
+        postgresql:
+          external:
+            enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should set correct service account
+    set:
+      neurondb:
+        enabled: true
+      rbac:
+        enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: RELEASE-NAME-neurondb
+
+  - it: should set security context
+    set:
+      neurondb:
+        enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.runAsNonRoot
+          value: true
+      - equal:
+          path: spec.template.spec.securityContext.allowPrivilegeEscalation
+          value: false
+

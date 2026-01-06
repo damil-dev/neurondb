@@ -1,0 +1,307 @@
+groups:
+  # ============================================================================
+  # NeuronDB Recording Rules
+  # ============================================================================
+  - name: neurondb_recording
+    interval: 30s
+    rules:
+      # Request rate aggregations
+      - record: neurondb:queries:rate5m
+        expr: rate(neurondb_queries_total[5m])
+
+      - record: neurondb:queries:rate1m
+        expr: rate(neurondb_queries_total[1m])
+
+      # Query type rates
+      - record: neurondb:queries:vector:rate5m
+        expr: rate(neurondb_queries_total{query_type="vector"}[5m])
+
+      - record: neurondb:queries:ann:rate5m
+        expr: rate(neurondb_queries_total{query_type="ann"}[5m])
+
+      # Error rate calculations
+      - record: neurondb:errors:rate5m
+        expr: rate(neurondb_errors_total[5m])
+
+      - record: neurondb:errors:ratio5m
+        expr: |
+          rate(neurondb_errors_total[5m]) / rate(neurondb_queries_total[5m])
+
+      # Latency percentiles
+      - record: neurondb:query_duration:p50
+        expr: histogram_quantile(0.50, rate(neurondb_query_duration_seconds_bucket[5m]))
+
+      - record: neurondb:query_duration:p95
+        expr: histogram_quantile(0.95, rate(neurondb_query_duration_seconds_bucket[5m]))
+
+      - record: neurondb:query_duration:p99
+        expr: histogram_quantile(0.99, rate(neurondb_query_duration_seconds_bucket[5m]))
+
+      # Cache metrics
+      - record: neurondb:cache:hit_rate5m
+        expr: |
+          rate(neurondb_cache_hits_total[5m]) / 
+          (rate(neurondb_cache_hits_total[5m]) + rate(neurondb_cache_misses_total[5m]))
+
+      - record: neurondb:cache:miss_rate5m
+        expr: |
+          rate(neurondb_cache_misses_total[5m]) / 
+          (rate(neurondb_cache_hits_total[5m]) + rate(neurondb_cache_misses_total[5m]))
+
+      # Vector search performance
+      - record: neurondb:vector_search:rate5m
+        expr: rate(neurondb_vector_search_total[5m])
+
+      - record: neurondb:vector_search:duration:p95
+        expr: histogram_quantile(0.95, rate(neurondb_vector_search_duration_seconds_bucket[5m]))
+
+      # Index metrics
+      - record: neurondb:index:size:total
+        expr: sum(neurondb_index_size_bytes)
+
+      - record: neurondb:index:count
+        expr: count(neurondb_index_size_bytes)
+
+      # Connection pool metrics
+      - record: neurondb:connections:active:ratio
+        expr: |
+          pg_stat_database_numbackends / pg_stat_database_max_connections
+
+  # ============================================================================
+  # NeuronAgent Recording Rules
+  # ============================================================================
+  - name: neuronagent_recording
+    interval: 30s
+    rules:
+      # Request rate aggregations
+      - record: neuronagent:requests:rate5m
+        expr: rate(neurondb_agent_requests_total[5m])
+
+      - record: neuronagent:requests:rate1m
+        expr: rate(neurondb_agent_requests_total[1m])
+
+      # Error rate calculations
+      - record: neuronagent:errors:rate5m
+        expr: rate(neurondb_agent_errors_total[5m])
+
+      - record: neuronagent:errors:ratio5m
+        expr: |
+          rate(neurondb_agent_errors_total[5m]) / rate(neurondb_agent_requests_total[5m])
+
+      # Latency percentiles
+      - record: neuronagent:request_duration:p50
+        expr: histogram_quantile(0.50, rate(neurondb_agent_request_duration_seconds_bucket[5m]))
+
+      - record: neuronagent:request_duration:p95
+        expr: histogram_quantile(0.95, rate(neurondb_agent_request_duration_seconds_bucket[5m]))
+
+      - record: neuronagent:request_duration:p99
+        expr: histogram_quantile(0.99, rate(neurondb_agent_request_duration_seconds_bucket[5m]))
+
+      # Endpoint-specific metrics
+      - record: neuronagent:endpoint:requests:rate5m
+        expr: rate(neurondb_agent_endpoint_requests_total[5m])
+
+      - record: neuronagent:endpoint:errors:rate5m
+        expr: rate(neurondb_agent_endpoint_errors_total[5m])
+
+      # Agent execution metrics
+      - record: neuronagent:executions:rate5m
+        expr: rate(neurondb_agent_executions_total[5m])
+
+      - record: neuronagent:executions:failures:rate5m
+        expr: rate(neurondb_agent_execution_failures_total[5m])
+
+      - record: neuronagent:executions:success:rate5m
+        expr: rate(neurondb_agent_executions_success_total[5m])
+
+      # Database connection metrics
+      - record: neuronagent:db:connections:active
+        expr: neurondb_agent_database_connections_active
+
+      - record: neuronagent:db:connections:errors:rate5m
+        expr: rate(neurondb_agent_database_connection_errors_total[5m])
+
+      # Resource utilization
+      - record: neuronagent:memory:usage:ratio
+        expr: |
+          process_resident_memory_bytes / process_virtual_memory_bytes
+
+      - record: neuronagent:cpu:usage:rate5m
+        expr: rate(process_cpu_seconds_total[5m])
+
+  # ============================================================================
+  # NeuronDesktop Recording Rules
+  # ============================================================================
+  - name: neurondesktop_recording
+    interval: 30s
+    rules:
+      # Request rate aggregations
+      - record: neurondesktop:api:requests:rate5m
+        expr: rate(neurondesktop_api_requests_total[5m])
+
+      - record: neurondesktop:api:requests:rate1m
+        expr: rate(neurondesktop_api_requests_total[1m])
+
+      # Error rate calculations
+      - record: neurondesktop:api:errors:rate5m
+        expr: rate(neurondesktop_api_errors_total[5m])
+
+      - record: neurondesktop:api:errors:ratio5m
+        expr: |
+          rate(neurondesktop_api_errors_total[5m]) / rate(neurondesktop_api_requests_total[5m])
+
+      # Latency percentiles
+      - record: neurondesktop:api:request_duration:p50
+        expr: histogram_quantile(0.50, rate(neurondesktop_api_request_duration_seconds_bucket[5m]))
+
+      - record: neurondesktop:api:request_duration:p95
+        expr: histogram_quantile(0.95, rate(neurondesktop_api_request_duration_seconds_bucket[5m]))
+
+      - record: neurondesktop:api:request_duration:p99
+        expr: histogram_quantile(0.99, rate(neurondesktop_api_request_duration_seconds_bucket[5m]))
+
+      # Connection metrics
+      - record: neurondesktop:connections:active
+        expr: neurondesktop_active_connections
+
+      - record: neurondesktop:connections:mcp:active
+        expr: neurondesktop_active_mcp_connections
+
+      - record: neurondesktop:connections:neurondb:active
+        expr: neurondesktop_active_neurondb_connections
+
+      - record: neurondesktop:connections:agent:active
+        expr: neurondesktop_active_agent_connections
+
+      # Database connection errors
+      - record: neurondesktop:db:connections:errors:rate5m
+        expr: rate(neurondesktop_database_connection_errors_total[5m])
+
+  # ============================================================================
+  # NeuronMCP Recording Rules
+  # ============================================================================
+  - name: neuronmcp_recording
+    interval: 30s
+    rules:
+      # Request rate aggregations
+      - record: neuronmcp:requests:rate5m
+        expr: rate(neurondb_mcp_requests_total[5m])
+
+      - record: neuronmcp:requests:rate1m
+        expr: rate(neurondb_mcp_requests_total[1m])
+
+      # Error rate calculations
+      - record: neuronmcp:errors:rate5m
+        expr: rate(neurondb_mcp_errors_total[5m])
+
+      - record: neuronmcp:errors:ratio5m
+        expr: |
+          rate(neurondb_mcp_errors_total[5m]) / rate(neurondb_mcp_requests_total[5m])
+
+      # Latency metrics
+      - record: neuronmcp:request_duration:avg5m
+        expr: rate(neurondb_mcp_request_duration_seconds[5m]) / rate(neurondb_mcp_requests_total[5m])
+
+      # Method-specific metrics
+      - record: neuronmcp:method:requests:rate5m
+        expr: rate(neurondb_mcp_method_requests_total[5m])
+
+      - record: neuronmcp:method:errors:rate5m
+        expr: rate(neurondb_mcp_method_errors_total[5m])
+
+      # Tool-specific metrics
+      - record: neuronmcp:tool:requests:rate5m
+        expr: rate(neurondb_mcp_tool_requests_total[5m])
+
+      - record: neuronmcp:tool:errors:rate5m
+        expr: rate(neurondb_mcp_tool_errors_total[5m])
+
+      # Connection pool metrics
+      - record: neuronmcp:pool:utilization
+        expr: neurondb_mcp_pool_utilization
+
+      - record: neuronmcp:pool:connections:active
+        expr: neurondb_mcp_pool_connections_active
+
+      - record: neuronmcp:pool:connections:idle
+        expr: neurondb_mcp_pool_connections_idle
+
+      - record: neuronmcp:pool:connections:total
+        expr: neurondb_mcp_pool_connections_total
+
+  # ============================================================================
+  # Infrastructure Recording Rules
+  # ============================================================================
+  - name: infrastructure_recording
+    interval: 30s
+    rules:
+      # CPU utilization
+      - record: infrastructure:cpu:usage:percent
+        expr: |
+          100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)
+
+      - record: infrastructure:cpu:usage:per_core
+        expr: |
+          100 - (irate(node_cpu_seconds_total{mode="idle"}[5m]) * 100)
+
+      # Memory utilization
+      - record: infrastructure:memory:usage:percent
+        expr: |
+          (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100
+
+      - record: infrastructure:memory:usage:bytes
+        expr: |
+          node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes
+
+      # Disk utilization
+      - record: infrastructure:disk:usage:percent
+        expr: |
+          (1 - (node_filesystem_avail_bytes{device!~"tmpfs|fuse.lxcfs"} / 
+                node_filesystem_size_bytes{device!~"tmpfs|fuse.lxcfs"})) * 100
+
+      - record: infrastructure:disk:usage:bytes
+        expr: |
+          node_filesystem_size_bytes{device!~"tmpfs|fuse.lxcfs"} - 
+          node_filesystem_avail_bytes{device!~"tmpfs|fuse.lxcfs"}
+
+      # Disk I/O rates
+      - record: infrastructure:disk:io:read:rate5m
+        expr: rate(node_disk_read_bytes_total[5m])
+
+      - record: infrastructure:disk:io:write:rate5m
+        expr: rate(node_disk_written_bytes_total[5m])
+
+      - record: infrastructure:disk:io:time:rate5m
+        expr: rate(node_disk_io_time_seconds_total[5m])
+
+      # Network rates
+      - record: infrastructure:network:receive:rate5m
+        expr: rate(node_network_receive_bytes_total[5m])
+
+      - record: infrastructure:network:transmit:rate5m
+        expr: rate(node_network_transmit_bytes_total[5m])
+
+      - record: infrastructure:network:errors:rate5m
+        expr: |
+          rate(node_network_receive_errs_total[5m]) + 
+          rate(node_network_transmit_errs_total[5m])
+
+      # Container metrics
+      - record: infrastructure:container:cpu:usage:rate5m
+        expr: rate(container_cpu_usage_seconds_total[5m])
+
+      - record: infrastructure:container:memory:usage:ratio
+        expr: |
+          container_memory_usage_bytes / container_spec_memory_limit_bytes
+
+      - record: infrastructure:container:memory:usage:bytes
+        expr: container_memory_usage_bytes
+
+      # Service availability
+      - record: infrastructure:service:up:count
+        expr: sum(up) by (service)
+
+      - record: infrastructure:service:down:count
+        expr: sum(up == 0) by (service)
+

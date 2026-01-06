@@ -1,0 +1,55 @@
+{{- if and .Values.monitoring.enabled .Values.monitoring.prometheus.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "neurondb.fullname" . }}-prometheus
+  labels:
+    {{- include "neurondb.labels" . | nindent 4 }}
+    app.kubernetes.io/component: prometheus
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "neurondb.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: prometheus
+  template:
+    metadata:
+      labels:
+        {{- include "neurondb.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: prometheus
+    spec:
+      containers:
+      - name: prometheus
+        image: "{{ if .Values.global.imageRegistry }}{{ .Values.global.imageRegistry }}/{{ end }}{{ .Values.monitoring.prometheus.image.repository }}:{{ .Values.monitoring.prometheus.image.tag }}"
+        imagePullPolicy: {{ .Values.monitoring.prometheus.image.pullPolicy }}
+        ports:
+        - name: http
+          containerPort: 9090
+          protocol: TCP
+        args:
+          - '--config.file=/etc/prometheus/prometheus.yml'
+          - '--storage.tsdb.path=/prometheus'
+          - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+          - '--web.console.templates=/usr/share/prometheus/consoles'
+          - '--storage.tsdb.retention.time={{ .Values.monitoring.prometheus.retention | default "30d" }}'
+        volumeMounts:
+        - name: config
+          mountPath: /etc/prometheus
+        - name: storage
+          mountPath: /prometheus
+        resources:
+          {{- toYaml .Values.monitoring.prometheus.resources | default (dict "requests" (dict "memory" "512Mi" "cpu" "250m") "limits" (dict "memory" "2Gi" "cpu" "1")) | nindent 10 }}
+      volumes:
+      - name: config
+        configMap:
+          name: {{ include "neurondb.fullname" . }}-prometheus-config
+      {{- if .Values.monitoring.prometheus.persistence.enabled }}
+      - name: storage
+        persistentVolumeClaim:
+          claimName: {{ include "neurondb.fullname" . }}-prometheus
+      {{- else }}
+      - name: storage
+        emptyDir: {}
+      {{- end }}
+{{- end }}
+

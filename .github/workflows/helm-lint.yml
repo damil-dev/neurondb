@@ -1,0 +1,32 @@
+name: Helm Lint
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'helm/**'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'helm/**'
+  workflow_dispatch:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: 'latest'
+
+      - name: Run helm lint
+        run: |
+          cd helm/neurondb
+          helm lint .
+          helm lint . --strict
+          helm lint . --quiet
+
