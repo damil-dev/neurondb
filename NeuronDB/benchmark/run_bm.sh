@@ -131,6 +131,14 @@ run_benchmark "rag" "RAG" \
     "" \
     ""
 
+# Generate consolidated report
+print_status "info" "Generating consolidated benchmark report..."
+if [ -f "generate_consolidated_report.py" ]; then
+    python3 generate_consolidated_report.py || print_status "warning" "Failed to generate consolidated report"
+else
+    print_status "warning" "Consolidated report generator not found"
+fi
+
 # Final summary
 echo -e "\n${BOLD}${GREEN}╔══════════════════════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BOLD}${GREEN}║                    ALL BENCHMARKS EXECUTION COMPLETE                          ║${NC}"
@@ -140,4 +148,5 @@ print_status "info" "Results saved in:"
 print_status "info" "  • Vector:  ./vector/results/"
 print_status "info" "  • Hybrid:  ./hybrid/results/"
 print_status "info" "  • RAG:     ./rag/results/"
+print_status "info" "  • Consolidated: README.md (Benchmark Results section)"
 
