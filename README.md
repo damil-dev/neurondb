@@ -8,19 +8,19 @@
       <img alt="PostgreSQL 16/17/18" src="https://img.shields.io/badge/PostgreSQL-16%2C17%2C18-blue.svg" />
     </a>
     <a href="https://github.com/neurondb/neurondb/actions/workflows/neurondb-build-matrix.yml">
-      <img alt="CI: NeuronDB" src="https://github.com/neurondb/neurondb/actions/workflows/neurondb-build-matrix.yml/badge.svg?branch=main" />
+      <img alt="CI: NeuronDB" src="https://img.shields.io/badge/CI-NeuronDB-blue.svg" />
     </a>
     <a href="https://github.com/neurondb/neurondb/actions/workflows/neuronmcp-build-matrix.yml">
-      <img alt="CI: NeuronMCP" src="https://github.com/neurondb/neurondb/actions/workflows/neuronmcp-build-matrix.yml/badge.svg?branch=main" />
+      <img alt="CI: NeuronMCP" src="https://img.shields.io/badge/CI-NeuronMCP-blue.svg" />
     </a>
     <a href="https://github.com/neurondb/neurondb/actions/workflows/integration-tests-full-ecosystem.yml">
-      <img alt="CI: Integration" src="https://github.com/neurondb/neurondb/actions/workflows/integration-tests-full-ecosystem.yml/badge.svg?branch=main" />
+      <img alt="CI: Integration" src="https://img.shields.io/badge/CI-Integration-blue.svg" />
     </a>
     <a href="https://github.com/neurondb/neurondb/actions/workflows/security-scan.yml">
-      <img alt="Security scan" src="https://github.com/neurondb/neurondb/actions/workflows/security-scan.yml/badge.svg?branch=main" />
+      <img alt="Security scan" src="https://img.shields.io/badge/Security-Scan-blue.svg" />
     </a>
     <a href="https://github.com/neurondb/neurondb/actions/workflows/neurondb-docker.yml">
-      <img alt="Docker" src="https://github.com/neurondb/neurondb/actions/workflows/neurondb-docker.yml/badge.svg?branch=main" />
+      <img alt="Docker" src="https://img.shields.io/badge/Docker-Build-blue.svg" />
     </a>
   </p>
   <p>
