@@ -67,3 +67,4 @@ CREATE INDEX IF NOT EXISTS test_vectors_embedding_idx ON test_schema.test_vector
 USING hnsw (embedding vector_cosine_ops);
 
 
+
