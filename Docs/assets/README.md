@@ -14,3 +14,4 @@ This directory contains screenshots, GIFs, and other visual assets referenced in
 3. Keep file sizes reasonable (< 2MB for images, < 5MB for GIFs)
 4. Use descriptive filenames
 
+
