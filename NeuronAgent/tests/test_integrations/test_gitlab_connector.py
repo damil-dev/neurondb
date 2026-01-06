@@ -19,3 +19,4 @@ class TestGitLabConnector:
         pytest.skip("GitLab connector requires API token")
 
 
+
