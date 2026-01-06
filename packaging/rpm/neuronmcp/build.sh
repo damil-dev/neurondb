@@ -11,7 +11,7 @@
 set -euo pipefail
 
 # Version from environment or default
-VERSION=${VERSION:-1.0.0.beta}
+VERSION=${VERSION:-1.0.0}
 RELEASE=${RELEASE:-1}
 ARCH=${ARCH:-x86_64}
 

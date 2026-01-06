@@ -11,7 +11,7 @@
 set -euo pipefail
 
 # Version from environment or default
-VERSION=${VERSION:-1.0.0.beta}
+VERSION=${VERSION:-1.0.0}
 # Strip 'v' prefix if present (Debian packages require versions to start with digit)
 VERSION=${VERSION#v}
 ARCH=${ARCH:-amd64}
