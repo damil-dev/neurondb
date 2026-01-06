@@ -556,3 +556,4 @@ echo ""
 exec "$REPO_ROOT/scripts/test_neurondb_docker_detailed.sh" --variant="$VARIANT"
 
 
+

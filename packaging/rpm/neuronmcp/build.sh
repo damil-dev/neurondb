@@ -11,7 +11,7 @@
 set -euo pipefail
 
 # Version from environment or default
-VERSION=${VERSION:-2.0.0}
+VERSION=${VERSION:-1.0.0.beta}
 RELEASE=${RELEASE:-1}
 ARCH=${ARCH:-x86_64}
 
@@ -47,4 +47,5 @@ echo "RPM spec file creation for NeuronMCP (placeholder)"
 
 echo "Package structure created in $INSTALL_DIR"
 echo "Note: Full RPM build requires proper spec file - this is a placeholder"
+
 

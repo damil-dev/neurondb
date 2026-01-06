@@ -11,7 +11,7 @@
 set -euo pipefail
 
 # Version from environment or default
-VERSION=${VERSION:-2.0.0}
+VERSION=${VERSION:-1.0.0.beta}
 RELEASE=${RELEASE:-1}
 ARCH=${ARCH:-x86_64}
 
@@ -84,4 +84,5 @@ cp "$RPM_FILE" "$REPO_ROOT/packaging/rpm/neurondb/"
 
 echo "Package built: $(basename $RPM_FILE)"
 ls -lh "$REPO_ROOT/packaging/rpm/neurondb/$(basename $RPM_FILE)"
+
 
