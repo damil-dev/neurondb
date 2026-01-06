@@ -515,8 +515,47 @@ cd NeuronDB/benchmark/vector
   --ef-search 40
 ```
 
+<details>
+<summary><strong>Benchmark Results & Hardware Specs</strong></summary>
+
+**Test Environment:**
+- **CPU**: 13th Gen Intel(R) Core(TM) i5-13400F (16 cores)
+- **RAM**: 31.1 GB
+- **GPU**: NVIDIA GeForce RTX 5060, 8151 MiB
+- **PostgreSQL**: 18.1
+
+**Vector Search Benchmarks:**
+
+| Metric | Value |
+|--------|-------|
+| Dataset | sift-128-euclidean |
+| Dimensions | 128 |
+| Training Vectors | 1,000,000 |
+| Test Queries | 10,000 |
+| Index Type | HNSW |
+| Recall@10 | 1.000 |
+| QPS | 1.90 |
+| Avg Latency | 525.62 ms |
+| p50 Latency | 524.68 ms |
+| p95 Latency | 546.62 ms |
+| p99 Latency | 555.52 ms |
+
+**Hybrid Search Benchmarks:**
+
+Status: Not run (see [`NeuronDB/benchmark/README.md`](NeuronDB/benchmark/README.md) for details)
+
+**RAG Pipeline Benchmarks:**
+
+Status: Completed (verification passed)
+
 > [!NOTE]
+<<<<<<< HEAD
 > Baseline benchmark results are available in [`NeuronDB/benchmark/README.md`](NeuronDB/benchmark/README.md). For detailed performance numbers by dataset, index type, and hardware profile, see [Benchmark Results](Docs/benchmarks/BENCHMARK_RESULTS.md).
+=======
+> For detailed benchmark results, reproducible configurations, and additional datasets, see [`NeuronDB/benchmark/README.md`](NeuronDB/benchmark/README.md).
+
+</details>
+>>>>>>> b6d0fa2 (Docs: Add benchmark results summary to main documentation.)
 
 <details>
 <summary><strong>Run individual benchmarks</strong></summary>
