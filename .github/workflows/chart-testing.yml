@@ -1,0 +1,49 @@
+name: Chart Testing
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'helm/**'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'helm/**'
+  workflow_dispatch:
+
+jobs:
+  chart-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: 'latest'
+
+      - name: Install chart-testing
+        uses: helm/chart-testing-action@v2
+        with:
+          version: v3.9.0
+
+      - name: Run chart-testing (lint)
+        run: |
+          ct lint --charts helm/neurondb
+
+      - name: Run chart-testing (install)
+        run: |
+          ct install --charts helm/neurondb
+
+      - name: Validate chart version
+        run: |
+          cd helm/neurondb
+          CHART_VERSION=$(helm show chart . | grep '^version:' | awk '{print $2}')
+          APP_VERSION=$(helm show chart . | grep '^appVersion:' | awk '{print $2}')
+          echo "Chart version: $CHART_VERSION"
+          echo "App version: $APP_VERSION"
+          if [[ "$CHART_VERSION" == "$APP_VERSION" ]]; then
+            echo "Warning: Chart version should be separate from app version"
+          fi
+

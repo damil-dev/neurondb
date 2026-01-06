@@ -1,0 +1,206 @@
+# PostgreSQL Exporter Queries Configuration
+# This file contains custom queries for the postgres_exporter
+# These queries extend the default PostgreSQL metrics with NeuronDB-specific metrics
+
+# Custom queries for NeuronDB-specific metrics
+queries:
+  # NeuronDB extension statistics
+  - name: "neurondb_extension_stats"
+    help: "NeuronDB extension statistics and health"
+    values:
+      extension_name: extension_name
+      extension_version: extension_version
+      is_enabled: is_enabled
+    query: |
+      SELECT 
+        extname as extension_name,
+        extversion as extension_version,
+        CASE WHEN extname = 'neurondb' THEN 1 ELSE 0 END as is_enabled
+      FROM pg_extension
+      WHERE extname = 'neurondb'
+    master: true
+
+  # NeuronDB vector statistics
+  - name: "neurondb_vector_stats"
+    help: "NeuronDB vector table statistics"
+    values:
+      schema_name: schema_name
+      table_name: table_name
+      vector_count: vector_count
+      index_count: index_count
+      avg_dimension: avg_dimension
+    query: |
+      SELECT 
+        schemaname as schema_name,
+        tablename as table_name,
+        n_tup_ins as vector_count,
+        n_tup_upd as index_count,
+        n_live_tup as avg_dimension
+      FROM pg_stat_user_tables
+      WHERE schemaname = 'neurondb'
+    master: true
+
+  # NeuronDB index health
+  - name: "neurondb_index_health"
+    help: "NeuronDB index health metrics"
+    values:
+      index_name: index_name
+      index_type: index_type
+      index_size_bytes: index_size_bytes
+      index_health_score: index_health_score
+    query: |
+      SELECT 
+        indexname as index_name,
+        indexdef as index_type,
+        pg_relation_size(indexrelid) as index_size_bytes,
+        1.0 as index_health_score
+      FROM pg_indexes
+      WHERE schemaname = 'neurondb'
+      LIMIT 100
+    master: true
+
+  # NeuronDB query performance
+  - name: "neurondb_query_performance"
+    help: "NeuronDB query performance metrics from pg_stat_statements"
+    values:
+      query_type: query_type
+      calls: calls
+      total_time: total_time
+      mean_time: mean_time
+      max_time: max_time
+    query: |
+      SELECT 
+        CASE 
+          WHEN query LIKE '%vector%' OR query LIKE '%embedding%' THEN 'vector'
+          WHEN query LIKE '%ann%' OR query LIKE '%similarity%' THEN 'ann'
+          ELSE 'other'
+        END as query_type,
+        COUNT(*) as calls,
+        SUM(total_exec_time) as total_time,
+        AVG(mean_exec_time) as mean_time,
+        MAX(max_exec_time) as max_time
+      FROM pg_stat_statements
+      WHERE query LIKE '%neurondb%'
+      GROUP BY query_type
+    master: true
+
+  # Database connection pool statistics
+  - name: "neurondb_connection_pool"
+    help: "NeuronDB connection pool statistics"
+    values:
+      database_name: database_name
+      active_connections: active_connections
+      idle_connections: idle_connections
+      max_connections: max_connections
+      connection_utilization: connection_utilization
+    query: |
+      SELECT 
+        datname as database_name,
+        numbackends as active_connections,
+        (SELECT setting::int FROM pg_settings WHERE name = 'max_connections') - numbackends as idle_connections,
+        (SELECT setting::int FROM pg_settings WHERE name = 'max_connections') as max_connections,
+        numbackends::float / (SELECT setting::int FROM pg_settings WHERE name = 'max_connections') as connection_utilization
+      FROM pg_stat_database
+      WHERE datname = current_database()
+    master: true
+
+  # Table bloat detection
+  - name: "neurondb_table_bloat"
+    help: "NeuronDB table bloat metrics"
+    values:
+      schema_name: schema_name
+      table_name: table_name
+      table_size_bytes: table_size_bytes
+      bloat_ratio: bloat_ratio
+    query: |
+      SELECT 
+        schemaname as schema_name,
+        tablename as table_name,
+        pg_total_relation_size(schemaname||'.'||tablename) as table_size_bytes,
+        CASE 
+          WHEN n_dead_tup > 0 THEN n_dead_tup::float / n_live_tup
+          ELSE 0
+        END as bloat_ratio
+      FROM pg_stat_user_tables
+      WHERE schemaname = 'neurondb'
+        AND n_live_tup > 0
+    master: true
+
+  # Index usage statistics
+  - name: "neurondb_index_usage"
+    help: "NeuronDB index usage statistics"
+    values:
+      schema_name: schema_name
+      index_name: index_name
+      index_scans: index_scans
+      index_size_bytes: index_size_bytes
+    query: |
+      SELECT 
+        schemaname as schema_name,
+        indexrelname as index_name,
+        idx_scan as index_scans,
+        pg_relation_size(indexrelid) as index_size_bytes
+      FROM pg_stat_user_indexes
+      WHERE schemaname = 'neurondb'
+    master: true
+
+  # Cache hit rates
+  - name: "neurondb_cache_stats"
+    help: "NeuronDB cache statistics"
+    values:
+      cache_type: cache_type
+      hits: hits
+      misses: misses
+      hit_rate: hit_rate
+    query: |
+      SELECT 
+        'heap' as cache_type,
+        sum(heap_blks_hit) as hits,
+        sum(heap_blks_read) as misses,
+        CASE 
+          WHEN sum(heap_blks_hit) + sum(heap_blks_read) > 0 
+          THEN sum(heap_blks_hit)::float / (sum(heap_blks_hit) + sum(heap_blks_read))
+          ELSE 0
+        END as hit_rate
+      FROM pg_statio_user_tables
+      WHERE schemaname = 'neurondb'
+    master: true
+
+  # Long running queries
+  - name: "neurondb_long_running_queries"
+    help: "NeuronDB long running queries"
+    values:
+      pid: pid
+      database_name: database_name
+      query_duration: query_duration
+      query_state: query_state
+    query: |
+      SELECT 
+        pid,
+        datname as database_name,
+        EXTRACT(EPOCH FROM (now() - query_start)) as query_duration,
+        state as query_state
+      FROM pg_stat_activity
+      WHERE datname = current_database()
+        AND state != 'idle'
+        AND query_start < now() - interval '5 minutes'
+      ORDER BY query_start
+      LIMIT 50
+    master: true
+
+  # Replication lag (if applicable)
+  - name: "neurondb_replication_lag"
+    help: "NeuronDB replication lag metrics"
+    values:
+      client_addr: client_addr
+      lag_bytes: lag_bytes
+      lag_seconds: lag_seconds
+    query: |
+      SELECT 
+        client_addr,
+        pg_wal_lsn_diff(pg_current_wal_lsn(), sent_lsn) as lag_bytes,
+        EXTRACT(EPOCH FROM (now() - reply_time)) as lag_seconds
+      FROM pg_stat_replication
+      WHERE client_addr IS NOT NULL
+    master: true
+

@@ -1,0 +1,154 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "global": {
+      "type": "object",
+      "properties": {
+        "imageRegistry": {"type": "string"},
+        "imagePullSecrets": {"type": "array", "items": {"type": "object"}}
+      }
+    },
+    "neurondb": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "image": {
+          "type": "object",
+          "properties": {
+            "repository": {"type": "string"},
+            "tag": {"type": "string"},
+            "pullPolicy": {"type": "string", "enum": ["Always", "IfNotPresent", "Never"]}
+          }
+        },
+        "postgresql": {
+          "type": "object",
+          "properties": {
+            "version": {"type": "string"},
+            "database": {"type": "string"},
+            "username": {"type": "string"},
+            "port": {"type": "integer", "minimum": 1, "maximum": 65535},
+            "external": {
+              "type": "object",
+              "properties": {
+                "enabled": {"type": "boolean"},
+                "host": {"type": "string"},
+                "port": {"type": "integer", "minimum": 1, "maximum": 65535},
+                "database": {"type": "string"},
+                "username": {"type": "string"},
+                "connectionString": {"type": "string"},
+                "secretName": {"type": "string"}
+              }
+            }
+          }
+        },
+        "persistence": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "size": {"type": "string"},
+            "storageClass": {"type": "string"}
+          }
+        },
+        "replicas": {"type": "integer", "minimum": 1},
+        "podManagementPolicy": {"type": "string", "enum": ["OrderedReady", "Parallel"]},
+        "updateStrategy": {
+          "type": "object",
+          "properties": {
+            "type": {"type": "string", "enum": ["RollingUpdate", "OnDelete"]}
+          }
+        },
+        "resources": {
+          "type": "object",
+          "properties": {
+            "requests": {"type": "object"},
+            "limits": {"type": "object"}
+          }
+        }
+      }
+    },
+    "neuronagent": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "replicas": {"type": "integer", "minimum": 0},
+        "autoscaling": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "minReplicas": {"type": "integer", "minimum": 1},
+            "maxReplicas": {"type": "integer", "minimum": 1}
+          }
+        }
+      }
+    },
+    "neuronmcp": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "replicas": {"type": "integer", "minimum": 0}
+      }
+    },
+    "neurondesktop": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean"}
+      }
+    },
+    "rbac": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "createRoles": {"type": "boolean"}
+      }
+    },
+    "networkPolicy": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "allowMonitoring": {"type": "boolean"}
+      }
+    },
+    "backup": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "schedule": {"type": "string"},
+        "retention": {"type": "integer", "minimum": 0},
+        "s3": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "bucket": {"type": "string"},
+            "region": {"type": "string"}
+          }
+        }
+      }
+    },
+    "migrations": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean"}
+      }
+    },
+    "monitoring": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean"}
+      }
+    },
+    "observability": {
+      "type": "object",
+      "properties": {
+        "prometheusOperator": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean"}
+          }
+        }
+      }
+    }
+  },
+  "required": []
+}
+

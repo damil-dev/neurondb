@@ -1,0 +1,67 @@
+# Node Exporter Textfile Collector Configuration
+# This file configures custom metrics collection via textfile collector
+# Place custom metric files in the textfile collector directory
+
+# Textfile collector directory (default: /var/lib/node_exporter/textfile_collector)
+# Custom metrics should be written as Prometheus-formatted text files
+
+# Example custom metrics that can be collected:
+# - NeuronDB-specific system metrics
+# - Custom application health checks
+# - Service-specific resource usage
+
+# Format for textfile metrics:
+# # HELP metric_name Description of the metric
+# # TYPE metric_name gauge|counter|histogram|summary
+# metric_name{label="value"} value timestamp
+
+# Example NeuronDB custom metrics file content:
+# # HELP neurondb_custom_health Custom health check metric
+# # TYPE neurondb_custom_health gauge
+# neurondb_custom_health{service="neurondb",status="healthy"} 1
+
+# Example service-specific metrics:
+# # HELP neurondb_service_uptime Service uptime in seconds
+# # TYPE neurondb_service_uptime counter
+# neurondb_service_uptime{service="neuronagent"} 3600
+
+# Note: The textfile collector automatically reads all .prom files from
+# the configured directory. No additional configuration needed here.
+
+# For production use, create scripts that write metrics to the textfile
+# collector directory. Example script structure:
+#
+# #!/bin/bash
+# METRICS_FILE="/var/lib/node_exporter/textfile_collector/neurondb_custom.prom"
+# 
+# # Check NeuronDB service health
+# if systemctl is-active --quiet neurondb; then
+#   echo 'neurondb_service_health{service="neurondb"} 1' > "$METRICS_FILE"
+# else
+#   echo 'neurondb_service_health{service="neurondb"} 0' > "$METRICS_FILE"
+# fi
+#
+# # Add timestamp
+# echo "# HELP neurondb_service_health NeuronDB service health status" >> "$METRICS_FILE"
+# echo "# TYPE neurondb_service_health gauge" >> "$METRICS_FILE"
+
+# Recommended custom metrics to collect:
+# 1. Service health checks (systemd service status)
+# 2. Custom application metrics not exposed via HTTP
+# 3. File-based health indicators
+# 4. External dependency checks
+# 5. Custom business logic metrics
+
+# Integration with systemd:
+# Create systemd timer or cron job to update metrics files periodically
+# Example systemd timer unit:
+#
+# [Unit]
+# Description=Update NeuronDB custom metrics
+# 
+# [Timer]
+# OnCalendar=*:0/15
+# 
+# [Install]
+# WantedBy=timers.target
+

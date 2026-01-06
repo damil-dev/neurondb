@@ -1,0 +1,251 @@
+{{- if and .Values.migrations.enabled (not .Values.neurondb.postgresql.external.enabled) }}
+{{- /* Pre-upgrade hook: Run migrations before StatefulSet update */}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "neurondb.fullname" . }}-migration-{{ .Release.Revision }}
+  labels:
+    {{- include "neurondb.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migration
+  annotations:
+    "helm.sh/hook": pre-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: {{ .Values.migrations.backoffLimit | default 3 }}
+  activeDeadlineSeconds: {{ .Values.migrations.activeDeadlineSeconds | default 600 }}
+  template:
+    metadata:
+      labels:
+        {{- include "neurondb.labels" . | nindent 8 }}
+        app.kubernetes.io/component: migration
+    spec:
+      serviceAccountName: {{ include "neurondb.neurondb.serviceAccountName" . }}
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+          - ALL
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+      - name: wait-for-db
+        image: {{ .Values.migrations.waitImage.repository }}:{{ .Values.migrations.waitImage.tag }}
+        command:
+        - sh
+        - -c
+        - |
+          until pg_isready -h {{ include "neurondb.postgresHost" . }} -p {{ include "neurondb.postgresPort" . }} -U {{ include "neurondb.postgresUsername" . }}; do
+            echo "Waiting for database to be ready..."
+            sleep 2
+          done
+          echo "Database is ready!"
+        env:
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "neurondb.postgresPasswordSecret" . }}
+              key: {{ include "neurondb.postgresPasswordKey" . }}
+      containers:
+      - name: migration
+        image: {{ .Values.migrations.image.repository }}:{{ .Values.migrations.image.tag }}
+        imagePullPolicy: {{ .Values.migrations.image.pullPolicy | default "IfNotPresent" }}
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          echo "Running NeuronDB migrations..."
+          
+          # Check current schema version
+          CURRENT_VERSION=$(psql -h {{ include "neurondb.postgresHost" . }} \
+            -p {{ include "neurondb.postgresPort" . }} \
+            -U {{ include "neurondb.postgresUsername" . }} \
+            -d {{ include "neurondb.postgresDatabase" . }} \
+            -t -c "SELECT COALESCE(MAX(version), 0) FROM neurondb_agent.schema_migrations;" 2>/dev/null || echo "0")
+          
+          echo "Current schema version: $CURRENT_VERSION"
+          
+          # Run migrations if migration script is provided
+          {{- if .Values.migrations.script }}
+          echo "Running migration script..."
+          {{ .Values.migrations.script | nindent 10 }}
+          {{- else }}
+          # Check if NeuronDB extension needs upgrade
+          EXT_VERSION=$(psql -h {{ include "neurondb.postgresHost" . }} \
+            -p {{ include "neurondb.postgresPort" . }} \
+            -U {{ include "neurondb.postgresUsername" . }} \
+            -d {{ include "neurondb.postgresDatabase" . }} \
+            -t -c "SELECT extversion FROM pg_extension WHERE extname = 'neurondb';" 2>/dev/null || echo "")
+          
+          if [ -z "$EXT_VERSION" ]; then
+            echo "NeuronDB extension not found, creating it..."
+            psql -h {{ include "neurondb.postgresHost" . }} \
+              -p {{ include "neurondb.postgresPort" . }} \
+              -U {{ include "neurondb.postgresUsername" . }} \
+              -d {{ include "neurondb.postgresDatabase" . }} \
+              -c "CREATE EXTENSION IF NOT EXISTS neurondb;"
+          else
+            echo "NeuronDB extension version: $EXT_VERSION"
+            echo "Extension upgrade will be handled by PostgreSQL ALTER EXTENSION"
+          fi
+          {{- end }}
+          
+          echo "Migrations completed successfully!"
+        env:
+        - name: PGHOST
+          value: {{ include "neurondb.postgresHost" . }}
+        - name: PGPORT
+          value: {{ include "neurondb.postgresPort" . | quote }}
+        - name: PGDATABASE
+          value: {{ include "neurondb.postgresDatabase" . }}
+        - name: PGUSER
+          value: {{ include "neurondb.postgresUsername" . }}
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "neurondb.postgresPasswordSecret" . }}
+              key: {{ include "neurondb.postgresPasswordKey" . }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1000
+          seccompProfile:
+            type: RuntimeDefault
+        resources:
+          {{- toYaml (.Values.migrations.resources | default (dict "requests" (dict "memory" "128Mi" "cpu" "100m") "limits" (dict "memory" "512Mi" "cpu" "500m"))) | nindent 10 }}
+      volumes:
+      - name: tmp
+        emptyDir: {}
+{{- end }}
+
+{{- if and .Values.migrations.enabled .Values.neurondb.postgresql.external.enabled }}
+{{- /* Migration job for external PostgreSQL */}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "neurondb.fullname" . }}-migration-{{ .Release.Revision }}
+  labels:
+    {{- include "neurondb.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migration
+  annotations:
+    "helm.sh/hook": pre-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: {{ .Values.migrations.backoffLimit | default 3 }}
+  activeDeadlineSeconds: {{ .Values.migrations.activeDeadlineSeconds | default 600 }}
+  template:
+    metadata:
+      labels:
+        {{- include "neurondb.labels" . | nindent 8 }}
+        app.kubernetes.io/component: migration
+    spec:
+      serviceAccountName: {{ include "neurondb.neurondb.serviceAccountName" . }}
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+          - ALL
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: migration
+        image: {{ .Values.migrations.image.repository }}:{{ .Values.migrations.image.tag }}
+        imagePullPolicy: {{ .Values.migrations.image.pullPolicy | default "IfNotPresent" }}
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          echo "Running NeuronDB migrations for external PostgreSQL..."
+          
+          {{- if .Values.migrations.script }}
+          echo "Running migration script..."
+          {{ .Values.migrations.script | nindent 10 }}
+          {{- else }}
+          echo "Migration script not provided. Skipping migrations."
+          echo "For external PostgreSQL, run migrations manually or provide migration script."
+          {{- end }}
+          
+          echo "Migrations completed!"
+        {{- if .Values.neurondb.postgresql.external.connectionString }}
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "neurondb.postgresPasswordSecret" . }}
+              key: {{ .Values.neurondb.postgresql.external.secretKeys.connectionString | default "connection-string" }}
+        {{- else }}
+        env:
+        - name: PGHOST
+          {{- if .Values.neurondb.postgresql.external.secretName }}
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "neurondb.postgresPasswordSecret" . }}
+              key: {{ .Values.neurondb.postgresql.external.secretKeys.host | default "host" }}
+          {{- else }}
+          value: {{ include "neurondb.postgresHost" . }}
+          {{- end }}
+        - name: PGPORT
+          {{- if .Values.neurondb.postgresql.external.secretName }}
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "neurondb.postgresPasswordSecret" . }}
+              key: {{ .Values.neurondb.postgresql.external.secretKeys.port | default "port" }}
+          {{- else }}
+          value: {{ include "neurondb.postgresPort" . | quote }}
+          {{- end }}
+        - name: PGDATABASE
+          {{- if .Values.neurondb.postgresql.external.secretName }}
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "neurondb.postgresPasswordSecret" . }}
+              key: {{ .Values.neurondb.postgresql.external.secretKeys.database | default "database" }}
+          {{- else }}
+          value: {{ include "neurondb.postgresDatabase" . }}
+          {{- end }}
+        - name: PGUSER
+          {{- if .Values.neurondb.postgresql.external.secretName }}
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "neurondb.postgresPasswordSecret" . }}
+              key: {{ .Values.neurondb.postgresql.external.secretKeys.username | default "username" }}
+          {{- else }}
+          value: {{ include "neurondb.postgresUsername" . }}
+          {{- end }}
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "neurondb.postgresPasswordSecret" . }}
+              key: {{ include "neurondb.postgresPasswordKey" . }}
+        {{- end }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1000
+          seccompProfile:
+            type: RuntimeDefault
+        resources:
+          {{- toYaml (.Values.migrations.resources | default (dict "requests" (dict "memory" "128Mi" "cpu" "100m") "limits" (dict "memory" "512Mi" "cpu" "500m"))) | nindent 10 }}
+      volumes:
+      - name: tmp
+        emptyDir: {}
+{{- end }}
+

@@ -1,0 +1,45 @@
+# Values for external observability stack
+# Use this when you have your own Prometheus/Grafana/Jaeger
+
+neurondb:
+  enabled: true
+
+neuronagent:
+  enabled: true
+
+neuronmcp:
+  enabled: true
+
+neurondesktop:
+  enabled: true
+
+# Disable bundled monitoring
+monitoring:
+  enabled: false
+
+# Enable Prometheus Operator integration
+observability:
+  prometheusOperator:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      interval: "30s"
+    prometheusRule:
+      enabled: true
+  openTelemetry:
+    enabled: true
+    endpoint: "http://otel-collector:4317"
+    exporter:
+      otlp:
+        endpoint: "http://otel-collector:4317"
+        insecure: true
+
+# RBAC and security
+rbac:
+  enabled: true
+
+networkPolicy:
+  enabled: true
+  allowMonitoring: true
+  monitoringNamespace: "monitoring"  # Namespace where your Prometheus runs
+

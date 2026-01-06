@@ -1,0 +1,41 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: neurondb
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/neurondb/neurondb2
+    targetRevision: main
+    path: helm/neurondb
+    helm:
+      valueFiles:
+        - values-production-external-postgres.yaml
+      parameters:
+        - name: neurondb.postgresql.external.secretName
+          value: neurondb-external-postgres-secret
+        - name: rbac.enabled
+          value: "true"
+        - name: networkPolicy.enabled
+          value: "true"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: neurondb
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  revisionHistoryLimit: 10
+

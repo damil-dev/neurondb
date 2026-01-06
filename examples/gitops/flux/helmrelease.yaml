@@ -1,0 +1,45 @@
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: neurondb
+  namespace: neurondb
+spec:
+  interval: 5m
+  chart:
+    spec:
+      chart: neurondb
+      sourceRef:
+        kind: HelmRepository
+        name: neurondb
+        namespace: flux-system
+      version: ">=2.0.0"
+  values:
+    neurondb:
+      enabled: true
+      postgresql:
+        external:
+          enabled: true
+          secretName: neurondb-external-postgres-secret
+    rbac:
+      enabled: true
+    networkPolicy:
+      enabled: true
+    monitoring:
+      enabled: false
+    observability:
+      prometheusOperator:
+        enabled: true
+        serviceMonitor:
+          enabled: true
+        prometheusRule:
+          enabled: true
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  rollback:
+    enable: true
+    retries: 3
+

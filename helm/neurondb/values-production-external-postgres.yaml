@@ -1,0 +1,97 @@
+# Production values for external PostgreSQL
+# This file demonstrates production-ready configuration with external PostgreSQL
+
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+
+neurondb:
+  enabled: true
+  postgresql:
+    external:
+      enabled: true
+      # Use secret for connection details (recommended for production)
+      secretName: "neurondb-external-postgres-secret"
+      secretKeys:
+        host: "host"
+        port: "port"
+        database: "database"
+        username: "username"
+        password: "password"
+        # Alternative: use connection string
+        # connectionString: "connection-string"
+
+# RBAC enabled for production
+rbac:
+  enabled: true
+  createRoles: true
+
+# NetworkPolicy enabled for production
+networkPolicy:
+  enabled: true
+  allowMonitoring: true
+
+# Security contexts
+neurondb:
+  securityContext:
+    readOnlyRootFilesystem: false  # Set to true if your image supports it
+
+neuronagent:
+  securityContext:
+    readOnlyRootFilesystem: false
+
+neuronmcp:
+  securityContext:
+    readOnlyRootFilesystem: false
+
+neurondesktop:
+  api:
+    securityContext:
+      readOnlyRootFilesystem: false
+  frontend:
+    securityContext:
+      readOnlyRootFilesystem: false
+
+# Resource limits for production
+neurondb:
+  resources:
+    requests:
+      memory: "8Gi"
+      cpu: "4"
+    limits:
+      memory: "16Gi"
+      cpu: "8"
+
+neuronagent:
+  replicas: 3
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "1"
+    limits:
+      memory: "4Gi"
+      cpu: "4"
+
+# Monitoring
+monitoring:
+  enabled: true
+  prometheus:
+    enabled: true
+    retention: "90d"
+    persistence:
+      enabled: true
+      size: "100Gi"
+
+# Backup (for external PostgreSQL, configure at the database level)
+backup:
+  enabled: false  # Disable chart-level backup, use database-level backup
+
+# Ingress with TLS
+ingress:
+  enabled: true
+  className: "nginx"
+  tls:
+    - secretName: neurondb-tls
+      hosts:
+        - neurondb.example.com
+
