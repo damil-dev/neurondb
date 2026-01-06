@@ -85,3 +85,4 @@ cp "$RPM_FILE" "$REPO_ROOT/packaging/rpm/neurondb/"
 echo "Package built: $(basename $RPM_FILE)"
 ls -lh "$REPO_ROOT/packaging/rpm/neurondb/$(basename $RPM_FILE)"
 
+
