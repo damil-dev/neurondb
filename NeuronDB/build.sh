@@ -881,15 +881,22 @@ install_neurondb() {
     
     run_cmd "Install NeurondB" $sudo_cmd make install PG_CONFIG="$pgc" || log_fatal "Installation failed"
     
-    local sharedir pkglibdir
+    # If control file specifies version 2.0 but we installed 1.0.sql, create symlink/copy
+    local sharedir pkglibdir default_version
     sharedir=$("$pgc" --sharedir 2>/dev/null || echo "unknown")
     pkglibdir=$("$pgc" --pkglibdir 2>/dev/null || echo "unknown")
+    default_version=$(grep -E "^default_version\s*=" neurondb.control | sed 's/.*=\s*\(.*\)/\1/' | tr -d "'\" " || echo "1.0")
+    
+    if [[ "$default_version" == "2.0" ]] && [[ -f "${sharedir}/extension/neurondb--1.0.sql" ]] && [[ ! -f "${sharedir}/extension/neurondb--2.0.sql" ]]; then
+        log_info "Control file specifies version 2.0, creating neurondb--2.0.sql from 1.0..."
+        $sudo_cmd cp "${sharedir}/extension/neurondb--1.0.sql" "${sharedir}/extension/neurondb--2.0.sql" || log_warn "Could not create neurondb--2.0.sql"
+    fi
     
     log_success "NeurondB installed"
     echo ""
     printf "  ${BOLD}Installation paths:${NC}\n"
-    log_info "Extension SQL:  ${sharedir}/extension/neurondb--1.0.sql"
-    log_info "Control file:   ${sharedir}/extension/neurondb.control"
+    log_info "Extension SQL:  ${sharedir}/extension/neurondb--${default_version}.sql"
+    log_info "Control file:   ${sharedir}/extension/neurondb.control (default_version: ${default_version})"
     log_info "Library:        ${pkglibdir}/neurondb.so"
     echo ""
 }
