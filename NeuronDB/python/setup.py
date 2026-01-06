@@ -9,7 +9,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
 	name="neurondb",
-	version="1.0.0",
+	version="2.0.0",
 	author="neurondb, Inc.",
 	author_email="admin@neurondb.com",
 	description="Python SDK for NeuronDB PostgreSQL extension",
