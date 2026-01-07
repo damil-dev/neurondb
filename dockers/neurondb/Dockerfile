@@ -109,7 +109,28 @@ EOF
 RUN cd NeuronDB && \
     GPU_BACKENDS=none make clean && \
     GPU_BACKENDS=none make && \
-    GPU_BACKENDS=none make install
+    # Ensure SQL file exists before installation (Makefile expects neurondb--1.0.sql)
+    if [ ! -f neurondb--1.0.sql ]; then \
+        if [ -f neurondb--1.0.sql.linux ]; then \
+            cp neurondb--1.0.sql.linux neurondb--1.0.sql; \
+        elif [ -f neurondb--2.0.sql ]; then \
+            cp neurondb--2.0.sql neurondb--1.0.sql; \
+        elif [ -f neurondb--2.0.sql.linux ]; then \
+            cp neurondb--2.0.sql.linux neurondb--1.0.sql; \
+        else \
+            echo "Warning: No SQL file found, attempting to generate..."; \
+            make neurondb--1.0.sql || echo "Could not generate SQL file"; \
+        fi; \
+    fi && \
+    GPU_BACKENDS=none make install && \
+    # After installation, check if the control file specifies version 2.0
+    # and if neurondb--2.0.sql is missing, create it from neurondb--1.0.sql
+    SHAREDIR=$(/usr/lib/postgresql/${PG_MAJOR}/bin/pg_config --sharedir) && \
+    DEFAULT_VERSION=$(grep -E "^default_version\s*=" "$SHAREDIR/extension/neurondb.control" | sed 's/.*=\s*\(.*\)/\1/' | tr -d "'\" " || echo "1.0") && \
+    if [ "$DEFAULT_VERSION" = "2.0" ] && [ -f "$SHAREDIR/extension/neurondb--1.0.sql" ] && [ ! -f "$SHAREDIR/extension/neurondb--2.0.sql" ]; then \
+      echo "Control file specifies version 2.0, creating neurondb--2.0.sql from 1.0..." && \
+      cp "$SHAREDIR/extension/neurondb--1.0.sql" "$SHAREDIR/extension/neurondb--2.0.sql"; \
+    fi
 
 # -----------------------------------------------------------------------------
 
