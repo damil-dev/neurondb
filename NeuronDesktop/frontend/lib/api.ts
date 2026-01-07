@@ -248,6 +248,22 @@ export const neurondbAPI = {
     api.post(`/profiles/${profileId}/neurondb/sql`, { query }),
   executeSQLFull: (profileId: string, query: string) =>
     api.post(`/profiles/${profileId}/neurondb/sql/execute`, { query }),
+  ingestDataset: (profileId: string, data: { 
+    source_type: string; 
+    source_path?: string; 
+    source?: string;
+    collection?: string; 
+    format?: string;
+    table_name?: string;
+    auto_embed?: boolean;
+    embedding_model?: string;
+    create_index?: boolean;
+  }) =>
+    api.post(`/profiles/${profileId}/neurondb/datasets/ingest`, data),
+  testConnection: (data: { dsn: string }) =>
+    api.post('/neurondb/test-connection', data),
+  loadDemoDataset: (data: { dsn: string }) =>
+    api.post('/neurondb/datasets/load-demo', data),
 }
 
 // Agent API
@@ -335,6 +351,8 @@ export const agentAPI = {
     api.get<Message[]>(`/profiles/${profileId}/agent/sessions/${sessionId}/messages`),
   testConfig: (config: { endpoint: string; api_key: string }) =>
     api.post('/agent/test', config),
+  health: (endpoint: string, apiKey: string) =>
+    api.get('/agent/health', { headers: { 'X-Agent-Endpoint': endpoint, 'X-Agent-API-Key': apiKey } }),
 }
 
 // Model Config API

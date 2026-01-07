@@ -128,7 +128,7 @@ func (h *DatasetHandlers) IngestDataset(w http.ResponseWriter, r *http.Request) 
 /* GetIngestStatus gets the status of an ingestion job */
 func (h *DatasetHandlers) GetIngestStatus(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	profileID := vars["profile_id"]
+	_ = vars["profile_id"] // profileID for future use
 	jobID := vars["job_id"]
 
 	// In production, query job status from database
@@ -145,7 +145,7 @@ func (h *DatasetHandlers) GetIngestStatus(w http.ResponseWriter, r *http.Request
 /* ListIngestJobs lists all ingestion jobs */
 func (h *DatasetHandlers) ListIngestJobs(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	profileID := vars["profile_id"]
+	_ = vars["profile_id"] // profileID for future use
 
 	// In production, query jobs from database
 	// For now, return empty list
