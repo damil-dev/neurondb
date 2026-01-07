@@ -95,9 +95,16 @@ jobs:
           docker cp /usr/share/postgresql/${{ matrix.pg_version }}/extension/neurondb--*.sql $CONTAINER_ID:/usr/share/postgresql/${{ matrix.pg_version }}/extension/ 2>/dev/null || true
           docker cp /usr/lib/postgresql/${{ matrix.pg_version }}/lib/neurondb.so $CONTAINER_ID:/usr/lib/postgresql/${{ matrix.pg_version }}/lib/ 2>/dev/null || true
           # If control file specifies version 2.0, ensure 2.0.sql exists in container
-          DEFAULT_VERSION=$(grep -E "^default_version\s*=" /usr/share/postgresql/${{ matrix.pg_version }}/extension/neurondb.control 2>/dev/null | sed 's/.*=\s*\(.*\)/\1/' | tr -d "'\" " || echo "1.0")
-          if [ "$DEFAULT_VERSION" = "2.0" ]; then
-            docker exec $CONTAINER_ID bash -c "if [ -f /usr/share/postgresql/${{ matrix.pg_version }}/extension/neurondb--1.0.sql ] && [ ! -f /usr/share/postgresql/${{ matrix.pg_version }}/extension/neurondb--2.0.sql ]; then cp /usr/share/postgresql/${{ matrix.pg_version }}/extension/neurondb--1.0.sql /usr/share/postgresql/${{ matrix.pg_version }}/extension/neurondb--2.0.sql; fi" || true
+          SHAREDIR="/usr/share/postgresql/${{ matrix.pg_version }}/extension"
+          if docker exec $CONTAINER_ID test -f "$SHAREDIR/neurondb.control"; then
+            DEFAULT_VERSION=$(docker exec $CONTAINER_ID grep -E "^default_version\s*=" "$SHAREDIR/neurondb.control" 2>/dev/null | sed 's/.*=\s*\(.*\)/\1/' | tr -d "'\" " || echo "1.0")
+            echo "Detected default_version: $DEFAULT_VERSION"
+            if [ "$DEFAULT_VERSION" = "2.0" ]; then
+              echo "Control file specifies version 2.0, ensuring neurondb--2.0.sql exists in container..."
+              docker exec $CONTAINER_ID bash -c "if [ -f $SHAREDIR/neurondb--1.0.sql ] && [ ! -f $SHAREDIR/neurondb--2.0.sql ]; then cp $SHAREDIR/neurondb--1.0.sql $SHAREDIR/neurondb--2.0.sql && echo 'Created neurondb--2.0.sql'; else echo 'neurondb--2.0.sql already exists or 1.0.sql not found'; fi" || echo "Warning: Could not create 2.0.sql in container"
+              # Verify it was created
+              docker exec $CONTAINER_ID ls -la $SHAREDIR/neurondb--*.sql || echo "Warning: Could not list SQL files"
+            fi
           fi
           # Copy ONNX Runtime if it exists
           if [ -d "/usr/local/onnxruntime" ]; then
