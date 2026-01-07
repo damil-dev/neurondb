@@ -260,6 +260,8 @@ export const neurondbAPI = {
     create_index?: boolean;
   }) =>
     api.post(`/profiles/${profileId}/neurondb/datasets/ingest`, data),
+  testConnection: (data: { dsn: string }) =>
+    api.post('/neurondb/test-connection', data),
 }
 
 // Agent API
