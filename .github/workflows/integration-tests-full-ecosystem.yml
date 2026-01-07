@@ -24,6 +24,9 @@ jobs:
       - name: Check service health
         run: |
           docker compose ps
+          # Ensure NeuronDB extension is created
+          echo "Creating NeuronDB extension if not exists..."
+          docker compose exec -T neurondb psql -U neurondb -d neurondb -c "CREATE EXTENSION IF NOT EXISTS neurondb;" || echo "Extension may already exist or creation failed"
           # Check NeuronDB
           docker compose exec -T neurondb psql -U neurondb -d neurondb -c "SELECT neurondb.version();" || exit 1
           # Check NeuronAgent

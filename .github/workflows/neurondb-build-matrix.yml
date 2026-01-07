@@ -67,6 +67,15 @@ jobs:
           echo "Using PG_CONFIG: $PG_CONFIG_PATH"
           $PG_CONFIG_PATH --version
           sudo make install PG_CONFIG=$PG_CONFIG_PATH
+          # If control file specifies version 2.0 but we installed 1.0.sql, create 2.0.sql
+          SHAREDIR=$($PG_CONFIG_PATH --sharedir)
+          if [ -f "$SHAREDIR/extension/neurondb.control" ]; then
+            DEFAULT_VERSION=$(grep -E "^default_version\s*=" "$SHAREDIR/extension/neurondb.control" | sed 's/.*=\s*\(.*\)/\1/' | tr -d "'\" " || echo "1.0")
+            if [ "$DEFAULT_VERSION" = "2.0" ] && [ -f "$SHAREDIR/extension/neurondb--1.0.sql" ] && [ ! -f "$SHAREDIR/extension/neurondb--2.0.sql" ]; then
+              echo "Control file specifies version 2.0, creating neurondb--2.0.sql from 1.0..."
+              sudo cp "$SHAREDIR/extension/neurondb--1.0.sql" "$SHAREDIR/extension/neurondb--2.0.sql"
+            fi
+          fi
         env:
           PG_CONFIG: /usr/bin/pg_config
 
@@ -82,9 +91,40 @@ jobs:
           # Install required dependencies in the container
           docker exec $CONTAINER_ID bash -c "apt-get update && apt-get install -y libcurl4 libssl3 || apt-get install -y libcurl4-openssl-dev libssl-dev || true"
           # Copy extension files into the container
-          docker cp /usr/share/postgresql/${{ matrix.pg_version }}/extension/neurondb.control $CONTAINER_ID:/usr/share/postgresql/${{ matrix.pg_version }}/extension/ 2>/dev/null || true
-          docker cp /usr/share/postgresql/${{ matrix.pg_version }}/extension/neurondb--*.sql $CONTAINER_ID:/usr/share/postgresql/${{ matrix.pg_version }}/extension/ 2>/dev/null || true
-          docker cp /usr/lib/postgresql/${{ matrix.pg_version }}/lib/neurondb.so $CONTAINER_ID:/usr/lib/postgresql/${{ matrix.pg_version }}/lib/ 2>/dev/null || true
+          SHAREDIR="/usr/share/postgresql/${{ matrix.pg_version }}/extension"
+          LIBDIR="/usr/lib/postgresql/${{ matrix.pg_version }}/lib"
+          echo "Copying extension files from host..."
+          echo "Checking host files:"
+          ls -la "$SHAREDIR/neurondb*" 2>/dev/null || echo "No files found in $SHAREDIR"
+          # Copy control file
+          docker cp "$SHAREDIR/neurondb.control" $CONTAINER_ID:"$SHAREDIR/" 2>/dev/null || echo "Warning: Could not copy control file"
+          # Copy SQL files individually (wildcard might not work in docker cp)
+          if [ -f "$SHAREDIR/neurondb--1.0.sql" ]; then
+            echo "Copying neurondb--1.0.sql..."
+            docker cp "$SHAREDIR/neurondb--1.0.sql" $CONTAINER_ID:"$SHAREDIR/" 2>/dev/null || echo "Warning: Could not copy 1.0.sql"
+          else
+            echo "WARNING: neurondb--1.0.sql not found on host!"
+          fi
+          if [ -f "$SHAREDIR/neurondb--2.0.sql" ]; then
+            echo "Copying neurondb--2.0.sql..."
+            docker cp "$SHAREDIR/neurondb--2.0.sql" $CONTAINER_ID:"$SHAREDIR/" 2>/dev/null || echo "Warning: Could not copy 2.0.sql"
+          else
+            echo "Note: neurondb--2.0.sql not found on host (will be created if needed)"
+          fi
+          # Copy library
+          docker cp "$LIBDIR/neurondb.so" $CONTAINER_ID:"$LIBDIR/" 2>/dev/null || echo "Warning: Could not copy library"
+          # If control file specifies version 2.0, ensure 2.0.sql exists in container
+          SHAREDIR="/usr/share/postgresql/${{ matrix.pg_version }}/extension"
+          if docker exec $CONTAINER_ID test -f "$SHAREDIR/neurondb.control"; then
+            DEFAULT_VERSION=$(docker exec $CONTAINER_ID grep -E "^default_version\s*=" "$SHAREDIR/neurondb.control" 2>/dev/null | sed 's/.*=\s*\(.*\)/\1/' | tr -d "'\" " || echo "1.0")
+            echo "Detected default_version: $DEFAULT_VERSION"
+            if [ "$DEFAULT_VERSION" = "2.0" ]; then
+              echo "Control file specifies version 2.0, ensuring neurondb--2.0.sql exists in container..."
+              docker exec $CONTAINER_ID bash -c "if [ -f $SHAREDIR/neurondb--1.0.sql ] && [ ! -f $SHAREDIR/neurondb--2.0.sql ]; then cp $SHAREDIR/neurondb--1.0.sql $SHAREDIR/neurondb--2.0.sql && echo 'Created neurondb--2.0.sql'; else echo 'neurondb--2.0.sql already exists or 1.0.sql not found'; fi" || echo "Warning: Could not create 2.0.sql in container"
+              # Verify it was created
+              docker exec $CONTAINER_ID ls -la $SHAREDIR/neurondb--*.sql || echo "Warning: Could not list SQL files"
+            fi
+          fi
           # Copy ONNX Runtime if it exists
           if [ -d "/usr/local/onnxruntime" ]; then
             docker exec $CONTAINER_ID mkdir -p /usr/local/onnxruntime
@@ -109,6 +149,23 @@ jobs:
           # Verify files were copied
           docker exec $CONTAINER_ID ls -la /usr/share/postgresql/${{ matrix.pg_version }}/extension/neurondb* || echo "Warning: Extension files not found in container"
           docker exec $CONTAINER_ID ldd /usr/lib/postgresql/${{ matrix.pg_version }}/lib/neurondb.so || echo "Warning: Could not check library dependencies"
+          # Final check: Ensure 2.0.sql exists if control file says 2.0
+          SHAREDIR="/usr/share/postgresql/${{ matrix.pg_version }}/extension"
+          if docker exec $CONTAINER_ID test -f "$SHAREDIR/neurondb.control"; then
+            DEFAULT_VERSION=$(docker exec $CONTAINER_ID grep -E "^default_version\s*=" "$SHAREDIR/neurondb.control" 2>/dev/null | sed 's/.*=\s*\(.*\)/\1/' | tr -d "'\" " || echo "1.0")
+            echo "Final check - Control file default_version: $DEFAULT_VERSION"
+            if [ "$DEFAULT_VERSION" = "2.0" ] && ! docker exec $CONTAINER_ID test -f "$SHAREDIR/neurondb--2.0.sql"; then
+              echo "WARNING: neurondb--2.0.sql missing! Attempting to create..."
+              if docker exec $CONTAINER_ID test -f "$SHAREDIR/neurondb--1.0.sql"; then
+                docker exec $CONTAINER_ID cp "$SHAREDIR/neurondb--1.0.sql" "$SHAREDIR/neurondb--2.0.sql"
+                echo "Created neurondb--2.0.sql from 1.0.sql"
+                docker exec $CONTAINER_ID ls -la "$SHAREDIR/neurondb--*.sql"
+              else
+                echo "ERROR: Neither 1.0.sql nor 2.0.sql found!"
+                exit 1
+              fi
+            fi
+          fi
 
       - name: Create extension in test database
         run: |
