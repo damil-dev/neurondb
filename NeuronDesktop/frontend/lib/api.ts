@@ -349,6 +349,8 @@ export const agentAPI = {
     api.get<Message[]>(`/profiles/${profileId}/agent/sessions/${sessionId}/messages`),
   testConfig: (config: { endpoint: string; api_key: string }) =>
     api.post('/agent/test', config),
+  health: (endpoint: string, apiKey: string) =>
+    api.get('/agent/health', { headers: { 'X-Agent-Endpoint': endpoint, 'X-Agent-API-Key': apiKey } }),
 }
 
 // Model Config API
