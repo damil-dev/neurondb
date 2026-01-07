@@ -262,6 +262,8 @@ export const neurondbAPI = {
     api.post(`/profiles/${profileId}/neurondb/datasets/ingest`, data),
   testConnection: (data: { dsn: string }) =>
     api.post('/neurondb/test-connection', data),
+  loadDemoDataset: (data: { dsn: string }) =>
+    api.post('/neurondb/datasets/load-demo', data),
 }
 
 // Agent API

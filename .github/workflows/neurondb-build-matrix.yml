@@ -130,6 +130,23 @@ jobs:
           # Verify files were copied
           docker exec $CONTAINER_ID ls -la /usr/share/postgresql/${{ matrix.pg_version }}/extension/neurondb* || echo "Warning: Extension files not found in container"
           docker exec $CONTAINER_ID ldd /usr/lib/postgresql/${{ matrix.pg_version }}/lib/neurondb.so || echo "Warning: Could not check library dependencies"
+          # Final check: Ensure 2.0.sql exists if control file says 2.0
+          SHAREDIR="/usr/share/postgresql/${{ matrix.pg_version }}/extension"
+          if docker exec $CONTAINER_ID test -f "$SHAREDIR/neurondb.control"; then
+            DEFAULT_VERSION=$(docker exec $CONTAINER_ID grep -E "^default_version\s*=" "$SHAREDIR/neurondb.control" 2>/dev/null | sed 's/.*=\s*\(.*\)/\1/' | tr -d "'\" " || echo "1.0")
+            echo "Final check - Control file default_version: $DEFAULT_VERSION"
+            if [ "$DEFAULT_VERSION" = "2.0" ] && ! docker exec $CONTAINER_ID test -f "$SHAREDIR/neurondb--2.0.sql"; then
+              echo "WARNING: neurondb--2.0.sql missing! Attempting to create..."
+              if docker exec $CONTAINER_ID test -f "$SHAREDIR/neurondb--1.0.sql"; then
+                docker exec $CONTAINER_ID cp "$SHAREDIR/neurondb--1.0.sql" "$SHAREDIR/neurondb--2.0.sql"
+                echo "Created neurondb--2.0.sql from 1.0.sql"
+                docker exec $CONTAINER_ID ls -la "$SHAREDIR/neurondb--*.sql"
+              else
+                echo "ERROR: Neither 1.0.sql nor 2.0.sql found!"
+                exit 1
+              fi
+            fi
+          fi
 
       - name: Create extension in test database
         run: |
