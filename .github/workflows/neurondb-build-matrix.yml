@@ -91,9 +91,28 @@ jobs:
           # Install required dependencies in the container
           docker exec $CONTAINER_ID bash -c "apt-get update && apt-get install -y libcurl4 libssl3 || apt-get install -y libcurl4-openssl-dev libssl-dev || true"
           # Copy extension files into the container
-          docker cp /usr/share/postgresql/${{ matrix.pg_version }}/extension/neurondb.control $CONTAINER_ID:/usr/share/postgresql/${{ matrix.pg_version }}/extension/ 2>/dev/null || true
-          docker cp /usr/share/postgresql/${{ matrix.pg_version }}/extension/neurondb--*.sql $CONTAINER_ID:/usr/share/postgresql/${{ matrix.pg_version }}/extension/ 2>/dev/null || true
-          docker cp /usr/lib/postgresql/${{ matrix.pg_version }}/lib/neurondb.so $CONTAINER_ID:/usr/lib/postgresql/${{ matrix.pg_version }}/lib/ 2>/dev/null || true
+          SHAREDIR="/usr/share/postgresql/${{ matrix.pg_version }}/extension"
+          LIBDIR="/usr/lib/postgresql/${{ matrix.pg_version }}/lib"
+          echo "Copying extension files from host..."
+          echo "Checking host files:"
+          ls -la "$SHAREDIR/neurondb*" 2>/dev/null || echo "No files found in $SHAREDIR"
+          # Copy control file
+          docker cp "$SHAREDIR/neurondb.control" $CONTAINER_ID:"$SHAREDIR/" 2>/dev/null || echo "Warning: Could not copy control file"
+          # Copy SQL files individually (wildcard might not work in docker cp)
+          if [ -f "$SHAREDIR/neurondb--1.0.sql" ]; then
+            echo "Copying neurondb--1.0.sql..."
+            docker cp "$SHAREDIR/neurondb--1.0.sql" $CONTAINER_ID:"$SHAREDIR/" 2>/dev/null || echo "Warning: Could not copy 1.0.sql"
+          else
+            echo "WARNING: neurondb--1.0.sql not found on host!"
+          fi
+          if [ -f "$SHAREDIR/neurondb--2.0.sql" ]; then
+            echo "Copying neurondb--2.0.sql..."
+            docker cp "$SHAREDIR/neurondb--2.0.sql" $CONTAINER_ID:"$SHAREDIR/" 2>/dev/null || echo "Warning: Could not copy 2.0.sql"
+          else
+            echo "Note: neurondb--2.0.sql not found on host (will be created if needed)"
+          fi
+          # Copy library
+          docker cp "$LIBDIR/neurondb.so" $CONTAINER_ID:"$LIBDIR/" 2>/dev/null || echo "Warning: Could not copy library"
           # If control file specifies version 2.0, ensure 2.0.sql exists in container
           SHAREDIR="/usr/share/postgresql/${{ matrix.pg_version }}/extension"
           if docker exec $CONTAINER_ID test -f "$SHAREDIR/neurondb.control"; then
