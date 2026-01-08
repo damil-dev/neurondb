@@ -170,3 +170,5 @@ print("  1. Install: pip install openai (or anthropic)")
 print("  2. Set API key: export OPENAI_API_KEY=your_key")
 print("  3. Replace generate_response() with actual LLM API calls")
 
+
+

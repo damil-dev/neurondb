@@ -11,3 +11,5 @@ sentence-transformers>=2.2.0
 # openai>=1.0.0  # For LLM integration
 # anthropic>=0.7.0  # For Claude integration
 
+
+

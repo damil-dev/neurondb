@@ -166,3 +166,5 @@ print("=" * 60)
 print("\nNote: Indexes are essential for fast search on large datasets.")
 print("HNSW (Hierarchical Navigable Small World) is the recommended index type.")
 
+
+

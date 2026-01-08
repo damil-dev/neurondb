@@ -100,3 +100,5 @@ cur.close()
 conn.close()
 print("\n✓ Example complete!")
 
+
+

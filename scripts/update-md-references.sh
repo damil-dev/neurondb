@@ -1,6 +1,19 @@
 #!/bin/bash
-
-# Script to update references to renamed .md files
+# -------------------------------------------------------------------------
+#
+# update-md-references.sh
+#    Script to update references to renamed .md files
+#
+# Updates references to renamed markdown files across the codebase by
+# finding and replacing old filenames with new filenames in various
+# file types.
+#
+# Copyright (c) 2024-2026, neurondb, Inc.
+#
+# IDENTIFICATION
+#    scripts/update-md-references.sh
+#
+# -------------------------------------------------------------------------
 
 cd /Users/pgedge/pge/neurondb2 || exit 1
 

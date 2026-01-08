@@ -6,7 +6,7 @@
  * Provides shared types for identity, authentication, and authorization
  * across NeuronDesktop, NeuronAgent, and NeuronMCP.
  *
- * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ * Copyright (c) 2024-2026, neurondb, Inc. <admin@neurondb.com>
  *
  * IDENTIFICATION
  *    pkg/identity/types.go
@@ -202,4 +202,6 @@ type PermissionChecker interface {
 	HasRole(ctx interface{}, principalID uuid.UUID, role StandardRole) (bool, error)
 	CheckPolicy(ctx interface{}, principalID uuid.UUID, resourceType ResourceType, resourceID *string, permission Permission) (bool, error)
 }
+
+
 

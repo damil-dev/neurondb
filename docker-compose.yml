@@ -1,10 +1,19 @@
-# Canonical Docker Compose file (repo root)
-# This file is intentionally located at the repository root so new users can run:
-#   docker compose up -d
-# without needing to know about the internal `dockers/` layout.
+# -------------------------------------------------------------------------
 #
-# It is based on `dockers/docker-compose.yml`, with paths adjusted to be correct
-# relative to the repository root.
+# docker-compose.yml
+#    Canonical Docker Compose file for NeuronDB Ecosystem
+#
+# This file is intentionally located at the repository root so new users can
+# run 'docker compose up -d' without needing to know about the internal
+# dockers/ layout. It is based on dockers/docker-compose.yml, with paths
+# adjusted to be correct relative to the repository root.
+#
+# Copyright (c) 2024-2026, neurondb, Inc.
+#
+# IDENTIFICATION
+#    docker-compose.yml
+#
+# -------------------------------------------------------------------------
 
 services:
   neurondb:

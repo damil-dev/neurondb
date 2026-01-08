@@ -156,3 +156,5 @@ agent = Agent(tools=[mcp_tool])
 - [Tool Catalog](../../NeuronMCP/docs/tool-resource-catalog.md) - All available tools
 - [MCP Protocol](https://modelcontextprotocol.io) - MCP specification
 
+
+
