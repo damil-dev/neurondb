@@ -48,7 +48,7 @@ docker compose up -d --build
 ```
 
 > [!NOTE]
-> Published images from GitHub Container Registry (GHCR) are available starting with v1.0.0. See [Container Images documentation](Docs/deployment/container-images.md) for image names and tags.
+> Published images from GitHub Container Registry (GHCR) are available starting with v2.0.0. See [Container Images documentation](Docs/deployment/container-images.md) for image names and tags.
 
 This command will:
 
@@ -90,14 +90,18 @@ Verify everything works with these quick smoke tests.
 Test that NeuronDB extension is loaded and functional:
 
 ```bash
+# Using docker compose exec (service name)
 docker compose exec neurondb psql -U neurondb -d neurondb -c "SELECT neurondb.version();"
+
+# Or connect directly from host
+psql "postgresql://neurondb:neurondb@localhost:5433/neurondb" -c "SELECT neurondb.version();"
 ```
 
 **Expected output:**
 ```
 version
 --------
-1.0.0
+2.0
 (1 row)
 ```
 
@@ -106,11 +110,20 @@ version
 Test that NeuronAgent REST API is responding:
 
 ```bash
-curl http://localhost:8080/health
+# Health check endpoint (no authentication required)
+curl -s http://localhost:8080/health
+
+# Pretty print JSON response
+curl -s http://localhost:8080/health | jq .
 ```
 
 **Expected output:**
 ```json
+{"status":"ok"}
+```
+
+**If you don't have jq installed, the raw response is:**
+```
 {"status":"ok"}
 ```
 
@@ -119,19 +132,22 @@ curl http://localhost:8080/health
 Test that NeuronMCP server responds to MCP protocol:
 
 ```bash
+# Test MCP server initialization via JSON-RPC
 echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0.0"}}}' | \
-docker compose exec -T neurondb-mcp /app/neurondb-mcp | head -20
+docker compose exec -T neuronmcp /app/neurondb-mcp | head -20
 ```
 
-**Expected output:**JSON-RPC response with server information.
+**Expected output:** JSON-RPC response with server information including protocol version and server capabilities.
 
-**Alternative: Use the Python MCP client:**
+**Alternative: Use the Python MCP client (if available):**
 
 ```bash
 cd NeuronMCP/client
 pip install -r requirements.txt
-./neurondb_mcp_client.py -c ../../neuronmcp_server.json -e "list_tools" 2>/dev/null | head -30
+python neurondb_mcp_client.py -c ../../neuronmcp_server.json -e "list_tools" 2>/dev/null | head -30
 ```
+
+**Note:** NeuronMCP communicates via stdio (standard input/output), not HTTP. It's designed to be used with MCP-compatible clients like Claude Desktop.
 
 ## Step 3: Quick Verification Script
 
@@ -159,6 +175,10 @@ All smoke tests passed!
 <summary><strong>Example 1: Create a Vector Table</strong></summary>
 
 ```bash
+# Create extension first (if not already created)
+docker compose exec neurondb psql -U neurondb -d neurondb -c "CREATE EXTENSION IF NOT EXISTS neurondb;"
+
+# Create table, insert data, and query
 docker compose exec neurondb psql -U neurondb -d neurondb <<EOF
 CREATE TABLE documents (
   id SERIAL PRIMARY KEY,
@@ -173,13 +193,39 @@ SELECT id, content FROM documents;
 EOF
 ```
 
+**Expected output:**
+```
+ id |    content    
+----+---------------
+  1 | Hello, world!
+(1 row)
+```
+
+**Or connect directly from your host machine:**
+```bash
+psql "postgresql://neurondb:neurondb@localhost:5433/neurondb" <<EOF
+CREATE EXTENSION IF NOT EXISTS neurondb;
+CREATE TABLE documents (
+  id SERIAL PRIMARY KEY,
+  content TEXT,
+  embedding vector(1536)
+);
+INSERT INTO documents (content, embedding)
+VALUES ('Hello, world!', '[0.1, 0.2, 0.3]'::vector);
+SELECT id, content FROM documents;
+EOF
+```
+
 </details>
 
 <details>
 <summary><strong>Example 2: Create an Agent via REST API</strong></summary>
 
 ```bash
-# First, create an API key (check NeuronAgent documentation)
+# Step 1: Create an API key first (see NeuronAgent documentation for key generation)
+# For testing, you can use the default development setup
+
+# Step 2: Create an agent
 curl -X POST http://localhost:8080/api/v1/agents \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
@@ -192,7 +238,20 @@ curl -X POST http://localhost:8080/api/v1/agents \
   }'
 ```
 
-**Note:** Replace `YOUR_API_KEY` with an actual API key from NeuronAgent
+**Expected output:**
+```json
+{
+  "id": "agent-uuid-here",
+  "name": "test-agent",
+  "status": "active",
+  "created_at": "2026-01-08T..."
+}
+```
+
+**Note:** 
+- Replace `YOUR_API_KEY` with an actual API key from NeuronAgent
+- See [NeuronAgent API documentation](NeuronAgent/docs/API.md) for authentication setup
+- For development, check if API key authentication is enabled in your configuration
 
 </details>
 
@@ -204,11 +263,21 @@ curl -X POST http://localhost:8080/api/v1/agents \
 
 **Check logs:**
 ```bash
+# View logs for all services
+docker compose logs
+
+# View logs for specific service
 docker compose logs neurondb
 docker compose logs neuronagent
-docker compose logs neurondb-mcp
+docker compose logs neuronmcp
 docker compose logs neurondesk-api
 docker compose logs neurondesk-frontend
+
+# Follow logs in real-time
+docker compose logs -f neurondb
+
+# View last 50 lines of logs
+docker compose logs --tail=50 neurondb
 ```
 
 **Common issues:**
@@ -251,7 +320,7 @@ All services should show "healthy" status. If not, check logs:
 ```bash
 docker compose logs --tail=50 neurondb
 docker compose logs --tail=50 neuronagent
-docker compose logs --tail=50 neurondb-mcp
+docker compose logs --tail=50 neuronmcp
 docker compose logs --tail=50 neurondesk-api
 docker compose logs --tail=50 neurondesk-frontend
 ```
@@ -310,13 +379,13 @@ docker compose rm neuronagent
 
 After `docker compose up -d`, you have:
 
-| Service | Container Name | Port | Description |
-|---------|---------------|------|-------------|
-| **NeuronDB** | `neurondb-cpu` | 5433 | PostgreSQL with NeuronDB extension |
-| **NeuronAgent** | `neuronagent` | 8080 | REST API server for agent runtime |
-| **NeuronMCP** | `neurondb-mcp` | - | MCP protocol server (stdio) |
-| **NeuronDesktop API** | `neurondesk-api` | 8081 | NeuronDesktop backend API |
-| **NeuronDesktop Frontend** | `neurondesk-frontend` | 3000 | NeuronDesktop web interface |
+| Service Name | Container Name | Port | Description | Connection String |
+|--------------|---------------|------|-------------|-------------------|
+| **NeuronDB** | `neurondb-cpu` | 5433 | PostgreSQL with NeuronDB extension | `postgresql://neurondb:neurondb@localhost:5433/neurondb` |
+| **NeuronAgent** | `neuronagent` | 8080 | REST API server for agent runtime | `http://localhost:8080` |
+| **NeuronMCP** | `neurondb-mcp` | - | MCP protocol server (stdio) | stdio (JSON-RPC 2.0) |
+| **NeuronDesktop API** | `neurondesk-api` | 8081 | NeuronDesktop backend API | `http://localhost:8081` |
+| **NeuronDesktop Frontend** | `neurondesk-frontend` | 3000 | NeuronDesktop web interface | `http://localhost:3000` |
 
 **Network:**All services communicate via `neurondb-network` Docker network.
 
@@ -328,22 +397,43 @@ After `docker compose up -d`, you have:
 ### PostgreSQL (NeuronDB)
 
 ```bash
-# Connect via psql
+# Connect via docker compose exec (inside container)
 docker compose exec neurondb psql -U neurondb -d neurondb
 
-# Or from host
+# Or connect directly from host machine
 psql "postgresql://neurondb:neurondb@localhost:5433/neurondb"
+
+# Quick test query
+psql "postgresql://neurondb:neurondb@localhost:5433/neurondb" -c "SELECT neurondb.version();"
+
+# Create extension (if not already created)
+psql "postgresql://neurondb:neurondb@localhost:5433/neurondb" -c "CREATE EXTENSION IF NOT EXISTS neurondb;"
 ```
+
+> [!WARNING]
+> Default password `neurondb` is for **development only**. Always use strong passwords in production!
 
 ### NeuronAgent REST API
 
 ```bash
-# Health check (no auth required)
-curl http://localhost:8080/health
+# Health check (no authentication required)
+curl -s http://localhost:8080/health
 
-# API endpoints (auth required)
-curl -H "Authorization: Bearer YOUR_API_KEY" \
-  http://localhost:8080/api/v1/agents
+# Pretty print JSON response
+curl -s http://localhost:8080/health | jq .
+
+# List agents (authentication required - replace YOUR_API_KEY)
+curl -s -H "Authorization: Bearer YOUR_API_KEY" \
+  http://localhost:8080/api/v1/agents | jq .
+
+# Get agent by ID
+curl -s -H "Authorization: Bearer YOUR_API_KEY" \
+  http://localhost:8080/api/v1/agents/AGENT_ID | jq .
+```
+
+**Expected health check response:**
+```json
+{"status":"ok"}
 ```
 
 ### NeuronMCP Server
@@ -360,12 +450,28 @@ cd NeuronMCP/client
 Access the unified web interface:
 
 ```bash
-# Web UI (browser)
-http://localhost:3000
+# Web UI (open in browser)
+open http://localhost:3000
+# Or visit: http://localhost:3000
 
-# API endpoint
-curl http://localhost:8081/health
+# API health check endpoint
+curl -s http://localhost:8081/health
+
+# Pretty print JSON response
+curl -s http://localhost:8081/health | jq .
 ```
+
+**Expected health check response:**
+```json
+{"status":"ok","service":"neurondesk-api"}
+```
+
+**NeuronDesktop provides:**
+- Unified web interface for all NeuronDB ecosystem components
+- Real-time monitoring and metrics
+- SQL console for direct database queries
+- Agent management interface
+- Vector search and RAG pipeline tools
 
 ## Configuration
 

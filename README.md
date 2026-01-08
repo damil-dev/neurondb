@@ -52,8 +52,11 @@
 Get vector search working in under a minute:
 
 ```bash
-# 1. Start PostgreSQL with NeuronDB
+# 1. Start PostgreSQL with NeuronDB (CPU profile, default)
 docker compose up -d neurondb
+
+# Wait for service to be healthy (about 30-60 seconds)
+docker compose ps
 
 # 2. Connect and create extension
 psql "postgresql://neurondb:neurondb@localhost:5433/neurondb" -c "CREATE EXTENSION IF NOT EXISTS neurondb;"
@@ -78,6 +81,16 @@ FROM documents
 ORDER BY embedding <=> '[0.15,0.25,0.35]'::vector
 LIMIT 3;
 EOF
+```
+
+**Expected output:**
+```
+ id |              content               |     distance      
+----+------------------------------------+-------------------
+  1 | Machine learning algorithms        | 0.141421356237309
+  2 | Neural networks and deep learning  | 0.173205080756888
+  3 | Natural language processing       | 0.244948974278318
+(3 rows)
 ```
 
 > [!SECURITY]
@@ -163,8 +176,17 @@ docker compose pull
 
 # Start services
 docker compose up -d
+
+# Wait for services to be healthy (30-60 seconds)
+docker compose ps
+
+# Verify all services are running
 ./scripts/health-check.sh
 ```
+
+**What you'll see:**
+- 5 services starting: `neurondb-cpu`, `neuronagent`, `neurondb-mcp`, `neurondesk-api`, `neurondesk-frontend`
+- All services should show "healthy" status after initialization
 
 > [!TIP]
 > For specific versions, see [Container Images documentation](Docs/deployment/container-images.md). Published images are available starting with v1.0.0.
@@ -172,9 +194,20 @@ docker compose up -d
 **Option 2: Build from source**
 
 ```bash
+# Build and start all services
 docker compose up -d --build
+
+# Monitor build progress (first time takes 5-10 minutes)
+docker compose logs -f
+
+# Once built, wait for services to be healthy
+docker compose ps
+
+# Verify all services are running
 ./scripts/health-check.sh
 ```
+
+**Build time:** First build takes 5-10 minutes depending on your system. Subsequent starts are 30-60 seconds.
 
 <details>
 <summary><strong>Prerequisites checklist</strong></summary>
@@ -243,8 +276,13 @@ neurondb.maintenance_work_mem = 256MB # Index build memory
 -- Check current version
 SELECT extversion FROM pg_extension WHERE extname = 'neurondb';
 
--- Upgrade to latest
+-- Expected output: 2.0
+
+-- Upgrade to latest (if newer version available)
 ALTER EXTENSION neurondb UPDATE;
+
+-- Verify upgrade
+SELECT neurondb.version();
 ```
 
 </details>
@@ -288,12 +326,13 @@ No additional services, ports, or configuration required!
 
 ## Service URLs & ports
 
-| Service | How to reach it | Default credentials |
-|---|---|---|
-| NeuronDB (PostgreSQL) | `postgresql://neurondb:neurondb@localhost:5433/neurondb` | User: `neurondb`, Password: `neurondb` ⚠️ **Dev only** |
-| NeuronAgent | `http://localhost:8080/health` | API key required for endpoints |
-| NeuronDesktop UI | `http://localhost:3000` | No auth (development) |
-| NeuronDesktop API | `http://localhost:8081/health` | No auth (development) |
+| Service | How to reach it | Default credentials | Notes |
+|---|---|---|---|
+| **NeuronDB (PostgreSQL)** | `postgresql://neurondb:neurondb@localhost:5433/neurondb` | User: `neurondb`, Password: `neurondb` ⚠️ **Dev only** | Container: `neurondb-cpu`, Service: `neurondb` |
+| **NeuronAgent** | `http://localhost:8080/health` | Health: no auth. API: API key required | Container: `neuronagent`, Service: `neuronagent` |
+| **NeuronDesktop UI** | `http://localhost:3000` | No auth (development mode) | Container: `neurondesk-frontend`, Service: `neurondesk-frontend` |
+| **NeuronDesktop API** | `http://localhost:8081/health` | Health: no auth. API: varies by config | Container: `neurondesk-api`, Service: `neurondesk-api` |
+| **NeuronMCP** | stdio (JSON-RPC 2.0) | N/A (MCP protocol) | Container: `neurondb-mcp`, Service: `neuronmcp`. No HTTP port. |
 
 > [!WARNING]
 > **Production Security**: The default credentials shown above are for development only. Always use strong, unique passwords in production. Set `POSTGRES_PASSWORD` and other secrets via environment variables or a `.env` file (see [`env.example`](env.example)).
@@ -301,9 +340,10 @@ No additional services, ports, or configuration required!
 ## Documentation
 
 - **Start here**: [`DOCUMENTATION.md`](DOCUMENTATION.md) (documentation index)
-- **Beginner walkthrough**: [`Docs/getting-started/simple-start.md`](Docs/getting-started/simple-start.md)
-- **Technical quick start**: [`QUICKSTART.md`](QUICKSTART.md)
-- **Official docs**: [`neurondb.ai/docs`](https://www.neurondb.ai/docs)
+- **Beginner walkthrough**: [`Docs/getting-started/simple-start.md`](Docs/getting-started/simple-start.md) - Step-by-step guide for beginners
+- **Technical quick start**: [`QUICKSTART.md`](QUICKSTART.md) - Fast setup for experienced users
+- **Complete guide**: [`Docs/getting-started/installation.md`](Docs/getting-started/installation.md) - Detailed installation options
+- **Official docs**: [`neurondb.ai/docs`](https://www.neurondb.ai/docs) - Online documentation
 
 ### Module-wise Documentation
 
@@ -480,33 +520,65 @@ cd NeuronDB/benchmark/rag
 
 ## GPU profiles (CUDA / ROCm / Metal)
 
-The root `docker-compose.yml` supports profiles:
+The root `docker-compose.yml` supports multiple GPU backends via Docker Compose profiles:
 
-- **CPU (default)**: `docker compose up -d`
-- **CUDA**: `docker compose --profile cuda up -d`
-- **ROCm**: `docker compose --profile rocm up -d`
+**Available profiles:**
+- **CPU (default)**: `docker compose up -d` or `docker compose --profile cpu up -d`
+- **CUDA (NVIDIA)**: `docker compose --profile cuda up -d`
+- **ROCm (AMD)**: `docker compose --profile rocm up -d`
+- **Metal (Apple Silicon)**: `docker compose --profile metal up -d`
 
-Ports differ per profile (see [`env.example`](env.example)):
+**Ports differ per profile** (see [`env.example`](env.example)):
 
-- **CPU**: `POSTGRES_PORT=5433`
+- **CPU**: `POSTGRES_PORT=5433` (default)
 - **CUDA**: `POSTGRES_CUDA_PORT=5434`
 - **ROCm**: `POSTGRES_ROCM_PORT=5435`
+- **Metal**: `POSTGRES_METAL_PORT=5436`
+
+**Example: Start with CUDA support**
+```bash
+# Stop CPU services first
+docker compose down
+
+# Start CUDA profile
+docker compose --profile cuda up -d
+
+# Verify CUDA services are running
+docker compose ps
+
+# Connect to CUDA-enabled PostgreSQL
+psql "postgresql://neurondb:neurondb@localhost:5434/neurondb" -c "SELECT neurondb.version();"
+```
+
+**GPU Requirements:**
+- **CUDA**: NVIDIA GPU with CUDA 12.2+ and nvidia-container-toolkit
+- **ROCm**: AMD GPU with ROCm 5.7+ and proper device access
+- **Metal**: Apple Silicon (M1/M2/M3) Mac with macOS 13+
 
 <details>
 <summary><strong>Common Docker commands</strong></summary>
 
 ```bash
-# Stop everything (keep data)
+# Stop everything (keep data volumes)
 docker compose down
 
-# Stop everything (delete data volumes)
+# Stop everything (delete data volumes - WARNING: deletes all data!)
 docker compose down -v
 
-# See status
+# See status of all services
 docker compose ps
 
-# Tail logs
+# Tail logs for all services
+docker compose logs -f
+
+# Tail logs for specific services
 docker compose logs -f neurondb neuronagent neuronmcp neurondesk-api neurondesk-frontend
+
+# View last 100 lines of logs
+docker compose logs --tail=100
+
+# View logs for specific service
+docker compose logs neurondb
 ```
 
 </details>
