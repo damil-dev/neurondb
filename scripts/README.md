@@ -1,487 +1,1124 @@
 # NeuronDB Scripts
 
-**Professional automation scripts for the NeuronDB ecosystem**
+**Professional, self-sufficient automation scripts for the NeuronDB ecosystem**
 
-This directory contains practical scripts for managing, deploying, monitoring, and maintaining NeuronDB components.
+This directory contains comprehensive mega-scripts for managing, deploying, monitoring, and maintaining all NeuronDB components. All scripts are **completely self-sufficient** with no external dependencies.
 
 ---
 
 ## 📋 Quick Reference
 
-| Script | Purpose | Common Usage |
-|--------|---------|--------------|
-| **ecosystem-setup.sh** | Complete ecosystem setup | `./ecosystem-setup.sh --mode docker --all` |
-| **install.sh** | Simple one-command installer | `./install.sh` |
-| **health-check.sh** | Quick health verification | `./health-check.sh` |
-| **integration-test.sh** | Comprehensive testing | `./integration-test.sh --tier 0` |
-| **backup-database.sh** | Database backup | `./backup-database.sh --format custom` |
-| **restore-database.sh** | Database restore | `./restore-database.sh --backup backup.dump` |
-| **monitor-status.sh** | Real-time monitoring | `./monitor-status.sh --watch` |
-| **view-logs.sh** | View component logs | `./view-logs.sh neuronagent --follow` |
-| **cleanup.sh** | Clean resources | `./cleanup.sh --all --dry-run` |
+| Script | Purpose | Quick Example |
+|--------|---------|---------------|
+| **neurondb-docker.sh** | All Docker operations | `./neurondb-docker.sh run --component neurondb` |
+| **neurondb-database.sh** | Database backup/restore/setup | `./neurondb-database.sh backup --format custom` |
+| **neurondb-setup.sh** | Installation and setup | `./neurondb-setup.sh install --mode docker` |
+| **neurondb-healthcheck.sh** | Health checks and testing | `./neurondb-healthcheck.sh quick` |
+| **neurondb-monitor.sh** | Monitoring and logs | `./neurondb-monitor.sh status` |
+| **neurondb-workflows.sh** | Release and git operations | `./neurondb-workflows.sh release --version 2.0.0` |
+| **neurondb-pkgs.sh** | Package management | `./neurondb-pkgs.sh verify --os ubuntu` |
+| **neurondb-blogs.sh** | Blog maintenance | `./neurondb-blogs.sh fix-markdown` |
+| **neurondb-cleanup.sh** | Cleanup operations | `./neurondb-cleanup.sh --all --dry-run` |
 
 ---
 
-## 🎯 Script Categories
+## 🎯 Script Architecture
 
-### 🚀 Setup & Installation
-
-#### `ecosystem-setup.sh`
-**Professional one-command setup for the entire NeuronDB ecosystem**
+All scripts follow a **unified command structure**:
 
 ```bash
-# Docker deployment (recommended for getting started)
-./ecosystem-setup.sh --mode docker --all
-
-# Install specific components with packages
-./ecosystem-setup.sh --mode deb --components NeuronDB NeuronAgent
-
-# Custom database configuration
-./ecosystem-setup.sh --mode rpm --components NeuronDB NeuronMCP \
-    --db-host db.example.com --db-password secret
+./neurondb-<category>.sh COMMAND [OPTIONS]
 ```
 
-**Features:**
-- ✅ Multiple installation modes: Docker, DEB, RPM, macOS packages
-- ✅ Flexible component selection with automatic dependency resolution
-- ✅ Database schema setup and migrations
-- ✅ Service management (systemd integration)
-- ✅ Comprehensive verification
-- ✅ Uninstall support with optional data removal
-- ✅ Dry-run mode for safe testing
+**Common Options (available in all scripts):**
+- `-h, --help` - Show detailed help message
+- `-v, --verbose` - Enable verbose output
+- `-V, --version` - Show version information
+- `--dry-run` - Preview changes without applying (where applicable)
+
+---
+
+## 🐳 Docker Management: `neurondb-docker.sh`
+
+**Purpose:** Complete Docker container management for all NeuronDB components. Handles building, running, testing, verifying, and monitoring Docker containers.
+
+### Commands
+
+#### `run` - Run Docker Containers
+Build, clean, or start Docker containers for NeuronDB components.
+
+```bash
+# Start NeuronDB CPU variant
+./neurondb-docker.sh run --component neurondb --variant cpu
+
+# Start NeuronDB with CUDA support
+./neurondb-docker.sh run --component neurondb --variant cuda
+
+# Build NeuronDB image
+./neurondb-docker.sh run --component neurondb --variant cpu --action build
+
+# Clean NeuronDB containers and volumes
+./neurondb-docker.sh run --component neurondb --variant cpu --action clean
+
+# Start NeuronAgent
+./neurondb-docker.sh run --component neuronagent
+
+# Start NeuronMCP
+./neurondb-docker.sh run --component neuronmcp
+```
 
 **Options:**
-- `--mode [docker|deb|rpm|mac]` - Installation mode
-- `--all` - Install all components
-- `--components COMP1 COMP2...` - Install specific components
-- `--db-host HOST` - Database host (default: localhost)
-- `--db-port PORT` - Database port
-- `--db-name NAME` - Database name (default: neurondb)
-- `--db-user USER` - Database user
-- `--db-password PASS` - Database password
-- `--skip-setup` - Skip database setup
-- `--skip-services` - Skip service startup
-- `--uninstall` - Uninstall components
-- `--remove-data` - Remove data during uninstall (⚠️ destructive!)
-- `--verbose` - Enable verbose output
-- `--dry-run` - Preview changes without applying
-
-**Environment Variables:**
-```bash
-export DB_HOST=localhost
-export DB_PORT=5432
-export DB_NAME=neurondb
-export DB_USER=postgres
-export DB_PASSWORD=your_password
-```
-
----
-
-#### `install.sh`
-**Simple one-command installer for quick setup**
-
-```bash
-# Full installation
-./install.sh
-
-# Skip dependency installation
-./install.sh --skip-deps
-
-# Skip database setup
-./install.sh --skip-setup
-```
+- `--component COMPONENT` - Component name: `neurondb`, `neuronagent`, `neuronmcp` (required)
+- `--variant VARIANT` - Variant for neurondb: `cpu`, `cuda`, `rocm`, `metal` (default: `cpu`)
+- `--action ACTION` - Action to perform: `build`, `clean`, `run` (default: `run`)
 
 **What it does:**
-1. Detects operating system (Ubuntu, Debian, RHEL, macOS)
-2. Installs system dependencies
-3. Detects PostgreSQL version
-4. Builds and installs NeuronDB extension
-5. Sets up database schemas
-6. Verifies installation
-
-**Supported Platforms:**
-- Ubuntu / Debian
-- RHEL / CentOS / Rocky Linux
-- macOS (with Homebrew)
+- Builds Docker images with proper build arguments
+- Manages Docker Compose profiles
+- Handles environment variables for database connections
+- Provides connection information after startup
 
 ---
 
-### ✅ Testing & Verification
-
-#### `health-check.sh`
-**Quick health check for all services (30 seconds)**
+#### `test` - Run Docker Tests
+Comprehensive testing suite for Docker deployments.
 
 ```bash
-# Run health check
-./health-check.sh
+# Basic connectivity tests
+./neurondb-docker.sh test --type basic --variant cpu
 
-# Expected output:
-# ✓ NeuronDB SQL query successful
-# ✓ NeuronAgent REST API responding
-# ✓ NeuronMCP server responding
-# All smoke tests passed!
+# Integration tests between components
+./neurondb-docker.sh test --type integration
+
+# Comprehensive test suite
+./neurondb-docker.sh test --type comprehensive --variant cuda
+
+# Detailed test suite
+./neurondb-docker.sh test --type detailed --variant cpu --quick
+
+# Deep test suite (REL1_STABLE)
+./neurondb-docker.sh test --type deep --variant cpu --stop-on-fail
 ```
 
-**Tests:**
-1. NeuronDB extension loaded and queryable
-2. NeuronAgent REST API responding (HTTP 200)
-3. NeuronMCP server responding to MCP protocol
+**Options:**
+- `--type TYPE` - Test type: `basic`, `integration`, `comprehensive`, `detailed`, `deep` (required)
+- `--variant VARIANT` - Container variant: `cpu`, `cuda`, `rocm`, `metal`, `all` (default: `cpu`)
+- `--component COMPONENT` - Component to test: `neurondb`, `neuronagent`, `neuronmcp`, `all` (default: `neurondb`)
+- `--stop-on-fail` - Stop testing on first failure
+- `--quick` - Run in quick mode (reduced test set)
 
-**Exit Codes:**
-- `0` - All tests passed
-- `1` - One or more tests failed
+**Test Types:**
+- **basic** - Container connectivity, PostgreSQL connection, extension installation
+- **integration** - Component integration (NeuronDB ↔ NeuronAgent ↔ NeuronMCP)
+- **comprehensive** - Full test suite covering all features
+- **detailed** - Detailed testing with verbose output
+- **deep** - Deep testing for stable releases
 
 ---
 
-#### `integration-test.sh`
-**Comprehensive integration testing suite (5-10 minutes)**
+#### `verify` - Verify Docker Setup
+Verify Docker dependencies and ecosystem health.
 
 ```bash
-# Run all tiers
-./integration-test.sh
+# Verify Docker dependencies
+./neurondb-docker.sh verify --dependencies
 
-# Run specific tier
-./integration-test.sh --tier 0    # Basic extension
-./integration-test.sh --tier 3    # ML algorithms
+# Verify entire Docker ecosystem
+./neurondb-docker.sh verify --ecosystem
 
-# Run multiple tiers
-./integration-test.sh --tier 0 --tier 1 --tier 2
-
-# Verbose output
-./integration-test.sh --verbose
+# Verify both
+./neurondb-docker.sh verify --dependencies --ecosystem
 ```
 
-**Test Tiers:**
+**Options:**
+- `--dependencies` - Verify Docker and Docker Compose installation
+- `--ecosystem` - Verify all running containers and services
 
-| Tier | Category | Tests |
-|------|----------|-------|
-| **0** | Basic Extension | Extension loading, version, schema creation |
-| **1** | Vector Operations | Vector columns, HNSW/IVF indexes, kNN queries |
-| **2** | Hybrid Search | Vector + full-text search combination |
-| **3** | ML Algorithms | Classification, regression, clustering (52+ algorithms) |
-| **4** | Embeddings | Embedding generation, storage, retrieval |
-| **5** | NeuronAgent | API endpoints, agent creation, messaging |
-| **6** | NeuronMCP | MCP protocol, tools, resources |
+**What it checks:**
+- Docker installation and daemon status
+- Docker Compose availability
+- Container running status
+- Service health
+
+---
+
+#### `logs` - View Container Logs
+View and follow logs from Docker containers.
+
+```bash
+# View last 50 lines of NeuronDB logs
+./neurondb-docker.sh logs --component neurondb
+
+# Follow NeuronAgent logs in real-time
+./neurondb-docker.sh logs --component neuronagent --follow
+
+# View last 100 lines
+./neurondb-docker.sh logs --component neurondb --lines 100
+```
+
+**Options:**
+- `--component COMPONENT` - Component name: `neurondb`, `neuronagent`, `neuronmcp` (required)
+- `--follow, -f` - Follow log output (like `tail -f`)
+- `--lines N` - Number of lines to show (default: 50)
+
+---
+
+#### `status` - Show Container Status
+Display status of all Docker containers.
+
+```bash
+./neurondb-docker.sh status
+```
 
 **Output:**
-```
-=== NeuronDB Integration Verification ===
+- Lists all NeuronDB-related containers
+- Shows running/stopped status
+- Displays container status details
+- Shows Docker Compose service status
 
-[TIER 0] Basic Extension Tests
-✓ Extension loads successfully
-✓ Version information correct
-✓ Schema created properly
+---
 
-...
+#### `build` - Build Docker Images
+Build Docker images for components.
 
-=== Summary ===
-Tests Passed: 45/45
-Tests Failed: 0/45
-Overall: PASSED
+```bash
+# Build NeuronDB CPU image
+./neurondb-docker.sh build --component neurondb --variant cpu
+
+# Build NeuronAgent
+./neurondb-docker.sh build --component neuronagent
 ```
 
 ---
 
-### 💾 Backup & Restore
+#### `clean` - Clean Docker Resources
+Clean up Docker containers and volumes.
 
-#### `backup-database.sh`
-**Professional database backup with multiple formats**
+```bash
+# Clean NeuronDB containers
+./neurondb-docker.sh clean --component neurondb --variant cpu
+```
+
+**⚠️ Warning:** This will remove containers and volumes, resulting in data loss!
+
+---
+
+#### `exec` - Execute Command in Container
+Execute commands inside running containers.
+
+```bash
+# Execute SQL query in NeuronDB
+./neurondb-docker.sh exec --component neurondb --command "psql -U neurondb -d neurondb -c 'SELECT version();'"
+
+# Check NeuronAgent status
+./neurondb-docker.sh exec --component neuronagent --command "curl localhost:8080/health"
+```
+
+**Options:**
+- `--component COMPONENT` - Component name (required)
+- `--command COMMAND` - Command to execute (required)
+
+---
+
+## 💾 Database Management: `neurondb-database.sh`
+
+**Purpose:** Complete database operations including backup, restore, setup, maintenance, and verification.
+
+### Commands
+
+#### `backup` - Create Database Backup
+Create backups in multiple formats with retention policies.
 
 ```bash
 # Custom format backup (recommended - compressed, supports parallel restore)
-./backup-database.sh --format custom
+./neurondb-database.sh backup --format custom
 
 # SQL format with compression
-./backup-database.sh --format sql --compress
+./neurondb-database.sh backup --format sql --compress
 
 # Directory format for large databases (parallel dump)
-./backup-database.sh --format directory --output /backups/neurondb
+./neurondb-database.sh backup --format directory --output /backups/neurondb
 
-# Custom retention policy
-./backup-database.sh --retention 7
+# Custom retention policy (keep backups for 7 days)
+./neurondb-database.sh backup --format custom --retention 7
 ```
 
-**Features:**
-- ✅ Multiple backup formats (SQL, custom, directory)
-- ✅ Automatic compression
-- ✅ Retention policy management
-- ✅ Database size detection
-- ✅ Detailed backup information
-
-**Formats:**
-- **SQL** - Plain SQL dump (text format, portable)
-- **Custom** - PostgreSQL custom format (compressed, supports parallel restore)
-- **Directory** - Directory format (parallel dump/restore, best for large DBs)
-
 **Options:**
-- `--format [sql|custom|directory]` - Backup format
-- `--output PATH` - Output directory (default: ./backups)
+- `--format FORMAT` - Backup format: `sql`, `custom`, `directory` (default: `custom`)
+- `--output DIR` - Output directory (default: `./backups`)
 - `--compress` - Compress SQL backups
 - `--retention DAYS` - Keep backups for N days (default: 30)
 
-**Environment Variables:**
+**Backup Formats:**
+- **sql** - Plain SQL dump (text format, portable, can be compressed)
+- **custom** - PostgreSQL custom format (compressed, supports parallel restore, recommended)
+- **directory** - Directory format (parallel dump/restore, best for large databases)
+
+**Database Configuration:**
+Set via environment variables or command-line options:
 ```bash
 export DB_HOST=localhost
 export DB_PORT=5432
 export DB_NAME=neurondb
 export DB_USER=postgres
 export DB_PASSWORD=your_password
+
+# Or use command-line options
+./neurondb-database.sh backup --host localhost --port 5432 --database neurondb --user postgres --password secret
 ```
+
+**What it does:**
+- Creates timestamped backups
+- Automatically cleans up old backups based on retention policy
+- Provides detailed backup information (size, location, restore instructions)
+- Supports multiple backup formats for different use cases
 
 ---
 
-#### `restore-database.sh`
-**Database restore supporting all backup formats**
+#### `restore` - Restore Database from Backup
+Restore databases from any backup format.
 
 ```bash
-# Restore from custom format
-./restore-database.sh --backup neurondb_backup_20250101_120000.dump
+# Restore from custom format (auto-detected)
+./neurondb-database.sh restore --backup neurondb_backup_20250101_120000.dump
 
 # Restore from SQL backup
-./restore-database.sh --backup neurondb_backup_20250101_120000.sql
+./neurondb-database.sh restore --backup neurondb_backup_20250101_120000.sql
 
 # Restore from directory format with 8 parallel jobs
-./restore-database.sh --backup neurondb_backup_20250101_120000_dir --jobs 8
+./neurondb-database.sh restore --backup neurondb_backup_20250101_120000_dir --jobs 8
 
-# Drop database before restore
-./restore-database.sh --backup backup.dump --drop
+# Drop database before restore (⚠️ destructive!)
+./neurondb-database.sh restore --backup backup.dump --drop
 
 # Clean database objects before restore
-./restore-database.sh --backup backup.dump --clean
+./neurondb-database.sh restore --backup backup.dump --clean
 ```
 
-**Features:**
-- ✅ Auto-detects backup format
-- ✅ Parallel restore for directory format
-- ✅ Optional database drop/recreation
-- ✅ Clean mode for object recreation
-- ✅ Restore verification
-
 **Options:**
-- `--backup PATH` - Backup file or directory (required)
-- `--format [sql|custom|directory]` - Force backup format (auto-detected if not specified)
-- `--drop` - Drop existing database before restore
+- `--backup PATH` - Backup file or directory to restore (required)
+- `--format FORMAT` - Force backup format (auto-detected if not specified)
+- `--drop` - Drop existing database before restore (requires confirmation)
 - `--clean` - Clean (drop) database objects before recreating
 - `--jobs N` - Number of parallel jobs for directory format (default: 4)
 
----
-
-### 📊 Monitoring & Operations
-
-#### `monitor-status.sh`
-**Real-time monitoring of all NeuronDB components**
-
-```bash
-# Single status check
-./monitor-status.sh
-
-# Continuous monitoring (updates every 5 seconds)
-./monitor-status.sh --watch
-
-# JSON output for integration
-./monitor-status.sh --json
-
-# Specify deployment mode
-./monitor-status.sh --mode docker --watch
-```
-
-**Features:**
-- ✅ Auto-detects deployment mode (Docker/Native)
-- ✅ Health status for all components
-- ✅ Version information
-- ✅ Resource usage (CPU, memory)
-- ✅ Service endpoints
-- ✅ JSON output for automation
-
-**Display:**
-```
-╔═══════════════════════════════════════════════════════════════╗
-║              NeuronDB Ecosystem Status Monitor                ║
-╚═══════════════════════════════════════════════════════════════╝
-
-Deployment Mode: docker
-
-┌─────────────────────────────────────────────────────────────┐
-│                    Component Status                         │
-├─────────────────┬─────────────┬───────────┬────────┬────────┤
-│ Component       │ Status      │ Version   │ Memory │ CPU    │
-├─────────────────┼─────────────┼───────────┼────────┼────────┤
-│ NeuronDB        │ healthy     │ 1.0.0     │ 256MB  │ 5.2%   │
-│ NeuronAgent     │ healthy     │ 0.1.0     │ 128MB  │ 2.1%   │
-│ NeuronMCP       │ healthy     │ stdio     │ 64MB   │ 0.5%   │
-│ NeuronDesktop   │ healthy     │ 0.1.0     │ 512MB  │ 8.3%   │
-└─────────────────┴─────────────┴───────────┴────────┴────────┘
-
-Service Endpoints:
-  ● NeuronDB:        postgresql://localhost:5433/neurondb
-  ● NeuronAgent:     http://localhost:8080
-  ● NeuronMCP:       stdio protocol
-  ● NeuronDesktop:   http://localhost:8081 (API)
-                     http://localhost:3000 (UI)
-```
-
-**Options:**
-- `--mode [docker|native]` - Deployment mode (auto-detected)
-- `--watch` - Continuous monitoring with 5-second updates
-- `--json` - JSON output for automation
+**What it does:**
+- Auto-detects backup format (SQL, custom, or directory)
+- Handles compressed backups automatically
+- Supports parallel restore for directory format
+- Verifies restore completion
+- Checks for NeuronDB extension after restore
 
 ---
 
-#### `view-logs.sh`
-**View and follow logs from all components**
+#### `setup` - Setup Database and Extensions
+Initialize database and install required extensions.
 
 ```bash
-# View all logs (last 50 lines)
-./view-logs.sh
+# Setup database with extensions
+./neurondb-database.sh setup
 
-# Follow NeuronAgent logs
-./view-logs.sh neuronagent --follow
-
-# View last 100 lines of NeuronDB logs
-./view-logs.sh neurondb --lines 100
-
-# Follow all logs in Docker mode
-./view-logs.sh all --follow --mode docker
+# With custom database configuration
+./neurondb-database.sh setup --host localhost --port 5432 --database neurondb --user postgres --password secret
 ```
 
-**Components:**
-- `neurondb` - Database server logs
-- `neuronagent` - Agent service logs
-- `neuronmcp` - MCP server logs
-- `neurondesktop` - Desktop service logs
-- `all` - All component logs (default)
-
-**Options:**
-- `--follow`, `-f` - Follow log output in real-time (tail -f)
-- `--lines N` - Number of lines to show (default: 50)
-- `--mode [docker|native]` - Deployment mode (auto-detected)
-
-**Auto-detection:**
-- Docker mode: Uses `docker logs` command
-- Native mode: Finds log files in standard locations
-- Systemd integration: Falls back to `journalctl` if needed
+**What it does:**
+- Creates database if it doesn't exist
+- Installs `vector` extension
+- Installs `neurondb` extension
+- Verifies installation
+- Displays database information
 
 ---
 
-### 🐳 Docker Management
-
-#### `docker-run-neurondb.sh`
-**Run NeuronDB database container**
+#### `status` - Check Database Status
+Display database status and information.
 
 ```bash
-# Start with defaults (CPU)
-./docker-run-neurondb.sh
+# Check database status
+./neurondb-database.sh status
 
-# Start with GPU support
-GPU=cuda ./docker-run-neurondb.sh
-
-# Custom configuration
-PORT=5434 GPU=rocm ./docker-run-neurondb.sh
+# With custom connection
+./neurondb-database.sh status --host localhost --port 5432 --database neurondb
 ```
 
-**Environment Variables:**
-- `PORT` - PostgreSQL port (default: 5433)
-- `GPU` - GPU backend: cpu, cuda, rocm, metal (default: cpu)
-- `POSTGRES_PASSWORD` - Database password (default: neurondb)
+**Output includes:**
+- Database name, host, port
+- Database size
+- Table count
+- Extension count and versions
+- Connection information
+- Installed extensions list
 
 ---
 
-#### `docker-run-neuronagent.sh`
-**Run NeuronAgent container**
+#### `vacuum` - Run VACUUM and ANALYZE
+Perform database maintenance operations.
 
 ```bash
-./docker-run-neuronagent.sh
+# Run VACUUM ANALYZE
+./neurondb-database.sh vacuum
 ```
+
+**What it does:**
+- Runs `VACUUM ANALYZE` on the database
+- Updates table statistics
+- Reclaims storage space
+- Improves query performance
 
 ---
 
-#### `docker-run-neuronmcp.sh`
-**Run NeuronMCP container**
+#### `list-backups` - List Available Backups
+List all available backups in the backup directory.
 
 ```bash
-./docker-run-neuronmcp.sh
+# List all backups
+./neurondb-database.sh list-backups
+
+# With custom backup directory
+./neurondb-database.sh list-backups --output /backups/neurondb
 ```
+
+**Output:**
+- SQL backups with sizes
+- Custom format backups with sizes
+- Directory format backups with sizes
 
 ---
 
-#### `docker-run-tests.sh`
-**Run all tests in Docker**
+#### `verify` - Verify Database Integrity
+Verify database integrity and extensions.
 
 ```bash
-./docker-run-tests.sh
-```
-
----
-
-#### `docker-test-neurondb.sh`
-**Test Docker deployment**
-
-```bash
-./docker-test-neurondb.sh
-```
-
----
-
-#### `docker-verify-dependencies.sh`
-**Verify all required libraries in Docker containers**
-
-```bash
-# Check default container
-./docker-verify-dependencies.sh
-
-# Check specific container
-./docker-verify-dependencies.sh neurondb-cpu
+# Verify database
+./neurondb-database.sh verify
 ```
 
 **What it checks:**
-- PostgreSQL libraries
-- ML libraries (XGBoost, LightGBM, CatBoost)
-- GPU libraries (CUDA, ROCm, Metal)
-- ONNX Runtime
-- OpenMP and Eigen
-- Python dependencies
-- Library path configuration
-- Functional tests
+- Database size
+- NeuronDB extension installation and version
+- Vector extension installation
+- Table count
+- Overall database health
 
 ---
 
-### 🧹 Maintenance
+## 🚀 Setup & Installation: `neurondb-setup.sh`
 
-#### `cleanup.sh`
-**Clean build artifacts, Docker resources, logs, and temporary files**
+**Purpose:** Complete setup and installation of the NeuronDB ecosystem in various modes.
+
+### Commands
+
+#### `install` - Install NeuronDB Ecosystem
+Install NeuronDB components using different methods.
 
 ```bash
-# Preview what would be cleaned (dry run)
-./cleanup.sh --all --dry-run
+# Install with Docker (recommended)
+./neurondb-setup.sh install --mode docker
 
-# Clean everything (Docker, logs, build artifacts, cache)
-./cleanup.sh --all
+# Install specific components
+./neurondb-setup.sh install --mode docker --components neurondb,neuronagent
 
-# Clean only Docker resources
-./cleanup.sh --docker
+# Install with DEB packages
+./neurondb-setup.sh install --mode deb
 
-# Clean logs and build artifacts
-./cleanup.sh --logs --build
-
-# Clean cache (node_modules, venv, etc.)
-./cleanup.sh --cache
+# Install with RPM packages
+./neurondb-setup.sh install --mode rpm
 ```
 
-**Features:**
-- ✅ Docker cleanup (containers, images, volumes)
-- ✅ Log file removal
-- ✅ Build artifact cleanup
-- ✅ Cache directory cleanup
-- ✅ Dry-run mode for safety
-- ✅ Interactive confirmation
+**Options:**
+- `--mode MODE` - Installation mode: `docker`, `deb`, `rpm` (default: `docker`)
+- `--components LIST` - Comma-separated list: `neurondb`, `neuronagent`, `neuronmcp`, `neurondesktop` (default: `all`)
+
+**Installation Modes:**
+- **docker** - Uses Docker Compose to start all services
+- **deb** - Installs DEB packages (Ubuntu/Debian)
+- **rpm** - Installs RPM packages (RHEL/CentOS/Rocky)
+
+**What it does:**
+- Checks prerequisites
+- Installs components based on mode
+- Configures services
+- Starts services
+- Verifies installation
+
+---
+
+#### `vagrant-deps` - Install Vagrant Dependencies
+Install VirtualBox and Vagrant for package testing.
+
+```bash
+# Install Vagrant dependencies
+./neurondb-setup.sh vagrant-deps
+```
+
+**What it does:**
+- Detects operating system
+- Installs VirtualBox
+- Installs Vagrant
+- Verifies installation
+
+**Supported Platforms:**
+- Ubuntu/Debian (apt-get)
+- RHEL/CentOS/Rocky (yum/dnf)
+- macOS (Homebrew)
+
+---
+
+#### `ecosystem` - Setup Complete Ecosystem
+One-command setup for the complete NeuronDB ecosystem.
+
+```bash
+# Setup complete ecosystem
+./neurondb-setup.sh ecosystem
+```
+
+**What it does:**
+- Checks all prerequisites
+- Installs all components
+- Configures services
+- Starts all services
+- Verifies complete setup
+
+---
+
+#### `verify` - Verify Installation
+Verify that installation completed successfully.
+
+```bash
+# Verify installation
+./neurondb-setup.sh verify
+```
+
+**What it checks:**
+- Docker installation and daemon
+- Container running status
+- Service health
+
+---
+
+#### `generate-passwords` - Generate Secure Passwords
+Generate secure passwords for deployment configuration.
+
+```bash
+# Generate secure passwords
+./neurondb-setup.sh generate-passwords > .env.secure
+
+# Review and copy to .env file
+cat .env.secure
+```
+
+**What it generates:**
+- Secure PostgreSQL password (base64 encoded, 32 bytes)
+- Environment variable template
+- Instructions for use
+
+**Output format:**
+```bash
+# Secure passwords generated on 2025-01-01 12:00:00
+# Copy these values to your .env file
+
+# PostgreSQL / NeuronDB
+POSTGRES_USER=neurondb
+POSTGRES_PASSWORD=<secure-random-password>
+POSTGRES_DB=neurondb
+
+# NeuronAgent (must match POSTGRES_PASSWORD)
+DB_PASSWORD=${POSTGRES_PASSWORD}
+
+# NeuronMCP (must match POSTGRES_PASSWORD)
+NEURONDB_PASSWORD=${POSTGRES_PASSWORD}
+
+# Generate NeuronAgent API key (if needed)
+# Use: openssl rand -hex 32
+```
+
+---
+
+## ✅ Health Checking: `neurondb-healthcheck.sh`
+
+**Purpose:** Health checks and integration testing for all NeuronDB components.
+
+### Commands
+
+#### `quick` - Quick Health Check
+Fast health check (30 seconds).
+
+```bash
+# Quick health check
+./neurondb-healthcheck.sh quick
+
+# With custom configuration
+./neurondb-healthcheck.sh quick --host localhost --port 5432 --database neurondb
+```
+
+**What it checks:**
+- Database connection
+- NeuronAgent health endpoint
+
+**Output:**
+```
+✓ Database connection
+✓ NeuronAgent health
+All checks passed!
+```
+
+---
+
+#### `health` - Full Health Check
+Comprehensive health check of all components.
+
+```bash
+# Full health check
+./neurondb-healthcheck.sh health
+
+# With custom agent URL
+./neurondb-healthcheck.sh health --agent-url http://localhost:8080
+```
+
+**What it checks:**
+- NeuronDB (PostgreSQL) connection
+- NeuronDB extension installation and version
+- NeuronAgent REST API health
+- Component integration
 
 **Options:**
-- `--all` - Clean everything
-- `--docker` - Clean Docker containers, images, volumes
+- `--host HOST` - Database host (default: `localhost`)
+- `--port PORT` - Database port (default: `5432`)
+- `--database NAME` - Database name (default: `neurondb`)
+- `--user USER` - Database user (default: `neurondb`)
+- `--password PASS` - Database password (or use `DB_PASSWORD` env var)
+- `--agent-url URL` - NeuronAgent URL (default: `http://localhost:8080`)
+
+---
+
+#### `integration` - Integration Tests
+Run integration tests between components.
+
+```bash
+# Run integration tests
+./neurondb-healthcheck.sh integration
+```
+
+**What it tests:**
+- NeuronDB → NeuronAgent integration
+- Component communication
+- End-to-end workflows
+
+---
+
+#### `smoke` - Smoke Tests
+Quick smoke tests for basic functionality.
+
+```bash
+# Run smoke tests
+./neurondb-healthcheck.sh smoke
+```
+
+**What it tests:**
+- NeuronDB SQL queries
+- NeuronAgent REST API
+- Basic component functionality
+
+---
+
+## 📊 Monitoring: `neurondb-monitor.sh`
+
+**Purpose:** Real-time monitoring, log viewing, and metrics collection for all components.
+
+### Commands
+
+#### `status` - Show Component Status
+Display status of all NeuronDB components.
+
+```bash
+# Show status
+./neurondb-monitor.sh status
+
+# Specify deployment mode
+./neurondb-monitor.sh status --mode docker
+```
+
+**Options:**
+- `--mode [docker|native]` - Deployment mode (auto-detected if not specified)
+
+**Output:**
+- Component running status
+- Container/service status
+- Deployment mode detection
+
+---
+
+#### `logs` - View Container Logs
+View and follow logs from components.
+
+```bash
+# View NeuronDB logs
+./neurondb-monitor.sh logs --component neurondb
+
+# Follow NeuronAgent logs
+./neurondb-monitor.sh logs --component neuronagent --follow
+
+# View last 100 lines
+./neurondb-monitor.sh logs --component neurondb --lines 100
+```
+
+**Options:**
+- `--component COMPONENT` - Component name: `neurondb`, `neuronagent`, `neuronmcp` (required)
+- `--follow, -f` - Follow log output in real-time
+- `--lines N` - Number of lines to show (default: 50)
+
+---
+
+#### `watch` - Watch Status Continuously
+Continuously monitor component status.
+
+```bash
+# Watch status (updates every 5 seconds)
+./neurondb-monitor.sh watch
+
+# Custom refresh interval
+./neurondb-monitor.sh watch --interval 3
+```
+
+**Options:**
+- `--interval SECONDS` - Refresh interval in seconds (default: 5)
+
+**What it does:**
+- Continuously displays component status
+- Updates at specified interval
+- Clears screen between updates
+- Press Ctrl+C to exit
+
+---
+
+#### `metrics` - Show Metrics and Statistics
+Display component metrics and resource usage.
+
+```bash
+# Show metrics
+./neurondb-monitor.sh metrics
+```
+
+**Output:**
+- Container CPU usage
+- Memory usage
+- Network I/O
+- Resource statistics
+
+---
+
+## 🔄 Workflows: `neurondb-workflows.sh`
+
+**Purpose:** Release management, version synchronization, and git operations.
+
+### Commands
+
+#### `release` - Create a New Release
+Create a new release with version updates.
+
+```bash
+# Create release
+./neurondb-workflows.sh release --version 2.0.0
+
+# Dry run to preview changes
+./neurondb-workflows.sh release --version 2.0.0 --dry-run
+```
+
+**Options:**
+- `--version VERSION` - Version number in semver format (required, e.g., `1.0.0`, `2.0.0-beta`)
+- `--dry-run` - Preview changes without applying
+
+**What it does:**
+- Updates version in all component files:
+  - `env.example`
+  - `package.json`
+  - `NeuronDB/neurondb.control`
+  - `NeuronAgent/go.mod`
+  - `NeuronDesktop/frontend/package.json`
+  - `NeuronMCP/go.mod`
+- Validates version format (semver)
+- Provides detailed output of changes
+
+---
+
+#### `sync` - Sync Version Branches
+Synchronize version branches (e.g., REL1_STABLE and main).
+
+```bash
+# Sync branches (main -> REL1_STABLE, 2.0.0 -> 1.0.0)
+./neurondb-workflows.sh sync
+
+# Custom branch sync
+./neurondb-workflows.sh sync --from-branch main --to-branch REL1_STABLE --from-version 2.0.0 --to-version 1.0.0
+
+# Dry run
+./neurondb-workflows.sh sync --dry-run
+```
+
+**Options:**
+- `--from-branch BRANCH` - Source branch (default: `main`)
+- `--to-branch BRANCH` - Target branch (default: `REL1_STABLE`)
+- `--from-version VER` - Source version (default: `2.0.0`)
+- `--to-version VER` - Target version (default: `1.0.0`)
+- `--dry-run` - Preview changes without applying
+
+**What it does:**
+- Fetches latest changes
+- Merges source branch into target branch
+- Replaces version numbers in all files
+- Updates Helm charts, Docker files, package files
+- Handles merge conflicts gracefully
+
+---
+
+#### `update-refs` - Update Markdown References
+Update references to renamed markdown files.
+
+```bash
+# Update references after file renames
+./neurondb-workflows.sh update-refs
+
+# Dry run
+./neurondb-workflows.sh update-refs --dry-run
+```
+
+**What it does:**
+- Detects renamed files from git status
+- Updates references in all file types:
+  - Markdown files (`.md`)
+  - Text files (`.txt`)
+  - Scripts (`.sh`)
+  - Go files (`.go`)
+  - Python files (`.py`)
+  - TypeScript/JavaScript files (`.ts`, `.tsx`, `.js`)
+  - JSON files (`.json`)
+
+---
+
+#### `pull` - Safe Git Pull
+Perform safe git pull with rebase (avoids merge commits).
+
+```bash
+# Safe git pull
+./neurondb-workflows.sh pull
+```
+
+**What it does:**
+- Checks for uncommitted changes
+- Stashes changes if needed
+- Fetches latest changes
+- Rebases on remote branch (maintains linear history)
+- Restores stashed changes
+- Handles conflicts gracefully
+
+**Benefits:**
+- Maintains linear git history
+- Avoids unnecessary merge commits
+- Preserves uncommitted work
+- Safe and reversible
+
+---
+
+## 📦 Package Management: `neurondb-pkgs.sh`
+
+**Purpose:** Package verification, SDK generation, and package testing.
+
+### Commands
+
+#### `verify` - Verify DEB/RPM Packages
+Verify package files and integrity.
+
+```bash
+# Verify packages for Ubuntu
+./neurondb-pkgs.sh verify --os ubuntu
+
+# Verify packages for Rocky Linux
+./neurondb-pkgs.sh verify --os rocky
+
+# Verify specific package
+./neurondb-pkgs.sh verify --os ubuntu --package neurondb_2.0.0_amd64.deb
+```
+
+**Options:**
+- `--os OS` - OS type: `ubuntu`, `rocky` (default: `ubuntu`)
+- `--package PATH` - Specific package file path
+
+**What it checks:**
+- Package file existence
+- Package format validity
+- Package metadata
+
+---
+
+#### `generate-sdk` - Generate Client SDKs
+Generate client SDKs from OpenAPI specification.
+
+```bash
+# Generate Python SDK
+./neurondb-pkgs.sh generate-sdk --language python
+
+# Generate JavaScript SDK
+./neurondb-pkgs.sh generate-sdk --language javascript
+
+# Generate Go SDK
+./neurondb-pkgs.sh generate-sdk --language go --output ./sdks
+
+# Generate Java SDK
+./neurondb-pkgs.sh generate-sdk --language java
+```
+
+**Options:**
+- `--language LANG` - Target language: `python`, `javascript`, `go`, `java` (default: `python`)
+- `--output DIR` - Output directory (default: `./sdks`)
+
+**Prerequisites:**
+- OpenAPI Generator CLI: `npm install -g @openapitools/openapi-generator-cli`
+
+**What it does:**
+- Finds OpenAPI specification file
+- Generates SDK in specified language
+- Creates output directory structure
+- Provides SDK location
+
+---
+
+#### `test-vagrant` - Test Packages in Vagrant VM
+Test packages in a Vagrant virtual machine.
+
+```bash
+# Test packages in Ubuntu VM
+./neurondb-pkgs.sh test-vagrant --os ubuntu
+
+# Test packages in Rocky Linux VM
+./neurondb-pkgs.sh test-vagrant --os rocky
+
+# Destroy VM after testing
+./neurondb-pkgs.sh test-vagrant --os ubuntu --destroy-vm
+```
+
+**Options:**
+- `--os OS` - OS type: `ubuntu`, `rocky` (default: `ubuntu`)
+- `--destroy-vm` - Destroy VM after testing
+
+**Prerequisites:**
+- Vagrant installed (use `neurondb-setup.sh vagrant-deps`)
+- VirtualBox installed
+
+**What it does:**
+- Starts Vagrant VM
+- Copies packages to VM
+- Installs packages
+- Runs basic verification
+- Optionally destroys VM
+
+---
+
+#### `validate-helm` - Validate Helm Charts
+Validate Helm chart syntax and structure.
+
+```bash
+# Validate Helm chart
+./neurondb-pkgs.sh validate-helm
+```
+
+**Prerequisites:**
+- Helm installed: https://helm.sh/docs/intro/install/
+
+**What it checks:**
+- Chart syntax
+- Required files
+- Values validation
+- Template validation
+
+---
+
+## 📝 Blog Management: `neurondb-blogs.sh`
+
+**Purpose:** Complete blog maintenance operations including formatting fixes, image path updates, and content extraction.
+
+### Commands
+
+#### `fix-markdown` - Fix Markdown Formatting
+Fix escaped backticks and markdown formatting issues.
+
+```bash
+# Fix markdown formatting
+./neurondb-blogs.sh fix-markdown
+
+# Dry run to preview changes
+./neurondb-blogs.sh fix-markdown --dry-run
+
+# Custom blog directory
+./neurondb-blogs.sh fix-markdown --blog-dir ./content/blog
+```
+
+**Options:**
+- `--blog-dir DIR` - Blog directory (default: `./blog`)
+- `--dry-run` - Preview changes without applying
+
+**What it fixes:**
+- Escaped backticks (`\`` → `` ` ``)
+- Triple backticks (`\`\`\`` → ` ``` `)
+- Markdown formatting issues
+
+---
+
+#### `fix-image-paths` - Fix Image Paths
+Update image paths in blog files.
+
+```bash
+# Fix image paths
+./neurondb-blogs.sh fix-image-paths
+
+# Dry run
+./neurondb-blogs.sh fix-image-paths --dry-run
+```
+
+**What it does:**
+- Updates paths from `/blog/{slug}/` to `assets/{slug}/`
+- Removes version query parameters
+- Updates all markdown files in blog directory
+
+---
+
+#### `fix-code-blocks` - Fix Code Block Formatting
+Ensure code blocks have correct formatting.
+
+```bash
+# Fix code blocks
+./neurondb-blogs.sh fix-code-blocks
+```
+
+**What it fixes:**
+- Code block language tags
+- Code block formatting
+- Ensures proper syntax highlighting
+
+---
+
+#### `copy` - Copy Blogs from Source
+Copy blog markdown and assets from neurondb-www repository.
+
+```bash
+# Copy blogs from neurondb-www
+./neurondb-blogs.sh copy --source /path/to/neurondb-www
+
+# Custom destination
+./neurondb-blogs.sh copy --source /path/to/neurondb-www --output ./blog
+```
+
+**Options:**
+- `--source DIR` - Source directory (default: `/Users/pgedge/pge/neurondb-www`)
+- `--output DIR` - Output directory (default: `./blog`)
+
+**What it does:**
+- Extracts markdown from React components
+- Copies blog assets (images, etc.)
+- Organizes files by blog slug
+
+---
+
+#### `convert-html` - Convert HTML to Markdown
+Convert HTML blog content to markdown format.
+
+```bash
+# Convert HTML to markdown
+./neurondb-blogs.sh convert-html --input blog.html --output ./blog
+```
+
+**Options:**
+- `--input FILE` - Input HTML file (required)
+- `--output DIR` - Output directory (default: `./blog`)
+
+**What it converts:**
+- HTML headings to markdown headings
+- HTML paragraphs to markdown
+- HTML images to markdown images
+- HTML lists to markdown lists
+- HTML code blocks to markdown code blocks
+
+---
+
+#### `extract` - Extract Blog Content
+Extract blog content from React components.
+
+```bash
+# Extract blogs from neurondb-www
+./neurondb-blogs.sh extract --source /path/to/neurondb-www
+```
+
+**Options:**
+- `--source DIR` - Source directory (default: `/Users/pgedge/pge/neurondb-www`)
+
+**What it extracts:**
+- Markdown content from React `page.tsx` files
+- Blog assets
+- Organizes by blog slug
+
+---
+
+#### `svg-to-png` - Convert SVG to PNG
+Convert SVG images to PNG format.
+
+```bash
+# Convert SVGs to PNGs
+./neurondb-blogs.sh svg-to-png
+
+# Custom dimensions
+./neurondb-blogs.sh svg-to-png --width 1920 --height 1080
+
+# Force conversion (overwrite existing)
+./neurondb-blogs.sh svg-to-png --force
+```
+
+**Options:**
+- `--width WIDTH` - PNG width in pixels (default: 1200)
+- `--height HEIGHT` - PNG height in pixels (default: 800)
+- `--force` - Force conversion even if PNG exists
+
+**Prerequisites:**
+- One of: `rsvg-convert`, `inkscape`, or ImageMagick `convert`
+- On macOS: `brew install librsvg`
+
+---
+
+## 🧹 Cleanup: `neurondb-cleanup.sh`
+
+**Purpose:** Clean build artifacts, Docker resources, logs, and temporary files.
+
+### Usage
+
+```bash
+# Preview cleanup (safe)
+./neurondb-cleanup.sh --all --dry-run
+
+# Clean everything
+./neurondb-cleanup.sh --all
+
+# Clean only Docker resources
+./neurondb-cleanup.sh --docker
+
+# Clean logs and build artifacts
+./neurondb-cleanup.sh --logs --build
+
+# Clean cache directories
+./neurondb-cleanup.sh --cache
+```
+
+**Options:**
+- `--all` - Clean everything (Docker, logs, build artifacts, cache)
+- `--docker` - Clean Docker containers, images, volumes (⚠️ destructive!)
 - `--logs` - Clean log files
-- `--build` - Clean build artifacts and binaries
-- `--cache` - Clean cache directories (node_modules, venv)
+- `--build` - Clean build artifacts
+- `--cache` - Clean cache directories (node_modules, venv, etc.)
 - `--dry-run` - Preview without making changes
+
+**What it cleans:**
+- **Docker**: Containers, images, volumes
+- **Logs**: All log files and log directories
+- **Build**: Compiled binaries, object files, build artifacts
+- **Cache**: node_modules, Python venv, Go vendor, build caches
 
 **⚠️ Warning:** `--docker` will stop and remove all containers and volumes, resulting in data loss!
 
@@ -492,32 +1129,17 @@ PORT=5434 GPU=rocm ./docker-run-neurondb.sh
 ### Complete Fresh Installation
 
 ```bash
-# 1. Run unified setup (Docker recommended)
-./ecosystem-setup.sh --mode docker --all
+# 1. Setup complete ecosystem
+./neurondb-setup.sh ecosystem
 
 # 2. Verify installation
-./integration-test.sh --tier 0
+./neurondb-setup.sh verify
 
 # 3. Quick health check
-./health-check.sh
+./neurondb-healthcheck.sh quick
 
 # 4. Monitor status
-./monitor-status.sh
-```
-
----
-
-### Source Installation (Native)
-
-```bash
-# 1. Simple installation
-./install.sh
-
-# 2. Verify
-./health-check.sh
-
-# 3. Run comprehensive tests
-./integration-test.sh
+./neurondb-monitor.sh status
 ```
 
 ---
@@ -526,57 +1148,36 @@ PORT=5434 GPU=rocm ./docker-run-neurondb.sh
 
 ```bash
 # 1. Start all services
-docker compose up -d
+./neurondb-docker.sh run --component neurondb --variant cpu
+./neurondb-docker.sh run --component neuronagent
+./neurondb-docker.sh run --component neuronmcp
 
-# Or use make targets
-make docker-run
+# 2. Verify Docker setup
+./neurondb-docker.sh verify --dependencies --ecosystem
 
-# 2. Verify dependencies
-./docker-verify-dependencies.sh
+# 3. Run tests
+./neurondb-docker.sh test --type basic
 
-# 3. Run Docker tests
-./docker-test-neurondb.sh
-
-# 4. Health check
-./health-check.sh
-
-# 5. Monitor
-./monitor-status.sh --watch
+# 4. Monitor
+./neurondb-monitor.sh watch
 ```
 
 ---
 
-### Package Installation
-
-```bash
-# Build packages first (if needed)
-cd packaging/deb
-./build-all-deb.sh
-cd ../..
-
-# Install with ecosystem setup
-./scripts/ecosystem-setup.sh --mode deb --all
-
-# Verify
-./scripts/integration-test.sh --tier 0
-```
-
----
-
-### Backup & Restore Workflow
+### Database Backup & Restore
 
 ```bash
 # 1. Create backup
-./backup-database.sh --format custom --retention 30
+./neurondb-database.sh backup --format custom --retention 30
 
 # 2. List backups
-ls -lh backups/
+./neurondb-database.sh list-backups
 
 # 3. Restore if needed
-./restore-database.sh --backup backups/neurondb_backup_20250101_120000.dump
+./neurondb-database.sh restore --backup backups/neurondb_backup_20250101_120000.dump
 
 # 4. Verify restore
-./health-check.sh
+./neurondb-database.sh verify
 ```
 
 ---
@@ -584,198 +1185,132 @@ ls -lh backups/
 ### Development Testing
 
 ```bash
-# Quick smoke test (30 seconds)
-./health-check.sh
+# Quick smoke test
+./neurondb-healthcheck.sh smoke
 
-# Full integration testing (5-10 minutes)
-./integration-test.sh
+# Full health check
+./neurondb-healthcheck.sh health
 
-# Specific tier testing
-./integration-test.sh --tier 0  # Basic extension
-./integration-test.sh --tier 1  # Vector ops
-./integration-test.sh --tier 3  # ML algorithms
+# Integration tests
+./neurondb-healthcheck.sh integration
 
-# Continuous monitoring during development
-./monitor-status.sh --watch
+# Monitor during development
+./neurondb-monitor.sh watch --interval 3
 ```
 
 ---
 
-### Troubleshooting & Debugging
+### Release Workflow
 
 ```bash
-# 1. Check component status
-./monitor-status.sh
+# 1. Create release
+./neurondb-workflows.sh release --version 2.0.0 --dry-run
+./neurondb-workflows.sh release --version 2.0.0
 
-# 2. View logs
-./view-logs.sh all
-./view-logs.sh neuronagent --follow
+# 2. Sync version branches
+./neurondb-workflows.sh sync --from-branch main --to-branch REL1_STABLE
 
-# 3. Run health check
-./health-check.sh
+# 3. Update references after file renames
+./neurondb-workflows.sh update-refs
 
-# 4. Run basic integration tests
-./integration-test.sh --tier 0 --verbose
-
-# 5. Check Docker dependencies (if using Docker)
-./docker-verify-dependencies.sh
+# 4. Safe git pull
+./neurondb-workflows.sh pull
 ```
 
 ---
 
-### Cleanup & Maintenance
+### Package Testing
 
 ```bash
-# Preview cleanup (safe)
-./cleanup.sh --all --dry-run
+# 1. Verify packages
+./neurondb-pkgs.sh verify --os ubuntu
 
-# Clean logs only
-./cleanup.sh --logs
+# 2. Test in Vagrant
+./neurondb-pkgs.sh test-vagrant --os rocky
 
-# Clean build artifacts
-./cleanup.sh --build
+# 3. Generate SDKs
+./neurondb-pkgs.sh generate-sdk --language python
 
-# Clean Docker resources
-./cleanup.sh --docker
-
-# Full cleanup
-./cleanup.sh --all
-
-# Then rebuild if needed
-make build              # Native build
-make docker-build       # Docker build
+# 4. Validate Helm charts
+./neurondb-pkgs.sh validate-helm
 ```
 
 ---
 
-### Uninstallation
+## 📚 Environment Variables
 
+All scripts support environment variables for configuration:
+
+### Database Configuration
 ```bash
-# Preview uninstall (Docker)
-./ecosystem-setup.sh --mode docker --all --uninstall --dry-run
-
-# Uninstall Docker deployment (keep volumes)
-./ecosystem-setup.sh --mode docker --all --uninstall
-
-# Uninstall with data removal (⚠️ destructive!)
-./ecosystem-setup.sh --mode docker --all --uninstall --remove-data
-
-# Uninstall packages
-./ecosystem-setup.sh --mode deb --components NeuronDB NeuronAgent --uninstall
+export DB_HOST=localhost
+export DB_PORT=5432
+export DB_NAME=neurondb
+export DB_USER=postgres
+export DB_PASSWORD=your_password
 ```
 
----
-
-## 📚 Script Development Guidelines
-
-### Naming Convention
-- Use **kebab-case** for script names: `ecosystem-setup.sh`, `backup-database.sh`
-- Use descriptive names: `integration-test.sh` not `test.sh`
-- Prefix Docker scripts: `docker-run-neurondb.sh`
-
-### Script Structure
+### Docker Configuration
 ```bash
-#!/bin/bash
-#
-# Script Name: my-script.sh
-# Description: Brief description of what the script does
-# Usage: ./my-script.sh [options]
-
-set -euo pipefail  # Exit on error, undefined variables, pipe failures
-
-# Configuration and Constants
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-# Colors for output
-readonly GREEN='\033[0;32m'
-readonly RED='\033[0;31m'
-readonly NC='\033[0m'
-
-# Functions
-show_help() {
-    # Help text
-}
-
-main() {
-    # Main logic
-}
-
-main "$@"
+export POSTGRES_USER=neurondb
+export POSTGRES_PASSWORD=neurondb
+export POSTGRES_DB=neurondb
+export PG_MAJOR=18
+export CUDA_VERSION=12.4.1
+export ONNX_VERSION=1.17.0
 ```
 
-### Best Practices
-
-1. **Error Handling**
-   - Use `set -euo pipefail`
-   - Check prerequisites
-   - Provide helpful error messages
-
-2. **Documentation**
-   - Include header comment with description and usage
-   - Provide `--help` option
-   - Add examples
-
-3. **Modularity**
-   - Break complex logic into functions
-   - Reuse common functions
-   - Keep scripts focused
-
-4. **User Experience**
-   - Color-coded output for readability
-   - Progress indicators
-   - Verbose mode option
-   - Dry-run mode for safety
-
-5. **Environment Variables**
-   - Use standard environment variables
-   - Provide sensible defaults
-   - Document all variables
+### Service Configuration
+```bash
+export SERVER_PORT=8080
+export AGENT_URL=http://localhost:8080
+export NEURONDB_HOST=neurondb
+export NEURONDB_PORT=5432
+```
 
 ---
 
 ## 🆘 Troubleshooting
 
-### Common Issues
-
-#### Script Permission Denied
+### Script Permission Denied
 ```bash
 # Make script executable
-chmod +x scripts/script-name.sh
+chmod +x scripts/neurondb-*.sh
 ```
 
-#### Environment Variables Not Set
-```bash
-# Check current variables
-env | grep DB_
-
-# Set required variables
-export DB_HOST=localhost
-export DB_PORT=5432
-export DB_NAME=neurondb
-```
-
-#### Database Connection Failed
+### Database Connection Failed
 ```bash
 # Test connection manually
 psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -c "SELECT 1;"
 
-# Check database is running
-docker compose ps neurondb
-
-# Check logs
-./view-logs.sh neurondb
+# Check Docker container
+./neurondb-docker.sh status
+./neurondb-docker.sh logs --component neurondb
 ```
 
-#### Docker Container Not Found
+### Docker Issues
 ```bash
-# List running containers
-docker compose ps
+# Check Docker status
+./neurondb-docker.sh verify --dependencies
 
-# Start services
-docker compose up -d
+# View container logs
+./neurondb-docker.sh logs --component neurondb --follow
 
-# Check logs
-./view-logs.sh --follow
+# Restart containers
+./neurondb-docker.sh run --component neurondb --variant cpu --action clean
+./neurondb-docker.sh run --component neurondb --variant cpu
+```
+
+### Help and Documentation
+```bash
+# Get help for any script
+./neurondb-*.sh --help
+
+# Verbose output
+./neurondb-*.sh COMMAND --verbose
+
+# Dry run (where applicable)
+./neurondb-*.sh COMMAND --dry-run
 ```
 
 ---
@@ -784,99 +1319,61 @@ docker compose up -d
 
 | Category | Scripts | Description |
 |----------|---------|-------------|
-| **Setup & Installation** | 2 | Ecosystem setup, simple installer |
-| **Testing & Verification** | 2 | Health checks, integration tests |
-| **Backup & Restore** | 2 | Database backup and restore |
-| **Monitoring** | 2 | Status monitoring, log viewing |
-| **Docker** | 6 | Docker container management |
-| **Maintenance** | 1 | Cleanup and maintenance |
-| **Total** | 15 | Professional production scripts |
-
----
-
-## 🔗 Related Resources
-
-### Documentation
-- **[Main README](../readme.md)** - Project overview
-- **[Quick Start](../QUICKSTART.md)** - Get started quickly
-- **[Documentation Index](../documentation.md)** - Complete documentation
-
-### Component Documentation
-- **[NeuronDB](../NeuronDB/readme.md)** - Database extension
-- **[NeuronAgent](../NeuronAgent/readme.md)** - Agent runtime
-- **[NeuronMCP](../NeuronMCP/readme.md)** - MCP server
-- **[NeuronDesktop](../NeuronDesktop/readme.md)** - Web interface
-
-### Guides
-- **[Installation Guide](../NeuronDB/INSTALL.md)** - Detailed installation
-- **[Deployment Guide](../NeuronAgent/docs/DEPLOYMENT.md)** - Production deployment
-- **[Docker Guide](../dockers/readme.md)** - Container deployment
-- **[Testing Guide](../NeuronAgent/TESTING.md)** - Testing strategies
-
----
-
-## 🤝 Contributing
-
-### Adding New Scripts
-
-1. Create script in `scripts/` directory
-2. Follow naming conventions (kebab-case)
-3. Include documentation header
-4. Add `--help` option
-5. Test thoroughly
-6. Update this README
-7. Submit pull request
-
-See [CONTRIBUTING.md](../CONTRIBUTING.md) for full guidelines.
-
----
-
-## 📝 Examples Moved
-
-Example scripts have been moved to the `examples/` directory:
-
-- **LLM Training Examples**: `examples/llm_training/`
-  - `train_postgres_llm.py` - Train custom LLM models
-  - `export_to_ollama.sh` - Export models to Ollama
-  - `start_custom_llm_system.sh` - Start custom LLM server
-  - `stop_custom_llm_system.sh` - Stop custom LLM server
-
-- **Data Loading Examples**: `examples/data_loading/`
-  - `load_huggingface_dataset.py` - Load HuggingFace datasets
+| **Docker Management** | 1 | Complete Docker operations |
+| **Database Management** | 1 | Backup, restore, setup, maintenance |
+| **Setup & Installation** | 1 | Installation and setup |
+| **Health Checking** | 1 | Health checks and testing |
+| **Monitoring** | 1 | Status monitoring and logs |
+| **Workflows** | 1 | Release and git operations |
+| **Package Management** | 1 | Package verification and SDK generation |
+| **Blog Management** | 1 | Blog maintenance operations |
+| **Utilities** | 2 | Cleanup and password generation |
+| **Total** | 10 | Professional production scripts |
 
 ---
 
 ## 🎓 Learning Path
 
 ### New Users
-1. Start with [Quick Start Guide](../QUICKSTART.md)
-2. Run `./health-check.sh` to verify setup
-3. Try `./monitor-status.sh --watch` to see the system running
-4. Explore `./view-logs.sh` to understand component behavior
+1. Start with setup: `./neurondb-setup.sh ecosystem`
+2. Verify: `./neurondb-healthcheck.sh quick`
+3. Monitor: `./neurondb-monitor.sh watch`
+4. Explore logs: `./neurondb-monitor.sh logs --component neurondb`
 
 ### Developers
-1. Use `./integration-test.sh` regularly during development
-2. Monitor with `./monitor-status.sh --watch` while coding
-3. Clean up with `./cleanup.sh --build` between rebuilds
-4. Back up test data with `./backup-database.sh`
+1. Use health checks: `./neurondb-healthcheck.sh integration`
+2. Monitor during development: `./neurondb-monitor.sh watch`
+3. Test Docker: `./neurondb-docker.sh test --type basic`
+4. Backup test data: `./neurondb-database.sh backup`
 
 ### DevOps/Operators
-1. Deploy with `./ecosystem-setup.sh --mode docker --all`
-2. Set up monitoring with `./monitor-status.sh --json` (integrate with your tools)
-3. Implement backup strategy with `./backup-database.sh --retention 30`
-4. Use `./view-logs.sh` for troubleshooting
+1. Deploy: `./neurondb-setup.sh install --mode docker`
+2. Monitor: `./neurondb-monitor.sh metrics`
+3. Backup strategy: `./neurondb-database.sh backup --retention 30`
+4. Troubleshoot: `./neurondb-monitor.sh logs --follow`
 
 ---
 
-**Last Updated:** 2025-12-31  
+## 🔗 Related Resources
+
+- **[Main README](../README.md)** - Project overview
+- **[Quick Start](../QUICKSTART.md)** - Get started quickly
+- **[Documentation Index](../DOCUMENTATION.md)** - Complete documentation
+- **[Contributing Guide](../CONTRIBUTING.md)** - Contribution guidelines
+
+---
+
+## 📝 Script Development
+
+All scripts follow these principles:
+- ✅ **Self-sufficient** - No external dependencies
+- ✅ **Standard CLI** - `--help`, `--verbose`, `--version`, `--dry-run`
+- ✅ **Modular** - Commands organized by functionality
+- ✅ **Professional** - Consistent naming and structure
+- ✅ **Well-documented** - Comprehensive help and examples
+
+---
+
+**Last Updated:** 2025-01-01  
 **Scripts Version:** 2.0.0  
 **Maintainer:** NeuronDB Team
-
----
-
-## 📬 Support
-
-For issues or questions:
-- **GitHub Issues**: [github.com/neurondb/neurondb/issues](https://github.com/neurondb/neurondb/issues)
-- **Documentation**: [www.neurondb.ai/docs](https://www.neurondb.ai/docs)
-- **Community**: [discord.gg/neurondb](https://discord.gg/neurondb)
