@@ -164,3 +164,4 @@ This document summarizes the improvements made to NeuronDB's vector subsystem as
 - **Integrity checks**: VectorCapsule provides tamper detection via checksums
 
 
+
