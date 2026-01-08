@@ -12,6 +12,35 @@ Thank you for your interest in contributing to NeuronDB!
 6. Commit with clear messages: `git commit -m "Add feature X"`
 7. Push and create a pull request
 
+### Avoiding Merge Commits
+
+To maintain a clean, linear git history, always use rebase when pulling changes:
+
+```bash
+# Configure git to always rebase on pull (recommended)
+git config pull.rebase true
+
+# Or use rebase explicitly when pulling
+git pull --rebase
+
+# Or use the safe pull script
+./scripts/git-pull-safe.sh
+```
+
+**Never use `git pull` without `--rebase`** as it creates unnecessary merge commits like:
+```
+Merge branch 'main' of github.com:neurondb/neurondb
+```
+
+If you accidentally create a merge commit before pushing, you can remove it:
+```bash
+# Reset to before the merge (keeps your changes)
+git reset --soft <commit-before-merge>
+
+# Re-commit your changes
+git commit -m "Your commit message"
+```
+
 ## Code Standards
 
 ### Code Style Enforcement

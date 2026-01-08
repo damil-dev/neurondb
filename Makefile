@@ -1,9 +1,18 @@
-# Makefile for NeuronDB Ecosystem
-# Unified build system supporting both Docker orchestration and source builds
+# -------------------------------------------------------------------------
 #
-# Build Modes:
-#   - Docker: Use docker-* targets for containerized builds
-#   - Source: Use build-* targets for native source builds
+# Makefile
+#    Unified build system for NeuronDB Ecosystem
+#
+# Unified build system supporting both Docker orchestration and source builds.
+# Build Modes: Docker (docker-* targets for containerized builds), Source
+# (build-* targets for native source builds).
+#
+# Copyright (c) 2024-2026, neurondb, Inc.
+#
+# IDENTIFICATION
+#    Makefile
+#
+# -------------------------------------------------------------------------
 
 .PHONY: help \
         docker-build docker-build-cpu docker-build-cuda docker-build-rocm docker-build-metal \
