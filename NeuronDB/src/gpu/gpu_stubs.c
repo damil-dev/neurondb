@@ -4,7 +4,7 @@
  *    Stub implementations for GPU backend functions
  *    Always compiled to ensure symbols are available in CPU-only builds
  *
- * Copyright (c) 2024-2025, neurondb, Inc.
+ * Copyright (c) 2024-2026, neurondb, Inc.
  *
  *-------------------------------------------------------------------------
  */

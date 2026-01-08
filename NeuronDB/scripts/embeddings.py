@@ -1,9 +1,17 @@
 #!/usr/bin/env python3
 """
+-------------------------------------------------------------------------
 embeddings.py
     Embedding generation and vector index management
 
-Copyright (c) 2024-2025, neurondb, Inc.
+Embedding generation and vector index management for document chunks,
+including batch processing and index creation.
+
+Copyright (c) 2024-2026, neurondb, Inc.
+
+IDENTIFICATION
+    NeuronDB/scripts/embeddings.py
+-------------------------------------------------------------------------
 """
 
 import psycopg2

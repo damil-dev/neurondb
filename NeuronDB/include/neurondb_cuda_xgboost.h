@@ -3,7 +3,7 @@
  * neurondb_cuda_xgboost.h
  *    CUDA-specific data structures and API for XGBoost
  *
- * Copyright (c) 2024-2025, neurondb, Inc.
+ * Copyright (c) 2024-2026, neurondb, Inc.
  *
  * IDENTIFICATION
  *    include/neurondb_cuda_xgboost.h

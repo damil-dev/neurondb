@@ -5,7 +5,7 @@
  *
  * This cache is backed by the neurondb.llm_cache table.
  *
- * Copyright (c) 2024-2025, neurondb, Inc.
+ * Copyright (c) 2024-2026, neurondb, Inc.
  *
  * IDENTIFICATION
  *	  src/llm/llm_cache.c

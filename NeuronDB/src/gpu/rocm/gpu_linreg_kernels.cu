@@ -3,7 +3,7 @@
  * gpu_linreg_kernels.cu
  *    ROCm kernels for Linear Regression operations
  *
- * Copyright (c) 2024-2025, neurondb, Inc.
+ * Copyright (c) 2024-2026, neurondb, Inc.
  *
  * IDENTIFICATION
  *    src/gpu/rocm/gpu_linreg_kernels.cu

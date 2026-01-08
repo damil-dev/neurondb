@@ -6,7 +6,7 @@
  * Defines structures for embedding versioning, lineage tracking,
  * and refresh policies with drift detection.
  *
- * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ * Copyright (c) 2024-2026, neurondb, Inc. <admin@neurondb.com>
  *
  * IDENTIFICATION
  *	  include/neurondb_embedding.h

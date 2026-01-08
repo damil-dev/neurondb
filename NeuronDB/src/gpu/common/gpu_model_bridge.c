@@ -6,7 +6,7 @@
  * This module connects SQL ML entry points with the model registry,
  * providing helper routines for training and prediction.
  *
- * Copyright (c) 2024-2025, neurondb, Inc.
+ * Copyright (c) 2024-2026, neurondb, Inc.
  *
  * IDENTIFICATION
  *    src/gpu/common/gpu_model_bridge.c

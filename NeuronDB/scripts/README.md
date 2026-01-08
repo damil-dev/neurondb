@@ -340,5 +340,5 @@ python3 load_documentation.py \
 
 ## License
 
-Copyright (c) 2024-2025, neurondb, Inc.
+Copyright (c) 2024-2026, neurondb, Inc.
 

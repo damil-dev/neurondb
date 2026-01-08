@@ -6,7 +6,7 @@
  * Implements CQ-HNSW with snapshot pinning to ensure identical
  * query results across all replicas, critical for distributed systems.
  *
- * Copyright (c) 2024-2025, neurondb, Inc.
+ * Copyright (c) 2024-2026, neurondb, Inc.
  *
  * IDENTIFICATION
  *	  src/index_consistent.c

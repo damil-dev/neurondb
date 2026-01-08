@@ -11,7 +11,7 @@
  *    context management, rigorous input contract, and explicit documentation
  *    is provided for all operators.
  *
- *    Copyright (c) 2024-2025, neurondb, Inc.
+ *    Copyright (c) 2024-2026, neurondb, Inc.
  *
  *    IDENTIFICATION
  *      src/core/operators.c

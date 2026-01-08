@@ -1,10 +1,17 @@
 #!/usr/bin/env python3
 """
+-------------------------------------------------------------------------
 doc_processor.py
-    Document processing utilities for extracting and cleaning text
-    from various file formats
+    Document processing utilities
 
-Copyright (c) 2024-2025, neurondb, Inc.
+Document processing utilities for extracting and cleaning text from
+various file formats including HTML, Markdown, and plain text.
+
+Copyright (c) 2024-2026, neurondb, Inc.
+
+IDENTIFICATION
+    NeuronDB/scripts/doc_processor.py
+-------------------------------------------------------------------------
 """
 
 import re

@@ -1,5 +1,17 @@
-# NeurondB: Advanced AI Database Extension
-# Copyright (c) 2024-2025, neurondb, Inc.
+# -------------------------------------------------------------------------
+#
+# Makefile.core
+#    Core build configuration for NeurondB
+#
+# Advanced AI Database Extension build configuration. Defines source files,
+# compilation flags, and build targets for the NeuronDB PostgreSQL extension.
+#
+# Copyright (c) 2024-2026, neurondb, Inc.
+#
+# IDENTIFICATION
+#    NeuronDB/Makefile.core
+#
+# -------------------------------------------------------------------------
 
 MODULE_big = neurondb
 EXTENSION = neurondb

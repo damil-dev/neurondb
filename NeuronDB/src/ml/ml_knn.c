@@ -6,7 +6,7 @@
  * This module implements KNN for classification and regression using
  * instance-based learning with Euclidean distance.
  *
- * Copyright (c) 2024-2025, neurondb, Inc.
+ * Copyright (c) 2024-2026, neurondb, Inc.
  *
  * IDENTIFICATION
  *    src/ml/ml_knn.c

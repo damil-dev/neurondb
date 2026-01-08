@@ -3,7 +3,7 @@
  * gpu_svm_rocm.c
  *    ROCm backend bridge for Support Vector Machine training and prediction.
  *
- * Copyright (c) 2024-2025, neurondb, Inc.
+ * Copyright (c) 2024-2026, neurondb, Inc.
  *
  * IDENTIFICATION
  *    src/gpu/rocm/gpu_svm_rocm.c

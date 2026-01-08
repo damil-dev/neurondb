@@ -9,7 +9,7 @@
  * - Cost-based index selection
  * - Query pattern analysis for tuning
  *
- * Copyright (c) 2024-2025, neurondb, Inc.
+ * Copyright (c) 2024-2026, neurondb, Inc.
  *
  * IDENTIFICATION
  *	  src/index/index_tuning.c

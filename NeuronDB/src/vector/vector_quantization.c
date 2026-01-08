@@ -6,7 +6,7 @@
  * Implements quantization and dequantization for storage efficiency.
  * FP16 provides 2x compression, INT8 provides 4x compression.
  *
- * Copyright (c) 2024-2025, neurondb, Inc.
+ * Copyright (c) 2024-2026, neurondb, Inc.
  *
  * IDENTIFICATION
  *	  src/vector/vector_quantization.c

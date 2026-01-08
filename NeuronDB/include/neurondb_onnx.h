@@ -2,19 +2,16 @@
  *
  * neurondb_onnx.h
  *    ONNX Runtime integration for NeuronDB
- *    Provides C API wrapper around ONNX Runtime for HuggingFace model inference
  *
- * Architecture:
- *   HuggingFace Models -> ONNX Export -> ONNX Runtime C API -> PostgreSQL
+ * Provides C API wrapper around ONNX Runtime for HuggingFace model inference.
+ * Architecture: HuggingFace Models -> ONNX Export -> ONNX Runtime C API -> PostgreSQL.
+ * Supported Backends: CPU (default), CUDA (NVIDIA GPUs), TensorRT (NVIDIA optimized),
+ * CoreML (Apple Silicon), DirectML (Windows).
  *
- * Supported Backends:
- *   - CPU (default)
- *   - CUDA (NVIDIA GPUs)
- *   - TensorRT (NVIDIA optimized)
- *   - CoreML (Apple Silicon)
- *   - DirectML (Windows)
+ * Copyright (c) 2024-2026, neurondb, Inc.
  *
- * SPDX-License-Identifier: PostgreSQL
+ * IDENTIFICATION
+ *    include/neurondb_onnx.h
  *
  *-------------------------------------------------------------------------
  */

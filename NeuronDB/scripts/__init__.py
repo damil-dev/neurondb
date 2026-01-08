@@ -1,15 +1,19 @@
 """
-Documentation Loading Scripts
-    Modular scripts for loading documentation files and creating embeddings
+-------------------------------------------------------------------------
+__init__.py
+    Documentation Loading Scripts
 
-Modules:
-    - load_docs.py: Main entry point
-    - doc_processor.py: File processing and text extraction
-    - chunking.py: Text chunking utilities
-    - db_operations.py: Database schema and operations
-    - embeddings.py: Embedding generation and vector indexes
+Modular scripts for loading documentation files and creating embeddings.
+Modules: load_docs.py (main entry point), doc_processor.py (file processing
+and text extraction), chunking.py (text chunking utilities),
+db_operations.py (database schema and operations), embeddings.py
+(embedding generation and vector indexes).
 
-Copyright (c) 2024-2025, neurondb, Inc.
+Copyright (c) 2024-2026, neurondb, Inc.
+
+IDENTIFICATION
+    NeuronDB/scripts/__init__.py
+-------------------------------------------------------------------------
 """
 
 __version__ = '2.0.0'

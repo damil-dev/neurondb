@@ -1,9 +1,17 @@
 #!/usr/bin/env python3
 """
+-------------------------------------------------------------------------
 chunking.py
-    Text chunking utilities for splitting documents into overlapping segments
+    Text chunking utilities
 
-Copyright (c) 2024-2025, neurondb, Inc.
+Text chunking utilities for splitting documents into overlapping segments
+with sentence boundary awareness for optimal embedding generation.
+
+Copyright (c) 2024-2026, neurondb, Inc.
+
+IDENTIFICATION
+    NeuronDB/scripts/chunking.py
+-------------------------------------------------------------------------
 """
 
 from typing import List, Tuple

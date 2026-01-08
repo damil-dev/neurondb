@@ -13,7 +13,7 @@
  *   - σi is the average distance from points in cluster i to its centroid
  *   - d(ci, cj) is the distance between centroids of clusters i and j
  *
- * Copyright (c) 2024-2025, neurondb, Inc.
+ * Copyright (c) 2024-2026, neurondb, Inc.
  *
  * IDENTIFICATION
  *    src/ml/ml_davies_bouldin.c

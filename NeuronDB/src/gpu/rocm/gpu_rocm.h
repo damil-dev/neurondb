@@ -2,7 +2,7 @@
  * gpu_rocm.h
  *     AMD ROCm GPU backend header
  *
- * Copyright (c) 2024-2025, neurondb, Inc.
+ * Copyright (c) 2024-2026, neurondb, Inc.
  */
 
 #ifndef NEURONDB_GPU_ROCM_H

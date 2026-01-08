@@ -6,7 +6,7 @@
  * Provides function declarations for accessing SQL query templates
  * used in linear regression operations.
  *
- * Copyright (c) 2024-2025, neurondb, Inc.
+ * Copyright (c) 2024-2026, neurondb, Inc.
  *
  * IDENTIFICATION
  *    include/neurondb_sql.h

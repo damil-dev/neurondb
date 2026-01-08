@@ -6,7 +6,7 @@
  * Implements linear algebra operations, statistics, transformations,
  * and filtering operations for comprehensive vector manipulation.
  *
- * Copyright (c) 2024-2025, neurondb, Inc.
+ * Copyright (c) 2024-2026, neurondb, Inc.
  *
  * IDENTIFICATION
  *	  src/vector/vector_advanced.c

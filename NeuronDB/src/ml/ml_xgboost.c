@@ -6,7 +6,7 @@
  * This module provides XGBoost gradient boosting for classification and
  * regression with model serialization and catalog storage.
  *
- * Copyright (c) 2024-2025, neurondb, Inc.
+ * Copyright (c) 2024-2026, neurondb, Inc.
  *
  * IDENTIFICATION
  *    src/ml/ml_xgboost.c

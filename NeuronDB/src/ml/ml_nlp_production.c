@@ -6,7 +6,7 @@
  * This module implements text embeddings, classification, sentiment
  * analysis, named entity recognition, and text generation.
  *
- * Copyright (c) 2024-2025, neurondb, Inc.
+ * Copyright (c) 2024-2026, neurondb, Inc.
  *
  * IDENTIFICATION
  *    src/ml/ml_nlp_production.c

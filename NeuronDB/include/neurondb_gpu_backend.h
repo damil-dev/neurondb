@@ -1,3 +1,19 @@
+/*-------------------------------------------------------------------------
+ *
+ * neurondb_gpu_backend.h
+ *    GPU backend interface for NeuronDB
+ *
+ * Defines the generic GPU backend interface that supports multiple GPU
+ * implementations (CUDA, ROCm, Metal) for machine learning operations.
+ *
+ * Copyright (c) 2024-2026, neurondb, Inc.
+ *
+ * IDENTIFICATION
+ *    include/neurondb_gpu_backend.h
+ *
+ *-------------------------------------------------------------------------
+ */
+
 #ifndef NEURONDB_GPU_BACKEND_H
 #define NEURONDB_GPU_BACKEND_H
 

@@ -6,7 +6,7 @@
  * This module implements t-SNE, UMAP, and autoencoder-based dimensionality
  * reduction for data visualization and feature compression.
  *
- * Copyright (c) 2024-2025, neurondb, Inc.
+ * Copyright (c) 2024-2026, neurondb, Inc.
  *
  * IDENTIFICATION
  *    src/ml/ml_dimensionality_reduction.c

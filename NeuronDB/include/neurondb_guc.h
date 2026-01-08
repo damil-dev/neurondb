@@ -1,12 +1,18 @@
 /*-------------------------------------------------------------------------
+ *
  * neurondb_guc.h
- *   Centralized GUC (Grand Unified Configuration) handling for NeuronDB
+ *    Centralized GUC (Grand Unified Configuration) handling for NeuronDB
  *
  * This header defines the NeuronDBConfig structure that holds all
  * configuration values and provides access to them throughout the system.
  *
- * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
- *-------------------------------------------------------------------------*/
+ * Copyright (c) 2024-2026, neurondb, Inc.
+ *
+ * IDENTIFICATION
+ *    include/neurondb_guc.h
+ *
+ *-------------------------------------------------------------------------
+ */
 
 #ifndef NEURONDB_GUC_H
 #define NEURONDB_GUC_H

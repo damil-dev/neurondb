@@ -9,7 +9,7 @@
  * - SPI return code validation
  * - Model structure validation
  *
- * Copyright (c) 2024-2025, neurondb, Inc.
+ * Copyright (c) 2024-2026, neurondb, Inc.
  *
  * IDENTIFICATION
  *    include/neurondb_validation.h

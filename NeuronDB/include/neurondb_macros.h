@@ -1,7 +1,15 @@
 /*-------------------------------------------------------------------------
  *
  * neurondb_macros.h
- *	  Strict pointer lifetime helpers for NeurondDB
+ *    Strict pointer lifetime helpers for NeurondDB
+ *
+ * Provides macros for safe memory management and pointer lifetime tracking
+ * to prevent use-after-free and memory leaks in NeuronDB code.
+ *
+ * Copyright (c) 2024-2026, neurondb, Inc.
+ *
+ * IDENTIFICATION
+ *    include/neurondb_macros.h
  *
  *-------------------------------------------------------------------------
  */

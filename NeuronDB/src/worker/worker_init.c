@@ -6,7 +6,7 @@
  * This module handles registration of all NeurondB background workers
  * via shared_preload_libraries mechanism.
  *
- * Copyright (c) 2024-2025, neurondb, Inc.
+ * Copyright (c) 2024-2026, neurondb, Inc.
  *
  * IDENTIFICATION
  *	  src/bgworker_init.c

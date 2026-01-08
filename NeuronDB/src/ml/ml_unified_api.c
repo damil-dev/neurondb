@@ -36,7 +36,7 @@
  *    - CANNOT MODIFY: Memory context lifecycle, SPI session management order
  *    - BREAKS IF: Memory contexts deleted while in use, SPI sessions used after end
  *
- * Copyright (c) 2024-2025, neurondb, Inc.
+ * Copyright (c) 2024-2026, neurondb, Inc.
  *
  * IDENTIFICATION
  *    src/ml/ml_unified_api.c

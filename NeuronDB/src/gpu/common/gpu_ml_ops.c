@@ -6,7 +6,7 @@
  * This module provides accelerated operations for matrix operations,
  * gradient descent, neural network passes, clustering, and normalization.
  *
- * Copyright (c) 2024-2025, neurondb, Inc.
+ * Copyright (c) 2024-2026, neurondb, Inc.
  *
  * IDENTIFICATION
  *    src/gpu/common/gpu_ml_ops.c

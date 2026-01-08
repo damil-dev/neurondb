@@ -7,7 +7,7 @@
  * Uses SKIP LOCKED to avoid blocking and enforces per-job retry limits.
  * All error scenarios are caught and handled robustly.
  *
- * Copyright (c) 2024-2025, neurondb, Inc.
+ * Copyright (c) 2024-2026, neurondb, Inc.
  *
  * IDENTIFICATION
  *	  src/bgworkers/neuranllm.c

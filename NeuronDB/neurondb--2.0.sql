@@ -1,15 +1,19 @@
--- ============================================================================
--- NeurondB Extension SQL Definitions
--- Advanced AI Database Extension for PostgreSQL
--- 
--- Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
--- 
--- Version Compatibility:
--- - PostgreSQL 16: Full support with PL/pgSQL fallbacks for macOS dylib loader issues
--- - PostgreSQL 17: Full support with PL/pgSQL fallbacks for macOS dylib loader issues
--- - PostgreSQL 18: Full support with native C functions (dylib loader fixed)
--- - OS Support: macOS, Rocky Linux, Ubuntu (all versions)
--- ============================================================================
+-- -------------------------------------------------------------------------
+--
+-- neurondb--2.0.sql
+--    NeurondB Extension SQL Definitions
+--
+-- Advanced AI Database Extension for PostgreSQL. Provides vector operations,
+-- machine learning, indexing, and advanced database capabilities.
+-- Version Compatibility: PostgreSQL 16, 17, 18 with full support. OS Support:
+-- macOS, Rocky Linux, Ubuntu (all versions).
+--
+-- Copyright (c) 2024-2026, neurondb, Inc.
+--
+-- IDENTIFICATION
+--    NeuronDB/neurondb--2.0.sql
+--
+-- -------------------------------------------------------------------------
 
 \echo Use "CREATE EXTENSION neurondb" to load this extension. \quit
 

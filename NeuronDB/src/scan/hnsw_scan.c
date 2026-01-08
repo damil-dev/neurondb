@@ -9,7 +9,7 @@
  * - Result set pruning with ef_search
  * - Distance computation caching
  *
- * Copyright (c) 2024-2025, neurondb, Inc.
+ * Copyright (c) 2024-2026, neurondb, Inc.
  *
  * IDENTIFICATION
  *	  src/scan/hnsw_scan.c

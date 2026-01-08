@@ -3,7 +3,7 @@
  * neurondb_hf.c
  *	  HuggingFace model SQL interface via ONNX Runtime
  *
- * Copyright (c) 2024-2025, neurondb, Inc.
+ * Copyright (c) 2024-2026, neurondb, Inc.
  * SPDX-License-Identifier: PostgreSQL
  *
  *-------------------------------------------------------------------------

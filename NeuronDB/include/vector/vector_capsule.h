@@ -7,8 +7,10 @@
  * representations (dense fp32, fp16, int8, binary, sparse) and metadata
  * (norms, checksums, provenance) for adaptive execution and indexing.
  *
- * Copyright (c) 2024-2025, neurondb, Inc.
- * SPDX-License-Identifier: PostgreSQL
+ * Copyright (c) 2024-2026, neurondb, Inc.
+ *
+ * IDENTIFICATION
+ *	  include/vector/vector_capsule.h
  *
  *-------------------------------------------------------------------------
  */

@@ -463,3 +463,5 @@ def evaluate_retrieval(eval_queries, retrieval_function):
 - [LLM Integration](llm-integration.md) - LLM setup and usage
 - [Vector Search](vector-search/indexing.md) - Index configuration
 
+
+

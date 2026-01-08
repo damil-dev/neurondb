@@ -1,32 +1,19 @@
 #!/usr/bin/env python3
 """
+-------------------------------------------------------------------------
 load_docs.py
     Main entry point for loading documentation files and creating embeddings
-    using NeurondB
 
-Usage:
-    python3 load_docs.py [OPTIONS]
+Main entry point for loading documentation files and creating embeddings
+using NeurondB. Supports various file formats and provides command-line
+options for database connection, embedding models, chunking parameters,
+and batch processing.
 
-Options:
-    -d, --directory DIR     Directory containing documentation files
-    -D, --database DB       Database name (default: postgres)
-    -U, --user USER         Database user (default: postgres)
-    -H, --host HOST         Database host (default: localhost)
-    -p, --port PORT         Database port (default: 5432)
-    -m, --model MODEL       Embedding model (default: all-MiniLM-L6-v2)
-    -c, --chunk-size SIZE   Chunk size in characters (default: 1000)
-    -o, --overlap SIZE      Chunk overlap in characters (default: 200)
-    -t, --table-prefix PFX   Table name prefix (default: docs)
-    --skip-embeddings        Skip embedding generation
-    --skip-index            Skip index creation
-    --batch-size SIZE       Batch size for embeddings (default: 100)
-    -v, --verbose           Verbose output
-    -h, --help              Show this help message
+Copyright (c) 2024-2026, neurondb, Inc.
 
-Example:
-    python3 load_docs.py -d /path/to/docs -D mydb -U myuser
-
-Copyright (c) 2024-2025, neurondb, Inc.
+IDENTIFICATION
+    NeuronDB/scripts/load_docs.py
+-------------------------------------------------------------------------
 """
 
 import sys

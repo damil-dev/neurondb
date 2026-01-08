@@ -7,7 +7,7 @@
  * full-text search in one index structure, enabling single plan node
  * and single heap walk for optimal performance.
  *
- * Copyright (c) 2024-2025, neurondb, Inc.
+ * Copyright (c) 2024-2026, neurondb, Inc.
  *
  * IDENTIFICATION
  *	  src/index_hybrid.c

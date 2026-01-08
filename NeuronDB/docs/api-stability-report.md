@@ -124,3 +124,5 @@ ORDER BY stability, function_name;
 - [SQL API Reference](sql-api.md) - Complete function reference with stability labels
 - [Deprecation Policy](deprecation-policy.md) - How deprecations are handled
 
+
+

@@ -7,7 +7,7 @@
  * using transformer architecture. Models are trained from scratch and exported
  * to ONNX format for inference.
  *
- * Copyright (c) 2024-2025, neurondb, Inc.
+ * Copyright (c) 2024-2026, neurondb, Inc.
  *
  * IDENTIFICATION
  *    src/ml/ml_transformer_llm.c

@@ -6,7 +6,7 @@
  * This module handles backend initialization, device selection, and
  * related statistics.
  *
- * Copyright (c) 2024-2025, neurondb, Inc.
+ * Copyright (c) 2024-2026, neurondb, Inc.
  *
  * IDENTIFICATION
  *    src/gpu/common/gpu_core.c

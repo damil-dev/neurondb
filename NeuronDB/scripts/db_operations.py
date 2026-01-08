@@ -1,9 +1,17 @@
 #!/usr/bin/env python3
 """
+-------------------------------------------------------------------------
 db_operations.py
-    Database schema and operations for document storage
+    Database schema and operations
 
-Copyright (c) 2024-2025, neurondb, Inc.
+Database schema and operations for document storage, including table
+creation, data insertion, and vector index management.
+
+Copyright (c) 2024-2026, neurondb, Inc.
+
+IDENTIFICATION
+    NeuronDB/scripts/db_operations.py
+-------------------------------------------------------------------------
 """
 
 import json

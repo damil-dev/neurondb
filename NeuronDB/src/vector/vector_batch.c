@@ -6,7 +6,7 @@
  * Implements efficient batch processing of multiple vectors for
  * distance calculations, normalization, and aggregation.
  *
- * Copyright (c) 2024-2025, neurondb, Inc.
+ * Copyright (c) 2024-2026, neurondb, Inc.
  *
  * IDENTIFICATION
  *	  src/vector/vector_batch.c
