@@ -3,7 +3,7 @@
  * circuit_breaker_adapter.go
  *    Adapter to use circuit breaker middleware with MCP middleware interface
  *
- * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ * Copyright (c) 2024-2026, neurondb, Inc. <admin@neurondb.com>
  *
  * IDENTIFICATION
  *    NeuronMCP/internal/middleware/builtin/circuit_breaker_adapter.go
@@ -99,4 +99,6 @@ func (a *CircuitBreakerAdapter) Execute(ctx context.Context, req *middleware.MCP
 
 	return next(ctx, req)
 }
+
+
 

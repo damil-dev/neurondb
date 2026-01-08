@@ -5,7 +5,7 @@
  *
  * Provides JSON schema validation and structure checking.
  *
- * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ * Copyright (c) 2024-2026, neurondb, Inc. <admin@neurondb.com>
  *
  * IDENTIFICATION
  *    NeuronMCP/internal/validation/json.go

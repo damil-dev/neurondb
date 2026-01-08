@@ -5,7 +5,7 @@
  *
  * Implements OIDC device authorization grant for secure laptop client authentication.
  *
- * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ * Copyright (c) 2024-2026, neurondb, Inc. <admin@neurondb.com>
  *
  * IDENTIFICATION
  *    NeuronMCP/internal/auth/oidc.go

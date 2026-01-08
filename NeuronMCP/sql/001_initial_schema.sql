@@ -6,7 +6,7 @@
  * Creates all tables, indexes, views, triggers, and pre-populates
  * default configurations for NeuronMCP to work seamlessly with NeuronDB.
  *
- * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ * Copyright (c) 2024-2026, neurondb, Inc. <admin@neurondb.com>
  *
  *-------------------------------------------------------------------------
  */

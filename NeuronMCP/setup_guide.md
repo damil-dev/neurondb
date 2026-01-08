@@ -53,7 +53,7 @@ Create `mcp-config.json`:
   },
   "server": {
     "name": "neurondb-mcp-server",
-    "version": "1.0.0"
+    "version": "2.0.0"
   },
   "logging": {
     "level": "info",

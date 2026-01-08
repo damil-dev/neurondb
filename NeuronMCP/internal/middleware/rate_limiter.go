@@ -3,7 +3,7 @@
  * rate_limiter.go
  *    Adaptive rate limiting middleware with token bucket algorithm
  *
- * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ * Copyright (c) 2024-2026, neurondb, Inc. <admin@neurondb.com>
  *
  * IDENTIFICATION
  *    NeuronMCP/internal/middleware/rate_limiter.go

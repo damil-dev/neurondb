@@ -3,7 +3,7 @@
  * main.go
  *    Main entry point for NeuronMCP server
  *
- * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ * Copyright (c) 2024-2026, neurondb, Inc. <admin@neurondb.com>
  *
  * IDENTIFICATION
  *    NeuronMCP/cmd/neurondb-mcp/main.go

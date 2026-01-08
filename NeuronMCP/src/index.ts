@@ -1,4 +1,19 @@
 #!/usr/bin/env node
+/*-------------------------------------------------------------------------
+ *
+ * index.ts
+ *    Main entry point for NeuronMCP server
+ *
+ * Initializes the MCP server with database connection, resources, tools,
+ * and middleware. Handles server lifecycle and protocol communication.
+ *
+ * Copyright (c) 2024-2026, neurondb, Inc.
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/src/index.ts
+ *
+ *-------------------------------------------------------------------------
+ */
 
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";

@@ -20,7 +20,7 @@
  *   - Exit code 1 if any check fails
  *   - Detailed output showing what's missing or incorrect
  *
- * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ * Copyright (c) 2024-2026, neurondb, Inc. <admin@neurondb.com>
  *
  *-------------------------------------------------------------------------
  */

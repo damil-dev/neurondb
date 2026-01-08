@@ -3,7 +3,7 @@
  * sse_transport.go
  *    Server-Sent Events transport for MCP
  *
- * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ * Copyright (c) 2024-2026, neurondb, Inc. <admin@neurondb.com>
  *
  * IDENTIFICATION
  *    NeuronMCP/pkg/mcp/sse_transport.go

@@ -1,3 +1,19 @@
+/*-------------------------------------------------------------------------
+ *
+ * config.ts
+ *    Configuration management for NeuronMCP
+ *
+ * Handles loading and validation of server configuration from files and
+ * environment variables. Provides type-safe configuration interfaces.
+ *
+ * Copyright (c) 2024-2026, neurondb, Inc.
+ *
+ * IDENTIFICATION
+ *    NeuronMCP/src/config.ts
+ *
+ *-------------------------------------------------------------------------
+ */
+
 import { readFileSync, existsSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";

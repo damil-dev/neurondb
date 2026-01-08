@@ -6,7 +6,7 @@
  * Provides middleware for validating MCP request structure, parameters,
  * and required fields before request processing.
  *
- * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ * Copyright (c) 2024-2026, neurondb, Inc. <admin@neurondb.com>
  *
  * IDENTIFICATION
  *    NeuronMCP/internal/middleware/builtin/validation.go
