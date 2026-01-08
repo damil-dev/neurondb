@@ -232,3 +232,5 @@ This document defines the unified identity, authentication, and authorization mo
 4. **Federation**: Support for external identity providers
 5. **Role Templates**: Predefined role templates for common use cases
 
+
+

@@ -196,3 +196,5 @@ NeuronDesktop/frontend/
 - Responsive design for mobile and desktop
 - Dark mode support where applicable
 
+
+
