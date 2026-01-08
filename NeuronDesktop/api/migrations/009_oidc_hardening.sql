@@ -38,3 +38,5 @@ $$ LANGUAGE plpgsql;
 COMMENT ON FUNCTION cleanup_expired_login_attempts() IS 
 'Cleans up expired login attempts older than 1 hour. Should be run periodically via cron or scheduled job.';
 
+
+

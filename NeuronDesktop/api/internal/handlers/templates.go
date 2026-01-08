@@ -3,7 +3,7 @@
  * templates.go
  *    Template management handlers for NeuronDesktop API
  *
- * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ * Copyright (c) 2024-2026, neurondb, Inc. <admin@neurondb.com>
  *
  * IDENTIFICATION
  *    NeuronDesktop/api/internal/handlers/templates.go

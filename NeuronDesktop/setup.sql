@@ -13,7 +13,7 @@
  *
  * This script is idempotent and can be run multiple times safely.
  *
- * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ * Copyright (c) 2024-2026, neurondb, Inc. <admin@neurondb.com>
  *
  * IDENTIFICATION
  *    NeuronDesktop/setup.sql
@@ -201,4 +201,6 @@ EXCEPTION
         -- Permissions may already be set, ignore errors
         NULL;
 END $$;
+
+
 

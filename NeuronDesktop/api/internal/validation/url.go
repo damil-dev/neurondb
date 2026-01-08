@@ -50,3 +50,5 @@ func ValidateURLRequired(urlStr, fieldName string) error {
 	return nil
 }
 
+
+
