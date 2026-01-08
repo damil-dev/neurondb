@@ -25,11 +25,12 @@ This example shows how to:
 # Install dependencies
 pip install -r requirements.txt
 
-# Set database connection
+# Set database connection (Docker Compose defaults)
 export DB_HOST=localhost
-export DB_PORT=5432
+export DB_PORT=5433        # Docker Compose default port
 export DB_NAME=neurondb
-export DB_USER=postgres
+export DB_USER=neurondb   # Docker Compose default user
+export DB_PASSWORD=neurondb  # Docker Compose default password
 
 # Run ingestion
 python ingest_documents.py
@@ -78,6 +79,7 @@ python evaluate.py --queries queries.json --expected expected_results.json
 - [RAG Playbook](../../NeuronDB/docs/rag/playbook.md) - Chunking and embedding guidance
 - [Vector Search](../../NeuronDB/docs/vector-search/indexing.md) - Index configuration
 - [Performance Playbook](../../NeuronDB/docs/performance/playbook.md) - Optimization tips
+
 
 
 

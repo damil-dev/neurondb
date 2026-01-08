@@ -13,10 +13,10 @@ from sentence_transformers import SentenceTransformer
 
 DB_CONFIG = {
     'host': os.getenv('DB_HOST', 'localhost'),
-    'port': int(os.getenv('DB_PORT', '5432')),
+    'port': int(os.getenv('DB_PORT', '5433')),  # Docker Compose default port
     'database': os.getenv('DB_NAME', 'neurondb'),
-    'user': os.getenv('DB_USER', 'postgres'),
-    'password': os.getenv('DB_PASSWORD', 'neurondb')
+    'user': os.getenv('DB_USER', 'neurondb'),  # Docker Compose default user
+    'password': os.getenv('DB_PASSWORD', 'neurondb')  # Docker Compose default password
 }
 
 MODEL_NAME = "all-MiniLM-L6-v2"
@@ -118,6 +118,7 @@ conn.commit()
 cur.close()
 conn.close()
 print("\n✓ Example complete!")
+
 
 
 

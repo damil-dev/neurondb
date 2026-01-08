@@ -242,14 +242,16 @@ pip install datasets
 
 ### Environment Variables
 
-Set these for database connection:
+Set these for database connection (Docker Compose defaults):
 ```bash
 export DB_HOST=localhost
-export DB_PORT=5432
+export DB_PORT=5433        # Docker Compose default port
 export DB_NAME=neurondb
-export DB_USER=postgres
-export DB_PASSWORD=neurondb
+export DB_USER=neurondb   # Docker Compose default user
+export DB_PASSWORD=neurondb  # Docker Compose default password
 ```
+
+**Note:** If using native PostgreSQL installation (not Docker), adjust port to `5432` and user to `postgres` as needed.
 
 For LLM integration:
 ```bash
@@ -497,10 +499,16 @@ embeddings = model.encode(texts, batch_size=8)
 
 #### "Connection refused" (database)
 ```bash
-# Check if database is running
+# Check if database is running (Docker Compose)
+docker compose ps neurondb
+
+# Or check health
 ./scripts/health-check.sh
 
-# Check connection parameters
+# Test connection (Docker Compose default)
+psql "postgresql://neurondb:neurondb@localhost:5433/neurondb" -c "SELECT 1;"
+
+# Or with environment variables
 psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -c "SELECT 1;"
 ```
 
@@ -641,7 +649,7 @@ After exploring these examples:
 
 ---
 
-**Last Updated:** 2025-12-31  
+**Last Updated:** 2026-01-08  
 **Examples Version:** 2.0.0  
 **Status:** ✅ Maintained
 

@@ -45,6 +45,25 @@ Creates a new agent with specified configuration.
 }
 ```
 
+**Example (curl):**
+```bash
+curl -X POST http://localhost:8080/api/v1/agents \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "research_agent",
+    "description": "Agent for research tasks",
+    "system_prompt": "You are a helpful research assistant.",
+    "model_name": "gpt-4",
+    "memory_table": "research_memory",
+    "enabled_tools": ["sql", "http", "browser"],
+    "config": {
+      "temperature": 0.7,
+      "max_tokens": 2000
+    }
+  }'
+```
+
 **Response:** `201 Created`
 ```json
 {
@@ -66,6 +85,17 @@ Creates a new agent with specified configuration.
 
 Lists all agents, optionally filtered by search query.
 
+**Example (curl):**
+```bash
+# List all agents
+curl -X GET http://localhost:8080/api/v1/agents \
+  -H "Authorization: Bearer YOUR_API_KEY"
+
+# Search agents
+curl -X GET "http://localhost:8080/api/v1/agents?search=research" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
 **Response:** `200 OK`
 ```json
 [
@@ -82,6 +112,12 @@ Lists all agents, optionally filtered by search query.
 `GET /api/v1/agents/{id}`
 
 Retrieves detailed information about a specific agent.
+
+**Example (curl):**
+```bash
+curl -X GET http://localhost:8080/api/v1/agents/{agent_id} \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
 
 **Response:** `200 OK`
 
@@ -251,6 +287,20 @@ Creates a new conversation session with an agent.
 }
 ```
 
+**Example (curl):**
+```bash
+curl -X POST http://localhost:8080/api/v1/sessions \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agent_id": "your-agent-id",
+    "external_user_id": "user123",
+    "metadata": {
+      "source": "web_app"
+    }
+  }'
+```
+
 **Response:** `201 Created`
 
 #### Get Session
@@ -296,6 +346,19 @@ Sends a message to an agent in a session.
   "stream": false,
   "metadata": {}
 }
+```
+
+**Example (curl):**
+```bash
+curl -X POST http://localhost:8080/api/v1/sessions/{session_id}/messages \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "role": "user",
+    "content": "What is machine learning?",
+    "stream": false,
+    "metadata": {}
+  }'
 ```
 
 **Response:** `200 OK`

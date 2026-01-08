@@ -18,13 +18,13 @@ import os
 import time
 from sentence_transformers import SentenceTransformer
 
-# Database connection
+# Database connection (defaults match Docker Compose setup)
 DB_CONFIG = {
     'host': os.getenv('DB_HOST', 'localhost'),
-    'port': int(os.getenv('DB_PORT', '5432')),
+    'port': int(os.getenv('DB_PORT', '5433')),  # Docker Compose default port
     'database': os.getenv('DB_NAME', 'neurondb'),
-    'user': os.getenv('DB_USER', 'postgres'),
-    'password': os.getenv('DB_PASSWORD', 'neurondb')
+    'user': os.getenv('DB_USER', 'neurondb'),  # Docker Compose default user
+    'password': os.getenv('DB_PASSWORD', 'neurondb')  # Docker Compose default password
 }
 
 MODEL_NAME = "all-MiniLM-L6-v2"
@@ -165,6 +165,7 @@ print("Example complete! ✓")
 print("=" * 60)
 print("\nNote: Indexes are essential for fast search on large datasets.")
 print("HNSW (Hierarchical Navigable Small World) is the recommended index type.")
+
 
 
 

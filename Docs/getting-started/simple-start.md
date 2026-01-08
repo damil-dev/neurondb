@@ -21,17 +21,60 @@
 
 **Steps:**
 
-1. **From repo root**, run:
+1. **From repo root**, start all services:
    ```bash
+   # Start all services (CPU profile, default)
    docker compose up -d
+   
+   # Or start just NeuronDB extension
+   docker compose up -d neurondb
+   
+   # Or start with GPU support (CUDA)
+   docker compose --profile cuda up -d
    ```
 
-2. **Verify** Postgres is reachable:
+2. **Wait for services to be healthy** (30-60 seconds):
    ```bash
+   docker compose ps
+   ```
+   
+   All services should show "healthy" status.
+
+3. **Verify** Postgres is reachable and extension is installed:
+   ```bash
+   # Create extension (if not already created)
+   docker compose exec neurondb psql -U neurondb -d neurondb -c "CREATE EXTENSION IF NOT EXISTS neurondb;"
+   
+   # Check version
    docker compose exec neurondb psql -U neurondb -d neurondb -c "SELECT neurondb.version();"
    ```
 
-**Expected output:** `1.0.0` (or current version)
+**Expected output:** `2.0` (or current version)
+
+4. **Test with a simple vector query:**
+   ```bash
+   docker compose exec neurondb psql -U neurondb -d neurondb <<EOF
+   CREATE TABLE test_vectors (
+     id SERIAL PRIMARY KEY,
+     name TEXT,
+     embedding vector(3)
+   );
+   INSERT INTO test_vectors (name, embedding) VALUES
+     ('apple', '[1.0, 0.0, 0.0]'::vector),
+     ('banana', '[0.0, 1.0, 0.0]'::vector);
+   SELECT name, embedding FROM test_vectors;
+   DROP TABLE test_vectors;
+   EOF
+   ```
+
+**Expected output:**
+```
+ name  |   embedding    
+-------+----------------
+ apple | [1,0,0]
+ banana | [0,1,0]
+(2 rows)
+```
 
 ## Native quickstart (outline)
 
@@ -46,7 +89,22 @@
    ```sql
    CREATE EXTENSION neurondb;
    ```
-4. **Test** with a basic query or load sample data from [`examples/`](../../examples/)
+
+4. **Verify installation:**
+   ```sql
+   SELECT neurondb.version();
+   ```
+   
+   **Expected output:** `2.0`
+
+5. **Test** with a basic query or load sample data from [`examples/`](../../examples/):
+   ```sql
+   -- Quick test
+   CREATE TABLE test (id SERIAL, vec vector(3));
+   INSERT INTO test (vec) VALUES ('[1,2,3]'::vector);
+   SELECT * FROM test;
+   DROP TABLE test;
+   ```
 
 </details>
 

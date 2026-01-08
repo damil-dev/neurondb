@@ -64,16 +64,32 @@ The official documentation provides:
 
 ### Database Setup
 
-Create database and extension:
+**Option 1: Using Docker Compose (Recommended for Quick Start)**
+
+If using the root `docker-compose.yml`:
+```bash
+# From repository root
+docker compose up -d neurondb
+
+# Wait for service to be healthy
+docker compose ps neurondb
+
+# Create extension (if not already created)
+psql "postgresql://neurondb:neurondb@localhost:5433/neurondb" -c "CREATE EXTENSION IF NOT EXISTS neurondb;"
+
+# Run NeuronAgent migrations
+psql "postgresql://neurondb:neurondb@localhost:5433/neurondb" -f NeuronAgent/sql/001_initial_schema.sql
+psql "postgresql://neurondb:neurondb@localhost:5433/neurondb" -f NeuronAgent/sql/002_add_indexes.sql
+psql "postgresql://neurondb:neurondb@localhost:5433/neurondb" -f NeuronAgent/sql/003_add_triggers.sql
+```
+
+**Option 2: Native PostgreSQL Installation**
 
 ```bash
 createdb neurondb
 psql -d neurondb -c "CREATE EXTENSION neurondb;"
-```
 
-Run migrations:
-
-```bash
+# Run migrations
 psql -d neurondb -f sql/001_initial_schema.sql
 psql -d neurondb -f sql/002_add_indexes.sql
 psql -d neurondb -f sql/003_add_triggers.sql
@@ -83,9 +99,20 @@ psql -d neurondb -f sql/003_add_triggers.sql
 
 Set environment variables or create `config.yaml`:
 
+**For Docker Compose setup (default):**
+```bash
+export DB_HOST=neurondb  # Service name in Docker network
+export DB_PORT=5432       # Container port (not host port)
+export DB_NAME=neurondb
+export DB_USER=neurondb
+export DB_PASSWORD=neurondb
+export SERVER_PORT=8080
+```
+
+**For native PostgreSQL or connecting from host:**
 ```bash
 export DB_HOST=localhost
-export DB_PORT=5432
+export DB_PORT=5433       # Host port (Docker Compose default)
 export DB_NAME=neurondb
 export DB_USER=neurondb
 export DB_PASSWORD=neurondb
@@ -104,6 +131,19 @@ go run cmd/agent-server/main.go
 
 Using Docker:
 
+**Option 1: Root docker-compose.yml (Recommended)**
+```bash
+# From repository root
+docker compose up -d neuronagent
+
+# Check status
+docker compose ps neuronagent
+
+# View logs
+docker compose logs -f neuronagent
+```
+
+**Option 2: NeuronAgent-specific docker-compose**
 ```bash
 cd docker
 # Optionally create .env file with your configuration
@@ -115,17 +155,44 @@ See [Docker Guide](docker/readme.md) for Docker deployment details.
 
 ### Verify Installation
 
-Test health endpoint:
+Test health endpoint (no authentication required):
 
 ```bash
-curl http://localhost:8080/health
+curl -s http://localhost:8080/health
+```
+
+**Expected output:**
+```json
+{"status":"ok"}
 ```
 
 Test API with authentication:
 
 ```bash
-curl -H "Authorization: Bearer <api_key>" \
-  http://localhost:8080/api/v1/agents
+# Replace YOUR_API_KEY with actual API key
+curl -s -H "Authorization: Bearer YOUR_API_KEY" \
+  http://localhost:8080/api/v1/agents | jq .
+```
+
+**Expected output:**
+```json
+[]
+```
+
+(Empty array if no agents created yet)
+
+**Create your first agent:**
+```bash
+curl -X POST http://localhost:8080/api/v1/agents \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "my-first-agent",
+    "system_prompt": "You are a helpful assistant",
+    "model_name": "gpt-4",
+    "enabled_tools": [],
+    "config": {}
+  }' | jq .
 ```
 
 ## API Endpoints

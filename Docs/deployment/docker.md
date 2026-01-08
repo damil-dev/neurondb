@@ -85,11 +85,14 @@ Each component uses environment variables for configuration. See component-speci
 
 ### Network Configuration
 
-Services communicate via Docker network using container names:
+Services communicate via Docker network using service names (not container names):
 
-- **NeuronAgent → NeuronDB**: `neurondb-cpu:5432`
-- **NeuronMCP → NeuronDB**: `neurondb-cpu:5432`
-- **NeuronDesktop → NeuronDB**: `localhost:5433` (external access)
+- **NeuronAgent → NeuronDB**: `neurondb:5432` (service name, internal Docker network)
+- **NeuronMCP → NeuronDB**: `neurondb:5432` (service name, internal Docker network)
+- **NeuronDesktop → NeuronDB**: `neurondb:5432` (service name, internal Docker network)
+- **External Access (from host)**: `localhost:5433` (mapped host port)
+
+**Important:** Inside Docker network, use service name `neurondb` (not container name `neurondb-cpu`). From your host machine, use `localhost:5433`.
 
 ## GPU Variants
 

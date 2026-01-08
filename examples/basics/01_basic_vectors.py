@@ -14,12 +14,13 @@ import psycopg2
 import os
 
 # Database connection (adjust these to match your setup)
+# Default values match Docker Compose setup (port 5433, user neurondb)
 DB_CONFIG = {
     'host': os.getenv('DB_HOST', 'localhost'),
-    'port': int(os.getenv('DB_PORT', '5432')),
+    'port': int(os.getenv('DB_PORT', '5433')),  # Docker Compose default port
     'database': os.getenv('DB_NAME', 'neurondb'),
-    'user': os.getenv('DB_USER', 'postgres'),
-    'password': os.getenv('DB_PASSWORD', 'neurondb')
+    'user': os.getenv('DB_USER', 'neurondb'),  # Docker Compose default user
+    'password': os.getenv('DB_PASSWORD', 'neurondb')  # Docker Compose default password
 }
 
 # Connect to database
@@ -104,6 +105,7 @@ conn.close()
 print("\n" + "=" * 60)
 print("Example complete! ✓")
 print("=" * 60)
+
 
 
 

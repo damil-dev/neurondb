@@ -9,14 +9,16 @@ Simple, copy-paste friendly examples to get started with NeuronDB.
    pip install -r requirements.txt
    ```
 
-2. **Set up database connection** (optional, uses defaults):
+2. **Set up database connection** (optional, uses defaults for Docker setup):
    ```bash
    export DB_HOST=localhost
-   export DB_PORT=5432
+   export DB_PORT=5433
    export DB_NAME=neurondb
-   export DB_USER=postgres
+   export DB_USER=neurondb
    export DB_PASSWORD=neurondb
    ```
+   
+   **Note:** Default values match the Docker Compose setup. If using a different PostgreSQL installation, adjust accordingly.
 
 3. **Run an example:**
    ```bash
@@ -114,8 +116,18 @@ If you don't have NeuronDB set up yet:
 
 **Using Docker (recommended):**
 ```bash
+# From repository root
 cd ../..
-docker compose up -d
+docker compose up -d neurondb
+
+# Wait for service to be healthy
+docker compose ps
+
+# Create extension (if not already created)
+psql "postgresql://neurondb:neurondb@localhost:5433/neurondb" -c "CREATE EXTENSION IF NOT EXISTS neurondb;"
+
+# Verify extension is installed
+psql "postgresql://neurondb:neurondb@localhost:5433/neurondb" -c "SELECT neurondb.version();"
 ```
 
 **Or follow the installation guide:**
@@ -151,7 +163,14 @@ make install
 ### "Connection refused"
 Check if PostgreSQL is running:
 ```bash
-psql -h localhost -U postgres -d neurondb -c "SELECT 1;"
+# For Docker setup
+docker compose ps neurondb
+
+# Test connection
+psql "postgresql://neurondb:neurondb@localhost:5433/neurondb" -c "SELECT 1;"
+
+# If using native PostgreSQL installation
+psql -h localhost -U neurondb -d neurondb -c "SELECT 1;"
 ```
 
 ### "ModuleNotFoundError"
@@ -197,6 +216,7 @@ After completing these examples:
 ---
 
 **Happy Learning! 🚀**
+
 
 
 

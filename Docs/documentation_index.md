@@ -2,8 +2,8 @@
 
 **Complete index of all documentation in the NeuronDB ecosystem.**
 
-> **Version:** 1.0  
-> **Last Updated:** 2025-01-01
+> **Version:** 2.0  
+> **Last Updated:** 2026-01-08
 
 ## Quick Navigation
 
@@ -32,7 +32,7 @@
 
 ### SQL API
 
-- **[SQL API Complete Reference](reference/sql-api-complete.md)** - All 654+ SQL functions, types, operators, and aggregates
+- **[SQL API Reference](../../NeuronDB/docs/sql-api.md)** - All 473+ SQL functions, types, operators, and aggregates
   - Vector operations
   - Distance metrics
   - Quantization functions
@@ -57,7 +57,7 @@
 
 ### Configuration
 
-- **[Configuration Complete Reference](reference/configuration-complete.md)** - All GUC variables
+- **[Configuration Reference](../../NeuronDB/docs/configuration.md)** - All GUC variables
   - Core/index settings
   - GPU settings
   - LLM settings
@@ -68,15 +68,16 @@
 
 ### Component APIs
 
-- **[NeuronAgent API Complete Reference](reference/neuronagent-api-complete.md)** - REST and WebSocket API
+- **[NeuronAgent API Reference](reference/neuronagent-api.md)** - REST and WebSocket API
   - Agents
   - Sessions
   - Messages
   - Tools
   - Memory
   - Webhooks
+  - Complete curl examples
 
-- **[NeuronMCP Tools Complete Reference](reference/neuronmcp-tools-complete.md)** - All 100+ MCP tools
+- **[NeuronMCP Tools Reference](../../NeuronMCP/TOOLS_REFERENCE.md)** - All 100+ MCP tools
   - Vector operations
   - Embedding functions
   - Hybrid search
@@ -86,7 +87,7 @@
   - PostgreSQL administration (27 tools)
   - Analytics tools
 
-- **[NeuronDesktop API Complete Reference](reference/neurondesktop-api-complete.md)** - REST and WebSocket API
+- **[NeuronDesktop API Reference](../../Docs/api_reference.md#neurondesktop-api)** - REST and WebSocket API
   - Profiles
   - NeuronDB operations
   - Agent integration
@@ -255,8 +256,8 @@
 
 ---
 
-**Last Updated:** 2025-01-01  
-**Documentation Version:** 1.0.0
+**Last Updated:** 2026-01-08  
+**Documentation Version:** 2.0.0
 
 
 

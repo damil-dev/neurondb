@@ -60,12 +60,12 @@ The easiest way to get started is using the automated setup script:
 git clone <repository-url>
 cd NeuronDesktop
 
-# Set database connection (optional - defaults shown)
+# Set database connection (optional - defaults for Docker Compose shown)
 export DB_HOST=localhost
-export DB_PORT=5432
+export DB_PORT=5433        # Docker Compose default port
 export DB_NAME=neurondesk
-export DB_USER=neurondesk
-export DB_PASSWORD=neurondesk
+export DB_USER=neurondb     # Docker Compose default user
+export DB_PASSWORD=neurondb  # Docker Compose default password
 
 # Run automated setup
 ./scripts/setup_neurondesktop.sh
@@ -138,11 +138,11 @@ docker-compose up -d
 ```bash
 cd api
 
-# Set environment variables
+# Set environment variables (Docker Compose defaults)
 export DB_HOST=localhost
-export DB_PORT=5432
-export DB_USER=neurondesk
-export DB_PASSWORD=neurondesk
+export DB_PORT=5433        # Docker Compose default port
+export DB_USER=neurondb     # Docker Compose default user
+export DB_PASSWORD=neurondb  # Docker Compose default password
 export DB_NAME=neurondesk
 
 # Initialize database

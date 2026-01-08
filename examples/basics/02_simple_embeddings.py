@@ -18,13 +18,13 @@ import os
 from sentence_transformers import SentenceTransformer
 import numpy as np
 
-# Database connection
+# Database connection (defaults match Docker Compose setup)
 DB_CONFIG = {
     'host': os.getenv('DB_HOST', 'localhost'),
-    'port': int(os.getenv('DB_PORT', '5432')),
+    'port': int(os.getenv('DB_PORT', '5433')),  # Docker Compose default port
     'database': os.getenv('DB_NAME', 'neurondb'),
-    'user': os.getenv('DB_USER', 'postgres'),
-    'password': os.getenv('DB_PASSWORD', 'neurondb')
+    'user': os.getenv('DB_USER', 'neurondb'),  # Docker Compose default user
+    'password': os.getenv('DB_PASSWORD', 'neurondb')  # Docker Compose default password
 }
 
 # Embedding model (small, fast model for examples)
@@ -121,6 +121,7 @@ conn.close()
 print("\n" + "=" * 60)
 print("Example complete! ✓")
 print("=" * 60)
+
 
 
 

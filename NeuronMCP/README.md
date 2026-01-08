@@ -80,7 +80,21 @@ The official documentation provides:
 
 ### Database Setup
 
-Create database and extension:
+**Option 1: Using Docker Compose (Recommended for Quick Start)**
+
+If using the root `docker-compose.yml`:
+```bash
+# From repository root
+docker compose up -d neurondb
+
+# Wait for service to be healthy
+docker compose ps neurondb
+
+# Create extension (if not already created)
+psql "postgresql://neurondb:neurondb@localhost:5433/neurondb" -c "CREATE EXTENSION IF NOT EXISTS neurondb;"
+```
+
+**Option 2: Native PostgreSQL Installation**
 
 ```bash
 createdb neurondb
@@ -125,7 +139,7 @@ Create `mcp-config.json`:
 {
   "database": {
     "host": "localhost",
-    "port": 5432,
+    "port": 5433,
     "database": "neurondb",
     "user": "neurondb",
     "password": "neurondb"
