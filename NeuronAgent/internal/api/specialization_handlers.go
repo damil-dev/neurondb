@@ -5,7 +5,7 @@
  *
  * Provides REST API endpoints for agent specialization management.
  *
- * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ * Copyright (c) 2024-2026, neurondb, Inc. <admin@neurondb.com>
  *
  * IDENTIFICATION
  *    NeuronAgent/internal/api/specialization_handlers.go
@@ -326,4 +326,6 @@ func toSpecializationResponse(specialization *db.AgentSpecialization) Specializa
 		UpdatedAt:          specialization.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
 	}
 }
+
+
 

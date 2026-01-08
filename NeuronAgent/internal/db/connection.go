@@ -6,7 +6,7 @@
  * Provides PostgreSQL connection pooling, retry logic, and connection
  * management with health checks.
  *
- * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ * Copyright (c) 2024-2026, neurondb, Inc. <admin@neurondb.com>
  *
  * IDENTIFICATION
  *    NeuronAgent/internal/db/connection.go

@@ -3,7 +3,7 @@
  * manager.go
  *    Caching layer for responses, embeddings, and tool results
  *
- * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ * Copyright (c) 2024-2026, neurondb, Inc. <admin@neurondb.com>
  *
  * IDENTIFICATION
  *    NeuronAgent/internal/cache/manager.go

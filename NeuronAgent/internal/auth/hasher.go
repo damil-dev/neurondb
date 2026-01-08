@@ -6,7 +6,7 @@
  * Provides bcrypt-based hashing functions for API key storage and
  * verification with configurable cost parameters.
  *
- * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ * Copyright (c) 2024-2026, neurondb, Inc. <admin@neurondb.com>
  *
  * IDENTIFICATION
  *    NeuronAgent/internal/auth/hasher.go
@@ -22,7 +22,7 @@ import (
 
 /* bcryptCost is set to 14 (16,384 rounds) for improved security against modern attacks */
 /* Cost 12 (4,096 rounds) was previously used but is no longer sufficient for production */
-/* Cost 14 is the recommended minimum as of 2024-2025 */
+/* Cost 14 is the recommended minimum as of 2024-2026 */
 const bcryptCost = 14
 
 /* HashAPIKey hashes an API key using bcrypt */

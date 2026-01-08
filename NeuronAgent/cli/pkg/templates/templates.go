@@ -3,7 +3,7 @@
  * templates.go
  *    Template management for agent creation
  *
- * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ * Copyright (c) 2024-2026, neurondb, Inc. <admin@neurondb.com>
  *
  * IDENTIFICATION
  *    NeuronAgent/cli/pkg/templates/templates.go

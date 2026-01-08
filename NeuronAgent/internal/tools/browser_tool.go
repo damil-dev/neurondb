@@ -3,7 +3,7 @@
  * browser_tool.go
  *    Web browser automation tool with DOM interaction
  *
- * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ * Copyright (c) 2024-2026, neurondb, Inc. <admin@neurondb.com>
  *
  * IDENTIFICATION
  *    NeuronAgent/internal/tools/browser_tool.go

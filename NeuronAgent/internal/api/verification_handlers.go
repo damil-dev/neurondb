@@ -6,7 +6,7 @@
  * Provides REST API endpoints for verification operations including
  * queueing verifications, retrieving results, and managing verification rules.
  *
- * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ * Copyright (c) 2024-2026, neurondb, Inc. <admin@neurondb.com>
  *
  * IDENTIFICATION
  *    NeuronAgent/internal/api/verification_handlers.go
@@ -487,4 +487,6 @@ func (h *VerificationHandlers) DeleteVerificationRule(w http.ResponseWriter, r *
 
 	w.WriteHeader(http.StatusNoContent)
 }
+
+
 

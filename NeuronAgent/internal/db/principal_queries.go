@@ -6,7 +6,7 @@
  * Provides database query functions for principals, policies, tool permissions,
  * data permissions, and audit logging.
  *
- * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ * Copyright (c) 2024-2026, neurondb, Inc. <admin@neurondb.com>
  *
  * IDENTIFICATION
  *    NeuronAgent/internal/db/principal_queries.go

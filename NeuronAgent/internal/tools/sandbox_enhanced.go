@@ -6,7 +6,7 @@
  * Provides sandboxed code execution with resource limits, file allowlists,
  * network egress rules, and container-based isolation.
  *
- * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ * Copyright (c) 2024-2026, neurondb, Inc. <admin@neurondb.com>
  *
  * IDENTIFICATION
  *    NeuronAgent/internal/tools/sandbox_enhanced.go

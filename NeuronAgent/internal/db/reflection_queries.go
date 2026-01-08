@@ -3,7 +3,7 @@
  * reflection_queries.go
  *    Database queries for reflections
  *
- * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ * Copyright (c) 2024-2026, neurondb, Inc. <admin@neurondb.com>
  *
  * IDENTIFICATION
  *    NeuronAgent/internal/db/reflection_queries.go

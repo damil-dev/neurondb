@@ -6,7 +6,7 @@
  * Enables agents to execute long-running tasks asynchronously with
  * status tracking, result storage, and completion notifications.
  *
- * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ * Copyright (c) 2024-2026, neurondb, Inc. <admin@neurondb.com>
  *
  * IDENTIFICATION
  *    NeuronAgent/migrations/018_async_tasks.sql

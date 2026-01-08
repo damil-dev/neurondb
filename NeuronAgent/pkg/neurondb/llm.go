@@ -6,7 +6,7 @@
  * Provides client functionality for Large Language Model operations through
  * NeuronDB, including text generation, streaming, and configuration management.
  *
- * Copyright (c) 2024-2025, neurondb, Inc. <admin@neurondb.com>
+ * Copyright (c) 2024-2026, neurondb, Inc. <admin@neurondb.com>
  *
  * IDENTIFICATION
  *    NeuronAgent/pkg/neurondb/llm.go

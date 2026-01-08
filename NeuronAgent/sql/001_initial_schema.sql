@@ -1,9 +1,17 @@
--- ============================================================================
--- NeuronAgent Initial Schema Migration
--- ============================================================================
--- This migration creates the core schema for NeuronAgent.
--- Prerequisites: NeuronDB extension must be installed
--- ============================================================================
+-- -------------------------------------------------------------------------
+--
+-- 001_initial_schema.sql
+--    NeuronAgent Initial Schema Migration
+--
+-- This migration creates the core schema for NeuronAgent. Prerequisites:
+-- NeuronDB extension must be installed.
+--
+-- Copyright (c) 2024-2026, neurondb, Inc.
+--
+-- IDENTIFICATION
+--    NeuronAgent/sql/001_initial_schema.sql
+--
+-- -------------------------------------------------------------------------
 
 -- Ensure required extensions exist
 CREATE EXTENSION IF NOT EXISTS neurondb;
