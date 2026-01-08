@@ -62,7 +62,8 @@ jobs:
         with:
           context: .
           file: dockers/neurondb/Dockerfile
-          push: ${{ github.event_name != 'pull_request' }}
+          push: ${{ github.repository == 'neurondb/neurondb' }}
+          load: ${{ github.repository != 'neurondb/neurondb' }}
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}-${{ matrix.tag_suffix }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest-${{ matrix.tag_suffix }}

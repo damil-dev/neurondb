@@ -51,7 +51,8 @@ jobs:
         with:
           context: ./NeuronMCP
           file: dockers/neuronmcp/Dockerfile
-          push: ${{ github.event_name != 'pull_request' }}
+          push: ${{ github.repository == 'neurondb/neurondb' }}
+          load: ${{ github.repository != 'neurondb/neurondb' }}
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
