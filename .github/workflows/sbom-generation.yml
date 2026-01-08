@@ -1,0 +1,57 @@
+name: SBOM Generation
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  generate-sbom:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Syft
+        uses: anchore/sbom-action/download-syft@v0
+        with:
+          syft-version: 'latest'
+
+      - name: Generate SBOM for images
+        env:
+          IMAGE_TAG: ${{ github.ref_name }}
+        run: |
+          mkdir -p sbom
+          IMAGES=(
+            "ghcr.io/neurondb/neurondb-postgres:$IMAGE_TAG"
+            "ghcr.io/neurondb/neuronagent:$IMAGE_TAG"
+            "ghcr.io/neurondb/neuronmcp:$IMAGE_TAG"
+            "ghcr.io/neurondb/neurondesktop-api:$IMAGE_TAG"
+            "ghcr.io/neurondb/neurondesktop-frontend:$IMAGE_TAG"
+          )
+          
+          for IMAGE in "${IMAGES[@]}"; do
+            IMAGE_NAME=$(echo $IMAGE | cut -d'/' -f3 | cut -d':' -f1)
+            echo "Generating SBOM for $IMAGE"
+            syft $IMAGE -o spdx-json > "sbom/${IMAGE_NAME}-${IMAGE_TAG}.spdx.json"
+            syft $IMAGE -o cyclonedx-json > "sbom/${IMAGE_NAME}-${IMAGE_TAG}.cyclonedx.json"
+          done
+
+      - name: Upload SBOM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom/
+          retention-days: 90
+
+      - name: Attach SBOM to release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: sbom/*.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

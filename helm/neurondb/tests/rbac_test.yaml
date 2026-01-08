@@ -1,0 +1,35 @@
+suite: test rbac
+templates:
+  - rbac.yaml
+tests:
+  - it: should create service accounts when rbac enabled
+    set:
+      rbac:
+        enabled: true
+      neurondb:
+        enabled: true
+      neuronagent:
+        enabled: true
+    asserts:
+      - hasDocuments:
+          count: 2
+      - isKind:
+          of: ServiceAccount
+          documentIndex: 0
+      - isKind:
+          of: ServiceAccount
+          documentIndex: 1
+
+  - it: should create roles when rbac enabled
+    set:
+      rbac:
+        enabled: true
+        createRoles: true
+      neurondb:
+        enabled: true
+    asserts:
+      - isKind:
+          of: Role
+      - isKind:
+          of: RoleBinding
+

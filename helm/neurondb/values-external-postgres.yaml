@@ -1,0 +1,38 @@
+# Example values for external PostgreSQL
+# This file demonstrates how to configure NeuronDB to use an external PostgreSQL instance
+
+neurondb:
+  enabled: true
+  # Disable internal PostgreSQL StatefulSet
+  postgresql:
+    external:
+      enabled: true
+      # Option 1: Direct connection details
+      host: "postgres.example.com"
+      port: 5432
+      database: "neurondb"
+      username: "neurondb"
+      # Password will be read from secret (see below)
+      
+      # Option 2: Connection string (alternative to individual fields)
+      # connectionString: "postgresql://user:pass@host:port/db"
+      
+      # Option 3: Use existing secret with connection details
+      # secretName: "external-postgres-secret"
+      # secretKeys:
+      #   host: "host"
+      #   port: "port"
+      #   database: "database"
+      #   username: "username"
+      #   password: "password"
+      #   # Or use a single connection string key:
+      #   connectionString: "connection-string"
+
+# Create secret with external PostgreSQL password
+secrets:
+  create: true
+  postgresPassword: "" # Set this to your external PostgreSQL password
+
+# Disable persistence since we're using external PostgreSQL
+# (StatefulSet won't be created when external.enabled=true)
+

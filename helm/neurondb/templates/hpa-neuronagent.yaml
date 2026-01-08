@@ -1,0 +1,23 @@
+{{- if and .Values.neuronagent.enabled .Values.neuronagent.autoscaling.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "neurondb.fullname" . }}-neuronagent
+  labels:
+    {{- include "neurondb.neuronagent.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "neurondb.fullname" . }}-neuronagent
+  minReplicas: {{ .Values.neuronagent.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.neuronagent.autoscaling.maxReplicas }}
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: {{ .Values.neuronagent.autoscaling.targetCPUUtilizationPercentage }}
+{{- end }}
+

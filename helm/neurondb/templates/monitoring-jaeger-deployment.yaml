@@ -1,0 +1,41 @@
+{{- if and .Values.monitoring.enabled .Values.monitoring.jaeger.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "neurondb.fullname" . }}-jaeger
+  labels:
+    {{- include "neurondb.labels" . | nindent 4 }}
+    app.kubernetes.io/component: jaeger
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "neurondb.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: jaeger
+  template:
+    metadata:
+      labels:
+        {{- include "neurondb.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: jaeger
+    spec:
+      containers:
+      - name: jaeger
+        image: "{{ if .Values.global.imageRegistry }}{{ .Values.global.imageRegistry }}/{{ end }}{{ .Values.monitoring.jaeger.image.repository }}:{{ .Values.monitoring.jaeger.image.tag }}"
+        imagePullPolicy: {{ .Values.monitoring.jaeger.image.pullPolicy }}
+        ports:
+        - name: ui
+          containerPort: 16686
+          protocol: TCP
+        - name: otlp-grpc
+          containerPort: 4317
+          protocol: TCP
+        - name: otlp-http
+          containerPort: 4318
+          protocol: TCP
+        env:
+        - name: COLLECTOR_OTLP_ENABLED
+          value: "true"
+        resources:
+          {{- toYaml .Values.monitoring.jaeger.resources | default (dict "requests" (dict "memory" "256Mi" "cpu" "100m") "limits" (dict "memory" "1Gi" "cpu" "500m")) | nindent 10 }}
+{{- end }}
+

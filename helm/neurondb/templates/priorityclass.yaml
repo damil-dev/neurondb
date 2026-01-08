@@ -1,0 +1,13 @@
+{{- if .Values.resourceGovernance.priorityClass.enabled }}
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: {{ include "neurondb.fullname" . }}-priority
+  labels:
+    {{- include "neurondb.labels" . | nindent 4 }}
+value: {{ .Values.resourceGovernance.priorityClass.value | default 1000 }}
+description: "Priority class for NeuronDB critical components (Agent and MCP)"
+globalDefault: false
+preemptionPolicy: {{ .Values.resourceGovernance.priorityClass.preemptionPolicy | default "PreemptLowerPriority" }}
+{{- end }}
+

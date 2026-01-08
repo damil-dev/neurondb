@@ -1,0 +1,21 @@
+{{- if and .Values.neurondb.enabled .Values.neurondb.postgresql.external.enabled }}
+{{- /* ConfigMap for external PostgreSQL connection details */}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "neurondb.fullname" . }}-external-postgres-config
+  labels:
+    {{- include "neurondb.labels" . | nindent 4 }}
+data:
+  {{- if .Values.neurondb.postgresql.external.connectionString }}
+  connection-string: {{ .Values.neurondb.postgresql.external.connectionString | quote }}
+  {{- else if .Values.neurondb.postgresql.external.secretName }}
+  # Connection details will be read from secret: {{ .Values.neurondb.postgresql.external.secretName }}
+  {{- else }}
+  host: {{ .Values.neurondb.postgresql.external.host | quote }}
+  port: {{ .Values.neurondb.postgresql.external.port | quote }}
+  database: {{ .Values.neurondb.postgresql.external.database | quote }}
+  username: {{ .Values.neurondb.postgresql.external.username | quote }}
+  {{- end }}
+{{- end }}
+

@@ -1,0 +1,240 @@
+global:
+  # The default SMTP From header field
+  resolve_timeout: 5m
+  # The default HTTP client configuration
+  http_config:
+    follow_redirects: true
+
+# The directory from which notification templates are read
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# The root route on which each incoming alert enters
+route:
+  # The root route must not have any matchers as it is the default fallback
+  # for all alerts that do not match any child routes
+  receiver: 'default'
+  group_by: ['alertname', 'cluster', 'service', 'module']
+  
+  # When a new group of alerts is created by an incoming alert, wait at least
+  # 'group_wait' to send the initial notification. This ensures that you get
+  # multiple alerts for the same group that start firing shortly after
+  # another are batched together on the first notification.
+  group_wait: 10s
+  
+  # When the first notification was sent, wait 'group_interval' to send a
+  # batch of new alerts that started firing for that group.
+  group_interval: 10s
+  
+  # If an alert has successfully been sent, wait 'repeat_interval' to
+  # resend them.
+  repeat_interval: 12h
+  
+  # Child routes
+  routes:
+    # Critical alerts - immediate notification
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      group_wait: 0s
+      group_interval: 5m
+      repeat_interval: 4h
+      continue: true
+    
+    # NeuronDB module alerts
+    - match:
+        module: neurondb
+      receiver: 'neurondb-alerts'
+      group_by: ['alertname', 'instance', 'variant']
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 6h
+    
+    # NeuronAgent module alerts
+    - match:
+        module: neuronagent
+      receiver: 'neuronagent-alerts'
+      group_by: ['alertname', 'instance', 'variant']
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 6h
+    
+    # NeuronDesktop module alerts
+    - match:
+        module: neurondesktop
+      receiver: 'neurondesktop-alerts'
+      group_by: ['alertname', 'instance']
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 6h
+    
+    # NeuronMCP module alerts
+    - match:
+        module: neuronmcp
+      receiver: 'neuronmcp-alerts'
+      group_by: ['alertname', 'instance', 'variant']
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 6h
+    
+    # Infrastructure alerts
+    - match:
+        module: infrastructure
+      receiver: 'infrastructure-alerts'
+      group_by: ['alertname', 'instance']
+      group_wait: 1m
+      group_interval: 10m
+      repeat_interval: 12h
+
+# Inhibition rules allow to mute a set of alerts given that another alert is
+# firing. We can use this to mute lower level alerts if a higher level alert
+# is already firing.
+inhibit_rules:
+  # Inhibit any warning-level alert if the same alert is already critical
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'instance', 'module']
+  
+  # Inhibit infrastructure alerts if service is down
+  - source_match:
+      alertname: 'NeuronDBServiceDown'
+    target_match:
+      module: 'neurondb'
+    equal: ['instance']
+  
+  - source_match:
+      alertname: 'NeuronAgentServiceDown'
+    target_match:
+      module: 'neuronagent'
+    equal: ['instance']
+  
+  - source_match:
+      alertname: 'NeuronDesktopAPIDown'
+    target_match:
+      module: 'neurondesktop'
+    equal: ['instance']
+  
+  - source_match:
+      alertname: 'NeuronMCPServiceDown'
+    target_match:
+      module: 'neuronmcp'
+    equal: ['instance']
+
+# Receivers
+receivers:
+  # Default receiver for all alerts
+  - name: 'default'
+    # Email configuration (example - configure with your SMTP settings)
+    # email_configs:
+    #   - to: 'admin@example.com'
+    #     from: 'alertmanager@neurondb.local'
+    #     smarthost: 'smtp.example.com:587'
+    #     auth_username: 'alertmanager'
+    #     auth_password: 'password'
+    #     headers:
+    #       Subject: 'NeuronDB Alert: {{ .GroupLabels.alertname }}'
+    
+    # Webhook configuration (example)
+    webhook_configs:
+      - url: 'http://localhost:5001/webhook'
+        send_resolved: true
+        http_config:
+          follow_redirects: true
+
+  # Critical alerts receiver
+  - name: 'critical-alerts'
+    # Email for critical alerts
+    # email_configs:
+    #   - to: 'oncall@example.com'
+    #     from: 'alertmanager@neurondb.local'
+    #     smarthost: 'smtp.example.com:587'
+    #     auth_username: 'alertmanager'
+    #     auth_password: 'password'
+    #     headers:
+    #       Subject: '🚨 CRITICAL: {{ .GroupLabels.alertname }}'
+    #     html: '{{ range .Alerts }}{{ .Annotations.description }}<br>{{ end }}'
+    
+    # PagerDuty integration (example)
+    # pagerduty_configs:
+    #   - service_key: '<PAGERDUTY_SERVICE_KEY>'
+    #     description: '{{ .GroupLabels.alertname }}: {{ .CommonAnnotations.summary }}'
+    
+    # Slack integration (example)
+    # slack_configs:
+    #   - api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+    #     channel: '#alerts-critical'
+    #     title: '🚨 Critical Alert'
+    #     text: '{{ range .Alerts }}{{ .Annotations.summary }}\n{{ .Annotations.description }}{{ end }}'
+    #     send_resolved: true
+    
+    webhook_configs:
+      - url: 'http://localhost:5001/webhook/critical'
+        send_resolved: true
+
+  # NeuronDB alerts receiver
+  - name: 'neurondb-alerts'
+    # email_configs:
+    #   - to: 'dba-team@example.com'
+    #     from: 'alertmanager@neurondb.local'
+    #     smarthost: 'smtp.example.com:587'
+    #     headers:
+    #       Subject: 'NeuronDB Alert: {{ .GroupLabels.alertname }}'
+    
+    webhook_configs:
+      - url: 'http://localhost:5001/webhook/neurondb'
+        send_resolved: true
+
+  # NeuronAgent alerts receiver
+  - name: 'neuronagent-alerts'
+    # email_configs:
+    #   - to: 'agent-team@example.com'
+    #     from: 'alertmanager@neurondb.local'
+    #     smarthost: 'smtp.example.com:587'
+    #     headers:
+    #       Subject: 'NeuronAgent Alert: {{ .GroupLabels.alertname }}'
+    
+    webhook_configs:
+      - url: 'http://localhost:5001/webhook/neuronagent'
+        send_resolved: true
+
+  # NeuronDesktop alerts receiver
+  - name: 'neurondesktop-alerts'
+    # email_configs:
+    #   - to: 'desktop-team@example.com'
+    #     from: 'alertmanager@neurondb.local'
+    #     smarthost: 'smtp.example.com:587'
+    #     headers:
+    #       Subject: 'NeuronDesktop Alert: {{ .GroupLabels.alertname }}'
+    
+    webhook_configs:
+      - url: 'http://localhost:5001/webhook/neurondesktop'
+        send_resolved: true
+
+  # NeuronMCP alerts receiver
+  - name: 'neuronmcp-alerts'
+    # email_configs:
+    #   - to: 'mcp-team@example.com'
+    #     from: 'alertmanager@neurondb.local'
+    #     smarthost: 'smtp.example.com:587'
+    #     headers:
+    #       Subject: 'NeuronMCP Alert: {{ .GroupLabels.alertname }}'
+    
+    webhook_configs:
+      - url: 'http://localhost:5001/webhook/neuronmcp'
+        send_resolved: true
+
+  # Infrastructure alerts receiver
+  - name: 'infrastructure-alerts'
+    # email_configs:
+    #   - to: 'ops-team@example.com'
+    #     from: 'alertmanager@neurondb.local'
+    #     smarthost: 'smtp.example.com:587'
+    #     headers:
+    #       Subject: 'Infrastructure Alert: {{ .GroupLabels.alertname }}'
+    
+    webhook_configs:
+      - url: 'http://localhost:5001/webhook/infrastructure'
+        send_resolved: true
+

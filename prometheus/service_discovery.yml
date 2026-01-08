@@ -1,0 +1,290 @@
+# Service Discovery Configuration for NeuronDB Ecosystem
+# This file contains service discovery configurations for Prometheus
+# It can be included in prometheus.yml using: - job_name: '...' ... (import this config)
+
+# Note: This is a reference configuration. In practice, service discovery
+# configurations are embedded directly in prometheus.yml scrape_configs.
+# This file serves as documentation and can be used as a template.
+
+# ============================================================================
+# Docker Service Discovery
+# ============================================================================
+# Docker service discovery automatically discovers containers running on the
+# Docker daemon. Requires docker_sd_configs in scrape_configs.
+
+docker_sd_configs_example:
+  # Discover all containers
+  - host: unix:///var/run/docker.sock
+    port: 2375
+    filters:
+      - name: label
+        values: ["com.neurondb.service"]
+  
+  # Filter by service type
+  neurondb_services:
+    - host: unix:///var/run/docker.sock
+      filters:
+        - name: label
+          values: ["com.neurondb.service=neurondb"]
+  
+  neuronagent_services:
+    - host: unix:///var/run/docker.sock
+      filters:
+        - name: label
+          values: ["com.neurondb.service=neuronagent"]
+  
+  neuronmcp_services:
+    - host: unix:///var/run/docker.sock
+      filters:
+        - name: label
+          values: ["com.neurondb.service=neuronmcp"]
+
+# ============================================================================
+# Static Service Discovery
+# ============================================================================
+# Static configurations for all NeuronDB ecosystem services
+# These are already included in prometheus.yml but listed here for reference
+
+static_configs_reference:
+  # NeuronDB instances
+  neurondb_cpu:
+    - targets: ['neurondb-cpu:9187']
+      labels:
+        variant: 'cpu'
+        service: 'neurondb'
+        instance: 'neurondb-cpu'
+  
+  neurondb_cuda:
+    - targets: ['neurondb-cuda:9187']
+      labels:
+        variant: 'cuda'
+        service: 'neurondb'
+        instance: 'neurondb-cuda'
+  
+  neurondb_rocm:
+    - targets: ['neurondb-rocm:9187']
+      labels:
+        variant: 'rocm'
+        service: 'neurondb'
+        instance: 'neurondb-rocm'
+  
+  neurondb_metal:
+    - targets: ['neurondb-metal:9187']
+      labels:
+        variant: 'metal'
+        service: 'neurondb'
+        instance: 'neurondb-metal'
+  
+  # PostgreSQL Exporters
+  postgres_exporter_cpu:
+    - targets: ['postgres-exporter-cpu:9187']
+      labels:
+        variant: 'cpu'
+        service: 'postgres'
+        instance: 'neurondb-cpu'
+  
+  postgres_exporter_cuda:
+    - targets: ['postgres-exporter-cuda:9187']
+      labels:
+        variant: 'cuda'
+        service: 'postgres'
+        instance: 'neurondb-cuda'
+  
+  postgres_exporter_rocm:
+    - targets: ['postgres-exporter-rocm:9187']
+      labels:
+        variant: 'rocm'
+        service: 'postgres'
+        instance: 'neurondb-rocm'
+  
+  postgres_exporter_metal:
+    - targets: ['postgres-exporter-metal:9187']
+      labels:
+        variant: 'metal'
+        service: 'postgres'
+        instance: 'neurondb-metal'
+  
+  # NeuronAgent instances
+  neuronagent_cpu:
+    - targets: ['neuronagent:8080']
+      labels:
+        variant: 'cpu'
+        service: 'neuronagent'
+        instance: 'neuronagent-cpu'
+  
+  neuronagent_cuda:
+    - targets: ['neuronagent-cuda:8080']
+      labels:
+        variant: 'cuda'
+        service: 'neuronagent'
+        instance: 'neuronagent-cuda'
+  
+  neuronagent_rocm:
+    - targets: ['neuronagent-rocm:8080']
+      labels:
+        variant: 'rocm'
+        service: 'neuronagent'
+        instance: 'neuronagent-rocm'
+  
+  neuronagent_metal:
+    - targets: ['neuronagent-metal:8080']
+      labels:
+        variant: 'metal'
+        service: 'neuronagent'
+        instance: 'neuronagent-metal'
+  
+  # NeuronDesktop services
+  neurondesktop_api:
+    - targets: ['neurondesk-api:8081']
+      labels:
+        service: 'neurondesktop'
+        component: 'api'
+        instance: 'neurondesk-api'
+  
+  neurondesktop_frontend:
+    - targets: ['neurondesk-frontend:3000']
+      labels:
+        service: 'neurondesktop'
+        component: 'frontend'
+        instance: 'neurondesk-frontend'
+  
+  # NeuronMCP instances
+  neuronmcp_cpu:
+    - targets: ['neurondb-mcp:9091']
+      labels:
+        variant: 'cpu'
+        service: 'neuronmcp'
+        instance: 'neuronmcp-cpu'
+  
+  neuronmcp_cuda:
+    - targets: ['neurondb-mcp-cuda:9091']
+      labels:
+        variant: 'cuda'
+        service: 'neuronmcp'
+        instance: 'neuronmcp-cuda'
+  
+  neuronmcp_rocm:
+    - targets: ['neurondb-mcp-rocm:9091']
+      labels:
+        variant: 'rocm'
+        service: 'neuronmcp'
+        instance: 'neuronmcp-rocm'
+  
+  neuronmcp_metal:
+    - targets: ['neurondb-mcp-metal:9091']
+      labels:
+        variant: 'metal'
+        service: 'neuronmcp'
+        instance: 'neuronmcp-metal'
+  
+  # Infrastructure services
+  node_exporter:
+    - targets: ['node-exporter:9100']
+      labels:
+        service: 'infrastructure'
+        component: 'node-exporter'
+  
+  cadvisor:
+    - targets: ['cadvisor:8080']
+      labels:
+        service: 'infrastructure'
+        component: 'cadvisor'
+  
+  prometheus:
+    - targets: ['localhost:9090']
+      labels:
+        service: 'prometheus'
+        component: 'self'
+  
+  alertmanager:
+    - targets: ['alertmanager:9093']
+      labels:
+        service: 'alertmanager'
+        component: 'self'
+
+# ============================================================================
+# File-based Service Discovery
+# ============================================================================
+# File-based service discovery allows Prometheus to read target lists from
+# files. Useful for dynamic service registration.
+
+file_sd_configs_example:
+  # Example: Read targets from JSON files
+  - files:
+      - '/etc/prometheus/targets/*.json'
+    refresh_interval: 5m
+  
+  # Example target file format (targets/neurondb.json):
+  # [
+  #   {
+  #     "targets": ["neurondb-cpu:9187"],
+  #     "labels": {
+  #       "variant": "cpu",
+  #       "service": "neurondb",
+  #       "instance": "neurondb-cpu"
+  #     }
+  #   }
+  # ]
+
+# ============================================================================
+# Kubernetes Service Discovery (if applicable)
+# ============================================================================
+# For Kubernetes deployments, use kubernetes_sd_configs
+
+kubernetes_sd_configs_example:
+  # Discover services
+  - role: service
+    namespaces:
+      names:
+        - default
+        - neurondb
+  
+  # Discover pods
+  - role: pod
+    namespaces:
+      names:
+        - default
+        - neurondb
+  
+  # Discover endpoints
+  - role: endpoints
+    namespaces:
+      names:
+        - default
+        - neurondb
+
+# ============================================================================
+# Relabeling Rules
+# ============================================================================
+# Relabeling rules can be used to modify labels and targets discovered
+# via service discovery
+
+relabel_configs_example:
+  # Extract variant from container name
+  - source_labels: [__meta_docker_container_name]
+    regex: 'neurondb-(cpu|cuda|rocm|metal)'
+    target_label: variant
+    replacement: '${1}'
+  
+  # Extract service from Docker label
+  - source_labels: [__meta_docker_container_label_com_neurondb_service]
+    target_label: service
+  
+  # Extract version from Docker label
+  - source_labels: [__meta_docker_container_label_com_neurondb_version]
+    target_label: version
+  
+  # Only scrape containers with neurondb service label
+  - source_labels: [__meta_docker_container_label_com_neurondb_service]
+    regex: 'neurondb|neuronagent|neuronmcp|neurondesktop'
+    action: keep
+
+# ============================================================================
+# Notes
+# ============================================================================
+# 1. Docker service discovery requires access to Docker socket
+# 2. File-based discovery is useful for dynamic environments
+# 3. Static discovery (current implementation) is simplest and most reliable
+# 4. Relabeling allows flexible label management
+# 5. Service discovery can be combined with relabeling for advanced scenarios
+
