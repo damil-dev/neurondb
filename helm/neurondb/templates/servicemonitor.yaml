@@ -15,13 +15,11 @@ spec:
     matchLabels:
       {{- include "neurondb.neurondb.selectorLabels" . | nindent 6 }}
   endpoints:
-  - port: postgresql
+  {{- if .Values.monitoring.prometheus.postgresExporter.enabled }}
+  - port: {{ .Values.monitoring.prometheus.postgresExporter.port | default 9187 }}
     interval: {{ .Values.observability.prometheusOperator.serviceMonitor.interval | default "30s" }}
     path: {{ .Values.observability.prometheusOperator.serviceMonitor.metricsPath | default "/metrics" }}
-    {{- if .Values.monitoring.prometheus.postgresExporter.enabled }}
-    - port: {{ .Values.monitoring.prometheus.postgresExporter.port }}
-      interval: {{ .Values.observability.prometheusOperator.serviceMonitor.interval | default "30s" }}
-    {{- end }}
+  {{- end }}
   namespaceSelector:
     matchNames:
     - {{ .Release.Namespace }}
@@ -51,7 +49,7 @@ spec:
     - {{ .Release.Namespace }}
 {{- end }}
 
-{{- if .Values.neuronmcp.enabled }}
+{{- if and .Values.neuronmcp.enabled .Values.observability.prometheusOperator.serviceMonitor.neuronmcp.enabled }}
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor

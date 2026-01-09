@@ -1,0 +1,54 @@
+{{- if and .Values.monitoring.enabled .Values.monitoring.prometheus.enabled .Values.monitoring.prometheus.alertmanager.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "neurondb.fullname" . }}-alertmanager
+  labels:
+    {{- include "neurondb.labels" . | nindent 4 }}
+    app.kubernetes.io/component: alertmanager
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "neurondb.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: alertmanager
+  template:
+    metadata:
+      labels:
+        {{- include "neurondb.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: alertmanager
+    spec:
+      containers:
+      - name: alertmanager
+        image: "{{ if .Values.global.imageRegistry }}{{ .Values.global.imageRegistry }}/{{ end }}{{ .Values.monitoring.prometheus.alertmanager.image.repository }}:{{ .Values.monitoring.prometheus.alertmanager.image.tag }}"
+        imagePullPolicy: {{ .Values.monitoring.prometheus.alertmanager.image.pullPolicy }}
+        args:
+          - '--config.file=/etc/alertmanager/alertmanager.yml'
+          - '--storage.path=/alertmanager'
+        ports:
+        - name: http
+          containerPort: 9093
+          protocol: TCP
+        volumeMounts:
+        - name: config
+          mountPath: /etc/alertmanager
+        - name: storage
+          mountPath: /alertmanager
+        {{- with .Values.monitoring.prometheus.alertmanager.resources }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+      volumes:
+      - name: config
+        configMap:
+          name: {{ include "neurondb.fullname" . }}-alertmanager-config
+      - name: storage
+        {{- if .Values.monitoring.prometheus.alertmanager.persistence.enabled }}
+        persistentVolumeClaim:
+          claimName: {{ include "neurondb.fullname" . }}-alertmanager
+        {{- else }}
+        emptyDir: {}
+        {{- end }}
+{{- end }}
+
+

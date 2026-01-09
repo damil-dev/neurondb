@@ -32,13 +32,13 @@ spec:
       query: {{ .Values.neuronagent.autoscaling.keda.triggers.queueDepth.query | default "SELECT COUNT(*) FROM neurondb_agent.job_queue WHERE status = 'pending';" }}
       targetValue: {{ .Values.neuronagent.autoscaling.keda.triggers.queueDepth.targetValue | default "100" }}
   {{- end }}
-  {{- if .Values.neuronagent.autoscaling.keda.triggers.customPrometheus }}
+  {{- if and .Values.neuronagent.autoscaling.keda.triggers.customPrometheus.enabled .Values.neuronagent.autoscaling.keda.triggers.customPrometheus.metricName }}
   - type: prometheus
     metadata:
       serverAddress: {{ .Values.neuronagent.autoscaling.keda.triggers.customPrometheus.prometheusServer | default "http://prometheus:9090" }}
       metricName: {{ .Values.neuronagent.autoscaling.keda.triggers.customPrometheus.metricName }}
-      threshold: {{ .Values.neuronagent.autoscaling.keda.triggers.customPrometheus.threshold }}
-      query: {{ .Values.neuronagent.autoscaling.keda.triggers.customPrometheus.query }}
+      threshold: {{ .Values.neuronagent.autoscaling.keda.triggers.customPrometheus.threshold | default "100" }}
+      query: {{ .Values.neuronagent.autoscaling.keda.triggers.customPrometheus.query | default "sum(rate(http_requests_total[2m]))" }}
   {{- end }}
 {{- end }}
 

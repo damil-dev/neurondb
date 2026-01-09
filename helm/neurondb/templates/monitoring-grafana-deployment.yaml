@@ -41,8 +41,10 @@ spec:
         volumeMounts:
         - name: datasources
           mountPath: /etc/grafana/provisioning/datasources
-        - name: dashboards
+        - name: dashboards-provisioning
           mountPath: /etc/grafana/provisioning/dashboards
+        - name: dashboards
+          mountPath: /var/lib/grafana/dashboards/default
         - name: storage
           mountPath: /var/lib/grafana
         resources:
@@ -51,6 +53,9 @@ spec:
       - name: datasources
         configMap:
           name: {{ include "neurondb.fullname" . }}-grafana-datasources
+      - name: dashboards-provisioning
+        configMap:
+          name: {{ include "neurondb.fullname" . }}-grafana-dashboards-provisioning
       - name: dashboards
         configMap:
           name: {{ include "neurondb.fullname" . }}-grafana-dashboards

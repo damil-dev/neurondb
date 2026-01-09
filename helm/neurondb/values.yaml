@@ -450,6 +450,8 @@ observability:
       interval: "30s"
       metricsPath: "/metrics"
       additionalLabels: {}
+      neuronmcp:
+        enabled: false  # NeuronMCP doesn't expose HTTP metrics (MCP protocol only)
     prometheusRule:
       enabled: true
       additionalLabels: {}
@@ -496,6 +498,27 @@ monitoring:
       port: 9187
     alertmanager:
       enabled: false
+      image:
+        repository: prom/alertmanager
+        tag: "latest"
+        pullPolicy: IfNotPresent
+      persistence:
+        enabled: true
+        size: "2Gi"
+        storageClass: ""
+      resources:
+        requests:
+          memory: "128Mi"
+          cpu: "100m"
+        limits:
+          memory: "512Mi"
+          cpu: "500m"
+      service:
+        type: ClusterIP
+        port: 9093
+      webhook:
+        url: ""  # Set to your webhook endpoint URL
+        criticalUrl: ""  # Optional: separate URL for critical alerts
   grafana:
     enabled: true
     image:

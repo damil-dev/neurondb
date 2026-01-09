@@ -1,0 +1,163 @@
+# Production configuration
+# Optimized for production workloads with high availability
+
+neurondb:
+  enabled: true
+  replicas: 3
+  persistence:
+    size: 500Gi
+    storageClass: "fast-ssd"
+    retentionPolicy: "Retain"
+  resources:
+    requests:
+      memory: "16Gi"
+      cpu: "8"
+    limits:
+      memory: "32Gi"
+      cpu: "16"
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 2
+  updateStrategy:
+    type: "RollingUpdate"
+    rollingUpdate:
+      maxUnavailable: 1
+  securityContext:
+    readOnlyRootFilesystem: true
+  healthCheck:
+    checkTables: true
+    requireTables: true
+
+neuronagent:
+  enabled: true
+  replicas: 5
+  autoscaling:
+    enabled: true
+    minReplicas: 5
+    maxReplicas: 50
+    targetCPUUtilizationPercentage: 70
+    advanced:
+      enabled: true
+      minReplicas: 5
+      maxReplicas: 50
+      metrics:
+        cpu:
+          enabled: true
+          targetUtilization: 70
+        memory:
+          enabled: true
+          targetUtilization: 80
+        httpRPS:
+          enabled: true
+          metricName: "http_requests_per_second"
+          targetValue: "1000"
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 3
+    maxUnavailable: 1
+  resources:
+    requests:
+      memory: "2Gi"
+      cpu: "2"
+    limits:
+      memory: "8Gi"
+      cpu: "8"
+  securityContext:
+    readOnlyRootFilesystem: true
+
+neuronmcp:
+  enabled: true
+  replicas: 3
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "2"
+
+neurondesktop:
+  enabled: true
+  api:
+    replicas: 3
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "500m"
+      limits:
+        memory: "2Gi"
+        cpu: "2"
+  frontend:
+    replicas: 3
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "250m"
+      limits:
+        memory: "1Gi"
+        cpu: "1"
+
+monitoring:
+  enabled: true
+  prometheus:
+    retention: "90d"
+    persistence:
+      size: "100Gi"
+      storageClass: "fast-ssd"
+  grafana:
+    adminPassword: "CHANGE_ME_IN_PRODUCTION"
+    persistence:
+      size: "50Gi"
+      storageClass: "fast-ssd"
+  jaeger:
+    enabled: true
+
+backup:
+  enabled: true
+  schedule: "0 */6 * * *"  # Every 6 hours
+  retention: 90
+  s3:
+    enabled: true
+    bucket: "neurondb-backups"
+    region: "us-east-1"
+    prefix: "production"
+
+migrations:
+  enabled: true
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  hosts:
+    - host: neurondb.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  apiEnabled: true
+  tls:
+    - secretName: neurondb-tls
+      hosts:
+        - neurondb.example.com
+
+networkPolicy:
+  enabled: true
+  allowMonitoring: true
+
+observability:
+  prometheusOperator:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+    prometheusRule:
+      enabled: true
+
+resourceGovernance:
+  priorityClass:
+    enabled: true
+    value: 2000
+    preemptionPolicy: "PreemptLowerPriority"
+
+

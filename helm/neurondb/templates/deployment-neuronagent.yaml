@@ -141,6 +141,15 @@ spec:
           value: {{ .Values.neuronagent.service.port | quote }}
         - name: LOG_LEVEL
           value: {{ .Values.neuronagent.logLevel | default "info" | quote }}
+        startupProbe:
+          httpGet:
+            path: {{ .Values.neuronagent.healthCheck.readinessProbe.path | default "/health" }}
+            port: http
+          initialDelaySeconds: 0
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 30
+          successThreshold: 1
         livenessProbe:
           httpGet:
             path: {{ .Values.neuronagent.healthCheck.livenessProbe.path | default "/health" }}

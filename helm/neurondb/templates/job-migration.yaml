@@ -115,7 +115,7 @@ spec:
           capabilities:
             drop:
             - ALL
-          readOnlyRootFilesystem: true
+          readOnlyRootFilesystem: false
           runAsNonRoot: true
           runAsUser: 1000
           seccompProfile:
@@ -174,13 +174,16 @@ spec:
           
           {{- if .Values.migrations.script }}
           echo "Running migration script..."
-          {{ .Values.migrations.script | nindent 10 }}
+          if ! ({{ .Values.migrations.script | nindent 12 }}); then
+            echo "ERROR: Migration script failed"
+            exit 1
+          fi
           {{- else }}
           echo "Migration script not provided. Skipping migrations."
           echo "For external PostgreSQL, run migrations manually or provide migration script."
           {{- end }}
           
-          echo "Migrations completed!"
+          echo "Migrations completed successfully!"
         {{- if .Values.neurondb.postgresql.external.connectionString }}
         env:
         - name: DATABASE_URL
@@ -237,7 +240,7 @@ spec:
           capabilities:
             drop:
             - ALL
-          readOnlyRootFilesystem: true
+          readOnlyRootFilesystem: false
           runAsNonRoot: true
           runAsUser: 1000
           seccompProfile:

@@ -67,24 +67,37 @@ spec:
               echo "Starting backup: ${BACKUP_FILE}"
               
               # Create backup using pg_dump with custom format
-              pg_dump -h {{ include "neurondb.postgresHost" . }} \
+              if ! pg_dump -h {{ include "neurondb.postgresHost" . }} \
                 -p {{ include "neurondb.postgresPort" . }} \
                 -U {{ include "neurondb.postgresUsername" . }} \
                 -d {{ include "neurondb.postgresDatabase" . }} \
                 -Fc \
                 -f "${BACKUP_PATH}" \
-                -v
+                -v; then
+                echo "ERROR: Failed to create database backup"
+                exit 1
+              fi
               
               echo "Backup created: ${BACKUP_PATH}"
-              ls -lh "${BACKUP_PATH}"
+              BACKUP_SIZE=$(ls -lh "${BACKUP_PATH}" | awk '{print $5}')
+              echo "Backup size: ${BACKUP_SIZE}"
+              
+              # Verify backup file exists and is not empty
+              if [ ! -f "${BACKUP_PATH}" ] || [ ! -s "${BACKUP_PATH}" ]; then
+                echo "ERROR: Backup file is missing or empty"
+                exit 1
+              fi
               
               # Upload to S3 if enabled
               {{- if .Values.backup.s3.enabled }}
               echo "Uploading to S3..."
-              aws s3 cp "${BACKUP_PATH}" \
+              if ! aws s3 cp "${BACKUP_PATH}" \
                 "s3://{{ .Values.backup.s3.bucket }}/{{ .Values.backup.s3.prefix | default "backups" }}/${BACKUP_FILE}" \
-                --region {{ .Values.backup.s3.region }}
-              echo "Backup uploaded to S3"
+                --region {{ .Values.backup.s3.region }}; then
+                echo "ERROR: Failed to upload backup to S3"
+                exit 1
+              fi
+              echo "Backup uploaded to S3 successfully"
               
               # Clean up old backups from S3 (keep last N days)
               if [ -n "{{ .Values.backup.retention }}" ]; then
@@ -110,21 +123,34 @@ spec:
               # Upload to GCS if enabled
               {{- if .Values.backup.gcs.enabled }}
               echo "Uploading to GCS..."
-              gsutil cp "${BACKUP_PATH}" \
-                "gs://{{ .Values.backup.gcs.bucket }}/{{ .Values.backup.gcs.prefix | default "backups" }}/${BACKUP_FILE}"
-              echo "Backup uploaded to GCS"
+              if [ ! -f "${GOOGLE_APPLICATION_CREDENTIALS}" ]; then
+                echo "ERROR: GCS credentials file not found at ${GOOGLE_APPLICATION_CREDENTIALS}"
+                exit 1
+              fi
+              if ! gsutil cp "${BACKUP_PATH}" \
+                "gs://{{ .Values.backup.gcs.bucket }}/{{ .Values.backup.gcs.prefix | default "backups" }}/${BACKUP_FILE}"; then
+                echo "ERROR: Failed to upload backup to GCS"
+                exit 1
+              fi
+              echo "Backup uploaded to GCS successfully"
               {{- end }}
               
               # Upload to Azure Blob if enabled
               {{- if .Values.backup.azure.enabled }}
               echo "Uploading to Azure Blob Storage..."
-              az storage blob upload \
+              if [ -n "${AZURE_CLIENT_ID}" ] && [ -n "${AZURE_CLIENT_SECRET}" ] && [ -n "${AZURE_TENANT_ID}" ]; then
+                az login --service-principal -u "${AZURE_CLIENT_ID}" -p "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}" || true
+              fi
+              if ! az storage blob upload \
                 --account-name {{ .Values.backup.azure.accountName }} \
                 --container-name {{ .Values.backup.azure.containerName }} \
                 --name "{{ .Values.backup.azure.prefix | default "backups" }}/${BACKUP_FILE}" \
                 --file "${BACKUP_PATH}" \
-                --auth-mode login
-              echo "Backup uploaded to Azure Blob Storage"
+                --auth-mode login; then
+                echo "ERROR: Failed to upload backup to Azure Blob Storage"
+                exit 1
+              fi
+              echo "Backup uploaded to Azure Blob Storage successfully"
               {{- end }}
               
               echo "Backup completed successfully!"
@@ -143,18 +169,22 @@ spec:
                   name: {{ include "neurondb.postgresPasswordSecret" . }}
                   key: {{ include "neurondb.postgresPasswordKey" . }}
             {{- if .Values.backup.s3.enabled }}
+            {{- if and .Values.backup.s3.accessKeyId .Values.backup.s3.secretAccessKey }}
             - name: AWS_ACCESS_KEY_ID
               valueFrom:
                 secretKeyRef:
                   name: {{ include "neurondb.fullname" . }}-backup-credentials
                   key: aws-access-key-id
+                  optional: true
             - name: AWS_SECRET_ACCESS_KEY
               valueFrom:
                 secretKeyRef:
                   name: {{ include "neurondb.fullname" . }}-backup-credentials
                   key: aws-secret-access-key
+                  optional: true
+            {{- end }}
             - name: AWS_DEFAULT_REGION
-              value: {{ .Values.backup.s3.region }}
+              value: {{ .Values.backup.s3.region | quote }}
             {{- end }}
             {{- if .Values.backup.gcs.enabled }}
             - name: GOOGLE_APPLICATION_CREDENTIALS

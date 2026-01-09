@@ -22,7 +22,7 @@ spec:
         severity: warning
       annotations:
         summary: "NeuronDB disk usage is above 80%"
-        description: "NeuronDB pod {{ $labels.pod }} has disk usage above 80% (current: {{ $value | humanizePercentage }})"
+        description: "NeuronDB pod {{`{{ $labels.pod }}`}} has disk usage above 80% (current: {{`{{ $value | humanizePercentage }}`}})"
     
     - alert: NeuronDBCriticalDiskUsage
       expr: |
@@ -32,7 +32,7 @@ spec:
         severity: critical
       annotations:
         summary: "NeuronDB disk usage is above 90%"
-        description: "NeuronDB pod {{ $labels.pod }} has disk usage above 90% (current: {{ $value | humanizePercentage }})"
+        description: "NeuronDB pod {{`{{ $labels.pod }}`}} has disk usage above 90% (current: {{`{{ $value | humanizePercentage }}`}})"
     
     # CrashLoopBackOff detection
     - alert: NeuronDBCrashLoopBackOff
@@ -43,7 +43,7 @@ spec:
         severity: critical
       annotations:
         summary: "NeuronDB pod is in CrashLoopBackOff"
-        description: "NeuronDB pod {{ $labels.pod }} has restarted {{ $value }} times"
+        description: "NeuronDB pod {{`{{ $labels.pod }}`}} has restarted {{`{{ $value }}`}} times"
     
     - alert: NeuronAgentCrashLoopBackOff
       expr: |
@@ -53,28 +53,28 @@ spec:
         severity: critical
       annotations:
         summary: "NeuronAgent pod is in CrashLoopBackOff"
-        description: "NeuronAgent pod {{ $labels.pod }} has restarted {{ $value }} times"
+        description: "NeuronAgent pod {{`{{ $labels.pod }}`}} has restarted {{`{{ $value }}`}} times"
     
     # High error rate
     - alert: NeuronAgentHighErrorRate
       expr: |
-        rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.05
+        rate(neurondb_agent_http_requests_total{status=~"5.."}[5m]) / rate(neurondb_agent_http_requests_total[5m]) > 0.05
       for: 5m
       labels:
         severity: warning
       annotations:
         summary: "NeuronAgent error rate is above 5%"
-        description: "NeuronAgent has error rate of {{ $value | humanizePercentage }}"
+        description: "NeuronAgent has error rate of {{`{{ $value | humanizePercentage }}`}}"
     
     - alert: NeuronAgentCriticalErrorRate
       expr: |
-        rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.1
+        rate(neurondb_agent_http_requests_total{status=~"5.."}[5m]) / rate(neurondb_agent_http_requests_total[5m]) > 0.1
       for: 2m
       labels:
         severity: critical
       annotations:
         summary: "NeuronAgent error rate is above 10%"
-        description: "NeuronAgent has error rate of {{ $value | humanizePercentage }}"
+        description: "NeuronAgent has error rate of {{`{{ $value | humanizePercentage }}`}}"
     
     # Database connection issues
     - alert: NeuronDBConnectionFailure
@@ -87,16 +87,16 @@ spec:
         summary: "NeuronDB database connection failed"
         description: "Cannot connect to NeuronDB database"
     
-    # Queue depth alerts (if applicable)
+    # Queue depth alerts
     - alert: NeuronAgentHighQueueDepth
       expr: |
-        neurondb_queue_depth > 1000
+        neurondb_agent_jobs_queued > 1000
       for: 5m
       labels:
         severity: warning
       annotations:
         summary: "NeuronAgent queue depth is high"
-        description: "NeuronAgent queue depth is {{ $value }} (threshold: 1000)"
+        description: "NeuronAgent queue depth is {{`{{ $value }}`}} (threshold: 1000)"
     
     # Replication lag (if applicable)
     - alert: NeuronDBReplicationLag
@@ -107,7 +107,7 @@ spec:
         severity: warning
       annotations:
         summary: "NeuronDB replication lag is high"
-        description: "NeuronDB replication lag is {{ $value }} seconds"
+        description: "NeuronDB replication lag is {{`{{ $value }}`}} seconds"
     
     # Pod not ready
     - alert: NeuronDBNotReady
@@ -118,7 +118,7 @@ spec:
         severity: warning
       annotations:
         summary: "NeuronDB pod is not ready"
-        description: "NeuronDB pod {{ $labels.pod }} is not ready"
+        description: "NeuronDB pod {{`{{ $labels.pod }}`}} is not ready"
     
     - alert: NeuronAgentNotReady
       expr: |
@@ -128,6 +128,81 @@ spec:
         severity: warning
       annotations:
         summary: "NeuronAgent pod is not ready"
-        description: "NeuronAgent pod {{ $labels.pod }} is not ready"
+        description: "NeuronAgent pod {{`{{ $labels.pod }}`}} is not ready"
+    
+    # High CPU usage
+    - alert: NeuronDBHighCPUUsage
+      expr: |
+        rate(container_cpu_usage_seconds_total{pod=~"neurondb-.*"}[5m]) > 0.8
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        summary: "NeuronDB CPU usage is high"
+        description: "NeuronDB pod {{`{{ $labels.pod }}`}} has CPU usage above 80%"
+    
+    - alert: NeuronAgentHighCPUUsage
+      expr: |
+        rate(container_cpu_usage_seconds_total{pod=~".*-neuronagent-.*"}[5m]) > 0.8
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        summary: "NeuronAgent CPU usage is high"
+        description: "NeuronAgent pod {{`{{ $labels.pod }}`}} has CPU usage above 80%"
+    
+    # High memory usage
+    - alert: NeuronDBHighMemoryUsage
+      expr: |
+        (container_memory_working_set_bytes{pod=~"neurondb-.*"} / container_spec_memory_limit_bytes{pod=~"neurondb-.*"}) > 0.85
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "NeuronDB memory usage is high"
+        description: "NeuronDB pod {{`{{ $labels.pod }}`}} has memory usage above 85%"
+    
+    - alert: NeuronAgentHighMemoryUsage
+      expr: |
+        (container_memory_working_set_bytes{pod=~".*-neuronagent-.*"} / container_spec_memory_limit_bytes{pod=~".*-neuronagent-.*"}) > 0.85
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "NeuronAgent memory usage is high"
+        description: "NeuronAgent pod {{`{{ $labels.pod }}`}} has memory usage above 85%"
+    
+    # Backup failures
+    - alert: NeuronDBBackupFailed
+      expr: |
+        kube_job_status_failed{job_name=~".*-backup-.*"} == 1
+      for: 0m
+      labels:
+        severity: critical
+      annotations:
+        summary: "NeuronDB backup job failed"
+        description: "Backup job {{`{{ $labels.job_name }}`}} has failed"
+    
+    # Migration failures
+    - alert: NeuronDBMigrationFailed
+      expr: |
+        kube_job_status_failed{job_name=~".*-migration-.*"} == 1
+      for: 0m
+      labels:
+        severity: critical
+      annotations:
+        summary: "NeuronDB migration job failed"
+        description: "Migration job {{`{{ $labels.job_name }}`}} has failed"
+    
+    # Too many connections
+    - alert: NeuronDBTooManyConnections
+      expr: |
+        pg_stat_database_numbackends{datname="neurondb"} > 100
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "NeuronDB has too many connections"
+        description: "NeuronDB has {{`{{ $value }}`}} active connections (threshold: 100)"
 {{- end }}
 

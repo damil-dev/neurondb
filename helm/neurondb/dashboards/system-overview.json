@@ -1,0 +1,147 @@
+{
+  "dashboard": {
+    "title": "NeuronDB System Overview",
+    "tags": ["system", "overview", "neurondb"],
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "version": 1,
+    "refresh": "30s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Pod Status",
+        "type": "table",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "kube_pod_status_phase{namespace=\"$namespace\"}",
+            "format": "table",
+            "instant": true
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Total CPU Usage",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "targets": [
+          {
+            "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"$namespace\"}[5m])) * 100",
+            "legendFormat": "Total CPU %"
+          }
+        ],
+        "yaxes": [
+          {"format": "percent", "label": "CPU %"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Total Memory Usage",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+        "targets": [
+          {
+            "expr": "sum(container_memory_working_set_bytes{namespace=\"$namespace\"})",
+            "legendFormat": "Total Memory"
+          }
+        ],
+        "yaxes": [
+          {"format": "bytes", "label": "Memory"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Network I/O",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+        "targets": [
+          {
+            "expr": "sum(rate(container_network_receive_bytes_total{namespace=\"$namespace\"}[5m]))",
+            "legendFormat": "Receive"
+          },
+          {
+            "expr": "sum(rate(container_network_transmit_bytes_total{namespace=\"$namespace\"}[5m]))",
+            "legendFormat": "Transmit"
+          }
+        ],
+        "yaxes": [
+          {"format": "Bps", "label": "Bytes/sec"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Disk I/O",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+        "targets": [
+          {
+            "expr": "sum(rate(container_fs_reads_bytes_total{namespace=\"$namespace\"}[5m]))",
+            "legendFormat": "Read"
+          },
+          {
+            "expr": "sum(rate(container_fs_writes_bytes_total{namespace=\"$namespace\"}[5m]))",
+            "legendFormat": "Write"
+          }
+        ],
+        "yaxes": [
+          {"format": "Bps", "label": "Bytes/sec"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Service Health",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 24},
+        "targets": [
+          {
+            "expr": "up{job=~\".*neurondb.*\"}",
+            "legendFormat": "NeuronDB"
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Service Health",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 24},
+        "targets": [
+          {
+            "expr": "up{job=~\".*neuronagent.*\"}",
+            "legendFormat": "NeuronAgent"
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Service Health",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 24},
+        "targets": [
+          {
+            "expr": "up{job=~\".*neurondesktop.*\"}",
+            "legendFormat": "NeuronDesktop"
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Service Health",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 18, "y": 24},
+        "targets": [
+          {
+            "expr": "up{job=~\".*prometheus.*\"}",
+            "legendFormat": "Prometheus"
+          }
+        ]
+      }
+    ]
+  }
+}
+
+

@@ -38,7 +38,7 @@ spec:
                   number: {{ $.Values.neurondesktop.frontend.service.port }}
           {{- end }}
     {{- end }}
-    {{- if .Values.ingress.apiEnabled }}
+    {{- if and .Values.ingress.apiEnabled (gt (len .Values.ingress.hosts) 0) }}
     - host: {{ (index .Values.ingress.hosts 0).host | quote }}
       http:
         paths:

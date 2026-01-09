@@ -1,0 +1,132 @@
+# High Availability configuration
+# Optimized for maximum availability with multi-zone deployment
+
+neurondb:
+  enabled: true
+  replicas: 5
+  podManagementPolicy: "Parallel"
+  persistence:
+    size: 1Ti
+    storageClass: "fast-ssd-multizone"
+    retentionPolicy: "Retain"
+  resources:
+    requests:
+      memory: "32Gi"
+      cpu: "16"
+    limits:
+      memory: "64Gi"
+      cpu: "32"
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 3
+  updateStrategy:
+    type: "RollingUpdate"
+    rollingUpdate:
+      partition: 5  # Start with canary, then reduce for gradual rollout
+      maxUnavailable: 1
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/component
+                operator: In
+                values:
+                  - neurondb
+          topologyKey: topology.kubernetes.io/zone
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: topology.kubernetes.io/zone
+      whenUnsatisfiable: DoNotSchedule
+      labelSelector:
+        matchLabels:
+          app.kubernetes.io/component: neurondb
+
+neuronagent:
+  enabled: true
+  replicas: 10
+  autoscaling:
+    enabled: true
+    minReplicas: 10
+    maxReplicas: 100
+    advanced:
+      enabled: true
+      minReplicas: 10
+      maxReplicas: 100
+      metrics:
+        cpu:
+          enabled: true
+          targetUtilization: 70
+        memory:
+          enabled: true
+          targetUtilization: 80
+        httpRPS:
+          enabled: true
+          metricName: "http_requests_per_second"
+          targetValue: "5000"
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 7
+    maxUnavailable: 2
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+                - key: app.kubernetes.io/component
+                  operator: In
+                  values:
+                    - neuronagent
+            topologyKey: topology.kubernetes.io/zone
+
+neuronmcp:
+  enabled: true
+  replicas: 5
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+                - key: app.kubernetes.io/component
+                  operator: In
+                  values:
+                    - neuronmcp
+            topologyKey: topology.kubernetes.io/zone
+
+neurondesktop:
+  enabled: true
+  api:
+    replicas: 5
+  frontend:
+    replicas: 5
+
+monitoring:
+  enabled: true
+  prometheus:
+    retention: "180d"
+    persistence:
+      size: "200Gi"
+
+backup:
+  enabled: true
+  schedule: "0 */4 * * *"  # Every 4 hours
+  retention: 180
+  s3:
+    enabled: true
+    bucket: "neurondb-ha-backups"
+    region: "us-east-1"
+    prefix: "ha-production"
+
+networkPolicy:
+  enabled: true
+
+resourceGovernance:
+  priorityClass:
+    enabled: true
+    value: 3000
+
+

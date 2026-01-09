@@ -1,0 +1,78 @@
+# Development configuration
+# Optimized for local development with minimal resources
+
+neurondb:
+  enabled: true
+  replicas: 1
+  persistence:
+    size: 10Gi
+    storageClass: ""
+  resources:
+    requests:
+      memory: "2Gi"
+      cpu: "1"
+    limits:
+      memory: "4Gi"
+      cpu: "2"
+
+neuronagent:
+  enabled: true
+  replicas: 1
+  autoscaling:
+    enabled: false
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "1"
+
+neuronmcp:
+  enabled: true
+  replicas: 1
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+neurondesktop:
+  enabled: true
+  api:
+    replicas: 1
+    resources:
+      requests:
+        memory: "128Mi"
+        cpu: "100m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+  frontend:
+    replicas: 1
+    resources:
+      requests:
+        memory: "64Mi"
+        cpu: "50m"
+      limits:
+        memory: "256Mi"
+        cpu: "250m"
+
+monitoring:
+  enabled: false
+
+backup:
+  enabled: false
+
+migrations:
+  enabled: true
+
+ingress:
+  enabled: false
+
+networkPolicy:
+  enabled: false
+
+

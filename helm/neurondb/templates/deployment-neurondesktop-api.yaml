@@ -112,6 +112,15 @@ spec:
           value: "true"
         - name: SESSION_COOKIE_SAME_SITE
           value: "Strict"
+        startupProbe:
+          httpGet:
+            path: {{ .Values.neurondesktop.api.healthCheck.readinessProbe.path | default "/health" }}
+            port: http
+          initialDelaySeconds: 0
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 30
+          successThreshold: 1
         livenessProbe:
           httpGet:
             path: {{ .Values.neurondesktop.api.healthCheck.livenessProbe.path | default "/health" }}

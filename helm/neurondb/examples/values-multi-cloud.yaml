@@ -1,0 +1,93 @@
+# Multi-Cloud Deployment Configuration
+# Example configuration for deploying across multiple cloud providers
+
+neurondb:
+  enabled: true
+  replicas: 3
+  persistence:
+    size: 500Gi
+    storageClass: "standard"  # Adjust per cloud provider
+
+neuronagent:
+  enabled: true
+  replicas: 5
+  autoscaling:
+    enabled: true
+    minReplicas: 5
+    maxReplicas: 50
+
+# Multi-region backup configuration
+backup:
+  enabled: true
+  schedule: "0 */6 * * *"
+  retention: 90
+  
+  # Primary backup to S3 (AWS)
+  s3:
+    enabled: true
+    bucket: "neurondb-backups-primary"
+    region: "us-east-1"
+    prefix: "primary"
+  
+  # Secondary backup to GCS (GCP) - cross-cloud backup
+  gcs:
+    enabled: true
+    bucket: "neurondb-backups-secondary"
+    prefix: "secondary"
+  
+  # Tertiary backup to Azure - multi-cloud redundancy
+  azure:
+    enabled: true
+    accountName: "neurondbstorage"
+    containerName: "backups"
+    prefix: "tertiary"
+
+# Network policies for multi-cloud security
+networkPolicy:
+  enabled: true
+  allowMonitoring: true
+
+# Monitoring with cross-cloud aggregation
+monitoring:
+  enabled: true
+  prometheus:
+    retention: "180d"
+  grafana:
+    enabled: true
+
+# High availability across regions
+neurondb:
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+                - key: app.kubernetes.io/component
+                  operator: In
+                  values:
+                    - neurondb
+            topologyKey: topology.kubernetes.io/zone
+
+neuronagent:
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+                - key: app.kubernetes.io/component
+                  operator: In
+                  values:
+                    - neuronagent
+            topologyKey: topology.kubernetes.io/zone
+
+# Resource governance for multi-cloud
+resourceGovernance:
+  priorityClass:
+    enabled: true
+    value: 2000
+
+

@@ -37,7 +37,7 @@ Monitoring:
 {{- if .Values.ingress.enabled }}
 Ingress:
 {{- range .Values.ingress.hosts }}
-  - https://{{ .host }}{{ (index $.Values.ingress.hosts 0).paths | first | get "path" }}
+  - {{ if $.Values.ingress.tls }}https{{ else }}http{{ end }}://{{ .host }}{{ if .paths }}{{ (first .paths).path }}{{ else }}/{{ end }}
 {{- end }}
 {{- else }}
 To access services, use port-forwarding:

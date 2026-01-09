@@ -60,41 +60,61 @@ spec:
           echo "Downloading backup: ${BACKUP_FILE}"
           
           {{- if .Values.backup.restore.fromS3 }}
-          aws s3 cp "s3://{{ .Values.backup.s3.bucket }}/{{ .Values.backup.s3.prefix | default "backups" }}/${BACKUP_FILE}" \
+          if ! aws s3 cp "s3://{{ .Values.backup.s3.bucket }}/{{ .Values.backup.s3.prefix | default "backups" }}/${BACKUP_FILE}" \
             "${DOWNLOAD_PATH}" \
-            --region {{ .Values.backup.s3.region }}
+            --region {{ .Values.backup.s3.region }}; then
+            echo "ERROR: Failed to download backup from S3"
+            exit 1
+          fi
           {{- end }}
           
           {{- if .Values.backup.restore.fromGCS }}
-          gsutil cp "gs://{{ .Values.backup.gcs.bucket }}/{{ .Values.backup.gcs.prefix | default "backups" }}/${BACKUP_FILE}" \
-            "${DOWNLOAD_PATH}"
+          if [ ! -f "${GOOGLE_APPLICATION_CREDENTIALS}" ]; then
+            echo "ERROR: GCS credentials file not found at ${GOOGLE_APPLICATION_CREDENTIALS}"
+            exit 1
+          fi
+          if ! gsutil cp "gs://{{ .Values.backup.gcs.bucket }}/{{ .Values.backup.gcs.prefix | default "backups" }}/${BACKUP_FILE}" \
+            "${DOWNLOAD_PATH}"; then
+            echo "ERROR: Failed to download backup from GCS"
+            exit 1
+          fi
           {{- end }}
           
           {{- if .Values.backup.restore.fromAzure }}
-          az storage blob download \
+          if [ -n "${AZURE_CLIENT_ID}" ] && [ -n "${AZURE_CLIENT_SECRET}" ] && [ -n "${AZURE_TENANT_ID}" ]; then
+            az login --service-principal -u "${AZURE_CLIENT_ID}" -p "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}" || true
+          fi
+          if ! az storage blob download \
             --account-name {{ .Values.backup.azure.accountName }} \
             --container-name {{ .Values.backup.azure.containerName }} \
             --name "{{ .Values.backup.azure.prefix | default "backups" }}/${BACKUP_FILE}" \
             --file "${DOWNLOAD_PATH}" \
-            --auth-mode login
+            --auth-mode login; then
+            echo "ERROR: Failed to download backup from Azure Blob Storage"
+            exit 1
+          fi
           {{- end }}
           
           echo "Backup downloaded: ${DOWNLOAD_PATH}"
           ls -lh "${DOWNLOAD_PATH}"
         env:
         {{- if .Values.backup.restore.fromS3 }}
+        {{- if and .Values.backup.s3.accessKeyId .Values.backup.s3.secretAccessKey }}
         - name: AWS_ACCESS_KEY_ID
           valueFrom:
             secretKeyRef:
               name: {{ include "neurondb.fullname" . }}-backup-credentials
               key: aws-access-key-id
+              optional: true
         - name: AWS_SECRET_ACCESS_KEY
           valueFrom:
             secretKeyRef:
               name: {{ include "neurondb.fullname" . }}-backup-credentials
               key: aws-secret-access-key
+              optional: true
+        {{- end }}
         - name: AWS_DEFAULT_REGION
-          value: {{ .Values.backup.s3.region }}
+          value: {{ .Values.backup.s3.region | quote }}
         {{- end }}
         {{- if .Values.backup.restore.fromGCS }}
         - name: GOOGLE_APPLICATION_CREDENTIALS
@@ -162,14 +182,17 @@ spec:
           
           # Restore database
           echo "Restoring database..."
-          pg_restore -h {{ include "neurondb.postgresHost" . }} \
+          if ! pg_restore -h {{ include "neurondb.postgresHost" . }} \
             -p {{ include "neurondb.postgresPort" . }} \
             -U {{ include "neurondb.postgresUsername" . }} \
             -d {{ include "neurondb.postgresDatabase" . }} \
             -v \
             -c \
             -1 \
-            "${RESTORE_PATH}"
+            "${RESTORE_PATH}"; then
+            echo "ERROR: Database restore failed"
+            exit 1
+          fi
           
           echo "Restore completed successfully!"
         env:

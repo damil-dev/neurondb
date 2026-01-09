@@ -1,0 +1,54 @@
+# External Monitoring Stack Configuration
+# Use this when you have existing Prometheus/Grafana/Jaeger in your cluster
+
+neurondb:
+  enabled: true
+  replicas: 3
+
+neuronagent:
+  enabled: true
+  replicas: 5
+
+neurondesktop:
+  enabled: true
+  api:
+    replicas: 3
+  frontend:
+    replicas: 3
+
+# Disable built-in monitoring stack
+monitoring:
+  enabled: false
+
+# Enable Prometheus Operator integration for external monitoring
+observability:
+  prometheusOperator:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      interval: "30s"
+      metricsPath: "/metrics"
+      additionalLabels:
+        release: prometheus  # Match your Prometheus Operator release
+    prometheusRule:
+      enabled: true
+      additionalLabels:
+        release: prometheus
+
+# Network policies allow access to external monitoring
+networkPolicy:
+  enabled: true
+  allowMonitoring: true
+  monitoringNamespace: "monitoring"  # Your monitoring namespace
+
+# Backup still enabled
+backup:
+  enabled: true
+  schedule: "0 2 * * *"
+  retention: 30
+  s3:
+    enabled: true
+    bucket: "neurondb-backups"
+    region: "us-east-1"
+
+

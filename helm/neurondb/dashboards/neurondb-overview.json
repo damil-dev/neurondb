@@ -1,0 +1,166 @@
+{
+  "dashboard": {
+    "title": "NeuronDB Overview",
+    "tags": ["neurondb", "postgresql", "database"],
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "version": 1,
+    "refresh": "30s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Database Connections",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 6, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "pg_stat_database_numbackends{datname=\"neurondb\"}",
+            "legendFormat": "Active Connections"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "thresholds"},
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": null, "color": "green"},
+                {"value": 50, "color": "yellow"},
+                {"value": 100, "color": "red"}
+              ]
+            },
+            "unit": "short"
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Database Size",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 6, "x": 6, "y": 0},
+        "targets": [
+          {
+            "expr": "pg_database_size_bytes{datname=\"neurondb\"}",
+            "legendFormat": "Database Size"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "bytes",
+            "color": {"mode": "palette-classic"}
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "Query Rate",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "targets": [
+          {
+            "expr": "rate(pg_stat_database_xact_commit{datname=\"neurondb\"}[5m]) + rate(pg_stat_database_xact_rollback{datname=\"neurondb\"}[5m])",
+            "legendFormat": "Queries/sec"
+          }
+        ],
+        "yaxes": [
+          {"format": "reqps", "label": "Queries/sec"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 4,
+        "title": "CPU Usage",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "targets": [
+          {
+            "expr": "rate(container_cpu_usage_seconds_total{pod=~\"neurondb-.*\"}[5m]) * 100",
+            "legendFormat": "{{pod}}"
+          }
+        ],
+        "yaxes": [
+          {"format": "percent", "max": 100, "label": "CPU %"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Memory Usage",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+        "targets": [
+          {
+            "expr": "container_memory_working_set_bytes{pod=~\"neurondb-.*\"}",
+            "legendFormat": "{{pod}}"
+          }
+        ],
+        "yaxes": [
+          {"format": "bytes", "label": "Memory"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Disk Usage",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+        "targets": [
+          {
+            "expr": "(1 - (node_filesystem_avail_bytes{mountpoint=\"/var/lib/postgresql/data\"} / node_filesystem_size_bytes{mountpoint=\"/var/lib/postgresql/data\"})) * 100",
+            "legendFormat": "Disk Usage %"
+          }
+        ],
+        "yaxes": [
+          {"format": "percent", "max": 100, "label": "Disk %"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Cache Hit Ratio",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 6, "x": 12, "y": 16},
+        "targets": [
+          {
+            "expr": "sum(rate(pg_stat_database_blks_hit{datname=\"neurondb\"}[5m])) / (sum(rate(pg_stat_database_blks_hit{datname=\"neurondb\"}[5m])) + sum(rate(pg_stat_database_blks_read{datname=\"neurondb\"}[5m]))) * 100",
+            "legendFormat": "Cache Hit Ratio"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "color": {"mode": "thresholds"},
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": null, "color": "red"},
+                {"value": 80, "color": "yellow"},
+                {"value": 95, "color": "green"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 8,
+        "title": "Active Transactions",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 6, "x": 18, "y": 16},
+        "targets": [
+          {
+            "expr": "pg_stat_activity_count{state=\"active\"}",
+            "legendFormat": "Active Transactions"
+          }
+        ],
+        "yaxes": [
+          {"format": "short", "label": "Count"},
+          {"format": "short"}
+        ]
+      }
+    ]
+  }
+}
+
+

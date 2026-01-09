@@ -109,6 +109,17 @@ spec:
         - name: var-tmp
           mountPath: /var/tmp
         {{- end }}
+        startupProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - pg_isready -U {{ .Values.neurondb.postgresql.username }}
+          initialDelaySeconds: 0
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 60
+          successThreshold: 1
         livenessProbe:
           exec:
             command:
