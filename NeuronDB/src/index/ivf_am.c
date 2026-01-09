@@ -285,6 +285,11 @@ typedef struct IvfScanOpaqueData
 	int			currentCluster; /* Current cluster being scanned */
 	BlockNumber currentListBlock;	/* Current list block */
 	int			currentListOffset;	/* Current offset in list */
+	/* Iterative scan support */
+	bool		iterativeScanEnabled;
+	int			iterativeScanMode;	/* 0=off, 1=strict_order, 2=relaxed_order */
+	int			maxProbes;			/* Maximum probes for iterative scan */
+	int			initialNprobe;		/* Initial nprobe value */
 }			IvfScanOpaqueData;
 
 typedef IvfScanOpaqueData * IvfScanOpaque;
@@ -1632,6 +1637,11 @@ ivfbeginscan(Relation index, int nkeys, int norderbys)
 	so->results = NULL;
 	so->distances = NULL;
 	so->selectedClusters = NULL;
+	/* Initialize iterative scan fields */
+	so->iterativeScanEnabled = false;
+	so->iterativeScanMode = 0;
+	so->maxProbes = 100;
+	so->initialNprobe = IVF_DEFAULT_NPROBE;
 
 	scan->opaque = so;
 
@@ -1713,6 +1723,34 @@ ivfrescan(IndexScanDesc scan,
 	if (so->nprobe <= 0)
 		so->nprobe = IVF_DEFAULT_NPROBE;
 
+	/* Initialize iterative scan settings from GUC */
+	{
+		extern int	ivf_iterative_scan;
+		extern int	ivf_max_probes;
+		extern int	neurondb_ivf_probes;
+
+		/* Use neurondb.ivf_probes if set, otherwise default */
+		int			probes = so->nprobe;
+		if (neurondb_ivf_probes > 0)
+			probes = neurondb_ivf_probes;
+
+		if (ivf_iterative_scan > 0)
+		{
+			so->iterativeScanMode = ivf_iterative_scan;
+			so->iterativeScanEnabled = true;
+			/* maxProbes should be at least as large as initial probes */
+			so->maxProbes = Max(ivf_max_probes, probes);
+		}
+		else
+		{
+			so->iterativeScanMode = 0;
+			so->iterativeScanEnabled = false;
+			so->maxProbes = probes;	/* Use current probes as max when iterative scan is off */
+		}
+		so->initialNprobe = probes;
+		so->nprobe = probes;
+	}
+
 	/* Extract query vector from orderbys */
 	if (norderbys > 0 && orderbys[0].sk_argument != 0)
 	{
@@ -1786,6 +1824,11 @@ ivfComputeDistance(const float4 * vec1, const float4 * vec2, int dim, int strate
 			if (norm1 == 0.0f || norm2 == 0.0f)
 				return 1.0f;
 			return 1.0f - (dot_product / (norm1 * norm2));
+
+		case 3:					/* Negative inner product */
+			for (i = 0; i < dim; i++)
+				dot_product += vec1[i] * vec2[i];
+			return (float4) (-dot_product);
 
 		default:				/* Default to L2 */
 			for (i = 0; i < dim; i++)
@@ -2203,6 +2246,86 @@ ivfgettuple(IndexScanDesc scan, ScanDirection dir)
 
 		UnlockReleaseBuffer(metaBuffer);
 		so->firstCall = false;
+		so->currentResult = 0;
+	}
+
+	/* Iterative scan: if we've exhausted results and iterative scan is enabled, probe more */
+	if (so->currentResult >= so->resultCount && so->iterativeScanEnabled && so->nprobe < so->maxProbes)
+	{
+		int			oldNprobe = so->nprobe;
+		int			newNprobe;
+
+		/* Increase nprobe for next scan (double it, but cap at maxProbes) */
+		newNprobe = Min(so->nprobe * 2, so->maxProbes);
+		
+		if (newNprobe <= oldNprobe)
+		{
+			/* Can't increase further, give up */
+			return false;
+		}
+
+		so->nprobe = newNprobe;
+
+		/* Re-scan with increased nprobe */
+		metaBuffer = ReadBuffer(scan->indexRelation, 0);
+		if (!BufferIsValid(metaBuffer))
+		{
+			ereport(ERROR,
+					(errcode(ERRCODE_INTERNAL_ERROR),
+					 errmsg("neurondb: ReadBuffer failed")));
+		}
+		LockBuffer(metaBuffer, BUFFER_LOCK_SHARE);
+		metaPage = BufferGetPage(metaBuffer);
+		meta = (IvfMetaPage) PageGetContents(metaPage);
+
+		if (meta->magicNumber != IVF_MAGIC_NUMBER)
+		{
+			UnlockReleaseBuffer(metaBuffer);
+			return false;
+		}
+
+		/* Free old results */
+		if (so->results)
+		{
+			pfree(so->results);
+			so->results = NULL;
+		}
+		if (so->distances)
+		{
+			pfree(so->distances);
+			so->distances = NULL;
+		}
+		if (so->selectedClusters)
+		{
+			pfree(so->selectedClusters);
+			so->selectedClusters = NULL;
+		}
+
+		/* Allocate selected clusters array */
+		nalloc(so->selectedClusters, int, so->nprobe);
+
+		/* Select nprobe closest clusters */
+		ivfSelectClusters(scan->indexRelation,
+						  meta,
+						  so->queryVector->data,
+						  so->queryVector->dim,
+						  so->nprobe,
+						  so->selectedClusters);
+
+		/* Collect candidates from selected clusters */
+		ivfCollectCandidates(scan->indexRelation,
+							 meta,
+							 so->queryVector->data,
+							 so->queryVector->dim,
+							 so->strategy,
+							 so->selectedClusters,
+							 so->nprobe,
+							 so->k,
+							 &so->results,
+							 &so->distances,
+							 &so->resultCount);
+
+		UnlockReleaseBuffer(metaBuffer);
 		so->currentResult = 0;
 	}
 
