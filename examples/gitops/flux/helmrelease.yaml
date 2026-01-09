@@ -36,10 +36,31 @@ spec:
   install:
     remediation:
       retries: 3
+      remediateLastFailure: true
   upgrade:
     remediation:
       retries: 3
+      remediateLastFailure: true
   rollback:
     enable: true
     retries: 3
+  test:
+    enable: true
+    timeout: 5m
+  suspend: false
+  valuesFrom:
+    - kind: Secret
+      name: neurondb-secrets
+      valuesKey: values.yaml
+      optional: true
+  postRenderers:
+    - kustomize:
+        patches:
+          - target:
+              kind: StatefulSet
+              name: neurondb-neurondb
+            patch: |-
+              - op: replace
+                path: /spec/replicas
+                value: 3
 
