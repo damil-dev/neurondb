@@ -20,6 +20,8 @@
 #include "neurondb.h"
 #include "fmgr.h"
 #include "utils/builtins.h"
+#include "utils/array.h"
+#include "funcapi.h"
 
 PG_FUNCTION_INFO_V1(encrypt_postquantum);
 Datum
@@ -105,18 +107,64 @@ PG_FUNCTION_INFO_V1(federated_vector_query);
 Datum
 federated_vector_query(PG_FUNCTION_ARGS)
 {
-	text	   *remote_host = PG_GETARG_TEXT_PP(0);
-	text	   *query = PG_GETARG_TEXT_PP(1);
-	char *host_str = NULL;
-	char *query_str = NULL;
+	FuncCallContext *funcctx;
+	ArrayType  *remote_servers = NULL;
+	Vector	   *query_vector = NULL;
+	int32		k;
+	text	   *combine_method = NULL;
+	
+	/* Initialize on first call */
+	if (SRF_IS_FIRSTCALL())
+	{
+		MemoryContext oldcontext;
 
-	host_str = text_to_cstring(remote_host);
+		funcctx = SRF_FIRSTCALL_INIT();
+		oldcontext = MemoryContextSwitchTo(funcctx->multi_call_memory_ctx);
 
-	(void) host_str;
-	query_str = text_to_cstring(query);
-	(void) query_str;
+		/* Validate required arguments */
+		if (PG_ARGISNULL(0))
+			ereport(ERROR,
+					(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+					 errmsg("neurondb: federated_vector_query: remote_servers cannot be NULL")));
 
+		if (PG_ARGISNULL(1))
+			ereport(ERROR,
+					(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+					 errmsg("neurondb: federated_vector_query: query_vector cannot be NULL")));
 
+		if (PG_ARGISNULL(2))
+			ereport(ERROR,
+					(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+					 errmsg("neurondb: federated_vector_query: k cannot be NULL")));
 
-	PG_RETURN_TEXT_P(cstring_to_text("Federated query completed"));
+		remote_servers = PG_GETARG_ARRAYTYPE_P(0);
+		query_vector = PG_GETARG_VECTOR_P(1);
+		k = PG_GETARG_INT32(2);
+
+		/* Optional combine_method parameter (defaults to 'merge' in SQL) */
+		if (!PG_ARGISNULL(3))
+			combine_method = PG_GETARG_TEXT_PP(3);
+
+		/* Reserved for future use - currently just return empty set */
+		(void) remote_servers;
+		(void) query_vector;
+		(void) k;
+		(void) combine_method;
+
+		funcctx->max_calls = 0;  /* Return no rows for now (stub implementation) */
+
+		MemoryContextSwitchTo(oldcontext);
+	}
+
+	funcctx = SRF_PERCALL_SETUP();
+
+	if (funcctx->call_cntr < funcctx->max_calls)
+	{
+		/* This would return actual results in a full implementation */
+		SRF_RETURN_NEXT(funcctx, (Datum) 0);
+	}
+	else
+	{
+		SRF_RETURN_DONE(funcctx);
+	}
 }

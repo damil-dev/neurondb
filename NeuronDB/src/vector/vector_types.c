@@ -448,7 +448,7 @@ sparsevec_in(PG_FUNCTION_ARGS)
 					(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
 					 errmsg("invalid index in sparsevec")));
 
-		/* pgvector sparsevec uses 1-based indexing, convert to 0-based */
+		/* sparsevec uses 1-based indexing, convert to 0-based */
 		if (indices[nnz] < 1)
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
@@ -588,7 +588,7 @@ sparsevec_out(PG_FUNCTION_ARGS)
 	{
 		if (i > 0)
 			appendStringInfoChar(&buf, ',');
-		/* pgvector sparsevec uses 1-based indexing */
+		/* sparsevec uses 1-based indexing */
 		appendStringInfo(&buf, "%d:%g", indices[i] + 1, values[i]);
 	}
 

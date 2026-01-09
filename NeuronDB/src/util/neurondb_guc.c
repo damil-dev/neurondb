@@ -17,10 +17,25 @@
 #include "neurondb_macros.h"
 #include "neurondb_constants.h"
 
+/* Enum options for iterative_scan */
+static const struct config_enum_entry iterative_scan_options[] = {
+	{"off", 0, false},
+	{"strict_order", 1, false},
+	{"relaxed_order", 2, false},
+	{NULL, 0, false}
+};
+
 int			neurondb_hnsw_ef_search = 64;
 int			neurondb_hnsw_k = 10;
 int			neurondb_ivf_probes = 10;
 int			neurondb_ef_construction = 200;
+
+/* Iterative scan parameters */
+int			hnsw_iterative_scan = 0;		/* 0=off, 1=strict_order, 2=relaxed_order */
+int			hnsw_max_scan_tuples = 20000;
+double		hnsw_scan_mem_multiplier = 1.0;
+int			ivf_iterative_scan = 0;	/* 0=off, 1=strict_order, 2=relaxed_order */
+int			ivf_max_probes = 100;
 
 int			neurondb_compute_mode = 0;
 /* Default GPU backend type: set at compile time based on available backend */
@@ -180,6 +195,7 @@ neurondb_init_all_gucs(void)
 							NULL,
 							NULL);
 
+
 	DefineCustomIntVariable("neurondb.hnsw_k",
 							"Sets the k parameter for HNSW index scans",
 							"Number of nearest neighbors to return. Default is 10.",
@@ -200,6 +216,73 @@ neurondb_init_all_gucs(void)
 							10,
 							1,
 							1000,
+							PGC_USERSET,
+							0,
+							NULL,
+							NULL,
+							NULL);
+
+	/* HNSW iterative scan parameters */
+	DefineCustomEnumVariable("neurondb.hnsw_iterative_scan",
+							 "Sets the mode for iterative scans",
+							 "Valid values: 'off' (default), 'strict_order', 'relaxed_order'. "
+							 "Iterative scans automatically extend index searches when filtering reduces results.",
+							 &hnsw_iterative_scan,
+							 0, /* HNSW_ITERATIVE_SCAN_OFF */
+							 iterative_scan_options,
+							 PGC_USERSET,
+							 0,
+							 NULL,
+							 NULL,
+							 NULL);
+
+	DefineCustomIntVariable("neurondb.hnsw_max_scan_tuples",
+							"Sets the max number of tuples to visit for iterative scans",
+							"This is approximate and does not affect the initial scan. Default is 20000.",
+							&hnsw_max_scan_tuples,
+							20000,
+							1,
+							INT_MAX,
+							PGC_USERSET,
+							0,
+							NULL,
+							NULL,
+							NULL);
+
+	DefineCustomRealVariable("neurondb.hnsw_scan_mem_multiplier",
+							 "Sets the multiple of work_mem to use for iterative scans",
+							 "Default is 1.0. Try increasing this if increasing neurondb.hnsw_max_scan_tuples does not improve recall.",
+							 &hnsw_scan_mem_multiplier,
+							 1.0,
+							 1.0,
+							 1000.0,
+							 PGC_USERSET,
+							 0,
+							 NULL,
+							 NULL,
+							 NULL);
+
+	/* IVF iterative scan parameters */
+	DefineCustomEnumVariable("neurondb.ivf_iterative_scan",
+							 "Sets the mode for iterative scans",
+							 "Valid values: 'off' (default), 'relaxed_order'. "
+							 "Iterative scans automatically extend index searches when filtering reduces results.",
+							 &ivf_iterative_scan,
+							 0, /* IVF_ITERATIVE_SCAN_OFF */
+							 iterative_scan_options,
+							 PGC_USERSET,
+							 0,
+							 NULL,
+							 NULL,
+							 NULL);
+
+	DefineCustomIntVariable("neurondb.ivf_max_probes",
+							"Sets the max number of probes for iterative scans",
+							"If this is lower than neurondb.ivf_probes, neurondb.ivf_probes will be used. Default is 100.",
+							&ivf_max_probes,
+							100,
+							1,
+							INT_MAX,
 							PGC_USERSET,
 							0,
 							NULL,
@@ -743,6 +826,7 @@ neurondb_init_all_gucs(void)
 							 NULL,
 							 NULL,
 		NULL);
+
 
 	neurondb_sync_config_from_gucs();
 }

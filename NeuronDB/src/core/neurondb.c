@@ -246,6 +246,7 @@ vector_in(PG_FUNCTION_ARGS)
 {
 	char	   *str = NULL;
 	Vector	   *result = NULL;
+	int32		typmod = -1;
 
 	/* Validate minimum argument count */
 	if (PG_NARGS() < 1)
@@ -256,10 +257,16 @@ vector_in(PG_FUNCTION_ARGS)
 	str = PG_GETARG_CSTRING(0);
 	result = vector_in_internal(str, NULL, true);
 
+	/* Check if typmod was passed as argument (for compatibility with custom callers) */
+	/* Note: In standard PostgreSQL type casting like '[1,2,3]'::vector(2),
+	 * the typmod is not automatically passed to the input function.
+	 * Full typmod validation from type casts requires additional infrastructure.
+	 * This check handles cases where typmod is explicitly passed. */
 	if (PG_NARGS() >= 3)
 	{
-		int32		typmod = PG_GETARG_INT32(2);
+		typmod = PG_GETARG_INT32(2);
 
+		/* Validate typmod if it was specified */
 		if (typmod >= 0 && result->dim != typmod)
 			ereport(ERROR,
 					(errcode(ERRCODE_DATA_EXCEPTION),

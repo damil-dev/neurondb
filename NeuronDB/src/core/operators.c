@@ -42,11 +42,38 @@
 #include <limits.h>
 #include <string.h>
 
+/*
+ * Internal helper to compare vectors
+ * Uses lexicographic comparison, supports different dimensions
+ */
+static int
+vector_cmp_internal(Vector *a, Vector *b)
+{
+	int			dim = Min(a->dim, b->dim);
+	int			i;
+
+	/* Check values before dimensions to be consistent with Postgres arrays */
+	for (i = 0; i < dim; i++)
+	{
+		if (a->data[i] < b->data[i])
+			return -1;
+		if (a->data[i] > b->data[i])
+			return 1;
+	}
+
+	/* If common elements are equal, compare by dimension */
+	if (a->dim < b->dim)
+		return -1;
+	if (a->dim > b->dim)
+		return 1;
+
+	return 0;
+}
+
 PG_FUNCTION_INFO_V1(vector_lt);
 Datum
 vector_lt(PG_FUNCTION_ARGS)
 {
-	int			i;
 	Vector	   *a = NULL;
 	Vector	   *b = NULL;
 
@@ -62,28 +89,13 @@ vector_lt(PG_FUNCTION_ARGS)
 	NDB_CHECK_VECTOR_VALID(a);
 	NDB_CHECK_VECTOR_VALID(b);
 
-	if (a->dim != b->dim)
-		ereport(ERROR,
-				(errcode(ERRCODE_DATA_EXCEPTION),
-				 errmsg("cannot compare vectors of different dimensions: %d vs %d",
-						a->dim,
-						b->dim)));
-
-	for (i = 0; i < a->dim; i++)
-	{
-		if (a->data[i] < b->data[i])
-			PG_RETURN_BOOL(true);
-		else if (a->data[i] > b->data[i])
-			PG_RETURN_BOOL(false);
-	}
-	PG_RETURN_BOOL(false);
+	PG_RETURN_BOOL(vector_cmp_internal(a, b) < 0);
 }
 
 PG_FUNCTION_INFO_V1(vector_le);
 Datum
 vector_le(PG_FUNCTION_ARGS)
 {
-	int			i;
 	Vector	   *a = NULL;
 	Vector	   *b = NULL;
 
@@ -99,28 +111,13 @@ vector_le(PG_FUNCTION_ARGS)
 	NDB_CHECK_VECTOR_VALID(a);
 	NDB_CHECK_VECTOR_VALID(b);
 
-	if (a->dim != b->dim)
-		ereport(ERROR,
-				(errcode(ERRCODE_DATA_EXCEPTION),
-				 errmsg("cannot compare vectors of different dimensions: %d vs %d",
-						a->dim,
-						b->dim)));
-
-	for (i = 0; i < a->dim; i++)
-	{
-		if (a->data[i] < b->data[i])
-			PG_RETURN_BOOL(true);
-		else if (a->data[i] > b->data[i])
-			PG_RETURN_BOOL(false);
-	}
-	PG_RETURN_BOOL(true);
+	PG_RETURN_BOOL(vector_cmp_internal(a, b) <= 0);
 }
 
 PG_FUNCTION_INFO_V1(vector_gt);
 Datum
 vector_gt(PG_FUNCTION_ARGS)
 {
-	int			i;
 	Vector	   *a = NULL;
 	Vector	   *b = NULL;
 
@@ -136,28 +133,13 @@ vector_gt(PG_FUNCTION_ARGS)
 	NDB_CHECK_VECTOR_VALID(a);
 	NDB_CHECK_VECTOR_VALID(b);
 
-	if (a->dim != b->dim)
-		ereport(ERROR,
-				(errcode(ERRCODE_DATA_EXCEPTION),
-				 errmsg("cannot compare vectors of different dimensions: %d vs %d",
-						a->dim,
-						b->dim)));
-
-	for (i = 0; i < a->dim; i++)
-	{
-		if (a->data[i] > b->data[i])
-			PG_RETURN_BOOL(true);
-		else if (a->data[i] < b->data[i])
-			PG_RETURN_BOOL(false);
-	}
-	PG_RETURN_BOOL(false);
+	PG_RETURN_BOOL(vector_cmp_internal(a, b) > 0);
 }
 
 PG_FUNCTION_INFO_V1(vector_ge);
 Datum
 vector_ge(PG_FUNCTION_ARGS)
 {
-	int			i;
 	Vector	   *a = NULL;
 	Vector	   *b = NULL;
 
@@ -173,21 +155,7 @@ vector_ge(PG_FUNCTION_ARGS)
 	NDB_CHECK_VECTOR_VALID(a);
 	NDB_CHECK_VECTOR_VALID(b);
 
-	if (a->dim != b->dim)
-		ereport(ERROR,
-				(errcode(ERRCODE_DATA_EXCEPTION),
-				 errmsg("cannot compare vectors of different dimensions: %d vs %d",
-						a->dim,
-						b->dim)));
-
-	for (i = 0; i < a->dim; i++)
-	{
-		if (a->data[i] > b->data[i])
-			PG_RETURN_BOOL(true);
-		else if (a->data[i] < b->data[i])
-			PG_RETURN_BOOL(false);
-	}
-	PG_RETURN_BOOL(true);
+	PG_RETURN_BOOL(vector_cmp_internal(a, b) >= 0);
 }
 
 PG_FUNCTION_INFO_V1(vector_cosine_similarity);

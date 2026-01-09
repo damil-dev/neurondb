@@ -124,6 +124,13 @@ extern int	neurondb_hnsw_ef_search;
 extern int	neurondb_hnsw_k;
 extern int	neurondb_ivf_probes;
 extern int	neurondb_ef_construction;
+
+/* Iterative scan parameters */
+extern int	hnsw_iterative_scan;
+extern int	hnsw_max_scan_tuples;
+extern double hnsw_scan_mem_multiplier;
+extern int	ivf_iterative_scan;
+extern int	ivf_max_probes;
 extern int	neurondb_compute_mode;
 extern int	neurondb_gpu_backend_type;
 extern int	neurondb_gpu_device;
