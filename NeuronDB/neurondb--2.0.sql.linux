@@ -181,7 +181,7 @@ CREATE TYPE rtext (
 
 COMMENT ON TYPE rtext IS 'Retrievable text type with token metadata for RAG pipelines';
 
--- Half-precision vector type (halfvec): FP16 quantized vectors (pgvector compatibility)
+-- Half-precision vector type (halfvec): FP16 quantized vectors (past compatibility)
 CREATE TYPE halfvec;
 
 CREATE FUNCTION halfvec_in(cstring) RETURNS halfvec
@@ -209,7 +209,7 @@ CREATE TYPE halfvec (
     CATEGORY = 'U'
 );
 
-COMMENT ON TYPE halfvec IS 'Half-precision vector type (FP16) for 2x compression, supports up to 4000 dimensions (pgvector compatible)';
+COMMENT ON TYPE halfvec IS 'Half-precision vector type (FP16) for 2x compression, supports up to 4000 dimensions (compatible)';
 
 -- Binary vector type (binaryvec): Packed binary vectors for quantization
 CREATE TYPE binaryvec;
@@ -246,7 +246,7 @@ CREATE OPERATOR <-> (
 );
 COMMENT ON OPERATOR <->(binaryvec, binaryvec) IS 'Hamming distance operator for binary vectors';
 
--- Sparse vector type (sparsevec): pgvector-compatible sparse vector format
+-- Sparse vector type (sparsevec): compatible sparse vector format
 CREATE TYPE sparsevec;
 
 CREATE FUNCTION sparsevec_in(cstring) RETURNS sparsevec
@@ -274,7 +274,7 @@ CREATE TYPE sparsevec (
     CATEGORY = 'U'
 );
 
-COMMENT ON TYPE sparsevec IS 'Sparse vector type (pgvector compatible), supports up to 1000 nonzero entries and 1M dimensions';
+COMMENT ON TYPE sparsevec IS 'Sparse vector type (compatible), supports up to 1000 nonzero entries and 1M dimensions';
 
 -- ============================================================================
 -- CORE CONFIGURATION TABLES (neurondb schema)
@@ -359,6 +359,13 @@ CREATE FUNCTION vector_concat(vector, vector) RETURNS vector
     LANGUAGE C IMMUTABLE STRICT;
 COMMENT ON FUNCTION vector_concat IS 'Concatenate two vectors';
 
+CREATE OPERATOR || (
+    LEFTARG = vector,
+    RIGHTARG = vector,
+    PROCEDURE = vector_concat
+);
+COMMENT ON OPERATOR ||(vector, vector) IS 'Vector concatenation operator';
+
 -- ============================================================================
 -- VECTOR ARITHMETIC OPERATORS
 -- ============================================================================
@@ -394,6 +401,15 @@ CREATE OPERATOR * (
     PROCEDURE = vector_mul,
     COMMUTATOR = *
 );
+
+-- Element-wise vector multiplication (Hadamard product)
+CREATE OPERATOR * (
+    LEFTARG = vector,
+    RIGHTARG = vector,
+    PROCEDURE = vector_hadamard,
+    COMMUTATOR = *
+);
+COMMENT ON OPERATOR *(vector, vector) IS 'Element-wise vector multiplication (Hadamard product)';
 
 -- ============================================================================
 -- DISTANCE FUNCTIONS & OPERATORS
@@ -526,39 +542,39 @@ COMMENT ON FUNCTION vector_to_binary IS 'Convert vector to binary (32x compressi
 CREATE FUNCTION binary_quantize(vector) RETURNS bit
     AS 'MODULE_PATHNAME', 'binary_quantize'
     LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
-COMMENT ON FUNCTION binary_quantize IS 'Convert vector to bit type via binary quantization (pgvector compatibility)';
+COMMENT ON FUNCTION binary_quantize IS 'Convert vector to bit type via binary quantization (past compatibility)';
 
--- Bit type support for binary vectors (pgvector compatibility)
+-- Bit type support for binary vectors (past compatibility)
 CREATE FUNCTION vector_to_bit(vector) RETURNS bit
     AS 'MODULE_PATHNAME', 'vector_to_bit'
     LANGUAGE C IMMUTABLE STRICT;
-COMMENT ON FUNCTION vector_to_bit IS 'Convert vector to PostgreSQL bit type (pgvector compatibility)';
+COMMENT ON FUNCTION vector_to_bit IS 'Convert vector to PostgreSQL bit type (past compatibility)';
 
 CREATE FUNCTION bit_to_vector(bit) RETURNS vector
     AS 'MODULE_PATHNAME', 'bit_to_vector'
     LANGUAGE C IMMUTABLE STRICT;
 COMMENT ON FUNCTION bit_to_vector IS 'Convert PostgreSQL bit type to vector';
 
--- Type conversion functions (pgvector compatibility)
+-- Type conversion functions (past compatibility)
 CREATE FUNCTION vector_to_halfvec(vector) RETURNS halfvec
     AS 'MODULE_PATHNAME', 'vector_to_halfvec'
     LANGUAGE C IMMUTABLE STRICT;
-COMMENT ON FUNCTION vector_to_halfvec IS 'Convert vector to halfvec (pgvector compatible)';
+COMMENT ON FUNCTION vector_to_halfvec IS 'Convert vector to halfvec (compatible)';
 
 CREATE FUNCTION halfvec_to_vector(halfvec) RETURNS vector
     AS 'MODULE_PATHNAME', 'halfvec_to_vector'
     LANGUAGE C IMMUTABLE STRICT;
-COMMENT ON FUNCTION halfvec_to_vector IS 'Convert halfvec to vector (pgvector compatible)';
+COMMENT ON FUNCTION halfvec_to_vector IS 'Convert halfvec to vector (compatible)';
 
 CREATE FUNCTION vector_to_sparsevec(vector) RETURNS sparsevec
     AS 'MODULE_PATHNAME', 'vector_to_sparsevec'
     LANGUAGE C IMMUTABLE STRICT;
-COMMENT ON FUNCTION vector_to_sparsevec IS 'Convert vector to sparsevec, storing only non-zero values (pgvector compatible)';
+COMMENT ON FUNCTION vector_to_sparsevec IS 'Convert vector to sparsevec, storing only non-zero values (compatible)';
 
 CREATE FUNCTION sparsevec_to_vector(sparsevec) RETURNS vector
     AS 'MODULE_PATHNAME', 'sparsevec_to_vector'
     LANGUAGE C IMMUTABLE STRICT;
-COMMENT ON FUNCTION sparsevec_to_vector IS 'Convert sparsevec to vector (pgvector compatible)';
+COMMENT ON FUNCTION sparsevec_to_vector IS 'Convert sparsevec to vector (compatible)';
 
 CREATE FUNCTION binary_hamming_distance(bytea, bytea) RETURNS integer
     AS 'MODULE_PATHNAME', 'binary_hamming_distance'
@@ -2163,7 +2179,7 @@ CREATE FUNCTION vector_where(vector, vector, real) RETURNS vector
 COMMENT ON FUNCTION vector_where IS 'Conditional vector assignment: where(condition, value_if_true, value_if_false)';
 
 -- =============================================================================
--- Advanced Vector Operations (Superior to pgvector)
+-- Advanced Vector Operations (Superior to other extensions)
 -- =============================================================================
 
 -- Element access and manipulation
@@ -2315,7 +2331,7 @@ CREATE FUNCTION vector_hash(vector) RETURNS integer
     LANGUAGE C IMMUTABLE STRICT;
 COMMENT ON FUNCTION vector_hash IS 'Hash function for vector type (supports hash joins)';
 
--- Vector Comparison Operators (pgvector compatibility)
+-- Vector Comparison Operators (past compatibility)
 CREATE OPERATOR = (
     LEFTARG = vector,
     RIGHTARG = vector,
@@ -2389,6 +2405,26 @@ CREATE FUNCTION halfvec_ne(halfvec, halfvec) RETURNS boolean
     LANGUAGE C IMMUTABLE STRICT;
 COMMENT ON FUNCTION halfvec_ne IS 'Halfvec inequality comparison';
 
+CREATE FUNCTION halfvec_lt(halfvec, halfvec) RETURNS bool
+    AS 'MODULE_PATHNAME', 'halfvec_lt'
+    LANGUAGE C IMMUTABLE STRICT;
+COMMENT ON FUNCTION halfvec_lt IS 'Halfvec less than comparison (lexicographic)';
+
+CREATE FUNCTION halfvec_le(halfvec, halfvec) RETURNS bool
+    AS 'MODULE_PATHNAME', 'halfvec_le'
+    LANGUAGE C IMMUTABLE STRICT;
+COMMENT ON FUNCTION halfvec_le IS 'Halfvec less than or equal comparison (lexicographic)';
+
+CREATE FUNCTION halfvec_gt(halfvec, halfvec) RETURNS bool
+    AS 'MODULE_PATHNAME', 'halfvec_gt'
+    LANGUAGE C IMMUTABLE STRICT;
+COMMENT ON FUNCTION halfvec_gt IS 'Halfvec greater than comparison (lexicographic)';
+
+CREATE FUNCTION halfvec_ge(halfvec, halfvec) RETURNS bool
+    AS 'MODULE_PATHNAME', 'halfvec_ge'
+    LANGUAGE C IMMUTABLE STRICT;
+COMMENT ON FUNCTION halfvec_ge IS 'Halfvec greater than or equal comparison (lexicographic)';
+
 CREATE FUNCTION halfvec_hash(halfvec) RETURNS integer
     AS 'MODULE_PATHNAME', 'halfvec_hash'
     LANGUAGE C IMMUTABLE STRICT;
@@ -2413,6 +2449,34 @@ CREATE OPERATOR <> (
     NEGATOR = =
 );
 COMMENT ON OPERATOR <>(halfvec, halfvec) IS 'Halfvec inequality operator';
+
+CREATE OPERATOR < (
+    LEFTARG = halfvec,
+    RIGHTARG = halfvec,
+    PROCEDURE = halfvec_lt
+);
+COMMENT ON OPERATOR <(halfvec, halfvec) IS 'Halfvec less than operator (lexicographic)';
+
+CREATE OPERATOR <= (
+    LEFTARG = halfvec,
+    RIGHTARG = halfvec,
+    PROCEDURE = halfvec_le
+);
+COMMENT ON OPERATOR <=(halfvec, halfvec) IS 'Halfvec less than or equal operator (lexicographic)';
+
+CREATE OPERATOR > (
+    LEFTARG = halfvec,
+    RIGHTARG = halfvec,
+    PROCEDURE = halfvec_gt
+);
+COMMENT ON OPERATOR >(halfvec, halfvec) IS 'Halfvec greater than operator (lexicographic)';
+
+CREATE OPERATOR >= (
+    LEFTARG = halfvec,
+    RIGHTARG = halfvec,
+    PROCEDURE = halfvec_ge
+);
+COMMENT ON OPERATOR >=(halfvec, halfvec) IS 'Halfvec greater than or equal operator (lexicographic)';
 
 -- Comparison operators for sparsevec type
 CREATE FUNCTION sparsevec_eq(sparsevec, sparsevec) RETURNS boolean
@@ -2472,6 +2536,11 @@ CREATE FUNCTION halfvec_inner_product(halfvec, halfvec) RETURNS real
     LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
 COMMENT ON FUNCTION halfvec_inner_product IS 'Inner product (negative for distance ordering) between halfvec vectors';
 
+CREATE FUNCTION halfvec_l1_distance(halfvec, halfvec) RETURNS real
+    AS 'MODULE_PATHNAME', 'halfvec_l1_distance'
+    LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
+COMMENT ON FUNCTION halfvec_l1_distance IS 'L1 (Manhattan) distance between halfvec vectors';
+
 CREATE FUNCTION l2_norm(halfvec) RETURNS double precision
     AS 'MODULE_PATHNAME', 'halfvec_l2_norm'
     LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
@@ -2504,6 +2573,14 @@ CREATE OPERATOR <#> (
     COMMUTATOR = '<#>'
 );
 
+CREATE OPERATOR <+> (
+    LEFTARG = halfvec,
+    RIGHTARG = halfvec,
+    PROCEDURE = halfvec_l1_distance,
+    COMMUTATOR = '<+>'
+);
+COMMENT ON OPERATOR <+>(halfvec, halfvec) IS 'L1 (Manhattan) distance operator for halfvec';
+
 -- Distance functions for sparsevec type
 CREATE FUNCTION sparsevec_l2_distance(sparsevec, sparsevec) RETURNS real
     AS 'MODULE_PATHNAME', 'sparsevec_l2_distance'
@@ -2520,16 +2597,16 @@ CREATE FUNCTION sparsevec_inner_product(sparsevec, sparsevec) RETURNS real
     LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
 COMMENT ON FUNCTION sparsevec_inner_product IS 'Inner product (negative for distance ordering) between sparsevec vectors';
 
--- Norm functions for sparsevec type (pgvector compatibility)
+-- Norm functions for sparsevec type (past compatibility)
 CREATE FUNCTION sparsevec_l2_norm(sparsevec) RETURNS double precision
     AS 'MODULE_PATHNAME', 'sparsevec_l2_norm'
     LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
-COMMENT ON FUNCTION sparsevec_l2_norm IS 'L2 (Euclidean) norm of sparsevec vector (pgvector compatible)';
+COMMENT ON FUNCTION sparsevec_l2_norm IS 'L2 (Euclidean) norm of sparsevec vector (compatible)';
 
 CREATE FUNCTION sparsevec_l2_normalize(sparsevec) RETURNS sparsevec
     AS 'MODULE_PATHNAME', 'sparsevec_l2_normalize'
     LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
-COMMENT ON FUNCTION sparsevec_l2_normalize IS 'Normalize sparsevec vector with L2 norm (pgvector compatible)';
+COMMENT ON FUNCTION sparsevec_l2_normalize IS 'Normalize sparsevec vector with L2 norm (compatible)';
 
 -- Distance operators for sparsevec type (defined after functions)
 CREATE OPERATOR <-> (
@@ -2592,7 +2669,7 @@ CREATE OPERATOR <~> (
     PROCEDURE = bit_hamming_distance,
     COMMUTATOR = '<~>'
 );
-COMMENT ON OPERATOR <~>(bit, bit) IS 'Hamming distance operator for bit vectors (pgvector compatibility)';
+COMMENT ON OPERATOR <~>(bit, bit) IS 'Hamming distance operator for bit vectors (past compatibility)';
 
 CREATE OPERATOR <%> (
     LEFTARG = bit,
@@ -2903,32 +2980,32 @@ CREATE OPERATOR <=> (
 );
 COMMENT ON OPERATOR <=>(vector, vector) IS 'Cosine distance operator';
 
--- L1 (Manhattan/Taxicab) Distance Operator <+> (pgvector compatibility)
+-- L1 (Manhattan/Taxicab) Distance Operator <+> (past compatibility)
 CREATE OPERATOR <+> (
     LEFTARG = vector,
     RIGHTARG = vector,
     PROCEDURE = vector_l1_distance,
     COMMUTATOR = '<+>'
 );
-COMMENT ON OPERATOR <+>(vector, vector) IS 'L1 (Manhattan/Taxicab) distance operator (pgvector compatible)';
+COMMENT ON OPERATOR <+>(vector, vector) IS 'L1 (Manhattan/Taxicab) distance operator (compatible)';
 
--- Hamming Distance Operator <~> (pgvector compatibility)
+-- Hamming Distance Operator <~> (past compatibility)
 CREATE OPERATOR <~> (
     LEFTARG = vector,
     RIGHTARG = vector,
     PROCEDURE = vector_hamming_distance,
     COMMUTATOR = '<~>'
 );
-COMMENT ON OPERATOR <~>(vector, vector) IS 'Hamming distance operator (pgvector compatible)';
+COMMENT ON OPERATOR <~>(vector, vector) IS 'Hamming distance operator (compatible)';
 
--- Jaccard Distance Operator <*~*> (pgvector compatibility)
+-- Jaccard Distance Operator <*~*> (past compatibility)
 CREATE OPERATOR <*~*> (
     LEFTARG = vector,
     RIGHTARG = vector,
     PROCEDURE = vector_jaccard_distance,
     COMMUTATOR = '<*~*>'
 );
-COMMENT ON OPERATOR <*~*>(vector, vector) IS 'Jaccard distance operator (pgvector compatible)';
+COMMENT ON OPERATOR <*~*>(vector, vector) IS 'Jaccard distance operator (compatible)';
 
 -- Operator class comparison functions
 CREATE FUNCTION vector_l2_less(vector, vector, vector) RETURNS boolean
@@ -5281,6 +5358,18 @@ CREATE FUNCTION create_policy(
     AS 'MODULE_PATHNAME', 'create_policy'
     LANGUAGE C VOLATILE;
 COMMENT ON FUNCTION create_policy IS 'Create row-level security policy for vector table';
+
+-- Hook functions
+CREATE FUNCTION register_custom_operator(
+    operator_name text,
+    function_name text,
+    left_type regtype DEFAULT NULL,
+    right_type regtype DEFAULT NULL,
+    return_type regtype DEFAULT NULL
+) RETURNS boolean
+    AS 'MODULE_PATHNAME', 'register_custom_operator'
+    LANGUAGE C VOLATILE;
+COMMENT ON FUNCTION register_custom_operator IS 'Register custom operator for vector types';
 
 -- Distributed functions
 CREATE FUNCTION federated_vector_query(

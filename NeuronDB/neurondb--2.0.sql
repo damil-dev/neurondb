@@ -363,6 +363,13 @@ CREATE FUNCTION vector_concat(vector, vector) RETURNS vector
     LANGUAGE C IMMUTABLE STRICT;
 COMMENT ON FUNCTION vector_concat IS 'Concatenate two vectors';
 
+CREATE OPERATOR || (
+    LEFTARG = vector,
+    RIGHTARG = vector,
+    PROCEDURE = vector_concat
+);
+COMMENT ON OPERATOR ||(vector, vector) IS 'Vector concatenation operator';
+
 -- ============================================================================
 -- VECTOR ARITHMETIC OPERATORS
 -- ============================================================================
@@ -399,6 +406,9 @@ CREATE OPERATOR * (
     COMMUTATOR = *
 );
 
+-- Element-wise vector multiplication (Hadamard product)
+-- Note: Operator created after function definition (see line ~2302)
+
 CREATE FUNCTION vector_div(vector, double precision) RETURNS vector
     AS 'MODULE_PATHNAME', 'vector_div_scalar'
     LANGUAGE C IMMUTABLE STRICT;
@@ -433,6 +443,18 @@ CREATE FUNCTION vector_inner_product(vector, vector) RETURNS real
     AS 'MODULE_PATHNAME', 'vector_inner_product'
     LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
 COMMENT ON FUNCTION vector_inner_product IS 'Negative inner product (for ordering)';
+
+-- vector_l2_squared_distance: Optimized L2 distance without sqrt (for index optimization)
+CREATE FUNCTION vector_l2_squared_distance(vector, vector) RETURNS double precision
+    AS '$libdir/neurondb', 'vector_l2_squared_distance'
+    LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
+COMMENT ON FUNCTION vector_l2_squared_distance IS 'L2 squared distance (without sqrt) for index optimization';
+
+-- vector_negative_inner_product: Negative inner product (for index optimization)
+CREATE FUNCTION vector_negative_inner_product(vector, vector) RETURNS double precision
+    AS '$libdir/neurondb', 'vector_negative_inner_product'
+    LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
+COMMENT ON FUNCTION vector_negative_inner_product IS 'Negative inner product for index optimization';
 
 -- Dot product (returns positive dot product, not negative like vector_inner_product)
 CREATE FUNCTION vector_dot(vector, vector) RETURNS real
@@ -2276,6 +2298,15 @@ CREATE FUNCTION vector_hadamard(vector, vector) RETURNS vector
     LANGUAGE C IMMUTABLE STRICT;
 COMMENT ON FUNCTION vector_hadamard IS 'Hadamard (element-wise) product';
 
+-- Element-wise vector multiplication operator (created after function)
+CREATE OPERATOR * (
+    LEFTARG = vector,
+    RIGHTARG = vector,
+    PROCEDURE = vector_hadamard,
+    COMMUTATOR = *
+);
+COMMENT ON OPERATOR *(vector, vector) IS 'Element-wise vector multiplication (Hadamard product)';
+
 CREATE FUNCTION vector_divide(vector, vector) RETURNS vector
     AS 'MODULE_PATHNAME', 'vector_divide'
     LANGUAGE C IMMUTABLE STRICT;
@@ -2358,6 +2389,21 @@ CREATE AGGREGATE vector_sum(vector) (
     FINALFUNC = vector_sum_finalfn
 );
 COMMENT ON AGGREGATE vector_sum(vector) IS 'Sum of vectors (element-wise sum)';
+
+-- Standard SQL aggregate functions for vector type
+CREATE AGGREGATE avg(vector) (
+    SFUNC = vector_avg_transfn,
+    STYPE = internal,
+    FINALFUNC = vector_avg_finalfn
+);
+COMMENT ON AGGREGATE avg(vector) IS 'Average of vectors (element-wise mean)';
+
+CREATE AGGREGATE sum(vector) (
+    SFUNC = vector_sum_transfn,
+    STYPE = internal,
+    FINALFUNC = vector_sum_finalfn
+);
+COMMENT ON AGGREGATE sum(vector) IS 'Sum of vectors (element-wise sum)';
 
 -- Vector comparison
 CREATE FUNCTION vector_eq(vector, vector) RETURNS boolean
@@ -2450,6 +2496,26 @@ CREATE FUNCTION halfvec_ne(halfvec, halfvec) RETURNS boolean
     LANGUAGE C IMMUTABLE STRICT;
 COMMENT ON FUNCTION halfvec_ne IS 'Halfvec inequality comparison';
 
+CREATE FUNCTION halfvec_lt(halfvec, halfvec) RETURNS bool
+    AS 'MODULE_PATHNAME', 'halfvec_lt'
+    LANGUAGE C IMMUTABLE STRICT;
+COMMENT ON FUNCTION halfvec_lt IS 'Halfvec less than comparison (lexicographic)';
+
+CREATE FUNCTION halfvec_le(halfvec, halfvec) RETURNS bool
+    AS 'MODULE_PATHNAME', 'halfvec_le'
+    LANGUAGE C IMMUTABLE STRICT;
+COMMENT ON FUNCTION halfvec_le IS 'Halfvec less than or equal comparison (lexicographic)';
+
+CREATE FUNCTION halfvec_gt(halfvec, halfvec) RETURNS bool
+    AS 'MODULE_PATHNAME', 'halfvec_gt'
+    LANGUAGE C IMMUTABLE STRICT;
+COMMENT ON FUNCTION halfvec_gt IS 'Halfvec greater than comparison (lexicographic)';
+
+CREATE FUNCTION halfvec_ge(halfvec, halfvec) RETURNS bool
+    AS 'MODULE_PATHNAME', 'halfvec_ge'
+    LANGUAGE C IMMUTABLE STRICT;
+COMMENT ON FUNCTION halfvec_ge IS 'Halfvec greater than or equal comparison (lexicographic)';
+
 CREATE FUNCTION halfvec_hash(halfvec) RETURNS integer
     AS 'MODULE_PATHNAME', 'halfvec_hash'
     LANGUAGE C IMMUTABLE STRICT;
@@ -2474,6 +2540,34 @@ CREATE OPERATOR <> (
     NEGATOR = =
 );
 COMMENT ON OPERATOR <>(halfvec, halfvec) IS 'Halfvec inequality operator';
+
+CREATE OPERATOR < (
+    LEFTARG = halfvec,
+    RIGHTARG = halfvec,
+    PROCEDURE = halfvec_lt
+);
+COMMENT ON OPERATOR <(halfvec, halfvec) IS 'Halfvec less than operator (lexicographic)';
+
+CREATE OPERATOR <= (
+    LEFTARG = halfvec,
+    RIGHTARG = halfvec,
+    PROCEDURE = halfvec_le
+);
+COMMENT ON OPERATOR <=(halfvec, halfvec) IS 'Halfvec less than or equal operator (lexicographic)';
+
+CREATE OPERATOR > (
+    LEFTARG = halfvec,
+    RIGHTARG = halfvec,
+    PROCEDURE = halfvec_gt
+);
+COMMENT ON OPERATOR >(halfvec, halfvec) IS 'Halfvec greater than operator (lexicographic)';
+
+CREATE OPERATOR >= (
+    LEFTARG = halfvec,
+    RIGHTARG = halfvec,
+    PROCEDURE = halfvec_ge
+);
+COMMENT ON OPERATOR >=(halfvec, halfvec) IS 'Halfvec greater than or equal operator (lexicographic)';
 
 -- Arithmetic operators for halfvec type
 CREATE FUNCTION halfvec_add(halfvec, halfvec) RETURNS halfvec
@@ -2634,6 +2728,11 @@ CREATE FUNCTION halfvec_inner_product(halfvec, halfvec) RETURNS real
     LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
 COMMENT ON FUNCTION halfvec_inner_product IS 'Inner product (negative for distance ordering) between halfvec vectors';
 
+CREATE FUNCTION halfvec_l1_distance(halfvec, halfvec) RETURNS real
+    AS 'MODULE_PATHNAME', 'halfvec_l1_distance'
+    LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
+COMMENT ON FUNCTION halfvec_l1_distance IS 'L1 (Manhattan) distance between halfvec vectors';
+
 CREATE FUNCTION l2_norm(halfvec) RETURNS double precision
     AS 'MODULE_PATHNAME', 'halfvec_l2_norm'
     LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
@@ -2665,6 +2764,14 @@ CREATE OPERATOR <#> (
     PROCEDURE = halfvec_inner_product,
     COMMUTATOR = '<#>'
 );
+
+CREATE OPERATOR <+> (
+    LEFTARG = halfvec,
+    RIGHTARG = halfvec,
+    PROCEDURE = halfvec_l1_distance,
+    COMMUTATOR = '<+>'
+);
+COMMENT ON OPERATOR <+>(halfvec, halfvec) IS 'L1 (Manhattan) distance operator for halfvec';
 
 -- Distance functions for sparsevec type
 CREATE FUNCTION sparsevec_l2_distance(sparsevec, sparsevec) RETURNS real
@@ -5647,6 +5754,18 @@ CREATE FUNCTION create_policy(
     AS 'MODULE_PATHNAME', 'create_policy'
     LANGUAGE C VOLATILE;
 COMMENT ON FUNCTION create_policy IS 'Create row-level security policy for vector table';
+
+-- Hook functions
+CREATE FUNCTION register_custom_operator(
+    operator_name text,
+    function_name text,
+    left_type regtype DEFAULT NULL,
+    right_type regtype DEFAULT NULL,
+    return_type regtype DEFAULT NULL
+) RETURNS boolean
+    AS 'MODULE_PATHNAME', 'register_custom_operator'
+    LANGUAGE C VOLATILE;
+COMMENT ON FUNCTION register_custom_operator IS 'Register custom operator for vector types';
 
 -- Distributed functions
 CREATE FUNCTION federated_vector_query(
