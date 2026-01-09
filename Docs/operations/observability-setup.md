@@ -46,52 +46,52 @@ Pre-built dashboards for:
 
 ## Setup
 
-### Step 1: Start Prometheus
+### Quick Start - Docker Compose
 
 ```bash
-# Using Docker Compose
-docker compose -f docker-compose.observability.yml up -d prometheus
+# Start the complete observability stack
+docker compose -f docker-compose.observability.yml up -d
+
+# This starts:
+# - Prometheus (localhost:9090)
+# - Grafana (localhost:3001, admin/admin)
+# - Alertmanager (localhost:9093)
+# - Postgres Exporter (localhost:9187)
+# - Node Exporter (localhost:9100)
+# - cAdvisor (localhost:8080)
+# - Jaeger (localhost:16686)
 ```
 
-### Step 2: Start Grafana
+### Quick Start - Helm/Kubernetes
 
 ```bash
-docker compose -f docker-compose.observability.yml up -d grafana
+# Install with monitoring enabled
+helm install neurondb ./helm/neurondb \
+  --set monitoring.enabled=true \
+  --set monitoring.prometheus.enabled=true \
+  --set monitoring.grafana.enabled=true \
+  --set monitoring.prometheus.alertmanager.enabled=true
+
+# Access dashboards
+kubectl port-forward svc/neurondb-grafana 3001:3000
+kubectl port-forward svc/neurondb-prometheus 9090:9090
 ```
-
-### Step 3: Configure Services
-
-Set environment variables:
-```bash
-export ENABLE_METRICS=true
-export METRICS_PORT=9090
-export ENABLE_TRACING=true
-export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
-```
-
-### Step 4: Import Dashboards
-
-1. Access Grafana: `http://localhost:3001`
-2. Import dashboards from `grafana/dashboards/`
-3. Configure data sources (Prometheus, Jaeger)
 
 ## Metrics
 
 ### NeuronAgent Metrics
 
-- `neurondb_agent_requests_total` - Total requests
-- `neurondb_agent_request_duration_seconds` - Request duration
-- `neurondb_agent_agents_active` - Active agents
-- `neurondb_agent_sessions_active` - Active sessions
-- `neurondb_agent_tool_calls_total` - Tool calls
-- `neurondb_agent_errors_total` - Error count
+- `neurondb_agent_http_requests_total` - Total HTTP requests (with `method`, `endpoint`, `status` labels)
+- `neurondb_agent_http_request_duration_seconds` - Request duration histogram
+- `neurondb_agent_executions_total` - Agent execution count
+- `neurondb_agent_llm_calls_total` - LLM API calls
+- `neurondb_agent_tool_executions_total` - Tool execution count
 
 ### NeuronDesktop Metrics
 
-- `neurondesktop_requests_total` - Total requests
-- `neurondesktop_request_duration_seconds` - Request duration
-- `neurondesktop_profiles_active` - Active profiles
-- `neurondesktop_errors_total` - Error count
+- `neurondesktop_api_http_requests_total` - Total HTTP requests (with `method`, `endpoint`, `status` labels)
+- `neurondesktop_api_http_request_duration_seconds` - Request duration histogram
+- `neurondesktop_api_active_connections` - Active connections by type
 
 ### NeuronDB Metrics
 
@@ -145,25 +145,26 @@ HTTP Request → NeuronDesktop API
 
 ## Alerts
 
+Alerts are configured in `prometheus/alerts.yml` with proper metric names:
+
 ### Critical Alerts
 
-- Service down
-- High error rate (> 5%)
-- High latency (p95 > 1s)
-- Database connection failures
+- **ServiceDown**: Service unavailable (checks `up` metric)
+- **NeuronAgentHighErrorRate**: Error rate > 5% (uses `status="5xx"` label)
+- **NeuronDesktopHighErrorRate**: Error rate > 5% (uses `status="5xx"` label)
+- **NeuronDBConnectionFailure**: Database unreachable
+- **HighCPUUsage**: CPU > 80%
+- **HighMemoryUsage**: Memory > 85%
+- **HighDiskUsage**: Disk > 85%
 
 ### Warning Alerts
 
-- Elevated error rate (> 1%)
-- Slow queries (> 500ms)
-- High memory usage (> 80%)
+- **NeuronAgentHighLatency**: P95 latency > 1s
+- **NeuronDesktopHighLatency**: P95 latency > 1s
 
-## Runbooks
+## Verification
 
-See `runbooks/` directory for operational runbooks:
-- `troubleshooting.md` - Common issues
-- `performance-tuning.md` - Performance optimization
-- `incident-response.md` - Incident handling
+See `prometheus/VERIFICATION.md` for a complete checklist to verify your observability stack.
 
 ## Best Practices
 
@@ -195,6 +196,7 @@ See `runbooks/` directory for operational runbooks:
 2. Use aggregation where possible
 3. Consider reducing label dimensions
 4. Monitor Prometheus memory usage
+
 
 
 

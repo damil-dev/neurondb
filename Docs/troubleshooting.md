@@ -36,9 +36,16 @@ docker logs neurondesk-api
    docker exec neurondb-cpu env | grep POSTGRES
    ```
 
-2. **Check port conflicts**:
+2. **Check port conflicts** (Docker Compose default ports):
    ```bash
-   netstat -tuln | grep -E "5432|8080|8081"
+   # Check if ports are in use
+   netstat -tuln | grep -E "5433|8080|8081|3000"
+   
+   # Or use lsof (macOS/Linux)
+   lsof -i :5433 -i :8080 -i :8081 -i :3000
+   
+   # Or use ss (Linux)
+   ss -tuln | grep -E "5433|8080|8081|3000"
    ```
 
 3. **Check disk space**:
@@ -76,11 +83,12 @@ sudo ufw status
    docker port neurondb-cpu
    ```
 
-3. **Check firewall rules**:
+3. **Check firewall rules** (Docker Compose default ports):
    ```bash
-   sudo ufw allow 5432/tcp
-   sudo ufw allow 8080/tcp
-   sudo ufw allow 8081/tcp
+   sudo ufw allow 5433/tcp  # PostgreSQL (Docker Compose default)
+   sudo ufw allow 8080/tcp  # NeuronAgent
+   sudo ufw allow 8081/tcp  # NeuronDesktop API
+   sudo ufw allow 3000/tcp  # NeuronDesktop UI
    ```
 
 ---
@@ -93,22 +101,45 @@ sudo ufw status
 
 **Diagnosis**:
 ```bash
-# Test connection
-psql -h localhost -U postgres -d postgres
+# Test connection (Docker Compose default)
+psql "postgresql://neurondb:neurondb@localhost:5433/neurondb" -c "SELECT 1;"
+
+# Or using docker compose exec
+docker compose exec neurondb psql -U neurondb -d neurondb -c "SELECT 1;"
 
 # Check PostgreSQL status
-docker exec neurondb-cpu pg_isready
+docker compose exec neurondb pg_isready -U neurondb -d neurondb
+
+# Or check container directly
+docker exec neurondb-cpu pg_isready -U neurondb -d neurondb
 ```
 
 **Solutions**:
-1. **Check credentials**:
+1. **Check credentials** (Docker Compose default):
    ```bash
+   # Default Docker Compose credentials
+   # User: neurondb
+   # Password: neurondb (development only!)
+   # Database: neurondb
+   # Port: 5433 (host), 5432 (container)
+   
+   # Check environment variable
    echo $POSTGRES_PASSWORD
+   
+   # Test with default credentials
+   psql "postgresql://neurondb:neurondb@localhost:5433/neurondb" -c "SELECT current_user;"
    ```
 
 2. **Check PostgreSQL is running**:
    ```bash
+   # Using docker compose
+   docker compose ps neurondb
+   
+   # Check container status
    docker exec neurondb-cpu pg_ctl status
+   
+   # Check health
+   docker compose exec neurondb pg_isready -U neurondb -d neurondb
    ```
 
 3. **Check connection limits**:
@@ -647,6 +678,7 @@ This troubleshooting guide covers the most common issues. For additional help:
 3. Review documentation
 4. Search GitHub issues
 5. Contact support
+
 
 
 

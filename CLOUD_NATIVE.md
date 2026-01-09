@@ -276,20 +276,71 @@ kubectl get events -n neurondb --sort-by='.lastTimestamp'
 # Check logs
 kubectl logs <pod-name> -n neurondb
 
-# Validate chart
-./scripts/validate-helm-chart.sh
+# Validate chart (comprehensive validation)
+./scripts/neurondb-helm.sh validate
+
+# Test chart installation (requires Kubernetes cluster)
+./scripts/neurondb-helm.sh test
+```
+
+## Validation and Testing
+
+### Chart Validation
+
+The Helm chart includes comprehensive validation and testing tools:
+
+```bash
+# Comprehensive validation (schema, templates, references, security)
+./scripts/neurondb-helm.sh validate
+
+# End-to-end installation testing (requires Kubernetes cluster)
+./scripts/neurondb-helm.sh test
+
+# Release automation
+./scripts/neurondb-helm.sh release --version-type [patch|minor|major]
+```
+
+### Example Configurations
+
+Pre-configured example values files are available in `helm/neurondb/examples/`:
+
+- `values-dev.yaml` - Development configuration with minimal resources
+- `values-prod.yaml` - Production configuration with HA and monitoring
+- `values-ha.yaml` - High availability multi-zone configuration
+- `values-external-postgres.yaml` - External PostgreSQL configuration
+- `values-external-monitoring.yaml` - External monitoring stack
+
+Example usage:
+
+```bash
+# Development
+helm install neurondb ./helm/neurondb \
+  --values ./helm/neurondb/examples/values-dev.yaml \
+  --namespace neurondb \
+  --create-namespace
+
+# Production
+helm install neurondb ./helm/neurondb \
+  --values ./helm/neurondb/examples/values-prod.yaml \
+  --namespace neurondb \
+  --create-namespace \
+  --set secrets.postgresPassword="$(openssl rand -base64 32)"
 ```
 
 ## Best Practices
 
-1. **Use Secrets**: Never hardcode passwords in values.yaml
-2. **Enable Monitoring**: Always enable monitoring in production
-3. **Set Resource Limits**: Configure appropriate CPU/memory limits
-4. **Use Storage Classes**: Configure appropriate storage for your cluster
-5. **Enable Network Policies**: For production security
-6. **Use Ingress**: For external access with TLS
-7. **Backup Regularly**: Backup persistent volumes
-8. **Monitor Resources**: Watch CPU, memory, and disk usage
+1. **Use Secrets**: Never hardcode passwords in values.yaml. Use Kubernetes secrets or external secret management.
+2. **Enable Monitoring**: Always enable monitoring in production. Use Prometheus Operator integration for advanced monitoring.
+3. **Set Resource Limits**: Configure appropriate CPU/memory limits based on your workload. See example configurations.
+4. **Use Storage Classes**: Configure appropriate storage for your cluster (fast-ssd for production).
+5. **Enable Network Policies**: For production security, enable network policies to restrict traffic.
+6. **Use Ingress with TLS**: For external access, use Ingress with TLS certificates (cert-manager recommended).
+7. **Backup Regularly**: Configure automated backups to S3/GCS/Azure with appropriate retention policies.
+8. **Monitor Resources**: Watch CPU, memory, and disk usage. Set up alerting via Prometheus.
+9. **Use Priority Classes**: Enable resource governance priority classes for critical workloads.
+10. **Validate Before Deploy**: Always run validation scripts before deploying to production.
+11. **Test Upgrades**: Test chart upgrades in a staging environment before production.
+12. **Enable Pod Disruption Budgets**: Configure PDBs to ensure availability during updates.
 
 ## Documentation
 

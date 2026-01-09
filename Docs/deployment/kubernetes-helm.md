@@ -110,8 +110,11 @@ kubectl get pvc -n neurondb
 # Run Helm test (if available)
 helm test neurondb -n neurondb
 
-# Validate chart
-./scripts/validate-helm-chart.sh
+# Validate chart (comprehensive validation)
+./scripts/neurondb-helm.sh validate
+
+# Test chart installation end-to-end (requires Kubernetes cluster or kind)
+./scripts/neurondb-helm.sh test
 ```
 
 ## Installation

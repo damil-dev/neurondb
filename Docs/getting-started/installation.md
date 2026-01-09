@@ -98,8 +98,17 @@ cd NeuronMCP
 go build ./cmd/neurondb-mcp
 
 # Run with environment variables (see `docker-compose.yml` for the env names)
+# For Docker Compose setup (connecting from host):
 export NEURONDB_HOST=localhost
-export NEURONDB_PORT=5432
+export NEURONDB_PORT=5433        # Docker Compose default host port
+export NEURONDB_DATABASE=neurondb
+export NEURONDB_USER=neurondb
+export NEURONDB_PASSWORD=neurondb
+./neurondb-mcp
+
+# For native PostgreSQL or inside Docker network:
+export NEURONDB_HOST=localhost
+export NEURONDB_PORT=5432        # Native PostgreSQL default port
 export NEURONDB_DATABASE=neurondb
 ./neurondb-mcp
 ```

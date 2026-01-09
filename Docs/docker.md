@@ -71,9 +71,12 @@ make logs
 
 ### Service Communication
 
-- **NeuronAgent → NeuronDB**: Connects via `neurondb-cpu:5432` (container name)
-- **NeuronMCP → NeuronDB**: Connects via `neurondb-cpu:5432` (container name)
-- **External Access**: Use host ports (`localhost:5433`, `localhost:8080`)
+- **NeuronAgent → NeuronDB**: Connects via service name `neurondb:5432` (internal Docker network)
+- **NeuronMCP → NeuronDB**: Connects via service name `neurondb:5432` (internal Docker network)
+- **NeuronDesktop → NeuronDB**: Connects via service name `neurondb:5432` (internal Docker network)
+- **External Access**: Use host ports (`localhost:5433` for PostgreSQL, `localhost:8080` for NeuronAgent, `localhost:8081` for NeuronDesktop API, `localhost:3000` for NeuronDesktop UI)
+
+**Important:** Inside Docker network, services use the service name (`neurondb`) not container name (`neurondb-cpu`). From your host machine, use `localhost` with the mapped ports.
 
 ## Configuration
 
@@ -95,8 +98,8 @@ POSTGRES_DB=neurondb
 POSTGRES_PORT=5433
 
 # NeuronAgent Configuration (auto-connects to NeuronDB)
-DB_HOST=neurondb-cpu        # Container name for automatic connection
-DB_PORT=5432                # Internal container port
+DB_HOST=neurondb            # Service name in Docker network (not container name)
+DB_PORT=5432                # Internal container port (not host port 5433)
 DB_NAME=neurondb
 DB_USER=neurondb
 DB_PASSWORD=neurondb
