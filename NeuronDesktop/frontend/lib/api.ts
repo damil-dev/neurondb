@@ -547,5 +547,44 @@ export const requestLogsAPI = {
     api.get(`/profiles/${profileId}/logs/export?format=${format}`, { responseType: 'blob' }),
 }
 
+export interface DashboardStats {
+  system_metrics: Record<string, any>
+  neurondb_stats?: {
+    collections_count: number
+    total_vectors: number
+    indexes_count: number
+    query_count: number
+    avg_query_time: number
+  }
+  neuronagent_stats?: {
+    agents_count: number
+    sessions_count: number
+    messages_count: number
+    avg_response_time: number
+  }
+  mcp_stats?: {
+    tools_count: number
+    tools_called: number
+    active_connections: number
+  }
+  recent_activity: Array<{
+    id: string
+    type: string
+    description: string
+    timestamp: string
+    user?: string
+  }>
+  health_status: {
+    status: string
+    components: Record<string, string>
+    last_checked: string
+  }
+}
+
+export const dashboardAPI = {
+  getDashboard: (profileId: string) => 
+    api.get<DashboardStats>(`/profiles/${profileId}/dashboard`),
+}
+
 export default api
 

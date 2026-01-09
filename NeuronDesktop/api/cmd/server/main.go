@@ -21,6 +21,7 @@ import (
 	"github.com/neurondb/NeuronDesktop/api/internal/handlers"
 	"github.com/neurondb/NeuronDesktop/api/internal/initialization"
 	"github.com/neurondb/NeuronDesktop/api/internal/logging"
+	"github.com/neurondb/NeuronDesktop/api/internal/metrics"
 	"github.com/neurondb/NeuronDesktop/api/internal/middleware"
 	"github.com/neurondb/NeuronDesktop/api/internal/session"
 )
@@ -183,6 +184,7 @@ func main() {
 
 	router.Use(middleware.RequestIDMiddleware())
 	router.Use(middleware.RecoveryMiddleware(logger))
+	router.Use(middleware.PrometheusMetricsMiddleware)
 	router.Use(middleware.LoggingMiddleware(logger, queries))
 
 	router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -193,6 +195,9 @@ func main() {
 			"timestamp": time.Now().UTC().Format(time.RFC3339),
 		})
 	}).Methods("GET")
+
+	// Prometheus metrics endpoint (no auth required)
+	router.Handle("/metrics", metrics.Handler()).Methods("GET")
 
 	systemMetricsRouter := router.PathPrefix("/api/v1/system-metrics").Subrouter()
 	systemMetricsRouter.HandleFunc("", systemMetricsHandlers.GetSystemMetrics).Methods("GET")
@@ -295,6 +300,12 @@ func main() {
 	apiRouter.HandleFunc("/profiles/validate", profileHandlers.ValidateProfile).Methods("POST")
 	apiRouter.HandleFunc("/profiles/{id}/health", profileHandlers.HealthCheckProfile).Methods("GET")
 
+	dashboardHandlers := handlers.NewDashboardHandlers(database)
+	apiRouter.HandleFunc("/profiles/{profile_id}/dashboard", dashboardHandlers.GetDashboard).Methods("GET")
+
+	unifiedQueryHandlers := handlers.NewUnifiedQueryHandlers(queries)
+	apiRouter.HandleFunc("/profiles/{profile_id}/unified-query", unifiedQueryHandlers.ExecuteUnifiedQuery).Methods("POST")
+
 	apiRouter.HandleFunc("/mcp/connections", mcpHandlers.ListConnections).Methods("GET")
 	apiRouter.HandleFunc("/mcp/test", mcpHandlers.TestMCPConfig).Methods("POST")
 	apiRouter.HandleFunc("/profiles/{profile_id}/mcp/tools", mcpHandlers.ListTools).Methods("GET")
@@ -347,8 +358,9 @@ func main() {
 	apiRouter.HandleFunc("/profiles/{profile_id}/models/default", modelConfigHandlers.GetDefaultModelConfig).Methods("GET")
 	apiRouter.HandleFunc("/profiles/{profile_id}/models/{id}/set-default", modelConfigHandlers.SetDefaultModelConfig).Methods("POST")
 
-	apiRouter.HandleFunc("/metrics", metricsHandlers.GetMetrics).Methods("GET")
-	apiRouter.HandleFunc("/metrics/reset", metricsHandlers.ResetMetrics).Methods("POST")
+	// JSON stats endpoint (moved from /metrics to avoid confusion with Prometheus)
+	apiRouter.HandleFunc("/stats", metricsHandlers.GetMetrics).Methods("GET")
+	apiRouter.HandleFunc("/stats/reset", metricsHandlers.ResetMetrics).Methods("POST")
 
 	apiRouter.HandleFunc("/profiles/{profile_id}/analytics", analyticsHandlers.GetAnalytics).Methods("GET")
 	apiRouter.HandleFunc("/analytics", analyticsHandlers.GetAnalytics).Methods("GET")

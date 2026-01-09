@@ -1161,3 +1161,194 @@ func (q *Queries) CreateMCPMessage(ctx context.Context, threadID, role, content,
 
 	return &msg, nil
 }
+
+/* Organization Queries */
+
+/* CreateOrganization creates a new organization */
+func (q *Queries) CreateOrganization(ctx context.Context, org *Organization) error {
+	settingsJSON, _ := json.Marshal(org.Settings)
+	query := `
+		INSERT INTO organizations (id, name, slug, description, settings, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7)
+	`
+	_, err := q.db.ExecContext(ctx, query, org.ID, org.Name, org.Slug, org.Description, settingsJSON, org.CreatedAt, org.UpdatedAt)
+	return err
+}
+
+/* GetOrganization gets an organization by ID */
+func (q *Queries) GetOrganization(ctx context.Context, id string) (*Organization, error) {
+	var org Organization
+	var settingsJSON []byte
+	query := `
+		SELECT id, name, slug, description, settings, created_at, updated_at
+		FROM organizations
+		WHERE id = $1
+	`
+	err := q.db.QueryRowContext(ctx, query, id).Scan(
+		&org.ID, &org.Name, &org.Slug, &org.Description, &settingsJSON, &org.CreatedAt, &org.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	if len(settingsJSON) > 0 {
+		json.Unmarshal(settingsJSON, &org.Settings)
+	}
+	return &org, nil
+}
+
+/* ListOrganizationsForUser lists organizations for a user */
+func (q *Queries) ListOrganizationsForUser(ctx context.Context, userID string) ([]Organization, error) {
+	query := `
+		SELECT o.id, o.name, o.slug, o.description, o.settings, o.created_at, o.updated_at
+		FROM organizations o
+		JOIN organization_members om ON o.id = om.organization_id
+		WHERE om.user_id = $1
+		ORDER BY o.created_at DESC
+	`
+	rows, err := q.db.QueryContext(ctx, query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var orgs []Organization
+	for rows.Next() {
+		var org Organization
+		var settingsJSON []byte
+		if err := rows.Scan(&org.ID, &org.Name, &org.Slug, &org.Description, &settingsJSON, &org.CreatedAt, &org.UpdatedAt); err != nil {
+			continue
+		}
+		if len(settingsJSON) > 0 {
+			json.Unmarshal(settingsJSON, &org.Settings)
+		}
+		orgs = append(orgs, org)
+	}
+	return orgs, rows.Err()
+}
+
+/* UpdateOrganization updates an organization */
+func (q *Queries) UpdateOrganization(ctx context.Context, org *Organization) error {
+	settingsJSON, _ := json.Marshal(org.Settings)
+	query := `
+		UPDATE organizations
+		SET name = $2, description = $3, settings = $4::jsonb, updated_at = $5
+		WHERE id = $1
+	`
+	_, err := q.db.ExecContext(ctx, query, org.ID, org.Name, org.Description, settingsJSON, org.UpdatedAt)
+	return err
+}
+
+/* DeleteOrganization deletes an organization */
+func (q *Queries) DeleteOrganization(ctx context.Context, id string) error {
+	query := `DELETE FROM organizations WHERE id = $1`
+	_, err := q.db.ExecContext(ctx, query, id)
+	return err
+}
+
+/* CreateOrganizationMember creates a new organization member */
+func (q *Queries) CreateOrganizationMember(ctx context.Context, member *OrganizationMember) error {
+	query := `
+		INSERT INTO organization_members (id, organization_id, user_id, role, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6)
+	`
+	_, err := q.db.ExecContext(ctx, query, member.ID, member.OrganizationID, member.UserID, member.Role, member.CreatedAt, member.UpdatedAt)
+	return err
+}
+
+/* GetOrganizationMember gets a member by organization and user ID */
+func (q *Queries) GetOrganizationMember(ctx context.Context, orgID, userID string) (*OrganizationMember, error) {
+	var member OrganizationMember
+	query := `
+		SELECT id, organization_id, user_id, role, created_at, updated_at
+		FROM organization_members
+		WHERE organization_id = $1 AND user_id = $2
+	`
+	err := q.db.QueryRowContext(ctx, query, orgID, userID).Scan(
+		&member.ID, &member.OrganizationID, &member.UserID, &member.Role, &member.CreatedAt, &member.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return &member, nil
+}
+
+/* GetOrganizationMemberByID gets a member by ID */
+func (q *Queries) GetOrganizationMemberByID(ctx context.Context, memberID string) (*OrganizationMember, error) {
+	var member OrganizationMember
+	query := `
+		SELECT id, organization_id, user_id, role, created_at, updated_at
+		FROM organization_members
+		WHERE id = $1
+	`
+	err := q.db.QueryRowContext(ctx, query, memberID).Scan(
+		&member.ID, &member.OrganizationID, &member.UserID, &member.Role, &member.CreatedAt, &member.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return &member, nil
+}
+
+/* ListOrganizationMembers lists all members of an organization */
+func (q *Queries) ListOrganizationMembers(ctx context.Context, orgID string) ([]OrganizationMember, error) {
+	query := `
+		SELECT id, organization_id, user_id, role, created_at, updated_at
+		FROM organization_members
+		WHERE organization_id = $1
+		ORDER BY role, created_at
+	`
+	rows, err := q.db.QueryContext(ctx, query, orgID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var members []OrganizationMember
+	for rows.Next() {
+		var member OrganizationMember
+		if err := rows.Scan(&member.ID, &member.OrganizationID, &member.UserID, &member.Role, &member.CreatedAt, &member.UpdatedAt); err != nil {
+			continue
+		}
+		members = append(members, member)
+	}
+	return members, rows.Err()
+}
+
+/* ListOrganizationMembersByRole lists members by role */
+func (q *Queries) ListOrganizationMembersByRole(ctx context.Context, orgID, role string) ([]OrganizationMember, error) {
+	query := `
+		SELECT id, organization_id, user_id, role, created_at, updated_at
+		FROM organization_members
+		WHERE organization_id = $1 AND role = $2
+	`
+	rows, err := q.db.QueryContext(ctx, query, orgID, role)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var members []OrganizationMember
+	for rows.Next() {
+		var member OrganizationMember
+		if err := rows.Scan(&member.ID, &member.OrganizationID, &member.UserID, &member.Role, &member.CreatedAt, &member.UpdatedAt); err != nil {
+			continue
+		}
+		members = append(members, member)
+	}
+	return members, rows.Err()
+}
+
+/* UpdateOrganizationMember updates a member */
+func (q *Queries) UpdateOrganizationMember(ctx context.Context, member *OrganizationMember) error {
+	query := `
+		UPDATE organization_members
+		SET role = $2, updated_at = $3
+		WHERE id = $1
+	`
+	_, err := q.db.ExecContext(ctx, query, member.ID, member.Role, member.UpdatedAt)
+	return err
+}
+
+/* DeleteOrganizationMember deletes a member */
+func (q *Queries) DeleteOrganizationMember(ctx context.Context, memberID string) error {
+	query := `DELETE FROM organization_members WHERE id = $1`
+	_, err := q.db.ExecContext(ctx, query, memberID)
+	return err
+}

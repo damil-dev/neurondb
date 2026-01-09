@@ -15,11 +15,13 @@ import {
   SparklesIcon,
   Bars3Icon,
   XMarkIcon,
-  WrenchScrewdriverIcon
+  WrenchScrewdriverIcon,
+  ChartBarIcon
 } from '@/components/Icons'
 
 const navigation = [
   { name: 'Home', href: '/', icon: HomeIcon },
+  { name: 'Dashboard', href: '/dashboard', icon: ChartBarIcon },
   { name: 'Factory', href: '/setup', icon: WrenchScrewdriverIcon },
   { name: 'Chat', href: '/chat', icon: ChatIcon },
   { name: 'MCP Console', href: '/mcp', icon: ChatBubbleLeftRightIcon },

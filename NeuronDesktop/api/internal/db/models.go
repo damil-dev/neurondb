@@ -90,3 +90,24 @@ type User struct {
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }
+
+/* Organization represents an organization/workspace */
+type Organization struct {
+	ID          string                 `json:"id"`
+	Name        string                 `json:"name"`
+	Slug        string                 `json:"slug"`
+	Description string                 `json:"description,omitempty"`
+	Settings    map[string]interface{} `json:"settings,omitempty"`
+	CreatedAt   time.Time              `json:"created_at"`
+	UpdatedAt   time.Time              `json:"updated_at"`
+}
+
+/* OrganizationMember represents a user's membership in an organization */
+type OrganizationMember struct {
+	ID             string    `json:"id"`
+	OrganizationID string    `json:"organization_id"`
+	UserID         string    `json:"user_id"`
+	Role           string    `json:"role"` // 'owner', 'admin', 'member', 'viewer'
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}

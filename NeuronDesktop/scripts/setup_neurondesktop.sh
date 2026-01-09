@@ -23,11 +23,13 @@ echo -e "${BLUE}========================================${NC}"
 echo ""
 
 # Database connection from environment variables
+# Note: Defaults match Docker Compose setup
+# For native PostgreSQL, override these variables
 DB_HOST="${DB_HOST:-localhost}"
-DB_PORT="${DB_PORT:-5432}"
+DB_PORT="${DB_PORT:-5433}"  # Docker Compose default port
 DB_NAME="${DB_NAME:-neurondesk}"
-DB_USER="${DB_USER:-neurondesk}"
-DB_PASSWORD="${DB_PASSWORD:-neurondesk}"
+DB_USER="${DB_USER:-neurondb}"  # Docker Compose default user
+DB_PASSWORD="${DB_PASSWORD:-neurondb}"  # Docker Compose default password
 
 # Export for sub-scripts
 export DB_HOST DB_PORT DB_NAME DB_USER DB_PASSWORD
@@ -176,6 +178,8 @@ if [ -n "${NEURONAGENT_ENDPOINT:-}" ]; then
     echo "  NeuronAgent: $NEURONAGENT_ENDPOINT"
 fi
 echo ""
+
+
 
 
 
