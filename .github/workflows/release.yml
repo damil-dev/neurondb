@@ -1,9 +1,6 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
     inputs:
       version:
@@ -124,6 +121,7 @@ jobs:
           generate_release_notes: true
           draft: false
           prerelease: false
+
 
 
 

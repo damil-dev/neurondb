@@ -1,9 +1,6 @@
 name: SLSA Provenance
 
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
 
 jobs:

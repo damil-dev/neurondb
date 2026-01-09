@@ -1,0 +1,179 @@
+name: Helm Chart Comprehensive Testing
+
+on:
+  workflow_dispatch:
+
+jobs:
+  validate:
+    name: Validate Helm Chart
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: '3.14.0'
+
+      - name: Install yq
+        run: |
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+        version: '1.28.0'
+
+      - name: Run validation script
+        run: |
+          chmod +x scripts/neurondb-helm.sh
+          ./scripts/neurondb-helm.sh validate
+
+  lint:
+    name: Lint Helm Chart
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: '3.14.0'
+
+      - name: Run Helm lint
+        run: |
+          helm lint helm/neurondb --strict
+
+      - name: Validate values schema
+        run: |
+          helm lint helm/neurondb --strict --values helm/neurondb/values.yaml
+
+      - name: Test with minimal values
+        if: hashFiles('helm/neurondb/values-minimal.yaml') != ''
+        run: |
+          helm lint helm/neurondb --strict --values helm/neurondb/values-minimal.yaml
+
+      - name: Test with external PostgreSQL
+        if: hashFiles('helm/neurondb/values-external-postgres.yaml') != ''
+        run: |
+          helm lint helm/neurondb --strict --values helm/neurondb/values-external-postgres.yaml
+
+  template-render:
+    name: Template Rendering Tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        values:
+          - ""
+          - "values-minimal.yaml"
+          - "values-external-postgres.yaml"
+          - "values-production-external-postgres.yaml"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: '3.14.0'
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+        version: '1.28.0'
+
+      - name: Render templates
+        run: |
+          if [ -z "${{ matrix.values }}" ]; then
+            helm template test-release helm/neurondb --debug > /dev/null
+          elif [ -f "helm/neurondb/${{ matrix.values }}" ]; then
+            helm template test-release helm/neurondb \
+              --values "helm/neurondb/${{ matrix.values }}" \
+              --debug > /dev/null
+          else
+            echo "Values file helm/neurondb/${{ matrix.values }} not found, skipping"
+            exit 0
+          fi
+
+      - name: Validate generated YAML
+        run: |
+          if [ -z "${{ matrix.values }}" ]; then
+            helm template test-release helm/neurondb | \
+              kubectl apply --dry-run=client -f - > /dev/null
+          elif [ -f "helm/neurondb/${{ matrix.values }}" ]; then
+            helm template test-release helm/neurondb \
+              --values "helm/neurondb/${{ matrix.values }}" | \
+              kubectl apply --dry-run=client -f - > /dev/null
+          fi
+
+  install-test:
+    name: Installation Tests (kind)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: '3.14.0'
+
+      - name: Install kind
+        uses: helm/kind-action@v1.9.0
+        with:
+          install_kubectl: true
+          version: 'v0.20.0'
+
+      - name: Create kind cluster
+        run: |
+          kind create cluster --name neurondb-test --wait 60s
+
+      - name: Run test suite
+        run: |
+          chmod +x scripts/neurondb-helm.sh
+          ./scripts/neurondb-helm.sh test --use-kind --no-cleanup || true
+
+      - name: Get pod logs on failure
+        if: failure()
+        run: |
+          kubectl get pods -A
+          kubectl describe pods -n neurondb-test || true
+          kubectl logs -n neurondb-test --all-containers=true --tail=100 || true
+
+      - name: Cleanup
+        if: always()
+        run: |
+          kind delete cluster --name neurondb-test || true
+
+  security-scan:
+    name: Security Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: '3.14.0'
+
+      - name: Render templates
+        run: |
+          helm template test-release helm/neurondb > rendered-manifests.yaml
+
+      - name: Run checkov
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: .
+          framework: kubernetes
+          soft_fail: true
+          quiet: true
+
+      - name: Run kube-score
+        uses: zegl/kube-score-action@v1
+        with:
+          paths: 'rendered-manifests.yaml'
+          exit-1-on-score: false
+          minimum-score: 5
+

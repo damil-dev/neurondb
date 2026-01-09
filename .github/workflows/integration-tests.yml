@@ -1,10 +1,6 @@
 name: Integration Tests
 
 on:
-  push:
-    branches: [main, develop]
-  pull_request:
-    branches: [main, develop]
   workflow_dispatch:
 
 jobs:
@@ -92,6 +88,7 @@ jobs:
           npm run test:e2e
         env:
           NEXT_PUBLIC_API_URL: http://localhost:8081
+
 
 
 

@@ -1,9 +1,6 @@
 name: Publish Helm Chart
 
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
     inputs:
       version:

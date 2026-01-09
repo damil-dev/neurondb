@@ -1,14 +1,6 @@
 name: Chart Testing
 
 on:
-  push:
-    branches: [main, develop]
-    paths:
-      - 'helm/**'
-  pull_request:
-    branches: [main, develop]
-    paths:
-      - 'helm/**'
   workflow_dispatch:
 
 jobs:

@@ -1,9 +1,6 @@
 name: Image Signing
 
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
 
 jobs:
