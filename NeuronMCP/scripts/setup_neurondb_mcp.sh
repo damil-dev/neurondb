@@ -6,16 +6,20 @@
 #
 # Usage:
 #   ./setup_neurondb_mcp.sh
-#   DB_HOST=localhost DB_PORT=5432 DB_NAME=neurondb DB_USER=postgres ./setup_neurondb_mcp.sh
+#   DB_HOST=localhost DB_PORT=5433 DB_NAME=neurondb DB_USER=neurondb ./setup_neurondb_mcp.sh
+#   # For native PostgreSQL (not Docker):
+#   DB_PORT=5432 DB_USER=postgres ./setup_neurondb_mcp.sh
 
 set -e
 
 # Default values (can be overridden by environment variables)
+# Note: Default port 5433 matches Docker Compose setup
+# For native PostgreSQL, set DB_PORT=5432 or NEURONDB_PORT=5432
 DB_HOST="${NEURONDB_HOST:-${DB_HOST:-localhost}}"
-DB_PORT="${NEURONDB_PORT:-${DB_PORT:-5432}}"
+DB_PORT="${NEURONDB_PORT:-${DB_PORT:-5433}}"  # Docker Compose default
 DB_NAME="${NEURONDB_DATABASE:-${DB_NAME:-neurondb}}"
-DB_USER="${NEURONDB_USER:-${DB_USER:-postgres}}"
-DB_PASSWORD="${NEURONDB_PASSWORD:-${DB_PASSWORD:-}}"
+DB_USER="${NEURONDB_USER:-${DB_USER:-neurondb}}"  # Docker Compose default user
+DB_PASSWORD="${NEURONDB_PASSWORD:-${DB_PASSWORD:-neurondb}}"  # Docker Compose default password
 
 # Get script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

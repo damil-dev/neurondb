@@ -16,6 +16,7 @@ package transport
 import (
 	"context"
 	"fmt"
+	"net/http"
 
 	"github.com/neurondb/NeuronMCP/pkg/mcp"
 )
@@ -31,8 +32,9 @@ const (
 
 /* Manager manages multiple transports */
 type Manager struct {
-	transports map[TransportType]interface{}
-	mcpServer  *mcp.Server
+	transports        map[TransportType]interface{}
+	mcpServer         *mcp.Server
+	prometheusHandler http.Handler
 }
 
 /* NewManager creates a new transport manager */
@@ -43,9 +45,14 @@ func NewManager(mcpServer *mcp.Server) *Manager {
 	}
 }
 
+/* SetPrometheusHandler sets the Prometheus metrics handler */
+func (m *Manager) SetPrometheusHandler(handler http.Handler) {
+	m.prometheusHandler = handler
+}
+
 /* StartHTTP starts the HTTP transport */
 func (m *Manager) StartHTTP(addr string) error {
-	httpTransport := NewHTTPTransport(addr, m.mcpServer)
+	httpTransport := NewHTTPTransport(addr, m.mcpServer, m.prometheusHandler)
 	m.transports[TransportHTTP] = httpTransport
 	return httpTransport.Start()
 }

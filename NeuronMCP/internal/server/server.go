@@ -19,6 +19,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/neurondb/NeuronMCP/internal/batch"
@@ -55,6 +56,7 @@ type Server struct {
 	idempotencyCache   *cache.IdempotencyCache
 	metricsCollector   *metrics.Collector
 	prometheusExporter *metrics.PrometheusExporter
+	httpServer         *HTTPServer  // HTTP server for /metrics and /health
 }
 
 /* NewServer creates a new server */
@@ -136,6 +138,13 @@ func NewServerWithConfig(configPath string) (*Server, error) {
 	/* Create metrics collector */
 	metricsCollector := metrics.NewCollectorWithDB(db)
 	prometheusExporter := metrics.NewPrometheusExporter(metricsCollector)
+	
+	/* Create HTTP server for metrics (port 8082 by default) */
+	httpAddr := ":8082"
+	if envAddr := os.Getenv("NEURONMCP_HTTP_ADDR"); envAddr != "" {
+		httpAddr = envAddr
+	}
+	httpServer := NewHTTPServer(httpAddr, prometheusExporter.Handler())
 
 	s := &Server{
 		mcpServer:          mcpServer,
@@ -154,6 +163,7 @@ func NewServerWithConfig(configPath string) (*Server, error) {
 		idempotencyCache:   idempotencyCache,
 		metricsCollector:   metricsCollector,
 		prometheusExporter: prometheusExporter,
+		httpServer:         httpServer,
 	}
 
 	s.setupHandlers()
@@ -194,6 +204,15 @@ func (s *Server) setupHandlers() {
 /* Start starts the server */
 func (s *Server) Start(ctx context.Context) error {
 	s.logger.Info("Starting Neurondb MCP server", nil)
+	
+	/* Start HTTP metrics server in background */
+	if s.httpServer != nil {
+		s.httpServer.Start()
+		s.logger.Info("HTTP metrics server started", map[string]interface{}{
+			"endpoint": "/metrics",
+		})
+	}
+	
   /* Run the MCP server - this will block until context is cancelled or EOF */
 	err := s.mcpServer.Run(ctx)
 	if err != nil && err != context.Canceled {
@@ -207,6 +226,17 @@ func (s *Server) Start(ctx context.Context) error {
 /* Stop stops the server gracefully */
 func (s *Server) Stop() error {
 	s.logger.Info("Stopping Neurondb MCP server", nil)
+	
+	/* Shutdown HTTP metrics server */
+	if s.httpServer != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := s.httpServer.Shutdown(ctx); err != nil {
+			s.logger.Warn("HTTP metrics server shutdown error", map[string]interface{}{
+				"error": err.Error(),
+			})
+		}
+	}
 	
 	/* Close database connections */
 	if s.db != nil {

@@ -30,7 +30,7 @@ type HTTPTransport struct {
 }
 
 /* NewHTTPTransport creates a new HTTP transport */
-func NewHTTPTransport(addr string, mcpServer *mcp.Server) *HTTPTransport {
+func NewHTTPTransport(addr string, mcpServer *mcp.Server, prometheusHandler http.Handler) *HTTPTransport {
 	transport := &HTTPTransport{
 		mcpServer: mcpServer,
 	}
@@ -45,6 +45,11 @@ func NewHTTPTransport(addr string, mcpServer *mcp.Server) *HTTPTransport {
 	
 	/* Health endpoint */
 	mux.HandleFunc("/health", transport.handleHealth)
+	
+	/* Prometheus metrics endpoint */
+	if prometheusHandler != nil {
+		mux.Handle("/metrics", prometheusHandler)
+	}
 
 	transport.server = &http.Server{
 		Addr:         addr,
