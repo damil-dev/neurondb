@@ -1,0 +1,104 @@
+{
+  "dashboard": {
+    "title": "NeuronDesktop API Overview",
+    "tags": ["neurondesktop", "ui", "api"],
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "version": 1,
+    "refresh": "30s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "API Request Rate",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "targets": [{
+          "expr": "sum(rate(neurondesktop_api_http_requests_total[5m])) by (method, status)",
+          "legendFormat": "{{method}} {{status}}"
+        }],
+        "yaxes": [
+          {"format": "reqps", "label": "Requests/sec"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 2,
+        "title": "API Response Time (p50/p95/p99)",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, sum(rate(neurondesktop_api_http_request_duration_seconds_bucket[5m])) by (le, method))",
+            "legendFormat": "p50 {{method}}"
+          },
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(neurondesktop_api_http_request_duration_seconds_bucket[5m])) by (le, method))",
+            "legendFormat": "p95 {{method}}"
+          },
+          {
+            "expr": "histogram_quantile(0.99, sum(rate(neurondesktop_api_http_request_duration_seconds_bucket[5m])) by (le, method))",
+            "legendFormat": "p99 {{method}}"
+          }
+        ],
+        "yaxes": [
+          {"format": "s", "label": "Duration"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Error Rate",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 6, "x": 0, "y": 8},
+        "targets": [{
+          "expr": "sum(rate(neurondesktop_api_http_requests_total{status=\"5xx\"}[5m])) / sum(rate(neurondesktop_api_http_requests_total[5m])) * 100",
+          "legendFormat": "Error Rate %"
+        }],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "color": {"mode": "thresholds"},
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": null, "color": "green"},
+                {"value": 1, "color": "yellow"},
+                {"value": 5, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "Active Connections",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 9, "x": 6, "y": 8},
+        "targets": [{
+          "expr": "neurondesktop_api_active_connections",
+          "legendFormat": "{{type}}"
+        }],
+        "yaxes": [
+          {"format": "short", "label": "Connections"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Requests by Endpoint",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 9, "x": 15, "y": 8},
+        "targets": [{
+          "expr": "topk(10, sum(rate(neurondesktop_api_http_requests_total[5m])) by (endpoint))",
+          "legendFormat": "{{endpoint}}"
+        }],
+        "yaxes": [
+          {"format": "reqps", "label": "Requests/sec"},
+          {"format": "short"}
+        ]
+      }
+    ]
+  }
+}
+
+

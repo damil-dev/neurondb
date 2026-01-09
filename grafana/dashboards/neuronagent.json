@@ -1,0 +1,156 @@
+{
+  "dashboard": {
+    "title": "NeuronAgent Overview",
+    "tags": ["neuronagent", "api", "agent"],
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "version": 1,
+    "refresh": "30s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Request Rate",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "targets": [{
+          "expr": "sum(rate(neurondb_agent_http_requests_total[5m])) by (method, status)",
+          "legendFormat": "{{method}} {{status}}"
+        }],
+        "yaxes": [
+          {"format": "reqps", "label": "Requests/sec"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Request Duration (p50/p95/p99)",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, sum(rate(neurondb_agent_http_request_duration_seconds_bucket[5m])) by (le, method))",
+            "legendFormat": "p50 {{method}}"
+          },
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(neurondb_agent_http_request_duration_seconds_bucket[5m])) by (le, method))",
+            "legendFormat": "p95 {{method}}"
+          },
+          {
+            "expr": "histogram_quantile(0.99, sum(rate(neurondb_agent_http_request_duration_seconds_bucket[5m])) by (le, method))",
+            "legendFormat": "p99 {{method}}"
+          }
+        ],
+        "yaxes": [
+          {"format": "s", "label": "Duration"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Error Rate",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 6, "x": 0, "y": 8},
+        "targets": [{
+          "expr": "sum(rate(neurondb_agent_http_requests_total{status=\"5xx\"}[5m])) / sum(rate(neurondb_agent_http_requests_total[5m])) * 100",
+          "legendFormat": "Error Rate %"
+        }],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "color": {"mode": "thresholds"},
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": null, "color": "green"},
+                {"value": 1, "color": "yellow"},
+                {"value": 5, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "Agent Executions",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 9, "x": 6, "y": 8},
+        "targets": [{
+          "expr": "sum(rate(neurondb_agent_executions_total[5m])) by (status)",
+          "legendFormat": "{{status}}"
+        }],
+        "yaxes": [
+          {"format": "ops", "label": "Executions/sec"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 5,
+        "title": "LLM Calls",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 9, "x": 15, "y": 8},
+        "targets": [{
+          "expr": "sum(rate(neurondb_agent_llm_calls_total[5m])) by (model, status)",
+          "legendFormat": "{{model}} {{status}}"
+        }],
+        "yaxes": [
+          {"format": "ops", "label": "Calls/sec"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Tool Executions",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+        "targets": [{
+          "expr": "sum(rate(neurondb_agent_tool_executions_total[5m])) by (tool_name, status)",
+          "legendFormat": "{{tool_name}} {{status}}"
+        }],
+        "yaxes": [
+          {"format": "ops", "label": "Executions/sec"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Jobs Queued",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 6, "x": 12, "y": 16},
+        "targets": [{
+          "expr": "neurondb_agent_jobs_queued",
+          "legendFormat": "Queued Jobs"
+        }],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {"mode": "thresholds"},
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": null, "color": "green"},
+                {"value": 100, "color": "yellow"},
+                {"value": 1000, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 8,
+        "title": "Memory Chunks Stored",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 6, "x": 18, "y": 16},
+        "targets": [{
+          "expr": "sum(rate(neurondb_agent_memory_chunks_stored_total[5m])) by (agent_id)",
+          "legendFormat": "{{agent_id}}"
+        }],
+        "yaxes": [
+          {"format": "ops", "label": "Chunks/sec"},
+          {"format": "short"}
+        ]
+      }
+    ]
+  }
+}
+
+

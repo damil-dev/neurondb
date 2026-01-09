@@ -7,6 +7,7 @@ global:
 
 rule_files:
   - alerts.yml
+  - recording_rules.yml
 
 scrape_configs:
   - job_name: 'neurondb-prometheus'
@@ -27,13 +28,35 @@ scrape_configs:
 
   - job_name: 'neurondb-postgres'
     static_configs:
-      - targets: ['neurondb-cpu:5433']
-    # Custom exporter for PostgreSQL metrics
-    # Requires postgres_exporter or custom metrics endpoint
+      - targets: ['postgres-exporter:9187']
+        labels:
+          service: 'neurondb'
+          variant: 'cpu'
+
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+        labels:
+          service: 'infrastructure'
+          component: 'node-exporter'
+
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+        labels:
+          service: 'infrastructure'
+          component: 'cadvisor'
+
+  - job_name: 'neuronmcp'
+    static_configs:
+      - targets: ['neuronmcp:8082']
+        labels:
+          service: 'neuronmcp'
+    metrics_path: '/metrics'
+    scrape_interval: 15s
 
 alerting:
   alertmanagers:
     - static_configs:
-        - targets: []
-          # Configure Alertmanager if needed
+        - targets: ['alertmanager:9093']
 

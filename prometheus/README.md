@@ -58,8 +58,13 @@ Main Prometheus configuration file containing:
 
 - **Global Settings**: Scrape intervals, evaluation intervals, external labels
 - **Scrape Configs**: All service endpoints with proper labeling
+  - `neuronagent`: Scrapes from `neuronagent:8080/metrics`
+  - `neurondesktop-api`: Scrapes from `neurondesk-api:8081/metrics`
+  - `neurondb-postgres`: Scrapes from `postgres-exporter:9187/metrics`
+  - `node-exporter`: Scrapes from `node-exporter:9100/metrics`
+  - `cadvisor`: Scrapes from `cadvisor:8080/metrics`
 - **Rule Files**: References to alerts.yml and recording_rules.yml
-- **Alertmanager**: Configuration for alert routing
+- **Alertmanager**: Configuration for alert routing to `alertmanager:9093`
 
 **Key Scrape Intervals**:
 - Default: 15 seconds
@@ -70,22 +75,46 @@ Main Prometheus configuration file containing:
 
 Comprehensive alert rules organized by module:
 
-- **NeuronDB Alerts**: Database health, query performance, index health, cache metrics
-- **NeuronAgent Alerts**: Service availability, error rates, latency, execution failures
-- **NeuronDesktop Alerts**: API availability, error rates, connection issues
-- **NeuronMCP Alerts**: Service availability, tool execution, connection pool
-- **Infrastructure Alerts**: System resources, container health, network issues
+- **Service Availability**: `ServiceDown` - Detects when services are unreachable
+- **NeuronAgent Alerts**: 
+  - `NeuronAgentHighErrorRate` - Error rate > 5% (uses 5xx status label)
+  - `NeuronAgentHighLatency` - P95 latency > 1s
+  - `NeuronAgentHighMemoryUsage` - Memory usage > 80%
+- **NeuronDesktop Alerts**:
+  - `NeuronDesktopHighErrorRate` - Error rate > 5% (uses 5xx status label)
+  - `NeuronDesktopHighLatency` - P95 latency > 1s
+  - `NeuronDesktopHighMemoryUsage` - Memory usage > 80%
+- **NeuronDB Alerts**: 
+  - `NeuronDBConnectionFailure` - Database connection failed (pg_up=0)
+- **Infrastructure Alerts**: 
+  - `HighCPUUsage` - CPU usage > 80%
+  - `HighMemoryUsage` - Memory usage > 85%
+  - `HighDiskUsage` - Disk usage > 85%
+
+All alerts use proper metric names matching the actual emitted metrics:
+- `neurondb_agent_http_requests_total` (not `neurondb_agent_requests_total`)
+- `neurondesktop_api_http_requests_total` (not `neurondesktop_api_requests_total`)
+- Error rates calculated from `status="5xx"` label (not separate error counters)
 
 ### recording_rules.yml
 
 Pre-computed metrics for performance optimization:
 
-- Request rate aggregations (1m, 5m)
-- Error rate calculations
-- Latency percentiles (P50, P95, P99)
-- Resource utilization averages
-- Connection pool metrics
-- Vector search performance metrics
+- **Request Rate Aggregations**: 
+  - `neuronagent:requests:rate5m` - Agent request rate over 5 minutes
+  - `neurondesktop:api:requests:rate5m` - API request rate over 5 minutes
+- **Error Rate Calculations**:
+  - `neuronagent:errors:ratio5m` - Agent error ratio (5xx / total)
+  - `neurondesktop:api:errors:ratio5m` - API error ratio (5xx / total)
+- **Latency Percentiles**:
+  - `neuronagent:request_duration:p50/p95/p99` - Agent latency percentiles
+  - `neurondesktop:api:request_duration:p50/p95/p99` - API latency percentiles
+- **Resource Utilization**:
+  - `infrastructure:cpu:usage:percent` - CPU usage percentage
+  - `infrastructure:memory:usage:percent` - Memory usage percentage
+  - `infrastructure:disk:usage:percent` - Disk usage percentage
+
+All recording rules use the correct metric names matching actual emitted metrics.
 
 ### alertmanager.yml
 
@@ -150,19 +179,15 @@ Reference documentation for service discovery configurations (Docker, static, fi
 | `neurondb_agent_database_connections_active` | Gauge | Active DB connections | - |
 | `neurondb_agent_database_connection_errors_total` | Counter | DB connection errors | - |
 
-**Note**: Some metrics may use simplified names like `neurondb_agent_requests_total`, `neurondb_agent_errors_total` in alerts.
-
 ### NeuronDesktop Metrics
 
 **Endpoint**: `http://neurondesk-api:8081/metrics`
 
 | Metric | Type | Description | Labels |
 |--------|------|-------------|--------|
-| `neurondesktop_api_requests_total` | Counter | Total API requests | `endpoint`, `method` |
-| `neurondesktop_api_errors_total` | Counter | API errors | `endpoint`, `error_type` |
-| `neurondesktop_api_request_duration_seconds` | Histogram | Request duration | `endpoint` |
-| `neurondesktop_active_connections` | Gauge | Active connections | - |
-| `neurondesktop_active_mcp_connections` | Gauge | Active MCP connections | - |
+| `neurondesktop_api_http_requests_total` | Counter | Total API requests | `method`, `endpoint`, `status` |
+| `neurondesktop_api_http_request_duration_seconds` | Histogram | Request duration | `method`, `endpoint` |
+| `neurondesktop_api_active_connections` | Gauge | Active connections | `type` |
 | `neurondesktop_active_neurondb_connections` | Gauge | Active NeuronDB connections | - |
 | `neurondesktop_active_agent_connections` | Gauge | Active agent connections | - |
 | `neurondesktop_database_connection_errors_total` | Counter | DB connection errors | - |
@@ -369,24 +394,51 @@ Current implementation uses static service discovery for reliability.
 
 ### Quick Start
 
-1. **Start Prometheus**:
+1. **Start the full observability stack**:
    ```bash
-   docker compose -f docker-compose.observability.yml up -d prometheus
+   docker compose -f docker-compose.observability.yml up -d
    ```
 
-2. **Start Alertmanager** (if configured):
-   ```bash
-   docker compose -f docker-compose.observability.yml up -d alertmanager
-   ```
-
-3. **Verify Prometheus**:
+2. **Verify Prometheus**:
    - Access Prometheus UI: http://localhost:9090
    - Check targets: http://localhost:9090/targets
-   - Verify all services are "UP"
+   - Verify all services are "UP" (neuronagent, neurondesktop-api, postgres-exporter, node-exporter, cadvisor)
+   - Check rules: http://localhost:9090/rules (should show alerts and recording rules)
 
-4. **Verify Alertmanager** (if configured):
+3. **Verify Alertmanager**:
    - Access Alertmanager UI: http://localhost:9093
-   - Check alert status
+   - Check alert status and routing
+   - Configure webhook URL via `ALERTMANAGER_WEBHOOK_URL` environment variable
+
+4. **Verify Grafana**:
+   - Access Grafana UI: http://localhost:3001
+   - Login: admin/admin (change in production!)
+   - Verify dashboards are loaded: NeuronAgent, NeuronDesktop API, NeuronDB/PostgreSQL, Infrastructure
+
+### Verification Checklist
+
+#### Docker Compose Deployment
+
+- [ ] All services are running: `docker compose -f docker-compose.observability.yml ps`
+- [ ] Prometheus targets are UP: http://localhost:9090/targets
+- [ ] Prometheus rules are loaded: http://localhost:9090/rules
+- [ ] Alertmanager is accessible: http://localhost:9093
+- [ ] Grafana dashboards are visible: http://localhost:3001
+- [ ] Metrics endpoints are accessible:
+  - `curl http://neuronagent:8080/metrics` (should return Prometheus format)
+  - `curl http://neurondesk-api:8081/metrics` (should return Prometheus format)
+- [ ] Recording rules are working: Query `neuronagent:requests:rate5m` in Prometheus
+
+#### Helm/Kubernetes Deployment
+
+- [ ] Prometheus pods are running: `kubectl get pods -l app.kubernetes.io/component=prometheus`
+- [ ] Alertmanager pods are running (if enabled): `kubectl get pods -l app.kubernetes.io/component=alertmanager`
+- [ ] Grafana pods are running: `kubectl get pods -l app.kubernetes.io/component=grafana`
+- [ ] ServiceMonitors are created (if using Prometheus Operator): `kubectl get servicemonitors`
+- [ ] PrometheusRules are created (if using Prometheus Operator): `kubectl get prometheusrules`
+- [ ] Metrics endpoints are accessible from within cluster:
+  - `kubectl exec -it <pod> -- curl http://<service>:<port>/metrics`
+- [ ] Webhook URL is configured in Alertmanager (if using webhooks)
 
 ### Docker Compose Integration
 
@@ -461,39 +513,42 @@ After modifying configuration files:
 
 **Request rate for NeuronAgent**:
 ```promql
-rate(neurondb_agent_requests_total[5m])
+rate(neurondb_agent_http_requests_total[5m])
 ```
 
-**Error rate percentage**:
+**Error rate percentage** (using 5xx status label):
 ```promql
-rate(neurondb_agent_errors_total[5m]) / rate(neurondb_agent_requests_total[5m]) * 100
+sum(rate(neurondb_agent_http_requests_total{status="5xx"}[5m])) / sum(rate(neurondb_agent_http_requests_total[5m])) * 100
 ```
 
 **P95 latency**:
 ```promql
-histogram_quantile(0.95, rate(neurondb_agent_request_duration_seconds_bucket[5m]))
+histogram_quantile(0.95, rate(neurondb_agent_http_request_duration_seconds_bucket[5m]))
 ```
 
 **Using recording rules**:
 ```promql
 neuronagent:request_duration:p95
+neuronagent:requests:rate5m
+neuronagent:errors:ratio5m
 ```
 
 ### Dashboard Queries
 
 **Service availability**:
 ```promql
-up{service="neuronagent"}
+up{job="neuronagent"}
 ```
 
-**Total requests by service**:
+**Total requests by method and status**:
 ```promql
-sum(rate(neurondb_agent_requests_total[5m])) by (service)
+sum(rate(neurondb_agent_http_requests_total[5m])) by (method, status)
 ```
 
 **Error rate by endpoint**:
 ```promql
-rate(neurondb_agent_errors_total[5m]) / rate(neurondb_agent_requests_total[5m]) by (endpoint)
+sum(rate(neurondb_agent_http_requests_total{status="5xx"}[5m])) by (endpoint) / 
+sum(rate(neurondb_agent_http_requests_total[5m])) by (endpoint) * 100
 ```
 
 ## Troubleshooting

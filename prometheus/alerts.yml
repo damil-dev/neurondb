@@ -11,43 +11,116 @@ groups:
           summary: "Service {{ $labels.job }} is down"
           description: "Service {{ $labels.job }} has been down for more than 1 minute"
 
-      - alert: HighErrorRate
+      - alert: NeuronAgentHighErrorRate
         expr: |
-          rate(neurondb_agent_errors_total[5m]) / rate(neurondb_agent_requests_total[5m]) > 0.05
+          sum(rate(neurondb_agent_http_requests_total{status="5xx"}[5m])) by (job) / 
+          sum(rate(neurondb_agent_http_requests_total[5m])) by (job) > 0.05
         for: 5m
         labels:
           severity: critical
+          module: neuronagent
         annotations:
-          summary: "High error rate in {{ $labels.job }}"
+          summary: "High error rate in NeuronAgent"
           description: "Error rate is {{ $value | humanizePercentage }} for {{ $labels.job }}"
 
-      - alert: HighLatency
+      - alert: NeuronDesktopHighErrorRate
         expr: |
-          histogram_quantile(0.95, rate(neurondb_agent_request_duration_seconds_bucket[5m])) > 1
+          sum(rate(neurondesktop_api_http_requests_total{status="5xx"}[5m])) by (job) / 
+          sum(rate(neurondesktop_api_http_requests_total[5m])) by (job) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          module: neurondesktop
+        annotations:
+          summary: "High error rate in NeuronDesktop API"
+          description: "Error rate is {{ $value | humanizePercentage }} for {{ $labels.job }}"
+
+      - alert: NeuronAgentHighLatency
+        expr: |
+          histogram_quantile(0.95, rate(neurondb_agent_http_request_duration_seconds_bucket[5m])) > 1
         for: 5m
         labels:
           severity: warning
+          module: neuronagent
         annotations:
-          summary: "High latency in {{ $labels.job }}"
+          summary: "High latency in NeuronAgent"
           description: "P95 latency is {{ $value }}s for {{ $labels.job }}"
 
-      - alert: DatabaseConnectionFailure
+      - alert: NeuronDesktopHighLatency
         expr: |
-          increase(neurondb_database_connection_errors_total[5m]) > 5
-        for: 1m
+          histogram_quantile(0.95, rate(neurondesktop_api_http_request_duration_seconds_bucket[5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+          module: neurondesktop
+        annotations:
+          summary: "High latency in NeuronDesktop API"
+          description: "P95 latency is {{ $value }}s for {{ $labels.job }}"
+
+      - alert: NeuronDBConnectionFailure
+        expr: |
+          pg_up == 0
+        for: 2m
         labels:
           severity: critical
+          module: neurondb
         annotations:
-          summary: "Database connection failures"
-          description: "{{ $value }} database connection failures in the last 5 minutes"
+          summary: "NeuronDB database connection failed"
+          description: "Cannot connect to NeuronDB database (pg_up=0)"
+
+      - alert: NeuronAgentHighMemoryUsage
+        expr: |
+          (process_resident_memory_bytes{job="neuronagent"} / process_virtual_memory_bytes{job="neuronagent"}) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          module: neuronagent
+        annotations:
+          summary: "High memory usage in NeuronAgent"
+          description: "Memory usage is {{ $value | humanizePercentage }} for NeuronAgent"
+
+      - alert: NeuronDesktopHighMemoryUsage
+        expr: |
+          (process_resident_memory_bytes{job="neurondesktop-api"} / process_virtual_memory_bytes{job="neurondesktop-api"}) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          module: neurondesktop
+        annotations:
+          summary: "High memory usage in NeuronDesktop API"
+          description: "Memory usage is {{ $value | humanizePercentage }} for NeuronDesktop API"
+
+      - alert: HighCPUUsage
+        expr: |
+          100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+          module: infrastructure
+        annotations:
+          summary: "High CPU usage on node"
+          description: "CPU usage is {{ $value }}% on {{ $labels.instance }}"
 
       - alert: HighMemoryUsage
         expr: |
-          (process_resident_memory_bytes / process_virtual_memory_bytes) > 0.8
+          (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
         for: 5m
         labels:
           severity: warning
+          module: infrastructure
         annotations:
-          summary: "High memory usage in {{ $labels.job }}"
-          description: "Memory usage is {{ $value | humanizePercentage }} for {{ $labels.job }}"
+          summary: "High memory usage on node"
+          description: "Memory usage is {{ $value }}% on {{ $labels.instance }}"
+
+      - alert: HighDiskUsage
+        expr: |
+          (1 - (node_filesystem_avail_bytes{device!~"tmpfs|fuse.lxcfs"} / 
+                node_filesystem_size_bytes{device!~"tmpfs|fuse.lxcfs"})) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+          module: infrastructure
+        annotations:
+          summary: "High disk usage on node"
+          description: "Disk usage is {{ $value }}% on {{ $labels.instance }} ({{ $labels.mountpoint }})"
 

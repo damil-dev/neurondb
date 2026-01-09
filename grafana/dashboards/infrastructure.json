@@ -1,0 +1,104 @@
+{
+  "dashboard": {
+    "title": "Infrastructure Overview",
+    "tags": ["system", "infrastructure", "node"],
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "version": 1,
+    "refresh": "30s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "CPU Usage",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "targets": [{
+          "expr": "100 - (avg by(instance) (irate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
+          "legendFormat": "{{instance}}"
+        }],
+        "yaxes": [
+          {"format": "percent", "max": 100, "label": "CPU %"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Memory Usage",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "targets": [{
+          "expr": "(1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100",
+          "legendFormat": "{{instance}}"
+        }],
+        "yaxes": [
+          {"format": "percent", "max": 100, "label": "Memory %"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Disk Usage",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "targets": [{
+          "expr": "(1 - (node_filesystem_avail_bytes{device!~\"tmpfs|fuse.lxcfs\"} / node_filesystem_size_bytes{device!~\"tmpfs|fuse.lxcfs\"})) * 100",
+          "legendFormat": "{{instance}} {{mountpoint}}"
+        }],
+        "yaxes": [
+          {"format": "percent", "max": 100, "label": "Disk %"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Network I/O",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+        "targets": [
+          {
+            "expr": "sum(rate(node_network_receive_bytes_total[5m])) by (instance)",
+            "legendFormat": "Receive {{instance}}"
+          },
+          {
+            "expr": "sum(rate(node_network_transmit_bytes_total[5m])) by (instance)",
+            "legendFormat": "Transmit {{instance}}"
+          }
+        ],
+        "yaxes": [
+          {"format": "Bps", "label": "Bytes/sec"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Container CPU Usage",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+        "targets": [{
+          "expr": "sum(rate(container_cpu_usage_seconds_total[5m])) by (name) * 100",
+          "legendFormat": "{{name}}"
+        }],
+        "yaxes": [
+          {"format": "percent", "label": "CPU %"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Container Memory Usage",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+        "targets": [{
+          "expr": "sum(container_memory_working_set_bytes) by (name)",
+          "legendFormat": "{{name}}"
+        }],
+        "yaxes": [
+          {"format": "bytes", "label": "Memory"},
+          {"format": "short"}
+        ]
+      }
+    ]
+  }
+}
+
+
