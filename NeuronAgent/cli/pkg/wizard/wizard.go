@@ -26,7 +26,8 @@ import (
 
 func RunWizard(apiClient *client.Client) error {
 	fmt.Println("\n✨ NeuronAgent Creation Wizard")
-	fmt.Println("═══════════════════════════════════════════════════════════\n")
+	fmt.Println("═══════════════════════════════════════════════════════════")
+	fmt.Println()
 
 	agentConfig := &config.AgentConfig{}
 

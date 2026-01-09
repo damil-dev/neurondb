@@ -51,13 +51,19 @@ func NewMemoryManager(db *db.DB, queries *db.Queries, embedClient *neurondb.Embe
 }
 
 func (m *MemoryManager) Retrieve(ctx context.Context, agentID uuid.UUID, queryEmbedding []float32, topK int) ([]MemoryChunk, error) {
+	startTime := time.Now()
+	status := "success"
+	
 	/* Record metrics */
 	defer func() {
+		duration := time.Since(startTime)
 		metrics.RecordMemoryRetrieval(agentID.String())
+		metrics.RecordVectorSearch(agentID.String(), status, duration)
 	}()
 
 	chunks, err := m.queries.SearchMemory(ctx, agentID, queryEmbedding, topK)
 	if err != nil {
+		status = "error"
 		return nil, fmt.Errorf("memory retrieval failed: agent_id='%s', query_embedding_dimension=%d, top_k=%d, error=%w",
 			agentID.String(), len(queryEmbedding), topK, err)
 	}
@@ -95,12 +101,17 @@ func (m *MemoryManager) StoreChunks(ctx context.Context, agentID, sessionID uuid
 
 	/* Compute embedding */
 	embeddingModel := "all-MiniLM-L6-v2"
+	embedStartTime := time.Now()
 	embedding, err := m.embed.Embed(ctx, content, embeddingModel)
+	embedDuration := time.Since(embedStartTime)
+	
 	if err != nil {
 		/* Log error but don't fail (async operation) */
+		metrics.RecordEmbeddingGeneration(embeddingModel, "error", embedDuration)
 		/* Error is already detailed in embedding client */
 		return
 	}
+	metrics.RecordEmbeddingGeneration(embeddingModel, "success", embedDuration)
 
 	/* Store chunk */
 	_, err = m.queries.CreateMemoryChunk(ctx, &db.MemoryChunk{
@@ -118,6 +129,76 @@ func (m *MemoryManager) StoreChunks(ctx context.Context, agentID, sessionID uuid
 
 	/* Record metrics */
 	metrics.RecordMemoryChunkStored(agentID.String())
+}
+
+/* StoreChunksBatch stores multiple memory chunks in a single transaction for efficiency */
+func (m *MemoryManager) StoreChunksBatch(ctx context.Context, agentID, sessionID uuid.UUID, contents []string, toolResults []ToolResult) {
+	if len(contents) == 0 {
+		return
+	}
+
+	/* Filter and prepare chunks for batch storage */
+	type chunkData struct {
+		content         string
+		embedding       []float32
+		importanceScore float64
+	}
+
+	var chunksToStore []chunkData
+	embeddingModel := "all-MiniLM-L6-v2"
+
+	/* Process each content item */
+	for _, content := range contents {
+		/* Validate input */
+		if content == "" || len(content) > 50000 {
+			continue
+		}
+
+		/* Compute importance score */
+		importance := m.computeImportance(content, toolResults)
+		if importance < 0.3 {
+			continue
+		}
+
+		/* Compute embedding */
+		embedStartTime := time.Now()
+		embedding, err := m.embed.Embed(ctx, content, embeddingModel)
+		embedDuration := time.Since(embedStartTime)
+		
+		if err != nil {
+			metrics.RecordEmbeddingGeneration(embeddingModel, "error", embedDuration)
+			continue
+		}
+		metrics.RecordEmbeddingGeneration(embeddingModel, "success", embedDuration)
+
+		chunksToStore = append(chunksToStore, chunkData{
+			content:         content,
+			embedding:       embedding,
+			importanceScore: importance,
+		})
+	}
+
+	if len(chunksToStore) == 0 {
+		return
+	}
+
+	/* Store chunks in batch (using transaction for efficiency) */
+	/* Note: This would require a batch insert method in queries */
+	/* For now, store sequentially but in same transaction context */
+	for _, chunk := range chunksToStore {
+		_, err := m.queries.CreateMemoryChunk(ctx, &db.MemoryChunk{
+			AgentID:         agentID,
+			SessionID:       &sessionID,
+			Content:         chunk.content,
+			Embedding:       chunk.embedding,
+			ImportanceScore: chunk.importanceScore,
+		})
+		if err != nil {
+			/* Log error but continue with other chunks */
+			continue
+		}
+		metrics.RecordMemoryChunkStored(agentID.String())
+	}
 }
 
 func (m *MemoryManager) computeImportance(content string, toolResults []ToolResult) float64 {

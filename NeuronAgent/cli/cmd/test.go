@@ -106,7 +106,8 @@ func testSingleMessage(apiClient *client.Client, agentID, message string) error 
 func testInteractive(apiClient *client.Client, agentID string) error {
 	fmt.Printf("🤖 Interactive test mode for agent: %s\n", agentID)
 	fmt.Println("Type 'exit' or 'quit' to end the session")
-	fmt.Println("─────────────────────────────────────────────────────────\n")
+	fmt.Println("─────────────────────────────────────────────────────────")
+	fmt.Println()
 
 	// Create session
 	session, err := apiClient.CreateSession(agentID, nil)

@@ -16,7 +16,6 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 
 	"github.com/neurondb/NeuronAgent/cli/pkg/client"
 	"github.com/neurondb/NeuronAgent/cli/pkg/config"
@@ -238,7 +237,9 @@ func exportWorkflow(cmd *cobra.Command, args []string) error {
 	/* Convert workflow to YAML format */
 	var workflowConfig config.WorkflowConfig
 
-	if dagDef, ok := workflow.DAGDefinition.(map[string]interface{}); ok {
+	/* DAGDefinition is already map[string]interface{} */
+	if workflow.DAGDefinition != nil {
+		dagDef := workflow.DAGDefinition
 		if name, ok := dagDef["name"].(string); ok {
 			workflowConfig.Name = name
 		}

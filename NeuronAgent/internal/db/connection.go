@@ -19,11 +19,13 @@ package db
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"strings"
 	"time"
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
+	"github.com/neurondb/NeuronAgent/internal/metrics"
 	"github.com/neurondb/NeuronAgent/internal/utils"
 )
 
@@ -81,8 +83,31 @@ func NewDBWithRetry(connStr string, poolConfig PoolConfig, maxRetries int, retry
 				_, err = db.Exec("SELECT 1")
 				if err != nil {
 					db.Close()
-					return nil, fmt.Errorf("connection test failed: %w", err)
+					/* Log retry attempt for connection test failure */
+					metrics.WarnWithContext(context.Background(), "Database connection test failed, will retry", map[string]interface{}{
+						"attempt":      attempt + 1,
+						"max_retries":  maxRetries,
+						"error":        err.Error(),
+						"connection":   connInfo.Host,
+					})
+					/* Retry connection test failures */
+					if attempt < maxRetries-1 {
+						delay := retryDelay
+						/* Add jitter: ±25% variation to prevent thundering herd */
+						jitter := float64(delay) * 0.25
+						jitterAmount := time.Duration(jitter * (rand.Float64()*2 - 1)) /* -0.25 to +0.25 */
+						delay = delay + jitterAmount
+						time.Sleep(delay)
+						retryDelay *= 2
+					}
+					continue
 				}
+
+				metrics.InfoWithContext(context.Background(), "Database connection established", map[string]interface{}{
+					"attempt":    attempt + 1,
+					"connection": connInfo.Host,
+					"database":   connInfo.Database,
+				})
 
 				return &DB{
 					DB:         db,
@@ -95,7 +120,22 @@ func NewDBWithRetry(connStr string, poolConfig PoolConfig, maxRetries int, retry
 		}
 
 		if attempt < maxRetries-1 {
-			time.Sleep(retryDelay)
+			/* Add jitter: ±25% variation to prevent thundering herd */
+			delay := retryDelay
+			jitter := float64(delay) * 0.25
+			jitterAmount := time.Duration(jitter * (rand.Float64()*2 - 1)) /* -0.25 to +0.25 */
+			delay = delay + jitterAmount
+			
+			/* Log retry attempt */
+			metrics.WarnWithContext(context.Background(), "Database connection failed, retrying", map[string]interface{}{
+				"attempt":      attempt + 1,
+				"max_retries":  maxRetries,
+				"retry_delay":  delay.String(),
+				"error":        err.Error(),
+				"connection":   connInfo.Host,
+			})
+			
+			time.Sleep(delay)
 			retryDelay *= 2
 		}
 	}
@@ -149,6 +189,15 @@ func (d *DB) HealthCheck(ctx context.Context) error {
 		return fmt.Errorf("health check failed on %s: query='SELECT 1', error=%w", d.GetConnInfoString(), err)
 	}
 	return nil
+}
+
+/* GetPoolStats returns connection pool statistics */
+func (d *DB) GetPoolStats() (openConns, idleConns, inUse int) {
+	if d.DB == nil {
+		return 0, 0, 0
+	}
+	stats := d.DB.Stats()
+	return stats.OpenConnections, stats.Idle, stats.InUse
 }
 
 /* Close closes the connection pool */

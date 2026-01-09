@@ -85,15 +85,20 @@ func (w *Worker) processJob(job *db.Job) {
 	var completedAt *time.Time
 
 	if err != nil {
-		retryCount++
-		if retryCount >= job.MaxRetries {
+		/* Use error classification to determine if job should be retried */
+		shouldRetry := ShouldRetry(err, retryCount, job.MaxRetries)
+		
+		if !shouldRetry || retryCount >= job.MaxRetries {
+			/* Non-retryable error or max retries reached */
 			status = "failed"
 			errStr := err.Error()
 			errorMsg = &errStr
 			now := time.Now()
 			completedAt = &now
 		} else {
-			status = "queued" // Retry - will be picked up again
+			/* Retryable error - will be picked up again */
+			retryCount++
+			status = "queued"
 			/* Don't set completedAt for retries */
 		}
 	} else {

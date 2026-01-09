@@ -19,6 +19,8 @@ package auth
 import (
 	"sync"
 	"time"
+
+	"github.com/neurondb/NeuronAgent/internal/metrics"
 )
 
 type RateLimiter struct {
@@ -50,14 +52,17 @@ func (r *RateLimiter) CheckLimit(keyID string, limitPerMin int) bool {
 			count:     1,
 			resetTime: now.Add(1 * time.Minute),
 		}
+		metrics.RecordRateLimitAllowed(keyID)
 		return true
 	}
 
 	if rl.count >= limitPerMin {
+		metrics.RecordRateLimitRejected(keyID)
 		return false
 	}
 
 	rl.count++
+	metrics.RecordRateLimitAllowed(keyID)
 	return true
 }
 

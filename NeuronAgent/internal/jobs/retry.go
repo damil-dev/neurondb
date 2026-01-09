@@ -16,6 +16,7 @@ package jobs
 import (
 	"context"
 	"math"
+	"strings"
 	"time"
 )
 
@@ -59,15 +60,85 @@ func CalculateDelay(attempt int, config RetryConfig) time.Duration {
 	return time.Duration(delay)
 }
 
+/* ErrorType classifies errors for retry logic */
+type ErrorType int
+
+const (
+	ErrorTypeRetryable ErrorType = iota
+	ErrorTypeNonRetryable
+	ErrorTypeUnknown
+)
+
+/* ClassifyError classifies an error as retryable or non-retryable */
+func ClassifyError(err error) ErrorType {
+	if err == nil {
+		return ErrorTypeNonRetryable
+	}
+
+	errStr := err.Error()
+
+	/* Non-retryable errors: validation, authentication, authorization, not found */
+	nonRetryablePatterns := []string{
+		"validation",
+		"invalid",
+		"unauthorized",
+		"forbidden",
+		"not found",
+		"does not exist",
+		"already exists",
+		"duplicate",
+		"malformed",
+		"parse error",
+		"syntax error",
+	}
+
+	/* Retryable errors: network, timeout, temporary, rate limit, server errors */
+	retryablePatterns := []string{
+		"connection",
+		"timeout",
+		"temporary",
+		"temporarily",
+		"rate limit",
+		"too many",
+		"server error",
+		"internal error",
+		"deadline exceeded",
+		"context canceled",
+		"network",
+		"unavailable",
+		"busy",
+		"locked",
+	}
+
+	errLower := strings.ToLower(errStr)
+
+	/* Check for non-retryable patterns first */
+	for _, pattern := range nonRetryablePatterns {
+		if strings.Contains(errLower, pattern) {
+			return ErrorTypeNonRetryable
+		}
+	}
+
+	/* Check for retryable patterns */
+	for _, pattern := range retryablePatterns {
+		if strings.Contains(errLower, pattern) {
+			return ErrorTypeRetryable
+		}
+	}
+
+	/* Default to retryable for unknown errors (conservative approach) */
+	return ErrorTypeRetryable
+}
+
 /* ShouldRetry determines if a job should be retried based on error */
 func ShouldRetry(err error, attempt int, maxRetries int) bool {
 	if attempt >= maxRetries {
 		return false
 	}
 
-	/* Don't retry on certain errors (e.g., validation errors) */
-	/* In production, you'd check error types */
-	return true
+	/* Classify error to determine if it's retryable */
+	errorType := ClassifyError(err)
+	return errorType == ErrorTypeRetryable
 }
 
 /* RetryWithBackoff retries a function with exponential backoff */

@@ -462,6 +462,23 @@ func main() {
 		}()
 	}
 
+	/* Start connection pool metrics collector */
+	metricsCtx, metricsCancel := context.WithCancel(context.Background())
+	defer metricsCancel()
+	go func() {
+		ticker := time.NewTicker(10 * time.Second) /* Collect metrics every 10 seconds */
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				openConns, idleConns, inUse := database.GetPoolStats()
+				metrics.RecordDBPoolStats(cfg.Database.Database, openConns, idleConns, inUse)
+			case <-metricsCtx.Done():
+				return
+			}
+		}
+	}()
+
 	/* Start server */
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
 	srv := &http.Server{
@@ -492,6 +509,9 @@ func main() {
 	<-quit
 
 	metrics.InfoWithContext(context.Background(), "Shutdown signal received, gracefully shutting down server", nil)
+
+	/* Stop metrics collector */
+	metricsCancel()
 
 	/* Cleanup resources */
 	if toolRegistry != nil {
