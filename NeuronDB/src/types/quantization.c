@@ -335,7 +335,7 @@ vector_to_binary(PG_FUNCTION_ARGS)
 }
 
 /*
- * binary_quantize: Convert vector to bit type (pgvector compatibility)
+ * binary_quantize: Convert vector to bit type
  * Returns bit type instead of bytea for compatibility
  */
 /* Forward declaration */
@@ -1932,6 +1932,190 @@ halfvec_ne(PG_FUNCTION_ARGS)
 }
 
 /*
+ * halfvec_lt: Less than comparison for halfvec (lexicographic)
+ */
+PG_FUNCTION_INFO_V1(halfvec_lt);
+Datum
+halfvec_lt(PG_FUNCTION_ARGS)
+{
+	VectorF16  *a = NULL;
+	VectorF16  *b = NULL;
+	int			i;
+	float4		val_a, val_b;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: halfvec_lt requires 2 arguments")));
+
+	a = (VectorF16 *) PG_DETOAST_DATUM(PG_GETARG_DATUM(0));
+	b = (VectorF16 *) PG_DETOAST_DATUM(PG_GETARG_DATUM(1));
+
+	if (a == NULL || b == NULL)
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("cannot compare NULL halfvec values")));
+
+	if (a->dim != b->dim)
+		ereport(ERROR,
+				(errcode(ERRCODE_DATA_EXCEPTION),
+				 errmsg("cannot compare halfvecs of different dimensions: %d vs %d",
+						a->dim,
+						b->dim)));
+
+	/* Compare element by element (lexicographic) */
+	for (i = 0; i < a->dim; i++)
+	{
+		val_a = fp16_to_float(a->data[i]);
+		val_b = fp16_to_float(b->data[i]);
+		if (val_a < val_b)
+			PG_RETURN_BOOL(true);
+		else if (val_a > val_b)
+			PG_RETURN_BOOL(false);
+	}
+	PG_RETURN_BOOL(false);
+}
+
+/*
+ * halfvec_le: Less than or equal comparison for halfvec (lexicographic)
+ */
+PG_FUNCTION_INFO_V1(halfvec_le);
+Datum
+halfvec_le(PG_FUNCTION_ARGS)
+{
+	VectorF16  *a = NULL;
+	VectorF16  *b = NULL;
+	int			i;
+	float4		val_a, val_b;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: halfvec_le requires 2 arguments")));
+
+	a = (VectorF16 *) PG_DETOAST_DATUM(PG_GETARG_DATUM(0));
+	b = (VectorF16 *) PG_DETOAST_DATUM(PG_GETARG_DATUM(1));
+
+	if (a == NULL || b == NULL)
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("cannot compare NULL halfvec values")));
+
+	if (a->dim != b->dim)
+		ereport(ERROR,
+				(errcode(ERRCODE_DATA_EXCEPTION),
+				 errmsg("cannot compare halfvecs of different dimensions: %d vs %d",
+						a->dim,
+						b->dim)));
+
+	/* Compare element by element (lexicographic) */
+	for (i = 0; i < a->dim; i++)
+	{
+		val_a = fp16_to_float(a->data[i]);
+		val_b = fp16_to_float(b->data[i]);
+		if (val_a < val_b)
+			PG_RETURN_BOOL(true);
+		else if (val_a > val_b)
+			PG_RETURN_BOOL(false);
+	}
+	PG_RETURN_BOOL(true);
+}
+
+/*
+ * halfvec_gt: Greater than comparison for halfvec (lexicographic)
+ */
+PG_FUNCTION_INFO_V1(halfvec_gt);
+Datum
+halfvec_gt(PG_FUNCTION_ARGS)
+{
+	VectorF16  *a = NULL;
+	VectorF16  *b = NULL;
+	int			i;
+	float4		val_a, val_b;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: halfvec_gt requires 2 arguments")));
+
+	a = (VectorF16 *) PG_DETOAST_DATUM(PG_GETARG_DATUM(0));
+	b = (VectorF16 *) PG_DETOAST_DATUM(PG_GETARG_DATUM(1));
+
+	if (a == NULL || b == NULL)
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("cannot compare NULL halfvec values")));
+
+	if (a->dim != b->dim)
+		ereport(ERROR,
+				(errcode(ERRCODE_DATA_EXCEPTION),
+				 errmsg("cannot compare halfvecs of different dimensions: %d vs %d",
+						a->dim,
+						b->dim)));
+
+	/* Compare element by element (lexicographic) */
+	for (i = 0; i < a->dim; i++)
+	{
+		val_a = fp16_to_float(a->data[i]);
+		val_b = fp16_to_float(b->data[i]);
+		if (val_a > val_b)
+			PG_RETURN_BOOL(true);
+		else if (val_a < val_b)
+			PG_RETURN_BOOL(false);
+	}
+	PG_RETURN_BOOL(false);
+}
+
+/*
+ * halfvec_ge: Greater than or equal comparison for halfvec (lexicographic)
+ */
+PG_FUNCTION_INFO_V1(halfvec_ge);
+Datum
+halfvec_ge(PG_FUNCTION_ARGS)
+{
+	VectorF16  *a = NULL;
+	VectorF16  *b = NULL;
+	int			i;
+	float4		val_a, val_b;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: halfvec_ge requires 2 arguments")));
+
+	a = (VectorF16 *) PG_DETOAST_DATUM(PG_GETARG_DATUM(0));
+	b = (VectorF16 *) PG_DETOAST_DATUM(PG_GETARG_DATUM(1));
+
+	if (a == NULL || b == NULL)
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("cannot compare NULL halfvec values")));
+
+	if (a->dim != b->dim)
+		ereport(ERROR,
+				(errcode(ERRCODE_DATA_EXCEPTION),
+				 errmsg("cannot compare halfvecs of different dimensions: %d vs %d",
+						a->dim,
+						b->dim)));
+
+	/* Compare element by element (lexicographic) */
+	for (i = 0; i < a->dim; i++)
+	{
+		val_a = fp16_to_float(a->data[i]);
+		val_b = fp16_to_float(b->data[i]);
+		if (val_a > val_b)
+			PG_RETURN_BOOL(true);
+		else if (val_a < val_b)
+			PG_RETURN_BOOL(false);
+	}
+	PG_RETURN_BOOL(true);
+}
+
+/*
  * halfvec_hash: Hash function for halfvec
  */
 PG_FUNCTION_INFO_V1(halfvec_hash);
@@ -2165,6 +2349,53 @@ halfvec_cosine_distance(PG_FUNCTION_ARGS)
 		PG_RETURN_FLOAT4(1.0);
 
 	result = (float4) (1.0 - (dot / (sqrt(norm_a) * sqrt(norm_b))));
+	PG_RETURN_FLOAT4(result);
+}
+
+/*
+ * halfvec_l1_distance: L1 (Manhattan) distance between two halfvec vectors
+ */
+PG_FUNCTION_INFO_V1(halfvec_l1_distance);
+Datum
+halfvec_l1_distance(PG_FUNCTION_ARGS)
+{
+	VectorF16  *a = NULL;
+	VectorF16  *b = NULL;
+	double		sum = 0.0;
+	int			i;
+	float4		result;
+
+	/* Validate argument count */
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: halfvec_l1_distance requires 2 arguments")));
+
+	a = (VectorF16 *) PG_DETOAST_DATUM(PG_GETARG_DATUM(0));
+	b = (VectorF16 *) PG_DETOAST_DATUM(PG_GETARG_DATUM(1));
+
+	if (a == NULL || b == NULL)
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("cannot compute distance with NULL halfvec")));
+
+	if (a->dim != b->dim)
+		ereport(ERROR,
+				(errcode(ERRCODE_DATA_EXCEPTION),
+				 errmsg("halfvec dimensions must match: %d vs %d",
+						a->dim,
+						b->dim)));
+
+	for (i = 0; i < a->dim; i++)
+	{
+		float		va = fp16_to_float(a->data[i]);
+		float		vb = fp16_to_float(b->data[i]);
+		double		diff = (double) va - (double) vb;
+
+		sum += fabs(diff);
+	}
+
+	result = (float4) sum;
 	PG_RETURN_FLOAT4(result);
 }
 
@@ -2474,7 +2705,7 @@ halfvec_neg(PG_FUNCTION_ARGS)
 }
 
 /*
- * vector_to_bit: Convert vector to PostgreSQL bit type (pgvector compatibility)
+ * vector_to_bit: Convert vector to PostgreSQL bit type
  * Returns bit type instead of bytea
  */
 PG_FUNCTION_INFO_V1(vector_to_bit);
