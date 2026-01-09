@@ -45,8 +45,20 @@ DROP TABLE t;
 \echo 'Test 2: IVF Index with Inner Product (<#> operator)'
 \echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
 
--- IVF does not support vector_ip_ops, skip this test
-\echo 'SKIPPED: IVF does not support vector_ip_ops'
+DROP TABLE IF EXISTS t CASCADE;
+CREATE TABLE t (val vector(3));
+-- Need more data points for IVF clustering
+INSERT INTO t (val) SELECT ARRAY[random(), random(), random()]::vector(3) FROM generate_series(1, 20);
+INSERT INTO t (val) VALUES ('[1,2,3]'), ('[4,5,6]'), ('[1,1,1]'), (NULL);
+CREATE INDEX ON t USING ivf (val vector_ip_ops) WITH (lists = 2);
+
+INSERT INTO t (val) VALUES ('[1,2,4]');
+
+SELECT * FROM t ORDER BY val <#> '[3,3,3]' LIMIT 5;
+SELECT COUNT(*) FROM (SELECT * FROM t ORDER BY val <#> '[1,1,1]') t2;
+SELECT COUNT(*) FROM (SELECT * FROM t ORDER BY val <#> (SELECT NULL::vector)) t2;
+
+DROP TABLE t;
 
 -- Test 3: IVF Index with Cosine Distance
 \echo ''
@@ -96,9 +108,8 @@ BEGIN
 END $$;
 
 -- Test index configuration parameters
--- Note: pgvector GUC parameters (ivfflat.probes, etc.) are not supported in NeuronDB
--- IVF uses index options (WITH clause) instead of GUC parameters
-\echo 'SKIPPED: pgvector GUC parameters (ivfflat.probes, etc.) not supported in NeuronDB'
+-- Note: IVF uses index options (WITH clause) for configuration
+\echo 'SKIPPED: IVF index configuration uses WITH clause options'
 
 DROP TABLE t;
 

@@ -1,11 +1,11 @@
 -- ============================================================================
--- Test 006: Advanced Vector Features (Beyond pgvector)
+-- Test 006: Advanced Vector Features
 -- ============================================================================
 -- Demonstrates: Time travel, Federation, Replication, Multi-vector search
 -- ============================================================================
 
 \echo '=========================================================================='
-\echo '|        Advanced Vector Features - Superior to pgvector                |'
+\echo '|        Advanced Vector Features - Comprehensive Implementation        |'
 \echo '=========================================================================='
 \echo ''
 
@@ -129,8 +129,8 @@ SELECT enable_vector_replication(
 \echo '=========================================================================='
 \echo 'Advanced Features Test Complete!'
 \echo ''
-\echo 'NeuronDB EXCEEDS pgvector with:'
-\echo '  ✅ 11 distance metrics vs 3 in pgvector'
+\echo 'NeuronDB Comprehensive Vector Features:'
+\echo '  ✅ 11 distance metrics
 \echo '  ✅ GPU acceleration (Metal/CUDA)'
 \echo '  ✅ Vector arithmetic (add, sub, mul)'
 \echo '  ✅ Time travel for embeddings'
@@ -142,7 +142,7 @@ SELECT enable_vector_replication(
 \echo '  ✅ Replication support'
 \echo '  ✅ 3 quantization methods (int8, fp16, binary)'
 \echo ''
-\echo 'Total: 111 vector functions vs ~20 in pgvector'
+\echo 'Total: 111+ vector functions
 \echo '=========================================================================='
 \echo ''
 

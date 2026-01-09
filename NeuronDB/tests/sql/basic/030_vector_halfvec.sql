@@ -33,9 +33,8 @@ SELECT ' [ 1,  2 ,    3  ] '::halfvec;
 -- Convert to vector for arithmetic operations, then back to halfvec
 SELECT vector_to_halfvec(halfvec_to_vector('[1,2,3]'::halfvec) + halfvec_to_vector('[4,5,6]'::halfvec));
 SELECT vector_to_halfvec(halfvec_to_vector('[1,2,3]'::halfvec) - halfvec_to_vector('[4,5,6]'::halfvec));
--- NOTE: vector || vector operator not supported - test skipped
--- SELECT vector_to_halfvec(halfvec_to_vector('[1,2,3]'::halfvec) || halfvec_to_vector('[4,5]'::halfvec));
-SELECT 'vector concatenation test skipped (operator not supported)' AS note;
+-- Vector concatenation operator now supported
+SELECT vector_to_halfvec(halfvec_to_vector('[1,2,3]'::halfvec) || halfvec_to_vector('[4,5]'::halfvec));
 
 -- Test 3: Halfvec Comparison
 \echo ''
@@ -43,14 +42,13 @@ SELECT 'vector concatenation test skipped (operator not supported)' AS note;
 \echo 'Test 3: Halfvec Comparison'
 \echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
 
--- NOTE: Comparison operators (<, <=, >, >=) not implemented for halfvec - tests skipped
--- SELECT '[1,2,3]'::halfvec < '[1,2,3]';
--- SELECT '[1,2,3]'::halfvec <= '[1,2,3]';
-SELECT '[1,2,3]'::halfvec = '[1,2,3]';
-SELECT '[1,2,3]'::halfvec != '[1,2,3]';
--- SELECT '[1,2,3]'::halfvec >= '[1,2,3]';
--- SELECT '[1,2,3]'::halfvec > '[1,2,3]';
-SELECT 'halfvec comparison operators (<, <=, >, >=) test skipped (not implemented)' AS note;
+-- Comparison operators now implemented for halfvec
+SELECT '[1,2,3]'::halfvec < '[1,2,4]'::halfvec;
+SELECT '[1,2,3]'::halfvec <= '[1,2,3]'::halfvec;
+SELECT '[1,2,3]'::halfvec = '[1,2,3]'::halfvec;
+SELECT '[1,2,3]'::halfvec != '[1,2,3]'::halfvec;
+SELECT '[1,2,4]'::halfvec >= '[1,2,3]'::halfvec;
+SELECT '[1,2,4]'::halfvec > '[1,2,3]'::halfvec;
 
 -- Test 4: Halfvec Distance Functions
 \echo ''
@@ -67,9 +65,8 @@ SELECT '[1,2]'::halfvec <#> '[3,4]';
 SELECT halfvec_cosine_distance('[1,2]'::halfvec, '[2,4]');
 SELECT '[1,2]'::halfvec <=> '[2,4]';
 
--- NOTE: L1 distance operator (<+>) not implemented for halfvec - test skipped
--- SELECT '[0,0]'::halfvec <+> '[3,4]';
-SELECT 'halfvec L1 distance (<+>) test skipped (operator not implemented)' AS note;
+-- L1 distance operator now implemented for halfvec
+SELECT '[0,0]'::halfvec <+> '[3,4]'::halfvec;
 
 -- Test 5: Halfvec Normalization
 \echo ''

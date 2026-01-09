@@ -64,16 +64,16 @@ SELECT 'set_access_mask test skipped (signature/implementation may differ)' AS n
 \echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
 
 \echo 'Test 8: Register custom operator'
--- NOTE: register_custom_operator function not implemented
-SELECT 'register_custom_operator test skipped (function not implemented)' AS note;
+-- Function is now implemented (basic stub)
+SELECT register_custom_operator('test_op', 'test_func', NULL::regtype, NULL::regtype, NULL::regtype) AS registered;
 
 \echo 'Test 9: Enable vector replication'
--- NOTE: enable_vector_replication function not implemented
-SELECT 'enable_vector_replication test skipped (function not implemented)' AS note;
+-- Function is now implemented (basic stub)
+SELECT enable_vector_replication('test_table', 'async') AS replication_enabled;
 
 \echo 'Test 10: Create vector FDW'
--- NOTE: create_vector_fdw function not implemented
-SELECT 'create_vector_fdw test skipped (function not implemented)' AS note;
+-- Function is now implemented (basic stub)
+SELECT create_vector_fdw('test_server', '{}'::jsonb) AS fdw_created;
 
 /*-------------------------------------------------------------------
  * ---- DISTRIBUTED OPERATIONS ----
@@ -83,8 +83,9 @@ SELECT 'create_vector_fdw test skipped (function not implemented)' AS note;
 \echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
 
 \echo 'Test 11: Federated vector query'
--- NOTE: federated_vector_query function not implemented
-SELECT 'federated_vector_query test skipped (function not implemented)' AS note;
+-- Function is now implemented (basic stub)
+-- Note: This requires proper setup with remote servers, so we just verify the function exists
+SELECT proname FROM pg_proc WHERE proname = 'federated_vector_query';
 
 \echo ''
 \echo '=========================================================================='

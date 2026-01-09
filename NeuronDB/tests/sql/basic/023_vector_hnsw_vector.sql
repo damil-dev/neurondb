@@ -142,18 +142,37 @@ DO $$ BEGIN
 EXCEPTION WHEN OTHERS THEN
 END $$;
 
--- NOTE: The following parameters are pgvector-specific and not supported in NeuronDB:
--- - hnsw.iterative_scan
--- - hnsw.max_scan_tuples  
--- - hnsw.scan_mem_multiplier
--- These tests are commented out until equivalent functionality is added
---SHOW hnsw.iterative_scan;
---SET hnsw.iterative_scan = on;
---SHOW hnsw.max_scan_tuples;
---SET hnsw.max_scan_tuples = 0;
---SHOW hnsw.scan_mem_multiplier;
---SET hnsw.scan_mem_multiplier = 0;
---SET hnsw.scan_mem_multiplier = 1001;
+-- Test iterative scan parameters (new feature)
+\echo ''
+\echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+\echo 'Test: Iterative Scan Parameters'
+\echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+
+SHOW neurondb.hnsw_iterative_scan;
+SET neurondb.hnsw_iterative_scan = 'off';
+SET neurondb.hnsw_iterative_scan = 'strict_order';
+SET neurondb.hnsw_iterative_scan = 'relaxed_order';
+SHOW neurondb.hnsw_max_scan_tuples;
+SET neurondb.hnsw_max_scan_tuples = 10000;
+SET neurondb.hnsw_max_scan_tuples = 20000;
+SHOW neurondb.hnsw_scan_mem_multiplier;
+SET neurondb.hnsw_scan_mem_multiplier = 1.0;
+SET neurondb.hnsw_scan_mem_multiplier = 2.0;
+
+-- Test invalid values
+DO $$
+BEGIN
+    BEGIN
+        SET neurondb.hnsw_max_scan_tuples = 0;
+        RAISE EXCEPTION 'Should have failed';
+    EXCEPTION WHEN OTHERS THEN
+    END;
+    BEGIN
+        SET neurondb.hnsw_scan_mem_multiplier = 0.0;
+        RAISE EXCEPTION 'Should have failed';
+    EXCEPTION WHEN OTHERS THEN
+    END;
+END $$;
 
 DROP TABLE t;
 

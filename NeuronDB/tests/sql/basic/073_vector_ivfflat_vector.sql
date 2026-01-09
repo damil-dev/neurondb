@@ -107,17 +107,28 @@ BEGIN
 END $$;
 
 -- Test index configuration parameters
--- Note: NeuronDB uses different parameter names than pgvector
--- SHOW ivfflat.probes;  -- Not supported, use ivf.nprobe instead
--- SET ivfflat.probes = 0;  -- Not supported
--- SET ivfflat.probes = 32769;  -- Not supported
--- SHOW ivfflat.iterative_scan;  -- Not supported
--- SET ivfflat.iterative_scan = on;  -- Not supported
-\echo 'SKIPPED: ivfflat.* parameters (NeuronDB uses ivf.nprobe instead)'
+-- Test iterative scan parameters (new feature)
+\echo ''
+\echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+\echo 'Test: IVF Iterative Scan Parameters'
+\echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
 
--- SHOW ivfflat.max_probes;  -- Not supported
--- SET ivfflat.max_probes = 0;  -- Not supported
--- SET ivfflat.max_probes = 32769;  -- Not supported
+SHOW neurondb.ivf_iterative_scan;
+SET neurondb.ivf_iterative_scan = 'off';
+SET neurondb.ivf_iterative_scan = 'relaxed_order';
+SHOW neurondb.ivf_max_probes;
+SET neurondb.ivf_max_probes = 50;
+SET neurondb.ivf_max_probes = 100;
+
+-- Test invalid values
+DO $$
+BEGIN
+    BEGIN
+        SET neurondb.ivf_max_probes = 0;
+        RAISE EXCEPTION 'Should have failed';
+    EXCEPTION WHEN OTHERS THEN
+    END;
+END $$;
 
 DROP TABLE t;
 

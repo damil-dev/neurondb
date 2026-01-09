@@ -43,8 +43,8 @@ CREATE TEMP TABLE rag_documents_test (
 
 -- Insert documents with clear, distinct topics
 INSERT INTO rag_documents_test (content, embedding, metadata) VALUES
-	('PostgreSQL is an advanced open-source relational database management system. It supports ACID transactions, foreign keys, triggers, views, and stored procedures. PostgreSQL is known for its extensibility through extensions like PostGIS for geospatial data and pgvector for vector similarity search.',
-	 embed_text('PostgreSQL is an advanced open-source relational database management system. It supports ACID transactions, foreign keys, triggers, views, and stored procedures. PostgreSQL is known for its extensibility through extensions like PostGIS for geospatial data and pgvector for vector similarity search.'),
+	('PostgreSQL is an advanced open-source relational database management system. It supports ACID transactions, foreign keys, triggers, views, and stored procedures. PostgreSQL is known for its extensibility through extensions like PostGIS for geospatial data and NeuronDB for vector similarity search.',
+	 embed_text('PostgreSQL is an advanced open-source relational database management system. It supports ACID transactions, foreign keys, triggers, views, and stored procedures. PostgreSQL is known for its extensibility through extensions like PostGIS for geospatial data and NeuronDB for vector similarity search.'),
 	 '{"topic": "database", "source": "docs"}'::jsonb),
 	('Machine learning is a subset of artificial intelligence that enables computers to learn from data without explicit programming. Common machine learning algorithms include linear regression, decision trees, neural networks, and support vector machines. Training involves adjusting model parameters to minimize prediction error.',
 	 embed_text('Machine learning is a subset of artificial intelligence that enables computers to learn from data without explicit programming. Common machine learning algorithms include linear regression, decision trees, neural networks, and support vector machines. Training involves adjusting model parameters to minimize prediction error.'),

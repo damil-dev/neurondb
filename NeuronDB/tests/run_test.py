@@ -200,7 +200,7 @@ def list_sql_files(category: str, module: Optional[str] = None) -> List[str]:
 			       "xgboost", "catboost", "lightgbm", "neural_network", "gmm", "kmeans", 
 			       "minibatch_kmeans", "hierarchical", "dbscan", "pca", "timeseries", 
 			       "automl", "recommender", "arima"],
-			"vector": ["vector", "vecmap", "sparse_vectors", "pgvector"],
+			"vector": ["vector", "vecmap", "sparse_vectors"],
 			"embedding": ["embedding", "embeddings"],
 			"rag": ["rag"],
 			"hybrid": ["hybrid_search"],

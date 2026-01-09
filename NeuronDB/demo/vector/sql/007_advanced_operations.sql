@@ -1,15 +1,15 @@
 -- ============================================================================
--- Test 007: Advanced Vector Operations (FAR BEYOND pgvector)
+-- Test 007: Advanced Vector Operations
 -- ============================================================================
--- Demonstrates 22 advanced functions that pgvector doesn't have
+-- Demonstrates 22 advanced vector manipulation functions
 -- ============================================================================
 
 \echo '=========================================================================='
-\echo '|    Advanced Vector Operations - NeuronDB Superiority Over pgvector    |'
+\echo '|    Advanced Vector Operations - Comprehensive Implementation          |'
 \echo '=========================================================================='
 \echo ''
 
--- Test 1: Element Access (pgvector doesn't have this)
+-- Test 1: Element Access
 \echo 'Test 1: Element Access - Get/Set individual elements'
 SELECT 
     '[10,20,30,40,50]'::vector AS original,
@@ -22,7 +22,7 @@ SELECT
     vector_set('[10,20,30,40,50]'::vector, 2, 999.0) AS set_index_2_to_999;
 
 \echo ''
-\echo 'Test 2: Vector Slicing (pgvector doesn''t have this)'
+\echo 'Test 2: Vector Slicing'
 SELECT 
     '[1,2,3,4,5,6,7,8,9,10]'::vector AS original,
     vector_slice('[1,2,3,4,5,6,7,8,9,10]'::vector, 0, 3) AS first_3_elements,
@@ -30,14 +30,14 @@ SELECT
     vector_slice('[1,2,3,4,5,6,7,8,9,10]'::vector, 2, 8) AS middle_elements;
 
 \echo ''
-\echo 'Test 3: Append/Prepend (pgvector doesn''t have this)'
+\echo 'Test 3: Append/Prepend'
 SELECT 
     '[1,2,3]'::vector AS original,
     vector_append('[1,2,3]'::vector, 4.0) AS appended,
     vector_prepend(0.0, '[1,2,3]'::vector) AS prepended;
 
 \echo ''
-\echo 'Test 4: Element-wise Operations (pgvector doesn''t have these)'
+\echo 'Test 4: Element-wise Operations'
 SELECT 
     '[-3,-2,-1,0,1,2,3]'::vector AS original,
     vector_abs('[-3,-2,-1,0,1,2,3]'::vector) AS absolute_values;
@@ -53,7 +53,7 @@ SELECT
     vector_pow('[2,3,4]'::vector, 0.5) AS square_root;
 
 \echo ''
-\echo 'Test 5: Hadamard Product & Division (pgvector doesn''t have these)'
+\echo 'Test 5: Hadamard Product & Division'
 SELECT 
     '[1,2,3,4,5]'::vector AS vec1,
     '[2,2,2,2,2]'::vector AS vec2,
@@ -61,7 +61,7 @@ SELECT
     vector_divide('[10,20,30,40,50]'::vector, '[2,2,2,2,2]'::vector) AS element_wise_div;
 
 \echo ''
-\echo 'Test 6: Statistical Functions (pgvector doesn''t have these)'
+\echo 'Test 6: Statistical Functions'
 SELECT 
     '[1,2,3,4,5,6,7,8,9,10]'::vector AS vector,
     vector_mean('[1,2,3,4,5,6,7,8,9,10]'::vector) AS mean_should_be_5_point_5,
@@ -72,7 +72,7 @@ SELECT
     vector_sum('[1,2,3,4,5]'::vector) AS sum_should_be_15;
 
 \echo ''
-\echo 'Test 7: Vector Comparison (pgvector doesn''t have these)'
+\echo 'Test 7: Vector Comparison'
 SELECT 
     '[1,2,3]'::vector = '[1,2,3]'::vector AS should_be_true,
     '[1,2,3]'::vector = '[1,2,4]'::vector AS should_be_false,
@@ -80,7 +80,7 @@ SELECT
     vector_ne('[1,2,3]'::vector, '[1,2,4]'::vector) AS ne_true;
 
 \echo ''
-\echo 'Test 8: Vector Preprocessing (pgvector doesn''t have these)'
+\echo 'Test 8: Vector Preprocessing'
 SELECT 
     '[-10,5,15,25,30]'::vector AS original,
     vector_clip('[-10,5,15,25,30]'::vector, 0.0, 20.0) AS clipped_0_to_20;
@@ -131,7 +131,7 @@ LIMIT 5;
 \echo '=========================================================================='
 \echo 'Advanced Operations Test Complete!'
 \echo ''
-\echo 'NeuronDB has 22 ADVANCED functions that pgvector LACKS:'
+\echo 'NeuronDB provides 22 advanced vector manipulation functions:'
 \echo '  ✅ Element access: vector_get(), vector_set()'
 \echo '  ✅ Slicing: vector_slice()'
 \echo '  ✅ Append/Prepend: vector_append(), vector_prepend()'
@@ -141,8 +141,7 @@ LIMIT 5;
 \echo '  ✅ Comparison: eq(), ne()'
 \echo '  ✅ Preprocessing: clip(), standardize(), minmax_normalize()'
 \echo ''
-\echo 'pgvector only has: Type, 3 distances, 2 indexes'
-\echo 'NeuronDB has: Type, 11 distances, 2 indexes, 22 advanced ops, GPU support'
+\echo 'NeuronDB provides: Type, 11 distances, 2 indexes, 22 advanced ops, GPU support'
 \echo '=========================================================================='
 \echo ''
 

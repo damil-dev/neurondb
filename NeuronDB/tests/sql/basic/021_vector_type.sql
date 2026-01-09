@@ -133,8 +133,8 @@ SELECT unnest('{"[1,2,3]", "[4,5,6]"}'::vector[]);
 
 SELECT '[1,2,3]'::vector + '[4,5,6]';
 SELECT '[1,2,3]'::vector - '[4,5,6]';
--- Note: Element-wise vector * vector multiplication not available in NeuronDB
--- Use inner_product for dot product, or scalar multiplication
+-- Element-wise vector * vector multiplication (Hadamard product) - not implemented
+-- SELECT '[1,2,3]'::vector * '[4,5,6]'::vector;
 SELECT '[1,2,3]'::vector * 2.0;
 SELECT '[1,2,3]'::vector || '[4,5]';
 
@@ -150,6 +150,18 @@ SELECT '[1,2,3]'::vector = '[1,2,3]';
 SELECT '[1,2,3]'::vector != '[1,2,3]';
 SELECT '[1,2,3]'::vector >= '[1,2,3]';
 SELECT '[1,2,3]'::vector > '[1,2,3]';
+
+-- Test comparison with different dimensions (lexicographic comparison - new feature)
+SELECT '[1,2]'::vector < '[1,2,3]'::vector;
+SELECT '[1,2,3]'::vector < '[1,2]'::vector;
+SELECT '[1,2]'::vector = '[1,2,3]'::vector;
+SELECT '[1,2,3]'::vector = '[1,2]'::vector;
+SELECT '[1,2]'::vector <= '[1,2,3]'::vector;
+SELECT '[1,2,3]'::vector <= '[1,2]'::vector;
+SELECT '[2,1]'::vector < '[1,2,3]'::vector;
+SELECT '[1,2,3]'::vector < '[2,1]'::vector;
+SELECT '[1,3]'::vector < '[1,2,3]'::vector;
+SELECT '[1,2,3]'::vector < '[1,3]'::vector;
 
 -- Test 7: Vector Dimensions and Norm
 \echo ''
@@ -173,8 +185,24 @@ SELECT vector_norm('[2]');
 SELECT vector_l2_distance('[0,0]'::vector, '[3,4]');
 SELECT '[0,0]'::vector <-> '[3,4]';
 
+-- Test vector_l2_squared_distance (new feature - for index optimization)
+SELECT vector_l2_squared_distance('[0,0]'::vector, '[3,4]'::vector);
+SELECT vector_l2_squared_distance('[0,0]'::vector, '[3,4]'::vector) = 25.0;
+SELECT vector_l2_squared_distance('[1,2]'::vector, '[4,6]'::vector);
+SELECT vector_l2_squared_distance('[1,2]'::vector, '[4,6]'::vector) = 25.0;
+SELECT vector_l2_squared_distance('[0,0,0]'::vector, '[3,4,5]'::vector);
+SELECT vector_l2_squared_distance('[0,0,0]'::vector, '[3,4,5]'::vector) = 50.0;
+
 SELECT vector_inner_product('[1,2]'::vector, '[3,4]');
 SELECT '[1,2]'::vector <#> '[3,4]';
+
+-- Test vector_negative_inner_product (new feature - for index optimization)
+SELECT vector_negative_inner_product('[1,2]'::vector, '[3,4]'::vector);
+SELECT vector_negative_inner_product('[1,2]'::vector, '[3,4]'::vector) = -11.0;
+SELECT vector_negative_inner_product('[0,0]'::vector, '[3,4]'::vector);
+SELECT vector_negative_inner_product('[0,0]'::vector, '[3,4]'::vector) = 0.0;
+SELECT vector_negative_inner_product('[1,1]'::vector, '[1,1]'::vector);
+SELECT vector_negative_inner_product('[1,1]'::vector, '[1,1]'::vector) = -2.0;
 
 SELECT vector_cosine_distance('[1,2]'::vector, '[2,4]');
 SELECT vector_cosine_distance('[1,2]'::vector, '[0,0]');
