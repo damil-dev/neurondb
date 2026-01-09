@@ -661,6 +661,34 @@ vector_sum(PG_FUNCTION_ARGS)
 }
 
 /*
+ * Internal helper to compare vectors
+ * Uses lexicographic comparison, supports different dimensions
+ */
+static int
+vector_cmp_internal_ops(Vector *a, Vector *b)
+{
+	int			dim = Min(a->dim, b->dim);
+	int			i;
+
+	/* Check values before dimensions to be consistent with Postgres arrays */
+	for (i = 0; i < dim; i++)
+	{
+		if (a->data[i] < b->data[i])
+			return -1;
+		if (a->data[i] > b->data[i])
+			return 1;
+	}
+
+	/* If common elements are equal, compare by dimension */
+	if (a->dim < b->dim)
+		return -1;
+	if (a->dim > b->dim)
+		return 1;
+
+	return 0;
+}
+
+/*
  * Vector comparison
  */
 PG_FUNCTION_INFO_V1(vector_eq);
@@ -681,25 +709,7 @@ vector_eq(PG_FUNCTION_ARGS)
 	b = PG_GETARG_VECTOR_P(1);
 	NDB_CHECK_VECTOR_VALID(b);
 	
-	/* Check dimension mismatch FIRST - before any element access
-	 * This must be checked before the loop to prevent out-of-bounds access
-	 * and to ensure mathematical correctness of vector comparison.
-	 * Use same pattern as vector_lt/vector_le in operators.c
-	 */
-	if (a->dim != b->dim)
-		ereport(ERROR,
-				(errcode(ERRCODE_DATA_EXCEPTION),
-				 errmsg("cannot compare vectors of different dimensions: %d vs %d",
-						a->dim,
-						b->dim)));
-
-	int			i;
-
-	for (i = 0; i < a->dim; i++)
-		if (a->data[i] != b->data[i])
-			PG_RETURN_BOOL(false);
-
-	PG_RETURN_BOOL(true);
+	PG_RETURN_BOOL(vector_cmp_internal_ops(a, b) == 0);
 }
 
 PG_FUNCTION_INFO_V1(vector_ne);

@@ -145,6 +145,54 @@ vector_l2_distance(PG_FUNCTION_ARGS)
 	PG_RETURN_FLOAT4(l2_distance_simd(a, b));
 }
 
+/* L2 squared distance (without sqrt) - used for index optimization */
+float4
+l2_squared_distance(Vector *a, Vector *b)
+{
+	double		c = 0.0;
+	double		diff;
+	double		sum = 0.0;
+	double		t;
+	double		y;
+	int			i;
+
+	check_dimensions(a, b);
+
+	/* Kahan summation for numerical stability */
+	for (i = 0; i < a->dim; i++)
+	{
+		diff = (double) a->data[i] - (double) b->data[i];
+		y = (diff * diff) - c;
+		t = sum + y;
+
+		c = (t - sum) - y;
+		sum = t;
+	}
+
+	return (float4) sum;
+}
+
+/* vector_l2_squared_distance: Optimized L2 distance without sqrt for index optimization */
+PG_FUNCTION_INFO_V1(vector_l2_squared_distance);
+Datum
+vector_l2_squared_distance(PG_FUNCTION_ARGS)
+{
+	Vector	   *a = NULL;
+	Vector	   *b = NULL;
+
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_l2_squared_distance requires 2 arguments")));
+
+	a = PG_GETARG_VECTOR_P(0);
+	NDB_CHECK_VECTOR_VALID(a);
+	b = PG_GETARG_VECTOR_P(1);
+	NDB_CHECK_VECTOR_VALID(b);
+
+	PG_RETURN_FLOAT8((double) l2_squared_distance(a, b));
+}
+
 float4
 inner_product_distance(Vector *a, Vector *b)
 {
@@ -178,6 +226,28 @@ vector_inner_product(PG_FUNCTION_ARGS)
 	NDB_CHECK_VECTOR_VALID(b);
 	/* Use SIMD-optimized version if available */
 	PG_RETURN_FLOAT4(inner_product_simd(a, b));
+}
+
+/* vector_negative_inner_product: Negative inner product for index optimization */
+PG_FUNCTION_INFO_V1(vector_negative_inner_product);
+Datum
+vector_negative_inner_product(PG_FUNCTION_ARGS)
+{
+	Vector	   *a = NULL;
+	Vector	   *b = NULL;
+
+	if (PG_NARGS() != 2)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("neurondb: vector_negative_inner_product requires 2 arguments")));
+
+	a = PG_GETARG_VECTOR_P(0);
+	NDB_CHECK_VECTOR_VALID(a);
+	b = PG_GETARG_VECTOR_P(1);
+	NDB_CHECK_VECTOR_VALID(b);
+
+	/* inner_product_distance already returns negative inner product */
+	PG_RETURN_FLOAT8((double) inner_product_distance(a, b));
 }
 
 float4

@@ -677,21 +677,29 @@ vector_eq(PG_FUNCTION_ARGS)
 	if (a == NULL || b == NULL)
 		PG_RETURN_BOOL(false);
 
-	if (a->dim != b->dim)
-		PG_RETURN_BOOL(false);
-
-	for (i = 0; i < a->dim; i++)
+	/* Use lexicographic comparison supporting different dimensions */
 	{
-		if (isnan(a->data[i]) || isnan(b->data[i]))
+		int			dim = Min(a->dim, b->dim);
+		int			j;
+
+		/* Check values before dimensions to be consistent with Postgres arrays */
+		for (j = 0; j < dim; j++)
 		{
-			/* NaN comparison: both must be NaN for equality */
-			if (isnan(a->data[i]) != isnan(b->data[i]))
+			if (isnan(a->data[j]) || isnan(b->data[j]))
+			{
+				/* NaN comparison: both must be NaN for equality */
+				if (isnan(a->data[j]) != isnan(b->data[j]))
+					PG_RETURN_BOOL(false);
+			}
+			else if (fabs(a->data[j] - b->data[j]) > 1e-6)
+			{
 				PG_RETURN_BOOL(false);
+			}
 		}
-		else if (fabs(a->data[i] - b->data[i]) > 1e-6)
-		{
+
+		/* If common elements are equal, compare by dimension */
+		if (a->dim != b->dim)
 			PG_RETURN_BOOL(false);
-		}
 	}
 
 	PG_RETURN_BOOL(true);

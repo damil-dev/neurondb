@@ -17,8 +17,10 @@
 /* Distance metric functions */
 extern Datum vector_l2_distance(PG_FUNCTION_ARGS);
 extern Datum vector_l2_distance_op(PG_FUNCTION_ARGS);
+extern Datum vector_l2_squared_distance(PG_FUNCTION_ARGS);
 extern Datum vector_inner_product(PG_FUNCTION_ARGS);
 extern Datum vector_inner_product_distance_op(PG_FUNCTION_ARGS);
+extern Datum vector_negative_inner_product(PG_FUNCTION_ARGS);
 extern Datum vector_cosine_distance(PG_FUNCTION_ARGS);
 extern Datum vector_cosine_distance_op(PG_FUNCTION_ARGS);
 extern Datum vector_l1_distance(PG_FUNCTION_ARGS);
