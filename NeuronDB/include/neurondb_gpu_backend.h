@@ -403,6 +403,68 @@ typedef struct ndb_gpu_backend
 									   char **text_out,
 									   char **errstr);
 
+	/* HNSW index search */
+	int			(*hnsw_search) (const float *query,
+								const float *nodes,
+								const uint32_t *neighbors,
+								const int32_t *neighbor_counts,
+								const int32_t *node_levels,
+								uint32_t entry_point,
+								int entry_level,
+								int dim,
+								int m,
+								int ef_search,
+								int k,
+								uint32_t *result_blocks,
+								float *result_distances,
+								ndb_stream_t stream);
+
+	/* IVF index search */
+	int			(*ivf_search) (const float *query,
+							  const float *centroids,
+							  const float *vectors,
+							  const int32_t *list_offsets,
+							  const int32_t *list_sizes,
+							  int nlists,
+							  int nprobe,
+							  int dim,
+							  int k,
+							  uint32_t *result_indices,
+							  float *result_distances,
+							  ndb_stream_t stream);
+
+	/* Batch HNSW search (multiple queries) */
+	int			(*hnsw_search_batch) (const float *queries,
+									 const float *nodes,
+									 const uint32_t *neighbors,
+									 const int32_t *neighbor_counts,
+									 const int32_t *node_levels,
+									 uint32_t entry_point,
+									 int entry_level,
+									 int num_queries,
+									 int dim,
+									 int m,
+									 int ef_search,
+									 int k,
+									 uint32_t *result_blocks,
+									 float *result_distances,
+									 ndb_stream_t stream);
+
+	/* Batch IVF search (multiple queries) */
+	int			(*ivf_search_batch) (const float *queries,
+									 const float *centroids,
+									 const float *vectors,
+									 const int32_t *list_offsets,
+									 const int32_t *list_sizes,
+									 int num_queries,
+									 int nlists,
+									 int nprobe,
+									 int dim,
+									 int k,
+									 uint32_t *result_indices,
+									 float *result_distances,
+									 ndb_stream_t stream);
+
 	/* Stream utilities */
 	int			(*stream_create) (ndb_stream_t * stream);
 	int			(*stream_destroy) (ndb_stream_t stream);

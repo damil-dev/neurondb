@@ -153,6 +153,60 @@ static int	ndb_cuda_launch_pq_encode(const float *vectors,
 									  int m,
 									  int ks,
 									  ndb_stream_t stream);
+static int	ndb_cuda_hnsw_search(const float *query,
+								 const float *nodes,
+								 const uint32_t *neighbors,
+								 const int32_t *neighbor_counts,
+								 const int32_t *node_levels,
+								 uint32_t entry_point,
+								 int entry_level,
+								 int dim,
+								 int m,
+								 int ef_search,
+								 int k,
+								 uint32_t *result_blocks,
+								 float *result_distances,
+								 ndb_stream_t stream);
+static int	ndb_cuda_hnsw_search_batch(const float *queries,
+										const float *nodes,
+										const uint32_t *neighbors,
+										const int32_t *neighbor_counts,
+										const int32_t *node_levels,
+										uint32_t entry_point,
+										int entry_level,
+										int num_queries,
+										int dim,
+										int m,
+										int ef_search,
+										int k,
+										uint32_t *result_blocks,
+										float *result_distances,
+										ndb_stream_t stream);
+static int	ndb_cuda_ivf_search(const float *query,
+								 const float *centroids,
+								 const float *vectors,
+								 const int32_t *list_offsets,
+								 const int32_t *list_sizes,
+								 int nlists,
+								 int nprobe,
+								 int dim,
+								 int k,
+								 uint32_t *result_indices,
+								 float *result_distances,
+								 ndb_stream_t stream);
+static int	ndb_cuda_ivf_search_batch(const float *queries,
+									  const float *centroids,
+									  const float *vectors,
+									  const int32_t *list_offsets,
+									  const int32_t *list_sizes,
+									  int num_queries,
+									  int nlists,
+									  int nprobe,
+									  int dim,
+									  int k,
+									  uint32_t *result_indices,
+									  float *result_distances,
+									  ndb_stream_t stream);
 
 static int
 ndb_cuda_init(void)
@@ -727,6 +781,204 @@ ndb_cuda_launch_pq_encode(const float *vectors,
 		: -1;
 }
 
+/* Forward declaration for HNSW kernel function */
+extern int gpu_hnsw_search_cuda(const float *h_query,
+								 const float *h_nodes,
+								 const uint32_t *h_neighbors,
+								 const int32_t *h_neighbor_counts,
+								 const int32_t *h_node_levels,
+								 uint32_t entry_point,
+								 int entry_level,
+								 int dim,
+								 int m,
+								 int ef_search,
+								 int k,
+								 uint32_t *h_result_blocks,
+								 float *h_result_distances);
+
+/* Forward declaration for IVF kernel function */
+extern int gpu_ivf_search_cuda(const float *h_query,
+								const float *h_centroids,
+								const float *h_vectors,
+								const int32_t *h_list_offsets,
+								const int32_t *h_list_sizes,
+								int nlists,
+								int nprobe,
+								int dim,
+								int k,
+								uint32_t *h_result_indices,
+								float *h_result_distances);
+
+/* Forward declaration for batch HNSW kernel function */
+extern int gpu_hnsw_search_batch_cuda(const float *h_queries,
+									  const float *h_nodes,
+									  const uint32_t *h_neighbors,
+									  const int32_t *h_neighbor_counts,
+									  const int32_t *h_node_levels,
+									  uint32_t entry_point,
+									  int entry_level,
+									  int num_queries,
+									  int dim,
+									  int m,
+									  int ef_search,
+									  int k,
+									  uint32_t *h_result_blocks,
+									  float *h_result_distances);
+
+/* Forward declaration for batch IVF kernel function */
+extern int gpu_ivf_search_batch_cuda(const float *h_queries,
+									 const float *h_centroids,
+									 const float *h_vectors,
+									 const int32_t *h_list_offsets,
+									 const int32_t *h_list_sizes,
+									 int num_queries,
+									 int nlists,
+									 int nprobe,
+									 int dim,
+									 int k,
+									 uint32_t *h_result_indices,
+									 float *h_result_distances);
+
+static int
+ndb_cuda_hnsw_search(const float *query,
+					 const float *nodes,
+					 const uint32_t *neighbors,
+					 const int32_t *neighbor_counts,
+					 const int32_t *node_levels,
+					 uint32_t entry_point,
+					 int entry_level,
+					 int dim,
+					 int m,
+					 int ef_search,
+					 int k,
+					 uint32_t *result_blocks,
+					 float *result_distances,
+					 ndb_stream_t stream)
+{
+	(void) stream; /* TODO: Use stream for async execution */
+
+	if (!cuda_ctx.initialized)
+		return -1;
+
+	return gpu_hnsw_search_cuda(query,
+								nodes,
+								neighbors,
+								neighbor_counts,
+								node_levels,
+								entry_point,
+								entry_level,
+								dim,
+								m,
+								ef_search,
+								k,
+								result_blocks,
+								result_distances);
+}
+
+static int
+ndb_cuda_hnsw_search_batch(const float *queries,
+							const float *nodes,
+							const uint32_t *neighbors,
+							const int32_t *neighbor_counts,
+							const int32_t *node_levels,
+							uint32_t entry_point,
+							int entry_level,
+							int num_queries,
+							int dim,
+							int m,
+							int ef_search,
+							int k,
+							uint32_t *result_blocks,
+							float *result_distances,
+							ndb_stream_t stream)
+{
+	(void) stream; /* TODO: Use stream for async execution */
+
+	if (!cuda_ctx.initialized)
+		return -1;
+
+	return gpu_hnsw_search_batch_cuda(queries,
+									 nodes,
+									 neighbors,
+									 neighbor_counts,
+									 node_levels,
+									 entry_point,
+									 entry_level,
+									 num_queries,
+									 dim,
+									 m,
+									 ef_search,
+									 k,
+									 result_blocks,
+									 result_distances);
+}
+
+static int
+ndb_cuda_ivf_search(const float *query,
+					const float *centroids,
+					const float *vectors,
+					const int32_t *list_offsets,
+					const int32_t *list_sizes,
+					int nlists,
+					int nprobe,
+					int dim,
+					int k,
+					uint32_t *result_indices,
+					float *result_distances,
+					ndb_stream_t stream)
+{
+	(void) stream; /* TODO: Use stream for async execution */
+
+	if (!cuda_ctx.initialized)
+		return -1;
+
+	return gpu_ivf_search_cuda(query,
+							   centroids,
+							   vectors,
+							   list_offsets,
+							   list_sizes,
+							   nlists,
+							   nprobe,
+							   dim,
+							   k,
+							   result_indices,
+							   result_distances);
+}
+
+static int
+ndb_cuda_ivf_search_batch(const float *queries,
+						   const float *centroids,
+						   const float *vectors,
+						   const int32_t *list_offsets,
+						   const int32_t *list_sizes,
+						   int num_queries,
+						   int nlists,
+						   int nprobe,
+						   int dim,
+						   int k,
+						   uint32_t *result_indices,
+						   float *result_distances,
+						   ndb_stream_t stream)
+{
+	(void) stream; /* TODO: Use stream for async execution */
+
+	if (!cuda_ctx.initialized)
+		return -1;
+
+	return gpu_ivf_search_batch_cuda(queries,
+									 centroids,
+									 vectors,
+									 list_offsets,
+									 list_sizes,
+									 num_queries,
+									 nlists,
+									 nprobe,
+									 dim,
+									 k,
+									 result_indices,
+									 result_distances);
+}
+
 static const ndb_gpu_backend ndb_cuda_backend = {
 	.name = "CUDA",
 	.provider = "NVIDIA",
@@ -818,6 +1070,11 @@ static const ndb_gpu_backend ndb_cuda_backend = {
 #endif
 	.hf_complete = ndb_cuda_hf_complete,
 	.hf_rerank = ndb_cuda_hf_rerank,
+
+	.hnsw_search = ndb_cuda_hnsw_search,
+	.hnsw_search_batch = ndb_cuda_hnsw_search_batch,
+	.ivf_search = ndb_cuda_ivf_search,
+	.ivf_search_batch = ndb_cuda_ivf_search_batch,
 
 	.stream_create = ndb_cuda_stream_create,
 	.stream_destroy = ndb_cuda_stream_destroy,

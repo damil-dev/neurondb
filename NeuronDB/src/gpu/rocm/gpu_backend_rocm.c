@@ -1196,6 +1196,11 @@ static const ndb_gpu_backend ndb_rocm_backend = {
 	.hf_rerank = ndb_rocm_hf_rerank,
 	.hf_vision_complete = NULL,
 
+	.hnsw_search = NULL, /* TODO: Implement ROCm HNSW search */
+	.hnsw_search_batch = NULL, /* TODO: Implement ROCm batch HNSW search */
+	.ivf_search = NULL, /* TODO: Implement ROCm IVF search */
+	.ivf_search_batch = NULL, /* TODO: Implement ROCm batch IVF search */
+
 	.stream_create = ndb_rocm_stream_create,
 	.stream_destroy = ndb_rocm_stream_destroy,
 	.stream_synchronize = ndb_rocm_stream_synchronize,

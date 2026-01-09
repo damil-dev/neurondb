@@ -7671,6 +7671,11 @@ static const ndb_gpu_backend ndb_metal_backend = {
 	.hf_complete = ndb_metal_hf_complete,
 	.hf_rerank = ndb_metal_hf_rerank,
 
+	.hnsw_search = NULL, /* TODO: Implement Metal HNSW search */
+	.hnsw_search_batch = NULL, /* TODO: Implement Metal batch HNSW search */
+	.ivf_search = NULL, /* TODO: Implement Metal IVF search */
+	.ivf_search_batch = NULL, /* TODO: Implement Metal batch IVF search */
+
 	.stream_create = ndb_metal_stream_create,
 	.stream_destroy = ndb_metal_stream_destroy,
 	.stream_synchronize = ndb_metal_stream_synchronize,
