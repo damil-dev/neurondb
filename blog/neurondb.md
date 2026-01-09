@@ -8,7 +8,7 @@
 
 PostgreSQL handles relational data. AI applications need vector similarity search, semantic retrieval, and machine learning inference. These capabilities require separate tools. Vector databases for embeddings. External ML services for inference. Custom code for hybrid search. This creates complexity, latency, and operational overhead.
 
-NeuronDB is a PostgreSQL extension. It adds vector search, ML inference, GPU acceleration, and hybrid retrieval to PostgreSQL. It maintains full pgvector compatibility. Applications use SQL syntax for AI operations. No external services required. No complex integrations needed.
+NeuronDB is a PostgreSQL extension. It adds vector search, ML inference, GPU acceleration, and hybrid retrieval to PostgreSQL. It maintains full  compatibility. Applications use SQL syntax for AI operations. No external services required. No complex integrations needed.
 
 NeuronDB supports PostgreSQL 16, 17, and 18. It is implemented in pure C following PostgreSQL coding standards. The extension has zero external dependencies. It provides 473 SQL functions, comprehensive ML capabilities with 19 implemented algorithms (part of 52 total ML features), and 4 background workers including the new neuranllm worker. All operations run within PostgreSQL. Includes 7 monitoring views, 4 new tables for multi-tenancy and security, and 27 new SQL functions for advanced features.
 
@@ -339,39 +339,39 @@ The RAG pipeline retrieves relevant context and formats it for LLM processing. A
 
 NeuronDB differs from other PostgreSQL extensions in several ways. The extension provides comprehensive AI capabilities beyond basic vector search.
 
-Vector indexing comparison shows NeuronDB supports HNSW and IVF indexing similar to pgvector. The extension provides DiskANN support for billion-scale vectors. pgvectorscale provides StreamingDiskANN but lacks other capabilities. pgai and PostgresML rely on pgvector for indexing.
+Vector indexing comparison shows NeuronDB supports HNSW and IVF indexing similar to  The extension provides DiskANN support for billion-scale vectors.  provides StreamingDiskANN but lacks other capabilities. pgai and PostgresML rely on  for indexing.
 
-ML inference comparison shows NeuronDB provides ONNX-based inference in C++. pgvector provides no ML inference. pgvectorscale provides no ML inference. pgai uses external API calls for inference. PostgresML uses Python ML libraries which add overhead.
+ML inference comparison shows NeuronDB provides ONNX-based inference in C++.  provides no ML inference.  provides no ML inference. pgai uses external API calls for inference. PostgresML uses Python ML libraries which add overhead.
 
-Embedding generation comparison shows NeuronDB generates embeddings in-database using ONNX. pgvector requires external embedding generation. pgvectorscale requires external embedding generation. pgai uses external API calls. PostgresML generates embeddings in-database using Transformers but with Python overhead.
+Embedding generation comparison shows NeuronDB generates embeddings in-database using ONNX.  requires external embedding generation.  requires external embedding generation. pgai uses external API calls. PostgresML generates embeddings in-database using Transformers but with Python overhead.
 
-Hybrid search comparison shows NeuronDB provides native hybrid search combining vector and full-text search. pgvector requires manual implementation of hybrid search. pgvectorscale requires manual implementation. pgai requires manual implementation. PostgresML requires manual implementation.
+Hybrid search comparison shows NeuronDB provides native hybrid search combining vector and full-text search.  requires manual implementation of hybrid search.  requires manual implementation. pgai requires manual implementation. PostgresML requires manual implementation.
 
-Reranking comparison shows NeuronDB provides cross-encoder, LLM, ColBERT, and MMR reranking. pgvector provides no reranking. pgvectorscale provides no reranking. pgai provides no reranking. PostgresML provides no reranking.
+Reranking comparison shows NeuronDB provides cross-encoder, LLM, ColBERT, and MMR reranking.  provides no reranking.  provides no reranking. pgai provides no reranking. PostgresML provides no reranking.
 
-ML algorithms comparison shows NeuronDB provides 52 algorithms including Random Forest, XGBoost, LightGBM, CatBoost, SVM, KNN, Decision Trees, Naive Bayes, Neural Networks, K-means, DBSCAN, GMM, and PCA. pgvector provides no ML algorithms. pgvectorscale provides no ML algorithms. pgai provides no ML algorithms. PostgresML provides XGBoost, LightGBM, sklearn suite, and Linear/Logistic Regression.
+ML algorithms comparison shows NeuronDB provides 52 algorithms including Random Forest, XGBoost, LightGBM, CatBoost, SVM, KNN, Decision Trees, Naive Bayes, Neural Networks, K-means, DBSCAN, GMM, and PCA.  provides no ML algorithms.  provides no ML algorithms. pgai provides no ML algorithms. PostgresML provides XGBoost, LightGBM, sklearn suite, and Linear/Logistic Regression.
 
-Background workers comparison shows NeuronDB provides four production workers. pgvector provides no background workers. pgvectorscale provides no background workers. pgai provides no background workers. PostgresML provides no background workers.
+Background workers comparison shows NeuronDB provides four production workers.  provides no background workers.  provides no background workers. pgai provides no background workers. PostgresML provides no background workers.
 
-RAG pipeline comparison shows NeuronDB provides a complete in-database RAG pipeline. pgvector provides no RAG pipeline. pgvectorscale provides no RAG pipeline. pgai provides partial RAG using external APIs. PostgresML provides partial RAG using Python.
+RAG pipeline comparison shows NeuronDB provides a complete in-database RAG pipeline.  provides no RAG pipeline.  provides no RAG pipeline. pgai provides partial RAG using external APIs. PostgresML provides partial RAG using Python.
 
-Quantization comparison shows NeuronDB supports FP16, INT8, and Binary quantization with 2x to 32x compression. pgvector supports binary quantization only. pgvectorscale supports binary quantization only. pgai provides no quantization. PostgresML provides no quantization.
+Quantization comparison shows NeuronDB supports FP16, INT8, and Binary quantization with 2x to 32x compression.  supports binary quantization only.  supports binary quantization only. pgai provides no quantization. PostgresML provides no quantization.
 
-Implementation comparison shows NeuronDB is implemented in pure C. pgvector is implemented in pure C. pgvectorscale is implemented in pure C. pgai is implemented in Rust and SQL. PostgresML is implemented in Python and C.
+Implementation comparison shows NeuronDB is implemented in pure C.  is implemented in pure C.  is implemented in pure C. pgai is implemented in Rust and SQL. PostgresML is implemented in Python and C.
 
-GPU support comparison shows NeuronDB supports CUDA, ROCm, and Metal with native C/C++ implementation. pgvector provides no GPU support. pgvectorscale provides no GPU support. pgai provides no GPU support. PostgresML provides CUDA support via Python which adds overhead.
+GPU support comparison shows NeuronDB supports CUDA, ROCm, and Metal with native C/C++ implementation.  provides no GPU support.  provides no GPU support. pgai provides no GPU support. PostgresML provides CUDA support via Python which adds overhead.
 
-PostgreSQL version support shows NeuronDB supports versions 16, 17, and 18. pgvector supports versions 12 through 18. pgvectorscale supports versions 15 through 18. pgai supports versions 16 through 18. PostgresML supports versions 14 through 16.
+PostgreSQL version support shows NeuronDB supports versions 16, 17, and 18.  supports versions 12 through 18.  supports versions 15 through 18. pgai supports versions 16 through 18. PostgresML supports versions 14 through 16.
 
-Vector types comparison shows NeuronDB provides five vector types: vector, vectorp, vecmap, vgraph, and rtext. pgvector provides one vector type. pgvectorscale provides one vector type. pgai uses pgvector types. PostgresML uses pgvector types.
+Vector types comparison shows NeuronDB provides five vector types: vector, vectorp, vecmap, vgraph, and rtext.  provides one vector type.  provides one vector type. pgai uses  types. PostgresML uses  types.
 
-Distance metrics comparison shows NeuronDB supports 10 or more metrics including L2, Cosine, Inner Product, Manhattan, Hamming, Jaccard, Chebyshev, Minkowski, Canberra, and Braycurtis. pgvector supports three metrics: L2, Cosine, and Inner Product. pgvectorscale supports three metrics. pgai uses pgvector metrics. PostgresML uses pgvector metrics.
+Distance metrics comparison shows NeuronDB supports 10 or more metrics including L2, Cosine, Inner Product, Manhattan, Hamming, Jaccard, Chebyshev, Minkowski, Canberra, and Braycurtis.  supports three metrics: L2, Cosine, and Inner Product.  supports three metrics. pgai uses  metrics. PostgresML uses  metrics.
 
-SQL functions comparison shows NeuronDB provides 473 SQL functions. pgvector provides approximately 20 functions. pgvectorscale provides approximately 30 functions. pgai provides approximately 15 functions. PostgresML provides approximately 50 functions.
+SQL functions comparison shows NeuronDB provides 473 SQL functions.  provides approximately 20 functions.  provides approximately 30 functions. pgai provides approximately 15 functions. PostgresML provides approximately 50 functions.
 
-Performance comparison shows NeuronDB achieves 100,000 or more queries per second with GPU acceleration. pgvector achieves 10,000 to 50,000 queries per second. pgvectorscale achieves 50,000 to 100,000 queries per second. pgai performance is limited by API overhead. PostgresML achieves 5,000 to 20,000 queries per second due to Python overhead.
+Performance comparison shows NeuronDB achieves 100,000 or more queries per second with GPU acceleration.  achieves 10,000 to 50,000 queries per second.  achieves 50,000 to 100,000 queries per second. pgai performance is limited by API overhead. PostgresML achieves 5,000 to 20,000 queries per second due to Python overhead.
 
-Dependencies comparison shows NeuronDB has zero dependencies with pure C implementation and optional ONNX. pgvector has zero dependencies with pure C. pgvectorscale has zero dependencies with pure C. pgai requires Rust runtime. PostgresML requires Python and ML libraries.
+Dependencies comparison shows NeuronDB has zero dependencies with pure C implementation and optional ONNX.  has zero dependencies with pure C.  has zero dependencies with pure C. pgai requires Rust runtime. PostgresML requires Python and ML libraries.
 
 ## Installation and Configuration
 
@@ -626,16 +626,16 @@ SET neurondb.default_model = 'all-MiniLM-L6-v2';
 
 Configuration options allow fine-tuning performance for specific workloads. Parameters balance speed, accuracy, and resource usage.
 
-## Migration from pgvector
+## Migration from 
 
-NeuronDB maintains full pgvector compatibility. Existing pgvector tables work without modification. The extension supports all pgvector operators and functions. Migration requires no query changes.
+NeuronDB maintains full  compatibility. Existing  tables work without modification. The extension supports all  operators and functions. Migration requires no query changes.
 
 Migration benefits include 10x to 100x faster queries with HNSW indexes. GPU acceleration provides additional speedups. Built-in embedding generation eliminates external services. Hybrid search capabilities combine vector and text search. All operations use standard SQL syntax.
 
-Migrate from pgvector:
+Migrate from 
 
 ```sql
--- Existing pgvector table works as-is
+-- Existing  table works as-is
 CREATE TABLE vectors (
     id SERIAL PRIMARY KEY,
     embedding vector(1536)
@@ -644,7 +644,7 @@ CREATE TABLE vectors (
 -- Use NeuronDB indexes for better performance
 CREATE INDEX ON vectors USING hnsw (embedding vector_cosine_ops);
 
--- All pgvector operators work
+-- All  operators work
 SELECT * FROM vectors 
 ORDER BY embedding <=> '[1,2,3...]'::vector(1536)
 LIMIT 10;
@@ -659,7 +659,7 @@ LIMIT 10;
 
 ```
 
-Migration requires no code changes. The extension provides drop-in compatibility with pgvector.
+Migration requires no code changes. The extension provides drop-in compatibility with 
 
 ## Monitoring and Observability
 
@@ -740,7 +740,7 @@ Security features protect data and ensure compliance with regulations. All featu
 
 NeuronDB extends PostgreSQL with AI capabilities. The extension provides vector search, ML inference, GPU acceleration, and RAG pipelines. All operations use standard SQL syntax. No external services required. No complex integrations needed.
 
-The extension supports PostgreSQL 16, 17, and 18. Implementation uses pure C following PostgreSQL coding standards. Zero external dependencies. 473 SQL functions. 52 ML algorithms. 4 background workers. Full pgvector compatibility.
+The extension supports PostgreSQL 16, 17, and 18. Implementation uses pure C following PostgreSQL coding standards. Zero external dependencies. 473 SQL functions. 52 ML algorithms. 4 background workers. Full  compatibility.
 
 Applications build semantic search, RAG systems, recommendation engines, and image search using SQL. Performance scales to billions of vectors. GPU acceleration provides 10x to 100x speedups. Production-ready features include monitoring, security, and background workers.
 

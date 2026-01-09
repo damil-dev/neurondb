@@ -267,10 +267,31 @@ func (t *VectorQuantizationTool) Execute(ctx context.Context, params map[string]
 		vecStr := formatVectorFromInterface(vector)
 		query = "SELECT vector_to_array(sparsevec_to_vector($1::sparsevec)) AS vector"
 		queryParams = []interface{}{vecStr}
-	case "to_bit", "from_bit":
-		return Error("bit operations not yet implemented", "NOT_IMPLEMENTED", map[string]interface{}{
-			"operation": operation,
-		}), nil
+	case "to_bit":
+		vector, ok := params["vector"].([]interface{})
+		if !ok || len(vector) == 0 {
+			return Error("vector is required for to_bit operation", "VALIDATION_ERROR", map[string]interface{}{
+				"operation": operation,
+			}), nil
+		}
+		vecStr := formatVectorFromInterface(vector)
+		query = "SELECT vector_to_bit($1::vector)::text AS bit_string"
+		queryParams = []interface{}{vecStr}
+	case "from_bit":
+		data, ok := params["data"].(string)
+		if !ok || data == "" {
+			return Error("data is required for from_bit operation (bit string like B'1010' or '1010')", "VALIDATION_ERROR", map[string]interface{}{
+				"operation": operation,
+			}), nil
+		}
+		// Handle both B'...' format and plain bit string
+		bitStr := data
+		if len(bitStr) > 0 && bitStr[0] != 'B' {
+			// If not in B'...' format, wrap it
+			bitStr = "B'" + bitStr + "'"
+		}
+		query = "SELECT vector_to_array(bit_to_vector($1::bit)) AS vector"
+		queryParams = []interface{}{bitStr}
 	default:
 		return Error(fmt.Sprintf("Unknown operation: %s", operation), "VALIDATION_ERROR", map[string]interface{}{
 			"operation": operation,

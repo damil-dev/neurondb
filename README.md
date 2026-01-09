@@ -123,7 +123,7 @@ EOF
 
 | Feature | NeuronDB | Alternatives |
 |---|---|---|
-| **Index types** | HNSW, IVF, PQ, hybrid, multi-vector | Limited (e.g., pgvector: HNSW/IVFFlat only) |
+| **Index types** | HNSW, IVF, PQ, hybrid, multi-vector | Comprehensive indexing options |
 | **GPU acceleration** | CUDA, ROCm, Metal (3 backends) | Single backend or CPU-only |
 | **Benchmark coverage** | RAGAS, MTEB, BEIR integrated | Manual setup required |
 | **Agent runtime** | NeuronAgent included (REST API, workflows) | External services needed |

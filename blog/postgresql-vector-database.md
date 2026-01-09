@@ -225,28 +225,28 @@ PostgreSQL with NeuronDB combines vector search, ML inference, embedding generat
 
 PostgreSQL vector database solutions include several extensions that add vector capabilities. The following comparison highlights key differences:
 
-| Feature | **NeuronDB** | **pgvector** | **pgvectorscale** | **pgai** | **PostgresML** |
-|---------|-------------|--------------|-------------------|----------|----------------|
-| **Vector Indexing** | HNSW, IVFFlat, DiskANN | HNSW, IVFFlat | StreamingDiskANN | Uses pgvector | pgvector-based |
-| **ML Inference** | ONNX (C++), 52 algorithms | None | None | API calls only | Python ML libs |
-| **Embedding Generation** | In-database (ONNX) | External only | External only | External API | In-database (Transformers) |
-| **Hybrid Search** | Native (Vector+FTS) | Manual combination | Manual combination | Manual | Manual |
-| **Reranking** | Cross-encoder, LLM, ColBERT, MMR | None | None | None | None |
-| **ML Algorithms** | 52 algorithms (RF, XGBoost, LightGBM, CatBoost, SVM, KNN, etc.) | None | None | None | XGBoost, LightGBM, sklearn |
-| **Background Workers** | 4 workers (neuranq, neuranmon, neurandefrag, neuranllm) | None | None | None | None |
-| **RAG Pipeline** | Complete in-database | None | None | Partial (API) | Partial (Python) |
-| **Quantization** | FP16, INT8, Binary (2x-32x compression) | Binary only | Binary only | None | None |
-| **GPU Support** | CUDA + ROCm + Metal (native) | None | None | None | CUDA (via Python) |
-| **Distance Metrics** | 10+ (L2, Cosine, Inner Product, Manhattan, Hamming, Jaccard, etc.) | 3 (L2, Cosine, Inner Product) | 3 (L2, Cosine, Inner Product) | Uses pgvector | Uses pgvector |
-| **Vector Types** | 5 types (vector, vectorp, vecmap, vgraph, rtext) | 1 type (vector) | 1 type (vector) | Uses pgvector | Uses pgvector |
-| **SQL Functions** | 473 functions | ~20 functions | ~30 functions | ~15 functions | ~50 functions |
-| **Performance (QPS)** | 100K+ (with GPU), 1K-2K (CPU) | 10K-50K | 50K-100K | Limited (API overhead) | 5K-20K (Python overhead) |
-| **Dependencies** | Zero (pure C, optional ONNX) | Zero (pure C) | Zero (pure C) | Rust runtime | Python + ML libraries |
+| Feature | **NeuronDB** | **Alternatives** |
+|---------|-------------|------------------|
+| **Vector Indexing** | HNSW, IVFFlat, DiskANN | Various options |
+| **ML Inference** | ONNX (C++), 52 algorithms | Limited or external |
+| **Embedding Generation** | In-database (ONNX) | External tools typically required |
+| **Hybrid Search** | Native (Vector+FTS) | Manual combination typically required |
+| **Reranking** | Cross-encoder, LLM, ColBERT, MMR | Limited or none |
+| **ML Algorithms** | 52 algorithms (RF, XGBoost, LightGBM, CatBoost, SVM, KNN, etc.) | Limited sets |
+| **Background Workers** | 4 workers (neuranq, neuranmon, neurandefrag, neuranllm) | Typically none |
+| **RAG Pipeline** | Complete in-database | Partial or external |
+| **Quantization** | FP16, INT8, Binary (2x-32x compression) | Limited options |
+| **GPU Support** | CUDA + ROCm + Metal (native) | Limited or none |
+| **Distance Metrics** | 10+ (L2, Cosine, Inner Product, Manhattan, Hamming, Jaccard, etc.) | Typically 3-4 metrics |
+| **Vector Types** | 5 types (vector, vectorp, vecmap, vgraph, rtext) | Typically 1 type |
+| **SQL Functions** | 473 functions | Typically 20-50 functions |
+| **Performance (QPS)** | 100K+ (with GPU), 1K-2K (CPU) | Varies widely |
+| **Dependencies** | Zero (pure C, optional ONNX) | Varies |
 | **PostgreSQL Versions** | 16, 17, 18 | 12-18 | 15-18 | 16-18 | 14-16 |
 | **ACID Transactions** | Full ACID for vectors | Full ACID for vectors | Full ACID for vectors | Full ACID for vectors | Full ACID for vectors |
 | **SQL Interface** | Standard SQL | Standard SQL | Standard SQL | Standard SQL | Standard SQL |
 
-NeuronDB provides ML inference, embedding generation, reranking, and RAG pipelines in PostgreSQL. pgvector provides vector indexing but lacks ML features. pgvectorscale adds billion-scale capabilities but requires external ML services. pgai and PostgresML use external APIs or Python, which adds latency and complexity.
+NeuronDB provides ML inference, embedding generation, reranking, and RAG pipelines in PostgreSQL. All features are implemented in-database with no external dependencies.
 
 ### Standalone Vector Database Comparison
 
@@ -293,7 +293,7 @@ Choose PostgreSQL + NeuronDB when:
 - Standard PostgreSQL tooling and monitoring are needed
 - Strong data consistency guarantees are required
 
-Choose pgvector when:
+NeuronDB provides comprehensive vector database features:
 - Only basic vector indexing is needed
 - ML inference or embedding generation are not needed
 - Minimal dependencies are required
