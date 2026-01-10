@@ -24,3 +24,4 @@ COMMENT ON COLUMN profiles.profile_password_hash IS 'Bcrypt hash of the profile 
 
 
 
+
