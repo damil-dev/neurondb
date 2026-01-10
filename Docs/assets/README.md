@@ -15,3 +15,4 @@ This directory contains screenshots, GIFs, and other visual assets referenced in
 4. Use descriptive filenames
 
 
+
