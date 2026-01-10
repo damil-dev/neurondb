@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - DEB and RPM package builds
 - Comprehensive documentation
 
-## [1.0.0] - 2025-01-XX
+## [1.0.0] - 2026-01-10
 
 ### Added
 - PostgreSQL extension for vector search with HNSW and IVF indexes
