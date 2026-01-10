@@ -61,3 +61,4 @@ SELECT vector_capsule_validate_integrity(
 
 
 
+

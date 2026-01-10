@@ -91,3 +91,4 @@ float4 vector_capsule_get_norm(VectorCapsule *vc, bool recompute);
 
 
 
+
