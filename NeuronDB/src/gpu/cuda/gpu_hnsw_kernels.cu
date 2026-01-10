@@ -194,7 +194,7 @@ hnsw_search_kernel(const float *query,
 		float min_dist = FLT_MAX;
 		uint32_t closest = current;
 
-		const int32_t *level_neighbors = neighbors + current * (current_level + 1) * m * 2 + current_level * m * 2;
+		const uint32_t *level_neighbors = neighbors + current * (current_level + 1) * m * 2 + current_level * m * 2;
 		int32_t ncount = neighbor_counts[current * HNSW_MAX_LEVEL + current_level];
 
 		for (int i = 0; i < ncount && i < m * 2; i++)
@@ -250,7 +250,7 @@ hnsw_search_kernel(const float *query,
 		}
 
 		/* Explore neighbors */
-		const int32_t *level_neighbors = neighbors + candidate_block * m * 2;
+		const uint32_t *level_neighbors = neighbors + candidate_block * m * 2;
 		int32_t ncount = neighbor_counts[candidate_block * HNSW_MAX_LEVEL + 0];
 
 		for (int i = 0; i < ncount && i < m * 2; i++)
@@ -579,7 +579,7 @@ hnsw_search_batch_kernel(const float *queries,
 
 		if (neighbors != NULL && neighbor_counts != NULL)
 		{
-			const int32_t *level_neighbors = neighbors + current * (current_level + 1) * m * 2 + current_level * m * 2;
+			const uint32_t *level_neighbors = neighbors + current * (current_level + 1) * m * 2 + current_level * m * 2;
 			int32_t ncount = neighbor_counts[current * HNSW_MAX_LEVEL + current_level];
 
 			for (int i = 0; i < ncount && i < m * 2; i++)
@@ -629,7 +629,7 @@ hnsw_search_batch_kernel(const float *queries,
 		/* Explore neighbors */
 		if (neighbors != NULL && neighbor_counts != NULL && nodes != NULL)
 		{
-			const int32_t *level_neighbors = neighbors + candidate_block * m * 2;
+			const uint32_t *level_neighbors = neighbors + candidate_block * m * 2;
 			int32_t ncount = neighbor_counts[candidate_block * HNSW_MAX_LEVEL + 0];
 
 			for (int i = 0; i < ncount && i < m * 2; i++)
