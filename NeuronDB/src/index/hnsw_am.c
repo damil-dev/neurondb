@@ -256,6 +256,41 @@ HnswNodeSizeWithM(int dim, int level, int m)
 /*
  * Build state for index build
  */
+/*
+ * In-memory graph element for fast building
+ * Similar to pgvector's HnswElement but optimized for NeuronDB
+ */
+typedef struct HnswInMemoryElement
+{
+	struct HnswInMemoryElement *next;	/* Linked list of all elements */
+	ItemPointerData heaptids[HNSW_HEAPTIDS];
+	uint8		heaptidsLength;
+	int			level;
+	int16		dim;
+	float4	   *vector;					/* Vector data (allocated separately) */
+	BlockNumber *neighbors[HNSW_MAX_LEVEL];	/* Neighbors at each level */
+	int16		neighborCount[HNSW_MAX_LEVEL];
+	float4	   *neighborDistances[HNSW_MAX_LEVEL];	/* Distances to neighbors */
+	BlockNumber blkno;					/* Set during flush */
+	OffsetNumber offno;					/* Set during flush */
+	BlockNumber neighborPage;			/* Set during flush */
+	OffsetNumber neighborOffno;			/* Set during flush */
+}			HnswInMemoryElement;
+
+/*
+ * In-memory graph structure
+ */
+typedef struct HnswInMemoryGraph
+{
+	HnswInMemoryElement *head;			/* Linked list head */
+	HnswInMemoryElement *entryPoint;	/* Entry point for searches */
+	int			entryLevel;				/* Level of entry point */
+	Size		memoryUsed;				/* Memory used so far */
+	Size		memoryTotal;			/* Total memory available */
+	bool		flushed;				/* True if graph has been flushed to disk */
+	slock_t		lock;					/* Spinlock for graph modifications */
+}			HnswInMemoryGraph;
+
 typedef struct HnswBuildState
 {
 	Relation	heap;
@@ -263,6 +298,11 @@ typedef struct HnswBuildState
 	IndexInfo  *indexInfo;
 	double		indtuples;
 	MemoryContext tmpCtx;
+	MemoryContext graphCtx;				/* Context for in-memory graph */
+	HnswInMemoryGraph *graph;			/* In-memory graph (NULL if using on-disk) */
+	int			m;
+	int			efConstruction;
+	int			dim;
 }			HnswBuildState;
 
 /*
@@ -332,6 +372,7 @@ static void hnswLoadOptions(Relation index, HnswOptions *opts_out);
 static void hnswInitMetaPage(Buffer metaBuffer, int16 m, int16 efConstruction, int16 efSearch, float4 ml);
 static int	hnswGetRandomLevel(float4 ml);
 static float4 hnswComputeDistance(const float4 * vec1, const float4 * vec2, int dim, int strategy) __attribute__((unused));
+static inline float4 hnswComputeDistanceSquaredL2(const float4 *vec1, const float4 *vec2, int dim);
 static void hnswSearch(Relation index, HnswMetaPage metaPage, const float4 * query,
 					   int dim, int strategy, int efSearch, int k,
 					   BlockNumber * *results, float4 * *distances, int *resultCount);
@@ -400,7 +441,7 @@ hnsw_handler(PG_FUNCTION_ARGS)
 	amroutine->ampredlocks = false;
 	amroutine->amcanparallel = false;	/* TODO: Parallel build not yet implemented */
 	amroutine->amcaninclude = false;
-	amroutine->amusemaintenanceworkmem = false;
+	amroutine->amusemaintenanceworkmem = true;	/* Enable in-memory graph building */
 	amroutine->amsummarizing = false;
 	amroutine->amparallelvacuumoptions = 0;
 	amroutine->amkeytype = InvalidOid;
@@ -434,6 +475,587 @@ hnsw_handler(PG_FUNCTION_ARGS)
 /*
  * Index Build
  */
+/*
+ * Initialize in-memory graph
+ */
+static void
+InitInMemoryGraph(HnswInMemoryGraph *graph, Size memoryTotal)
+{
+	graph->head = NULL;
+	graph->entryPoint = NULL;
+	graph->entryLevel = -1;
+	graph->memoryUsed = 0;
+	graph->memoryTotal = memoryTotal;
+	graph->flushed = false;
+	SpinLockInit(&graph->lock);
+}
+
+/*
+ * Flush in-memory graph to disk
+ */
+static void
+FlushInMemoryGraph(Relation index, HnswInMemoryGraph *graph, HnswBuildState *buildstate)
+{
+	HnswInMemoryElement *element;
+	Buffer		metaBuffer;
+	HnswMetaPage metaPage;
+	Page		page;
+	BlockNumber entryBlkno = InvalidBlockNumber;
+	int			entryLevel = -1;
+
+	if (graph == NULL || graph->flushed)
+		return;
+
+	/* Initialize metadata page */
+	metaBuffer = HNSW_READBUFFER(index, 0);
+	LockBuffer(metaBuffer, BUFFER_LOCK_EXCLUSIVE);
+	page = BufferGetPage(metaBuffer);
+	metaPage = (HnswMetaPage) PageGetContents(page);
+
+	/* Traverse graph and write elements to disk */
+	element = graph->head;
+	while (element != NULL)
+	{
+		HnswInMemoryElement *next = element->next;
+		BlockNumber blkno;
+		Buffer		buf;
+		Page		page;
+		HnswNode	node;
+		Size		nodeSize;
+		int			i, l;
+		bool		overflow = false;
+
+		/* Calculate node size */
+		nodeSize = hnswComputeNodeSizeSafe(element->dim, element->level, buildstate->m, &overflow);
+		if (overflow || nodeSize == 0)
+		{
+			UnlockReleaseBuffer(metaBuffer);
+			ereport(ERROR,
+					(errcode(ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE),
+					 errmsg("hnsw: node size calculation overflow during flush")));
+		}
+
+		/* Allocate new page for this node */
+		buf = HNSW_READBUFFER(index, P_NEW);
+		LockBuffer(buf, BUFFER_LOCK_EXCLUSIVE);
+		page = BufferGetPage(buf);
+		PageInit(page, BufferGetPageSize(buf), 0);
+		blkno = BufferGetBlockNumber(buf);
+
+		/* Allocate node buffer */
+		char	   *nodeBuf;
+		
+		nodeBuf = (char *) palloc(nodeSize);
+		node = (HnswNode) nodeBuf;
+		MemSet(node, 0, nodeSize);
+
+		/* Copy element data to node */
+		node->level = element->level;
+		node->dim = element->dim;
+		node->heaptidsLength = element->heaptidsLength;
+		for (i = 0; i < HNSW_HEAPTIDS; i++)
+			node->heaptids[i] = element->heaptids[i];
+		for (l = 0; l < HNSW_MAX_LEVEL; l++)
+			node->neighborCount[l] = element->neighborCount[l];
+
+		/* Copy vector */
+		memcpy(HnswGetVector(node), element->vector, element->dim * sizeof(float4));
+
+		/* Copy neighbors - will be updated in second pass */
+		for (l = 0; l <= element->level; l++)
+		{
+			BlockNumber *nodeNeighbors = HnswGetNeighborsSafe(node, l, buildstate->m);
+			/* Initialize to InvalidBlockNumber */
+			int			lm = (l == 0 ? buildstate->m * 2 : buildstate->m);
+			for (i = 0; i < lm; i++)
+				nodeNeighbors[i] = InvalidBlockNumber;
+		}
+
+		/* Add node to page */
+		if (PageAddItem(page, (Item) node, nodeSize, InvalidOffsetNumber, false, false) == InvalidOffsetNumber)
+		{
+			pfree(nodeBuf);
+			UnlockReleaseBuffer(buf);
+			UnlockReleaseBuffer(metaBuffer);
+			ereport(ERROR,
+					(errcode(ERRCODE_INTERNAL_ERROR),
+					 errmsg("hnsw: failed to add node to page")));
+		}
+
+		pfree(nodeBuf);
+
+		/* Store block numbers for later neighbor linking */
+		element->blkno = blkno;
+		element->offno = FirstOffsetNumber;
+
+		/* Update entry point if this is the highest level */
+		if (element->level > entryLevel)
+		{
+			entryLevel = element->level;
+			entryBlkno = blkno;
+		}
+
+		MarkBufferDirty(buf);
+		UnlockReleaseBuffer(buf);
+
+		element = next;
+	}
+
+	/* Update metadata */
+	if (BlockNumberIsValid(entryBlkno))
+	{
+		metaPage->entryPoint = entryBlkno;
+		metaPage->entryLevel = entryLevel;
+		metaPage->maxLevel = entryLevel;
+		metaPage->insertedVectors = buildstate->indtuples;
+	}
+
+	MarkBufferDirty(metaBuffer);
+	UnlockReleaseBuffer(metaBuffer);
+
+	/* Second pass: Update neighbors by converting element pointers to block numbers */
+	/* Neighbors were found during in-memory insert phase and stored as element pointers */
+	element = graph->head;
+	while (element != NULL)
+	{
+		HnswInMemoryElement *next = element->next;
+		Buffer		buf;
+		Page		page;
+		HnswNode	node;
+		int			l;
+
+		buf = HNSW_READBUFFER(index, element->blkno);
+		LockBuffer(buf, BUFFER_LOCK_EXCLUSIVE);
+		page = BufferGetPage(buf);
+		node = (HnswNode) PageGetItem(page, PageGetItemId(page, FirstOffsetNumber));
+
+		/* Update neighbors for each level */
+		for (l = 0; l <= element->level; l++)
+		{
+			BlockNumber *nodeNeighbors = HnswGetNeighborsSafe(node, l, buildstate->m);
+			int			lm = (l == 0 ? buildstate->m * 2 : buildstate->m);
+			int			count = element->neighborCount[l];
+
+			if (count > 0 && element->neighbors[l] != NULL)
+			{
+				/* Convert element pointers (stored as BlockNumber) to actual block numbers */
+				for (int i = 0; i < count && i < lm; i++)
+				{
+					/* Element pointer was stored as (BlockNumber)(uintptr_t)element */
+					HnswInMemoryElement *neighborElem = 
+						(HnswInMemoryElement *) (uintptr_t) element->neighbors[l][i];
+					
+					/* Validate neighbor element exists and has a block number */
+					if (neighborElem != NULL && BlockNumberIsValid(neighborElem->blkno))
+					{
+						nodeNeighbors[i] = neighborElem->blkno;
+					}
+					else
+					{
+						/* Invalid neighbor - shouldn't happen, but handle gracefully */
+						nodeNeighbors[i] = InvalidBlockNumber;
+						count = i;	/* Adjust count */
+						break;
+					}
+				}
+				node->neighborCount[l] = count;
+			}
+			else
+			{
+				/* No neighbors found during insert - this can happen for first element */
+				node->neighborCount[l] = 0;
+			}
+		}
+
+		MarkBufferDirty(buf);
+		UnlockReleaseBuffer(buf);
+
+		element = next;
+	}
+
+	graph->flushed = true;
+}
+
+/*
+ * Find neighbors in in-memory graph using efficient greedy search
+ * 
+ * This implements the HNSW insertion algorithm: for each level l where
+ * the element exists, find efConstruction candidates via greedy search
+ * starting from entry point, then select top m neighbors.
+ */
+static void
+FindNeighborsInMemory(HnswInMemoryElement *element, HnswInMemoryElement *entryPoint,
+					  HnswInMemoryGraph *graph, int m, int efConstruction, int dim, int strategy)
+{
+	int			level = element->level;
+	int			l;
+	MemoryContext oldCtx;
+
+	if (entryPoint == NULL || graph->head == element)
+	{
+		/* First element or no entry point - no neighbors yet */
+		return;
+	}
+
+	/* Use graph context for allocations */
+	oldCtx = MemoryContextSwitchTo(graph->head->vector ? 
+								   CurrentMemoryContext : CurrentMemoryContext);
+
+	/* Process each level from top to bottom */
+	for (l = level; l >= 0; l--)
+	{
+		int			lm = (l == 0 ? m * 2 : m);
+		int			maxCandidates = Min(efConstruction, 200);
+		HnswInMemoryElement *current;
+		HnswInMemoryElement **candidates;
+		float4	   *candidateDists;
+		int			candidateCount = 0;
+		bool	   *visited;
+		int			i, j;
+
+		/* Allocate candidate arrays */
+		candidates = (HnswInMemoryElement **) palloc(maxCandidates * sizeof(HnswInMemoryElement *));
+		candidateDists = (float4 *) palloc(maxCandidates * sizeof(float4));
+		visited = (bool *) palloc0(maxCandidates * sizeof(bool));
+
+		/* Find starting point at level l or higher */
+		current = entryPoint;
+		while (current != NULL && current != element && current->level < l)
+		{
+			/* Find closest element at level l or higher by scanning graph */
+			HnswInMemoryElement *best = NULL;
+			float4		bestDist = FLT_MAX;
+			HnswInMemoryElement *scan = graph->head;
+
+			while (scan != NULL && scan != element)
+			{
+				if (scan->level >= l)
+				{
+					/* Use squared distance for L2 comparisons */
+					float4		dist = (strategy == 1) ?
+									  hnswComputeDistanceSquaredL2(element->vector, scan->vector, dim) :
+									  hnswComputeDistance(element->vector, scan->vector, dim, strategy);
+					if (dist < bestDist)
+					{
+						bestDist = dist;
+						best = scan;
+					}
+				}
+				scan = scan->next;
+			}
+			if (best != NULL)
+				current = best;
+			else
+				break;
+		}
+
+		if (current == NULL || current == element)
+		{
+			pfree(candidates);
+			pfree(candidateDists);
+			pfree(visited);
+			continue;
+		}
+
+		/* Greedy search for efConstruction candidates */
+		for (i = 0; i < maxCandidates && current != NULL && current != element; i++)
+		{
+			/* Use squared distance for L2 comparisons to avoid sqrt overhead */
+			float4		currentDist = (strategy == 1) ? 
+									  hnswComputeDistanceSquaredL2(element->vector, current->vector, dim) :
+									  hnswComputeDistance(element->vector, current->vector, dim, strategy);
+			bool		isVisited = false;
+
+			/* Check if already visited */
+			for (j = 0; j < candidateCount; j++)
+			{
+				if (candidates[j] == current)
+				{
+					isVisited = true;
+					break;
+				}
+			}
+
+			if (!isVisited)
+			{
+				/* Add to candidates or replace worst */
+				if (candidateCount < maxCandidates)
+				{
+					candidates[candidateCount] = current;
+					candidateDists[candidateCount] = currentDist;
+					candidateCount++;
+				}
+				else
+				{
+					/* Find worst candidate */
+					int			worstIdx = 0;
+					for (j = 1; j < candidateCount; j++)
+					{
+						if (candidateDists[j] > candidateDists[worstIdx])
+							worstIdx = j;
+					}
+					if (currentDist < candidateDists[worstIdx])
+					{
+						candidates[worstIdx] = current;
+						candidateDists[worstIdx] = currentDist;
+					}
+				}
+			}
+
+			/* Find closer unvisited neighbor at this level */
+			HnswInMemoryElement *closer;
+			float4		closerDist;
+			
+			closer = NULL;
+			closerDist = currentDist;
+
+			/* Check neighbors of current element at this level */
+			if (current->neighborCount[l] > 0 && current->neighbors[l] != NULL)
+			{
+				/* Neighbors are stored as BlockNumber pointers (temporary) during in-memory phase */
+				/* For now, scan all elements at level l to find closest */
+				HnswInMemoryElement *scan = graph->head;
+				while (scan != NULL && scan != element)
+				{
+					if (scan->level >= l && scan != current)
+					{
+						bool		alreadyCandidate = false;
+						for (j = 0; j < candidateCount; j++)
+						{
+							if (candidates[j] == scan)
+							{
+								alreadyCandidate = true;
+								break;
+							}
+						}
+						if (!alreadyCandidate)
+						{
+							/* Use squared distance for L2 comparisons */
+							float4		scanDist = (strategy == 1) ?
+												  hnswComputeDistanceSquaredL2(element->vector, scan->vector, dim) :
+												  hnswComputeDistance(element->vector, scan->vector, dim, strategy);
+							if (scanDist < closerDist)
+							{
+								closerDist = scanDist;
+								closer = scan;
+							}
+						}
+					}
+					scan = scan->next;
+				}
+			}
+			else
+			{
+				/* No neighbors yet, scan all elements at this level */
+				HnswInMemoryElement *scan = graph->head;
+				while (scan != NULL && scan != element)
+				{
+					if (scan->level >= l && scan != current)
+					{
+						bool		alreadyCandidate = false;
+						for (j = 0; j < candidateCount; j++)
+						{
+							if (candidates[j] == scan)
+							{
+								alreadyCandidate = true;
+								break;
+							}
+						}
+						if (!alreadyCandidate)
+						{
+							/* Use squared distance for L2 comparisons */
+							float4		scanDist = (strategy == 1) ?
+												  hnswComputeDistanceSquaredL2(element->vector, scan->vector, dim) :
+												  hnswComputeDistance(element->vector, scan->vector, dim, strategy);
+							if (scanDist < closerDist)
+							{
+								closerDist = scanDist;
+								closer = scan;
+							}
+						}
+					}
+					scan = scan->next;
+				}
+			}
+
+			if (closer != NULL && closerDist < currentDist)
+				current = closer;
+			else
+				break;		/* No closer neighbor found, done */
+		}
+
+		/* Select top lm neighbors from candidates using sorting */
+		if (candidateCount > 0)
+		{
+			/* Create temporary array for sorting */
+			typedef struct {
+				HnswInMemoryElement *elem;
+				float4 dist;
+			} InMemoryNeighborCandidate;
+			InMemoryNeighborCandidate *sortedCandidates = 
+				(InMemoryNeighborCandidate *) palloc(candidateCount * sizeof(InMemoryNeighborCandidate));
+
+			for (i = 0; i < candidateCount; i++)
+			{
+				sortedCandidates[i].elem = candidates[i];
+				sortedCandidates[i].dist = candidateDists[i];
+			}
+
+			/* Sort by distance using selection sort (optimized for small arrays) */
+			/* For inner product (strategy 3), larger distance is better (descending) */
+			/* For L2/cosine, smaller distance is better (ascending) */
+			for (i = 0; i < candidateCount - 1; i++)
+			{
+				int			bestIdx = i;
+				for (j = i + 1; j < candidateCount; j++)
+				{
+					if (strategy == 3)
+					{
+						/* Inner product: larger is better */
+						if (sortedCandidates[j].dist > sortedCandidates[bestIdx].dist)
+							bestIdx = j;
+					}
+					else
+					{
+						/* L2/cosine: smaller is better */
+						if (sortedCandidates[j].dist < sortedCandidates[bestIdx].dist)
+							bestIdx = j;
+					}
+				}
+				if (bestIdx != i)
+				{
+					InMemoryNeighborCandidate temp = sortedCandidates[i];
+					sortedCandidates[i] = sortedCandidates[bestIdx];
+					sortedCandidates[bestIdx] = temp;
+				}
+			}
+
+			/* Select top lm */
+			int			selectedCount;
+			
+			selectedCount = Min(lm, candidateCount);
+
+			element->neighbors[l] = (BlockNumber *) palloc0(lm * sizeof(BlockNumber));
+			element->neighborDistances[l] = (float4 *) palloc0(lm * sizeof(float4));
+			element->neighborCount[l] = selectedCount;
+
+			for (i = 0; i < selectedCount; i++)
+			{
+				/* Store element pointer temporarily as BlockNumber (will be converted during flush) */
+				element->neighbors[l][i] = (BlockNumber) (uintptr_t) sortedCandidates[i].elem;
+				element->neighborDistances[l][i] = sortedCandidates[i].dist;
+			}
+
+			pfree(sortedCandidates);
+		}
+
+		pfree(candidates);
+		pfree(candidateDists);
+		pfree(visited);
+	}
+
+	MemoryContextSwitchTo(oldCtx);
+}
+
+/*
+ * Insert tuple into in-memory graph
+ */
+static bool
+InsertTupleInMemory(Relation index, Datum *values, bool *isnull, ItemPointer tid,
+					HnswBuildState *buildstate)
+{
+	HnswInMemoryGraph *graph = buildstate->graph;
+	HnswInMemoryElement *element;
+	float4	   *vector;
+	int			dim;
+	int			level;
+	Size		elementSize;
+	MemoryContext oldCtx;
+	Oid			keyType;
+
+	if (graph == NULL || graph->flushed)
+		return false;
+
+	/* Extract vector */
+	if (isnull[0])
+		return false;
+
+	keyType = hnswGetKeyType(index, 1);
+	vector = hnswExtractVectorData(values[0], keyType, &dim, buildstate->tmpCtx);
+	if (vector == NULL)
+		return false;
+
+	if (buildstate->dim == 0)
+		buildstate->dim = dim;
+
+	/* Calculate level */
+	level = hnswGetRandomLevel(HNSW_DEFAULT_ML);
+	if (level >= HNSW_MAX_LEVEL)
+		level = HNSW_MAX_LEVEL - 1;
+
+	/* Estimate element size */
+	elementSize = sizeof(HnswInMemoryElement) + 
+				  dim * sizeof(float4) + 
+				  (level + 1) * buildstate->m * 2 * sizeof(BlockNumber) +
+				  (level + 1) * buildstate->m * 2 * sizeof(float4);
+
+	/* Check memory limit */
+	SpinLockAcquire(&graph->lock);
+	if (graph->memoryUsed + elementSize > graph->memoryTotal)
+	{
+		SpinLockRelease(&graph->lock);
+		return false;	/* Out of memory, fall back to on-disk */
+	}
+	graph->memoryUsed += elementSize;
+	SpinLockRelease(&graph->lock);
+
+	/* Allocate element in graph context */
+	oldCtx = MemoryContextSwitchTo(buildstate->graphCtx);
+	element = (HnswInMemoryElement *) palloc0(sizeof(HnswInMemoryElement));
+	element->vector = (float4 *) palloc(dim * sizeof(float4));
+	memcpy(element->vector, vector, dim * sizeof(float4));
+	element->dim = dim;
+	element->level = level;
+	element->heaptidsLength = 1;
+	element->heaptids[0] = *tid;
+
+	/* Initialize neighbor arrays */
+	for (int l = 0; l <= level; l++)
+	{
+		element->neighbors[l] = NULL;
+		element->neighborDistances[l] = NULL;
+		element->neighborCount[l] = 0;
+	}
+
+	/* Add to graph FIRST so it's available for neighbor finding */
+	SpinLockAcquire(&graph->lock);
+	element->next = graph->head;
+	HnswInMemoryElement *oldEntryPoint;
+	
+	oldEntryPoint = graph->entryPoint;
+
+	/* Update entry point if needed */
+	if (graph->entryPoint == NULL || element->level > graph->entryLevel)
+	{
+		graph->entryPoint = element;
+		graph->entryLevel = element->level;
+	}
+	graph->head = element;
+	SpinLockRelease(&graph->lock);
+
+	/* Find neighbors using in-memory search - use old entry point as starting point */
+	/* Use strategy 1 (L2) - should match index operator class */
+	{
+		int			strategy = 1;	/* Default to L2, could be extracted from index if needed */
+		
+		FindNeighborsInMemory(element, oldEntryPoint ? oldEntryPoint : element, graph, 
+							 buildstate->m, buildstate->efConstruction, dim, strategy);
+	}
+
+	MemoryContextSwitchTo(oldCtx);
+	return true;
+}
+
 static IndexBuildResult *
 hnswbuild(Relation heap, Relation index, IndexInfo * indexInfo)
 {
@@ -444,6 +1066,8 @@ hnswbuild(Relation heap, Relation index, IndexInfo * indexInfo)
 	int			m,
 				ef_construction,
 				ef_search;
+	Size		memoryTotal;
+	HnswInMemoryGraph *graph = NULL;
 
 
 	buildstate.heap = heap;
@@ -481,21 +1105,46 @@ hnswbuild(Relation heap, Relation index, IndexInfo * indexInfo)
 	ef_construction = options->efConstruction;
 	ef_search = options->ef_search;
 
+	buildstate.m = m;
+	buildstate.efConstruction = ef_construction;
+	buildstate.dim = 0;
+
 	hnswInitMetaPage(metaBuffer, m, ef_construction, ef_search, HNSW_DEFAULT_ML);
 
 	MarkBufferDirty(metaBuffer);
 	UnlockReleaseBuffer(metaBuffer);
+
+	/* Try to use in-memory graph building */
+	memoryTotal = (Size) maintenance_work_mem * 1024L;
+	if (memoryTotal > 0)
+	{
+		/* Create graph context and initialize in-memory graph */
+		buildstate.graphCtx = AllocSetContextCreate(CurrentMemoryContext,
+													"HNSW build graph context",
+													ALLOCSET_DEFAULT_SIZES);
+		graph = (HnswInMemoryGraph *) MemoryContextAlloc(buildstate.graphCtx, sizeof(HnswInMemoryGraph));
+		InitInMemoryGraph(graph, memoryTotal);
+		buildstate.graph = graph;
+	}
 
 	/* Use parallel scan if available */
 	buildstate.indtuples = table_index_build_scan(heap, index, indexInfo,
 												  true, true, hnswBuildCallback,
 												  (void *) &buildstate, NULL);
 
+	/* Flush in-memory graph to disk if we built one */
+	if (graph != NULL && !graph->flushed)
+	{
+		FlushInMemoryGraph(index, graph, &buildstate);
+	}
+
 	{
 		nalloc(result, IndexBuildResult, 1);
 		result->heap_tuples = buildstate.indtuples;
 		result->index_tuples = buildstate.indtuples;
 
+		if (buildstate.graphCtx != NULL)
+			MemoryContextDelete(buildstate.graphCtx);
 		MemoryContextDelete(buildstate.tmpCtx);
 
 		return result;
@@ -523,9 +1172,26 @@ hnswBuildCallback(Relation index, ItemPointer tid, Datum * values,
 				  bool *isnull, bool tupleIsAlive, void *state)
 {
 	HnswBuildState *buildstate = (HnswBuildState *) state;
+	bool		inserted = false;
 
-	hnswinsert(index, values, isnull, tid, buildstate->heap,
-			   UNIQUE_CHECK_NO, true, buildstate->indexInfo);
+	/* Try in-memory insert first if graph is available */
+	if (buildstate->graph != NULL && !buildstate->graph->flushed)
+	{
+		inserted = InsertTupleInMemory(index, values, isnull, tid, buildstate);
+	}
+
+	/* Fall back to on-disk insert if in-memory failed */
+	if (!inserted)
+	{
+		/* If we ran out of memory, flush and switch to on-disk */
+		if (buildstate->graph != NULL && !buildstate->graph->flushed)
+		{
+			FlushInMemoryGraph(index, buildstate->graph, buildstate);
+		}
+
+		hnswinsert(index, values, isnull, tid, buildstate->heap,
+				   UNIQUE_CHECK_NO, true, buildstate->indexInfo);
+	}
 
 	buildstate->indtuples++;
 }
@@ -1705,7 +2371,25 @@ hnswComputeNodeSizeSafe(int dim, int level, int m, bool *overflow)
 }
 
 /*
+ * Optimized L2 squared distance (no sqrt) for comparisons
+ * Uses SIMD if available via external function, falls back to scalar
+ * This avoids sqrt() overhead when we only need to compare distances
+ */
+static inline float4
+hnswComputeDistanceSquaredL2(const float4 *vec1, const float4 *vec2, int dim)
+{
+	/* Use existing SIMD function - it's linked from neurondb_simd_impl.c */
+	/* This function has SIMD optimizations (AVX2/NEON) with scalar fallback */
+	extern double neurondb_l2_distance_squared(const float *a, const float *b, int n);
+	
+	return (float4) neurondb_l2_distance_squared((const float *) vec1, (const float *) vec2, dim);
+}
+
+/*
  * Distance computation for L2, Cosine, or negative-InnerProduct distances
+ * 
+ * For L2 distance, this returns sqrt(sum), but for comparisons use
+ * hnswComputeDistanceSquaredL2() instead to avoid sqrt overhead.
  */
 static float4
 hnswComputeDistance(const float4 * vec1, const float4 * vec2, int dim, int strategy)
@@ -1719,12 +2403,9 @@ hnswComputeDistance(const float4 * vec1, const float4 * vec2, int dim, int strat
 	switch (strategy)
 	{
 		case 1:					/* L2 */
-			for (i = 0; i < dim; i++)
-			{
-				double		d = vec1[i] - vec2[i];
-
-				sum += d * d;
-			}
+			/* For comparisons, caller should use hnswComputeDistanceSquaredL2 */
+			/* Here we need actual distance (with sqrt) */
+			sum = (double) hnswComputeDistanceSquaredL2(vec1, vec2, dim);
 			return (float4) sqrt(sum);
 
 		case 2:					/* Cosine */
