@@ -139,4 +139,3 @@ func isPostgreSQLTool(name string) bool {
 	/* PostgreSQL tools start with "postgresql_" */
 	return len(name) >= 11 && name[:11] == "postgresql_"
 }
-

@@ -253,9 +253,7 @@ func (m *Manager) buildPromptWithTools(messages []Message) string {
 			promptBuilder.WriteString("Key tools: postgresql_version, postgresql_stats, postgresql_connections, vector_search, generate_embedding\n")
 			promptBuilder.WriteString("Example: TOOL_CALL: {\"name\": \"postgresql_version\", \"arguments\": {}}\n\n")
 		}
-	}
-
-	/* Add conversation messages */
+	}	/* Add conversation messages */
 	for _, msg := range messages {
 		switch msg.Role {
 		case "user":
