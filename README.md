@@ -440,6 +440,53 @@ This validates connectivity and runs the vector/hybrid/RAG benchmark groups.
 | **Hybrid** | Combined vector + full-text search | BEIR (nfcorpus, msmarco, etc.) | NDCG, MAP, Recall, Precision |
 | **RAG** | End-to-end RAG pipeline quality | MTEB, BEIR, RAGAS | Faithfulness, Relevancy, Context Precision |
 
+### Vector Performance Benchmark
+
+NeuronDB HNSW index building performance compared to pgvector:
+
+**Test Environment:**
+- **PostgreSQL**: 18.0
+- **CPU**: Apple Silicon (aarch64-apple-darwin)
+- **RAM**: 256MB `maintenance_work_mem`
+- **Index Parameters**: `m = 16`, `ef_construction = 200`
+- **Distance Metric**: L2 (Euclidean)
+
+**Results:**
+
+| Test Case | NeuronDB Optimized | pgvector | Speedup |
+|-----------|-------------------|----------|---------|
+| 50K vectors (128-dim L2) | 606ms (0.606s) ✅ | 6,108ms (6.108s) | **10.1x faster** |
+| 50K vectors (128-dim Cosine) | 583ms (0.583s) ✅ | 5,113ms (5.113s) | **8.8x faster** |
+| 10K vectors (768-dim L2) | 146ms (0.146s) ✅ | 3,960ms (3.960s) | **27.1x faster** |
+| 100K vectors (128-dim L2) | 1,208ms (1.208s) ✅ | 15,696ms (15.696s) | **13.0x faster** |
+
+**Optimizations Applied:**
+- ✅ In-memory graph building using `maintenance_work_mem`
+- ✅ Efficient neighbor finding during insert (not after flush)
+- ✅ SIMD-optimized distance calculations (AVX2/NEON)
+- ✅ Squared distance optimization (avoiding `sqrt()` overhead)
+- ✅ Optimized flush with pre-computed neighbors
+
+**Benchmark Scripts:**
+- [`NeuronDB/benchmark/vector/neurondb_vector.sql`](NeuronDB/benchmark/vector/neurondb_vector.sql) - NeuronDB optimized HNSW benchmark
+- [`NeuronDB/benchmark/vector/pgvector.sql`](NeuronDB/benchmark/vector/pgvector.sql) - pgvector reference benchmark
+
+**How to Run:**
+```bash
+# Create separate databases for fair comparison
+psql -d postgres -c "CREATE DATABASE neurondb_bench;"
+psql -d postgres -c "CREATE DATABASE pgvector_bench;"
+
+# Run NeuronDB benchmark
+psql -d neurondb_bench -f NeuronDB/benchmark/vector/neurondb_vector.sql
+
+# Run pgvector benchmark
+psql -d pgvector_bench -f NeuronDB/benchmark/vector/pgvector.sql
+```
+
+> [!NOTE]
+> Both benchmarks use identical test parameters (same vector generation pattern, same index parameters) to ensure fair comparison. See [`NeuronDB/benchmark/vector/README.md`](NeuronDB/benchmark/vector/README.md) for detailed benchmark documentation.
+
 ### Reproducible benchmarks
 
 To reproduce benchmark results:
