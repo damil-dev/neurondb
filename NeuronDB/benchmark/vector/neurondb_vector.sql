@@ -15,6 +15,7 @@
 
 -- Suppress NOTICE messages to reduce output noise
 SET client_min_messages TO WARNING;
+SET maintenance_work_mem = '256MB';
 
 \echo '=========================================================================='
 \echo 'NeuronDB Vector Performance Benchmark Suite'
@@ -32,8 +33,12 @@ SET client_min_messages TO WARNING;
 -- Ensure NeuronDB extension is loaded
 CREATE EXTENSION IF NOT EXISTS neurondb;
 
--- Table for 128-dimensional vectors (common embedding size)
+-- Clean up any existing tables to ensure clean run
 DROP TABLE IF EXISTS vectors_128 CASCADE;
+DROP TABLE IF EXISTS vectors_768 CASCADE;
+DROP TABLE IF EXISTS vectors_100k CASCADE;
+
+-- Table for 128-dimensional vectors (common embedding size)
 CREATE TABLE vectors_128 (
     id SERIAL PRIMARY KEY,
     category TEXT,
@@ -42,7 +47,6 @@ CREATE TABLE vectors_128 (
 );
 
 -- Table for 768-dimensional vectors (large embeddings like BERT)
-DROP TABLE IF EXISTS vectors_768 CASCADE;
 CREATE TABLE vectors_768 (
     id SERIAL PRIMARY KEY,
     category TEXT,
@@ -51,7 +55,6 @@ CREATE TABLE vectors_768 (
 );
 
 -- Table for 100K vectors (scale test)
-DROP TABLE IF EXISTS vectors_100k CASCADE;
 CREATE TABLE vectors_100k (
     id SERIAL PRIMARY KEY,
     category TEXT,
@@ -125,7 +128,8 @@ FROM generate_series(1, 100000) i;
 \echo 'Benchmark 1: HNSW Index Creation (128-dim, L2 distance)'
 \echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
 
-CREATE INDEX IF NOT EXISTS idx_vectors_128_hnsw_l2 
+DROP INDEX IF EXISTS idx_vectors_128_hnsw_l2;
+CREATE INDEX idx_vectors_128_hnsw_l2 
     ON vectors_128 USING hnsw (embedding vector_l2_ops) 
     WITH (m = 16, ef_construction = 200);
 
@@ -135,7 +139,8 @@ CREATE INDEX IF NOT EXISTS idx_vectors_128_hnsw_l2
 \echo 'Benchmark 1b: HNSW Index Creation (128-dim, Cosine distance)'
 \echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
 
-CREATE INDEX IF NOT EXISTS idx_vectors_128_hnsw_cosine
+DROP INDEX IF EXISTS idx_vectors_128_hnsw_cosine;
+CREATE INDEX idx_vectors_128_hnsw_cosine
     ON vectors_128 USING hnsw (embedding vector_cosine_ops) 
     WITH (m = 16, ef_construction = 200);
 
@@ -145,7 +150,8 @@ CREATE INDEX IF NOT EXISTS idx_vectors_128_hnsw_cosine
 \echo 'Benchmark 1c: HNSW Index Creation (768-dim, L2 distance)'
 \echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
 
-CREATE INDEX IF NOT EXISTS idx_vectors_768_hnsw_l2
+DROP INDEX IF EXISTS idx_vectors_768_hnsw_l2;
+CREATE INDEX idx_vectors_768_hnsw_l2
     ON vectors_768 USING hnsw (embedding vector_l2_ops) 
     WITH (m = 16, ef_construction = 200);
 
@@ -155,7 +161,8 @@ CREATE INDEX IF NOT EXISTS idx_vectors_768_hnsw_l2
 \echo 'Benchmark 1d: HNSW Index Creation (100K vectors, 128-dim)'
 \echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
 
-CREATE INDEX IF NOT EXISTS idx_vectors_100k_hnsw_l2
+DROP INDEX IF EXISTS idx_vectors_100k_hnsw_l2;
+CREATE INDEX idx_vectors_100k_hnsw_l2
     ON vectors_100k USING hnsw (embedding vector_l2_ops) 
     WITH (m = 16, ef_construction = 200);
 
