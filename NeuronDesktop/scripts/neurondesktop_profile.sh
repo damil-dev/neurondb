@@ -1,22 +1,31 @@
 #!/bin/bash
-# Setup default profile for NeuronDesktop
+# ====================================================================
+# NeuronDesktop Default Profile Setup
+# ====================================================================
+# Sets up default profile for NeuronDesktop
 # Auto-detects NeuronMCP binary and creates default profile with proper configuration
+# ====================================================================
 
 set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+NEURONDESKTOP_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+SCRIPT_NAME=$(basename "$0")
+
+# Version
+VERSION="2.0.0"
+
+# Default values
+VERBOSE=false
 
 # Colors for output
 CYAN='\033[0;36m'
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
 RED='\033[0;31m'
+BLUE='\033[0;34m'
 NC='\033[0m' # No Color
-
-echo -e "${CYAN}Setting up default profile for NeuronDesktop...${NC}"
-
-# Get project root (assuming script is in NeuronDesktop/scripts/)
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-NEURONDESKTOP_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # Database connection from environment variables
 DB_HOST="${DB_HOST:-localhost}"
@@ -38,6 +47,128 @@ AGENT_API_KEY="${NEURONAGENT_API_KEY:-}"
 
 # User ID for default profile
 USER_ID="${USER_ID:-default}"
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+	case $1 in
+		-D|--database)
+			DB_NAME="$2"
+			shift 2
+			;;
+		-U|--user)
+			DB_USER="$2"
+			shift 2
+			;;
+		-H|--host)
+			DB_HOST="$2"
+			shift 2
+			;;
+		-p|--port)
+			DB_PORT="$2"
+			shift 2
+			;;
+		--neurondb-host)
+			NEURONDB_HOST="$2"
+			shift 2
+			;;
+		--neurondb-port)
+			NEURONDB_PORT="$2"
+			shift 2
+			;;
+		--neurondb-database)
+			NEURONDB_DATABASE="$2"
+			shift 2
+			;;
+		--agent-endpoint)
+			AGENT_ENDPOINT="$2"
+			shift 2
+			;;
+		--agent-api-key)
+			AGENT_API_KEY="$2"
+			shift 2
+			;;
+		-u|--user-id)
+			USER_ID="$2"
+			shift 2
+			;;
+		-v|--verbose)
+			VERBOSE=true
+			shift
+			;;
+		-V|--version)
+			echo "neurondesktop_profile.sh version $VERSION"
+			exit 0
+			;;
+		-h|--help)
+			cat << EOF
+NeuronDesktop Default Profile Setup
+
+Usage:
+    $SCRIPT_NAME [OPTIONS]
+
+Description:
+    Sets up default profile for NeuronDesktop. Auto-detects NeuronMCP binary
+    and creates default profile with proper configuration.
+
+Options:
+    -D, --database DB              Database name (default: neurondesk)
+    -U, --user USER                Database user (default: neurondesk)
+    -H, --host HOST                Database host (default: localhost)
+    -p, --port PORT                Database port (default: 5432)
+    --neurondb-host HOST           NeuronDB host (default: localhost)
+    --neurondb-port PORT           NeuronDB port (default: 5432)
+    --neurondb-database DB         NeuronDB database (default: neurondb)
+    --agent-endpoint URL           Agent endpoint (default: http://localhost:8080)
+    --agent-api-key KEY            Agent API key
+    -u, --user-id USER             User ID (default: default)
+    -v, --verbose                  Enable verbose output
+    -V, --version                  Show version information
+    -h, --help                     Show this help message
+
+Environment Variables:
+    DB_HOST                Database host (default: localhost)
+    DB_PORT                Database port (default: 5432)
+    DB_NAME                Database name (default: neurondesk)
+    DB_USER                Database user (default: neurondesk)
+    NEURONDB_HOST          NeuronDB host (default: localhost)
+    NEURONDB_PORT          NeuronDB port (default: 5432)
+    NEURONDB_DATABASE      NeuronDB database (default: neurondb)
+    NEURONAGENT_ENDPOINT   Agent endpoint (default: http://localhost:8080)
+    NEURONAGENT_API_KEY    Agent API key
+    USER_ID                User ID (default: default)
+
+Examples:
+    # Basic usage
+    $SCRIPT_NAME
+
+    # Custom database and NeuronDB
+    $SCRIPT_NAME -D mydb --neurondb-database myneurondb
+
+    # With verbose output
+    $SCRIPT_NAME --verbose
+
+EOF
+			exit 0
+			;;
+		*)
+			echo -e "${RED}Unknown option: $1${NC}" >&2
+			echo "Use -h or --help for usage information" >&2
+			exit 1
+			;;
+	esac
+done
+
+if [ "$VERBOSE" = true ]; then
+	echo "========================================"
+	echo "NeuronDesktop Default Profile Setup"
+	echo "========================================"
+	echo "Database: $DB_HOST:$DB_PORT/$DB_NAME"
+	echo "NeuronDB: $NEURONDB_HOST:$NEURONDB_PORT/$NEURONDB_DATABASE"
+	echo "Agent Endpoint: $AGENT_ENDPOINT"
+	echo "========================================"
+fi
+
+echo -e "${CYAN}Setting up default profile for NeuronDesktop...${NC}"
 
 # Function to find NeuronMCP binary
 find_neurondb_mcp() {

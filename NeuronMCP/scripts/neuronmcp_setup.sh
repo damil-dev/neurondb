@@ -1,16 +1,31 @@
 #!/bin/bash
-# NeuronMCP Configuration Schema Setup Script
-#
+# ====================================================================
+# NeuronMCP Configuration Schema Setup
+# ====================================================================
 # Sets up comprehensive database schema for NeuronMCP with all configurations,
 # tables, functions, and pre-populated defaults.
-#
-# Usage:
-#   ./setup_neurondb_mcp.sh
-#   DB_HOST=localhost DB_PORT=5433 DB_NAME=neurondb DB_USER=neurondb ./setup_neurondb_mcp.sh
-#   # For native PostgreSQL (not Docker):
-#   DB_PORT=5432 DB_USER=postgres ./setup_neurondb_mcp.sh
+# ====================================================================
 
 set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+SQL_DIR="$PROJECT_ROOT/sql"
+SCRIPT_NAME=$(basename "$0")
+
+# Version
+VERSION="2.0.0"
+
+# Default values
+VERBOSE=false
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
 
 # Default values (can be overridden by environment variables)
 # Note: Default port 5433 matches Docker Compose setup
@@ -21,17 +36,98 @@ DB_NAME="${NEURONDB_DATABASE:-${DB_NAME:-neurondb}}"
 DB_USER="${NEURONDB_USER:-${DB_USER:-neurondb}}"  # Docker Compose default user
 DB_PASSWORD="${NEURONDB_PASSWORD:-${DB_PASSWORD:-neurondb}}"  # Docker Compose default password
 
-# Get script directory
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-SQL_DIR="$PROJECT_ROOT/sql"
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+	case $1 in
+		-D|--database)
+			DB_NAME="$2"
+			shift 2
+			;;
+		-U|--user)
+			DB_USER="$2"
+			shift 2
+			;;
+		-H|--host)
+			DB_HOST="$2"
+			shift 2
+			;;
+		-p|--port)
+			DB_PORT="$2"
+			shift 2
+			;;
+		--password)
+			DB_PASSWORD="$2"
+			shift 2
+			;;
+		-v|--verbose)
+			VERBOSE=true
+			shift
+			;;
+		-V|--version)
+			echo "neuronmcp_setup.sh version $VERSION"
+			exit 0
+			;;
+		-h|--help)
+			cat << EOF
+NeuronMCP Configuration Schema Setup
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+Usage:
+    $SCRIPT_NAME [OPTIONS]
+
+Description:
+    Sets up comprehensive database schema for NeuronMCP with all configurations,
+    tables, functions, and pre-populated defaults.
+
+Options:
+    -D, --database DB     Database name (default: neurondb)
+    -U, --user USER       Database user (default: neurondb)
+    -H, --host HOST       Database host (default: localhost)
+    -p, --port PORT       Database port (default: 5433)
+    --password PASSWORD   Database password
+    -v, --verbose         Enable verbose output
+    -V, --version         Show version information
+    -h, --help            Show this help message
+
+Environment Variables:
+    NEURONDB_HOST / DB_HOST       Database host (default: localhost)
+    NEURONDB_PORT / DB_PORT       Database port (default: 5433)
+    NEURONDB_DATABASE / DB_NAME   Database name (default: neurondb)
+    NEURONDB_USER / DB_USER       Database user (default: neurondb)
+    NEURONDB_PASSWORD / DB_PASSWORD   Database password
+
+Examples:
+    # Basic usage (Docker Compose defaults)
+    $SCRIPT_NAME
+
+    # Native PostgreSQL
+    $SCRIPT_NAME -p 5432 -U postgres
+
+    # Custom database
+    $SCRIPT_NAME -D mydb -U myuser -H localhost -p 5432
+
+    # With verbose output
+    $SCRIPT_NAME --verbose
+
+EOF
+			exit 0
+			;;
+		*)
+			echo -e "${RED}Unknown option: $1${NC}" >&2
+			echo "Use -h or --help for usage information" >&2
+			exit 1
+			;;
+	esac
+done
+
+if [ "$VERBOSE" = true ]; then
+	echo "========================================"
+	echo "NeuronMCP Configuration Schema Setup"
+	echo "========================================"
+	echo "Database: $DB_HOST:$DB_PORT/$DB_NAME"
+	echo "User: $DB_USER"
+	echo "========================================"
+	echo ""
+fi
 
 # Function to print colored output
 print_info() {
@@ -277,12 +373,12 @@ main() {
     fi
     
     # Run schema SQL
-    if ! run_sql_file "$SQL_DIR/001_initial_schema.sql" "Schema setup"; then
+    if ! run_sql_file "$SQL_DIR/neuronmcp_initial_schema.sql" "Schema setup"; then
         exit 1
     fi
     
     # Run functions SQL
-    if ! run_sql_file "$SQL_DIR/002_functions.sql" "Functions setup"; then
+    if ! run_sql_file "$SQL_DIR/neuronmcp_functions.sql" "Functions setup"; then
         exit 1
     fi
     

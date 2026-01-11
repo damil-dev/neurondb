@@ -1,8 +1,22 @@
 #!/bin/bash
+# ====================================================================
+# NeuronDesktop Setup
+# ====================================================================
 # Unified setup script for NeuronDesktop
 # Orchestrates database migrations, default profile creation, and sample agent setup
+# ====================================================================
 
 set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+NEURONDESKTOP_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+SCRIPT_NAME=$(basename "$0")
+
+# Version
+VERSION="2.0.0"
+
+# Default values
+VERBOSE=false
 
 # Colors for output
 CYAN='\033[0;36m'
@@ -11,16 +25,6 @@ YELLOW='\033[0;33m'
 RED='\033[0;31m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
-
-# Get script directory
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-NEURONDESKTOP_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-
-# Print header
-echo -e "${BLUE}========================================${NC}"
-echo -e "${BLUE}  NeuronDesktop Setup${NC}"
-echo -e "${BLUE}========================================${NC}"
-echo ""
 
 # Database connection from environment variables
 # Note: Defaults match Docker Compose setup
@@ -33,6 +37,105 @@ DB_PASSWORD="${DB_PASSWORD:-neurondb}"  # Docker Compose default password
 
 # Export for sub-scripts
 export DB_HOST DB_PORT DB_NAME DB_USER DB_PASSWORD
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+	case $1 in
+		-D|--database)
+			DB_NAME="$2"
+			export DB_NAME
+			shift 2
+			;;
+		-U|--user)
+			DB_USER="$2"
+			export DB_USER
+			shift 2
+			;;
+		-H|--host)
+			DB_HOST="$2"
+			export DB_HOST
+			shift 2
+			;;
+		-p|--port)
+			DB_PORT="$2"
+			export DB_PORT
+			shift 2
+			;;
+		--password)
+			DB_PASSWORD="$2"
+			export DB_PASSWORD
+			shift 2
+			;;
+		-v|--verbose)
+			VERBOSE=true
+			shift
+			;;
+		-V|--version)
+			echo "neurondesktop_setup.sh version $VERSION"
+			exit 0
+			;;
+		-h|--help)
+			cat << EOF
+NeuronDesktop Setup
+
+Usage:
+    $SCRIPT_NAME [OPTIONS]
+
+Description:
+    Unified setup script for NeuronDesktop. Orchestrates database migrations,
+    default profile creation, and sample agent setup.
+
+Options:
+    -D, --database DB     Database name (default: neurondesk)
+    -U, --user USER       Database user (default: neurondb)
+    -H, --host HOST       Database host (default: localhost)
+    -p, --port PORT       Database port (default: 5433)
+    --password PASSWORD   Database password
+    -v, --verbose         Enable verbose output
+    -V, --version         Show version information
+    -h, --help            Show this help message
+
+Environment Variables:
+    DB_HOST       Database host (default: localhost)
+    DB_PORT       Database port (default: 5433)
+    DB_NAME       Database name (default: neurondesk)
+    DB_USER       Database user (default: neurondb)
+    DB_PASSWORD   Database password
+
+Examples:
+    # Basic usage (Docker Compose defaults)
+    $SCRIPT_NAME
+
+    # Native PostgreSQL
+    $SCRIPT_NAME -p 5432 -U postgres
+
+    # Custom database
+    $SCRIPT_NAME -D mydb -U myuser -H localhost -p 5432
+
+    # With verbose output
+    $SCRIPT_NAME --verbose
+
+EOF
+			exit 0
+			;;
+		*)
+			echo -e "${RED}Unknown option: $1${NC}" >&2
+			echo "Use -h or --help for usage information" >&2
+			exit 1
+			;;
+	esac
+done
+
+# Print header
+if [ "$VERBOSE" = true ]; then
+	echo "========================================"
+	echo "NeuronDesktop Setup"
+	echo "========================================"
+	echo "Database: $DB_HOST:$DB_PORT/$DB_NAME"
+	echo "User: $DB_USER"
+	echo "========================================"
+	echo ""
+fi
 
 # Step 1: Check database connection
 echo -e "${CYAN}Step 1: Checking database connection...${NC}"
@@ -108,17 +211,17 @@ if [ -f "$SCRIPT_DIR/setup_default_profile.sh" ]; then
         exit 1
     fi
 else
-    echo -e "${RED}✗ setup_default_profile.sh not found${NC}"
+    echo -e "${RED}✗ neurondesktop_profile.sh not found${NC}"
     exit 1
 fi
 echo ""
 
 # Step 5: Create sample NeuronAgent (optional)
 echo -e "${CYAN}Step 5: Creating sample NeuronAgent (optional)...${NC}"
-if [ -f "$SCRIPT_DIR/create_sample_agent.sh" ]; then
+if [ -f "$SCRIPT_DIR/neurondesktop_create_agent.sh" ]; then
     # Check if NeuronAgent endpoint is configured
     if [ -n "${NEURONAGENT_ENDPOINT:-}" ] || curl -s -o /dev/null -w "%{http_code}" "http://localhost:8080/health" 2>/dev/null | grep -q "200"; then
-        bash "$SCRIPT_DIR/create_sample_agent.sh"
+        bash "$SCRIPT_DIR/neurondesktop_create_agent.sh"
         if [ $? -eq 0 ]; then
             echo -e "${GREEN}✓ Sample agent setup complete${NC}"
         else
@@ -129,7 +232,7 @@ if [ -f "$SCRIPT_DIR/create_sample_agent.sh" ]; then
         echo -e "${YELLOW}  Set NEURONAGENT_ENDPOINT to create a sample agent.${NC}"
     fi
 else
-    echo -e "${YELLOW}⚠ create_sample_agent.sh not found${NC}"
+    echo -e "${YELLOW}⚠ neurondesktop_create_agent.sh not found${NC}"
 fi
 echo ""
 

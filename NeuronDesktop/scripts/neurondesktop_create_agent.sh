@@ -1,17 +1,28 @@
 #!/bin/bash
-# Create a sample NeuronAgent via API
+# ====================================================================
+# NeuronDesktop Create Sample Agent
+# ====================================================================
+# Creates a sample NeuronAgent via API
 # Checks NeuronAgent health and creates a sample assistant agent
+# ====================================================================
 
 set -e
+
+SCRIPT_NAME=$(basename "$0")
+
+# Version
+VERSION="2.0.0"
+
+# Default values
+VERBOSE=false
 
 # Colors for output
 CYAN='\033[0;36m'
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
 RED='\033[0;31m'
+BLUE='\033[0;34m'
 NC='\033[0m' # No Color
-
-echo -e "${CYAN}Creating sample NeuronAgent...${NC}"
 
 # Configuration from environment variables
 AGENT_ENDPOINT="${NEURONAGENT_ENDPOINT:-http://localhost:8080}"
@@ -23,6 +34,113 @@ AGENT_DESCRIPTION="${SAMPLE_AGENT_DESCRIPTION:-General purpose assistant for ans
 AGENT_SYSTEM_PROMPT="${SAMPLE_AGENT_SYSTEM_PROMPT:-You are a helpful, harmless, and honest assistant. Answer questions accurately and helpfully.}"
 AGENT_MODEL="${SAMPLE_AGENT_MODEL:-gpt-4}"
 AGENT_TOOLS="${SAMPLE_AGENT_TOOLS:-sql,http}"
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+	case $1 in
+		-e|--endpoint|--agent-endpoint)
+			AGENT_ENDPOINT="$2"
+			shift 2
+			;;
+		-k|--key|--api-key)
+			AGENT_API_KEY="$2"
+			shift 2
+			;;
+		-n|--name|--agent-name)
+			AGENT_NAME="$2"
+			shift 2
+			;;
+		-d|--description)
+			AGENT_DESCRIPTION="$2"
+			shift 2
+			;;
+		-p|--prompt|--system-prompt)
+			AGENT_SYSTEM_PROMPT="$2"
+			shift 2
+			;;
+		-m|--model)
+			AGENT_MODEL="$2"
+			shift 2
+			;;
+		-t|--tools)
+			AGENT_TOOLS="$2"
+			shift 2
+			;;
+		-v|--verbose)
+			VERBOSE=true
+			shift
+			;;
+		-V|--version)
+			echo "neurondesktop_create_agent.sh version $VERSION"
+			exit 0
+			;;
+		-h|--help)
+			cat << EOF
+NeuronDesktop Create Sample Agent
+
+Usage:
+    $SCRIPT_NAME [OPTIONS]
+
+Description:
+    Creates a sample NeuronAgent via API. Checks NeuronAgent health and
+    creates a sample assistant agent.
+
+Options:
+    -e, --endpoint, --agent-endpoint URL    NeuronAgent endpoint (default: http://localhost:8080)
+    -k, --key, --api-key KEY                API key for authentication
+    -n, --name, --agent-name NAME           Agent name (default: sample-assistant)
+    -d, --description DESC                  Agent description
+    -p, --prompt, --system-prompt PROMPT    System prompt
+    -m, --model MODEL                       Model name (default: gpt-4)
+    -t, --tools TOOLS                       Comma-separated tools (default: sql,http)
+    -v, --verbose                           Enable verbose output
+    -V, --version                           Show version information
+    -h, --help                              Show this help message
+
+Environment Variables:
+    NEURONAGENT_ENDPOINT       NeuronAgent endpoint (default: http://localhost:8080)
+    NEURONAGENT_API_KEY        API key for authentication
+    SAMPLE_AGENT_NAME          Agent name (default: sample-assistant)
+    SAMPLE_AGENT_DESCRIPTION   Agent description
+    SAMPLE_AGENT_SYSTEM_PROMPT System prompt
+    SAMPLE_AGENT_MODEL         Model name (default: gpt-4)
+    SAMPLE_AGENT_TOOLS         Comma-separated tools (default: sql,http)
+
+Examples:
+    # Basic usage
+    $SCRIPT_NAME
+
+    # Custom endpoint and API key
+    $SCRIPT_NAME -e http://localhost:9090 -k my-api-key
+
+    # Custom agent configuration
+    $SCRIPT_NAME -n my-agent -m gpt-3.5-turbo -t sql,http,web
+
+    # With verbose output
+    $SCRIPT_NAME --verbose
+
+EOF
+			exit 0
+			;;
+		*)
+			echo -e "${RED}Unknown option: $1${NC}" >&2
+			echo "Use -h or --help for usage information" >&2
+			exit 1
+			;;
+	esac
+done
+
+if [ "$VERBOSE" = true ]; then
+	echo "========================================"
+	echo "NeuronDesktop Create Sample Agent"
+	echo "========================================"
+	echo "Endpoint: $AGENT_ENDPOINT"
+	echo "Agent Name: $AGENT_NAME"
+	echo "Model: $AGENT_MODEL"
+	echo "========================================"
+fi
+
+echo -e "${CYAN}Creating sample NeuronAgent...${NC}"
 
 # Check if NeuronAgent is running
 echo -e "${CYAN}Checking NeuronAgent health...${NC}"
