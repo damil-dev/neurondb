@@ -34,7 +34,7 @@ type HybridSearchTool struct {
 func NewHybridSearchTool(db *database.Database, logger *logging.Logger) *HybridSearchTool {
 	return &HybridSearchTool{
 		BaseTool: NewBaseTool(
-			"hybrid_search",
+			"neurondb_hybrid_search",
 			"Perform hybrid search combining semantic (vector) and lexical (BM25/text) search",
 			map[string]interface{}{
 				"type": "object",
@@ -97,7 +97,7 @@ func NewHybridSearchTool(db *database.Database, logger *logging.Logger) *HybridS
 func (t *HybridSearchTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for hybrid_search tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_hybrid_search tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil
@@ -180,14 +180,14 @@ func (t *HybridSearchTool) Execute(ctx context.Context, params map[string]interf
 	}
 
 	if table == "" {
-		return Error("table parameter is required and cannot be empty for hybrid_search tool", "VALIDATION_ERROR", map[string]interface{}{
+		return Error("table parameter is required and cannot be empty for neurondb_hybrid_search tool", "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "table",
 			"params":    params,
 		}), nil
 	}
 
 	if queryText == "" {
-		return Error(fmt.Sprintf("query_text parameter is required and cannot be empty for hybrid_search tool: table='%s'", table), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("query_text parameter is required and cannot be empty for neurondb_hybrid_search tool: table='%s'", table), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "query_text",
 			"table":     table,
 			"params":    params,
@@ -195,7 +195,7 @@ func (t *HybridSearchTool) Execute(ctx context.Context, params map[string]interf
 	}
 
 	if vectorColumn == "" {
-		return Error(fmt.Sprintf("vector_column parameter is required and cannot be empty for hybrid_search tool: table='%s', query_text_length=%d", table, len(queryText)), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("vector_column parameter is required and cannot be empty for neurondb_hybrid_search tool: table='%s', query_text_length=%d", table, len(queryText)), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter":      "vector_column",
 			"table":          table,
 			"query_text_length": len(queryText),
@@ -204,7 +204,7 @@ func (t *HybridSearchTool) Execute(ctx context.Context, params map[string]interf
 	}
 
 	if textColumn == "" {
-		return Error(fmt.Sprintf("text_column parameter is required and cannot be empty for hybrid_search tool: table='%s', query_text_length=%d, vector_column='%s'", table, len(queryText), vectorColumn), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("text_column parameter is required and cannot be empty for neurondb_hybrid_search tool: table='%s', query_text_length=%d, vector_column='%s'", table, len(queryText), vectorColumn), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter":      "text_column",
 			"table":          table,
 			"query_text_length": len(queryText),
@@ -214,7 +214,7 @@ func (t *HybridSearchTool) Execute(ctx context.Context, params map[string]interf
 	}
 
 	if len(queryVector) == 0 {
-		return Error(fmt.Sprintf("query_vector parameter is required and cannot be empty for hybrid_search tool: table='%s', query_text_length=%d, vector_column='%s', text_column='%s'", table, len(queryText), vectorColumn, textColumn), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("query_vector parameter is required and cannot be empty for neurondb_hybrid_search tool: table='%s', query_text_length=%d, vector_column='%s', text_column='%s'", table, len(queryText), vectorColumn, textColumn), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter":      "query_vector",
 			"table":          table,
 			"query_text_length": len(queryText),
@@ -225,7 +225,7 @@ func (t *HybridSearchTool) Execute(ctx context.Context, params map[string]interf
 	}
 
 	if vectorWeight < 0.0 || vectorWeight > 1.0 {
-		return Error(fmt.Sprintf("vector_weight must be between 0.0 and 1.0 for hybrid_search tool: table='%s', received vector_weight=%g", table, vectorWeight), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("vector_weight must be between 0.0 and 1.0 for neurondb_hybrid_search tool: table='%s', received vector_weight=%g", table, vectorWeight), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter":    "vector_weight",
 			"table":        table,
 			"vector_weight": vectorWeight,

@@ -171,5 +171,102 @@ func RegisterAllTools(registry *ToolRegistry, db *database.Database, logger *log
 	registry.Register(NewPostgreSQLIndexSizeTool(db, logger))
 	registry.Register(NewPostgreSQLBloatTool(db, logger))
 	registry.Register(NewPostgreSQLVacuumStatsTool(db, logger))
+
+  /* PostgreSQL tools - Administration (16 tools) */
+	registry.Register(NewPostgreSQLExplainTool(db, logger))
+	registry.Register(NewPostgreSQLExplainAnalyzeTool(db, logger))
+	registry.Register(NewPostgreSQLVacuumTool(db, logger))
+	registry.Register(NewPostgreSQLAnalyzeTool(db, logger))
+	registry.Register(NewPostgreSQLReindexTool(db, logger))
+	registry.Register(NewPostgreSQLTransactionsTool(db, logger))
+	registry.Register(NewPostgreSQLTerminateQueryTool(db, logger))
+	registry.Register(NewPostgreSQLSetConfigTool(db, logger))
+	registry.Register(NewPostgreSQLReloadConfigTool(db, logger))
+	registry.Register(NewPostgreSQLSlowQueriesTool(db, logger))
+	registry.Register(NewPostgreSQLCacheHitRatioTool(db, logger))
+	registry.Register(NewPostgreSQLBufferStatsTool(db, logger))
+	registry.Register(NewPostgreSQLPartitionsTool(db, logger))
+	registry.Register(NewPostgreSQLPartitionStatsTool(db, logger))
+	registry.Register(NewPostgreSQLFDWServersTool(db, logger))
+	registry.Register(NewPostgreSQLFDWTablesTool(db, logger))
+	registry.Register(NewPostgreSQLLogicalReplicationSlotsTool(db, logger))
+
+  /* PostgreSQL tools - Query Execution & Management (6 tools) */
+	registry.Register(NewPostgreSQLExecuteQueryTool(db, logger))
+	registry.Register(NewPostgreSQLQueryPlanTool(db, logger))
+	registry.Register(NewPostgreSQLCancelQueryTool(db, logger))
+	registry.Register(NewPostgreSQLKillQueryTool(db, logger))
+	registry.Register(NewPostgreSQLQueryHistoryTool(db, logger))
+	registry.Register(NewPostgreSQLQueryOptimizationTool(db, logger))
+
+  /* PostgreSQL tools - Backup & Recovery (6 tools) */
+	registry.Register(NewPostgreSQLBackupDatabaseTool(db, logger))
+	registry.Register(NewPostgreSQLRestoreDatabaseTool(db, logger))
+	registry.Register(NewPostgreSQLBackupTableTool(db, logger))
+	registry.Register(NewPostgreSQLListBackupsTool(db, logger))
+	registry.Register(NewPostgreSQLVerifyBackupTool(db, logger))
+	registry.Register(NewPostgreSQLBackupScheduleTool(db, logger))
+
+  /* PostgreSQL tools - Schema Modification (7 tools) */
+	registry.Register(NewPostgreSQLCreateTableTool(db, logger))
+	registry.Register(NewPostgreSQLAlterTableTool(db, logger))
+	registry.Register(NewPostgreSQLDropTableTool(db, logger))
+	registry.Register(NewPostgreSQLCreateIndexTool(db, logger))
+	registry.Register(NewPostgreSQLCreateViewTool(db, logger))
+	registry.Register(NewPostgreSQLCreateFunctionTool(db, logger))
+	registry.Register(NewPostgreSQLCreateTriggerTool(db, logger))
+
+  /* PostgreSQL tools - High Availability (5 tools) */
+	registry.Register(NewPostgreSQLReplicationLagTool(db, logger))
+	registry.Register(NewPostgreSQLPromoteReplicaTool(db, logger))
+	registry.Register(NewPostgreSQLSyncStatusTool(db, logger))
+	registry.Register(NewPostgreSQLClusterTool(db, logger))
+	registry.Register(NewPostgreSQLFailoverTool(db, logger))
+
+  /* PostgreSQL tools - Security & Compliance (4 tools) */
+	registry.Register(NewPostgreSQLAuditLogTool(db, logger))
+	registry.Register(NewPostgreSQLSecurityScanTool(db, logger))
+	registry.Register(NewPostgreSQLComplianceCheckTool(db, logger))
+	registry.Register(NewPostgreSQLEncryptionStatusTool(db, logger))
+
+  /* PostgreSQL tools - Maintenance Operations (1 tool) */
+	registry.Register(NewPostgreSQLMaintenanceWindowTool(db, logger))
+
+  /* Advanced Vector Operations (10 tools) */
+	registry.Register(NewVectorAggregateTool(db, logger))
+	registry.Register(NewVectorNormalizeBatchTool(db, logger))
+	registry.Register(NewVectorSimilarityMatrixTool(db, logger))
+	registry.Register(NewVectorBatchDistanceTool(db, logger))
+	registry.Register(NewVectorIndexStatisticsTool(db, logger))
+	registry.Register(NewVectorDimensionReductionTool(db, logger))
+	registry.Register(NewVectorClusterAnalysisTool(db, logger))
+	registry.Register(NewVectorAnomalyDetectionTool(db, logger))
+	registry.Register(NewVectorQuantizationAdvancedTool(db, logger))
+	registry.Register(NewVectorCacheManagementTool(db, logger))
+
+  /* Advanced ML Features (8 tools) */
+	registry.Register(NewMLModelVersioningTool(db, logger))
+	registry.Register(NewMLModelABTestingTool(db, logger))
+	registry.Register(NewMLModelExplainabilityTool(db, logger))
+	registry.Register(NewMLModelMonitoringTool(db, logger))
+	registry.Register(NewMLModelRollbackTool(db, logger))
+	registry.Register(NewMLModelRetrainingTool(db, logger))
+	registry.Register(NewMLEnsembleModelsTool(db, logger))
+	registry.Register(NewMLModelExportFormatsTool(db, logger))
+
+  /* Advanced Graph Operations (6 tools) */
+	registry.Register(NewVectorGraphShortestPathTool(db, logger))
+	registry.Register(NewVectorGraphCentralityTool(db, logger))
+	registry.Register(NewVectorGraphAnalysisTool(db, logger))
+	registry.Register(NewVectorGraphCommunityDetectionAdvancedTool(db, logger))
+	registry.Register(NewVectorGraphClusteringTool(db, logger))
+	registry.Register(NewVectorGraphVisualizationTool(db, logger))
+
+  /* Multi-Modal Operations (5 tools) */
+	registry.Register(NewMultimodalEmbedTool(db, logger))
+	registry.Register(NewMultimodalSearchTool(db, logger))
+	registry.Register(NewMultimodalRetrievalTool(db, logger))
+	registry.Register(NewImageEmbedBatchTool(db, logger))
+	registry.Register(NewAudioEmbedTool(db, logger))
 }
 

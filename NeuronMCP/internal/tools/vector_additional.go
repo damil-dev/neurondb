@@ -32,7 +32,7 @@ type VectorSimilarityTool struct {
 func NewVectorSimilarityTool(db *database.Database, logger *logging.Logger) *VectorSimilarityTool {
 	return &VectorSimilarityTool{
 		BaseTool: NewBaseTool(
-			"vector_similarity",
+			"neurondb_vector_similarity",
 			"Compute similarity between two vectors",
 			map[string]interface{}{
 				"type": "object",
@@ -66,7 +66,7 @@ func NewVectorSimilarityTool(db *database.Database, logger *logging.Logger) *Vec
 func (t *VectorSimilarityTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for vector_similarity tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_vector_similarity tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil
@@ -80,7 +80,7 @@ func (t *VectorSimilarityTool) Execute(ctx context.Context, params map[string]in
 	}
 
 	if vector1 == nil || len(vector1) == 0 {
-		return Error("vector1 parameter is required and cannot be empty array for vector_similarity tool", "VALIDATION_ERROR", map[string]interface{}{
+		return Error("vector1 parameter is required and cannot be empty array for neurondb_vector_similarity tool", "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "vector1",
 			"vector1_dimension": 0,
 			"params": params,
@@ -88,7 +88,7 @@ func (t *VectorSimilarityTool) Execute(ctx context.Context, params map[string]in
 	}
 
 	if vector2 == nil || len(vector2) == 0 {
-		return Error(fmt.Sprintf("vector2 parameter is required and cannot be empty array for vector_similarity tool: vector1_dimension=%d", len(vector1)), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("vector2 parameter is required and cannot be empty array for neurondb_vector_similarity tool: vector1_dimension=%d", len(vector1)), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "vector2",
 			"vector1_dimension": len(vector1),
 			"vector2_dimension": 0,
@@ -97,7 +97,7 @@ func (t *VectorSimilarityTool) Execute(ctx context.Context, params map[string]in
 	}
 
 	if len(vector1) != len(vector2) {
-		return Error(fmt.Sprintf("vector1 and vector2 must have the same dimension for vector_similarity tool: vector1_dimension=%d, vector2_dimension=%d, distance_metric='%s'", len(vector1), len(vector2), distanceMetric), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("vector1 and vector2 must have the same dimension for neurondb_vector_similarity tool: vector1_dimension=%d, vector2_dimension=%d, distance_metric='%s'", len(vector1), len(vector2), distanceMetric), "VALIDATION_ERROR", map[string]interface{}{
 			"vector1_dimension": len(vector1),
 			"vector2_dimension": len(vector2),
 			"distance_metric":   distanceMetric,
@@ -108,7 +108,7 @@ func (t *VectorSimilarityTool) Execute(ctx context.Context, params map[string]in
 	validMetrics := map[string]bool{"l2": true, "cosine": true, "inner_product": true, "l1": true}
 	if !validMetrics[distanceMetric] {
 		validList := []string{"l2", "cosine", "inner_product", "l1"}
-		return Error(fmt.Sprintf("invalid distance_metric '%s' for vector_similarity tool: vector1_dimension=%d, vector2_dimension=%d. Valid metrics are: %v", distanceMetric, len(vector1), len(vector2), validList), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("invalid distance_metric '%s' for neurondb_vector_similarity tool: vector1_dimension=%d, vector2_dimension=%d. Valid metrics are: %v", distanceMetric, len(vector1), len(vector2), validList), "VALIDATION_ERROR", map[string]interface{}{
 			"distance_metric":   distanceMetric,
 			"vector1_dimension": len(vector1),
 			"vector2_dimension": len(vector2),
@@ -160,7 +160,7 @@ type CreateVectorIndexTool struct {
 func NewCreateVectorIndexTool(db *database.Database, logger *logging.Logger) *CreateVectorIndexTool {
 	return &CreateVectorIndexTool{
 		BaseTool: NewBaseTool(
-			"create_vector_index",
+			"neurondb_create_vector_index",
 			"Create a vector index (HNSW or IVF) for a vector column",
 			map[string]interface{}{
 				"type": "object",
@@ -211,7 +211,7 @@ func NewCreateVectorIndexTool(db *database.Database, logger *logging.Logger) *Cr
 func (t *CreateVectorIndexTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for create_vector_index tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_create_vector_index tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil
@@ -227,7 +227,7 @@ func (t *CreateVectorIndexTool) Execute(ctx context.Context, params map[string]i
 	indexName, _ := params["index_name"].(string)
 
 	if table == "" {
-		return Error(fmt.Sprintf("table parameter is required and cannot be empty for create_vector_index tool: index_type='%s'", indexType), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("table parameter is required and cannot be empty for neurondb_create_vector_index tool: index_type='%s'", indexType), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter":  "table",
 			"index_type": indexType,
 			"params":     params,
@@ -235,7 +235,7 @@ func (t *CreateVectorIndexTool) Execute(ctx context.Context, params map[string]i
 	}
 
 	if vectorColumn == "" {
-		return Error(fmt.Sprintf("vector_column parameter is required and cannot be empty for create_vector_index tool: index_type='%s', table='%s'", indexType, table), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("vector_column parameter is required and cannot be empty for neurondb_create_vector_index tool: index_type='%s', table='%s'", indexType, table), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter":  "vector_column",
 			"index_type": indexType,
 			"table":      table,
@@ -244,7 +244,7 @@ func (t *CreateVectorIndexTool) Execute(ctx context.Context, params map[string]i
 	}
 
 	if indexName == "" {
-		return Error(fmt.Sprintf("index_name parameter is required and cannot be empty for create_vector_index tool: index_type='%s', table='%s', vector_column='%s'", indexType, table, vectorColumn), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("index_name parameter is required and cannot be empty for neurondb_create_vector_index tool: index_type='%s', table='%s', vector_column='%s'", indexType, table, vectorColumn), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter":     "index_name",
 			"index_type":    indexType,
 			"table":         table,
@@ -255,7 +255,7 @@ func (t *CreateVectorIndexTool) Execute(ctx context.Context, params map[string]i
 
 	validTypes := map[string]bool{"hnsw": true, "ivf": true}
 	if !validTypes[indexType] {
-		return Error(fmt.Sprintf("invalid index_type '%s' for create_vector_index tool: table='%s', vector_column='%s', index_name='%s'. Valid types are: hnsw, ivf", indexType, table, vectorColumn, indexName), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("invalid index_type '%s' for neurondb_create_vector_index tool: table='%s', vector_column='%s', index_name='%s'. Valid types are: hnsw, ivf", indexType, table, vectorColumn, indexName), "VALIDATION_ERROR", map[string]interface{}{
 			"index_type":    indexType,
 			"table":         table,
 			"vector_column": vectorColumn,

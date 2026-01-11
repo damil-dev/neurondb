@@ -32,7 +32,7 @@ type ONNXTool struct {
 func NewONNXTool(db *database.Database, logger *logging.Logger) *ONNXTool {
 	return &ONNXTool{
 		BaseTool: NewBaseTool(
-			"onnx_model",
+			"neurondb_onnx_model",
 			"Manage ONNX models: import, export, info, predict",
 			map[string]interface{}{
 				"type": "object",
@@ -68,7 +68,7 @@ func NewONNXTool(db *database.Database, logger *logging.Logger) *ONNXTool {
 func (t *ONNXTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for onnx_model tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_onnx_model tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil

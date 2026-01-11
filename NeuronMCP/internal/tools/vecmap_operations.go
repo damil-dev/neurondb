@@ -33,7 +33,7 @@ type VecmapOperationsTool struct {
 func NewVecmapOperationsTool(db *database.Database, logger *logging.Logger) *VecmapOperationsTool {
 	return &VecmapOperationsTool{
 		BaseTool: NewBaseTool(
-			"vecmap_operations",
+			"neurondb_vecmap_operations",
 			"Perform operations on vecmap (sparse vector) type: distances, arithmetic, norm",
 			map[string]interface{}{
 				"type": "object",
@@ -68,7 +68,7 @@ func NewVecmapOperationsTool(db *database.Database, logger *logging.Logger) *Vec
 func (t *VecmapOperationsTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for vecmap_operations tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_vecmap_operations tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil

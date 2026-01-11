@@ -33,7 +33,7 @@ type ClusterDataTool struct {
 func NewClusterDataTool(db *database.Database, logger *logging.Logger) *ClusterDataTool {
 	return &ClusterDataTool{
 		BaseTool: NewBaseTool(
-			"cluster_data",
+			"neurondb_cluster_data",
 			"Perform clustering on vector data using K-means, GMM, DBSCAN, or hierarchical clustering",
 			map[string]interface{}{
 				"type": "object",
@@ -85,7 +85,7 @@ func NewClusterDataTool(db *database.Database, logger *logging.Logger) *ClusterD
 func (t *ClusterDataTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for cluster_data tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_cluster_data tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil
@@ -100,7 +100,7 @@ func (t *ClusterDataTool) Execute(ctx context.Context, params map[string]interfa
 	vectorColumn, _ := params["vector_column"].(string)
 
 	if table == "" {
-		return Error(fmt.Sprintf("table parameter is required and cannot be empty for cluster_data tool with algorithm '%s'", algorithm), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("table parameter is required and cannot be empty for neurondb_cluster_data tool with algorithm '%s'", algorithm), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "table",
 			"algorithm": algorithm,
 			"params":    params,
@@ -108,7 +108,7 @@ func (t *ClusterDataTool) Execute(ctx context.Context, params map[string]interfa
 	}
 
 	if vectorColumn == "" {
-		return Error(fmt.Sprintf("vector_column parameter is required and cannot be empty for cluster_data tool: algorithm='%s', table='%s'", algorithm, table), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("vector_column parameter is required and cannot be empty for neurondb_cluster_data tool: algorithm='%s', table='%s'", algorithm, table), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "vector_column",
 			"algorithm": algorithm,
 			"table":     table,
@@ -182,7 +182,7 @@ func (t *ClusterDataTool) Execute(ctx context.Context, params map[string]interfa
 
 	default:
 		validAlgorithms := []string{"kmeans", "gmm", "dbscan", "hierarchical", "minibatch_kmeans"}
-		return Error(fmt.Sprintf("Unsupported clustering algorithm '%s' for cluster_data tool: table='%s', vector_column='%s'. Valid algorithms are: %v", algorithm, table, vectorColumn, validAlgorithms), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Unsupported clustering algorithm '%s' for neurondb_cluster_data tool: table='%s', vector_column='%s'. Valid algorithms are: %v", algorithm, table, vectorColumn, validAlgorithms), "VALIDATION_ERROR", map[string]interface{}{
 			"algorithm":       algorithm,
 			"table":           table,
 			"vector_column":   vectorColumn,
@@ -219,7 +219,7 @@ type DetectOutliersTool struct {
 func NewDetectOutliersTool(db *database.Database, logger *logging.Logger) *DetectOutliersTool {
 	return &DetectOutliersTool{
 		BaseTool: NewBaseTool(
-			"detect_outliers",
+			"neurondb_detect_outliers",
 			"Detect outliers in vector data using Z-score method",
 			map[string]interface{}{
 				"type": "object",
@@ -250,7 +250,7 @@ func NewDetectOutliersTool(db *database.Database, logger *logging.Logger) *Detec
 func (t *DetectOutliersTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for detect_outliers tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_detect_outliers tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil
@@ -264,14 +264,14 @@ func (t *DetectOutliersTool) Execute(ctx context.Context, params map[string]inte
 	}
 
 	if table == "" {
-		return Error("table parameter is required and cannot be empty for detect_outliers tool", "VALIDATION_ERROR", map[string]interface{}{
+		return Error("table parameter is required and cannot be empty for neurondb_detect_outliers tool", "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "table",
 			"params":    params,
 		}), nil
 	}
 
 	if vectorColumn == "" {
-		return Error(fmt.Sprintf("vector_column parameter is required and cannot be empty for detect_outliers tool: table='%s'", table), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("vector_column parameter is required and cannot be empty for neurondb_detect_outliers tool: table='%s'", table), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "vector_column",
 			"table":     table,
 			"params":    params,
@@ -279,7 +279,7 @@ func (t *DetectOutliersTool) Execute(ctx context.Context, params map[string]inte
 	}
 
 	if threshold <= 0 {
-		return Error(fmt.Sprintf("threshold must be greater than 0 for detect_outliers tool: table='%s', vector_column='%s', received threshold=%g", table, vectorColumn, threshold), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("threshold must be greater than 0 for neurondb_detect_outliers tool: table='%s', vector_column='%s', received threshold=%g", table, vectorColumn, threshold), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter":     "threshold",
 			"table":         table,
 			"vector_column": vectorColumn,
@@ -319,7 +319,7 @@ type ReduceDimensionalityTool struct {
 func NewReduceDimensionalityTool(db *database.Database, logger *logging.Logger) *ReduceDimensionalityTool {
 	return &ReduceDimensionalityTool{
 		BaseTool: NewBaseTool(
-			"reduce_dimensionality",
+			"neurondb_reduce_dimensionality",
 			"Reduce dimensionality using PCA",
 			map[string]interface{}{
 				"type": "object",
@@ -350,7 +350,7 @@ func NewReduceDimensionalityTool(db *database.Database, logger *logging.Logger) 
 func (t *ReduceDimensionalityTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for reduce_dimensionality tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_reduce_dimensionality tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil
@@ -364,14 +364,14 @@ func (t *ReduceDimensionalityTool) Execute(ctx context.Context, params map[strin
 	}
 
 	if table == "" {
-		return Error("table parameter is required and cannot be empty for reduce_dimensionality tool", "VALIDATION_ERROR", map[string]interface{}{
+		return Error("table parameter is required and cannot be empty for neurondb_reduce_dimensionality tool", "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "table",
 			"params":    params,
 		}), nil
 	}
 
 	if vectorColumn == "" {
-		return Error(fmt.Sprintf("vector_column parameter is required and cannot be empty for reduce_dimensionality tool: table='%s'", table), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("vector_column parameter is required and cannot be empty for neurondb_reduce_dimensionality tool: table='%s'", table), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "vector_column",
 			"table":     table,
 			"params":    params,
@@ -379,7 +379,7 @@ func (t *ReduceDimensionalityTool) Execute(ctx context.Context, params map[strin
 	}
 
 	if nComponents < 1 {
-		return Error(fmt.Sprintf("n_components must be at least 1 for reduce_dimensionality tool: table='%s', vector_column='%s', received n_components=%d", table, vectorColumn, nComponents), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("n_components must be at least 1 for neurondb_reduce_dimensionality tool: table='%s', vector_column='%s', received n_components=%d", table, vectorColumn, nComponents), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter":     "n_components",
 			"table":         table,
 			"vector_column": vectorColumn,

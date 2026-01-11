@@ -33,7 +33,7 @@ type RerankCrossEncoderTool struct {
 func NewRerankCrossEncoderTool(db *database.Database, logger *logging.Logger) *RerankCrossEncoderTool {
 	return &RerankCrossEncoderTool{
 		BaseTool: NewBaseTool(
-			"rerank_cross_encoder",
+			"neurondb_rerank_cross_encoder",
 			"Rerank documents using cross-encoder model",
 			map[string]interface{}{
 				"type": "object",
@@ -72,7 +72,7 @@ func NewRerankCrossEncoderTool(db *database.Database, logger *logging.Logger) *R
 func (t *RerankCrossEncoderTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for rerank_cross_encoder tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_rerank_cross_encoder tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil
@@ -132,7 +132,7 @@ type RerankLLMTool struct {
 func NewRerankLLMTool(db *database.Database, logger *logging.Logger) *RerankLLMTool {
 	return &RerankLLMTool{
 		BaseTool: NewBaseTool(
-			"rerank_llm",
+			"neurondb_rerank_llm",
 			"Rerank documents using LLM",
 			map[string]interface{}{
 				"type": "object",
@@ -171,7 +171,7 @@ func NewRerankLLMTool(db *database.Database, logger *logging.Logger) *RerankLLMT
 func (t *RerankLLMTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for rerank_llm tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_rerank_llm tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil
@@ -231,7 +231,7 @@ type RerankCohereTool struct {
 func NewRerankCohereTool(db *database.Database, logger *logging.Logger) *RerankCohereTool {
 	return &RerankCohereTool{
 		BaseTool: NewBaseTool(
-			"rerank_cohere",
+			"neurondb_rerank_cohere",
 			"Rerank documents using Cohere API",
 			map[string]interface{}{
 				"type": "object",
@@ -265,7 +265,7 @@ func NewRerankCohereTool(db *database.Database, logger *logging.Logger) *RerankC
 func (t *RerankCohereTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for rerank_cohere tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_rerank_cohere tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil
@@ -321,7 +321,7 @@ type RerankColBERTTool struct {
 func NewRerankColBERTTool(db *database.Database, logger *logging.Logger) *RerankColBERTTool {
 	return &RerankColBERTTool{
 		BaseTool: NewBaseTool(
-			"rerank_colbert",
+			"neurondb_rerank_colbert",
 			"Rerank documents using ColBERT model",
 			map[string]interface{}{
 				"type": "object",
@@ -353,7 +353,7 @@ func NewRerankColBERTTool(db *database.Database, logger *logging.Logger) *Rerank
 func (t *RerankColBERTTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for rerank_colbert tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_rerank_colbert tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil
@@ -409,7 +409,7 @@ type RerankLTRTool struct {
 func NewRerankLTRTool(db *database.Database, logger *logging.Logger) *RerankLTRTool {
 	return &RerankLTRTool{
 		BaseTool: NewBaseTool(
-			"rerank_ltr",
+			"neurondb_rerank_ltr",
 			"Rerank documents using learning-to-rank",
 			map[string]interface{}{
 				"type": "object",
@@ -444,7 +444,7 @@ func NewRerankLTRTool(db *database.Database, logger *logging.Logger) *RerankLTRT
 func (t *RerankLTRTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for rerank_ltr tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_rerank_ltr tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil
@@ -498,7 +498,7 @@ type RerankEnsembleTool struct {
 func NewRerankEnsembleTool(db *database.Database, logger *logging.Logger) *RerankEnsembleTool {
 	return &RerankEnsembleTool{
 		BaseTool: NewBaseTool(
-			"rerank_ensemble",
+			"neurondb_rerank_ensemble",
 			"Rerank documents using ensemble of multiple rerankers",
 			map[string]interface{}{
 				"type": "object",
@@ -535,7 +535,7 @@ func NewRerankEnsembleTool(db *database.Database, logger *logging.Logger) *Reran
 func (t *RerankEnsembleTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for rerank_ensemble tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_rerank_ensemble tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil

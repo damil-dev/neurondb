@@ -34,7 +34,7 @@ type WorkerManagementTool struct {
 func NewWorkerManagementTool(db *database.Database, logger *logging.Logger) *WorkerManagementTool {
 	return &WorkerManagementTool{
 		BaseTool: NewBaseTool(
-			"worker_management",
+			"neurondb_worker_management",
 			"Manage background workers: status, jobs, queue",
 			map[string]interface{}{
 				"type": "object",
@@ -70,7 +70,7 @@ func NewWorkerManagementTool(db *database.Database, logger *logging.Logger) *Wor
 func (t *WorkerManagementTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for worker_management tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_worker_management tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil

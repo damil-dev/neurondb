@@ -38,7 +38,7 @@ type VectorSearchTool struct {
 /* NewVectorSearchTool creates a new vector search tool */
 func NewVectorSearchTool(db *database.Database, logger *logging.Logger) *VectorSearchTool {
 	tool := NewBaseToolWithVersion(
-		"vector_search",
+		"neurondb_vector_search",
 		"Perform vector similarity search using L2, cosine, inner product, L1, Hamming, Chebyshev, or Minkowski distance",
 		"2.0.0",
 		map[string]interface{}{
@@ -96,7 +96,7 @@ func NewVectorSearchTool(db *database.Database, logger *logging.Logger) *VectorS
 func (t *VectorSearchTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for vector_search tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_vector_search tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil
@@ -219,7 +219,7 @@ type VectorSearchL2Tool struct {
 func NewVectorSearchL2Tool(db *database.Database, logger *logging.Logger) *VectorSearchL2Tool {
 	return &VectorSearchL2Tool{
 		BaseTool: NewBaseTool(
-			"vector_search_l2",
+			"neurondb_vector_search_l2",
 			"Perform vector similarity search using L2 (Euclidean) distance",
 			map[string]interface{}{
 				"type": "object",
@@ -282,7 +282,7 @@ type VectorSearchCosineTool struct {
 func NewVectorSearchCosineTool(db *database.Database, logger *logging.Logger) *VectorSearchCosineTool {
 	return &VectorSearchCosineTool{
 		BaseTool: NewBaseTool(
-			"vector_search_cosine",
+			"neurondb_vector_search_cosine",
 			"Perform vector similarity search using cosine distance",
 			map[string]interface{}{
 				"type": "object",
@@ -345,7 +345,7 @@ type VectorSearchInnerProductTool struct {
 func NewVectorSearchInnerProductTool(db *database.Database, logger *logging.Logger) *VectorSearchInnerProductTool {
 	return &VectorSearchInnerProductTool{
 		BaseTool: NewBaseTool(
-			"vector_search_inner_product",
+			"neurondb_vector_search_inner_product",
 			"Perform vector similarity search using inner product distance",
 			map[string]interface{}{
 				"type": "object",
@@ -408,7 +408,7 @@ type VectorSearchL1Tool struct {
 func NewVectorSearchL1Tool(db *database.Database, logger *logging.Logger) *VectorSearchL1Tool {
 	return &VectorSearchL1Tool{
 		BaseTool: NewBaseTool(
-			"vector_search_l1",
+			"neurondb_vector_search_l1",
 			"Perform vector similarity search using L1 (Manhattan) distance",
 			map[string]interface{}{
 				"type": "object",
@@ -471,7 +471,7 @@ type VectorSearchHammingTool struct {
 func NewVectorSearchHammingTool(db *database.Database, logger *logging.Logger) *VectorSearchHammingTool {
 	return &VectorSearchHammingTool{
 		BaseTool: NewBaseTool(
-			"vector_search_hamming",
+			"neurondb_vector_search_hamming",
 			"Perform vector similarity search using Hamming distance",
 			map[string]interface{}{
 				"type": "object",
@@ -534,7 +534,7 @@ type VectorSearchChebyshevTool struct {
 func NewVectorSearchChebyshevTool(db *database.Database, logger *logging.Logger) *VectorSearchChebyshevTool {
 	return &VectorSearchChebyshevTool{
 		BaseTool: NewBaseTool(
-			"vector_search_chebyshev",
+			"neurondb_vector_search_chebyshev",
 			"Perform vector similarity search using Chebyshev distance",
 			map[string]interface{}{
 				"type": "object",
@@ -597,7 +597,7 @@ type VectorSearchMinkowskiTool struct {
 func NewVectorSearchMinkowskiTool(db *database.Database, logger *logging.Logger) *VectorSearchMinkowskiTool {
 	return &VectorSearchMinkowskiTool{
 		BaseTool: NewBaseTool(
-			"vector_search_minkowski",
+			"neurondb_vector_search_minkowski",
 			"Perform vector similarity search using Minkowski distance with configurable p parameter",
 			map[string]interface{}{
 				"type": "object",
@@ -676,7 +676,7 @@ type GenerateEmbeddingTool struct {
 func NewGenerateEmbeddingTool(db *database.Database, logger *logging.Logger) *GenerateEmbeddingTool {
 	return &GenerateEmbeddingTool{
 		BaseTool: NewBaseTool(
-			"generate_embedding",
+			"neurondb_generate_embedding",
 			"Generate text embedding using configured model",
 			map[string]interface{}{
 				"type": "object",
@@ -715,7 +715,7 @@ func (t *GenerateEmbeddingTool) Execute(ctx context.Context, params map[string]i
 	
 	textLen := len(text)
 	if textLen == 0 {
-		return Error("text parameter is required and cannot be empty for generate_embedding tool", "VALIDATION_ERROR", map[string]interface{}{
+		return Error("text parameter is required and cannot be empty for neurondb_generate_embedding tool", "VALIDATION_ERROR", map[string]interface{}{
 			"parameter":   "text",
 			"text_length": 0,
 			"params":      params,
@@ -847,7 +847,7 @@ type BatchEmbeddingTool struct {
 func NewBatchEmbeddingTool(db *database.Database, logger *logging.Logger) *BatchEmbeddingTool {
 	return &BatchEmbeddingTool{
 		BaseTool: NewBaseTool(
-			"batch_embedding",
+			"neurondb_batch_embedding",
 			"Generate embeddings for multiple texts efficiently",
 			map[string]interface{}{
 				"type": "object",
@@ -884,7 +884,7 @@ func (t *BatchEmbeddingTool) Execute(ctx context.Context, params map[string]inte
 	
 	textsCount := len(texts)
 	if textsCount == 0 {
-		return Error("texts parameter is required and cannot be empty array for batch_embedding tool", "VALIDATION_ERROR", map[string]interface{}{
+		return Error("texts parameter is required and cannot be empty array for neurondb_batch_embedding tool", "VALIDATION_ERROR", map[string]interface{}{
 			"parameter":   "texts",
 			"texts_count": 0,
 			"params":      params,
@@ -892,7 +892,7 @@ func (t *BatchEmbeddingTool) Execute(ctx context.Context, params map[string]inte
 	}
 
 	if textsCount > 1000 {
-		return Error(fmt.Sprintf("texts array exceeds maximum size of 1000: received %d texts for batch_embedding tool", textsCount), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("texts array exceeds maximum size of 1000: received %d texts for neurondb_batch_embedding tool", textsCount), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter":   "texts",
 			"texts_count": textsCount,
 			"max_count":   1000,
@@ -909,7 +909,7 @@ func (t *BatchEmbeddingTool) Execute(ctx context.Context, params map[string]inte
 	for i, text := range texts {
 		if textStr, ok := text.(string); ok {
 			if textStr == "" {
-				return Error(fmt.Sprintf("texts array element at index %d is empty string for batch_embedding tool", i), "VALIDATION_ERROR", map[string]interface{}{
+				return Error(fmt.Sprintf("texts array element at index %d is empty string for neurondb_batch_embedding tool", i), "VALIDATION_ERROR", map[string]interface{}{
 					"parameter":   "texts",
 					"texts_count": textsCount,
 					"empty_index": i,
@@ -918,7 +918,7 @@ func (t *BatchEmbeddingTool) Execute(ctx context.Context, params map[string]inte
 			}
 			textStrings = append(textStrings, textStr)
 		} else {
-			return Error(fmt.Sprintf("texts array element at index %d must be a string for batch_embedding tool: got %T", i, text), "VALIDATION_ERROR", map[string]interface{}{
+			return Error(fmt.Sprintf("texts array element at index %d must be a string for neurondb_batch_embedding tool: got %T", i, text), "VALIDATION_ERROR", map[string]interface{}{
 				"parameter":     "texts",
 				"texts_count":   textsCount,
 				"invalid_index": i,

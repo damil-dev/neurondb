@@ -33,7 +33,7 @@ type AnalyzeDataTool struct {
 func NewAnalyzeDataTool(db *database.Database, logger *logging.Logger) *AnalyzeDataTool {
 	return &AnalyzeDataTool{
 		BaseTool: NewBaseTool(
-			"analyze_data",
+			"neurondb_analyze_data",
 			"Perform comprehensive data analysis including statistics, distributions, and data quality metrics",
 			map[string]interface{}{
 				"type": "object",
@@ -70,7 +70,7 @@ func NewAnalyzeDataTool(db *database.Database, logger *logging.Logger) *AnalyzeD
 func (t *AnalyzeDataTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for analyze_data tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_analyze_data tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil
@@ -94,7 +94,7 @@ func (t *AnalyzeDataTool) Execute(ctx context.Context, params map[string]interfa
 	includeDistribution, _ := params["include_distribution"].(bool)
 
 	if table == "" {
-		return Error("table parameter is required and cannot be empty for analyze_data tool", "VALIDATION_ERROR", map[string]interface{}{
+		return Error("table parameter is required and cannot be empty for neurondb_analyze_data tool", "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "table",
 			"params":    params,
 		}), nil
@@ -133,7 +133,7 @@ func (t *AnalyzeDataTool) Execute(ctx context.Context, params map[string]interfa
 		}
 
 		if len(statsQueries) == 0 {
-			return Error(fmt.Sprintf("No valid columns specified for analyze_data tool: table='%s'", table), "VALIDATION_ERROR", map[string]interface{}{
+			return Error(fmt.Sprintf("No valid columns specified for neurondb_analyze_data tool: table='%s'", table), "VALIDATION_ERROR", map[string]interface{}{
 				"table": table,
 			}), nil
 		}
@@ -161,7 +161,7 @@ func (t *AnalyzeDataTool) Execute(ctx context.Context, params map[string]interfa
 		}
 
 		if len(colResults) == 0 {
-			return Error(fmt.Sprintf("Table '%s' not found or has no columns for analyze_data tool", table), "NOT_FOUND", map[string]interface{}{
+			return Error(fmt.Sprintf("Table '%s' not found or has no columns for neurondb_analyze_data tool", table), "NOT_FOUND", map[string]interface{}{
 				"table": table,
 			}), nil
 		}
@@ -196,7 +196,7 @@ func (t *AnalyzeDataTool) Execute(ctx context.Context, params map[string]interfa
 		}
 
 		if len(statsParts) == 0 {
-			return Error(fmt.Sprintf("No numeric columns found in table '%s' for analyze_data tool", table), "VALIDATION_ERROR", map[string]interface{}{
+			return Error(fmt.Sprintf("No numeric columns found in table '%s' for neurondb_analyze_data tool", table), "VALIDATION_ERROR", map[string]interface{}{
 				"table": table,
 			}), nil
 		}

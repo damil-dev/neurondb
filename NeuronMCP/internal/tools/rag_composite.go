@@ -35,7 +35,7 @@ type IngestDocumentsTool struct {
 func NewIngestDocumentsTool(db *database.Database, logger *logging.Logger) *IngestDocumentsTool {
 	return &IngestDocumentsTool{
 		BaseTool: NewBaseToolWithVersion(
-			"ingest_documents",
+			"neurondb_ingest_documents",
 			"Composite tool: Ingest documents into a collection with automatic chunking and embedding",
 			"2.0.0",
 			map[string]interface{}{
@@ -101,7 +101,7 @@ func NewIngestDocumentsTool(db *database.Database, logger *logging.Logger) *Inge
 func (t *IngestDocumentsTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for ingest_documents tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_ingest_documents tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil
@@ -194,7 +194,7 @@ type AnswerWithCitationsTool struct {
 func NewAnswerWithCitationsTool(db *database.Database, logger *logging.Logger) *AnswerWithCitationsTool {
 	return &AnswerWithCitationsTool{
 		BaseTool: NewBaseToolWithVersion(
-			"answer_with_citations",
+			"neurondb_answer_with_citations",
 			"Composite tool: Answer a question using RAG with source citations",
 			"2.0.0",
 			map[string]interface{}{
@@ -255,7 +255,7 @@ func NewAnswerWithCitationsTool(db *database.Database, logger *logging.Logger) *
 func (t *AnswerWithCitationsTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for answer_with_citations tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_answer_with_citations tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil

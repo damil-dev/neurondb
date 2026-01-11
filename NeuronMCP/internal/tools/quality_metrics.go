@@ -32,7 +32,7 @@ type QualityMetricsTool struct {
 func NewQualityMetricsTool(db *database.Database, logger *logging.Logger) *QualityMetricsTool {
 	return &QualityMetricsTool{
 		BaseTool: NewBaseTool(
-			"quality_metrics",
+			"neurondb_quality_metrics",
 			"Compute quality metrics: Recall@K, Precision@K, F1@K, MRR, Davies-Bouldin Index",
 			map[string]interface{}{
 				"type": "object",
@@ -71,7 +71,7 @@ func NewQualityMetricsTool(db *database.Database, logger *logging.Logger) *Quali
 func (t *QualityMetricsTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for quality_metrics tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_quality_metrics tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil

@@ -50,9 +50,9 @@ func (e *DryRunExecutor) Execute(ctx context.Context, params map[string]interfac
 func RequiresConfirmation(toolName string) bool {
 	/* List of tools that require confirmation */
 	dangerousTools := []string{
-		"delete_model",
-		"drop_index",
-		"delete_embedding_model_config",
+		"neurondb_delete_model",
+		"neurondb_drop_index",
+		"neurondb_delete_embedding_model_config",
 		/* Add more as needed */
 	}
 

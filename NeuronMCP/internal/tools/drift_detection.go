@@ -32,7 +32,7 @@ type DriftDetectionTool struct {
 func NewDriftDetectionTool(db *database.Database, logger *logging.Logger) *DriftDetectionTool {
 	return &DriftDetectionTool{
 		BaseTool: NewBaseTool(
-			"detect_drift",
+			"neurondb_detect_drift",
 			"Detect data drift: centroid drift, distribution divergence, temporal monitoring",
 			map[string]interface{}{
 				"type": "object",
@@ -71,7 +71,7 @@ func NewDriftDetectionTool(db *database.Database, logger *logging.Logger) *Drift
 func (t *DriftDetectionTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for detect_drift tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_detect_drift tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil

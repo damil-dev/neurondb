@@ -34,7 +34,7 @@ type TextSearchTool struct {
 func NewTextSearchTool(db *database.Database, logger *logging.Logger) *TextSearchTool {
 	return &TextSearchTool{
 		BaseTool: NewBaseTool(
-			"text_search",
+			"neurondb_text_search",
 			"Perform full-text search using PostgreSQL FTS (text-only, no vectors required)",
 			map[string]interface{}{
 				"type": "object",
@@ -82,7 +82,7 @@ func NewTextSearchTool(db *database.Database, logger *logging.Logger) *TextSearc
 func (t *TextSearchTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for text_search tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_text_search tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil
@@ -152,14 +152,14 @@ func (t *TextSearchTool) Execute(ctx context.Context, params map[string]interfac
 	filters, _ := params["filters"].(map[string]interface{})
 
 	if table == "" {
-		return Error("table parameter is required and cannot be empty for text_search tool", "VALIDATION_ERROR", map[string]interface{}{
+		return Error("table parameter is required and cannot be empty for neurondb_text_search tool", "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "table",
 			"params":    params,
 		}), nil
 	}
 
 	if queryText == "" {
-		return Error(fmt.Sprintf("query_text parameter is required and cannot be empty for text_search tool: table='%s'", table), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("query_text parameter is required and cannot be empty for neurondb_text_search tool: table='%s'", table), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "query_text",
 			"table":     table,
 			"params":    params,
@@ -167,7 +167,7 @@ func (t *TextSearchTool) Execute(ctx context.Context, params map[string]interfac
 	}
 
 	if limit < 1 || limit > 10000 {
-		return Error(fmt.Sprintf("limit must be between 1 and 10000 for text_search tool: table='%s', received limit=%d", table, limit), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("limit must be between 1 and 10000 for neurondb_text_search tool: table='%s', received limit=%d", table, limit), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "limit",
 			"table":      table,
 			"limit":      limit,

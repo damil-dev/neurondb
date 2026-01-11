@@ -34,7 +34,7 @@ type EmbedImageTool struct {
 func NewEmbedImageTool(db *database.Database, logger *logging.Logger) *EmbedImageTool {
 	return &EmbedImageTool{
 		BaseTool: NewBaseTool(
-			"embed_image",
+			"neurondb_embed_image",
 			"Generate image embedding from image bytes",
 			map[string]interface{}{
 				"type": "object",
@@ -61,7 +61,7 @@ func NewEmbedImageTool(db *database.Database, logger *logging.Logger) *EmbedImag
 func (t *EmbedImageTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for embed_image tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_embed_image tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil
@@ -155,7 +155,7 @@ type EmbedMultimodalTool struct {
 func NewEmbedMultimodalTool(db *database.Database, logger *logging.Logger) *EmbedMultimodalTool {
 	return &EmbedMultimodalTool{
 		BaseTool: NewBaseTool(
-			"embed_multimodal",
+			"neurondb_embed_multimodal",
 			"Generate multimodal embedding from text and image",
 			map[string]interface{}{
 				"type": "object",
@@ -186,7 +186,7 @@ func NewEmbedMultimodalTool(db *database.Database, logger *logging.Logger) *Embe
 func (t *EmbedMultimodalTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for embed_multimodal tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_embed_multimodal tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil
@@ -253,7 +253,7 @@ type EmbedCachedTool struct {
 func NewEmbedCachedTool(db *database.Database, logger *logging.Logger) *EmbedCachedTool {
 	return &EmbedCachedTool{
 		BaseTool: NewBaseTool(
-			"embed_cached",
+			"neurondb_embed_cached",
 			"Generate cached text embedding (uses cache if available)",
 			map[string]interface{}{
 				"type": "object",
@@ -280,7 +280,7 @@ func NewEmbedCachedTool(db *database.Database, logger *logging.Logger) *EmbedCac
 func (t *EmbedCachedTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for embed_cached tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_embed_cached tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil
@@ -330,7 +330,7 @@ type ConfigureEmbeddingModelTool struct {
 func NewConfigureEmbeddingModelTool(db *database.Database, logger *logging.Logger) *ConfigureEmbeddingModelTool {
 	return &ConfigureEmbeddingModelTool{
 		BaseTool: NewBaseTool(
-			"configure_embedding_model",
+			"neurondb_configure_embedding_model",
 			"Configure embedding model settings",
 			map[string]interface{}{
 				"type": "object",
@@ -356,7 +356,7 @@ func NewConfigureEmbeddingModelTool(db *database.Database, logger *logging.Logge
 func (t *ConfigureEmbeddingModelTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for configure_embedding_model tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_configure_embedding_model tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil
@@ -409,7 +409,7 @@ type GetEmbeddingModelConfigTool struct {
 func NewGetEmbeddingModelConfigTool(db *database.Database, logger *logging.Logger) *GetEmbeddingModelConfigTool {
 	return &GetEmbeddingModelConfigTool{
 		BaseTool: NewBaseTool(
-			"get_embedding_model_config",
+			"neurondb_get_embedding_model_config",
 			"Get embedding model configuration",
 			map[string]interface{}{
 				"type": "object",
@@ -431,7 +431,7 @@ func NewGetEmbeddingModelConfigTool(db *database.Database, logger *logging.Logge
 func (t *GetEmbeddingModelConfigTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for get_embedding_model_config tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_get_embedding_model_config tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil
@@ -476,7 +476,7 @@ type ListEmbeddingModelConfigsTool struct {
 func NewListEmbeddingModelConfigsTool(db *database.Database, logger *logging.Logger) *ListEmbeddingModelConfigsTool {
 	return &ListEmbeddingModelConfigsTool{
 		BaseTool: NewBaseTool(
-			"list_embedding_model_configs",
+			"neurondb_list_embedding_model_configs",
 			"List all embedding model configurations",
 			map[string]interface{}{
 				"type":       "object",
@@ -519,7 +519,7 @@ type DeleteEmbeddingModelConfigTool struct {
 func NewDeleteEmbeddingModelConfigTool(db *database.Database, logger *logging.Logger) *DeleteEmbeddingModelConfigTool {
 	return &DeleteEmbeddingModelConfigTool{
 		BaseTool: NewBaseTool(
-			"delete_embedding_model_config",
+			"neurondb_delete_embedding_model_config",
 			"Delete embedding model configuration",
 			map[string]interface{}{
 				"type": "object",
@@ -541,7 +541,7 @@ func NewDeleteEmbeddingModelConfigTool(db *database.Database, logger *logging.Lo
 func (t *DeleteEmbeddingModelConfigTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for delete_embedding_model_config tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_delete_embedding_model_config tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil

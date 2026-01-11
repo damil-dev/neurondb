@@ -33,7 +33,7 @@ type VectorQuantizationTool struct {
 func NewVectorQuantizationTool(db *database.Database, logger *logging.Logger) *VectorQuantizationTool {
 	return &VectorQuantizationTool{
 		BaseTool: NewBaseTool(
-			"vector_quantize",
+			"neurondb_vector_quantize",
 			"Quantize or dequantize vectors using int8, fp16, binary, uint8, ternary, or int4 formats",
 			map[string]interface{}{
 				"type": "object",
@@ -65,7 +65,7 @@ func NewVectorQuantizationTool(db *database.Database, logger *logging.Logger) *V
 func (t *VectorQuantizationTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for vector_quantize tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_vector_quantize tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil
@@ -326,7 +326,7 @@ type QuantizationAnalysisTool struct {
 func NewQuantizationAnalysisTool(db *database.Database, logger *logging.Logger) *QuantizationAnalysisTool {
 	return &QuantizationAnalysisTool{
 		BaseTool: NewBaseTool(
-			"quantization_analyze",
+			"neurondb_quantization_analyze",
 			"Analyze quantization options for a vector (int8, fp16, binary, uint8, ternary, int4) or compare distances",
 			map[string]interface{}{
 				"type": "object",
@@ -368,7 +368,7 @@ func NewQuantizationAnalysisTool(db *database.Database, logger *logging.Logger) 
 func (t *QuantizationAnalysisTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for quantization_analyze tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_quantization_analyze tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil

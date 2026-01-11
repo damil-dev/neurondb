@@ -32,7 +32,7 @@ type AutoMLTool struct {
 func NewAutoMLTool(db *database.Database, logger *logging.Logger) *AutoMLTool {
 	return &AutoMLTool{
 		BaseTool: NewBaseTool(
-			"automl",
+			"neurondb_automl",
 			"Automated machine learning: model selection, hyperparameter tuning",
 			map[string]interface{}{
 				"type": "object",
@@ -77,7 +77,7 @@ func NewAutoMLTool(db *database.Database, logger *logging.Logger) *AutoMLTool {
 func (t *AutoMLTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for automl tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_automl tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil

@@ -34,7 +34,7 @@ type ProcessDocumentTool struct {
 func NewProcessDocumentTool(db *database.Database, logger *logging.Logger) *ProcessDocumentTool {
 	return &ProcessDocumentTool{
 		BaseTool: NewBaseTool(
-			"process_document",
+			"neurondb_process_document",
 			"Process a document: chunk text and generate embeddings",
 			map[string]interface{}{
 				"type": "object",
@@ -74,7 +74,7 @@ func NewProcessDocumentTool(db *database.Database, logger *logging.Logger) *Proc
 func (t *ProcessDocumentTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for process_document tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_process_document tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil
@@ -190,7 +190,7 @@ type RetrieveContextTool struct {
 func NewRetrieveContextTool(db *database.Database, logger *logging.Logger) *RetrieveContextTool {
 	return &RetrieveContextTool{
 		BaseTool: NewBaseTool(
-			"retrieve_context",
+			"neurondb_retrieve_context",
 			"Retrieve relevant context using vector search",
 			map[string]interface{}{
 				"type": "object",
@@ -228,7 +228,7 @@ func NewRetrieveContextTool(db *database.Database, logger *logging.Logger) *Retr
 func (t *RetrieveContextTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for retrieve_context tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_retrieve_context tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil
@@ -243,14 +243,14 @@ func (t *RetrieveContextTool) Execute(ctx context.Context, params map[string]int
 	}
 
 	if queryText == "" {
-		return Error("query parameter is required and cannot be empty for retrieve_context tool", "VALIDATION_ERROR", map[string]interface{}{
+		return Error("query parameter is required and cannot be empty for neurondb_retrieve_context tool", "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "query",
 			"params":    params,
 		}), nil
 	}
 
 	if table == "" {
-		return Error(fmt.Sprintf("table parameter is required and cannot be empty for retrieve_context tool: query_length=%d", len(queryText)), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("table parameter is required and cannot be empty for neurondb_retrieve_context tool: query_length=%d", len(queryText)), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter":   "table",
 			"query_length": len(queryText),
 			"params":      params,
@@ -258,7 +258,7 @@ func (t *RetrieveContextTool) Execute(ctx context.Context, params map[string]int
 	}
 
 	if vectorColumn == "" {
-		return Error(fmt.Sprintf("vector_column parameter is required and cannot be empty for retrieve_context tool: query_length=%d, table='%s'", len(queryText), table), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("vector_column parameter is required and cannot be empty for neurondb_retrieve_context tool: query_length=%d, table='%s'", len(queryText), table), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter":   "vector_column",
 			"query_length": len(queryText),
 			"table":       table,
@@ -267,7 +267,7 @@ func (t *RetrieveContextTool) Execute(ctx context.Context, params map[string]int
 	}
 
 	if limit <= 0 {
-		return Error(fmt.Sprintf("limit must be greater than 0 for retrieve_context tool: query_length=%d, table='%s', vector_column='%s', received limit=%d", len(queryText), table, vectorColumn, limit), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("limit must be greater than 0 for neurondb_retrieve_context tool: query_length=%d, table='%s', vector_column='%s', received limit=%d", len(queryText), table, vectorColumn, limit), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter":     "limit",
 			"query_length":  len(queryText),
 			"table":         table,
@@ -278,7 +278,7 @@ func (t *RetrieveContextTool) Execute(ctx context.Context, params map[string]int
 	}
 
 	if limit > 100 {
-		return Error(fmt.Sprintf("limit exceeds maximum value of 100 for retrieve_context tool: query_length=%d, table='%s', vector_column='%s', received limit=%d", len(queryText), table, vectorColumn, limit), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("limit exceeds maximum value of 100 for neurondb_retrieve_context tool: query_length=%d, table='%s', vector_column='%s', received limit=%d", len(queryText), table, vectorColumn, limit), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter":     "limit",
 			"query_length":  len(queryText),
 			"table":         table,
@@ -339,7 +339,7 @@ type GenerateResponseTool struct {
 func NewGenerateResponseTool(db *database.Database, logger *logging.Logger) *GenerateResponseTool {
 	return &GenerateResponseTool{
 		BaseTool: NewBaseTool(
-			"generate_response",
+			"neurondb_generate_response",
 			"Generate a response using RAG pipeline",
 			map[string]interface{}{
 				"type": "object",
@@ -367,7 +367,7 @@ func NewGenerateResponseTool(db *database.Database, logger *logging.Logger) *Gen
 func (t *GenerateResponseTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for generate_response tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_generate_response tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil
@@ -377,14 +377,14 @@ func (t *GenerateResponseTool) Execute(ctx context.Context, params map[string]in
 	context, _ := params["context"].([]interface{})
 
 	if query == "" {
-		return Error("query parameter is required and cannot be empty for generate_response tool", "VALIDATION_ERROR", map[string]interface{}{
+		return Error("query parameter is required and cannot be empty for neurondb_generate_response tool", "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "query",
 			"params":    params,
 		}), nil
 	}
 
 	if context == nil || len(context) == 0 {
-		return Error(fmt.Sprintf("context parameter is required and cannot be empty array for generate_response tool: query_length=%d", len(query)), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("context parameter is required and cannot be empty array for neurondb_generate_response tool: query_length=%d", len(query)), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter":    "context",
 			"query_length": len(query),
 			"context_count": 0,
@@ -400,7 +400,7 @@ func (t *GenerateResponseTool) Execute(ctx context.Context, params map[string]in
 		}
 		if s, ok := c.(string); ok {
 			if s == "" {
-				return Error(fmt.Sprintf("context element at index %d is empty string for generate_response tool: query_length=%d, context_count=%d", i, len(query), contextCount), "VALIDATION_ERROR", map[string]interface{}{
+				return Error(fmt.Sprintf("context element at index %d is empty string for neurondb_generate_response tool: query_length=%d, context_count=%d", i, len(query), contextCount), "VALIDATION_ERROR", map[string]interface{}{
 					"parameter":     "context",
 					"query_length":  len(query),
 					"context_count": contextCount,
@@ -410,7 +410,7 @@ func (t *GenerateResponseTool) Execute(ctx context.Context, params map[string]in
 			}
 			contextStr += s
 		} else {
-			return Error(fmt.Sprintf("context element at index %d has invalid type for generate_response tool: query_length=%d, context_count=%d, expected string, got %T", i, len(query), contextCount, c), "VALIDATION_ERROR", map[string]interface{}{
+			return Error(fmt.Sprintf("context element at index %d has invalid type for neurondb_generate_response tool: query_length=%d, context_count=%d, expected string, got %T", i, len(query), contextCount, c), "VALIDATION_ERROR", map[string]interface{}{
 				"parameter":     "context",
 				"query_length":  len(query),
 				"context_count": contextCount,
@@ -459,7 +459,7 @@ type ChunkDocumentTool struct {
 func NewChunkDocumentTool(db *database.Database, logger *logging.Logger) *ChunkDocumentTool {
 	return &ChunkDocumentTool{
 		BaseTool: NewBaseTool(
-			"chunk_document",
+			"neurondb_chunk_document",
 			"Chunk a document into smaller pieces with optional overlap",
 			map[string]interface{}{
 				"type": "object",
@@ -494,7 +494,7 @@ func NewChunkDocumentTool(db *database.Database, logger *logging.Logger) *ChunkD
 func (t *ChunkDocumentTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for chunk_document tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_chunk_document tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil
@@ -518,7 +518,7 @@ func (t *ChunkDocumentTool) Execute(ctx context.Context, params map[string]inter
 	}
 
 	if text == "" {
-		return Error("text or document parameter is required and cannot be empty for chunk_document tool", "VALIDATION_ERROR", map[string]interface{}{
+		return Error("text or document parameter is required and cannot be empty for neurondb_chunk_document tool", "VALIDATION_ERROR", map[string]interface{}{
 			"parameter":   "text",
 			"text_length": 0,
 			"params":      params,
@@ -527,7 +527,7 @@ func (t *ChunkDocumentTool) Execute(ctx context.Context, params map[string]inter
 
 	textLen := len(text)
 	if chunkSize <= 0 {
-		return Error(fmt.Sprintf("chunk_size must be greater than 0 for chunk_document tool: text_length=%d, received chunk_size=%d", textLen, chunkSize), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("chunk_size must be greater than 0 for neurondb_chunk_document tool: text_length=%d, received chunk_size=%d", textLen, chunkSize), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter":   "chunk_size",
 			"text_length": textLen,
 			"chunk_size":  chunkSize,
@@ -536,7 +536,7 @@ func (t *ChunkDocumentTool) Execute(ctx context.Context, params map[string]inter
 	}
 
 	if overlap < 0 {
-		return Error(fmt.Sprintf("overlap cannot be negative for chunk_document tool: text_length=%d, chunk_size=%d, received overlap=%d", textLen, chunkSize, overlap), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("overlap cannot be negative for neurondb_chunk_document tool: text_length=%d, chunk_size=%d, received overlap=%d", textLen, chunkSize, overlap), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter":   "overlap",
 			"text_length": textLen,
 			"chunk_size":  chunkSize,
@@ -546,7 +546,7 @@ func (t *ChunkDocumentTool) Execute(ctx context.Context, params map[string]inter
 	}
 
 	if overlap >= chunkSize {
-		return Error(fmt.Sprintf("overlap must be less than chunk_size for chunk_document tool: text_length=%d, chunk_size=%d, overlap=%d", textLen, chunkSize, overlap), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("overlap must be less than chunk_size for neurondb_chunk_document tool: text_length=%d, chunk_size=%d, overlap=%d", textLen, chunkSize, overlap), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter":   "overlap",
 			"text_length": textLen,
 			"chunk_size":  chunkSize,

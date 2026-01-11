@@ -1,3 +1,6 @@
+//go:build verification_schema
+// +build verification_schema
+
 /*-------------------------------------------------------------------------
  *
  * validate_schema_setup.go
@@ -10,8 +13,6 @@
  *
  *-------------------------------------------------------------------------
  */
-
-// +build ignore
 
 package main
 

@@ -1,3 +1,6 @@
+//go:build verification_version_compatibility
+// +build verification_version_compatibility
+
 /*-------------------------------------------------------------------------
  *
  * test_version_compatibility.go
@@ -9,8 +12,6 @@
  *
  *-------------------------------------------------------------------------
  */
-
-// +build ignore
 
 package main
 

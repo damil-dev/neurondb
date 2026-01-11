@@ -32,7 +32,7 @@ type TuneHNSWIndexTool struct {
 func NewTuneHNSWIndexTool(db *database.Database, logger *logging.Logger) *TuneHNSWIndexTool {
 	return &TuneHNSWIndexTool{
 		BaseTool: NewBaseTool(
-			"tune_hnsw_index",
+			"neurondb_tune_hnsw_index",
 			"Automatically optimize HNSW index parameters (m, ef_construction) based on dataset characteristics",
 			map[string]interface{}{
 				"type": "object",
@@ -58,7 +58,7 @@ func NewTuneHNSWIndexTool(db *database.Database, logger *logging.Logger) *TuneHN
 func (t *TuneHNSWIndexTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for tune_hnsw_index tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_tune_hnsw_index tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil
@@ -68,14 +68,14 @@ func (t *TuneHNSWIndexTool) Execute(ctx context.Context, params map[string]inter
 	vectorColumn, _ := params["vector_column"].(string)
 
 	if table == "" {
-		return Error("table parameter is required and cannot be empty for tune_hnsw_index tool", "VALIDATION_ERROR", map[string]interface{}{
+		return Error("table parameter is required and cannot be empty for neurondb_tune_hnsw_index tool", "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "table",
 			"params":    params,
 		}), nil
 	}
 
 	if vectorColumn == "" {
-		return Error(fmt.Sprintf("vector_column parameter is required and cannot be empty for tune_hnsw_index tool: table='%s'", table), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("vector_column parameter is required and cannot be empty for neurondb_tune_hnsw_index tool: table='%s'", table), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "vector_column",
 			"table":     table,
 			"params":    params,
@@ -113,7 +113,7 @@ type TuneIVFIndexTool struct {
 func NewTuneIVFIndexTool(db *database.Database, logger *logging.Logger) *TuneIVFIndexTool {
 	return &TuneIVFIndexTool{
 		BaseTool: NewBaseTool(
-			"tune_ivf_index",
+			"neurondb_tune_ivf_index",
 			"Automatically optimize IVF index parameters (num_lists, probes) based on dataset characteristics",
 			map[string]interface{}{
 				"type": "object",
@@ -139,7 +139,7 @@ func NewTuneIVFIndexTool(db *database.Database, logger *logging.Logger) *TuneIVF
 func (t *TuneIVFIndexTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for tune_ivf_index tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_tune_ivf_index tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil
@@ -149,14 +149,14 @@ func (t *TuneIVFIndexTool) Execute(ctx context.Context, params map[string]interf
 	vectorColumn, _ := params["vector_column"].(string)
 
 	if table == "" {
-		return Error("table parameter is required and cannot be empty for tune_ivf_index tool", "VALIDATION_ERROR", map[string]interface{}{
+		return Error("table parameter is required and cannot be empty for neurondb_tune_ivf_index tool", "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "table",
 			"params":    params,
 		}), nil
 	}
 
 	if vectorColumn == "" {
-		return Error(fmt.Sprintf("vector_column parameter is required and cannot be empty for tune_ivf_index tool: table='%s'", table), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("vector_column parameter is required and cannot be empty for neurondb_tune_ivf_index tool: table='%s'", table), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "vector_column",
 			"table":     table,
 			"params":    params,

@@ -39,7 +39,7 @@ type TrainModelTool struct {
 func NewTrainModelTool(db *database.Database, logger *logging.Logger) *TrainModelTool {
 	return &TrainModelTool{
 		BaseTool: NewBaseTool(
-			"train_model",
+			"neurondb_train_model",
 			"Train an ML model using specified algorithm",
 			map[string]interface{}{
 				"type": "object",
@@ -82,7 +82,7 @@ func NewTrainModelTool(db *database.Database, logger *logging.Logger) *TrainMode
 func (t *TrainModelTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for train_model tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_train_model tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil
@@ -210,7 +210,7 @@ type PredictTool struct {
 func NewPredictTool(db *database.Database, logger *logging.Logger) *PredictTool {
 	return &PredictTool{
 		BaseTool: NewBaseTool(
-			"predict",
+			"neurondb_predict",
 			"Predict using a trained ML model",
 			map[string]interface{}{
 				"type": "object",
@@ -237,7 +237,7 @@ func NewPredictTool(db *database.Database, logger *logging.Logger) *PredictTool 
 func (t *PredictTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for predict tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_predict tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil
@@ -245,7 +245,7 @@ func (t *PredictTool) Execute(ctx context.Context, params map[string]interface{}
 
 	modelID, ok := params["model_id"].(float64)
 	if !ok {
-		return Error(fmt.Sprintf("model_id parameter must be a number for predict tool: received type %T, value=%v", params["model_id"], params["model_id"]), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("model_id parameter must be a number for neurondb_predict tool: received type %T, value=%v", params["model_id"], params["model_id"]), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "model_id",
 			"received_type": fmt.Sprintf("%T", params["model_id"]),
 			"received_value": params["model_id"],
@@ -255,7 +255,7 @@ func (t *PredictTool) Execute(ctx context.Context, params map[string]interface{}
 
 	modelIDInt := int(modelID)
 	if modelIDInt <= 0 {
-		return Error(fmt.Sprintf("model_id must be a positive integer for predict tool: received %d", modelIDInt), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("model_id must be a positive integer for neurondb_predict tool: received %d", modelIDInt), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "model_id",
 			"value":     modelIDInt,
 			"params":    params,
@@ -264,7 +264,7 @@ func (t *PredictTool) Execute(ctx context.Context, params map[string]interface{}
 
 	features, ok := params["features"].([]interface{})
 	if !ok {
-		return Error(fmt.Sprintf("features parameter must be an array for predict tool: model_id=%d, received type %T, value=%v", modelIDInt, params["features"], params["features"]), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("features parameter must be an array for neurondb_predict tool: model_id=%d, received type %T, value=%v", modelIDInt, params["features"], params["features"]), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter":     "features",
 			"model_id":      modelIDInt,
 			"received_type": fmt.Sprintf("%T", params["features"]),
@@ -273,7 +273,7 @@ func (t *PredictTool) Execute(ctx context.Context, params map[string]interface{}
 	}
 
 	if len(features) == 0 {
-		return Error(fmt.Sprintf("features array cannot be empty for predict tool: model_id=%d, features_count=0", modelIDInt), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("features array cannot be empty for neurondb_predict tool: model_id=%d, features_count=0", modelIDInt), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter":    "features",
 			"model_id":     modelIDInt,
 			"features_count": 0,
@@ -310,7 +310,7 @@ type EvaluateModelTool struct {
 func NewEvaluateModelTool(db *database.Database, logger *logging.Logger) *EvaluateModelTool {
 	return &EvaluateModelTool{
 		BaseTool: NewBaseTool(
-			"evaluate_model",
+			"neurondb_evaluate_model",
 			"Evaluate a trained ML model",
 			map[string]interface{}{
 				"type": "object",
@@ -344,7 +344,7 @@ func NewEvaluateModelTool(db *database.Database, logger *logging.Logger) *Evalua
 func (t *EvaluateModelTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for evaluate_model tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_evaluate_model tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil
@@ -357,7 +357,7 @@ func (t *EvaluateModelTool) Execute(ctx context.Context, params map[string]inter
 	labelCol, _ := params["label_col"].(string)
 
 	if modelIDInt <= 0 {
-		return Error(fmt.Sprintf("model_id must be a positive integer for evaluate_model tool: received %d", modelIDInt), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("model_id must be a positive integer for neurondb_evaluate_model tool: received %d", modelIDInt), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "model_id",
 			"value":     modelIDInt,
 			"params":    params,
@@ -365,7 +365,7 @@ func (t *EvaluateModelTool) Execute(ctx context.Context, params map[string]inter
 	}
 
 	if testTable == "" {
-		return Error(fmt.Sprintf("test_table parameter is required and cannot be empty for evaluate_model tool: model_id=%d", modelIDInt), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("test_table parameter is required and cannot be empty for neurondb_evaluate_model tool: model_id=%d", modelIDInt), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "test_table",
 			"model_id":  modelIDInt,
 			"params":    params,
@@ -373,7 +373,7 @@ func (t *EvaluateModelTool) Execute(ctx context.Context, params map[string]inter
 	}
 
 	if featureCol == "" {
-		return Error(fmt.Sprintf("feature_col parameter is required and cannot be empty for evaluate_model tool: model_id=%d, test_table='%s'", modelIDInt, testTable), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("feature_col parameter is required and cannot be empty for neurondb_evaluate_model tool: model_id=%d, test_table='%s'", modelIDInt, testTable), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter":  "feature_col",
 			"model_id":   modelIDInt,
 			"test_table": testTable,
@@ -382,7 +382,7 @@ func (t *EvaluateModelTool) Execute(ctx context.Context, params map[string]inter
 	}
 
 	if labelCol == "" {
-		return Error(fmt.Sprintf("label_col parameter is required and cannot be empty for evaluate_model tool: model_id=%d, test_table='%s', feature_col='%s'", modelIDInt, testTable, featureCol), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("label_col parameter is required and cannot be empty for neurondb_evaluate_model tool: model_id=%d, test_table='%s', feature_col='%s'", modelIDInt, testTable, featureCol), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter":  "label_col",
 			"model_id":   modelIDInt,
 			"test_table": testTable,
@@ -425,7 +425,7 @@ type ListModelsTool struct {
 func NewListModelsTool(db *database.Database, logger *logging.Logger) *ListModelsTool {
 	return &ListModelsTool{
 		BaseTool: NewBaseTool(
-			"list_models",
+			"neurondb_list_models",
 			"List all trained ML models",
 			map[string]interface{}{
 				"type": "object",
@@ -504,7 +504,7 @@ type GetModelInfoTool struct {
 func NewGetModelInfoTool(db *database.Database, logger *logging.Logger) *GetModelInfoTool {
 	return &GetModelInfoTool{
 		BaseTool: NewBaseTool(
-			"get_model_info",
+			"neurondb_get_model_info",
 			"Get detailed information about a trained model",
 			map[string]interface{}{
 				"type": "object",
@@ -526,7 +526,7 @@ func NewGetModelInfoTool(db *database.Database, logger *logging.Logger) *GetMode
 func (t *GetModelInfoTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for get_model_info tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_get_model_info tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil
@@ -536,7 +536,7 @@ func (t *GetModelInfoTool) Execute(ctx context.Context, params map[string]interf
 	modelIDInt := int(modelID)
 
 	if modelIDInt <= 0 {
-		return Error(fmt.Sprintf("model_id must be a positive integer for get_model_info tool: received %d", modelIDInt), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("model_id must be a positive integer for neurondb_get_model_info tool: received %d", modelIDInt), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "model_id",
 			"value":     modelIDInt,
 			"params":    params,
@@ -574,7 +574,7 @@ type DeleteModelTool struct {
 func NewDeleteModelTool(db *database.Database, logger *logging.Logger) *DeleteModelTool {
 	return &DeleteModelTool{
 		BaseTool: NewBaseTool(
-			"delete_model",
+			"neurondb_delete_model",
 			"Delete a trained ML model",
 			map[string]interface{}{
 				"type": "object",
@@ -596,7 +596,7 @@ func NewDeleteModelTool(db *database.Database, logger *logging.Logger) *DeleteMo
 func (t *DeleteModelTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for delete_model tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_delete_model tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil

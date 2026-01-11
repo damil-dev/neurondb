@@ -32,7 +32,7 @@ type TimeSeriesTool struct {
 func NewTimeSeriesTool(db *database.Database, logger *logging.Logger) *TimeSeriesTool {
 	return &TimeSeriesTool{
 		BaseTool: NewBaseTool(
-			"timeseries_analysis",
+			"neurondb_timeseries_analysis",
 			"Perform time series analysis: ARIMA, forecasting",
 			map[string]interface{}{
 				"type": "object",
@@ -83,7 +83,7 @@ func NewTimeSeriesTool(db *database.Database, logger *logging.Logger) *TimeSerie
 func (t *TimeSeriesTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for timeseries_analysis tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_timeseries_analysis tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil

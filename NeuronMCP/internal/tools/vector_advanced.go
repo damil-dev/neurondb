@@ -32,7 +32,7 @@ type VectorArithmeticTool struct {
 func NewVectorArithmeticTool(db *database.Database, logger *logging.Logger) *VectorArithmeticTool {
 	return &VectorArithmeticTool{
 		BaseTool: NewBaseTool(
-			"vector_arithmetic",
+			"neurondb_vector_arithmetic",
 			"Perform vector arithmetic operations: add, subtract, multiply, normalize, concat, norm",
 			map[string]interface{}{
 				"type": "object",
@@ -69,7 +69,7 @@ func NewVectorArithmeticTool(db *database.Database, logger *logging.Logger) *Vec
 func (t *VectorArithmeticTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for vector_arithmetic tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_vector_arithmetic tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil
@@ -164,7 +164,7 @@ type VectorDistanceTool struct {
 func NewVectorDistanceTool(db *database.Database, logger *logging.Logger) *VectorDistanceTool {
 	return &VectorDistanceTool{
 		BaseTool: NewBaseTool(
-			"vector_distance",
+			"neurondb_vector_distance",
 			"Compute distance between two vectors using L1, L2, Hamming, Chebyshev, Minkowski, Jaccard, Dice, or Mahalanobis metrics",
 			map[string]interface{}{
 				"type": "object",
@@ -208,7 +208,7 @@ func NewVectorDistanceTool(db *database.Database, logger *logging.Logger) *Vecto
 func (t *VectorDistanceTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for vector_distance tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_vector_distance tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil
@@ -311,7 +311,7 @@ type VectorSimilarityUnifiedTool struct {
 func NewVectorSimilarityUnifiedTool(db *database.Database, logger *logging.Logger) *VectorSimilarityUnifiedTool {
 	return &VectorSimilarityUnifiedTool{
 		BaseTool: NewBaseTool(
-			"vector_similarity_unified",
+			"neurondb_vector_similarity_unified",
 			"Compute similarity between two vectors using unified similarity function (cosine, inner_product, l2)",
 			map[string]interface{}{
 				"type": "object",
@@ -345,7 +345,7 @@ func NewVectorSimilarityUnifiedTool(db *database.Database, logger *logging.Logge
 func (t *VectorSimilarityUnifiedTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for vector_similarity_unified tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_vector_similarity_unified tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil

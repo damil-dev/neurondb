@@ -35,7 +35,7 @@ type CreateHNSWIndexTool struct {
 func NewCreateHNSWIndexTool(db *database.Database, logger *logging.Logger) *CreateHNSWIndexTool {
 	return &CreateHNSWIndexTool{
 		BaseTool: NewBaseTool(
-			"create_hnsw_index",
+			"neurondb_create_hnsw_index",
 			"Create HNSW index for vector column",
 			map[string]interface{}{
 				"type": "object",
@@ -79,7 +79,7 @@ func NewCreateHNSWIndexTool(db *database.Database, logger *logging.Logger) *Crea
 func (t *CreateHNSWIndexTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for create_hnsw_index tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_create_hnsw_index tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil
@@ -168,7 +168,7 @@ func (t *CreateHNSWIndexTool) Execute(ctx context.Context, params map[string]int
 	}
 
 	if efConstruction < 4 || efConstruction > 2000 {
-		return Error(fmt.Sprintf("ef_construction parameter must be between 4 and 2000 for create_hnsw_index tool: table='%s', vector_column='%s', index_name='%s', m=%d, received ef_construction=%d", table, vectorColumn, indexName, m, efConstruction), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("ef_construction parameter must be between 4 and 2000 for neurondb_create_hnsw_index tool: table='%s', vector_column='%s', index_name='%s', m=%d, received ef_construction=%d", table, vectorColumn, indexName, m, efConstruction), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter":      "ef_construction",
 			"table":          table,
 			"vector_column":  vectorColumn,
@@ -219,7 +219,7 @@ type CreateIVFIndexTool struct {
 func NewCreateIVFIndexTool(db *database.Database, logger *logging.Logger) *CreateIVFIndexTool {
 	return &CreateIVFIndexTool{
 		BaseTool: NewBaseTool(
-			"create_ivf_index",
+			"neurondb_create_ivf_index",
 			"Create IVF index for vector column",
 			map[string]interface{}{
 				"type": "object",
@@ -255,7 +255,7 @@ func NewCreateIVFIndexTool(db *database.Database, logger *logging.Logger) *Creat
 func (t *CreateIVFIndexTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for create_ivf_index tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_create_ivf_index tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil
@@ -284,14 +284,14 @@ func (t *CreateIVFIndexTool) Execute(ctx context.Context, params map[string]inte
 	}
 
 	if table == "" {
-		return Error("table parameter is required and cannot be empty for create_ivf_index tool", "VALIDATION_ERROR", map[string]interface{}{
+		return Error("table parameter is required and cannot be empty for neurondb_create_ivf_index tool", "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "table",
 			"params":    params,
 		}), nil
 	}
 
 	if vectorColumn == "" {
-		return Error(fmt.Sprintf("vector_column parameter is required and cannot be empty for create_ivf_index tool: table='%s'", table), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("vector_column parameter is required and cannot be empty for neurondb_create_ivf_index tool: table='%s'", table), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "vector_column",
 			"table":     table,
 			"params":    params,
@@ -299,7 +299,7 @@ func (t *CreateIVFIndexTool) Execute(ctx context.Context, params map[string]inte
 	}
 
 	if indexName == "" {
-		return Error(fmt.Sprintf("index_name parameter is required and cannot be empty for create_ivf_index tool: table='%s', vector_column='%s'", table, vectorColumn), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("index_name parameter is required and cannot be empty for neurondb_create_ivf_index tool: table='%s', vector_column='%s'", table, vectorColumn), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter":     "index_name",
 			"table":         table,
 			"vector_column": vectorColumn,
@@ -308,7 +308,7 @@ func (t *CreateIVFIndexTool) Execute(ctx context.Context, params map[string]inte
 	}
 
 	if numLists < 1 {
-		return Error(fmt.Sprintf("num_lists must be at least 1 for create_ivf_index tool: table='%s', vector_column='%s', index_name='%s', received num_lists=%d", table, vectorColumn, indexName, numLists), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("num_lists must be at least 1 for neurondb_create_ivf_index tool: table='%s', vector_column='%s', index_name='%s', received num_lists=%d", table, vectorColumn, indexName, numLists), "VALIDATION_ERROR", map[string]interface{}{
 			"parameter":     "num_lists",
 			"table":         table,
 			"vector_column": vectorColumn,
@@ -354,7 +354,7 @@ type IndexStatusTool struct {
 func NewIndexStatusTool(db *database.Database, logger *logging.Logger) *IndexStatusTool {
 	return &IndexStatusTool{
 		BaseTool: NewBaseTool(
-			"index_status",
+			"neurondb_index_status",
 			"Get status and statistics for a vector index",
 			map[string]interface{}{
 				"type": "object",
@@ -376,7 +376,7 @@ func NewIndexStatusTool(db *database.Database, logger *logging.Logger) *IndexSta
 func (t *IndexStatusTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for index_status tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_index_status tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil
@@ -385,7 +385,7 @@ func (t *IndexStatusTool) Execute(ctx context.Context, params map[string]interfa
 	indexName, _ := params["index_name"].(string)
 
 	if indexName == "" {
-		return Error("index_name parameter is required and cannot be empty for index_status tool", "VALIDATION_ERROR", map[string]interface{}{
+		return Error("index_name parameter is required and cannot be empty for neurondb_index_status tool", "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "index_name",
 			"params":    params,
 		}), nil
@@ -444,7 +444,7 @@ type DropIndexTool struct {
 func NewDropIndexTool(db *database.Database, logger *logging.Logger) *DropIndexTool {
 	return &DropIndexTool{
 		BaseTool: NewBaseTool(
-			"drop_index",
+			"neurondb_drop_index",
 			"Drop a vector index",
 			map[string]interface{}{
 				"type": "object",
@@ -466,7 +466,7 @@ func NewDropIndexTool(db *database.Database, logger *logging.Logger) *DropIndexT
 func (t *DropIndexTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for drop_index tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_drop_index tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil
@@ -475,7 +475,7 @@ func (t *DropIndexTool) Execute(ctx context.Context, params map[string]interface
 	indexName, _ := params["index_name"].(string)
 
 	if indexName == "" {
-		return Error("index_name parameter is required and cannot be empty for drop_index tool", "VALIDATION_ERROR", map[string]interface{}{
+		return Error("index_name parameter is required and cannot be empty for neurondb_drop_index tool", "VALIDATION_ERROR", map[string]interface{}{
 			"parameter": "index_name",
 			"params":    params,
 		}), nil

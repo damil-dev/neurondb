@@ -39,7 +39,7 @@ type DatasetLoadingTool struct {
 func NewDatasetLoadingTool(db *database.Database, logger *logging.Logger) *DatasetLoadingTool {
 	return &DatasetLoadingTool{
 		BaseTool: NewBaseTool(
-			"load_dataset",
+			"neurondb_load_dataset",
 			"Load datasets from multiple sources (HuggingFace, URLs, GitHub, S3, local files) into PostgreSQL with automatic schema detection, embedding generation, and index creation",
 			map[string]interface{}{
 				"type": "object",
@@ -134,7 +134,7 @@ func NewDatasetLoadingTool(db *database.Database, logger *logging.Logger) *Datas
 func (t *DatasetLoadingTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for load_dataset tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_load_dataset tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil
@@ -143,6 +143,7 @@ func (t *DatasetLoadingTool) Execute(ctx context.Context, params map[string]inte
 	/* Get source path (preferred) or dataset_name (backward compatibility) */
 	sourcePath, _ := params["source_path"].(string)
 	datasetName, _ := params["dataset_name"].(string)
+	/* Support both source_path and dataset_name for backward compatibility */
 	if sourcePath == "" && datasetName != "" {
 		sourcePath = datasetName
 	}
@@ -269,9 +270,22 @@ func (t *DatasetLoadingTool) loadDataset(ctx context.Context, sourceType, source
 	/* Find the Python loader script */
 	scriptPath := t.findDatasetLoaderScript()
 	if scriptPath == "" {
+		/* Log warning about script not found */
+		t.logger.Warn("Dataset loader script not found, using fallback method", map[string]interface{}{
+			"source_type": sourceType,
+			"source_path": sourcePath,
+			"hint":        "Please ensure dataset_loader.py is available in NeuronMCP/internal/tools/",
+		})
 		/* Fallback: try to use inline Python code if script not found */
 		return t.loadGenericDatasetFallback(ctx, sourceType, sourcePath, split, limit)
 	}
+
+	/* Log that we found the script */
+	t.logger.Info("Using dataset loader script", map[string]interface{}{
+		"script_path": scriptPath,
+		"source_type": sourceType,
+		"source_path": sourcePath,
+	})
 
 	/* Build command arguments */
 	args := []string{scriptPath}

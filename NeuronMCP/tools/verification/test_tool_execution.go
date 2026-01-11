@@ -1,3 +1,6 @@
+//go:build verification_tool_execution
+// +build verification_tool_execution
+
 /*-------------------------------------------------------------------------
  *
  * test_tool_execution.go
@@ -9,8 +12,6 @@
  *
  *-------------------------------------------------------------------------
  */
-
-// +build ignore
 
 package main
 

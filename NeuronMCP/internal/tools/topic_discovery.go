@@ -32,7 +32,7 @@ type TopicDiscoveryTool struct {
 func NewTopicDiscoveryTool(db *database.Database, logger *logging.Logger) *TopicDiscoveryTool {
 	return &TopicDiscoveryTool{
 		BaseTool: NewBaseTool(
-			"topic_discovery",
+			"neurondb_topic_discovery",
 			"Perform topic modeling and discovery on text data",
 			map[string]interface{}{
 				"type": "object",
@@ -71,7 +71,7 @@ func NewTopicDiscoveryTool(db *database.Database, logger *logging.Logger) *Topic
 func (t *TopicDiscoveryTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for topic_discovery tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_topic_discovery tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil

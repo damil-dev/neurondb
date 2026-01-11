@@ -33,7 +33,7 @@ type ReciprocalRankFusionTool struct {
 func NewReciprocalRankFusionTool(db *database.Database, logger *logging.Logger) *ReciprocalRankFusionTool {
 	return &ReciprocalRankFusionTool{
 		BaseTool: NewBaseTool(
-			"reciprocal_rank_fusion",
+			"neurondb_reciprocal_rank_fusion",
 			"Perform reciprocal rank fusion on multiple ranking arrays",
 			map[string]interface{}{
 				"type": "object",
@@ -64,7 +64,7 @@ func NewReciprocalRankFusionTool(db *database.Database, logger *logging.Logger) 
 func (t *ReciprocalRankFusionTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for reciprocal_rank_fusion tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_reciprocal_rank_fusion tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil
@@ -122,7 +122,7 @@ type SemanticKeywordSearchTool struct {
 func NewSemanticKeywordSearchTool(db *database.Database, logger *logging.Logger) *SemanticKeywordSearchTool {
 	return &SemanticKeywordSearchTool{
 		BaseTool: NewBaseTool(
-			"semantic_keyword_search",
+			"neurondb_semantic_keyword_search",
 			"Perform semantic + keyword search",
 			map[string]interface{}{
 				"type": "object",
@@ -160,7 +160,7 @@ func NewSemanticKeywordSearchTool(db *database.Database, logger *logging.Logger)
 func (t *SemanticKeywordSearchTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for semantic_keyword_search tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_semantic_keyword_search tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil
@@ -209,7 +209,7 @@ type MultiVectorSearchTool struct {
 func NewMultiVectorSearchTool(db *database.Database, logger *logging.Logger) *MultiVectorSearchTool {
 	return &MultiVectorSearchTool{
 		BaseTool: NewBaseTool(
-			"multi_vector_search",
+			"neurondb_multi_vector_search",
 			"Perform search with multiple query vectors",
 			map[string]interface{}{
 				"type": "object",
@@ -252,7 +252,7 @@ func NewMultiVectorSearchTool(db *database.Database, logger *logging.Logger) *Mu
 func (t *MultiVectorSearchTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for multi_vector_search tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_multi_vector_search tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil
@@ -313,7 +313,7 @@ type FacetedVectorSearchTool struct {
 func NewFacetedVectorSearchTool(db *database.Database, logger *logging.Logger) *FacetedVectorSearchTool {
 	return &FacetedVectorSearchTool{
 		BaseTool: NewBaseTool(
-			"faceted_vector_search",
+			"neurondb_faceted_vector_search",
 			"Perform faceted vector search",
 			map[string]interface{}{
 				"type": "object",
@@ -351,7 +351,7 @@ func NewFacetedVectorSearchTool(db *database.Database, logger *logging.Logger) *
 func (t *FacetedVectorSearchTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for faceted_vector_search tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_faceted_vector_search tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil
@@ -400,7 +400,7 @@ type TemporalVectorSearchTool struct {
 func NewTemporalVectorSearchTool(db *database.Database, logger *logging.Logger) *TemporalVectorSearchTool {
 	return &TemporalVectorSearchTool{
 		BaseTool: NewBaseTool(
-			"temporal_vector_search",
+			"neurondb_temporal_vector_search",
 			"Perform temporal vector search with time decay",
 			map[string]interface{}{
 				"type": "object",
@@ -443,7 +443,7 @@ func NewTemporalVectorSearchTool(db *database.Database, logger *logging.Logger) 
 func (t *TemporalVectorSearchTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for temporal_vector_search tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_temporal_vector_search tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil
@@ -496,7 +496,7 @@ type DiverseVectorSearchTool struct {
 func NewDiverseVectorSearchTool(db *database.Database, logger *logging.Logger) *DiverseVectorSearchTool {
 	return &DiverseVectorSearchTool{
 		BaseTool: NewBaseTool(
-			"diverse_vector_search",
+			"neurondb_diverse_vector_search",
 			"Perform diverse vector search to maximize result diversity",
 			map[string]interface{}{
 				"type": "object",
@@ -537,7 +537,7 @@ func NewDiverseVectorSearchTool(db *database.Database, logger *logging.Logger) *
 func (t *DiverseVectorSearchTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for diverse_vector_search tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_diverse_vector_search tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil

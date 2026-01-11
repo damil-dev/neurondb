@@ -32,7 +32,7 @@ type VectorGraphTool struct {
 func NewVectorGraphTool(db *database.Database, logger *logging.Logger) *VectorGraphTool {
 	return &VectorGraphTool{
 		BaseTool: NewBaseTool(
-			"vector_graph",
+			"neurondb_vector_graph",
 			"Perform graph operations: BFS, DFS, PageRank, community detection on vgraph type",
 			map[string]interface{}{
 				"type": "object",
@@ -82,7 +82,7 @@ func NewVectorGraphTool(db *database.Database, logger *logging.Logger) *VectorGr
 func (t *VectorGraphTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
-		return Error(fmt.Sprintf("Invalid parameters for vector_graph tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
+		return Error(fmt.Sprintf("Invalid parameters for neurondb_vector_graph tool: %v", errors), "VALIDATION_ERROR", map[string]interface{}{
 			"errors": errors,
 			"params": params,
 		}), nil

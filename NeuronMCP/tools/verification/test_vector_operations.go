@@ -1,3 +1,6 @@
+//go:build verification_vector_operations
+// +build verification_vector_operations
+
 /*-------------------------------------------------------------------------
  *
  * test_vector_operations.go
@@ -10,8 +13,6 @@
  *
  *-------------------------------------------------------------------------
  */
-
-// +build ignore
 
 package main
 

@@ -1,3 +1,6 @@
+//go:build verification
+// +build verification
+
 /*-------------------------------------------------------------------------
  *
  * test_connection_verification.go
@@ -10,8 +13,6 @@
  *
  *-------------------------------------------------------------------------
  */
-
-// +build ignore
 
 package main
 
