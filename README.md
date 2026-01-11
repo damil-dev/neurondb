@@ -128,8 +128,8 @@ EOF
 | **Index types** | HNSW, IVF, PQ, hybrid, multi-vector | Comprehensive indexing options |
 | **GPU acceleration** | CUDA, ROCm, Metal (3 backends) | Single backend or CPU-only |
 | **Benchmark coverage** | RAGAS, MTEB, BEIR integrated | Manual setup required |
-| **Agent runtime** | NeuronAgent included (REST API, workflows) | External services needed |
-| **MCP server** | NeuronMCP included (100+ tools) | Separate integration required |
+| **Agent runtime** | NeuronAgent included (REST/WebSocket API, multi-agent collaboration, workflow engine with HITL, hierarchical memory, evaluation framework, budget management, 20+ tools) | External services needed |
+| **MCP server** | NeuronMCP included (100+ tools, middleware system, batch operations, progress tracking, enterprise features, authentication, caching) | Separate integration required |
 | **Desktop UI** | NeuronDesktop included | Build your own |
 | **ML algorithms** | 52+ algorithms (classification, regression, clustering) | Extension only (limited) |
 | **SQL functions** | 520+ functions | Typically <100 |
@@ -447,8 +447,8 @@ No additional services, ports, or configuration required!
 | Component | Path | What it is |
 |---|---|---|
 | NeuronDB | `NeuronDB/` | PostgreSQL extension with vector search, ML algorithms, GPU acceleration (CUDA/ROCm/Metal), embeddings, RAG pipeline, hybrid search, and background workers |
-| NeuronAgent | `NeuronAgent/` | Agent runtime + REST/WebSocket API (Go) with multi-agent collaboration, workflow engine, HITL, tools, memory, budget management, and evaluation framework |
-| NeuronMCP | `NeuronMCP/` | MCP server for MCP-compatible clients (Go) with tools and resources |
+| NeuronAgent | `NeuronAgent/` | Agent runtime + REST/WebSocket API (Go) with multi-agent collaboration, DAG-based workflow engine with human-in-the-loop (HITL), hierarchical memory management, planning & reflection, evaluation framework, budget & cost management, 20+ tools (SQL, HTTP, Code, Shell, Browser, Filesystem, Memory, Collaboration, NeuronDB tools, Multimodal), Prometheus metrics, RBAC, audit logging, and background workers |
+| NeuronMCP | `NeuronMCP/` | MCP server for MCP-compatible clients (Go) with 100+ tools (50+ vector operations, complete ML pipeline, RAG operations, 27 PostgreSQL admin tools, dataset loading), middleware system (validation, logging, timeout, error handling, auth, rate limiting), enterprise features (Prometheus metrics, webhooks, circuit breaker, caching, connection pooling), batch operations, progress tracking, authentication (JWT, API keys, OAuth2), and full MCP protocol support (prompts, sampling/completions, resources) |
 | NeuronDesktop | `NeuronDesktop/` | Web UI + API for the ecosystem providing a unified interface |
 
 ### Component READMEs

@@ -54,8 +54,8 @@ This command will:
 
 - [x] Build all Docker images (first time only, takes a few minutes)
 - [x] Start PostgreSQL with NeuronDB extension
-- [x] Start NeuronAgent (REST API server)
-- [x] Start NeuronMCP (MCP protocol server)
+- [x] Start NeuronAgent (REST/WebSocket API server with multi-agent collaboration, workflow engine, HITL, and 20+ tools)
+- [x] Start NeuronMCP (MCP protocol server with 100+ tools, middleware, and enterprise features)
 - [x] Start NeuronDesktop (web interface with API and frontend)
 - [x] Configure networking between all components
 
@@ -74,8 +74,8 @@ You should see five services running:
 | Service | Status | Description |
 |---------|--------|-------------|
 | `neurondb` | healthy | PostgreSQL with NeuronDB extension |
-| `neuronagent` | healthy | REST API server |
-| `neuronmcp` | healthy | MCP protocol server |
+| `neuronagent` | healthy | REST/WebSocket API server with multi-agent collaboration, workflow engine (DAG-based with HITL), hierarchical memory, evaluation framework, budget management, and 20+ tools |
+| `neuronmcp` | healthy | MCP protocol server with 100+ tools, middleware system, batch operations, progress tracking, and enterprise features |
 | `neurondesk-api` | healthy | NeuronDesktop API server |
 | `neurondesk-frontend` | healthy | NeuronDesktop web interface |
 
