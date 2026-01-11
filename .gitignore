@@ -215,6 +215,7 @@ NeuronDB/*.sql.BAK
 
 # Python cache (for scripts)
 __pycache__/
+**/__pycache__/
 *.py[cod]
 *$py.class
 *.so
@@ -229,6 +230,7 @@ NeuronDB/tools/**/__pycache__/
 NeuronDB/dataset/**/__pycache__/
 NeuronAgent/**/__pycache__/
 NeuronMCP/**/__pycache__/
+ansible/.venv/
 
 # Python virtual environments
 venv/
@@ -330,6 +332,15 @@ docker-compose.override.yml
 NeuronDB/tests/error/
 NeuronDB/tests/output/
 !NeuronDB/tests/error/.gitignore
+
+# Test plan files
+NeuronDB/tests/COMPREHENSIVE_PLAN_*.md
+NeuronDB/tests/run_comprehensive_plan.sh
+
+# Regression test artifacts
+NeuronDB/regression.diffs
+NeuronDB/regression.out
+NeuronDB/results/
 
 # Coverage reports
 coverage/
