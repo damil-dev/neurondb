@@ -12,7 +12,7 @@ These scripts provide a complete workflow for:
 
 ## Scripts
 
-### `load_docs.py` (Main Entry Point)
+### `neurondb_load_docs.py` (Main Entry Point)
 Main Python script that orchestrates the complete workflow. Uses modular components for maximum flexibility.
 
 **Features:**
@@ -24,7 +24,7 @@ Main Python script that orchestrates the complete workflow. Uses modular compone
 
 **Usage:**
 ```bash
-python3 load_docs.py -d /path/to/docs -D mydb -U myuser
+python3 neurondb_load_docs.py -d /path/to/docs -D mydb -U myuser
 ```
 
 ### Modular Components
@@ -50,13 +50,13 @@ The script is built from highly modular components:
   - `EmbeddingGenerator`: Batch embedding generation
   - `VectorIndexManager`: HNSW index creation and management
 
-### `load_documentation.sh`
+### `neurondb_load_docs.sh`
 Bash wrapper script for convenience (uses Python internally).
 
 **Usage:**
 ```bash
-chmod +x load_documentation.sh
-./load_documentation.sh -d /path/to/docs -D mydb -U myuser
+chmod +x neurondb_load_docs.sh
+./neurondb_load_docs.sh -d /path/to/docs -D mydb -U myuser
 ```
 
 ## Prerequisites
@@ -84,7 +84,7 @@ Or use `.pgpass` file for password-less access.
 
 ```bash
 # Using bash script
-./load_documentation.sh \
+./neurondb_load_docs.sh \
   -d /path/to/documentation \
   -D my_database \
   -U my_user \
@@ -92,7 +92,7 @@ Or use `.pgpass` file for password-less access.
   -p 5432
 
 # Or using Python script
-python3 load_documentation.py \
+python3 neurondb_load_docs.py \
   -d /path/to/documentation \
   -D my_database \
   -U my_user
@@ -307,7 +307,7 @@ LIMIT 10;
 ### Example 1: Load PostgreSQL Documentation
 
 ```bash
-./load_documentation.sh \
+./neurondb_load_docs.sh \
   -d ~/postgresql-docs/html \
   -D postgres \
   -U postgres \
@@ -320,7 +320,7 @@ LIMIT 10;
 ### Example 2: Load API Documentation (Smaller Chunks)
 
 ```bash
-python3 load_documentation.py \
+python3 neurondb_load_docs.py \
   -d ~/api-docs \
   -D mydb \
   -c 500 \
@@ -332,7 +332,7 @@ python3 load_documentation.py \
 ### Example 3: Load and Chunk Only (Skip Embeddings)
 
 ```bash
-./load_documentation.sh \
+./neurondb_load_docs.sh \
   -d ~/docs \
   -D mydb \
   --skip-embeddings
