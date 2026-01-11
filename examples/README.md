@@ -10,6 +10,12 @@ This directory contains complete, practical examples showing how to build real-w
 
 **New to NeuronDB? Start here:**
 
+0. **[Quickstart Data Pack](quickstart/)** - Get started in under a minute! ⚡
+   - Load sample data with one command
+   - ~500 documents with pre-built embeddings
+   - Ready to query immediately
+   - Perfect for trying recipes and examples
+
 1. **[Basics Examples](basics/)** - Simple, copy-paste friendly examples
    - `01_basic_vectors.py` - Vector basics
    - `02_simple_embeddings.py` - Text to embeddings
@@ -26,6 +32,41 @@ This directory contains complete, practical examples showing how to build real-w
 ---
 
 ## 📚 Example Categories
+
+### 0. ⚡ Quickstart Data Pack (`quickstart/`)
+**Get started in under a minute!**
+
+Load sample data and start querying immediately.
+
+**What you'll get:**
+- ~500 sample documents with embeddings
+- Pre-built HNSW index
+- Ready-to-run queries
+- Perfect for learning and testing
+
+**Quick Start:**
+```bash
+# Load quickstart data (one command!)
+./examples/quickstart/load_quickstart.sh
+
+# Or use the CLI
+./scripts/neurondb-cli.sh quickstart
+
+# Then try a query
+psql "postgresql://neurondb:neurondb@localhost:5433/neurondb" -c "SELECT COUNT(*) FROM quickstart_documents;"
+```
+
+**Files:**
+- `quickstart_data.sql` - SQL data pack
+- `load_quickstart.sh` - Loader script
+- `README.md` - Complete documentation
+
+**Next Steps:**
+- Try SQL recipes: [Docs/getting-started/recipes/](../Docs/getting-started/recipes/)
+- Run Python examples with the loaded data
+- Create your own queries
+
+---
 
 ### 1. 🔍 Semantic Search (`semantic-search-docs/`)
 Complete working example for semantic search over document collections.

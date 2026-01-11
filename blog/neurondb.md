@@ -10,7 +10,7 @@ PostgreSQL handles relational data. AI applications need vector similarity searc
 
 NeuronDB is a PostgreSQL extension. It adds vector search, ML inference, GPU acceleration, and hybrid retrieval to PostgreSQL. It maintains full  compatibility. Applications use SQL syntax for AI operations. No external services required. No complex integrations needed.
 
-NeuronDB supports PostgreSQL 16, 17, and 18. It is implemented in pure C following PostgreSQL coding standards. The extension has zero external dependencies. It provides 473 SQL functions, comprehensive ML capabilities with 19 implemented algorithms (part of 52 total ML features), and 4 background workers including the new neuranllm worker. All operations run within PostgreSQL. Includes 7 monitoring views, 4 new tables for multi-tenancy and security, and 27 new SQL functions for advanced features.
+NeuronDB supports PostgreSQL 16, 17, and 18. It is implemented in pure C following PostgreSQL coding standards. The extension has zero external dependencies. It provides 520+ SQL functions, comprehensive ML capabilities with 19 implemented algorithms (part of 52 total ML features), and 4 background workers including the new neuranllm worker. All operations run within PostgreSQL. Includes 7 monitoring views, 4 new tables for multi-tenancy and security, and 27 new SQL functions for advanced features.
 
 ## What is NeuronDB
 
@@ -20,7 +20,7 @@ The extension provides five vector types. The vector type stores float32 embeddi
 
 NeuronDB includes comprehensive ML capabilities with 19 fully implemented algorithms in pure C. **Clustering**: K-Means, Mini-batch K-means, DBSCAN, GMM, Hierarchical clustering. **Dimensionality Reduction**: PCA, PCA Whitening. **Quantization**: Product Quantization (PQ), Optimized PQ (OPQ). **Outlier Detection**: Z-score, Modified Z-score, IQR. **Reranking**: MMR (Maximal Marginal Relevance), Ensemble (Weighted & Borda), Learning-to-Rank (LTR). **Quality Metrics**: Recall@K, Precision@K, F1@K, MRR, Davies-Bouldin Index, Silhouette Score. **Drift Detection**: Centroid drift, Distribution divergence, Temporal drift monitoring. **Analytics**: Topic discovery, Similarity histograms, KNN graph building, Embedding quality assessment. **Search**: Hybrid Lexical-Semantic Fusion, Reciprocal Rank Fusion (RRF). Additionally supports Random Forest, XGBoost, LightGBM, CatBoost, Linear/Logistic Regression, Ridge, Lasso, SVM, KNN, Naive Bayes, Decision Trees, Neural Networks, Deep Learning. All algorithms support GPU acceleration.
 
-The extension provides 473 SQL functions for vector operations, ML inference, embedding generation, hybrid search, reranking, and analytics. Functions integrate with PostgreSQL's query planner and optimizer. Operations use standard SQL syntax.
+The extension provides 520+ SQL functions for vector operations, ML inference, embedding generation, hybrid search, reranking, and analytics. Functions integrate with PostgreSQL's query planner and optimizer. Operations use standard SQL syntax.
 
 ## Vector Search Capabilities
 
@@ -367,7 +367,7 @@ Vector types comparison shows NeuronDB provides five vector types: vector, vecto
 
 Distance metrics comparison shows NeuronDB supports 10 or more metrics including L2, Cosine, Inner Product, Manhattan, Hamming, Jaccard, Chebyshev, Minkowski, Canberra, and Braycurtis.  supports three metrics: L2, Cosine, and Inner Product.  supports three metrics. pgai uses  metrics. PostgresML uses  metrics.
 
-SQL functions comparison shows NeuronDB provides 473 SQL functions.  provides approximately 20 functions.  provides approximately 30 functions. pgai provides approximately 15 functions. PostgresML provides approximately 50 functions.
+SQL functions comparison shows NeuronDB provides 520+ SQL functions.  provides approximately 20 functions.  provides approximately 30 functions. pgai provides approximately 15 functions. PostgresML provides approximately 50 functions.
 
 Performance comparison shows NeuronDB achieves 100,000 or more queries per second with GPU acceleration.  achieves 10,000 to 50,000 queries per second.  achieves 50,000 to 100,000 queries per second. pgai performance is limited by API overhead. PostgresML achieves 5,000 to 20,000 queries per second due to Python overhead.
 
@@ -740,7 +740,7 @@ Security features protect data and ensure compliance with regulations. All featu
 
 NeuronDB extends PostgreSQL with AI capabilities. The extension provides vector search, ML inference, GPU acceleration, and RAG pipelines. All operations use standard SQL syntax. No external services required. No complex integrations needed.
 
-The extension supports PostgreSQL 16, 17, and 18. Implementation uses pure C following PostgreSQL coding standards. Zero external dependencies. 473 SQL functions. 52 ML algorithms. 4 background workers. Full  compatibility.
+The extension supports PostgreSQL 16, 17, and 18. Implementation uses pure C following PostgreSQL coding standards. Zero external dependencies. 520+ SQL functions. 52 ML algorithms. 4 background workers. Full  compatibility.
 
 Applications build semantic search, RAG systems, recommendation engines, and image search using SQL. Performance scales to billions of vectors. GPU acceleration provides 10x to 100x speedups. Production-ready features include monitoring, security, and background workers.
 

@@ -32,7 +32,7 @@
 
 ### SQL API
 
-- **[SQL API Reference](../../NeuronDB/docs/sql-api.md)** - All 473+ SQL functions, types, operators, and aggregates
+- **[SQL API Reference](../../NeuronDB/docs/sql-api.md)** - All 520+ SQL functions, types, operators, and aggregates
   - Vector operations
   - Distance metrics
   - Quantization functions
@@ -227,7 +227,7 @@
 
 ### Coverage
 
-- **SQL Functions:** 654+ functions documented
+- **SQL Functions:** 520+ functions documented
 - **Data Types:** 8+ types documented
 - **Configuration Options:** 30+ GUC variables documented
 - **API Endpoints:** 50+ endpoints documented

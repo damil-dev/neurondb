@@ -46,6 +46,8 @@
 
 > [!TIP]
 > New here? Start with [`Docs/getting-started/simple-start.md`](Docs/getting-started/simple-start.md) or jump to [`QUICKSTART.md`](QUICKSTART.md).
+> 
+> **Developer Tools**: Try the [quickstart data pack](examples/quickstart/), [SQL recipe library](Docs/getting-started/recipes/), and [CLI helpers](scripts/neurondb-cli.sh) for faster development!
 
 ## Hello NeuronDB (60 seconds)
 
@@ -130,7 +132,7 @@ EOF
 | **MCP server** | NeuronMCP included (100+ tools) | Separate integration required |
 | **Desktop UI** | NeuronDesktop included | Build your own |
 | **ML algorithms** | 52+ algorithms (classification, regression, clustering) | Extension only (limited) |
-| **SQL functions** | 473+ functions | Typically <100 |
+| **SQL functions** | 520+ functions | Typically <100 |
 
 ## Architecture
 
@@ -185,7 +187,7 @@ docker compose ps
 ```
 
 **What you'll see:**
-- 5 services starting: `neurondb-cpu`, `neuronagent`, `neurondb-mcp`, `neurondesk-api`, `neurondesk-frontend`
+- 5 services starting: `neurondb`, `neuronagent`, `neuronmcp`, `neurondesk-api`, `neurondesk-frontend`
 - All services should show "healthy" status after initialization
 
 > [!TIP]
@@ -221,11 +223,17 @@ docker compose ps
 
 > [!IMPORTANT]
 > Prefer a step-by-step guide? See [`QUICKSTART.md`](QUICKSTART.md).
+> 
+> **New Developer Tools**: After setup, try the [quickstart data pack](examples/quickstart/) for sample data, [SQL recipe library](Docs/getting-started/recipes/) for ready-to-run queries, and [CLI helpers](scripts/neurondb-cli.sh) for index management!
 
 > [!SECURITY]
 > Default credentials are for **development only**. In production, set strong passwords via environment variables or `.env` file.
 
 ### Native install
+
+Install components directly on your system without Docker.
+
+#### NeuronDB Extension
 
 Install the NeuronDB extension directly into your existing PostgreSQL installation.
 
@@ -288,6 +296,47 @@ SELECT neurondb.version();
 </details>
 
 For detailed installation instructions, see [`NeuronDB/INSTALL.md`](NeuronDB/INSTALL.md).
+
+#### Ecosystem Components (NeuronMCP, NeuronAgent, NeuronDesktop)
+
+Install NeuronMCP, NeuronAgent, and NeuronDesktop from source with automated scripts.
+
+**Quick Installation:**
+
+```bash
+# Install all components
+sudo ./scripts/install-components.sh
+
+# Install specific components
+sudo ./scripts/install-components.sh neuronmcp neuronagent
+
+# Install with system services enabled
+sudo ./scripts/install-components.sh --enable-service
+```
+
+**Prerequisites:**
+- Go 1.23+ (for building)
+- PostgreSQL 16+ with NeuronDB extension
+- Node.js 18+ (for NeuronDesktop)
+
+**Manual Installation:**
+
+See [Native Installation Guide](Docs/getting-started/installation-native.md) for detailed instructions.
+
+**Service Management:**
+
+```bash
+# Start services
+./scripts/manage-services.sh start
+
+# Check status
+./scripts/manage-services.sh status
+
+# View logs
+./scripts/manage-services.sh logs neuronagent
+```
+
+For service management details, see [Service Management Guide](Docs/getting-started/installation-services.md).
 
 ### Minimal mode (extension only)
 
@@ -652,7 +701,7 @@ Key operational considerations for production:
 <details>
 <summary><strong>Stats snapshot (may change)</strong></summary>
 
-- **473 SQL functions** in NeuronDB extension
+- **520+ SQL functions** in NeuronDB extension
 - **52+ ML algorithms** supported
 - **100+ MCP tools** available
 - **4 integrated components** working together

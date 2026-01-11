@@ -150,7 +150,7 @@ docker exec neurondb-cpu pg_isready -U neurondb -d neurondb
 
 ### NeuronDB Extension Not Loading
 
-**Symptoms**: `neurondb_version()` function not found
+**Symptoms**: `neurondb.version()` function not found
 
 **Diagnosis**:
 ```sql

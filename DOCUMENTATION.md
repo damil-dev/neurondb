@@ -43,7 +43,7 @@ This documentation is organized to support different reading modes:
 <details>
 <summary><strong>What's available on the official site</strong></summary>
 
-- Complete API references (all 473 SQL functions)
+- Complete API references (all 520+ SQL functions)
 - Detailed tutorials and step-by-step guides
 - Best practices and production guides
 - Performance optimization strategies
@@ -136,7 +136,7 @@ graph TB
 | Script | Purpose |
 |--------|---------|
 | `scripts/setup_neurondb_ecosystem.sh` | Unified setup for all components |
-| `scripts/verify_neurondb_integration.sh` | Comprehensive integration testing |
+| `NeuronAgent/scripts/neuronagent_verify.sh` | Comprehensive integration testing |
 | `scripts/smoke-test.sh` | Quick smoke tests |
 
 ---
@@ -252,7 +252,7 @@ graph TB
 
 | Document | Description |
 |----------|-------------|
-| [SQL API Reference](NeuronDB/docs/sql-api.md) | Complete SQL function reference (473 functions) |
+| [SQL API Reference](NeuronDB/docs/sql-api.md) | Complete SQL function reference (520+ functions) |
 | [Function Stability](NeuronDB/docs/function-stability.md) | API stability classifications |
 | [Deprecation Policy](NeuronDB/docs/deprecation-policy.md) | Deprecation and removal process |
 | [API Snapshots](NeuronDB/docs/api-snapshots/readme.md) | Versioned API references |
@@ -457,7 +457,7 @@ graph TB
 
 | Category | Count | Details |
 |----------|-------|---------|
-| **SQL Functions** | 473 | NeuronDB extension functions |
+| **SQL Functions** | 520+ | NeuronDB extension functions |
 | **ML Algorithms** | 52+ | Classification, regression, clustering, etc. |
 | **MCP Tools** | 100+ | Model Context Protocol tools |
 | **Components** | 4 | NeuronDB, NeuronAgent, NeuronMCP, NeuronDesktop |

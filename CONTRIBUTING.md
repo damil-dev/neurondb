@@ -57,13 +57,13 @@ All code must conform to the style guidelines enforced by automated tools. Code 
 ```bash
 # Format all C files
 cd NeuronDB
-./scripts/run_pgindent.sh
+./scripts/neurondb_format.sh
 
 # Check formatting without modifying files
-./scripts/run_pgindent.sh --check
+./scripts/neurondb_format.sh --check
 
 # Show diff of formatting changes
-./scripts/run_pgindent.sh --diff
+./scripts/neurondb_format.sh --diff
 ```
 
 **Style Rules:**
@@ -295,7 +295,7 @@ cd ../NeuronMCP
 go test ./...
 
 # Integration tests
-./scripts/verify_neurondb_integration.sh
+./NeuronAgent/scripts/neuronagent_verify.sh
 ```
 
 ### Style Enforcement

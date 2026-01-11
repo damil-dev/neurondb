@@ -73,9 +73,9 @@ You should see five services running:
 
 | Service | Status | Description |
 |---------|--------|-------------|
-| `neurondb-cpu` | healthy | PostgreSQL with NeuronDB extension |
+| `neurondb` | healthy | PostgreSQL with NeuronDB extension |
 | `neuronagent` | healthy | REST API server |
-| `neurondb-mcp` | healthy | MCP protocol server |
+| `neuronmcp` | healthy | MCP protocol server |
 | `neurondesk-api` | healthy | NeuronDesktop API server |
 | `neurondesk-frontend` | healthy | NeuronDesktop web interface |
 
@@ -488,6 +488,118 @@ See component-specific documentation for detailed configuration options.
 - **Documentation:**See [readme.md](readme.md) for detailed documentation
 - **Issues:**Check service logs: `docker compose logs [service-name]`
 - **Support:**Contact support@neurondb.ai
+
+## Quickstart with Sample Data
+
+Get started immediately with pre-generated sample data:
+
+```bash
+# Set up quickstart data pack (200 sample documents with embeddings)
+./scripts/neurondb-quickstart-data.sh
+```
+
+This script will:
+- Generate 200 sample documents with pre-computed embeddings
+- Create the `quickstart_documents` table
+- Create an HNSW index for fast similarity search
+- Verify the setup
+
+**Try a similarity search:**
+
+```bash
+psql "postgresql://neurondb:neurondb@localhost:5433/neurondb" <<EOF
+WITH q AS (SELECT embed_text('machine learning') AS query_vec)
+SELECT title, 1 - (embedding <=> q.query_vec) AS similarity
+FROM quickstart_documents, q
+ORDER BY embedding <=> q.query_vec
+LIMIT 5;
+EOF
+```
+
+For more details, see [Quickstart Data Pack documentation](examples/quickstart-data/README.md).
+
+## SQL Recipes
+
+Explore ready-to-run SQL recipes for common patterns:
+
+**Vector Search Recipes:**
+- Basic similarity search
+- Filtered search with metadata
+- Multiple distance metrics
+- Performance tuning
+
+**Hybrid Search Recipes:**
+- Text + vector combination
+- Weighted scoring
+- Reciprocal Rank Fusion (RRF)
+- Faceted search
+
+**Indexing Recipes:**
+- Create HNSW indexes
+- Create IVF indexes
+- Tune parameters
+- Index maintenance
+
+**RAG Patterns:**
+- Document chunking
+- Context retrieval
+- Reranking
+- Complete RAG pipeline
+
+**Quick start:**
+```bash
+# Run a vector search recipe
+psql "postgresql://neurondb:neurondb@localhost:5433/neurondb" \
+  -f examples/sql-recipes/vector-search/01_basic_similarity.sql
+```
+
+See [SQL Recipe Library](examples/sql-recipes/README.md) for all recipes.
+
+## CLI Helpers
+
+Use command-line helpers for common operations:
+
+### Create Vector Indexes
+
+```bash
+# Create HNSW index (default)
+./scripts/neurondb-create-index.sh \
+  --table quickstart_documents \
+  --column embedding
+
+# Create with custom parameters
+./scripts/neurondb-create-index.sh \
+  --table documents \
+  --column embedding \
+  --type hnsw \
+  --metric cosine \
+  --m 32 \
+  --ef-construction 128
+
+# Create IVF index
+./scripts/neurondb-create-index.sh \
+  --table documents \
+  --column embedding \
+  --type ivf \
+  --lists 50
+```
+
+### Load Embedding Models
+
+```bash
+# Load a HuggingFace embedding model
+./scripts/neurondb-load-model.sh \
+  --name mini_lm \
+  --model sentence-transformers/all-MiniLM-L6-v2
+
+# Load with custom configuration
+./scripts/neurondb-load-model.sh \
+  --name mpnet \
+  --model sentence-transformers/all-mpnet-base-v2 \
+  --config '{"batch_size": 64}'
+```
+
+For more details, see the [Scripts README](scripts/README.md).
 
 ## Next Steps
 
