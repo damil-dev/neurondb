@@ -3832,10 +3832,10 @@ hnswInsertNode(Relation index,
 				/* Final validation before calling HnswGetNeighborsSafe to catch any issues */
 				if (entryNode->dim <= 0 || entryNode->dim > 32767)
 				{
-					elog(ERROR,
-						 (errcode(ERRCODE_DATA_CORRUPTED),
-						  errmsg("hnsw: entry node dim %d is invalid (expected %d) - index corruption at block %u",
-								 entryNode->dim, dim, bestEntry)));
+					ereport(ERROR,
+							(errcode(ERRCODE_DATA_CORRUPTED),
+							 errmsg("hnsw: entry node dim %d is invalid (expected %d) - index corruption at block %u",
+									entryNode->dim, dim, bestEntry)));
 				}
 				
 				entryNeighbors = HnswGetNeighborsSafe(entryNode, level, metaPage->m);
@@ -5105,14 +5105,14 @@ hnswdelete(Relation index,
 	{
 		elog(WARNING, "hnsw: page %u is new or empty, cannot delete node at offset %u", nodeBlkno, nodeOffset);
 		UnlockReleaseBuffer(nodeBuf);
-		return;
+		return false;
 	}
 	
 	if (PageGetMaxOffsetNumber(nodePage) < nodeOffset)
 	{
 		elog(WARNING, "hnsw: offset %u exceeds max offset on page %u", nodeOffset, nodeBlkno);
 		UnlockReleaseBuffer(nodeBuf);
-		return;
+		return false;
 	}
 	
 	{
@@ -5121,7 +5121,7 @@ hnswdelete(Relation index,
 		{
 			elog(WARNING, "hnsw: invalid ItemId at offset %u on page %u", nodeOffset, nodeBlkno);
 			UnlockReleaseBuffer(nodeBuf);
-			return;
+			return false;
 		}
 		
 		node = (HnswNode) PageGetItem(nodePage, deleteItemId);
@@ -5131,7 +5131,7 @@ hnswdelete(Relation index,
 	{
 		elog(WARNING, "hnsw: failed to read node at offset %u on page %u", nodeOffset, nodeBlkno);
 		UnlockReleaseBuffer(nodeBuf);
-		return;
+		return false;
 	}
 	
 	/* Validate node structure before use */
@@ -5139,7 +5139,7 @@ hnswdelete(Relation index,
 	{
 		elog(WARNING, "hnsw: node at offset %u on page %u has invalid dim %d", nodeOffset, nodeBlkno, node->dim);
 		UnlockReleaseBuffer(nodeBuf);
-		return;
+		return false;
 	}
 
 	/* Validate node level */

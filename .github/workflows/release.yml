@@ -46,8 +46,8 @@ jobs:
             -t ghcr.io/neurondb/neurondb-postgres:${{ steps.version.outputs.version }} \
             -t ghcr.io/neurondb/neurondb-postgres:latest \
             --push \
-            -f NeuronDB/docker/Dockerfile \
-            NeuronDB/
+            -f dockers/neurondb/Dockerfile \
+            .
       
       - name: Build NeuronAgent image
         run: |
