@@ -15,7 +15,7 @@
 
 MODULE_big = neurondb
 EXTENSION = neurondb
-DATA = neurondb--1.0.sql
+DATA = neurondb--1.0.sql neurondb--2.0.sql neurondb--1.0--2.0.sql
 DOCS = README.md
 
 PG_CPPFLAGS += -I$(srcdir)/include
