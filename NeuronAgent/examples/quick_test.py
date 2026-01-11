@@ -40,7 +40,7 @@ try:
 except Exception as e:
     if "401" in str(e) or "Authentication" in str(e):
         print("   ⚠️  API accessible but authentication required (expected)")
-        print("   Generate API key: ./scripts/generate_api_keys.sh")
+        print("   Generate API key: ./scripts/neuronagent_generate_keys.sh")
     else:
         print(f"   ✗ API error: {e}")
 

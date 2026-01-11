@@ -28,7 +28,7 @@ NeuronAgent is an AI agent runtime system that provides:
 3. **API Key**
    ```bash
    # Generate an API key
-   ./scripts/generate_api_keys.sh
+   ./scripts/neuronagent_generate_keys.sh
    
    # Or set environment variable
    export NEURONAGENT_API_KEY=your_api_key_here

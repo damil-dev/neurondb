@@ -1,11 +1,21 @@
 #!/bin/bash
+# ====================================================================
+# NeuronAgent Integration Verification
+# ====================================================================
 # Comprehensive NeuronAgent-NeuronDB Integration Verification Script
 # Tests all integration points between NeuronAgent and NeuronDB
-# Based on the integration verification plan
+# ====================================================================
 
 set -e
 
 cd "$(dirname "$0")/.."
+SCRIPT_NAME=$(basename "$0")
+
+# Version
+VERSION="2.0.0"
+
+# Default values
+VERBOSE=false
 
 # Colors
 GREEN='\033[0;32m'
@@ -21,6 +31,97 @@ DB_NAME="${DB_NAME:-neurondb}"
 DB_HOST="${DB_HOST:-localhost}"
 DB_PORT="${DB_PORT:-5433}"
 SERVER_URL="${SERVER_URL:-http://localhost:8080}"
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+	case $1 in
+		-D|--database)
+			DB_NAME="$2"
+			shift 2
+			;;
+		-U|--user)
+			DB_USER="$2"
+			shift 2
+			;;
+		-H|--host)
+			DB_HOST="$2"
+			shift 2
+			;;
+		-p|--port)
+			DB_PORT="$2"
+			shift 2
+			;;
+		--server-url)
+			SERVER_URL="$2"
+			shift 2
+			;;
+		-v|--verbose)
+			VERBOSE=true
+			shift
+			;;
+		-V|--version)
+			echo "neuronagent_verify.sh version $VERSION"
+			exit 0
+			;;
+		-h|--help)
+			cat << EOF
+NeuronAgent Integration Verification
+
+Usage:
+    $SCRIPT_NAME [OPTIONS]
+
+Description:
+    Comprehensive NeuronAgent-NeuronDB Integration Verification Script
+    Tests all integration points between NeuronAgent and NeuronDB
+
+Options:
+    -D, --database DB      Database name (default: neurondb)
+    -U, --user USER        Database user (default: neurondb)
+    -H, --host HOST        Database host (default: localhost)
+    -p, --port PORT        Database port (default: 5433)
+    --server-url URL       NeuronAgent server URL (default: http://localhost:8080)
+    -v, --verbose          Enable verbose output
+    -V, --version          Show version information
+    -h, --help             Show this help message
+
+Environment Variables:
+    DB_USER       Database user (default: neurondb)
+    DB_NAME       Database name (default: neurondb)
+    DB_HOST       Database host (default: localhost)
+    DB_PORT       Database port (default: 5433)
+    SERVER_URL    NeuronAgent server URL (default: http://localhost:8080)
+
+Examples:
+    # Basic usage
+    $SCRIPT_NAME
+
+    # Custom database and server
+    $SCRIPT_NAME -D mydb --server-url http://localhost:9090
+
+    # With verbose output
+    $SCRIPT_NAME --verbose
+
+EOF
+			exit 0
+			;;
+		*)
+			echo -e "${RED}Unknown option: $1${NC}" >&2
+			echo "Use -h or --help for usage information" >&2
+			exit 1
+			;;
+	esac
+done
+
+if [ "$VERBOSE" = true ]; then
+	echo "========================================"
+	echo "NeuronAgent Integration Verification"
+	echo "========================================"
+	echo "Database: $DB_HOST:$DB_PORT/$DB_NAME"
+	echo "User: $DB_USER"
+	echo "Server URL: $SERVER_URL"
+	echo "========================================"
+	echo ""
+fi
 
 # Test counters
 TESTS_PASSED=0
@@ -160,7 +261,7 @@ else
             echo "    export DB_NAME=neurondb"
             echo "    export DB_PASSWORD=neurondb  # or PGPASSWORD"
             echo ""
-            echo "  Then run: ./scripts/verify_neurondb_integration.sh"
+            echo "  Then run: ./scripts/neuronagent_verify.sh"
             echo ""
             echo "  Note: Most verification tests require a running database."
             exit 1

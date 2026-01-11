@@ -78,9 +78,9 @@ docker compose ps neurondb
 psql "postgresql://neurondb:neurondb@localhost:5433/neurondb" -c "CREATE EXTENSION IF NOT EXISTS neurondb;"
 
 # Run NeuronAgent migrations
-psql "postgresql://neurondb:neurondb@localhost:5433/neurondb" -f NeuronAgent/sql/001_initial_schema.sql
-psql "postgresql://neurondb:neurondb@localhost:5433/neurondb" -f NeuronAgent/sql/002_add_indexes.sql
-psql "postgresql://neurondb:neurondb@localhost:5433/neurondb" -f NeuronAgent/sql/003_add_triggers.sql
+psql "postgresql://neurondb:neurondb@localhost:5433/neurondb" -f NeuronAgent/sql/neuronagent_initial_schema.sql
+psql "postgresql://neurondb:neurondb@localhost:5433/neurondb" -f NeuronAgent/sql/neuronagent_add_indexes.sql
+psql "postgresql://neurondb:neurondb@localhost:5433/neurondb" -f NeuronAgent/sql/neuronagent_add_triggers.sql
 ```
 
 **Option 2: Native PostgreSQL Installation**
@@ -90,9 +90,9 @@ createdb neurondb
 psql -d neurondb -c "CREATE EXTENSION neurondb;"
 
 # Run migrations
-psql -d neurondb -f sql/001_initial_schema.sql
-psql -d neurondb -f sql/002_add_indexes.sql
-psql -d neurondb -f sql/003_add_triggers.sql
+psql -d neurondb -f sql/neuronagent_initial_schema.sql
+psql -d neurondb -f sql/neuronagent_add_indexes.sql
+psql -d neurondb -f sql/neuronagent_add_triggers.sql
 ```
 
 ### Configuration
@@ -123,13 +123,34 @@ See [Deployment Guide](docs/DEPLOYMENT.md) for complete configuration options.
 
 ### Run Service
 
+#### Automated Installation (Recommended)
+
+Use the installation script for easy setup:
+
+```bash
+# From repository root
+sudo ./scripts/install-neuronagent.sh
+
+# With system service enabled
+sudo ./scripts/install-neuronagent.sh --enable-service
+```
+
+#### Manual Build and Run
+
 From source:
 
 ```bash
 go run cmd/agent-server/main.go
 ```
 
-Using Docker:
+Or build and run:
+
+```bash
+make build
+./bin/neuronagent
+```
+
+#### Using Docker
 
 **Option 1: Root docker-compose.yml (Recommended)**
 ```bash
@@ -152,6 +173,10 @@ docker compose up -d
 ```
 
 See [Docker Guide](docker/readme.md) for Docker deployment details.
+
+#### Running as a Service
+
+For systemd (Linux) or launchd (macOS), see [Service Management Guide](../../Docs/getting-started/installation-services.md).
 
 ### Verify Installation
 

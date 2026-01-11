@@ -496,7 +496,7 @@ def main():
     if not os.getenv('NEURONAGENT_API_KEY'):
         print("\n✗ Error: NEURONAGENT_API_KEY environment variable not set")
         print("   Set it with: export NEURONAGENT_API_KEY=your_api_key")
-        print("   Or generate one using: ./scripts/generate_api_keys.sh")
+        print("   Or generate one using: ./scripts/neuronagent_generate_keys.sh")
         sys.exit(1)
     
     try:

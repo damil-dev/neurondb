@@ -34,7 +34,7 @@ run: build
 # Run database migrations
 migrate:
 	@echo "Running migrations..."
-	@./scripts/run_migrations.sh
+	@./scripts/neuronagent_migrate.sh
 
 # Format code
 fmt:
@@ -70,5 +70,5 @@ deps:
 # Generate API keys
 generate-key:
 	@echo "Generating API key..."
-	@./scripts/generate_api_keys.sh
+	@./scripts/neuronagent_generate_keys.sh
 

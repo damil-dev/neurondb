@@ -24,7 +24,7 @@ curl http://localhost:8080/health
 ```bash
 # Generate an API key
 cd /path/to/NeuronAgent
-./scripts/generate_api_keys.sh
+./scripts/neuronagent_generate_keys.sh
 
 # Or set manually
 export NEURONAGENT_API_KEY=your_api_key_here
