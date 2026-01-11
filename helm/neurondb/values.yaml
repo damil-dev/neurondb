@@ -17,9 +17,9 @@ neurondb:
     version: "17"
     database: "neurondb"
     username: "neurondb"
-    password: "" # Set via secret
+    password: ""  # Set via secret
     port: 5432
-    config: "" # Optional postgresql.conf content
+    config: ""  # Optional postgresql.conf content
     # External PostgreSQL configuration
     external:
       enabled: false  # Set to true to use external PostgreSQL
