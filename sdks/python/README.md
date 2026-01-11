@@ -1,89 +1,57 @@
-# NeuronDB Python SDK
+# NeuronMCP Python SDK
 
-Python client libraries for NeuronDB ecosystem components.
+A comprehensive Python SDK for interacting with NeuronMCP (Model Context Protocol) server.
+
+## Features
+
+- ✅ Full MCP protocol support
+- ✅ Async/await support
+- ✅ Type hints throughout
+- ✅ Comprehensive error handling
+- ✅ Automatic retry logic
+- ✅ Connection pooling
+- ✅ Request/response logging
 
 ## Installation
 
 ```bash
-pip install neuronagent
-# Or from source
-pip install -e ./neuronagent
+pip install neurondb-mcp-python
 ```
 
-## Usage
-
-### NeuronAgent
+## Quick Start
 
 ```python
-from neuronagent import NeuronAgentClient
+import asyncio
+from neurondb_mcp import NeuronMCPClient
 
-# Initialize client
-client = NeuronAgentClient(
-    base_url="http://localhost:8080",
-    api_key="your-api-key"
-)
+async def main():
+    async with NeuronMCPClient("http://localhost:8080", api_key="your-api-key") as client:
+        # List all available tools
+        tools = await client.list_tools()
+        print(f"Available tools: {len(tools)}")
+        
+        # Call a tool
+        result = await client.call_tool("vector_search", {
+            "table": "documents",
+            "vector_column": "embedding",
+            "query_vector": [0.1, 0.2, 0.3],
+            "limit": 10
+        })
+        
+        print(f"Results: {result.content}")
 
-# Create an agent
-agent = client.agents.create_agent(
-    name="my-agent",
-    system_prompt="You are a helpful assistant",
-    model_name="gpt-4",
-    enabled_tools=["sql", "http"]
-)
-
-# Create a session
-session = client.sessions.create_session(agent_id=agent.id)
-
-# Send a message
-response = client.sessions.send_message(
-    session_id=session.id,
-    content="What is the weather today?"
-)
-
-print(response.content)
-```
-
-### NeuronDB (Direct SQL)
-
-```python
-import psycopg2
-from neurondb import NeuronDBClient
-
-# Connect to NeuronDB
-conn = psycopg2.connect(
-    host="localhost",
-    port=5433,
-    database="neurondb",
-    user="neurondb",
-    password="neurondb"
-)
-
-# Use NeuronDB functions
-with conn.cursor() as cur:
-    # Vector search
-    cur.execute("""
-        SELECT id, content, embedding <=> %s AS distance
-        FROM documents
-        ORDER BY embedding <=> %s
-        LIMIT 10
-    """, (query_vector, query_vector))
-    
-    results = cur.fetchall()
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ## Examples
 
-See `examples/` directory for complete examples:
-- `basic_agent.py` - Basic agent usage
-- `rag_pipeline.py` - RAG pipeline example
-- `vector_search.py` - Vector search example
+See the `examples/` directory for more comprehensive examples.
 
-## API Reference
+## Documentation
 
-Full API documentation is available at:
-- NeuronAgent: https://www.neurondb.ai/docs/neuronagent/api
+Full documentation available at: https://docs.neurondb.com/mcp/python-sdk
 
+## License
 
-
-
-
+MIT License
