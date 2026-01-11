@@ -1,0 +1,52 @@
+---
+# Maintenance operations playbook
+
+- name: System Maintenance
+  hosts: all
+  become: yes
+  gather_facts: yes
+
+  tasks:
+    - name: Update system packages (Debian/Ubuntu)
+      apt:
+        update_cache: yes
+        upgrade: dist
+      when: ansible_os_family == "Debian"
+
+    - name: Update system packages (RHEL/CentOS/Rocky)
+      yum:
+        name: "*"
+        state: latest
+      when: ansible_os_family == "RedHat"
+
+    - name: Run database VACUUM
+      shell: |
+        psql -h localhost -U {{ neuronagent_db_user | default('neurondb') }} -d {{ neuronagent_db_name | default('neurondb') }} -c "VACUUM ANALYZE;"
+      become_user: "{{ postgresql_user }}"
+      register: vacuum_result
+      changed_when: false
+
+    - name: Display VACUUM result
+      debug:
+        msg: "{{ vacuum_result.stdout }}"
+
+    - name: Clean old log files
+      find:
+        paths: "{{ neurondb_log_dir }}"
+        patterns: "*.log.*"
+        age: "{{ backup_retention_days | default(30) }}"
+      register: old_logs
+
+    - name: Remove old log files
+      file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ old_logs.files }}"
+      when: old_logs.files | length > 0
+
+    - name: Clean old backups
+      shell: |
+        find {{ backup_dir | default('/backups/neurondb') }} -name "*.dump" -mtime +{{ backup_retention_days | default(30) }} -delete
+      changed_when: false
+      failed_when: false
+

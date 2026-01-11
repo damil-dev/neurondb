@@ -1,0 +1,37 @@
+[Unit]
+Description=NeuronDesktop API
+After=network.target postgresql.service neuronagent.service
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=neurondb
+Group=neurondb
+WorkingDirectory=/opt/neurondb/neurondesktop/bin
+Environment="DB_HOST=localhost"
+Environment="DB_PORT=5432"
+Environment="DB_NAME=neurondesk"
+Environment="DB_USER=neurondesk"
+Environment="DB_PASSWORD=changeme"
+Environment="SERVER_PORT=8081"
+Environment="NEURONAGENT_ENDPOINT=http://localhost:8080"
+Environment="NEURONAGENT_API_KEY="
+Environment="LOG_LEVEL=info"
+ExecStart=/opt/neurondb/neurondesktop/bin/neurondesk-api
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=neurondesk-api
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=32768
+
+[Install]
+WantedBy=multi-user.target
+

@@ -1,0 +1,11 @@
+---
+# Example host-specific variables
+# Copy this file and rename it to match your hostname
+
+# Override global variables for this specific host
+# postgresql_max_connections: 300
+# neurondb_maintenance_work_mem: "1GB"
+
+# Host-specific paths (if different from defaults)
+# neurondb_base_dir: "/custom/path/neurondb"
+

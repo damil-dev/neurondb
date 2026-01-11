@@ -1,0 +1,81 @@
+---
+# Backup and restore operations playbook
+
+- name: Backup NeuronDB
+  hosts: all
+  become: yes
+  gather_facts: yes
+
+  tasks:
+    - name: Create backup directory
+      file:
+        path: "{{ backup_dir | default('/backups/neurondb') }}"
+        state: directory
+        mode: '0755'
+
+    - name: Create database backup using pg_dump
+      shell: |
+        mkdir -p {{ backup_dir | default('/backups/neurondb') }}
+        pg_dump -h {{ neuronagent_db_host | default('localhost') }} \
+                -p {{ neuronagent_db_port | default(5432) }} \
+                -U {{ neuronagent_db_user | default('neurondb') }} \
+                -d {{ neuronagent_db_name | default('neurondb') }} \
+                -F c \
+                -f {{ backup_dir | default('/backups/neurondb') }}/neurondb_backup_$(date +%Y%m%d_%H%M%S).dump
+      environment:
+        PGPASSWORD: "{{ neuronagent_db_password }}"
+      register: backup_result
+      no_log: true
+      changed_when: backup_result.rc == 0
+
+    - name: Display backup information
+      debug:
+        msg: "{{ backup_result.stdout }}"
+
+- name: Restore NeuronDB
+  hosts: all
+  become: yes
+  gather_facts: yes
+  vars:
+    backup_file: "{{ backup_file_path | mandatory }}"
+
+  tasks:
+    - name: Verify backup file exists
+      stat:
+        path: "{{ backup_file }}"
+      register: backup_stat
+
+    - name: Fail if backup file does not exist
+      fail:
+        msg: "Backup file {{ backup_file }} does not exist"
+      when: not backup_stat.stat.exists
+
+    - name: Restore database from backup using pg_restore
+      shell: |
+        pg_restore -h {{ neuronagent_db_host | default('localhost') }} \
+                   -p {{ neuronagent_db_port | default(5432) }} \
+                   -U {{ neuronagent_db_user | default('neurondb') }} \
+                   -d {{ neuronagent_db_name | default('neurondb') }} \
+                   -c \
+                   {{ backup_file }}
+      environment:
+        PGPASSWORD: "{{ neuronagent_db_password }}"
+      register: restore_result
+      no_log: true
+      changed_when: restore_result.rc == 0
+
+    - name: Display restore information
+      debug:
+        msg: "{{ restore_result.stdout }}"
+
+    - name: Verify restore
+      shell: |
+        psql -h localhost -U {{ neuronagent_db_user | default('neurondb') }} -d {{ neuronagent_db_name | default('neurondb') }} -c "SELECT COUNT(*) FROM pg_tables WHERE schemaname = 'public';"
+      become_user: "{{ postgresql_user }}"
+      register: verify_result
+      changed_when: false
+
+    - name: Display verification result
+      debug:
+        msg: "Restore verified: {{ verify_result.stdout }}"
+

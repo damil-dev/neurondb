@@ -1,0 +1,30 @@
+[Unit]
+Description=NeuronDesktop Frontend
+After=network.target neurondesk-api.service
+Requires=neurondesk-api.service
+
+[Service]
+Type=simple
+User=neurondb
+Group=neurondb
+WorkingDirectory=/opt/neurondb/neurondesktop/frontend
+Environment="NEXT_PUBLIC_API_URL=http://localhost:8081/api/v1"
+Environment="PORT=3000"
+ExecStart=/usr/bin/npm start
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=neurondesk-frontend
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=32768
+
+[Install]
+WantedBy=multi-user.target
+

@@ -1,0 +1,32 @@
+---
+# Staging environment variables (production-like)
+
+# Resource allocation
+postgresql_max_connections: 100
+postgresql_shared_buffers: "256MB"
+postgresql_effective_cache_size: "1GB"
+neurondb_maintenance_work_mem: "256MB"
+
+# Logging
+log_level: "info"
+log_format: "json"
+
+# Debugging
+debug_mode: false
+enable_profiling: false
+
+# Service configuration
+neuronagent_workers: 3
+neuronagent_port: 8080
+neuronmcp_http_addr: ":8082"
+neurondesktop_api_port: 8081
+neurondesktop_frontend_port: 3000
+
+# Security
+security_hardening: true
+fail2ban_enabled: true
+firewall_enabled: true
+
+# Monitoring
+enable_monitoring: true
+

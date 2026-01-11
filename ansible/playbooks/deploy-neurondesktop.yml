@@ -1,0 +1,33 @@
+---
+# NeuronDesktop deployment playbook
+
+- name: Deploy NeuronDesktop
+  hosts: all
+  become: yes
+  gather_facts: yes
+
+  pre_tasks:
+    - name: Ensure NeuronAgent is installed
+      fail:
+        msg: "NeuronAgent must be installed before NeuronDesktop"
+      when: not install_neuronagent | default(true)
+
+  roles:
+    - role: neurondesktop
+      when: install_neurondesktop | default(true)
+
+  post_tasks:
+    - name: Verify NeuronDesktop API health
+      uri:
+        url: "http://localhost:{{ neurondesktop_api_port }}/health"
+        method: GET
+        status_code: 200
+      register: api_health
+      until: api_health.status == 200
+      retries: 5
+      delay: 3
+
+    - name: Display NeuronDesktop status
+      debug:
+        msg: "NeuronDesktop API is running and healthy"
+

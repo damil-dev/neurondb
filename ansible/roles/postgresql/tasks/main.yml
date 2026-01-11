@@ -1,0 +1,113 @@
+---
+# PostgreSQL installation and configuration
+
+- name: Add PostgreSQL repository key (Debian/Ubuntu)
+  apt_key:
+    url: https://www.postgresql.org/media/keys/ACCC4CF8.asc
+    keyring: /usr/share/keyrings/postgresql.gpg
+    state: present
+  when: ansible_os_family == "Debian"
+
+- name: Add PostgreSQL repository (Debian/Ubuntu)
+  apt_repository:
+    repo: "deb [signed-by=/usr/share/keyrings/postgresql.gpg] http://apt.postgresql.org/pub/repos/apt {{ ansible_distribution_release }}-pgdg main"
+    filename: pgdg
+    state: present
+  when: ansible_os_family == "Debian"
+
+- name: Add PostgreSQL repository (RHEL/CentOS/Rocky)
+  yum_repository:
+    name: pgdg{{ postgresql_version }}
+    description: PostgreSQL {{ postgresql_version }} official repository
+    baseurl: "https://download.postgresql.org/pub/repos/yum/{{ postgresql_version }}/redhat/rhel-{{ ansible_distribution_major_version }}-{{ ansible_architecture }}"
+    gpgcheck: yes
+    gpgkey: https://download.postgresql.org/pub/repos/yum/RPM-GPG-KEY-PGDG
+    enabled: yes
+  when: ansible_os_family == "RedHat"
+
+- name: Disable built-in PostgreSQL module (RHEL/CentOS/Rocky)
+  command: dnf -qy module disable postgresql
+  when: ansible_os_family == "RedHat"
+  changed_when: false
+
+- name: Install PostgreSQL and development packages (Debian/Ubuntu)
+  apt:
+    name:
+      - "postgresql-{{ postgresql_version }}"
+      - "postgresql-server-dev-{{ postgresql_version }}"
+      - "postgresql-contrib-{{ postgresql_version }}"
+    state: present
+    update_cache: yes
+  when: ansible_os_family == "Debian"
+  notify: restart postgresql
+
+- name: Install PostgreSQL and development packages (RHEL/CentOS/Rocky)
+  yum:
+    name:
+      - "postgresql{{ postgresql_version }}"
+      - "postgresql{{ postgresql_version }}-server"
+      - "postgresql{{ postgresql_version }}-devel"
+      - "postgresql{{ postgresql_version }}-contrib"
+    state: present
+  when: ansible_os_family == "RedHat"
+  notify: restart postgresql
+
+- name: Initialize PostgreSQL database (if not exists)
+  command: "{{ postgresql_bin_dir }}/initdb -D {{ postgresql_data_dir }}"
+  args:
+    creates: "{{ postgresql_data_dir }}/PG_VERSION"
+  when: ansible_os_family == "RedHat"
+  become_user: "{{ postgresql_user }}"
+
+- name: Configure PostgreSQL
+  template:
+    src: postgresql.conf.j2
+    dest: "{{ postgresql_config_dir }}/postgresql.conf"
+    owner: "{{ postgresql_user }}"
+    group: "{{ postgresql_group }}"
+    mode: '0644'
+  notify: restart postgresql
+
+- name: Configure pg_hba.conf
+  template:
+    src: pg_hba.conf.j2
+    dest: "{{ postgresql_config_dir }}/pg_hba.conf"
+    owner: "{{ postgresql_user }}"
+    group: "{{ postgresql_group }}"
+    mode: '0640'
+  notify: reload postgresql
+
+- name: Ensure PostgreSQL is running and enabled
+  systemd:
+    name: "{{ postgresql_service_name }}"
+    enabled: yes
+    state: started
+
+- name: Wait for PostgreSQL to be ready
+  wait_for:
+    port: 5432
+    host: localhost
+    delay: 5
+    timeout: 30
+
+- name: Create NeuronDB database user
+  shell: |
+    psql -h localhost -U postgres -c "CREATE USER {{ neurondb_database_user | default('neurondb') }} WITH PASSWORD '{{ neurondb_database_password | default('changeme') }}';" || true
+  become_user: "{{ postgresql_user }}"
+  no_log: true
+  register: create_user
+  changed_when: "'already exists' not in create_user.stderr"
+
+- name: Create NeuronDB database
+  shell: |
+    psql -h localhost -U postgres -c "CREATE DATABASE {{ neurondb_database_name | default('neurondb') }} OWNER {{ neurondb_database_user | default('neurondb') }};" || true
+  become_user: "{{ postgresql_user }}"
+  register: create_db
+  changed_when: "'already exists' not in create_db.stderr"
+
+- name: Grant privileges to database user
+  shell: |
+    psql -h localhost -U postgres -d {{ neurondb_database_name | default('neurondb') }} -c "GRANT ALL PRIVILEGES ON DATABASE {{ neurondb_database_name | default('neurondb') }} TO {{ neurondb_database_user | default('neurondb') }};"
+  become_user: "{{ postgresql_user }}"
+  when: create_db.changed or create_user.changed
+

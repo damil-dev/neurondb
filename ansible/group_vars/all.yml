@@ -1,0 +1,53 @@
+---
+# Global variables for all hosts
+
+# NeuronDB versions
+neurondb_version: "2.0.0"
+postgresql_version: "17"
+go_version: "1.24"
+nodejs_version: "20"
+
+# Installation paths
+neurondb_base_dir: "/opt/neurondb"
+neurondb_data_dir: "/var/lib/neurondb"
+neurondb_log_dir: "/var/log/neurondb"
+neurondb_config_dir: "/etc/neurondb"
+
+# PostgreSQL configuration
+postgresql_data_dir: "/var/lib/postgresql/{{ postgresql_version }}/main"
+postgresql_config_dir: "/etc/postgresql/{{ postgresql_version }}/main"
+
+# Service users
+neurondb_user: "neurondb"
+neurondb_group: "neurondb"
+postgresql_user: "postgres"
+postgresql_group: "postgres"
+
+# Component installation flags
+install_neurondb: true
+install_neuronagent: true
+install_neuronmcp: true
+install_neurondesktop: true
+
+# Build options
+build_from_source: false
+enable_ml_libraries: false  # XGBoost, LightGBM, CatBoost
+
+# Network configuration
+firewall_enabled: true
+ssh_port: 22
+
+# Monitoring
+enable_monitoring: false
+prometheus_port: 9090
+grafana_port: 3000
+
+# Backup configuration
+backup_enabled: true
+backup_retention_days: 30
+backup_schedule: "0 2 * * *"  # Daily at 2 AM
+
+# Security
+security_hardening: true
+fail2ban_enabled: true
+

@@ -1,0 +1,14 @@
+---
+# Monitoring setup (Prometheus, Grafana)
+# Optional role for monitoring infrastructure
+
+- name: Install Prometheus (optional)
+  debug:
+    msg: "Monitoring setup - implement based on requirements"
+  when: enable_monitoring | default(false)
+
+- name: Install Grafana (optional)
+  debug:
+    msg: "Grafana setup - implement based on requirements"
+  when: enable_monitoring | default(false)
+

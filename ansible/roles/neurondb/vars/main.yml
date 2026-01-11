@@ -1,0 +1,10 @@
+---
+# Default variables for NeuronDB role
+
+neurondb_source_dir: "/opt/neurondb-source"
+neurondb_repo_url: "https://github.com/neurondb/neurondb.git"
+
+# PostgreSQL paths (will be set based on version)
+postgresql_lib_dir: "/usr/lib/postgresql/{{ postgresql_version }}/lib"
+postgresql_share_dir: "/usr/share/postgresql/{{ postgresql_version }}/extension"
+

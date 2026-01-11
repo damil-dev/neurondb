@@ -1,0 +1,8 @@
+---
+# Handlers for NeuronDB role
+
+- name: restart postgresql
+  systemd:
+    name: "{{ postgresql_service_name }}"
+    state: restarted
+

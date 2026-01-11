@@ -1,0 +1,50 @@
+---
+# NeuronAgent deployment playbook
+
+- name: Deploy NeuronAgent
+  hosts: all
+  become: yes
+  gather_facts: yes
+
+  pre_tasks:
+    - name: Ensure NeuronDB is installed
+      fail:
+        msg: "NeuronDB must be installed before NeuronAgent"
+      when: not install_neurondb | default(true)
+
+  roles:
+    - role: neuronagent
+      when: install_neuronagent | default(true)
+
+  post_tasks:
+    - name: Verify NeuronAgent health
+      uri:
+        url: "http://localhost:{{ neuronagent_port }}/health"
+        method: GET
+        status_code: 200
+      register: health_check
+      until: health_check.status == 200
+      retries: 5
+      delay: 3
+
+    - name: Display NeuronAgent status
+      debug:
+        msg: "NeuronAgent is running and healthy"
+
+    - name: Check if health check script exists
+      stat:
+        path: "{{ ansible_env.HOME }}/neurondb/scripts/neurondb-healthcheck.sh"
+      register: healthcheck_script
+      delegate_to: localhost
+      run_once: true
+
+    - name: Run health check script (if available)
+      shell: |
+        cd {{ ansible_env.HOME }}/neurondb
+        ./scripts/neurondb-healthcheck.sh health --agent-url http://localhost:{{ neuronagent_port }}
+      when: healthcheck_script.stat.exists | default(false)
+      changed_when: false
+      failed_when: false
+      delegate_to: localhost
+      run_once: true
+

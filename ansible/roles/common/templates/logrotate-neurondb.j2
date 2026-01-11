@@ -1,0 +1,14 @@
+{{ neurondb_log_dir }}/*.log {
+    daily
+    rotate {{ backup_retention_days | default(30) }}
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0644 {{ neurondb_user }} {{ neurondb_group }}
+    sharedscripts
+    postrotate
+        systemctl reload neurondb > /dev/null 2>&1 || true
+    endscript
+}
+

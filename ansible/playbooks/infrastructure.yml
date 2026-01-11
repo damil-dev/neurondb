@@ -1,0 +1,158 @@
+---
+# Infrastructure provisioning playbook
+# Handles OS-level setup: firewall, system tuning, certificates, etc.
+
+- name: Provision Infrastructure
+  hosts: all
+  become: yes
+  gather_facts: yes
+
+  roles:
+    - role: common
+
+  tasks:
+    - name: Configure firewall (UFW for Debian/Ubuntu)
+      block:
+        - name: Install UFW
+          apt:
+            name: ufw
+            state: present
+          when: ansible_os_family == "Debian"
+
+        - name: Allow SSH
+          ufw:
+            rule: allow
+            port: "{{ ssh_port }}"
+            proto: tcp
+
+        - name: Allow PostgreSQL
+          ufw:
+            rule: allow
+            port: "5432"
+            proto: tcp
+
+        - name: Allow NeuronAgent
+          ufw:
+            rule: allow
+            port: "{{ neuronagent_port }}"
+            proto: tcp
+
+        - name: Allow NeuronMCP HTTP
+          ufw:
+            rule: allow
+            port: "8082"
+            proto: tcp
+
+        - name: Allow NeuronDesktop API
+          ufw:
+            rule: allow
+            port: "{{ neurondesktop_api_port }}"
+            proto: tcp
+
+        - name: Allow NeuronDesktop Frontend
+          ufw:
+            rule: allow
+            port: "{{ neurondesktop_frontend_port }}"
+            proto: tcp
+
+        - name: Enable UFW
+          ufw:
+            state: enabled
+      when: firewall_enabled | default(false) and ansible_os_family == "Debian"
+
+    - name: Configure firewall (firewalld for RHEL/CentOS/Rocky)
+      block:
+        - name: Install firewalld
+          yum:
+            name: firewalld
+            state: present
+          when: ansible_os_family == "RedHat"
+
+        - name: Start and enable firewalld
+          systemd:
+            name: firewalld
+            enabled: yes
+            state: started
+
+        - name: Allow SSH
+          firewalld:
+            port: "{{ ssh_port }}/tcp"
+            permanent: yes
+            state: enabled
+            immediate: yes
+
+        - name: Allow PostgreSQL
+          firewalld:
+            port: "5432/tcp"
+            permanent: yes
+            state: enabled
+            immediate: yes
+
+        - name: Allow NeuronAgent
+          firewalld:
+            port: "{{ neuronagent_port }}/tcp"
+            permanent: yes
+            state: enabled
+            immediate: yes
+
+        - name: Allow NeuronMCP HTTP
+          firewalld:
+            port: "8082/tcp"
+            permanent: yes
+            state: enabled
+            immediate: yes
+
+        - name: Allow NeuronDesktop API
+          firewalld:
+            port: "{{ neurondesktop_api_port }}/tcp"
+            permanent: yes
+            state: enabled
+            immediate: yes
+
+        - name: Allow NeuronDesktop Frontend
+          firewalld:
+            port: "{{ neurondesktop_frontend_port }}/tcp"
+            permanent: yes
+            state: enabled
+            immediate: yes
+      when: firewall_enabled | default(false) and ansible_os_family == "RedHat"
+
+    - name: Install and configure Fail2Ban
+      block:
+        - name: Install Fail2Ban (Debian/Ubuntu)
+          apt:
+            name: fail2ban
+            state: present
+          when: ansible_os_family == "Debian"
+
+        - name: Install Fail2Ban (RHEL/CentOS/Rocky)
+          yum:
+            name: fail2ban
+            state: present
+          when: ansible_os_family == "RedHat"
+
+        - name: Enable and start Fail2Ban
+          systemd:
+            name: fail2ban
+            enabled: yes
+            state: started
+      when: fail2ban_enabled | default(false)
+
+    - name: Configure SSL/TLS certificates (if enabled)
+      block:
+        - name: Create SSL certificate directory
+          file:
+            path: /etc/ssl/neurondb
+            state: directory
+            mode: '0755'
+
+        - name: Generate self-signed certificate (if not provided)
+          openssl_certificate:
+            path: /etc/ssl/neurondb/neurondb.crt
+            privatekey_path: /etc/ssl/neurondb/neurondb.key
+            common_name: "{{ ansible_fqdn | default(ansible_hostname) }}"
+            valid_in: 365
+            provider: selfsigned
+          when: ssl_enabled | default(false)
+      when: ssl_enabled | default(false)
+

@@ -1,0 +1,37 @@
+[Unit]
+Description=NeuronMCP - MCP Server for NeuronDB
+After=network.target postgresql.service
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=neurondb
+Group=neurondb
+WorkingDirectory=/opt/neurondb/neuronmcp/bin
+Environment="NEURONDB_HOST=localhost"
+Environment="NEURONDB_PORT=5432"
+Environment="NEURONDB_DATABASE=neurondb"
+Environment="NEURONDB_USER=neurondb"
+Environment="NEURONDB_PASSWORD=changeme"
+Environment="NEURONMCP_HTTP_ADDR=:8082"
+Environment="NEURONDB_LOG_LEVEL=info"
+Environment="NEURONDB_LOG_FORMAT=text"
+Environment="NEURONDB_LOG_OUTPUT=stderr"
+ExecStart=/opt/neurondb/neuronmcp/bin/neurondb-mcp
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=neuronmcp
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=32768
+
+[Install]
+WantedBy=multi-user.target
+

@@ -1,0 +1,41 @@
+---
+# Main orchestration playbook
+# Deploys complete NeuronDB ecosystem
+
+- name: Provision Infrastructure
+  import_playbook: infrastructure.yml
+
+- name: Deploy NeuronDB
+  import_playbook: deploy-neurondb.yml
+
+- name: Deploy NeuronAgent
+  import_playbook: deploy-neuronagent.yml
+
+- name: Deploy NeuronMCP
+  import_playbook: deploy-neuronmcp.yml
+
+- name: Deploy NeuronDesktop
+  import_playbook: deploy-neurondesktop.yml
+
+- name: Final Verification
+  hosts: all
+  become: yes
+  gather_facts: yes
+
+  tasks:
+    - name: Verify all services are running
+      systemd:
+        name: "{{ item }}"
+      register: service_status
+      loop:
+        - "{{ 'postgresql' if install_neurondb | default(true) else '' }}"
+        - "{{ 'neuronagent' if install_neuronagent | default(true) else '' }}"
+        - "{{ 'neuronmcp' if install_neuronmcp | default(true) else '' }}"
+        - "{{ 'neurondesk-api' if install_neurondesktop | default(true) else '' }}"
+        - "{{ 'neurondesk-frontend' if install_neurondesktop | default(true) else '' }}"
+      when: item != ""
+
+    - name: Display deployment summary
+      debug:
+        msg: "NeuronDB ecosystem deployment completed successfully"
+

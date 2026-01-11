@@ -1,0 +1,28 @@
+---
+# NeuronMCP deployment playbook
+
+- name: Deploy NeuronMCP
+  hosts: all
+  become: yes
+  gather_facts: yes
+
+  pre_tasks:
+    - name: Ensure NeuronDB is installed
+      fail:
+        msg: "NeuronDB must be installed before NeuronMCP"
+      when: not install_neurondb | default(true)
+
+  roles:
+    - role: neuronmcp
+      when: install_neuronmcp | default(true)
+
+  post_tasks:
+    - name: Verify NeuronMCP service status
+      systemd:
+        name: neuronmcp
+      register: service_status
+
+    - name: Display NeuronMCP status
+      debug:
+        msg: "NeuronMCP service is {{ service_status.status.ActiveState }}"
+

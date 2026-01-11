@@ -1,0 +1,138 @@
+---
+# NeuronDB extension installation
+
+- name: Install build dependencies (Debian/Ubuntu)
+  apt:
+    name:
+      - build-essential
+      - libcurl4-openssl-dev
+      - libssl-dev
+      - zlib1g-dev
+      - pkg-config
+      - cmake
+      - git
+    state: present
+  when: ansible_os_family == "Debian"
+
+- name: Install build dependencies (RHEL/CentOS/Rocky)
+  yum:
+    name:
+      - gcc
+      - gcc-c++
+      - make
+      - libcurl-devel
+      - openssl-devel
+      - zlib-devel
+      - pkgconfig
+      - cmake
+      - git
+    state: present
+  when: ansible_os_family == "RedHat"
+
+- name: Install ML libraries (optional - XGBoost, LightGBM, CatBoost)
+  block:
+    - name: Install XGBoost dependencies (Debian/Ubuntu)
+      apt:
+        name:
+          - libxgboost-dev
+        state: present
+      when: ansible_os_family == "Debian" and enable_ml_libraries | default(false)
+
+    - name: Install XGBoost dependencies (RHEL/CentOS/Rocky)
+      yum:
+        name:
+          - xgboost-devel
+        state: present
+      when: ansible_os_family == "RedHat" and enable_ml_libraries | default(false)
+  when: enable_ml_libraries | default(false)
+
+- name: Check if NeuronDB source exists
+  stat:
+    path: "{{ neurondb_source_dir }}/Makefile"
+  register: neurondb_source
+
+- name: Clone NeuronDB repository
+  git:
+    repo: "{{ neurondb_repo_url | default('https://github.com/neurondb/neurondb.git') }}"
+    dest: "{{ neurondb_source_dir }}"
+    version: "{{ neurondb_version }}"
+    update: no
+  when: not neurondb_source.stat.exists
+
+- name: Update NeuronDB repository
+  git:
+    repo: "{{ neurondb_repo_url | default('https://github.com/neurondb/neurondb.git') }}"
+    dest: "{{ neurondb_source_dir }}"
+    version: "{{ neurondb_version }}"
+    update: yes
+  when: neurondb_source.stat.exists and build_from_source | default(false)
+
+- name: Find pg_config
+  command: which pg_config
+  register: pg_config_path
+  changed_when: false
+  failed_when: false
+
+- name: Set pg_config path
+  set_fact:
+    pg_config: "{{ pg_config_path.stdout | default('/usr/bin/pg_config') }}"
+
+- name: Build NeuronDB extension
+  shell: |
+    cd {{ neurondb_source_dir }}
+    make PG_CONFIG={{ pg_config }}
+  environment:
+    PG_CONFIG: "{{ pg_config }}"
+  when: build_from_source | default(false)
+
+- name: Install NeuronDB extension using make
+  shell: |
+    cd {{ neurondb_source_dir }}
+    make install PG_CONFIG={{ pg_config }}
+  environment:
+    PG_CONFIG: "{{ pg_config }}"
+  become: yes
+  when: build_from_source | default(false)
+
+- name: Install NeuronDB extension using setup script
+  shell: |
+    cd {{ neurondb_source_dir }}
+    {{ neurondb_source_dir }}/build.sh
+  args:
+    creates: "{{ postgresql_lib_dir }}/neurondb.so"
+  become: yes
+  when: not build_from_source | default(true)
+
+- name: Verify NeuronDB extension files
+  stat:
+    path: "{{ item }}"
+  register: neurondb_files
+  loop:
+    - "{{ postgresql_lib_dir }}/neurondb.so"
+    - "{{ postgresql_share_dir }}/extension/neurondb.control"
+
+- name: Check if extension files exist
+  fail:
+    msg: "NeuronDB extension file {{ item.item }} not found"
+  loop: "{{ neurondb_files.results }}"
+  when: not item.stat.exists
+
+- name: Create NeuronDB extension in database
+  shell: |
+    psql -h localhost -U {{ neurondb_database_user | default('neurondb') }} -d {{ neurondb_database_name | default('neurondb') }} -c "CREATE EXTENSION IF NOT EXISTS neurondb;"
+  become_user: "{{ postgresql_user }}"
+  register: extension_result
+  changed_when: "'already exists' not in extension_result.stderr"
+
+- name: Verify NeuronDB extension installation
+  shell: |
+    psql -h localhost -U {{ neurondb_database_user | default('neurondb') }} -d {{ neurondb_database_name | default('neurondb') }} -t -c "SELECT extversion FROM pg_extension WHERE extname = 'neurondb';"
+  become_user: "{{ postgresql_user }}"
+  register: extension_version
+  changed_when: false
+  failed_when: extension_version.rc != 0 or extension_version.stdout | trim == ""
+
+- name: Display NeuronDB version
+  debug:
+    msg: "NeuronDB extension version: {{ extension_version.stdout | trim }}"
+

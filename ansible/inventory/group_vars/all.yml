@@ -1,0 +1,4 @@
+---
+# This file is a symlink or copy of ../group_vars/all.yml
+# Keeping for compatibility with Ansible inventory structure
+

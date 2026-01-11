@@ -1,0 +1,21 @@
+# Firewall rules for NeuronDB ecosystem
+# Managed by Ansible
+
+# SSH
+-A INPUT -p tcp --dport {{ ssh_port }} -j ACCEPT
+
+# PostgreSQL
+-A INPUT -p tcp --dport 5432 -j ACCEPT
+
+# NeuronAgent
+-A INPUT -p tcp --dport {{ neuronagent_port }} -j ACCEPT
+
+# NeuronMCP HTTP
+-A INPUT -p tcp --dport 8082 -j ACCEPT
+
+# NeuronDesktop API
+-A INPUT -p tcp --dport {{ neurondesktop_api_port }} -j ACCEPT
+
+# NeuronDesktop Frontend
+-A INPUT -p tcp --dport {{ neurondesktop_frontend_port }} -j ACCEPT
+

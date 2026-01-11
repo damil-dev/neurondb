@@ -1,0 +1,28 @@
+[Unit]
+Description=NeuronAgent - Agent runtime and REST API
+After=network.target postgresql.service
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=neurondb
+Group=neurondb
+WorkingDirectory=/opt/neurondb/neuronagent/bin
+ExecStart=/opt/neurondb/neuronagent/bin/agent-server -config /etc/neurondb/neuronagent/config.yaml
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=neuronagent
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=32768
+
+[Install]
+WantedBy=multi-user.target
+

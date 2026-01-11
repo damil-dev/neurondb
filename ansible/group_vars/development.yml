@@ -1,0 +1,32 @@
+---
+# Development environment variables
+
+# Resource allocation (lower for dev)
+postgresql_max_connections: 50
+postgresql_shared_buffers: "128MB"
+postgresql_effective_cache_size: "512MB"
+neurondb_maintenance_work_mem: "128MB"
+
+# Logging
+log_level: "debug"
+log_format: "text"
+
+# Debugging
+debug_mode: true
+enable_profiling: false
+
+# Service configuration
+neuronagent_workers: 2
+neuronagent_port: 8080
+neuronmcp_http_addr: ":8082"
+neurondesktop_api_port: 8081
+neurondesktop_frontend_port: 3000
+
+# Security (relaxed for dev)
+security_hardening: false
+fail2ban_enabled: false
+firewall_enabled: false
+
+# Monitoring (optional in dev)
+enable_monitoring: false
+

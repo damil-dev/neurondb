@@ -1,0 +1,7 @@
+---
+# Handlers for common role
+
+- name: reload logrotate
+  command: systemctl reload logrotate || true
+  changed_when: false
+

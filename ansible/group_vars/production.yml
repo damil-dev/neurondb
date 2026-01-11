@@ -1,0 +1,47 @@
+---
+# Production environment variables
+
+# Resource allocation (tuned for production)
+postgresql_max_connections: 200
+postgresql_shared_buffers: "512MB"
+postgresql_effective_cache_size: "2GB"
+neurondb_maintenance_work_mem: "512MB"
+
+# Performance tuning
+postgresql_work_mem: "16MB"
+postgresql_maintenance_work_mem: "256MB"
+postgresql_checkpoint_completion_target: 0.9
+postgresql_wal_buffers: "16MB"
+
+# Logging
+log_level: "warn"
+log_format: "json"
+
+# Debugging
+debug_mode: false
+enable_profiling: false
+
+# Service configuration
+neuronagent_workers: 5
+neuronagent_port: 8080
+neuronmcp_http_addr: ":8082"
+neurondesktop_api_port: 8081
+neurondesktop_frontend_port: 3000
+
+# Security (strict for production)
+security_hardening: true
+fail2ban_enabled: true
+firewall_enabled: true
+ssl_enabled: true
+
+# Monitoring (required in production)
+enable_monitoring: true
+
+# Backup (required in production)
+backup_enabled: true
+backup_retention_days: 30
+backup_schedule: "0 2 * * *"
+
+# High availability
+ha_enabled: false  # Set to true for HA setup
+
