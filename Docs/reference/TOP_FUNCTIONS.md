@@ -197,12 +197,12 @@ SELECT * FROM neurondb.cluster_kmeans(
 
 ## Configuration & Management
 
-### 17. `neurondb_version()`
+### 17. `neurondb.version()`
 Get NeuronDB version.
 
 ```sql
-SELECT neurondb_version();
--- Returns: '1.0.0'
+SELECT neurondb.version();
+-- Returns: jsonb with version, postgresql_version, capabilities, and api fields
 ```
 
 ### 18. `set_llm_config(provider, api_key, endpoint)`
@@ -245,7 +245,7 @@ SELECT * FROM neurondb_gpu_info();
 
 ## Next Steps
 
-- **Complete API Reference**: [SQL API Reference](sql-api-complete.md) - All 473+ functions
+- **Complete API Reference**: [SQL API Reference](sql-api-complete.md) - All 520+ functions
 - **Examples**: [Examples Directory](../../examples/README.md) - Working code examples
 - **Vector Search Guide**: [Indexing Documentation](../../NeuronDB/docs/vector-search/indexing.md)
 - **RAG Guide**: [RAG Pipeline Documentation](../../NeuronDB/docs/rag/overview.md)

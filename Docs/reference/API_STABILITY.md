@@ -164,7 +164,7 @@ Deprecated functions include:
 **Core Functions:**
 - `embed_text(text, text) → vector`
 - `embed_text_batch(text[], text) → vector[]`
-- `neurondb_version() → text`
+- `neurondb.version() → jsonb`
 - `neurondb_gpu_info() → table`
 
 **Index Creation:**
