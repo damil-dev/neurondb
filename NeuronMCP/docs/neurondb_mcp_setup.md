@@ -20,13 +20,13 @@ The schema follows database best practices with proper normalization, security, 
 
 ```bash
 cd NeuronMCP
-./scripts/setup_neurondb_mcp.sh
+./scripts/neuronmcp_setup.sh
 ```
 
 Or with custom database connection:
 
 ```bash
-DB_HOST=localhost DB_PORT=5432 DB_NAME=neurondb DB_USER=postgres ./scripts/setup_neurondb_mcp.sh
+DB_HOST=localhost DB_PORT=5432 DB_NAME=neurondb DB_USER=postgres ./scripts/neuronmcp_setup.sh
 ```
 
 ### 2. Set API Keys
@@ -584,7 +584,7 @@ If upgrading from a previous version:
 
 ```sql
 -- 1. Setup schema (run setup script)
--- ./scripts/setup_neurondb_mcp.sh
+-- ./scripts/neuronmcp_setup.sh
 
 -- 2. Set encryption key (IMPORTANT: change in production!)
 ALTER SYSTEM SET neurondb.encryption_key = 'your-secure-key-here';

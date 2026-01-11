@@ -236,7 +236,7 @@ func verifyTables(ctx context.Context, db *database.Database, tables []string, c
 		fmt.Printf("  ✅ PASSED: All %s tables exist\n", category)
 	} else {
 		fmt.Printf("  ❌ FAILED: Missing %s tables: %v\n", category, missing)
-		fmt.Printf("     Run setup script: ./scripts/setup_neurondb_mcp.sh\n")
+		fmt.Printf("     Run setup script: ./scripts/neuronmcp_setup.sh\n")
 	}
 }
 

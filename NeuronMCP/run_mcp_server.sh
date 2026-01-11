@@ -7,7 +7,16 @@ set -e  # Exit on error
 
 # Get the directory where this script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BINARY_PATH="${SCRIPT_DIR}/bin/neurondb-mcp"
+# Try neurondb-mcp first, fall back to neuronmcp
+if [ -f "${SCRIPT_DIR}/bin/neurondb-mcp" ]; then
+    BINARY_PATH="${SCRIPT_DIR}/bin/neurondb-mcp"
+elif [ -f "${SCRIPT_DIR}/bin/neuronmcp" ]; then
+    BINARY_PATH="${SCRIPT_DIR}/bin/neuronmcp"
+elif [ -f "${SCRIPT_DIR}/neurondb-mcp" ]; then
+    BINARY_PATH="${SCRIPT_DIR}/neurondb-mcp"
+else
+    BINARY_PATH="${SCRIPT_DIR}/bin/neurondb-mcp"
+fi
 
 # Check if binary exists
 if [ ! -f "$BINARY_PATH" ]; then
@@ -20,8 +29,8 @@ fi
 export NEURONDB_HOST="localhost"
 export NEURONDB_PORT="5432"
 export NEURONDB_DATABASE="neurondb"
-export NEURONDB_USER="pge"
-export NEURONDB_PASSWORD="test"
+export NEURONDB_USER="pgedge"
+export NEURONDB_PASSWORD=""
 
 # Display configuration
 echo "=========================================="

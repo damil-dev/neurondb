@@ -77,7 +77,7 @@ if go run "$SCRIPT_DIR/validate_schema_setup.go"; then
 else
     print_error "Schema setup validation failed"
     print_info "Note: Some failures may be expected if schema is not yet set up"
-    print_info "Run: ./scripts/setup_neurondb_mcp.sh"
+    print_info "Run: ./scripts/neuronmcp_setup.sh"
 fi
 
 # Test 4: Version Compatibility Verification
@@ -106,7 +106,7 @@ print_success "All verification tests completed!"
 print_info ""
 print_info "Next steps:"
 print_info "  1. Review any warnings or skipped tests above"
-print_info "  2. If schema validation failed, run: ./scripts/setup_neurondb_mcp.sh"
+print_info "  2. If schema validation failed, run: ./scripts/neuronmcp_setup.sh"
 print_info "  3. Set API keys: SELECT neurondb_set_model_key('model_name', 'api_key');"
 print_info "  4. View verification summary: cat VERIFICATION_SUMMARY.md"
 print_info ""

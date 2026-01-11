@@ -116,7 +116,7 @@ NeuronMCP requires a comprehensive database schema for managing LLM models, API 
 
 ```bash
 cd NeuronMCP
-./scripts/setup_neurondb_mcp.sh
+./scripts/neuronmcp_setup.sh
 ```
 
 **Set API Keys:**
@@ -172,6 +172,20 @@ export NEURONDB_PASSWORD=neurondb
 
 ### Build and Run
 
+#### Automated Installation (Recommended)
+
+Use the installation script for easy setup:
+
+```bash
+# From repository root
+sudo ./scripts/install-neuronmcp.sh
+
+# With system service enabled
+sudo ./scripts/install-neuronmcp.sh --enable-service
+```
+
+#### Manual Build
+
 From source:
 
 ```bash
@@ -179,7 +193,7 @@ go build ./cmd/neurondb-mcp
 ./neurondb-mcp
 ```
 
-Using Docker:
+#### Using Docker
 
 ```bash
 cd docker
@@ -189,6 +203,10 @@ docker compose up -d
 ```
 
 See [Docker Guide](docker/readme.md) for Docker deployment details.
+
+#### Running as a Service
+
+For systemd (Linux) or launchd (macOS), see [Service Management Guide](../../Docs/getting-started/installation-services.md).
 
 ## MCP Protocol
 
