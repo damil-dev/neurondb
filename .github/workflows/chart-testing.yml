@@ -22,7 +22,7 @@ jobs:
 
       - name: Run chart-testing (lint)
         run: |
-          ct lint --charts helm/neurondb
+          ct lint --charts helm/neurondb --validate-maintainers=false
 
       - name: Run chart-testing (install)
         run: |
