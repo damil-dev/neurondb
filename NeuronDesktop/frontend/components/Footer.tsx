@@ -9,11 +9,12 @@ export default function Footer() {
   useEffect(() => {
     const checkApiStatus = async () => {
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081'
+        // Use root health endpoint (works reliably)
+        const baseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081/api/v1').replace('/api/v1', '')
         const controller = new AbortController()
         const timeoutId = setTimeout(() => controller.abort(), 2000)
         
-        const response = await fetch(`${apiUrl}/health`, {
+        const response = await fetch(`${baseUrl}/health`, {
           method: 'GET',
           signal: controller.signal,
         })

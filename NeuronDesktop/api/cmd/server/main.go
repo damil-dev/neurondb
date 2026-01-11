@@ -181,6 +181,7 @@ func main() {
 	rateLimiter := middleware.NewRateLimiter(10000, 1*time.Minute)
 
 	router := mux.NewRouter()
+	router.StrictSlash(true)
 
 	router.Use(middleware.RequestIDMiddleware())
 	router.Use(middleware.RecoveryMiddleware(logger))
@@ -244,6 +245,17 @@ func main() {
 		}
 		databaseTestHandlers.TestConnection(w, r)
 	}).Methods("POST", "OPTIONS")
+
+	// Health endpoint under /api/v1 (for frontend compatibility, no auth required)
+	// Register on main router with exact path match to avoid subrouter conflicts
+	router.HandleFunc("/api/v1/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":    "ok",
+			"service":   "neurondesk-api",
+			"timestamp": time.Now().UTC().Format(time.RFC3339),
+		})
+	}).Methods("GET").Name("api_health")
 
 	apiRouter := router.PathPrefix("/api/v1").Subrouter()
 
