@@ -26,7 +26,7 @@ Comprehensive tests for GPU operations:
 
 =cut
 
-plan tests => 90;
+plan tests => 4;  # 3 neurondb_ok + 1 subtest
 
 my $node = PostgresNode->new('test_gpu');
 $node->init();
@@ -36,7 +36,7 @@ install_extension($node, 'postgres');
 neurondb_ok($node, 'postgres', 'NeuronDB extension installed');
 
 subtest 'GPU Detection' => sub {
-    plan tests => 10;
+    plan tests => 4;  # 3 neurondb_ok + 1 subtest
     
     query_ok($node, 'postgres', q{
         SELECT neurondb.gpu_available();

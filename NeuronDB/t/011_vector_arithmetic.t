@@ -23,7 +23,8 @@ Target: 80+ test cases
 
 =cut
 
-plan tests => 90;
+# Test plan: 3 neurondb_ok + 7 subtests = 10 top-level tests
+plan tests => 10;
 
 my $node = PostgresNode->new('vector_arithmetic_test');
 $node->init();

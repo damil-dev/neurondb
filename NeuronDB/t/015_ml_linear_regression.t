@@ -24,7 +24,7 @@ Target: 100+ test cases
 
 =cut
 
-plan tests => 110;
+plan tests => 9;  # 3 neurondb_ok + 6 subtests
 
 my $node = PostgresNode->new('ml_regression_test');
 $node->init();
@@ -38,7 +38,7 @@ neurondb_ok($node, 'postgres', 'NeuronDB extension installed');
 # ============================================================================
 
 subtest 'Linear Regression' => sub {
-	plan tests => 20;
+	plan tests => 9;  # 3 neurondb_ok + 6 subtests
 	
 	# Create regression dataset
 	create_regression_dataset($node, 'postgres',
@@ -109,7 +109,7 @@ subtest 'Linear Regression' => sub {
 # ============================================================================
 
 subtest 'Ridge Regression' => sub {
-	plan tests => 15;
+	plan tests => 9;  # 3 neurondb_ok + 6 subtests
 	
 	# Create dataset
 	create_regression_dataset($node, 'postgres',
@@ -161,7 +161,7 @@ subtest 'Ridge Regression' => sub {
 # ============================================================================
 
 subtest 'Lasso Regression' => sub {
-	plan tests => 15;
+	plan tests => 9;  # 3 neurondb_ok + 6 subtests
 	
 	# Create dataset
 	create_regression_dataset($node, 'postgres',
@@ -213,7 +213,7 @@ subtest 'Lasso Regression' => sub {
 # ============================================================================
 
 subtest 'Cross-Validation' => sub {
-	plan tests => 10;
+	plan tests => 9;  # 3 neurondb_ok + 6 subtests
 	
 	# Test cross-validation for linear regression
 	my ($success, $msg) = test_cross_validation($node, 'postgres', 'linear_regression',
@@ -247,7 +247,7 @@ subtest 'Cross-Validation' => sub {
 # ============================================================================
 
 subtest 'Prediction Accuracy' => sub {
-	plan tests => 15;
+	plan tests => 9;  # 3 neurondb_ok + 6 subtests
 	
 	# Create train/test split
 	create_regression_dataset($node, 'postgres',
@@ -311,7 +311,7 @@ subtest 'Prediction Accuracy' => sub {
 # ============================================================================
 
 subtest 'Outlier Handling' => sub {
-	plan tests => 10;
+	plan tests => 9;  # 3 neurondb_ok + 6 subtests
 	
 	# Create dataset with outliers
 	$node->psql('postgres', q{

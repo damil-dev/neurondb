@@ -96,6 +96,13 @@ static bool enforce_quotas = true;
 bool		neurondb_automl_use_gpu = false;
 bool		neurondb_vector_capsule_enabled = false;
 
+/* Security and governance GUCs */
+bool		neurondb_rls_embeddings_enabled = false;
+bool		neurondb_encryption_enabled = false;
+bool		neurondb_audit_ml_enabled = false;
+bool		neurondb_audit_rag_enabled = false;
+int			neurondb_audit_retention_days = 365;
+
 NeuronDBConfig *neurondb_config = NULL;
 
 static bool
@@ -826,6 +833,64 @@ neurondb_init_all_gucs(void)
 							 NULL,
 							 NULL,
 		NULL);
+
+	/* Security and governance GUCs */
+	DefineCustomBoolVariable("neurondb.rls_embeddings_enabled",
+							 "Enable Row-Level Security for embeddings",
+							 "When enabled, RLS policies are enforced during vector index scans and ANN searches.",
+							 &neurondb_rls_embeddings_enabled,
+							 false,
+							 PGC_USERSET,
+							 0,
+							 NULL,
+							 NULL,
+							 NULL);
+
+	DefineCustomBoolVariable("neurondb.encryption_enabled",
+							 "Enable field-level encryption for vectors",
+							 "When enabled, supports encryption/decryption of sensitive vector data and metadata.",
+							 &neurondb_encryption_enabled,
+							 false,
+							 PGC_SUSET,
+							 0,
+							 NULL,
+							 NULL,
+							 NULL);
+
+	DefineCustomBoolVariable("neurondb.audit_ml_enabled",
+							 "Enable audit logging for ML inference operations",
+							 "When enabled, logs all ML model inference calls for compliance and security.",
+							 &neurondb_audit_ml_enabled,
+							 false,
+							 PGC_USERSET,
+							 0,
+							 NULL,
+							 NULL,
+							 NULL);
+
+	DefineCustomBoolVariable("neurondb.audit_rag_enabled",
+							 "Enable audit logging for RAG operations",
+							 "When enabled, logs all RAG retrieve and generate operations for compliance.",
+							 &neurondb_audit_rag_enabled,
+							 false,
+							 PGC_USERSET,
+							 0,
+							 NULL,
+							 NULL,
+							 NULL);
+
+	DefineCustomIntVariable("neurondb.audit_retention_days",
+							"Audit log retention period in days",
+							"Audit logs older than this many days will be eligible for archival or deletion. Default is 365.",
+							&neurondb_audit_retention_days,
+							365,
+							1,
+							3650,
+							PGC_SUSET,
+							0,
+							NULL,
+							NULL,
+							NULL);
 
 
 	neurondb_sync_config_from_gucs();

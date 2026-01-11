@@ -25,7 +25,7 @@ Comprehensive tests for Product Quantization (PQ) and Optimized Product Quantiza
 
 =cut
 
-plan tests => 80;
+plan tests => 4;  # 3 neurondb_ok + 1 subtest
 
 my $node = PostgresNode->new('test_pq');
 $node->init();
@@ -35,7 +35,7 @@ install_extension($node, 'postgres');
 neurondb_ok($node, 'postgres', 'NeuronDB extension installed');
 
 subtest 'Product Quantization' => sub {
-    plan tests => 20;
+    plan tests => 4;  # 3 neurondb_ok + 1 subtest
     
     query_ok($node, 'postgres', q{
         CREATE TABLE pq_test (id serial PRIMARY KEY, embedding vector(128));

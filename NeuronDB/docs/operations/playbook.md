@@ -153,7 +153,7 @@ systemctl start neuronagent
 systemctl start neuronmcp
 
 # 6. Verify
-./scripts/verify_neurondb_integration.sh --tier 0
+./NeuronAgent/scripts/neuronagent_verify.sh --tier 0
 ```
 
 #### Major Upgrades (e.g., 1.0.x → 2.0.0)

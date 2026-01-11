@@ -23,7 +23,7 @@ Comprehensive tests for distributed search features:
 
 =cut
 
-plan tests => 60;
+plan tests => 4;  # 3 neurondb_ok + 1 subtest
 
 my $node = PostgresNode->new('test_distributed');
 $node->init();
@@ -33,7 +33,7 @@ install_extension($node, 'postgres');
 neurondb_ok($node, 'postgres', 'NeuronDB extension installed');
 
 subtest 'Shard Management' => sub {
-    plan tests => 10;
+    plan tests => 4;  # 3 neurondb_ok + 1 subtest
     
     query_ok($node, 'postgres', q{
         CREATE TABLE distributed_data (id serial PRIMARY KEY, embedding vector(64));

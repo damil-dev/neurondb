@@ -23,7 +23,8 @@ Target: 120+ test cases
 
 =cut
 
-plan tests => 130;
+# Test plan: 3 neurondb_ok + 7 subtests = 10 top-level tests
+plan tests => 10;
 
 my $node = PostgresNode->new('distance_metrics_test');
 $node->init();

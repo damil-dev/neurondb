@@ -25,7 +25,7 @@ Comprehensive tests for background workers:
 
 =cut
 
-plan tests => 70;
+plan tests => 4;  # 3 neurondb_ok + 1 subtest
 
 my $node = PostgresNode->new('test_workers');
 $node->init();
@@ -35,7 +35,7 @@ install_extension($node, 'postgres');
 neurondb_ok($node, 'postgres', 'NeuronDB extension installed');
 
 subtest 'Job Queue' => sub {
-    plan tests => 15;
+    plan tests => 4;  # 3 neurondb_ok + 1 subtest
     
     query_ok($node, 'postgres', q{
         SELECT neurondb.submit_job('test_job', 'SELECT 1');

@@ -2115,6 +2115,7 @@ hnswgettuple(IndexScanDesc scan, ScanDirection dir)
 	if (PageIsNew(page) || PageIsEmpty(page) ||
 		PageGetMaxOffsetNumber(page) < FirstOffsetNumber)
 	{
+		UnlockReleaseBuffer(buf);
 		so->currentResult++;
 		return false;
 	}
@@ -2123,6 +2124,7 @@ hnswgettuple(IndexScanDesc scan, ScanDirection dir)
 		ItemId scanItemId = PageGetItemId(page, FirstOffsetNumber);
 		if (!ItemIdIsValid(scanItemId) || !ItemIdHasStorage(scanItemId))
 		{
+			UnlockReleaseBuffer(buf);
 			so->currentResult++;
 			return false;
 		}
@@ -2135,7 +2137,8 @@ hnswgettuple(IndexScanDesc scan, ScanDirection dir)
 		/* Validate node structure before use */
 		if (node->dim <= 0 || node->dim > 32767)
 		{
-			elog(WARNING, "hnsw: node at block %u has invalid dim %d in scan, skipping", buf != InvalidBuffer ? BufferGetBlockNumber(buf) : 0, node->dim);
+			BlockNumber blkno = buf != InvalidBuffer ? BufferGetBlockNumber(buf) : 0;
+			elog(WARNING, "hnsw: node at block %u has invalid dim %d in scan, skipping", blkno, node->dim);
 			UnlockReleaseBuffer(buf);
 			so->currentResult++;
 			return false;
@@ -2985,21 +2988,13 @@ hnswSearch(Relation index,
 				int			validNeighborCount = 0;
 				int maxNeighbors;
 				
-				/* Validate node dim before using */
-				if (node->dim <= 0 || node->dim > 32767)
-				{
-					elog(WARNING, "hnsw: node at block %u has invalid dim %d in search, skipping", current, node->dim);
-					UnlockReleaseBuffer(nodeBuf);
-					continue;
-				}
-				
 				/* Validate level bounds BEFORE array access to prevent out-of-bounds read */
 				if (level < 0 || level >= HNSW_MAX_LEVEL)
 				{
 					elog(WARNING, "hnsw: invalid level %d in search, skipping (max: %d)",
 						 level, HNSW_MAX_LEVEL - 1);
 					UnlockReleaseBuffer(nodeBuf);
-					continue;
+					break;
 				}
 				
 				neighbors = HnswGetNeighborsSafe(node, level, metaPage->m);
@@ -3293,14 +3288,54 @@ hnswSearch(Relation index,
 					continue;
 				}
 
-				node = (HnswNode) PageGetItem(nodePage,
-											  PageGetItemId(nodePage, FirstOffsetNumber));
+				/* Validate page structure before reading node */
+				OffsetNumber maxOff = PageGetMaxOffsetNumber(nodePage);
+				/* Sanity check: maxOffset should be reasonable (max ~200-300 items per page) */
+				if (maxOff > 1000)
+				{
+					UnlockReleaseBuffer(nodeBuf);
+					continue;
+				}
+				
+				/* HNSW constraint: one node per page, so maxOffset must be FirstOffsetNumber */
+				if (maxOff != FirstOffsetNumber && maxOff != InvalidOffsetNumber)
+				{
+					UnlockReleaseBuffer(nodeBuf);
+					continue;
+				}
+				
+				{
+					ItemId itemId = PageGetItemId(nodePage, FirstOffsetNumber);
+					if (!ItemIdIsValid(itemId) || !ItemIdHasStorage(itemId))
+					{
+						UnlockReleaseBuffer(nodeBuf);
+						continue;
+					}
+					node = (HnswNode) PageGetItem(nodePage, itemId);
+				}
 				if (node == NULL)
 				{
 					UnlockReleaseBuffer(nodeBuf);
 					continue;
 				}
 
+			/* Validate node structure immediately after reading - check for all-zeros corruption */
+			if (node->dim == 0 && node->level == 0 && node->neighborCount[0] == 0)
+			{
+				/* Check if entire node structure is zeroed (corruption indicator) */
+				bool allZeros = true;
+				for (int z = 0; z < HNSW_HEAPTIDS && allZeros; z++)
+				{
+					if (ItemPointerIsValid(&node->heaptids[z]))
+						allZeros = false;
+				}
+				if (allZeros)
+				{
+					UnlockReleaseBuffer(nodeBuf);
+					continue;
+				}
+			}
+			
 			if (!hnswValidateLevelSafe(node->level))
 			{
 				UnlockReleaseBuffer(nodeBuf);
@@ -3832,10 +3867,10 @@ hnswInsertNode(Relation index,
 				/* Final validation before calling HnswGetNeighborsSafe to catch any issues */
 				if (entryNode->dim <= 0 || entryNode->dim > 32767)
 				{
-					elog(ERROR,
-						 (errcode(ERRCODE_DATA_CORRUPTED),
-						  errmsg("hnsw: entry node dim %d is invalid (expected %d) - index corruption at block %u",
-								 entryNode->dim, dim, bestEntry)));
+					ereport(ERROR,
+							(errcode(ERRCODE_DATA_CORRUPTED),
+							 errmsg("hnsw: entry node dim %d is invalid (expected %d) - index corruption at block %u",
+									entryNode->dim, dim, bestEntry)));
 				}
 				
 				entryNeighbors = HnswGetNeighborsSafe(entryNode, level, metaPage->m);
@@ -3988,10 +4023,104 @@ hnswInsertNode(Relation index,
 		elog(WARNING, "[HNSW_INSERT_PRE_PAGEADD] node has invalid dim %d, skipping debug log", node->dim);
 	}
 	
-	if (PageAddItem(page, (Item) node, nodeSize, InvalidOffsetNumber, false, false) == InvalidOffsetNumber)
+	/* Validate node before adding to page */
+	if (node->dim != dim || node->dim <= 0 || node->dim > 32767)
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_DATA_CORRUPTED),
+				 errmsg("hnsw: node has invalid dim %d before PageAddItem (expected %d)",
+						node->dim, dim)));
+	}
+	if (node->level != level || !hnswValidateLevelSafe(node->level))
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_DATA_CORRUPTED),
+				 errmsg("hnsw: node has invalid level %d before PageAddItem (expected %d)",
+						node->level, level)));
+	}
+	
+	/* Ensure page is truly empty - double check before adding */
+	if (PageGetMaxOffsetNumber(page) != InvalidOffsetNumber)
+	{
+		UnlockReleaseBuffer(buf);
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
-				 errmsg("hnsw: failed to add node to page")));
+				 errmsg("hnsw: page %u already has items (maxOffset=%u), cannot add node (HNSW uses one node per page)",
+						blkno, PageGetMaxOffsetNumber(page))));
+	}
+	
+	if (PageAddItem(page, (Item) node, nodeSize, InvalidOffsetNumber, false, false) == InvalidOffsetNumber)
+	{
+		UnlockReleaseBuffer(buf);
+		ereport(ERROR,
+				(errcode(ERRCODE_INTERNAL_ERROR),
+				 errmsg("hnsw: failed to add node to page %u (nodeSize=%zu, freeSpace=%zu)",
+						blkno, nodeSize, PageGetFreeSpace(page))));
+	}
+
+	/* Immediately verify the node was written correctly and page still has only one item */
+	{
+		OffsetNumber maxOffset = PageGetMaxOffsetNumber(page);
+		if (maxOffset != FirstOffsetNumber)
+		{
+			UnlockReleaseBuffer(buf);
+			ereport(ERROR,
+					(errcode(ERRCODE_DATA_CORRUPTED),
+					 errmsg("hnsw: page %u has %u items after PageAddItem (expected 1) - HNSW violation",
+							blkno, maxOffset)));
+		}
+		
+		ItemId itemId = PageGetItemId(page, FirstOffsetNumber);
+		if (!ItemIdIsValid(itemId) || !ItemIdHasStorage(itemId))
+		{
+			UnlockReleaseBuffer(buf);
+			ereport(ERROR,
+					(errcode(ERRCODE_INTERNAL_ERROR),
+					 errmsg("hnsw: item ID invalid after PageAddItem at block %u", blkno)));
+		}
+		
+		/* Verify item size matches expected node size */
+		Size itemSize = ItemIdGetLength(itemId);
+		if (itemSize != nodeSize)
+		{
+			UnlockReleaseBuffer(buf);
+			ereport(ERROR,
+					(errcode(ERRCODE_DATA_CORRUPTED),
+					 errmsg("hnsw: item size mismatch after PageAddItem at block %u: got %zu, expected %zu",
+							blkno, itemSize, nodeSize)));
+		}
+		
+		{
+			HnswNode verifyNode = (HnswNode) PageGetItem(page, itemId);
+			if (verifyNode == NULL)
+			{
+				UnlockReleaseBuffer(buf);
+				ereport(ERROR,
+						(errcode(ERRCODE_INTERNAL_ERROR),
+						 errmsg("hnsw: null node after PageGetItem at block %u", blkno)));
+			}
+			
+			/* Validate node structure immediately after reading */
+			if (verifyNode->dim != dim || verifyNode->dim <= 0 || verifyNode->dim > 32767)
+			{
+				UnlockReleaseBuffer(buf);
+				ereport(ERROR,
+						(errcode(ERRCODE_DATA_CORRUPTED),
+						 errmsg("hnsw: node corruption detected immediately after PageAddItem at block %u: dim=%d (expected %d)",
+								blkno, verifyNode->dim, dim)));
+			}
+			if (verifyNode->level != level || !hnswValidateLevelSafe(verifyNode->level))
+			{
+				UnlockReleaseBuffer(buf);
+				ereport(ERROR,
+						(errcode(ERRCODE_DATA_CORRUPTED),
+						 errmsg("hnsw: node level corruption detected immediately after PageAddItem at block %u: level=%d (expected %d)",
+								blkno, verifyNode->level, level)));
+			}
+			
+			elog(DEBUG1, "[HNSW_INSERT_VERIFY_SUCCESS] block=%u dim=%d level=%d verified correctly", blkno, verifyNode->dim, verifyNode->level);
+		}
+	}
 
 	MarkBufferDirty(buf);
 	/* Release the buffer immediately. We'll re-read it later when linking neighbors. */
@@ -4201,6 +4330,22 @@ hnswInsertNode(Relation index,
 					{
 						elog(WARNING, "hnsw: invalid currentLevel %d in insert, skipping (max: %d)",
 							 currentLevel, HNSW_MAX_LEVEL - 1);
+						/* Unlock buffer and free memory before continuing */
+						if (BufferIsValid(newNodeBuf))
+						{
+							UnlockReleaseBuffer(newNodeBuf);
+							newNodeBuf = InvalidBuffer;
+						}
+						if (selectedNeighbors)
+						{
+							pfree(selectedNeighbors);
+							selectedNeighbors = NULL;
+						}
+						if (selectedDistances)
+						{
+							pfree(selectedDistances);
+							selectedDistances = NULL;
+						}
 						continue;
 					}
 					
@@ -4274,8 +4419,33 @@ hnswInsertNode(Relation index,
 					neighborPage = BufferGetPage(neighborBuf);
 					
 					/* Check if page has valid items before accessing */
-					if (PageIsNew(neighborPage) || PageIsEmpty(neighborPage) ||
-						PageGetMaxOffsetNumber(neighborPage) < FirstOffsetNumber)
+					if (PageIsNew(neighborPage) || PageIsEmpty(neighborPage))
+					{
+						UnlockReleaseBuffer(neighborBuf);
+						hasNeighborLock = false;
+						neighborBuf = InvalidBuffer;
+						continue;
+					}
+					
+					/* Validate page structure - check for corrupted page headers */
+					OffsetNumber maxOff = PageGetMaxOffsetNumber(neighborPage);
+					if (maxOff > 1000)
+					{
+						UnlockReleaseBuffer(neighborBuf);
+						hasNeighborLock = false;
+						neighborBuf = InvalidBuffer;
+						continue;
+					}
+					
+					if (maxOff != FirstOffsetNumber && maxOff != InvalidOffsetNumber)
+					{
+						UnlockReleaseBuffer(neighborBuf);
+						hasNeighborLock = false;
+						neighborBuf = InvalidBuffer;
+						continue;
+					}
+					
+					if (maxOff < FirstOffsetNumber)
 					{
 						UnlockReleaseBuffer(neighborBuf);
 						hasNeighborLock = false;
@@ -4302,6 +4472,24 @@ hnswInsertNode(Relation index,
 					neighborBuf = InvalidBuffer;
 					continue;
 				}
+
+					/* Check for zeroed node corruption */
+					if (neighborNode->dim == 0 && neighborNode->level == 0 && neighborNode->neighborCount[0] == 0)
+					{
+						bool allZeros = true;
+						for (int z = 0; z < HNSW_HEAPTIDS && allZeros; z++)
+						{
+							if (ItemPointerIsValid(&neighborNode->heaptids[z]))
+								allZeros = false;
+						}
+						if (allZeros)
+						{
+							UnlockReleaseBuffer(neighborBuf);
+							hasNeighborLock = false;
+							neighborBuf = InvalidBuffer;
+							continue;
+						}
+					}
 
 					/* Validate neighbor node structure before use */
 					if (neighborNode->dim <= 0 || neighborNode->dim > 32767)
@@ -5105,14 +5293,16 @@ hnswdelete(Relation index,
 	{
 		elog(WARNING, "hnsw: page %u is new or empty, cannot delete node at offset %u", nodeBlkno, nodeOffset);
 		UnlockReleaseBuffer(nodeBuf);
-		return;
+		UnlockReleaseBuffer(metaBuffer);
+		return false;
 	}
 	
 	if (PageGetMaxOffsetNumber(nodePage) < nodeOffset)
 	{
 		elog(WARNING, "hnsw: offset %u exceeds max offset on page %u", nodeOffset, nodeBlkno);
 		UnlockReleaseBuffer(nodeBuf);
-		return;
+		UnlockReleaseBuffer(metaBuffer);
+		return false;
 	}
 	
 	{
@@ -5121,7 +5311,8 @@ hnswdelete(Relation index,
 		{
 			elog(WARNING, "hnsw: invalid ItemId at offset %u on page %u", nodeOffset, nodeBlkno);
 			UnlockReleaseBuffer(nodeBuf);
-			return;
+			UnlockReleaseBuffer(metaBuffer);
+			return false;
 		}
 		
 		node = (HnswNode) PageGetItem(nodePage, deleteItemId);
@@ -5131,7 +5322,8 @@ hnswdelete(Relation index,
 	{
 		elog(WARNING, "hnsw: failed to read node at offset %u on page %u", nodeOffset, nodeBlkno);
 		UnlockReleaseBuffer(nodeBuf);
-		return;
+		UnlockReleaseBuffer(metaBuffer);
+		return false;
 	}
 	
 	/* Validate node structure before use */
@@ -5139,7 +5331,8 @@ hnswdelete(Relation index,
 	{
 		elog(WARNING, "hnsw: node at offset %u on page %u has invalid dim %d", nodeOffset, nodeBlkno, node->dim);
 		UnlockReleaseBuffer(nodeBuf);
-		return;
+		UnlockReleaseBuffer(metaBuffer);
+		return false;
 	}
 
 	/* Validate node level */

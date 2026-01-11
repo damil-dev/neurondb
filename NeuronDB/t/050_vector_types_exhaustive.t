@@ -23,7 +23,8 @@ Target: 100+ test cases
 
 =cut
 
-plan tests => 120;
+# Test plan: 2 setup + 3 neurondb_ok + 7 subtests + 2 cleanup = 14 top-level tests
+plan tests => 14;
 
 my $node = PostgresNode->new('vector_types_test');
 ok($node, 'PostgresNode created');
@@ -110,9 +111,10 @@ subtest 'Vector Creation - Array Conversion' => sub {
 	
 	# Various dimensions
 	for my $dim (3, 5, 10, 128) {
-		my $arr = '{' . join(',', map { $_ * 0.1 } (1..$dim)) . '}';
+		my @vals = map { $_ * 0.1 } (1..$dim);
+		my $array_sql = 'ARRAY[' . join(',', @vals) . ']';
 		query_ok($node, 'postgres', 
-			"SELECT array_to_vector(ARRAY$arr::real[])::vector($dim);", 
+			"SELECT array_to_vector(${array_sql}::real[])::vector($dim);", 
 			"array_to_vector with dimension $dim");
 	}
 };

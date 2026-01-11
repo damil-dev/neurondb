@@ -39,7 +39,7 @@ Comprehensive tests for ML clustering algorithms:
 
 =cut
 
-plan tests => 120;
+plan tests => 9;  # 3 neurondb_ok + 6 subtests
 
 my $node = PostgresNode->new('test_clustering');
 $node->init();
@@ -54,7 +54,7 @@ query_ok($node, 'postgres', "SET neurondb.enable_ml = on;", 'ML features enabled
 # Test 1-20: K-Means Clustering
 #
 subtest 'K-Means Standard' => sub {
-    plan tests => 20;
+    plan tests => 9;  # 3 neurondb_ok + 6 subtests
     
     query_ok($node, 'postgres', q{
         CREATE TABLE kmeans_data (
@@ -145,7 +145,7 @@ subtest 'K-Means Standard' => sub {
 # Test 21-40: Mini-Batch K-Means
 #
 subtest 'Mini-Batch K-Means' => sub {
-    plan tests => 20;
+    plan tests => 9;  # 3 neurondb_ok + 6 subtests
     
     query_ok($node, 'postgres', q{
         CREATE TABLE minibatch_data (
@@ -222,7 +222,7 @@ subtest 'Mini-Batch K-Means' => sub {
 # Test 41-60: DBSCAN
 #
 subtest 'DBSCAN Clustering' => sub {
-    plan tests => 20;
+    plan tests => 9;  # 3 neurondb_ok + 6 subtests
     
     query_ok($node, 'postgres', q{
         CREATE TABLE dbscan_data (
@@ -321,7 +321,7 @@ subtest 'DBSCAN Clustering' => sub {
 # Test 61-80: Hierarchical Clustering
 #
 subtest 'Hierarchical Clustering' => sub {
-    plan tests => 20;
+    plan tests => 9;  # 3 neurondb_ok + 6 subtests
     
     query_ok($node, 'postgres', q{
         CREATE TABLE hierarchical_data (
@@ -386,7 +386,7 @@ subtest 'Hierarchical Clustering' => sub {
 # Test 81-100: Gaussian Mixture Models (GMM)
 #
 subtest 'Gaussian Mixture Models' => sub {
-    plan tests => 20;
+    plan tests => 9;  # 3 neurondb_ok + 6 subtests
     
     query_ok($node, 'postgres', q{
         CREATE TABLE gmm_data (
@@ -471,7 +471,7 @@ subtest 'Gaussian Mixture Models' => sub {
 # Test 101-120: Cluster Evaluation Metrics
 #
 subtest 'Cluster Evaluation' => sub {
-    plan tests => 20;
+    plan tests => 9;  # 3 neurondb_ok + 6 subtests
     
     query_ok($node, 'postgres', q{
         CREATE TABLE eval_data (

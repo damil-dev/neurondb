@@ -25,7 +25,7 @@ Comprehensive tests for IVF (Inverted File) indexes:
 
 =cut
 
-plan tests => 80;
+plan tests => 4;  # 3 neurondb_ok + 1 subtest
 
 my $node = PostgresNode->new('test_ivf');
 $node->init();
@@ -35,7 +35,7 @@ install_extension($node, 'postgres');
 neurondb_ok($node, 'postgres', 'NeuronDB extension installed');
 
 subtest 'IVFFlat Basic' => sub {
-    plan tests => 20;
+    plan tests => 4;  # 3 neurondb_ok + 1 subtest
     
     query_ok($node, 'postgres', q{
         CREATE TABLE ivf_test (id serial PRIMARY KEY, embedding vector(128));

@@ -27,7 +27,7 @@ Comprehensive edge case tests:
 
 =cut
 
-plan tests => 120;
+plan tests => 9;  # 3 neurondb_ok + 6 subtests
 
 my $node = PostgresNode->new('test_edge_cases');
 $node->init();
@@ -37,7 +37,7 @@ install_extension($node, 'postgres');
 neurondb_ok($node, 'postgres', 'NeuronDB extension installed');
 
 subtest 'NULL Handling' => sub {
-    plan tests => 20;
+    plan tests => 9;  # 3 neurondb_ok + 6 subtests
     
     query_ok($node, 'postgres', q{
         CREATE TABLE null_test (id serial, v vector(3));
@@ -57,7 +57,7 @@ subtest 'NULL Handling' => sub {
 };
 
 subtest 'Dimension Mismatches' => sub {
-    plan tests => 20;
+    plan tests => 9;  # 3 neurondb_ok + 6 subtests
     
     query_fails($node, 'postgres', q{
         SELECT ARRAY[1,2]::vector + ARRAY[1,2,3]::vector;
@@ -69,7 +69,7 @@ subtest 'Dimension Mismatches' => sub {
 };
 
 subtest 'Boundary Conditions' => sub {
-    plan tests => 20;
+    plan tests => 9;  # 3 neurondb_ok + 6 subtests
     
     query_ok($node, 'postgres', q{
         SELECT ARRAY[]::real[]::vector(0);
@@ -89,7 +89,7 @@ subtest 'Boundary Conditions' => sub {
 };
 
 subtest 'Concurrent Operations' => sub {
-    plan tests => 20;
+    plan tests => 9;  # 3 neurondb_ok + 6 subtests
     
     query_ok($node, 'postgres', q{
         CREATE TABLE concurrent_test (id serial, v vector(4));
@@ -104,7 +104,7 @@ subtest 'Concurrent Operations' => sub {
 };
 
 subtest 'Memory Limits' => sub {
-    plan tests => 20;
+    plan tests => 9;  # 3 neurondb_ok + 6 subtests
     
     # Test large result sets
     query_ok($node, 'postgres', q{
@@ -124,7 +124,7 @@ subtest 'Memory Limits' => sub {
 };
 
 subtest 'Invalid Inputs' => sub {
-    plan tests => 20;
+    plan tests => 9;  # 3 neurondb_ok + 6 subtests
     
     query_fails($node, 'postgres', q{
         SELECT 'invalid'::vector;

@@ -90,7 +90,7 @@ NeuronDB extends PostgreSQL with vector search, ML model inference, hybrid retri
 🌐 **[https://www.neurondb.ai/docs](https://www.neurondb.ai/docs)**
 
 The official documentation site provides:
-- **Complete API Reference**: All 473 SQL functions with examples
+- **Complete API Reference**: All 520+ SQL functions with examples
 - **Detailed Tutorials**: Step-by-step guides for all features
 - **Performance Guides**: Optimization strategies and benchmarks
 - **Production Best Practices**: Deployment, scaling, and monitoring
@@ -118,7 +118,7 @@ NeuronDB follows PostgreSQL's architectural patterns:
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                    SQL Interface                         │
-│              (473 functions, types, operators)          │
+│              (520+ functions, types, operators)          │
 ├─────────────────────────────────────────────────────────┤
 │  Vector Types  │  Distance Ops  │  Index Methods        │
 │  (vector, vectorp, vecmap, vgraph, rtext)               │

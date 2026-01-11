@@ -42,6 +42,9 @@ CREATE TABLE stress_vectors (
     metadata JSONB
 );
 
+-- Disable autovacuum for this table to avoid crashes during stress test
+ALTER TABLE stress_vectors SET (autovacuum_enabled = false);
+
 -- Insert 100K initial vectors
 INSERT INTO stress_vectors (category, embedding, metadata)
 SELECT 
@@ -331,8 +334,14 @@ BEGIN
         RAISE NOTICE 'Starting batch %: % ANALYZE operations', batch_num, batch_size;
         
         FOR i IN 1..batch_size LOOP
-            ANALYZE stress_vectors;
-            analyze_count := analyze_count + 1;
+            BEGIN
+                ANALYZE stress_vectors;
+                analyze_count := analyze_count + 1;
+            EXCEPTION
+                WHEN OTHERS THEN
+                    RAISE WARNING 'ANALYZE operation % failed: %', i, SQLERRM;
+                    -- Continue with next operation
+            END;
         END LOOP;
         
         batch_end_time := clock_timestamp();

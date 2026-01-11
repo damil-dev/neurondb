@@ -44,7 +44,7 @@ Comprehensive tests for ML classification algorithms:
 
 =cut
 
-plan tests => 150;
+plan tests => 11;  # 3 neurondb_ok + 8 subtests
 
 my $node = PostgresNode->new('test_classification');
 $node->init();
@@ -60,7 +60,7 @@ query_ok($node, 'postgres', "SET neurondb.enable_ml = on;", 'ML features enabled
 # Test 1-15: Logistic Regression
 #
 subtest 'Logistic Regression Binary' => sub {
-    plan tests => 15;
+    plan tests => 11;  # 3 neurondb_ok + 8 subtests
     
     # Create binary classification dataset
     query_ok($node, 'postgres', q{
@@ -153,7 +153,7 @@ subtest 'Logistic Regression Binary' => sub {
 # Test 16-30: Multi-class Logistic Regression
 #
 subtest 'Logistic Regression Multi-class' => sub {
-    plan tests => 15;
+    plan tests => 11;  # 3 neurondb_ok + 8 subtests
     
     # Create multi-class dataset (Iris-like)
     query_ok($node, 'postgres', q{
@@ -232,7 +232,7 @@ subtest 'Logistic Regression Multi-class' => sub {
 # Test 31-50: Support Vector Machines (SVM)
 #
 subtest 'SVM Linear Kernel' => sub {
-    plan tests => 20;
+    plan tests => 11;  # 3 neurondb_ok + 8 subtests
     
     query_ok($node, 'postgres', q{
         CREATE TABLE svm_data (
@@ -316,7 +316,7 @@ subtest 'SVM Linear Kernel' => sub {
 # Test 51-70: Decision Trees
 #
 subtest 'Decision Trees' => sub {
-    plan tests => 20;
+    plan tests => 11;  # 3 neurondb_ok + 8 subtests
     
     query_ok($node, 'postgres', q{
         CREATE TABLE tree_data (
@@ -396,7 +396,7 @@ subtest 'Decision Trees' => sub {
 # Test 71-90: Random Forest
 #
 subtest 'Random Forest' => sub {
-    plan tests => 20;
+    plan tests => 11;  # 3 neurondb_ok + 8 subtests
     
     query_ok($node, 'postgres', q{
         CREATE TABLE forest_data (
@@ -475,7 +475,7 @@ subtest 'Random Forest' => sub {
 # Test 91-110: Naive Bayes
 #
 subtest 'Naive Bayes' => sub {
-    plan tests => 20;
+    plan tests => 11;  # 3 neurondb_ok + 8 subtests
     
     query_ok($node, 'postgres', q{
         CREATE TABLE nb_data (
@@ -542,7 +542,7 @@ subtest 'Naive Bayes' => sub {
 # Test 111-130: KNN Classification
 #
 subtest 'KNN Classification' => sub {
-    plan tests => 20;
+    plan tests => 11;  # 3 neurondb_ok + 8 subtests
     
     query_ok($node, 'postgres', q{
         CREATE TABLE knn_data (
@@ -615,7 +615,7 @@ subtest 'KNN Classification' => sub {
 # Test 131-150: Advanced Classification Features
 #
 subtest 'Advanced Classification Features' => sub {
-    plan tests => 20;
+    plan tests => 11;  # 3 neurondb_ok + 8 subtests
     
     # Test cross-validation
     query_ok($node, 'postgres', q{

@@ -222,6 +222,12 @@ OBJS += \
 	src/util/neurondb_simd_impl.o \
 	src/util/neurondb_json.o
 
+# Security and governance
+OBJS += \
+	src/security/vector_encryption.o \
+	src/security/ml_audit.o \
+	src/security/rag_audit.o
+
 REGRESS = \
 	00_create \
 	01_types_basic \

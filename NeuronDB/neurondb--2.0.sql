@@ -8251,3 +8251,208 @@ COMMENT ON TABLE neurondb.hyperparameter_results IS 'Hyperparameter tuning resul
 COMMENT ON TABLE neurondb.text_models IS 'Text ML model registry';
 COMMENT ON TABLE neurondb.rag_pipelines IS 'RAG pipeline configurations';
 
+-- ============================================================================
+-- DATA GOVERNANCE & SECURITY
+-- ============================================================================
+
+-- Extended ML Inference Audit Log Table
+CREATE TABLE IF NOT EXISTS neurondb.ml_inference_audit_log (
+    audit_id BIGSERIAL PRIMARY KEY,
+    model_id INTEGER,
+    operation_type TEXT NOT NULL,
+    user_id TEXT DEFAULT CURRENT_USER,
+    input_hash TEXT,
+    output_hash TEXT,
+    metadata JSONB,
+    timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+COMMENT ON TABLE neurondb.ml_inference_audit_log IS 'Audit log for ML inference operations';
+COMMENT ON COLUMN neurondb.ml_inference_audit_log.input_hash IS 'SHA-256 hash of input data';
+COMMENT ON COLUMN neurondb.ml_inference_audit_log.output_hash IS 'SHA-256 hash of output data';
+
+CREATE INDEX IF NOT EXISTS idx_ml_inference_audit_model_time 
+    ON neurondb.ml_inference_audit_log(model_id, timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_ml_inference_audit_user_time 
+    ON neurondb.ml_inference_audit_log(user_id, timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_ml_inference_audit_operation 
+    ON neurondb.ml_inference_audit_log(operation_type, timestamp DESC);
+
+-- RAG Operation Audit Log Table
+CREATE TABLE IF NOT EXISTS neurondb.rag_operation_audit_log (
+    audit_id BIGSERIAL PRIMARY KEY,
+    pipeline_name TEXT NOT NULL,
+    operation_type TEXT NOT NULL,
+    user_id TEXT DEFAULT CURRENT_USER,
+    query_hash TEXT,
+    result_count INTEGER DEFAULT 0,
+    metadata JSONB,
+    timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+COMMENT ON TABLE neurondb.rag_operation_audit_log IS 'Audit log for RAG operations (retrieve, generate, chat)';
+COMMENT ON COLUMN neurondb.rag_operation_audit_log.query_hash IS 'SHA-256 hash of query text';
+COMMENT ON COLUMN neurondb.rag_operation_audit_log.result_count IS 'Number of results returned';
+
+CREATE INDEX IF NOT EXISTS idx_rag_audit_pipeline_time 
+    ON neurondb.rag_operation_audit_log(pipeline_name, timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_rag_audit_user_time 
+    ON neurondb.rag_operation_audit_log(user_id, timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_rag_audit_operation 
+    ON neurondb.rag_operation_audit_log(operation_type, timestamp DESC);
+
+-- Grant permissions on audit tables
+GRANT SELECT ON neurondb.ml_inference_audit_log TO PUBLIC;
+GRANT SELECT ON neurondb.rag_operation_audit_log TO PUBLIC;
+
+-- Security Functions
+
+-- Enhanced RLS for embeddings
+CREATE FUNCTION enable_embedding_rls(table_name text) RETURNS void
+    AS 'MODULE_PATHNAME', 'neurondb_create_tenant_policy'
+    LANGUAGE C VOLATILE;
+COMMENT ON FUNCTION enable_embedding_rls(text) IS 'Enable Row-Level Security for embeddings table';
+
+CREATE FUNCTION create_embedding_rls_policy(
+    table_name text,
+    policy_name text,
+    using_expression text
+) RETURNS void
+    LANGUAGE plpgsql
+    AS $$
+    BEGIN
+        EXECUTE format('CREATE POLICY %I ON %I FOR SELECT USING (%s)',
+            policy_name, table_name, using_expression);
+    END;
+    $$;
+COMMENT ON FUNCTION create_embedding_rls_policy(text, text, text) IS 
+    'Create RLS policy for embeddings table with custom USING expression';
+
+-- Vector encryption functions
+CREATE FUNCTION encrypt_vector(embedding vector, encryption_key text) RETURNS bytea
+    AS 'MODULE_PATHNAME', 'encrypt_vector'
+    LANGUAGE C IMMUTABLE STRICT;
+COMMENT ON FUNCTION encrypt_vector(vector, text) IS 
+    'Encrypt vector using AES-256-GCM. Requires OpenSSL support.';
+
+CREATE FUNCTION decrypt_vector(encrypted_data bytea, decryption_key text) RETURNS vector
+    AS 'MODULE_PATHNAME', 'decrypt_vector'
+    LANGUAGE C IMMUTABLE STRICT;
+COMMENT ON FUNCTION decrypt_vector(bytea, text) IS 
+    'Decrypt encrypted vector data. Requires OpenSSL support.';
+
+CREATE FUNCTION rotate_encryption_key(
+    table_name text,
+    column_name text,
+    old_key text,
+    new_key text
+) RETURNS void
+    LANGUAGE plpgsql
+    AS $$
+    DECLARE
+        row_count integer;
+    BEGIN
+        -- Decrypt with old key and re-encrypt with new key
+        EXECUTE format('
+            UPDATE %I 
+            SET %I = encrypt_vector(
+                decrypt_vector(%I, %L),
+                %L
+            )
+            WHERE %I IS NOT NULL',
+            table_name, column_name, column_name, old_key, new_key, column_name);
+        GET DIAGNOSTICS row_count = ROW_COUNT;
+        RAISE NOTICE 'Rotated encryption key for % rows in %.%', 
+            row_count, table_name, column_name;
+    END;
+    $$;
+COMMENT ON FUNCTION rotate_encryption_key(text, text, text, text) IS 
+    'Rotate encryption key for a column by decrypting with old key and re-encrypting with new key';
+
+-- Audit logging functions
+CREATE FUNCTION log_ml_inference(
+    model_id integer,
+    operation_type text,
+    input_hash text DEFAULT NULL,
+    output_hash text DEFAULT NULL,
+    metadata jsonb DEFAULT NULL
+) RETURNS boolean
+    AS 'MODULE_PATHNAME', 'log_ml_inference'
+    LANGUAGE C VOLATILE;
+COMMENT ON FUNCTION log_ml_inference(integer, text, text, text, jsonb) IS 
+    'Log ML inference operation to audit table';
+
+CREATE FUNCTION log_rag_operation(
+    pipeline_name text,
+    operation_type text,
+    query_hash text DEFAULT NULL,
+    result_count integer DEFAULT 0,
+    metadata jsonb DEFAULT NULL
+) RETURNS boolean
+    AS 'MODULE_PATHNAME', 'log_rag_operation'
+    LANGUAGE C VOLATILE;
+COMMENT ON FUNCTION log_rag_operation(text, text, text, integer, jsonb) IS 
+    'Log RAG operation to audit table';
+
+CREATE FUNCTION query_audit_log(
+    log_type text,
+    start_time timestamptz DEFAULT NULL,
+    end_time timestamptz DEFAULT NULL,
+    user_id text DEFAULT NULL,
+    operation_type text DEFAULT NULL
+) RETURNS TABLE(
+    audit_id bigint,
+    "timestamp" timestamptz,
+    user_id text,
+    operation_type text,
+    metadata jsonb
+)
+    LANGUAGE plpgsql
+    AS $$
+    BEGIN
+        IF log_type = 'ml_inference' THEN
+            RETURN QUERY
+            SELECT 
+                a.audit_id,
+                a.timestamp,
+                a.user_id,
+                a.operation_type,
+                a.metadata
+            FROM neurondb.ml_inference_audit_log a
+            WHERE (start_time IS NULL OR a.timestamp >= start_time)
+                AND (end_time IS NULL OR a.timestamp <= end_time)
+                AND (user_id IS NULL OR a.user_id = query_audit_log.user_id)
+                AND (operation_type IS NULL OR a.operation_type = query_audit_log.operation_type)
+            ORDER BY a.timestamp DESC;
+        ELSIF log_type = 'rag_operation' THEN
+            RETURN QUERY
+            SELECT 
+                a.audit_id,
+                a.timestamp,
+                a.user_id,
+                a.operation_type,
+                a.metadata
+            FROM neurondb.rag_operation_audit_log a
+            WHERE (start_time IS NULL OR a.timestamp >= start_time)
+                AND (end_time IS NULL OR a.timestamp <= end_time)
+                AND (user_id IS NULL OR a.user_id = query_audit_log.user_id)
+                AND (operation_type IS NULL OR a.operation_type = query_audit_log.operation_type)
+            ORDER BY a.timestamp DESC;
+        ELSE
+            RAISE EXCEPTION 'Invalid log_type: %. Must be "ml_inference" or "rag_operation"', log_type;
+        END IF;
+    END;
+    $$;
+COMMENT ON FUNCTION query_audit_log(text, timestamptz, timestamptz, text, text) IS 
+    'Query audit logs with filtering by time range, user, and operation type';
+
+-- Grant execute permissions on security functions
+GRANT EXECUTE ON FUNCTION enable_embedding_rls(text) TO PUBLIC;
+GRANT EXECUTE ON FUNCTION create_embedding_rls_policy(text, text, text) TO PUBLIC;
+GRANT EXECUTE ON FUNCTION encrypt_vector(vector, text) TO PUBLIC;
+GRANT EXECUTE ON FUNCTION decrypt_vector(bytea, text) TO PUBLIC;
+GRANT EXECUTE ON FUNCTION rotate_encryption_key(text, text, text, text) TO PUBLIC;
+GRANT EXECUTE ON FUNCTION log_ml_inference(integer, text, text, text, jsonb) TO PUBLIC;
+GRANT EXECUTE ON FUNCTION log_rag_operation(text, text, text, integer, jsonb) TO PUBLIC;
+GRANT EXECUTE ON FUNCTION query_audit_log(text, timestamptz, timestamptz, text, text) TO PUBLIC;
+

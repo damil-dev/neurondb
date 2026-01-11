@@ -29,7 +29,7 @@ Comprehensive tests for dimensionality reduction:
 
 =cut
 
-plan tests => 100;
+plan tests => 4;  # 3 neurondb_ok + 1 subtest
 
 my $node = PostgresNode->new('test_dim_reduction');
 $node->init();
@@ -40,7 +40,7 @@ neurondb_ok($node, 'postgres', 'NeuronDB extension installed');
 query_ok($node, 'postgres', "SET neurondb.enable_ml = on;", 'ML features enabled');
 
 subtest 'PCA Standard' => sub {
-    plan tests => 25;
+    plan tests => 4;  # 3 neurondb_ok + 1 subtest
     
     query_ok($node, 'postgres', q{
         CREATE TABLE pca_data (id serial PRIMARY KEY, features vector(10));

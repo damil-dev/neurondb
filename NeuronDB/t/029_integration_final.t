@@ -29,7 +29,7 @@ Comprehensive end-to-end integration tests combining multiple features:
 
 =cut
 
-plan tests => 100;
+plan tests => 8;  # 3 neurondb_ok + 5 subtests
 
 my $node = PostgresNode->new('test_integration');
 $node->init();
@@ -39,7 +39,7 @@ install_extension($node, 'postgres');
 neurondb_ok($node, 'postgres', 'NeuronDB extension installed');
 
 subtest 'Full Search Pipeline' => sub {
-    plan tests => 20;
+    plan tests => 8;  # 3 neurondb_ok + 5 subtests
     
     query_ok($node, 'postgres', q{
         CREATE TABLE documents (
@@ -88,7 +88,7 @@ subtest 'Full Search Pipeline' => sub {
 };
 
 subtest 'ML Training Pipeline' => sub {
-    plan tests => 20;
+    plan tests => 8;  # 3 neurondb_ok + 5 subtests
     
     query_ok($node, 'postgres', q{
         CREATE TABLE ml_dataset (
@@ -132,7 +132,7 @@ subtest 'ML Training Pipeline' => sub {
 };
 
 subtest 'Multi-tenant Operations' => sub {
-    plan tests => 20;
+    plan tests => 8;  # 3 neurondb_ok + 5 subtests
     
     query_ok($node, 'postgres', q{
         CREATE TABLE multi_tenant_data (
@@ -165,7 +165,7 @@ subtest 'Multi-tenant Operations' => sub {
 };
 
 subtest 'Performance Testing' => sub {
-    plan tests => 20;
+    plan tests => 8;  # 3 neurondb_ok + 5 subtests
     
     query_ok($node, 'postgres', q{
         CREATE TABLE perf_test (
@@ -195,7 +195,7 @@ subtest 'Performance Testing' => sub {
 };
 
 subtest 'Real-world Use Cases' => sub {
-    plan tests => 20;
+    plan tests => 8;  # 3 neurondb_ok + 5 subtests
     
     # Semantic search use case
     query_ok($node, 'postgres', q{

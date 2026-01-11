@@ -22,7 +22,7 @@ Demonstrates maximal usage of all three modules:
 
 =cut
 
-plan tests => 24;  # 2 nodes + 2 ports + 2 dirs + 2 starts + 2 queries + 1 complex + 1 result + 1 neurondb_ok (3 tests) + 1 vectors + 1 count + 1 vec ops + 1 dist + 1 agg + 1 ML + 1 GPU + 1 workers + 1 indexes + 1 error (may skip) + 2 stops + 2 cleanup
+plan tests => 28;  # 2 nodes + 2 ports + 2 dirs + 2 starts + 2 queries + 1 complex + 1 result + 1 neurondb_ok (3 tests) + 1 vectors + 1 count + 1 vec ops + 1 dist + 1 agg + 1 ML (may skip) + 1 GPU + 1 workers + 1 indexes + 1 error + 2 stops + 2 cleanup
 
 # Maximal PostgresNode usage: multiple nodes, custom configs
 my $node1 = PostgresNode->new('maximal_test_1', port => undef);
@@ -102,10 +102,9 @@ ok($success, "Aggregates: $msg");
 );
 
 # ML may not be available, that's OK
-if ($success) {
+SKIP: {
+	skip("ML function not available: $msg", 1) unless $success;
 	pass("ML function test: $msg");
-} else {
-	skip("ML function not available: $msg", 1);
 }
 
 # Test GPU features
@@ -127,10 +126,11 @@ ok($success, "Indexes: $msg");
 # Test error handling with TapTest
 # Check that querying a nonexistent table fails
 my $error_result = $node1->psql('postgres', 'SELECT * FROM nonexistent_table;');
-if (!$error_result->{success}) {
+SKIP: {
+	if ($error_result->{success}) {
+		skip('Error handling test - query unexpectedly succeeded', 1);
+	}
 	pass('Error handling works correctly');
-} else {
-	skip('Error handling test - query unexpectedly succeeded', 1);
 }
 
 # Maximal cleanup: multiple nodes

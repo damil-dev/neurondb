@@ -161,7 +161,10 @@ sub _update_config {
 	
 	# Find neurondb library location
 	my $libdir = $self->_find_libdir();
-	my $neurondb_lib = File::Spec->catfile($libdir, 'neurondb.so');
+	# Try both .so (Linux) and .dylib (macOS) extensions
+	my $neurondb_lib_so = File::Spec->catfile($libdir, 'neurondb.so');
+	my $neurondb_lib_dylib = File::Spec->catfile($libdir, 'neurondb.dylib');
+	my $neurondb_lib = (-f $neurondb_lib_dylib) ? $neurondb_lib_dylib : $neurondb_lib_so;
 	
 	open my $fh, '>>', $conf_file or die "Cannot open $conf_file: $!\n";
 	print $fh "\n# Test configuration - Optimized for TAP tests\n";
@@ -173,7 +176,9 @@ sub _update_config {
 		print $fh "shared_preload_libraries = 'neurondb'\n";
 		print $fh "# NeurondB library: $neurondb_lib\n";
 	} else {
-		warn "Warning: neurondb.so not found at $neurondb_lib, skipping preload\n";
+		warn "Warning: neurondb.so/neurondb.dylib not found at $libdir, skipping preload\n";
+		warn "  Tried: $neurondb_lib_so\n";
+		warn "  Tried: $neurondb_lib_dylib\n";
 	}
 	
 	# Optimized settings for testing
