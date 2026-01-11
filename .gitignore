@@ -333,9 +333,6 @@ NeuronDB/tests/error/
 NeuronDB/tests/output/
 !NeuronDB/tests/error/.gitignore
 
-# Test plan files
-NeuronDB/tests/COMPREHENSIVE_PLAN_*.md
-NeuronDB/tests/run_comprehensive_plan.sh
 
 # Regression test artifacts
 NeuronDB/regression.diffs
