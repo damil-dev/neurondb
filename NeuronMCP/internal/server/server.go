@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/neurondb/NeuronMCP/internal/batch"
@@ -139,12 +140,38 @@ func NewServerWithConfig(configPath string) (*Server, error) {
 	metricsCollector := metrics.NewCollectorWithDB(db)
 	prometheusExporter := metrics.NewPrometheusExporter(metricsCollector)
 	
-	/* Create HTTP server for metrics (port 8082 by default) */
-	httpAddr := ":8082"
-	if envAddr := os.Getenv("NEURONMCP_HTTP_ADDR"); envAddr != "" {
-		httpAddr = envAddr
+	/* Determine if HTTP metrics server should be enabled
+	 * - Default: Disabled for stdio mode (MCP over stdin/stdout)
+	 * - Enabled if NEURONMCP_ENABLE_HTTP_METRICS=true
+	 * - The HTTP server is not needed for Claude Desktop and other stdio-based MCP clients
+	 * - Only enable if explicitly requested or when using HTTP transport mode
+	 */
+	var httpServer *HTTPServer
+	enableHTTPMetrics := false
+	
+	/* Check environment variable to explicitly enable HTTP metrics */
+	if envEnable := os.Getenv("NEURONMCP_ENABLE_HTTP_METRICS"); envEnable != "" {
+		if enabled, err := strconv.ParseBool(envEnable); err == nil {
+			enableHTTPMetrics = enabled
+		}
 	}
-	httpServer := NewHTTPServer(httpAddr, prometheusExporter.Handler())
+	
+	if enableHTTPMetrics {
+		/* Create HTTP server for metrics (port 8082 by default) */
+		httpAddr := ":8082"
+		if envAddr := os.Getenv("NEURONMCP_HTTP_ADDR"); envAddr != "" {
+			httpAddr = envAddr
+		}
+		httpServer = NewHTTPServer(httpAddr, prometheusExporter.Handler())
+		logger.Info("HTTP metrics server enabled", map[string]interface{}{
+			"address": httpAddr,
+			"note": "HTTP metrics server is enabled via NEURONMCP_ENABLE_HTTP_METRICS. This is not needed for stdio-based MCP clients like Claude Desktop.",
+		})
+	} else {
+		logger.Info("HTTP metrics server disabled", map[string]interface{}{
+			"note": "HTTP metrics server is disabled by default for stdio mode. Set NEURONMCP_ENABLE_HTTP_METRICS=true to enable.",
+		})
+	}
 
 	s := &Server{
 		mcpServer:          mcpServer,
@@ -205,7 +232,7 @@ func (s *Server) setupHandlers() {
 func (s *Server) Start(ctx context.Context) error {
 	s.logger.Info("Starting Neurondb MCP server", nil)
 	
-	/* Start HTTP metrics server in background */
+	/* Start HTTP metrics server in background (only if enabled) */
 	if s.httpServer != nil {
 		s.httpServer.Start()
 		s.logger.Info("HTTP metrics server started", map[string]interface{}{

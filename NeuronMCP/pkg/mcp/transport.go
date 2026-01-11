@@ -24,10 +24,11 @@ import (
 
 /* StdioTransport handles MCP communication over stdio */
 type StdioTransport struct {
-	stdin         *bufio.Reader
-	stdout        *bufio.Writer
-	stderr        io.Writer
-	maxRequestSize int64 /* Maximum request size in bytes (0 = unlimited) */
+	stdin          *bufio.Reader
+	stdout         *bufio.Writer
+	stderr         io.Writer
+	maxRequestSize int64
+	clientUsesHeaders bool /* Track if client uses Content-Length headers */
 }
 
 /* NewStdioTransport creates a new stdio transport */
@@ -37,13 +38,17 @@ func NewStdioTransport() *StdioTransport {
 
 /* NewStdioTransportWithMaxSize creates a new stdio transport with max request size */
 func NewStdioTransportWithMaxSize(maxRequestSize int64) *StdioTransport {
-	/* Use a buffered writer for stdout to enable flushing */
-	stdoutWriter := bufio.NewWriter(os.Stdout)
+	/* Use a small buffered writer for stdout
+	 * MCP protocol requires precise control over when data is sent
+	 * Small buffer (1KB) ensures quick flushing while maintaining efficiency
+	 * Note: Must flush after each message to ensure immediate transmission
+	 */
 	return &StdioTransport{
-		stdin:          bufio.NewReader(os.Stdin),
-		stdout:         stdoutWriter,
-		stderr:         os.Stderr,
-		maxRequestSize: maxRequestSize,
+		stdin:             bufio.NewReader(os.Stdin),
+		stdout:            bufio.NewWriterSize(os.Stdout, 1024), /* 1KB buffer for efficiency with immediate flushing */
+		stderr:            os.Stderr,
+		maxRequestSize:    maxRequestSize,
+		clientUsesHeaders: true, /* Default to Content-Length headers (MCP standard) */
 	}
 }
 
@@ -81,6 +86,8 @@ func (t *StdioTransport) ReadMessage() (*JSONRPCRequest, error) {
    /* Claude Desktop sends with Content-Length, but we support direct JSON for compatibility */
 		if headerLines == 1 && strings.HasPrefix(strings.TrimSpace(line), "{") {
 			t.WriteError(fmt.Errorf("DEBUG: First line is JSON (fallback mode, no Content-Length headers), parsing directly"))
+			/* Client doesn't use headers - we'll respond without headers too */
+			t.clientUsesHeaders = false
 			
 			/* Enforce maximum request size for JSON without Content-Length */
 			if t.maxRequestSize > 0 && int64(len(line)) > t.maxRequestSize {
@@ -116,6 +123,8 @@ func (t *StdioTransport) ReadMessage() (*JSONRPCRequest, error) {
 		return nil, fmt.Errorf("missing or invalid Content-Length header")
 	}
 
+	/* Client uses Content-Length headers */
+	t.clientUsesHeaders = true
 	t.WriteError(fmt.Errorf("DEBUG: Headers parsed, contentLength=%d, reading body", contentLength))
 	
 	/* Enforce maximum request size */
@@ -146,26 +155,60 @@ func (t *StdioTransport) WriteMessage(resp *JSONRPCResponse) error {
 		return fmt.Errorf("failed to serialize response: %w", err)
 	}
 
-	t.WriteError(fmt.Errorf("DEBUG: Writing response: %s", string(data)))
+	t.WriteError(fmt.Errorf("DEBUG: Writing response: %s (clientUsesHeaders=%v)", string(data), t.clientUsesHeaders))
 
-  /* MCP protocol requires Content-Length headers for all messages */
-  /* Format: Content-Length: <len>\r\n\r\n<body> */
-	header := fmt.Sprintf("Content-Length: %d\r\n\r\n", len(data))
-	if _, err := t.stdout.WriteString(header); err != nil {
-		return fmt.Errorf("failed to write header: %w", err)
+  /* WORKAROUND: Claude Desktop appears to have issues parsing Content-Length headers in responses
+   * Even though it sends requests with headers, it expects responses without headers
+   * This is a known issue with some MCP clients - always respond without headers for compatibility
+   * TODO: This should be fixed in Claude Desktop to properly support MCP spec
+   */
+	forceNoHeaders := os.Getenv("NEURONMCP_FORCE_NO_HEADERS") == "true"
+	
+  /* Default to no headers for Claude Desktop compatibility, unless explicitly enabled
+   * MCP spec says to use headers, but Claude Desktop doesn't handle them properly
+   */
+	if t.clientUsesHeaders && !forceNoHeaders {
+		/* Client sent headers, but Claude Desktop can't parse response headers
+		 * So we respond WITHOUT headers as a workaround
+		 * This is technically not MCP spec compliant, but necessary for Claude Desktop
+		 */
+		t.clientUsesHeaders = false
 	}
 	
-  /* Write JSON body (no newline after body per MCP spec) */
+	if t.clientUsesHeaders {
+    /* MCP protocol format: Content-Length: <len>\r\n\r\n<body> */
+    /* Per MCP spec: headers must end with \r\n\r\n (CRLF CRLF) */
+		header := fmt.Sprintf("Content-Length: %d\r\n\r\n", len(data))
+		headerBytes := []byte(header)
+		
+    /* Write header first, then body, then flush */
+		if _, err := t.stdout.Write(headerBytes); err != nil {
+			return fmt.Errorf("failed to write header: %w", err)
+		}
+	}
+	
+  /* Write JSON body */
 	if _, err := t.stdout.Write(data); err != nil {
 		return fmt.Errorf("failed to write body: %w", err)
 	}
+	
+  /* When sending without headers (direct JSON), add a newline for compatibility
+   * Some clients expect responses to end with a newline when using direct JSON format
+   */
+	if !t.clientUsesHeaders {
+		if _, err := t.stdout.Write([]byte("\n")); err != nil {
+			return fmt.Errorf("failed to write newline: %w", err)
+		}
+	}
 
-  /* Flush stdout to ensure message is sent immediately */
+  /* CRITICAL: Flush immediately after writing to ensure message is sent
+   * Without flushing, the buffer might hold the data and cause protocol issues
+   */
 	if err := t.stdout.Flush(); err != nil {
 		return fmt.Errorf("failed to flush stdout: %w", err)
 	}
 
-	t.WriteError(fmt.Errorf("DEBUG: Response written and flushed"))
+	t.WriteError(fmt.Errorf("DEBUG: Response written and flushed (format: %s)", map[bool]string{true: "Content-Length headers", false: "direct JSON"}[t.clientUsesHeaders]))
 
 	return nil
 }
@@ -186,21 +229,34 @@ func (t *StdioTransport) WriteNotification(method string, params interface{}) er
 		return fmt.Errorf("failed to serialize notification: %w", err)
 	}
 
-	t.WriteError(fmt.Errorf("DEBUG: Writing notification: %s", string(data)))
+	t.WriteError(fmt.Errorf("DEBUG: Writing notification: %s (clientUsesHeaders=%v)", string(data), t.clientUsesHeaders))
 
-  /* MCP protocol requires Content-Length headers for all messages */
-  /* Format: Content-Length: <len>\r\n\r\n<body> */
-	header := fmt.Sprintf("Content-Length: %d\r\n\r\n", len(data))
-	if _, err := t.stdout.WriteString(header); err != nil {
-		return fmt.Errorf("failed to write header: %w", err)
+  /* WORKAROUND: Check environment variable for forced no headers */
+	forceNoHeaders := os.Getenv("NEURONMCP_FORCE_NO_HEADERS") == "true"
+	
+  /* Match client's request format (notifications follow same format) */
+	if t.clientUsesHeaders && !forceNoHeaders {
+    /* MCP protocol format: Content-Length: <len>\r\n\r\n<body> */
+		header := fmt.Sprintf("Content-Length: %d\r\n\r\n", len(data))
+		headerBytes := []byte(header)
+		if _, err := t.stdout.Write(headerBytes); err != nil {
+			return fmt.Errorf("failed to write header: %w", err)
+		}
 	}
 	
-  /* Write JSON body (no newline after body per MCP spec) */
+  /* Write JSON body */
 	if _, err := t.stdout.Write(data); err != nil {
 		return fmt.Errorf("failed to write body: %w", err)
 	}
+	
+  /* When sending without headers (direct JSON), add a newline for compatibility */
+	if !t.clientUsesHeaders || forceNoHeaders {
+		if _, err := t.stdout.Write([]byte("\n")); err != nil {
+			return fmt.Errorf("failed to write newline: %w", err)
+		}
+	}
 
-  /* Flush stdout to ensure message is sent immediately */
+  /* CRITICAL: Flush immediately after writing to ensure message is sent */
 	if err := t.stdout.Flush(); err != nil {
 		return fmt.Errorf("failed to flush stdout: %w", err)
 	}

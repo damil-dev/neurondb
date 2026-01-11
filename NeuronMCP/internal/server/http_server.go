@@ -17,6 +17,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -58,8 +59,8 @@ func NewHTTPServer(addr string, prometheusHandler http.Handler) *HTTPServer {
 func (h *HTTPServer) Start() {
 	go func() {
 		if err := h.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			/* Log error but don't crash - HTTP is optional for metrics */
-			fmt.Printf("HTTP metrics server error: %v\n", err)
+			/* Log error to stderr - never write to stdout as it breaks MCP protocol */
+			fmt.Fprintf(os.Stderr, "HTTP metrics server error: %v\n", err)
 		}
 	}()
 }

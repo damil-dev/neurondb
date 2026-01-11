@@ -3,8 +3,6 @@
 # NeuronMCP Server Startup Script
 # Runs the MCP server with configured environment variables
 
-set -e  # Exit on error
-
 # Get the directory where this script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Try neurondb-mcp first, fall back to neuronmcp
@@ -41,11 +39,19 @@ echo "Database: $NEURONDB_DATABASE@$NEURONDB_HOST:$NEURONDB_PORT"
 echo "User: $NEURONDB_USER"
 echo "=========================================="
 echo ""
+echo "Press Ctrl+C to shutdown gracefully"
+echo ""
 
 # Change to script directory
 cd "$SCRIPT_DIR"
 
-# Run the MCP server
+# Run the MCP server in the foreground using exec
+# This replaces the shell process, maintaining stdio connection
+# The binary itself handles SIGINT and SIGTERM signals for graceful shutdown
+# Using exec is necessary because:
+# 1. MCP servers communicate via stdio (stdin/stdout for JSON-RPC)
+# 2. Running in background (&) disconnects stdin, causing immediate EOF and exit
+# 3. The binary has its own signal handlers for graceful shutdown
 exec "$BINARY_PATH"
 
 

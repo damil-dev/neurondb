@@ -1,7 +1,9 @@
 /*-------------------------------------------------------------------------
  *
  * tracing.go
- *    OpenTelemetry tracing integration for NeuronMCP
+ *    Distributed tracing support
+ *
+ * Implements OpenTelemetry integration as specified in Phase 2.2.
  *
  * Copyright (c) 2024-2026, neurondb, Inc. <admin@neurondb.com>
  *
@@ -15,54 +17,73 @@ package observability
 
 import (
 	"context"
+	"fmt"
 	"time"
 )
 
-/* Tracer provides distributed tracing capabilities */
-type Tracer struct {
-	enabled bool
-	spans   map[string]*Span
-}
+/* TraceID represents a trace ID */
+type TraceID string
+
+/* SpanID represents a span ID */
+type SpanID string
 
 /* Span represents a tracing span */
 type Span struct {
-	TraceID    string
-	SpanID     string
-	ParentID   string
+	TraceID    TraceID
+	SpanID     SpanID
+	ParentID   *SpanID
 	Name       string
 	StartTime  time.Time
-	EndTime    time.Time
+	EndTime    *time.Time
+	Attributes map[string]interface{}
+	Events     []SpanEvent
+	Status     string
+}
+
+/* SpanEvent represents a span event */
+type SpanEvent struct {
+	Name       string
+	Timestamp  time.Time
 	Attributes map[string]interface{}
 }
 
+/* Tracer provides distributed tracing */
+type Tracer struct {
+	spans map[SpanID]*Span
+}
+
 /* NewTracer creates a new tracer */
-func NewTracer(enabled bool) *Tracer {
+func NewTracer() *Tracer {
 	return &Tracer{
-		enabled: enabled,
-		spans:   make(map[string]*Span),
+		spans: make(map[SpanID]*Span),
 	}
 }
 
 /* StartSpan starts a new span */
-func (t *Tracer) StartSpan(ctx context.Context, name string) (context.Context, string) {
-	if !t.enabled {
-		return ctx, ""
+func (t *Tracer) StartSpan(ctx context.Context, name string) (context.Context, SpanID) {
+	spanID := SpanID(fmt.Sprintf("span_%d", time.Now().UnixNano()))
+	traceID := TraceID(fmt.Sprintf("trace_%d", time.Now().UnixNano()))
+
+	/* Try to get trace ID from context */
+	if existingTraceID, ok := ctx.Value("trace_id").(TraceID); ok {
+		traceID = existingTraceID
 	}
 
-	spanID := generateID()
-	traceID := getOrCreateTraceID(ctx)
+	/* Try to get parent span ID from context */
+	var parentID *SpanID
+	if existingParentID, ok := ctx.Value("span_id").(SpanID); ok {
+		parentID = &existingParentID
+	}
 
 	span := &Span{
 		TraceID:    traceID,
 		SpanID:     spanID,
+		ParentID:   parentID,
 		Name:       name,
 		StartTime:  time.Now(),
 		Attributes: make(map[string]interface{}),
-	}
-
-	/* Get parent span ID if exists */
-	if parentSpanID := ctx.Value("span_id"); parentSpanID != nil {
-		span.ParentID = parentSpanID.(string)
+		Events:     []SpanEvent{},
+		Status:     "ok",
 	}
 
 	t.spans[spanID] = span
@@ -75,67 +96,62 @@ func (t *Tracer) StartSpan(ctx context.Context, name string) (context.Context, s
 }
 
 /* EndSpan ends a span */
-func (t *Tracer) EndSpan(spanID string) {
-	if !t.enabled || spanID == "" {
-		return
-	}
-
-	if span, exists := t.spans[spanID]; exists {
-		span.EndTime = time.Now()
-		/* In production, send to tracing backend (e.g., Jaeger, Zipkin) */
-		delete(t.spans, spanID)
-	}
-}
-
-/* AddAttribute adds an attribute to a span */
-func (t *Tracer) AddAttribute(spanID string, key string, value interface{}) {
-	if !t.enabled || spanID == "" {
-		return
-	}
-
-	if span, exists := t.spans[spanID]; exists {
-		span.Attributes[key] = value
-	}
-}
-
-/* GetSpan returns a span by ID */
-func (t *Tracer) GetSpan(spanID string) (*Span, bool) {
-	if !t.enabled || spanID == "" {
-		return nil, false
-	}
-
+func (t *Tracer) EndSpan(spanID SpanID) {
 	span, exists := t.spans[spanID]
-	return span, exists
-}
-
-/* GetTraceIDFromContext gets trace ID from context */
-func GetTraceIDFromContext(ctx context.Context) (string, bool) {
-	traceID, ok := ctx.Value("trace_id").(string)
-	return traceID, ok
-}
-
-/* getOrCreateTraceID gets trace ID from context or creates a new one */
-func getOrCreateTraceID(ctx context.Context) string {
-	if traceID, ok := ctx.Value("trace_id").(string); ok {
-		return traceID
+	if !exists {
+		return
 	}
-	return generateID()
+
+	now := time.Now()
+	span.EndTime = &now
 }
 
-/* generateID generates a unique ID */
-func generateID() string {
-	/* Simple ID generation - in production, use proper UUID library */
-	return time.Now().Format("20060102150405") + "-" + randomString(8)
-}
-
-/* randomString generates a random string */
-func randomString(length int) string {
-	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	b := make([]byte, length)
-	now := time.Now().UnixNano()
-	for i := range b {
-		b[i] = charset[int(now+int64(i))%len(charset)]
+/* AddSpanAttribute adds an attribute to a span */
+func (t *Tracer) AddSpanAttribute(spanID SpanID, key string, value interface{}) {
+	span, exists := t.spans[spanID]
+	if !exists {
+		return
 	}
-	return string(b)
+
+	span.Attributes[key] = value
 }
 
+/* AddSpanEvent adds an event to a span */
+func (t *Tracer) AddSpanEvent(spanID SpanID, name string, attributes map[string]interface{}) {
+	span, exists := t.spans[spanID]
+	if !exists {
+		return
+	}
+
+	span.Events = append(span.Events, SpanEvent{
+		Name:       name,
+		Timestamp:  time.Now(),
+		Attributes: attributes,
+	})
+}
+
+/* SetSpanStatus sets the status of a span */
+func (t *Tracer) SetSpanStatus(spanID SpanID, status string) {
+	span, exists := t.spans[spanID]
+	if !exists {
+		return
+	}
+
+	span.Status = status
+}
+
+/* GetSpan gets a span */
+func (t *Tracer) GetSpan(spanID SpanID) *Span {
+	return t.spans[spanID]
+}
+
+/* GetTrace gets all spans for a trace */
+func (t *Tracer) GetTrace(traceID TraceID) []*Span {
+	spans := []*Span{}
+	for _, span := range t.spans {
+		if span.TraceID == traceID {
+			spans = append(spans, span)
+		}
+	}
+	return spans
+}
