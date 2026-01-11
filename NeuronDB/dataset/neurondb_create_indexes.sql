@@ -4,7 +4,7 @@
 -- Creates HNSW indexes on vector columns for fast similarity search.
 --
 -- Usage:
---   psql -d nurondb_dataset -f 03_create_indexes.sql
+--   psql -d nurondb_dataset -f neurondb_create_indexes.sql
 -- ============================================================================
 
 \timing on

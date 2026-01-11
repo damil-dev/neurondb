@@ -14,6 +14,13 @@ set -e
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 cd "$PROJECT_ROOT"
+SCRIPT_NAME=$(basename "$0")
+
+# Version
+VERSION="2.0.0"
+
+# Default values
+VERBOSE=false
 
 # Configuration
 export PGHOST="${PGHOST:-localhost}"
@@ -27,16 +34,73 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
-echo "========================================"
-echo "NeurondB Regression Testing with Datasets"
-echo "========================================"
-echo "PostgreSQL: $PGHOST:$PGPORT"
-echo "Test Database: $TEST_DB"
-echo "Project Root: $PROJECT_ROOT"
-echo "========================================"
-echo ""
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+	case $1 in
+		-v|--verbose)
+			VERBOSE=true
+			shift
+			;;
+		-V|--version)
+			echo "neurondb_test_datasets.sh version $VERSION"
+			exit 0
+			;;
+		-h|--help)
+			cat << EOF
+NeuronDB Comprehensive Regression Testing with Real Datasets
+
+Usage:
+    $SCRIPT_NAME [OPTIONS]
+
+Description:
+    This script:
+    1. Sets up test database
+    2. Loads comprehensive datasets
+    3. Runs full regression suite
+    4. Reports results
+
+Options:
+    -v, --verbose    Enable verbose output
+    -V, --version    Show version information
+    -h, --help       Show this help message
+
+Environment Variables:
+    PGHOST       Database host (default: localhost)
+    PGPORT       Database port (default: 5432)
+    PGUSER       Database user (default: postgres)
+    PGDATABASE   Database name (default: neurondb_test)
+
+Examples:
+    # Basic usage
+    $SCRIPT_NAME
+
+    # With verbose output
+    $SCRIPT_NAME --verbose
+
+EOF
+			exit 0
+			;;
+		*)
+			echo -e "${RED}Unknown option: $1${NC}" >&2
+			echo "Use -h or --help for usage information" >&2
+			exit 1
+			;;
+	esac
+done
+
+if [ "$VERBOSE" = true ]; then
+	echo "========================================"
+	echo "NeuronDB Regression Testing with Datasets"
+	echo "========================================"
+	echo "PostgreSQL: $PGHOST:$PGPORT"
+	echo "Test Database: $TEST_DB"
+	echo "Project Root: $PROJECT_ROOT"
+	echo "========================================"
+	echo ""
+fi
 
 # Step 1: Ensure NeurondB is compiled
 echo -e "${BLUE}Step 1: Building NeurondB Extension${NC}"
@@ -68,14 +132,14 @@ echo ""
 # Step 3: Create/Recreate test database
 echo -e "${BLUE}Step 3: Setting up Test Database${NC}"
 echo "----------------------------------------"
-python3 gen_dataset_enhanced.py --recreate-db --dbname "$TEST_DB"
+python3 neurondb_dataset.py --recreate-db --dbname "$TEST_DB"
 echo ""
 
 # Step 4: Install NeurondB extension in test database
 echo -e "${BLUE}Step 4: Installing NeurondB Extension${NC}"
 echo "----------------------------------------"
 export PGDATABASE="$TEST_DB"
-psql -v ON_ERROR_STOP=1 -f setup_test_db.sql
+psql -v ON_ERROR_STOP=1 -f neurondb_setup_test_db.sql
 echo -e "${GREEN}✓ Extension installed${NC}"
 echo ""
 
@@ -86,26 +150,26 @@ echo "This may take 10-30 minutes depending on network speed..."
 echo ""
 
 echo -e "${YELLOW}[1/6]${NC} Loading MS MARCO passages (document retrieval)..."
-python3 gen_dataset_enhanced.py --load-msmarco --limit 10000 --dbname "$TEST_DB"
+python3 neurondb_dataset.py --load-msmarco --limit 10000 --dbname "$TEST_DB"
 
 echo -e "${YELLOW}[2/6]${NC} Loading Wikipedia embeddings (clustering, PCA)..."
-python3 gen_dataset_enhanced.py --load-wikipedia --limit 5000 --dbname "$TEST_DB"
+python3 neurondb_dataset.py --load-wikipedia --limit 5000 --dbname "$TEST_DB"
 
 echo -e "${YELLOW}[3/6]${NC} Loading HotpotQA (question answering, MMR)..."
-python3 gen_dataset_enhanced.py --load-hotpotqa --limit 3000 --dbname "$TEST_DB"
+python3 neurondb_dataset.py --load-hotpotqa --limit 3000 --dbname "$TEST_DB"
 
 echo -e "${YELLOW}[4/6]${NC} Loading SIFT vectors (high-dim, quantization)..."
-python3 gen_dataset_enhanced.py --load-sift --limit 50000 --dbname "$TEST_DB"
+python3 neurondb_dataset.py --load-sift --limit 50000 --dbname "$TEST_DB"
 
 echo -e "${YELLOW}[5/6]${NC} Loading Deep1B vectors (scalability)..."
-python3 gen_dataset_enhanced.py --load-deep1b --limit 20000 --dbname "$TEST_DB"
+python3 neurondb_dataset.py --load-deep1b --limit 20000 --dbname "$TEST_DB"
 
 echo -e "${YELLOW}[6/6]${NC} Creating synthetic test datasets..."
-python3 gen_dataset_enhanced.py --create-synthetic --dbname "$TEST_DB"
+python3 neurondb_dataset.py --create-synthetic --dbname "$TEST_DB"
 
 echo ""
 echo -e "${YELLOW}Creating full-text search indexes...${NC}"
-python3 gen_dataset_enhanced.py --create-fts-indexes --dbname "$TEST_DB"
+python3 neurondb_dataset.py --create-fts-indexes --dbname "$TEST_DB"
 
 echo ""
 echo -e "${GREEN}✓ All datasets loaded${NC}"
@@ -114,7 +178,7 @@ echo ""
 # Step 6: Show dataset statistics
 echo -e "${BLUE}Step 6: Dataset Statistics${NC}"
 echo "----------------------------------------"
-python3 gen_dataset_enhanced.py --show-stats --dbname "$TEST_DB"
+python3 neurondb_dataset.py --show-stats --dbname "$TEST_DB"
 echo ""
 
 deactivate
@@ -188,4 +252,3 @@ echo "  dropdb $TEST_DB"
 echo ""
 
 exit $RESULT
-

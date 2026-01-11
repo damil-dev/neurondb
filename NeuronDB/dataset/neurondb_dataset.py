@@ -13,10 +13,10 @@ Supports:
   - Synthetic test data generation
 
 Usage:
-  python3 gen_dataset_enhanced.py --recreate-db
-  python3 gen_dataset_enhanced.py --load-msmarco --limit 10000
-  python3 gen_dataset_enhanced.py --load-all
-  python3 gen_dataset_enhanced.py --show-stats
+  python3 neurondb_dataset.py --recreate-db
+  python3 neurondb_dataset.py --load-msmarco --limit 10000
+  python3 neurondb_dataset.py --load-all
+  python3 neurondb_dataset.py --show-stats
 """
 
 import argparse
@@ -24,13 +24,16 @@ import os
 import sys
 from pathlib import Path
 
-# Import all functions from the original gen_dataset.py
+# Version
+__version__ = "2.0.0"
+
+# Import all functions from the original neurondb_gen_dataset.py
 # We'll import it as a module
 sys.path.insert(0, str(Path(__file__).parent))
 try:
-    import gen_dataset as gd
+    import neurondb_gen_dataset as gd
 except ImportError:
-    print("Error: Could not import gen_dataset.py", file=sys.stderr)
+    print("Error: Could not import neurondb_gen_dataset.py", file=sys.stderr)
     sys.exit(1)
 
 
@@ -95,6 +98,9 @@ Examples:
                         help='Create full-text search indexes')
     parser.add_argument('--show-stats', action='store_true',
                         help='Show dataset statistics')
+    
+    # Version
+    parser.add_argument('--version', action='version', version=f'neurondb_dataset.py version {__version__}')
 
     args = parser.parse_args()
 

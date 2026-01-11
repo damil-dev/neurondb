@@ -3,7 +3,7 @@
 # Script to run pg_indent on all C and header files in NeuronDB
 #
 # Usage:
-#   ./run_pgindent.sh [--check|--diff] [files...]
+#   ./neurondb_format.sh [--check|--diff] [files...]
 #
 # Options:
 #   --check    Show which files would be changed (dry-run)
@@ -13,9 +13,12 @@
 
 set -e
 
+# Version
+VERSION="1.0.0"
+
 # Configuration
 PG_INDENT_SCRIPT="/home/pge/pge/postgres.18/src/tools/pgindent/pgindent"
-PG_BSD_INDENT_WRAPPER="$(dirname "$0")/pg_bsd_indent_wrapper.sh"
+PG_BSD_INDENT_WRAPPER="$(dirname "$0")/neurondb_bsd_indent_wrapper.sh"
 PG_BSD_INDENT="/home/pge/pge/postgres.18/src/tools/pg_bsd_indent/pg_bsd_indent"
 TYPEDEFS_FILE="$(dirname "$0")/../typedefs.list"
 NEURONDB_ROOT="$(dirname "$0")/.."
@@ -56,6 +59,7 @@ cd "$NEURONDB_ROOT" || exit 1
 
 # Parse arguments
 MODE=""
+VERBOSE=false
 FILES=()
 
 for arg in "$@"; do
@@ -66,12 +70,22 @@ for arg in "$@"; do
         --diff)
             MODE="--diff"
             ;;
+        -v|--verbose)
+            VERBOSE=true
+            ;;
+        -V|--version)
+            echo "neurondb_format.sh version $VERSION"
+            exit 0
+            ;;
         --help|-h)
-            echo "Usage: $0 [--check|--diff] [files...]"
+            echo "Usage: neurondb_format.sh [--check|--diff] [files...]"
             echo ""
             echo "Options:"
             echo "  --check    Show which files would be changed (dry-run)"
             echo "  --diff     Show the diff of changes that would be made"
+            echo "  -v, --verbose   Enable verbose output"
+            echo "  -V, --version   Show version information"
+            echo "  -h, --help      Show this help message"
             echo "  files      Specific files to format (default: all .c and .h files)"
             exit 0
             ;;
@@ -100,7 +114,7 @@ fi
 
 # If specific files provided, use them; otherwise find all .c and .h files
 if [ ${#FILES[@]} -eq 0 ]; then
-    echo "Finding all .c and .h files in src/ and include/ directories..."
+    [ "$VERBOSE" = true ] && echo "Finding all .c and .h files in src/ and include/ directories..."
     # Find all .c and .h files, excluding object files and other generated files
     while IFS= read -r -d '' file; do
         FILES+=("$file")
@@ -113,7 +127,9 @@ if [ ${#FILES[@]} -eq 0 ]; then
 fi
 
 echo "Processing ${#FILES[@]} file(s)..."
-echo ""
+[ "$VERBOSE" = true ] && echo ""
+[ "$VERBOSE" = true ] && echo "Command: ${CMD[*]} ${FILES[*]}"
+[ "$VERBOSE" = true ] && echo ""
 
 # Run pgindent
 "${CMD[@]}" "${FILES[@]}"

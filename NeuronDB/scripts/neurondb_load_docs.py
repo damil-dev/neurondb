@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 -------------------------------------------------------------------------
-load_docs.py
+neurondb_load_docs.py
     Main entry point for loading documentation files and creating embeddings
 
 Main entry point for loading documentation files and creating embeddings
@@ -12,7 +12,7 @@ and batch processing.
 Copyright (c) 2024-2026, neurondb, Inc.
 
 IDENTIFICATION
-    NeuronDB/scripts/load_docs.py
+    NeuronDB/scripts/neurondb_load_docs.py
 -------------------------------------------------------------------------
 """
 
@@ -23,10 +23,13 @@ import psycopg2
 from pathlib import Path
 
 # Import modular components
-from doc_processor import FileProcessor
-from chunking import SQLChunker
-from db_operations import DatabaseSchema, DocumentLoader, StatisticsManager
-from embeddings import EmbeddingGenerator, VectorIndexManager
+from neurondb_doc_processor import FileProcessor
+from neurondb_chunking import SQLChunker
+from neurondb_db_operations import DatabaseSchema, DocumentLoader, StatisticsManager
+from neurondb_embeddings import EmbeddingGenerator, VectorIndexManager
+
+# Version
+__version__ = "2.0.0"
 
 
 class DocumentationLoader:
@@ -178,13 +181,13 @@ def main():
 		epilog="""
 Examples:
   # Basic usage
-  python3 load_docs.py -d /path/to/docs
+  python3 neurondb_load_docs.py -d /path/to/docs
 
   # Custom database and model
-  python3 load_docs.py -d /path/to/docs -D mydb -U myuser -m all-mpnet-base-v2
+  python3 neurondb_load_docs.py -d /path/to/docs -D mydb -U myuser -m all-mpnet-base-v2
 
   # Skip embeddings (just load and chunk)
-  python3 load_docs.py -d /path/to/docs --skip-embeddings
+  python3 neurondb_load_docs.py -d /path/to/docs --skip-embeddings
 		"""
 	)
 	
@@ -214,6 +217,7 @@ Examples:
 		help='Batch size for embeddings (default: 100)')
 	parser.add_argument('-v', '--verbose', action='store_true',
 		help='Verbose output')
+	parser.add_argument('--version', action='version', version=f'neurondb_load_docs.py version {__version__}')
 	
 	args = parser.parse_args()
 	
