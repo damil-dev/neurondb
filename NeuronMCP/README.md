@@ -30,19 +30,21 @@ The official documentation provides:
 | Feature | Description |
 |---------|-------------|
 | **MCP Protocol** | Full JSON-RPC 2.0 implementation with stdio, HTTP, and SSE transport |
-| **Vector Operations** | 50+ tools for search, embedding generation, indexing with 7+ distance metrics |
-| **ML Tools** | Complete ML pipeline: training, prediction, evaluation, AutoML |
-| **RAG Operations** | Document processing, context retrieval, response generation with reranking |
+| **Vector Operations** | 50+ tools for vector search (L2, cosine, inner product), embedding generation, indexing (HNSW, IVF), quantization (int8, fp16, binary, uint8, ternary, int4), and 7+ distance metrics |
+| **ML Tools** | Complete ML pipeline: training (52+ algorithms), prediction, evaluation, AutoML, ONNX model support, time series analysis, and analytics |
+| **RAG Operations** | Document processing, context retrieval, response generation with multiple reranking methods (cross-encoder, LLM, Cohere, ColBERT, LTR, ensemble) |
+| **PostgreSQL Tools** | 27 comprehensive PostgreSQL administration tools for version, stats, databases, connections, locks, replication, settings, extensions, tables, indexes, schemas, views, sequences, functions, triggers, constraints, users, roles, permissions, table/index stats, active queries, wait events, sizes, bloat, and vacuum stats |
+| **Dataset Loading** | Load datasets from HuggingFace, URLs, GitHub, S3, and local files with automatic schema detection, embedding generation, and index creation |
 | **Resources** | Schema, models, indexes, config, workers, stats with real-time subscriptions |
 | **Prompts Protocol** | Full prompts/list and prompts/get with template engine |
 | **Sampling/Completions** | sampling/createMessage with streaming support |
 | **Progress Tracking** | Long-running operation progress with progress/get |
 | **Batch Operations** | Transactional batch tool calls (tools/call_batch) |
 | **Tool Discovery** | Search and filter tools with categorization |
-| **Middleware** | Pluggable middleware: validation, logging, timeout, error handling, auth, rate limiting |
-| **Security** | JWT, API keys, OAuth2 authentication with rate limiting |
-| **Performance** | Caching layer with TTL, connection pooling |
-| **Enterprise** | Metrics (Prometheus), webhooks, retry/resilience (circuit breaker) |
+| **Middleware System** | Pluggable middleware pipeline: request validation, structured logging, configurable timeouts, comprehensive error handling, authentication (JWT, API keys, OAuth2), and rate limiting with per-key quotas |
+| **Security** | Multiple authentication methods (JWT, API keys, OAuth2), rate limiting, request validation, and secure credential storage |
+| **Performance** | TTL-based caching layer with idempotency support, connection pooling, and optimized query execution |
+| **Enterprise Features** | Prometheus metrics export, webhook notifications, circuit breaker for resilience, retry mechanisms, health checks, and comprehensive monitoring |
 | **Health Checks** | Database, tools, and resource availability monitoring |
 | **Configuration** | JSON config files with environment variable overrides |
 | **Modular Architecture** | 19 independent packages with clean separation of concerns |
