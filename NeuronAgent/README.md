@@ -28,14 +28,24 @@ The official documentation provides:
 
 | Feature | Description |
 |---------|-------------|
-| **Agent Runtime** | Complete state machine for autonomous task execution |
-| **Long-term Memory** | HNSW-based vector search for context retrieval |
-| **Tool System** | Extensible tool registry with SQL, HTTP, Code, and Shell tools |
-| **REST API** | Full CRUD API for agents, sessions, and messages |
-| **WebSocket Support** | Streaming agent responses in real-time |
-| **Authentication** | API key-based authentication with rate limiting |
-| **Background Jobs** | PostgreSQL-based job queue with worker pool |
-| **NeuronDB Integration** | Direct integration with NeuronDB embedding and LLM functions |
+| **Agent Runtime** | Complete state machine for autonomous task execution with persistent memory |
+| **Multi-Agent Collaboration** | Agent-to-agent communication, task delegation, shared workspaces, and hierarchical agent structures |
+| **Workflow Engine** | DAG-based workflow execution with agent, tool, HTTP, approval, and conditional steps |
+| **Human-in-the-Loop (HITL)** | Approval gates, feedback loops, and human oversight in workflows with email/webhook notifications |
+| **Hierarchical Memory** | Multi-level memory organization with HNSW-based vector search for better context retrieval |
+| **Long-term Memory** | HNSW-based vector search for context retrieval with memory promotion |
+| **Planning & Reflection** | LLM-based planning with task decomposition, agent self-reflection, and quality assessment |
+| **Evaluation Framework** | Built-in evaluation system for agent performance with automated quality scoring |
+| **Budget & Cost Management** | Real-time cost tracking, per-agent and per-session budget controls, and budget alerts |
+| **Tool System (20+ Tools)** | Extensible tool registry with SQL, HTTP, Code, Shell, Browser (Playwright), Filesystem (virtual), Memory, Collaboration, NeuronDB tools (RAG, Hybrid Search, Reranking, Vector, ML, Analytics, Visualization), and Multimodal processing |
+| **REST API** | Full CRUD API for agents, sessions, messages, workflows, plans, budgets, and collaborations |
+| **WebSocket Support** | Streaming agent responses in real-time with event streaming |
+| **Authentication & Security** | API key-based authentication with bcrypt hashing, RBAC, fine-grained permissions, and audit logging |
+| **Background Jobs** | PostgreSQL-based job queue with worker pool, async task execution, and memory promotion |
+| **Observability** | Prometheus metrics, structured logging, distributed tracing, and debugging tools |
+| **NeuronDB Integration** | Direct integration with NeuronDB embedding, LLM, vector search, and ML functions |
+| **Virtual Filesystem** | Isolated filesystem for agents with secure file operations |
+| **Versioning & History** | Version control for agents, execution replay, and state snapshots |
 
 ## Architecture
 

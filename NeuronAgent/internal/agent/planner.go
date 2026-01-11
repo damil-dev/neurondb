@@ -21,22 +21,47 @@ import (
 )
 
 type Planner struct {
-	maxIterations int
-	llm           *LLMClient
+	maxIterations    int
+	llm              *LLMClient
+	reasoningEngine  *ReasoningEngine
+	reasoningMode    ReasoningMode
 }
 
 func NewPlanner() *Planner {
 	return &Planner{
 		maxIterations: 10,  /* Prevent infinite loops */
 		llm:           nil, /* Will be set by runtime */
+		reasoningMode: ReasoningModeStandard,
 	}
 }
 
 /* NewPlannerWithLLM creates a planner with LLM support */
 func NewPlannerWithLLM(llm *LLMClient) *Planner {
+	config := ReasoningConfig{
+		Mode:              ReasoningModeStandard,
+		MaxThoughts:       5,
+		ConsistencySamples: 3,
+		EnableAdaptive:    true,
+		Temperature:       0.7,
+	}
 	return &Planner{
-		maxIterations: 10,
-		llm:           llm,
+		maxIterations:  10,
+		llm:            llm,
+		reasoningEngine: NewReasoningEngine(llm, config),
+		reasoningMode:  ReasoningModeStandard,
+	}
+}
+
+/* NewPlannerWithReasoning creates a planner with advanced reasoning support */
+func NewPlannerWithReasoning(llm *LLMClient, mode ReasoningMode, config ReasoningConfig) *Planner {
+	if config.Mode == "" {
+		config.Mode = mode
+	}
+	return &Planner{
+		maxIterations:  10,
+		llm:            llm,
+		reasoningEngine: NewReasoningEngine(llm, config),
+		reasoningMode:  mode,
 	}
 }
 
@@ -55,6 +80,17 @@ func (p *Planner) Plan(ctx context.Context, userMessage string, availableTools [
 		return p.simplePlan(userMessage), nil
 	}
 
+	/* Use advanced reasoning if configured */
+	if p.reasoningEngine != nil && p.reasoningMode != ReasoningModeStandard {
+		return p.planWithReasoning(ctx, userMessage, availableTools)
+	}
+
+	/* Standard planning */
+	return p.planStandard(ctx, userMessage, availableTools)
+}
+
+/* planStandard creates a plan using standard planning */
+func (p *Planner) planStandard(ctx context.Context, userMessage string, availableTools []string) ([]PlanStep, error) {
 	/* Build planning prompt with recursive decomposition support */
 	toolsList := strings.Join(availableTools, ", ")
 	prompt := fmt.Sprintf(`You are a task planning assistant. Break down the following task into a series of steps.
@@ -115,6 +151,73 @@ Example format:
 	steps = p.addDependencyTracking(steps)
 
 	return steps, nil
+}
+
+/* planWithReasoning creates a plan using advanced reasoning patterns */
+func (p *Planner) planWithReasoning(ctx context.Context, userMessage string, availableTools []string) ([]PlanStep, error) {
+	var steps []PlanStep
+	var err error
+
+	switch p.reasoningMode {
+	case ReasoningModeChainOfThought:
+		/* Chain-of-Thought: convert thoughts to plan steps */
+		thoughts, err2 := p.reasoningEngine.ChainOfThoughtReasoning(ctx, userMessage, availableTools)
+		if err2 != nil {
+			return p.planStandard(ctx, userMessage, availableTools) /* Fallback */
+		}
+		steps = p.thoughtsToPlanSteps(thoughts)
+
+	case ReasoningModeTreeOfThoughts:
+		/* Tree-of-Thoughts: explore multiple paths */
+		thoughts, err2 := p.reasoningEngine.TreeOfThoughtsReasoning(ctx, userMessage, availableTools)
+		if err2 != nil {
+			return p.planStandard(ctx, userMessage, availableTools) /* Fallback */
+		}
+		steps = p.thoughtsToPlanSteps(thoughts)
+
+	case ReasoningModeSelfConsistency:
+		/* Self-Consistency: generate multiple plans and find consensus */
+		steps, err = p.reasoningEngine.SelfConsistencyReasoning(ctx, userMessage, availableTools)
+		if err != nil {
+			return p.planStandard(ctx, userMessage, availableTools) /* Fallback */
+		}
+
+	default:
+		/* Fallback to standard */
+		return p.planStandard(ctx, userMessage, availableTools)
+	}
+
+	/* Validate and optimize plan */
+	steps = p.validatePlan(steps, availableTools)
+
+	/* Optimize plan if enabled */
+	if p.reasoningEngine.config.EnableAdaptive {
+		optimized, err2 := p.reasoningEngine.PlanOptimization(ctx, steps, availableTools)
+		if err2 == nil && len(optimized) > 0 {
+			steps = optimized
+		}
+	}
+
+	/* Add dependency tracking */
+	steps = p.addDependencyTracking(steps)
+
+	return steps, nil
+}
+
+/* thoughtsToPlanSteps converts thoughts to plan steps */
+func (p *Planner) thoughtsToPlanSteps(thoughts []Thought) []PlanStep {
+	var steps []PlanStep
+	for _, thought := range thoughts {
+		/* Extract plan information from thought content */
+		/* This is a simplified conversion - in practice, thoughts might contain structured data */
+		step := PlanStep{
+			Action:  thought.Content,
+			Tool:    "", /* Would need to parse from thought */
+			Payload: make(map[string]interface{}),
+		}
+		steps = append(steps, step)
+	}
+	return steps
 }
 
 /* needsRecursiveDecomposition checks if plan needs further decomposition */
