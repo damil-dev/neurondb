@@ -1400,6 +1400,9 @@ ivfbulkdelete(IndexVacuumInfo * info,
 				if (!ItemIdIsValid(itemId) || ItemIdIsDead(itemId))
 					continue;
 
+				if (!ItemIdHasStorage(itemId))
+					continue;
+
 				entry = (IvfListEntry) PageGetItem(listPage, itemId);
 
 				/* Check callback to see if this tuple should be deleted */

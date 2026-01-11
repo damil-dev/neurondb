@@ -409,6 +409,15 @@ validate_hnsw_index(Relation index)
 				if (!ItemIdIsValid(itemId) || ItemIdIsDead(itemId))
 					continue;
 
+				if (!ItemIdHasStorage(itemId))
+				{
+					appendStringInfo(&result->messages,
+									 "WARN: ItemId at offset %u on page %u has no storage\n",
+									 offnum, blkno);
+					result->warnings++;
+					continue;
+				}
+
 				{
 					HnswNode	node = (HnswNode) PageGetItem(nodePage, itemId);
 
