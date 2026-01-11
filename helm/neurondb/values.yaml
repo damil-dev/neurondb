@@ -357,8 +357,8 @@ ingress:
 # Secrets
 secrets:
   create: true
-  postgresPassword: "" # Auto-generated if empty (32 char random)
-  agentApiKeys: [] # List of API keys
+  postgresPassword: ""  # Auto-generated if empty (32 char random)
+  agentApiKeys: []  # List of API keys
 
 # External Secrets Integration
 externalSecrets:
@@ -586,8 +586,8 @@ resourceGovernance:
 # Backup
 backup:
   enabled: true
-  schedule: "0 2 * * *" # Daily at 2 AM (cron format)
-  retention: 30 # days
+  schedule: "0 2 * * *"  # Daily at 2 AM (cron format)
+  retention: 30  # days
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 1
   activeDeadlineSeconds: 3600
