@@ -68,7 +68,7 @@ export DB_USER=neurondb     # Docker Compose default user
 export DB_PASSWORD=neurondb  # Docker Compose default password
 
 # Run automated setup
-./scripts/setup_neurondesktop.sh
+./scripts/neurondesktop_setup.sh
 ```
 
 This script will:
@@ -131,9 +131,29 @@ docker-compose up -d
 
 **Note:** The standalone setup uses its own Postgres container on port 5433, which may conflict with the root-level stack if both are running simultaneously.
 
-### Manual Setup
+#### Running as a Service
 
-#### Backend
+For systemd (Linux) or launchd (macOS), see [Service Management Guide](../../Docs/getting-started/installation-services.md).
+
+### Native Installation
+
+#### Automated Installation (Recommended)
+
+Use the installation script for easy setup:
+
+```bash
+# From repository root
+sudo ./scripts/install-neurondesktop.sh
+
+# With system service enabled
+sudo ./scripts/install-neurondesktop.sh --enable-service
+```
+
+**Note:** The installation script installs the API backend. For the frontend, see [Frontend Setup](#frontend-setup) below.
+
+#### Manual Setup
+
+##### Backend
 
 ```bash
 cd api
@@ -153,7 +173,16 @@ psql -d neurondesk -f migrations/001_initial_schema.sql
 go run cmd/server/main.go
 ```
 
-#### Frontend
+Or use the setup script:
+
+```bash
+cd NeuronDesktop
+./scripts/neurondesktop_setup.sh
+cd api
+go run cmd/server/main.go
+```
+
+##### Frontend
 
 ```bash
 cd frontend
