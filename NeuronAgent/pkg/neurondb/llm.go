@@ -324,3 +324,41 @@ func parseToolCalls(output string) []ToolCall {
 
 	return toolCalls
 }
+
+/* AnalyzeImage analyzes an image using NeuronDB vision capabilities */
+func (c *LLMClient) AnalyzeImage(ctx context.Context, imageData []byte, prompt string, config LLMConfig) (string, error) {
+	/* Build parameters JSON */
+	params := make(map[string]interface{})
+	if config.Temperature != nil {
+		params["temperature"] = *config.Temperature
+	}
+	if config.MaxTokens != nil {
+		params["max_tokens"] = *config.MaxTokens
+	}
+	if config.TopP != nil {
+		params["top_p"] = *config.TopP
+	}
+
+	paramsJSON, err := json.Marshal(params)
+	if err != nil {
+		return "", fmt.Errorf("image analysis failed: parameter_marshaling_error=true, error=%w", err)
+	}
+
+	/* Use NeuronDB image analysis function */
+	/* Try neurondb_llm_image_analyze first, fallback to ndb_llm_image_analyze */
+	var output string
+	query := `SELECT neurondb_llm_image_analyze($1::bytea, $2, $3::jsonb, $4) AS output`
+
+	err = c.db.GetContext(ctx, &output, query, imageData, prompt, paramsJSON, config.Model)
+	if err != nil {
+		/* Fallback to ndb_llm_image_analyze if available */
+		query = `SELECT ndb_llm_image_analyze($1::bytea, $2, $3::jsonb, $4) AS output`
+		err = c.db.GetContext(ctx, &output, query, imageData, prompt, paramsJSON, config.Model)
+		if err != nil {
+			return "", fmt.Errorf("image analysis failed via NeuronDB: image_size=%d, prompt_length=%d, model='%s', function='neurondb_llm_image_analyze' (fallback: 'ndb_llm_image_analyze'), error=%w",
+				len(imageData), len(prompt), config.Model, err)
+		}
+	}
+
+	return output, nil
+}
