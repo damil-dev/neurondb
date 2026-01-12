@@ -1,17 +1,8 @@
-/*-------------------------------------------------------------------------
+/*
+ * Server implements the main MCP server for NeuronMCP
  *
- * server.go
- *    MCP server implementation for NeuronMCP
- *
- * Provides the main MCP server that handles protocol communication,
- * request routing, middleware execution, and tool/resource management.
- *
- * Copyright (c) 2024-2026, neurondb, Inc. <admin@neurondb.com>
- *
- * IDENTIFICATION
- *    NeuronMCP/internal/server/server.go
- *
- *-------------------------------------------------------------------------
+ * Provides MCP protocol communication, request routing, middleware execution,
+ * and tool/resource management for PostgreSQL and vector operations.
  */
 
 package server
@@ -39,33 +30,39 @@ import (
 	"github.com/neurondb/NeuronMCP/pkg/mcp"
 )
 
-/* Server is the main MCP server */
+/*
+ * Server is the main MCP server
+ */
 type Server struct {
-	mcpServer          *mcp.Server
-	db                 *database.Database
-	config             *config.ConfigManager
-	logger             *logging.Logger
-	middleware         *middleware.Manager
-	toolRegistry       *tools.ToolRegistry
-	resources          *resources.Manager
-	prompts            *prompts.Manager
-	sampling           *sampling.Manager
-	health             *health.Checker
-	progress           *progress.Tracker
-	batch              *batch.Processor
+	mcpServer           *mcp.Server
+	db                  *database.Database
+	config              *config.ConfigManager
+	logger              *logging.Logger
+	middleware          *middleware.Manager
+	toolRegistry        *tools.ToolRegistry
+	resources           *resources.Manager
+	prompts             *prompts.Manager
+	sampling            *sampling.Manager
+	health              *health.Checker
+	progress            *progress.Tracker
+	batch               *batch.Processor
 	capabilitiesManager *CapabilitiesManager
-	idempotencyCache   *cache.IdempotencyCache
-	metricsCollector   *metrics.Collector
-	prometheusExporter *metrics.PrometheusExporter
-	httpServer         *HTTPServer  // HTTP server for /metrics and /health
+	idempotencyCache    *cache.IdempotencyCache
+	metricsCollector    *metrics.Collector
+	prometheusExporter  *metrics.PrometheusExporter
+	httpServer          *HTTPServer // HTTP server for /metrics and /health
 }
 
-/* NewServer creates a new server */
+/*
+ * NewServer creates a new server
+ */
 func NewServer() (*Server, error) {
 	return NewServerWithConfig("")
 }
 
-/* NewServerWithConfig creates a new server with a specific config path */
+/*
+ * NewServerWithConfig creates a new server with a specific config path
+ */
 func NewServerWithConfig(configPath string) (*Server, error) {
 	cfgMgr := config.NewConfigManager()
 	_, err := cfgMgr.Load(configPath)
@@ -76,28 +73,24 @@ func NewServerWithConfig(configPath string) (*Server, error) {
 	logger := logging.NewLogger(cfgMgr.GetLoggingConfig())
 
 	db := database.NewDatabase()
-  /* Log database config for debugging */
 	dbCfg := cfgMgr.GetDatabaseConfig()
 	logger.Info("Database configuration", map[string]interface{}{
-		"host":     dbCfg.GetHost(),
-		"port":     dbCfg.GetPort(),
-		"database": dbCfg.GetDatabase(),
-		"user":     dbCfg.GetUser(),
+		"host":         dbCfg.GetHost(),
+		"port":         dbCfg.GetPort(),
+		"database":     dbCfg.GetDatabase(),
+		"user":         dbCfg.GetUser(),
 		"has_password": dbCfg.Password != nil && *dbCfg.Password != "",
 	})
-	
-  /* Try to connect, but don't fail server startup if it fails */
-  /* The server can start and tools will fail gracefully with proper error messages */
+
 	if err := db.Connect(dbCfg); err != nil {
 		logger.Warn("Failed to connect to database at startup", map[string]interface{}{
-			"error": err.Error(),
+			"error":    err.Error(),
 			"host":     dbCfg.GetHost(),
 			"port":     dbCfg.GetPort(),
 			"database": dbCfg.GetDatabase(),
 			"user":     dbCfg.GetUser(),
-			"note":  "Server will start but tools may fail. Database connection will be retried on first use.",
+			"note":     "Server will start but tools may fail. Database connection will be retried on first use.",
 		})
-   /* Continue anyway - tools will handle connection errors gracefully */
 	} else {
 		logger.Info("Connected to database", map[string]interface{}{
 			"host":     dbCfg.GetHost(),
@@ -107,27 +100,21 @@ func NewServerWithConfig(configPath string) (*Server, error) {
 	}
 
 	serverSettings := cfgMgr.GetServerSettings()
-	
-	/* Get max request size from config */
-	maxRequestSize := int64(0) /* Default: unlimited */
+
+	maxRequestSize := int64(0)
 	if serverSettings.MaxRequestSize != nil && *serverSettings.MaxRequestSize > 0 {
 		maxRequestSize = int64(*serverSettings.MaxRequestSize)
 	}
-	
+
 	mcpServer := mcp.NewServerWithMaxRequestSize(serverSettings.GetName(), serverSettings.GetVersion(), maxRequestSize)
 
 	mwManager := middleware.NewManager(logger)
 	setupBuiltInMiddleware(mwManager, cfgMgr, logger)
 
 	toolRegistry := tools.NewToolRegistry(db, logger)
-	
-	/* Check if minimal tool mode is enabled for testing */
-	if os.Getenv("NEURONMCP_MINIMAL_TOOLS") == "true" {
-		logger.Info("Minimal tool mode enabled - registering only essential tools", nil)
-		tools.RegisterMinimalTools(toolRegistry, db, logger)
-	} else {
-		tools.RegisterAllTools(toolRegistry, db, logger)
-	}
+
+	logger.Info("Registering all NeuronMCP tools", nil)
+	tools.RegisterAllTools(toolRegistry, db, logger)
 
 	capabilitiesManager := NewCapabilitiesManager(serverSettings.GetName(), serverSettings.GetVersion(), toolRegistry)
 
@@ -139,32 +126,22 @@ func NewServerWithConfig(configPath string) (*Server, error) {
 	healthChecker := health.NewChecker(db, logger)
 	progressTracker := progress.NewTracker()
 	batchProcessor := batch.NewProcessor(db, toolRegistry, logger)
-	
+
 	/* Create idempotency cache with 1 hour TTL */
 	idempotencyCache := cache.NewIdempotencyCache(time.Hour)
 
 	/* Create metrics collector */
 	metricsCollector := metrics.NewCollectorWithDB(db)
 	prometheusExporter := metrics.NewPrometheusExporter(metricsCollector)
-	
-	/* Determine if HTTP metrics server should be enabled
-	 * - Default: Disabled for stdio mode (MCP over stdin/stdout)
-	 * - Enabled if NEURONMCP_ENABLE_HTTP_METRICS=true
-	 * - The HTTP server is not needed for Claude Desktop and other stdio-based MCP clients
-	 * - Only enable if explicitly requested or when using HTTP transport mode
-	 */
+
 	var httpServer *HTTPServer
 	enableHTTPMetrics := false
-	
-	/* Check environment variable to explicitly enable HTTP metrics */
+
 	if envEnable := os.Getenv("NEURONMCP_ENABLE_HTTP_METRICS"); envEnable != "" {
-		if enabled, err := strconv.ParseBool(envEnable); err == nil {
-			enableHTTPMetrics = enabled
-		}
+		enableHTTPMetrics, _ = strconv.ParseBool(envEnable)
 	}
-	
+
 	if enableHTTPMetrics {
-		/* Create HTTP server for metrics (port 8082 by default) */
 		httpAddr := ":8082"
 		if envAddr := os.Getenv("NEURONMCP_HTTP_ADDR"); envAddr != "" {
 			httpAddr = envAddr
@@ -172,32 +149,31 @@ func NewServerWithConfig(configPath string) (*Server, error) {
 		httpServer = NewHTTPServer(httpAddr, prometheusExporter.Handler())
 		logger.Info("HTTP metrics server enabled", map[string]interface{}{
 			"address": httpAddr,
-			"note": "HTTP metrics server is enabled via NEURONMCP_ENABLE_HTTP_METRICS. This is not needed for stdio-based MCP clients like Claude Desktop.",
 		})
 	} else {
 		logger.Info("HTTP metrics server disabled", map[string]interface{}{
-			"note": "HTTP metrics server is disabled by default for stdio mode. Set NEURONMCP_ENABLE_HTTP_METRICS=true to enable.",
+			"note": "Set NEURONMCP_ENABLE_HTTP_METRICS=true to enable HTTP metrics server",
 		})
 	}
 
 	s := &Server{
-		mcpServer:          mcpServer,
-		db:                 db,
-		config:             cfgMgr,
-		logger:             logger,
-		middleware:         mwManager,
-		toolRegistry:       toolRegistry,
-		resources:          resourcesManager,
-		prompts:            promptsManager,
-		sampling:           samplingManager,
-		health:             healthChecker,
-		progress:           progressTracker,
-		batch:              batchProcessor,
+		mcpServer:           mcpServer,
+		db:                  db,
+		config:              cfgMgr,
+		logger:              logger,
+		middleware:          mwManager,
+		toolRegistry:        toolRegistry,
+		resources:           resourcesManager,
+		prompts:             promptsManager,
+		sampling:            samplingManager,
+		health:              healthChecker,
+		progress:            progressTracker,
+		batch:               batchProcessor,
 		capabilitiesManager: capabilitiesManager,
-		idempotencyCache:   idempotencyCache,
-		metricsCollector:   metricsCollector,
-		prometheusExporter: prometheusExporter,
-		httpServer:         httpServer,
+		idempotencyCache:    idempotencyCache,
+		metricsCollector:    metricsCollector,
+		prometheusExporter:  prometheusExporter,
+		httpServer:          httpServer,
 	}
 
 	s.setupHandlers()
@@ -214,8 +190,8 @@ func (s *Server) setupHandlers() {
 	s.setupHealthHandlers()
 	s.setupProgressHandlers()
 	s.setupBatchHandlers()
-	
-  /* Set capabilities using capabilities manager */
+
+	/* Set capabilities using capabilities manager */
 	if s.capabilitiesManager != nil {
 		caps := s.capabilitiesManager.GetServerCapabilities()
 		s.mcpServer.SetCapabilities(caps)
@@ -229,8 +205,8 @@ func (s *Server) setupHandlers() {
 				Subscribe:   false,
 				ListChanged: false,
 			},
-			Prompts:   make(map[string]interface{}),
-			Sampling:  make(map[string]interface{}),
+			Prompts:  make(map[string]interface{}),
+			Sampling: make(map[string]interface{}),
 		})
 	}
 }
@@ -238,7 +214,7 @@ func (s *Server) setupHandlers() {
 /* Start starts the server */
 func (s *Server) Start(ctx context.Context) error {
 	s.logger.Info("Starting Neurondb MCP server", nil)
-	
+
 	/* Start HTTP metrics server in background (only if enabled) */
 	if s.httpServer != nil {
 		s.httpServer.Start()
@@ -246,8 +222,8 @@ func (s *Server) Start(ctx context.Context) error {
 			"endpoint": "/metrics",
 		})
 	}
-	
-  /* Run the MCP server - this will block until context is cancelled or EOF */
+
+	/* Run the MCP server - this will block until context is cancelled or EOF */
 	err := s.mcpServer.Run(ctx)
 	if err != nil && err != context.Canceled {
 		s.logger.Warn("MCP server stopped", map[string]interface{}{
@@ -260,7 +236,7 @@ func (s *Server) Start(ctx context.Context) error {
 /* Stop stops the server gracefully */
 func (s *Server) Stop() error {
 	s.logger.Info("Stopping Neurondb MCP server", nil)
-	
+
 	/* Shutdown HTTP metrics server */
 	if s.httpServer != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -271,39 +247,39 @@ func (s *Server) Stop() error {
 			})
 		}
 	}
-	
+
 	/* Close database connections */
 	if s.db != nil {
 		s.db.Close()
 	}
-	
+
 	/* Close idempotency cache */
 	if s.idempotencyCache != nil {
 		s.idempotencyCache.Close()
 		s.idempotencyCache = nil
 	}
-	
+
 	/* Close other resources */
 	if s.progress != nil {
 		/* Progress tracker cleanup if needed */
 		s.progress = nil
 	}
-	
+
 	if s.batch != nil {
 		/* Batch processor cleanup if needed */
 		s.batch = nil
 	}
-	
+
 	/* Note: HTTP server and SSE connections are managed by transport manager
 	 * If HTTP transport is used, it should be shut down via transport manager:
 	 * transportManager.Shutdown(ctx)
 	 * Currently, the server uses stdio transport by default, so HTTP/SSE cleanup
 	 * is not needed unless HTTP transport is explicitly started.
 	 */
-	
+
 	/* Context cancellation will handle goroutine cleanup */
 	/* All goroutines should respect context cancellation */
-	
+
 	s.logger.Info("NeuronMCP server stopped", nil)
 	return nil
 }
@@ -327,4 +303,3 @@ func (s *Server) GetMetricsCollector() *metrics.Collector {
 func (s *Server) GetPrometheusExporter() *metrics.PrometheusExporter {
 	return s.prometheusExporter
 }
-

@@ -1,14 +1,8 @@
-/*-------------------------------------------------------------------------
+/*
+ * Filter implements tool filtering logic for NeuronMCP
  *
- * filter.go
- *    Database operations
- *
- * Copyright (c) 2024-2026, neurondb, Inc. <admin@neurondb.com>
- *
- * IDENTIFICATION
- *    NeuronMCP/internal/server/filter.go
- *
- *-------------------------------------------------------------------------
+ * Handles feature flag-based filtering and tool validation
+ * for MCP protocol compatibility with different clients.
  */
 
 package server

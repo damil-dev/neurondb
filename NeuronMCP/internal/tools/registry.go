@@ -1,16 +1,8 @@
-/*-------------------------------------------------------------------------
+/*
+ * Tool registry manages MCP tool definitions and registration
  *
- * registry.go
- *    Tool registry for NeuronMCP
- *
- * Manages tool registration, definitions, and execution for the MCP server.
- *
- * Copyright (c) 2024-2026, neurondb, Inc. <admin@neurondb.com>
- *
- * IDENTIFICATION
- *    NeuronMCP/internal/tools/registry.go
- *
- *-------------------------------------------------------------------------
+ * Provides thread-safe tool registration, lookup, and filtering
+ * for MCP protocol compatibility.
  */
 
 package tools
