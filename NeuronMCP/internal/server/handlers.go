@@ -62,9 +62,69 @@ func (s *Server) handleListTools(ctx context.Context, params json.RawMessage) (i
 	definitions := s.toolRegistry.GetAllDefinitions()
 	filtered := s.filterToolsByFeatures(definitions)
 	
-	mcpTools := make([]mcp.ToolDefinition, len(filtered))
-	for i, def := range filtered {
-		mcpTools[i] = mcp.ToolDefinition{
+	/* Log tool count for debugging */
+	s.logger.Info("Tools list requested", map[string]interface{}{
+		"total_tools":     len(definitions),
+		"filtered_tools":  len(filtered),
+		"filtered_out":    len(definitions) - len(filtered),
+	})
+	
+	/* Validate and filter out any tools with invalid names or schemas */
+	validTools := make([]mcp.ToolDefinition, 0, len(filtered))
+	for _, def := range filtered {
+		/* Skip tools with empty names */
+		if def.Name == "" {
+			s.logger.Warn("Skipping tool with empty name", map[string]interface{}{
+				"description": def.Description,
+			})
+			continue
+		}
+		
+		/* Validate tool name format (must be valid identifier) */
+		if len(def.Name) > 100 {
+			s.logger.Warn("Skipping tool with name too long", map[string]interface{}{
+				"tool_name": def.Name,
+				"name_length": len(def.Name),
+			})
+			continue
+		}
+		
+		/* Ensure inputSchema is valid - Claude Desktop requires type: "object" */
+		if def.InputSchema == nil {
+			s.logger.Warn("Tool has nil inputSchema, using default", map[string]interface{}{
+				"tool_name": def.Name,
+			})
+			def.InputSchema = map[string]interface{}{
+				"type":       "object",
+				"properties": map[string]interface{}{},
+			}
+		} else {
+			/* Ensure type field is set - required by Claude Desktop */
+			if _, hasType := def.InputSchema["type"]; !hasType {
+				s.logger.Warn("Tool inputSchema missing type field, adding type: object", map[string]interface{}{
+					"tool_name": def.Name,
+				})
+				/* Create new map to preserve order and add type first */
+				newSchema := make(map[string]interface{})
+				newSchema["type"] = "object"
+				for k, v := range def.InputSchema {
+					newSchema[k] = v
+				}
+				def.InputSchema = newSchema
+			} else if def.InputSchema["type"] != "object" {
+				/* Log warning if type is not "object" but don't change it (might be intentional) */
+				s.logger.Warn("Tool inputSchema has non-object type", map[string]interface{}{
+					"tool_name": def.Name,
+					"type":      def.InputSchema["type"],
+				})
+			}
+			/* Ensure properties field exists */
+			if _, hasProperties := def.InputSchema["properties"]; !hasProperties {
+				def.InputSchema["properties"] = map[string]interface{}{}
+			}
+		}
+		
+		mcpTool := mcp.ToolDefinition{
 			Name:         def.Name,
 			Description:  def.Description,
 			InputSchema:  def.InputSchema,
@@ -73,9 +133,15 @@ func (s *Server) handleListTools(ctx context.Context, params json.RawMessage) (i
 			Deprecated:   def.Deprecated,
 			Deprecation:  def.Deprecation,
 		}
+		validTools = append(validTools, mcpTool)
 	}
 	
-	return mcp.ListToolsResponse{Tools: mcpTools}, nil
+	s.logger.Info("Tools list response prepared", map[string]interface{}{
+		"valid_tools": len(validTools),
+		"total_requested": len(filtered),
+	})
+	
+	return mcp.ListToolsResponse{Tools: validTools}, nil
 }
 
 /* handleCallTool handles the tools/call request */
