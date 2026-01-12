@@ -164,14 +164,13 @@ func (t *StdioTransport) WriteMessage(resp *JSONRPCResponse) error {
    */
 	forceNoHeaders := os.Getenv("NEURONMCP_FORCE_NO_HEADERS") == "true"
 	
-  /* Default to no headers for Claude Desktop compatibility, unless explicitly enabled
-   * MCP spec says to use headers, but Claude Desktop doesn't handle them properly
+  /* IMPORTANT: Claude Desktop sends requests with Content-Length headers
+   * Per MCP spec, we should respond with headers when client uses headers
+   * Previous assumption that Claude Desktop can't parse headers was incorrect
+   * Always match the client's header usage for proper MCP protocol compliance
    */
-	if t.clientUsesHeaders && !forceNoHeaders {
-		/* Client sent headers, but Claude Desktop can't parse response headers
-		 * So we respond WITHOUT headers as a workaround
-		 * This is technically not MCP spec compliant, but necessary for Claude Desktop
-		 */
+	if forceNoHeaders {
+		/* Only disable headers if explicitly forced */
 		t.clientUsesHeaders = false
 	}
 	
