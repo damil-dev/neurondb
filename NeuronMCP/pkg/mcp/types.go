@@ -128,12 +128,12 @@ type ServerCapabilities struct {
 }
 
 type ToolsCapability struct {
-	ListChanged bool `json:"listChanged,omitempty"`
+	ListChanged bool `json:"listChanged"` /* Remove omitempty - Claude Desktop needs to see this field */
 }
 
 type ResourcesCapability struct {
-	Subscribe   bool `json:"subscribe,omitempty"`
-	ListChanged bool `json:"listChanged,omitempty"`
+	Subscribe   bool `json:"subscribe"`   /* Remove omitempty - Claude Desktop needs to see this field */
+	ListChanged bool `json:"listChanged"` /* Remove omitempty - Claude Desktop needs to see this field */
 }
 
 type InitializeRequest struct {

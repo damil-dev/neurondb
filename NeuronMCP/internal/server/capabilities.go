@@ -86,11 +86,11 @@ func (cm *CapabilitiesManager) GetServerCapabilities() mcp.ServerCapabilities {
 
 	return mcp.ServerCapabilities{
 		Tools: mcp.ToolsCapability{
-			ListChanged: true,
+			ListChanged: false, /* Set to false for Claude Desktop compatibility - tools list is static */
 		},
 		Resources: mcp.ResourcesCapability{
 			Subscribe:   false,
-			ListChanged: true,
+			ListChanged: false, /* Set to false for Claude Desktop compatibility */
 		},
 		Experimental: map[string]interface{}{
 			"feature_flags":  cm.featureFlags,

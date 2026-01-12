@@ -60,8 +60,21 @@ func (r *ToolRegistry) Register(tool Tool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	toolName := tool.Name()
+	
+	/* Check for duplicate tool names and warn */
+	if existingTool, exists := r.tools[toolName]; exists {
+		if r.logger != nil {
+			r.logger.Warn(fmt.Sprintf("Duplicate tool name detected: %s (overwriting existing tool)", toolName), map[string]interface{}{
+				"tool_name": toolName,
+				"existing_description": existingTool.Description(),
+				"new_description": tool.Description(),
+			})
+		}
+	}
+
 	definition := ToolDefinition{
-		Name:         tool.Name(),
+		Name:         toolName,
 		Description:  tool.Description(),
 		InputSchema:  tool.InputSchema(),
 		OutputSchema: tool.OutputSchema(),
@@ -70,10 +83,10 @@ func (r *ToolRegistry) Register(tool Tool) {
 		Deprecation:  tool.Deprecation(),
 	}
 
-	r.tools[tool.Name()] = tool
-	r.definitions[tool.Name()] = definition
+	r.tools[toolName] = tool
+	r.definitions[toolName] = definition
 	if r.logger != nil {
-		r.logger.Debug(fmt.Sprintf("Registered tool: %s (version: %s)", tool.Name(), tool.Version()), nil)
+		r.logger.Debug(fmt.Sprintf("Registered tool: %s (version: %s)", toolName, tool.Version()), nil)
 	}
 }
 
