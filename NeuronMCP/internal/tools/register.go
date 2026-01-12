@@ -274,10 +274,6 @@ func RegisterAllTools(registry *ToolRegistry, db *database.Database, logger *log
 
 /* RegisterEssentialTools registers only the most essential tools (default for Claude Desktop compatibility) */
 func RegisterEssentialTools(registry *ToolRegistry, db *database.Database, logger *logging.Logger) {
-	if logger != nil {
-		logger.Info("Registering essential tools (optimized for Claude Desktop)", nil)
-	}
-
 	/* Essential PostgreSQL tools */
 	registry.Register(NewPostgreSQLVersionTool(db, logger))
 	registry.Register(NewPostgreSQLExecuteQueryTool(db, logger))
@@ -289,17 +285,10 @@ func RegisterEssentialTools(registry *ToolRegistry, db *database.Database, logge
 
 	/* Essential RAG tools */
 	registry.Register(NewRetrieveContextTool(db, logger))
-
-	if logger != nil {
-		logger.Info("Essential tools registered (6 tools total)", nil)
-	}
 }
 
 /* RegisterPostgreSQLOnlyTools registers ALL PostgreSQL tools only (no neurondb_ prefix) */
 func RegisterPostgreSQLOnlyTools(registry *ToolRegistry, db *database.Database, logger *logging.Logger) {
-	if logger != nil {
-		logger.Info("Registering ALL PostgreSQL tools only (no neurondb_ tools)", nil)
-	}
 
 	/* PostgreSQL tools - Server Information (8 tools) */
 	registry.Register(NewPostgreSQLVersionTool(db, logger))
@@ -400,38 +389,20 @@ func RegisterPostgreSQLOnlyTools(registry *ToolRegistry, db *database.Database, 
 
 	/* TEST: Add ONE neurondb_ tool to see if it causes issues */
 	registry.Register(NewVectorSearchTool(db, logger))
-
-	if logger != nil {
-		logger.Info("ALL PostgreSQL tools + 1 neurondb_ tool registered", nil)
-	}
 }
 
 /* RegisterMinimalTools registers 5 essential PostgreSQL tools only (no neurondb_ prefix) */
 func RegisterMinimalTools(registry *ToolRegistry, db *database.Database, logger *logging.Logger) {
-	if logger != nil {
-		logger.Info("Registering minimal PostgreSQL tool set for Claude Desktop (5 tools)", nil)
-	}
-
 	/* Only PostgreSQL tools - no neurondb_ prefix to test Claude Desktop compatibility */
 	registry.Register(NewPostgreSQLVersionTool(db, logger))
 	registry.Register(NewPostgreSQLExecuteQueryTool(db, logger))
 	registry.Register(NewPostgreSQLTablesTool(db, logger))
 	registry.Register(NewPostgreSQLQueryPlanTool(db, logger))
 	registry.Register(NewPostgreSQLCancelQueryTool(db, logger))
-
-	if logger != nil {
-		logger.Info("Minimal PostgreSQL tool set registered successfully (5 tools)", nil)
-	}
 }
 
 /* RegisterToolsByCategory registers tools based on category selection */
 func RegisterToolsByCategory(registry *ToolRegistry, db *database.Database, logger *logging.Logger, categories string) {
-	if logger != nil {
-		logger.Info("Registering tools by category", map[string]interface{}{
-			"categories": categories,
-		})
-	}
-
 	categoryList := strings.Split(categories, ",")
 	categoryMap := make(map[string]bool)
 	for _, cat := range categoryList {
@@ -443,40 +414,22 @@ func RegisterToolsByCategory(registry *ToolRegistry, db *database.Database, logg
 
 	/* Register PostgreSQL tools */
 	if categoryMap["postgresql"] || categoryMap["all"] {
-		if logger != nil {
-			logger.Info("Registering PostgreSQL tools", nil)
-		}
 		RegisterPostgreSQLTools(registry, db, logger)
 	}
 
 	/* Register Vector tools */
 	if categoryMap["vector"] || categoryMap["all"] {
-		if logger != nil {
-			logger.Info("Registering Vector tools", nil)
-		}
 		RegisterVectorTools(registry, db, logger)
 	}
 
 	/* Register ML tools */
 	if categoryMap["ml"] || categoryMap["all"] {
-		if logger != nil {
-			logger.Info("Registering ML tools", nil)
-		}
 		RegisterMLTools(registry, db, logger)
 	}
 
 	/* Register RAG tools */
 	if categoryMap["rag"] || categoryMap["all"] {
-		if logger != nil {
-			logger.Info("Registering RAG tools", nil)
-		}
 		RegisterRAGTools(registry, db, logger)
-	}
-
-	if logger != nil {
-		logger.Info("Category-based tool registration completed", map[string]interface{}{
-			"enabled_categories": categories,
-		})
 	}
 }
 

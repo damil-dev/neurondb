@@ -112,8 +112,6 @@ func NewServerWithConfig(configPath string) (*Server, error) {
 	setupBuiltInMiddleware(mwManager, cfgMgr, logger)
 
 	toolRegistry := tools.NewToolRegistry(db, logger)
-
-	logger.Info("Registering all NeuronMCP tools", nil)
 	tools.RegisterAllTools(toolRegistry, db, logger)
 
 	capabilitiesManager := NewCapabilitiesManager(serverSettings.GetName(), serverSettings.GetVersion(), toolRegistry)
@@ -149,10 +147,6 @@ func NewServerWithConfig(configPath string) (*Server, error) {
 		httpServer = NewHTTPServer(httpAddr, prometheusExporter.Handler())
 		logger.Info("HTTP metrics server enabled", map[string]interface{}{
 			"address": httpAddr,
-		})
-	} else {
-		logger.Info("HTTP metrics server disabled", map[string]interface{}{
-			"note": "Set NEURONMCP_ENABLE_HTTP_METRICS=true to enable HTTP metrics server",
 		})
 	}
 

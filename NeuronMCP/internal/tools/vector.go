@@ -699,10 +699,6 @@ func NewGenerateEmbeddingTool(db *database.Database, logger *logging.Logger) *Ge
 
 /* Execute executes the embedding generation */
 func (t *GenerateEmbeddingTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
-	t.logger.Info("GenerateEmbeddingTool.Execute called", map[string]interface{}{
-		"params": params,
-	})
-
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
 		return Error("Invalid parameters", "VALIDATION_ERROR", map[string]interface{}{"errors": errors}), nil
@@ -726,20 +722,9 @@ func (t *GenerateEmbeddingTool) Execute(ctx context.Context, params map[string]i
 		/* Try to get default model for embedding operation */
 		if defaultModel, err := t.configHelper.GetDefaultModel(ctx, "embedding"); err == nil {
 			modelName = defaultModel
-			t.logger.Info("Using default embedding model from database", map[string]interface{}{"model": modelName})
 		} else {
 			modelName = "default"
-			t.logger.Info("Using fallback default model", map[string]interface{}{"model": modelName, "error": err.Error()})
 		}
-	}
-
-	/* Try to resolve API key from database (for future use with NeuronDB functions that accept keys) */
-	/* For now, NeuronDB uses GUC settings, but we log usage */
-	/* TODO: Use resolved API key when NeuronDB functions support it */
-	if _, err := t.configHelper.ResolveModelKey(ctx, modelName); err == nil {
-		t.logger.Debug("Resolved API key from database", map[string]interface{}{"model": modelName, "has_key": true})
-	} else {
-		t.logger.Debug("No API key in database, will use GUC settings", map[string]interface{}{"model": modelName, "error": err.Error()})
 	}
 
 	var result interface{}
@@ -748,13 +733,6 @@ func (t *GenerateEmbeddingTool) Execute(ctx context.Context, params map[string]i
 	
 	query := "SELECT embed_text($1, $2)::text AS embedding"
 	queryParams := []interface{}{text, modelName}
-	
-	t.logger.Info("Generating embedding", map[string]interface{}{
-		"method": "embed_text",
-		"model":  modelName,
-		"text_length": textLen,
-		"query": query,
-	})
 	
 	result, err = t.executor.ExecuteQueryOneWithTimeout(ctx, query, queryParams, EmbeddingQueryTimeout)
 	if err != nil {
@@ -928,13 +906,6 @@ func (t *BatchEmbeddingTool) Execute(ctx context.Context, params map[string]inte
 
 	query := "SELECT json_agg(embedding::text) AS embeddings FROM unnest(neurondb.embed_batch($1, $2::text[])) AS embedding"
 	queryParams := []interface{}{modelName, textStrings}
-
-	t.logger.Info("Generating batch embeddings", map[string]interface{}{
-		"method": "neurondb.embed_batch",
-		"model":  modelName,
-		"texts_count": textsCount,
-		"query": query,
-	})
 
 	result, err := t.executor.ExecuteQueryOneWithTimeout(ctx, query, queryParams, EmbeddingQueryTimeout)
 	if err != nil {

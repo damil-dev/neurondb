@@ -30,14 +30,13 @@ func (s *Server) filterToolsByFeatures(definitions []tools.ToolDefinition) []too
 func shouldIncludeTool(toolName string, features *config.FeaturesConfig) bool {
   /* PostgreSQL tools - always enabled by default */
 	if isPostgreSQLTool(toolName) {
-		/* PostgreSQL core tools are always enabled */
 		return true
 	}
 	
   /* Vector tools - default to enabled if feature config exists and is enabled, or if no config (default enabled) */
 	if isVectorTool(toolName) {
 		if features.Vector == nil {
-			return true /* Default enabled if no config */
+			return true
 		}
 		return features.Vector.Enabled
 	}
@@ -45,7 +44,7 @@ func shouldIncludeTool(toolName string, features *config.FeaturesConfig) bool {
   /* ML tools - default to enabled */
 	if isMLTool(toolName) {
 		if features.ML == nil {
-			return true /* Default enabled if no config */
+			return true
 		}
 		return features.ML.Enabled
 	}
@@ -53,7 +52,7 @@ func shouldIncludeTool(toolName string, features *config.FeaturesConfig) bool {
   /* Analytics tools - default to enabled */
 	if isAnalyticsTool(toolName) {
 		if features.Analytics == nil {
-			return true /* Default enabled if no config */
+			return true
 		}
 		return features.Analytics.Enabled
 	}
@@ -61,7 +60,7 @@ func shouldIncludeTool(toolName string, features *config.FeaturesConfig) bool {
   /* RAG tools - default to enabled */
 	if isRAGTool(toolName) {
 		if features.RAG == nil {
-			return true /* Default enabled if no config */
+			return true
 		}
 		return features.RAG.Enabled
 	}
@@ -69,7 +68,7 @@ func shouldIncludeTool(toolName string, features *config.FeaturesConfig) bool {
   /* Project tools - default to enabled */
 	if isProjectTool(toolName) {
 		if features.Projects == nil {
-			return true /* Default enabled if no config */
+			return true
 		}
 		return features.Projects.Enabled
 	}
@@ -77,12 +76,11 @@ func shouldIncludeTool(toolName string, features *config.FeaturesConfig) bool {
   /* GPU tools - default to enabled */
 	if isGPUTool(toolName) {
 		if features.GPU == nil {
-			return true /* Default enabled if no config */
+			return true
 		}
 		return features.GPU.Enabled
 	}
 	
-  /* Default: include if no specific feature flag */
 	return true
 }
 
@@ -190,7 +188,6 @@ func isGPUTool(name string) bool {
 }
 
 func isPostgreSQLTool(name string) bool {
-	/* PostgreSQL tools start with "postgresql_" */
 	return len(name) >= 11 && name[:11] == "postgresql_"
 }
 
