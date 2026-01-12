@@ -72,7 +72,7 @@ func TestServerSetup(t *testing.T) {
 		toolNames[def.Name] = true
 	}
 
-	expectedTools := []string{"vector_search", "train_model", "predict", "cluster_data"}
+	expectedTools := []string{"neurondb_vector_search", "neurondb_train_model", "neurondb_predict", "neurondb_cluster_data"}
 	for _, expected := range expectedTools {
 		if !toolNames[expected] {
 			t.Errorf("Missing expected tool: %s", expected)
@@ -119,9 +119,9 @@ func TestToolRegistry(t *testing.T) {
 	}
 
   /* Test that existing tool is found */
-	tool = toolRegistry.GetTool("vector_search")
+	tool = toolRegistry.GetTool("neurondb_vector_search")
 	if tool == nil {
-		t.Fatal("GetTool() should return tool for 'vector_search'")
+		t.Fatal("GetTool() should return tool for 'neurondb_vector_search'")
 	}
 
   /* Test with empty string - should not crash */
@@ -251,7 +251,7 @@ func TestHandleCallTool_ErrorConditions(t *testing.T) {
 	}()
 
   /* Test with malformed arguments - should handle gracefully */
-	malformedParams := json.RawMessage(`{"name": "vector_search", "arguments": "not an object"}`)
+	malformedParams := json.RawMessage(`{"name": "neurondb_vector_search", "arguments": "not an object"}`)
 	_, err = srv.handleCallTool(ctx, malformedParams)
   /* May or may not error depending on JSON parsing, but should not crash */
 	if err != nil {
@@ -305,7 +305,7 @@ func TestExecuteTool_ErrorConditions(t *testing.T) {
 				t.Fatalf("executeTool panicked with nil arguments: %v", r)
 			}
 		}()
-		_, _ = srv.executeTool(ctx, "vector_search", nil, false, "", false)
+		_, _ = srv.executeTool(ctx, "neurondb_vector_search", nil, false, "", false)
 	}()
 
   /* Test with invalid tool name containing null bytes - should not crash */
@@ -315,7 +315,7 @@ func TestExecuteTool_ErrorConditions(t *testing.T) {
 				t.Fatalf("executeTool panicked with invalid tool name: %v", r)
 			}
 		}()
-		_, _ = srv.executeTool(ctx, "vector_search\x00", map[string]interface{}{}, false, "", false)
+		_, _ = srv.executeTool(ctx, "neurondb_vector_search\x00", map[string]interface{}{}, false, "", false)
 	}()
 }
 

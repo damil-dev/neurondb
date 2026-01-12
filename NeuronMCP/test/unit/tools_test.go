@@ -50,17 +50,17 @@ func TestToolRegistry(t *testing.T) {
 	/* Check for expected tool categories */
 	expectedTools := map[string]bool{
 		/* Vector search */
-		"vector_search":              false,
-		"vector_search_l2":           false,
-		"vector_search_cosine":        false,
-		"vector_search_inner_product": false,
+		"neurondb_vector_search":              false,
+		"neurondb_vector_search_l2":           false,
+		"neurondb_vector_search_cosine":       false,
+		"neurondb_vector_search_inner_product": false,
 		/* Embeddings */
-		"generate_embedding": false,
-		"batch_embedding":   false,
+		"neurondb_generate_embedding": false,
+		"neurondb_batch_embedding":    false,
 		/* ML */
-		"train_model":    false,
-		"predict":        false,
-		"list_models":    false,
+		"neurondb_train_model": false,
+		"neurondb_predict":     false,
+		"neurondb_list_models": false,
 		/* PostgreSQL */
 		"postgresql_version": false,
 		"postgresql_stats":   false,
@@ -94,9 +94,9 @@ func TestToolValidation(t *testing.T) {
 	tools.RegisterAllTools(registry, db, logger)
 
 	/* Test vector_search validation */
-	tool := registry.GetTool("vector_search")
+	tool := registry.GetTool("neurondb_vector_search")
 	if tool == nil {
-		t.Fatal("vector_search tool not found")
+		t.Fatal("neurondb_vector_search tool not found")
 	}
 
 	ctx := context.Background()
