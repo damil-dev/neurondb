@@ -37,10 +37,9 @@ type VectorSearchTool struct {
 
 /* NewVectorSearchTool creates a new vector search tool */
 func NewVectorSearchTool(db *database.Database, logger *logging.Logger) *VectorSearchTool {
-	tool := NewBaseToolWithVersion(
-		"neurondb_vector_search",
+	tool := NewBaseTool(
+		"postgresql_vector_search",
 		"Perform vector similarity search using L2, cosine, inner product, L1, Hamming, Chebyshev, or Minkowski distance",
-		"2.0.0",
 		map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
@@ -82,7 +81,6 @@ func NewVectorSearchTool(db *database.Database, logger *logging.Logger) *VectorS
 			"required": []interface{}{"table", "vector_column", "query_vector"},
 			"additionalProperties": false,
 		},
-		VectorSearchOutputSchema(),
 	)
 	return &VectorSearchTool{
 		BaseTool:     tool,
@@ -219,7 +217,7 @@ type VectorSearchL2Tool struct {
 func NewVectorSearchL2Tool(db *database.Database, logger *logging.Logger) *VectorSearchL2Tool {
 	return &VectorSearchL2Tool{
 		BaseTool: NewBaseTool(
-			"neurondb_vector_search_l2",
+			"postgresql_vector_search_l2",
 			"Perform vector similarity search using L2 (Euclidean) distance",
 			map[string]interface{}{
 				"type": "object",
@@ -282,7 +280,7 @@ type VectorSearchCosineTool struct {
 func NewVectorSearchCosineTool(db *database.Database, logger *logging.Logger) *VectorSearchCosineTool {
 	return &VectorSearchCosineTool{
 		BaseTool: NewBaseTool(
-			"neurondb_vector_search_cosine",
+			"postgresql_vector_search_cosine",
 			"Perform vector similarity search using cosine distance",
 			map[string]interface{}{
 				"type": "object",
@@ -345,7 +343,7 @@ type VectorSearchInnerProductTool struct {
 func NewVectorSearchInnerProductTool(db *database.Database, logger *logging.Logger) *VectorSearchInnerProductTool {
 	return &VectorSearchInnerProductTool{
 		BaseTool: NewBaseTool(
-			"neurondb_vector_search_inner_product",
+			"postgresql_vector_search_inner_product",
 			"Perform vector similarity search using inner product distance",
 			map[string]interface{}{
 				"type": "object",
@@ -408,7 +406,7 @@ type VectorSearchL1Tool struct {
 func NewVectorSearchL1Tool(db *database.Database, logger *logging.Logger) *VectorSearchL1Tool {
 	return &VectorSearchL1Tool{
 		BaseTool: NewBaseTool(
-			"neurondb_vector_search_l1",
+			"postgresql_vector_search_l1",
 			"Perform vector similarity search using L1 (Manhattan) distance",
 			map[string]interface{}{
 				"type": "object",
@@ -471,7 +469,7 @@ type VectorSearchHammingTool struct {
 func NewVectorSearchHammingTool(db *database.Database, logger *logging.Logger) *VectorSearchHammingTool {
 	return &VectorSearchHammingTool{
 		BaseTool: NewBaseTool(
-			"neurondb_vector_search_hamming",
+			"postgresql_vector_search_hamming",
 			"Perform vector similarity search using Hamming distance",
 			map[string]interface{}{
 				"type": "object",
@@ -534,7 +532,7 @@ type VectorSearchChebyshevTool struct {
 func NewVectorSearchChebyshevTool(db *database.Database, logger *logging.Logger) *VectorSearchChebyshevTool {
 	return &VectorSearchChebyshevTool{
 		BaseTool: NewBaseTool(
-			"neurondb_vector_search_chebyshev",
+			"postgresql_vector_search_chebyshev",
 			"Perform vector similarity search using Chebyshev distance",
 			map[string]interface{}{
 				"type": "object",
@@ -597,7 +595,7 @@ type VectorSearchMinkowskiTool struct {
 func NewVectorSearchMinkowskiTool(db *database.Database, logger *logging.Logger) *VectorSearchMinkowskiTool {
 	return &VectorSearchMinkowskiTool{
 		BaseTool: NewBaseTool(
-			"neurondb_vector_search_minkowski",
+			"postgresql_vector_search_minkowski",
 			"Perform vector similarity search using Minkowski distance with configurable p parameter",
 			map[string]interface{}{
 				"type": "object",
@@ -676,7 +674,7 @@ type GenerateEmbeddingTool struct {
 func NewGenerateEmbeddingTool(db *database.Database, logger *logging.Logger) *GenerateEmbeddingTool {
 	return &GenerateEmbeddingTool{
 		BaseTool: NewBaseTool(
-			"neurondb_generate_embedding",
+			"postgresql_generate_embedding",
 			"Generate text embedding using configured model",
 			map[string]interface{}{
 				"type": "object",
@@ -847,7 +845,7 @@ type BatchEmbeddingTool struct {
 func NewBatchEmbeddingTool(db *database.Database, logger *logging.Logger) *BatchEmbeddingTool {
 	return &BatchEmbeddingTool{
 		BaseTool: NewBaseTool(
-			"neurondb_batch_embedding",
+			"postgresql_batch_embedding",
 			"Generate embeddings for multiple texts efficiently",
 			map[string]interface{}{
 				"type": "object",
