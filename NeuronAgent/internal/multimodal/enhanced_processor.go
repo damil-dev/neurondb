@@ -18,7 +18,6 @@ package multimodal
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 

@@ -583,13 +583,13 @@ func (r *AdvancedRAG) calculateContextRecall(ctx context.Context, query string, 
 	var totalSimilarity float64
 	validContexts := 0
 
-	for _, ctx := range contexts {
-		if ctx == "" {
+	for _, contextText := range contexts {
+		if contextText == "" {
 			continue
 		}
 
 		/* Generate context embedding */
-		ctxEmbedding, err := r.embed.Embed(ctx, ctx, "all-MiniLM-L6-v2")
+		ctxEmbedding, err := r.embed.Embed(ctx, contextText, "all-MiniLM-L6-v2")
 		if err != nil {
 			/* Skip contexts that fail to embed */
 			continue

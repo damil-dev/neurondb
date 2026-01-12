@@ -218,7 +218,7 @@ func (sim *SelfImprovementManager) ABTest(ctx context.Context, agentID uuid.UUID
 
 					/* Execute task with variant configuration */
 					start := time.Now()
-					success, err := sim.executeTaskWithConfig(ctx, agentID, task, variant.Config)
+					success, _ := sim.executeTaskWithConfig(ctx, agentID, task, variant.Config)
 					latency := time.Since(start)
 
 					/* Collect metrics */
@@ -325,7 +325,6 @@ func min(a, b float64) float64 {
 		return a
 	}
 	return b
-}
 }
 
 /* ReinforcementLearningOptimize uses RL for agent optimization */
@@ -780,7 +779,7 @@ func (sim *SelfImprovementManager) executeTaskWithConfig(ctx context.Context, ag
 			if err == nil {
 				/* Execute with variant config */
 				/* Note: In production, would temporarily apply config to agent */
-				_, err := sim.runtime.Execute(ctx, sessionID, message, false)
+				_, err := sim.runtime.Execute(ctx, sessionID, message)
 				return err == nil, err
 			}
 		}
