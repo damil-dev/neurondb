@@ -32,7 +32,7 @@ type TuneHNSWIndexTool struct {
 func NewTuneHNSWIndexTool(db *database.Database, logger *logging.Logger) *TuneHNSWIndexTool {
 	return &TuneHNSWIndexTool{
 		BaseTool: NewBaseTool(
-			"neurondb_tune_hnsw_index",
+			"postgresql_tune_hnsw_index",
 			"Automatically optimize HNSW index parameters (m, ef_construction) based on dataset characteristics",
 			map[string]interface{}{
 				"type": "object",
@@ -113,7 +113,7 @@ type TuneIVFIndexTool struct {
 func NewTuneIVFIndexTool(db *database.Database, logger *logging.Logger) *TuneIVFIndexTool {
 	return &TuneIVFIndexTool{
 		BaseTool: NewBaseTool(
-			"neurondb_tune_ivf_index",
+			"postgresql_tune_ivf_index",
 			"Automatically optimize IVF index parameters (num_lists, probes) based on dataset characteristics",
 			map[string]interface{}{
 				"type": "object",

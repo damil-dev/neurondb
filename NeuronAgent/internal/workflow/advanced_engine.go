@@ -20,6 +20,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -169,11 +171,13 @@ func (awe *AdvancedWorkflowEngine) VersionWorkflow(ctx context.Context, workflow
 	/* Copy steps */
 	for _, step := range steps {
 		newStep := &db.WorkflowStep{
-			WorkflowID: newWorkflow.ID,
-			StepName:   step.StepName,
-			StepType:   step.StepType,
-			Config:     step.Config,
+			WorkflowID:   newWorkflow.ID,
+			StepName:     step.StepName,
+			StepType:     step.StepType,
+			Inputs:       step.Inputs,
+			Outputs:      step.Outputs,
 			Dependencies: step.Dependencies,
+			RetryConfig:  step.RetryConfig,
 		}
 		if err := awe.queries.CreateWorkflowStep(ctx, newStep); err != nil {
 			return uuid.Nil, fmt.Errorf("workflow versioning failed: step_copy_failed=true, step_name='%s', error=%w", step.StepName, err)
@@ -186,15 +190,17 @@ func (awe *AdvancedWorkflowEngine) VersionWorkflow(ctx context.Context, workflow
 /* CreateWorkflowTemplate creates a reusable workflow template */
 func (awe *AdvancedWorkflowEngine) CreateWorkflowTemplate(ctx context.Context, name string, description string, steps []db.WorkflowStep, parameters []TemplateParameter) (uuid.UUID, error) {
 	/* Create template workflow */
+	/* Store description and metadata in DAGDefinition */
+	dagDefinition := map[string]interface{}{
+		"description": description,
+		"template":    true,
+		"parameters":  parameters,
+		"created_at":  time.Now().Format(time.RFC3339),
+	}
 	template := &db.Workflow{
-		Name:        fmt.Sprintf("Template: %s", name),
-		Description: description,
-		Status:      "template",
-		Metadata: map[string]interface{}{
-			"template":     true,
-			"parameters":   parameters,
-			"created_at":   time.Now().Format(time.RFC3339),
-		},
+		Name:          fmt.Sprintf("Template: %s", name),
+		DAGDefinition: db.FromMap(dagDefinition),
+		Status:        "template",
 	}
 
 	if err := awe.queries.CreateWorkflow(ctx, template); err != nil {
@@ -204,11 +210,13 @@ func (awe *AdvancedWorkflowEngine) CreateWorkflowTemplate(ctx context.Context, n
 	/* Create template steps */
 	for _, step := range steps {
 		newStep := &db.WorkflowStep{
-			WorkflowID: template.ID,
-			StepName:   step.StepName,
-			StepType:   step.StepType,
-			Config:     step.Config,
+			WorkflowID:   template.ID,
+			StepName:     step.StepName,
+			StepType:     step.StepType,
+			Inputs:       step.Inputs,
+			Outputs:      step.Outputs,
 			Dependencies: step.Dependencies,
+			RetryConfig:  step.RetryConfig,
 		}
 		if err := awe.queries.CreateWorkflowStep(ctx, newStep); err != nil {
 			return uuid.Nil, fmt.Errorf("template creation failed: step_creation_failed=true, step_name='%s', error=%w", step.StepName, err)
@@ -238,15 +246,24 @@ func (awe *AdvancedWorkflowEngine) InstantiateTemplate(ctx context.Context, temp
 	}
 
 	/* Create new workflow instance */
+	/* Extract description from template's DAGDefinition if present */
+	var description string
+	if template.DAGDefinition != nil {
+		if desc, ok := template.DAGDefinition["description"].(string); ok {
+			description = desc
+		}
+	}
+	/* Store metadata in DAGDefinition */
+	dagDefinition := map[string]interface{}{
+		"description": description,
+		"template_id": templateID.String(),
+		"parameters":  parameterValues,
+		"created_at":  time.Now().Format(time.RFC3339),
+	}
 	instance := &db.Workflow{
-		Name:        template.Name,
-		Description: template.Description,
-		Status:      "draft",
-		Metadata: map[string]interface{}{
-			"template_id":  templateID.String(),
-			"parameters":   parameterValues,
-			"created_at":   time.Now().Format(time.RFC3339),
-		},
+		Name:          template.Name,
+		DAGDefinition: db.FromMap(dagDefinition),
+		Status:        "draft",
 	}
 
 	if err := awe.queries.CreateWorkflow(ctx, instance); err != nil {
@@ -255,15 +272,21 @@ func (awe *AdvancedWorkflowEngine) InstantiateTemplate(ctx context.Context, temp
 
 	/* Create instance steps with parameter substitution */
 	for _, step := range steps {
-		/* Substitute parameters in step config */
-		config := awe.substituteParameters(step.Config, parameterValues)
+		/* Substitute parameters in step inputs */
+		var inputs map[string]interface{}
+		if step.Inputs != nil {
+			inputsMap := step.Inputs.ToMap()
+			inputs = awe.substituteParameters(inputsMap, parameterValues)
+		}
 
 		newStep := &db.WorkflowStep{
-			WorkflowID: instance.ID,
-			StepName:   step.StepName,
-			StepType:   step.StepType,
-			Config:     config,
+			WorkflowID:   instance.ID,
+			StepName:     step.StepName,
+			StepType:     step.StepType,
+			Inputs:       db.FromMap(inputs),
+			Outputs:      step.Outputs,
 			Dependencies: step.Dependencies,
+			RetryConfig:  step.RetryConfig,
 		}
 		if err := awe.queries.CreateWorkflowStep(ctx, newStep); err != nil {
 			return uuid.Nil, fmt.Errorf("template instantiation failed: step_creation_failed=true, step_name='%s', error=%w", step.StepName, err)
@@ -359,15 +382,243 @@ func (awe *AdvancedWorkflowEngine) buildStepInputs(step *db.WorkflowStep, workfl
 }
 
 func (awe *AdvancedWorkflowEngine) evaluateCondition(ctx context.Context, condition string, inputs map[string]interface{}) (bool, error) {
-	/* Simple condition evaluation */
-	/* In production, this would use a proper expression evaluator */
-	/* For now, check if condition is a simple equality */
+	if condition == "" {
+		return true, nil
+	}
+
+	/* Parse and evaluate condition expression */
+	/* Supports: ==, !=, >, <, >=, <=, &&, ||, in */
 	
-	/* Example: "input.status == 'active'" */
-	/* This is a placeholder - actual implementation would parse and evaluate the condition */
+	/* Trim whitespace */
+	condition = strings.TrimSpace(condition)
 	
-	/* For now, return true as a default */
-	return true, nil
+	/* Handle logical operators (&&, ||) */
+	if strings.Contains(condition, " && ") {
+		parts := strings.Split(condition, " && ")
+		for _, part := range parts {
+			result, err := awe.evaluateCondition(ctx, strings.TrimSpace(part), inputs)
+			if err != nil {
+				return false, err
+			}
+			if !result {
+				return false, nil
+			}
+		}
+		return true, nil
+	}
+	
+	if strings.Contains(condition, " || ") {
+		parts := strings.Split(condition, " || ")
+		for _, part := range parts {
+			result, err := awe.evaluateCondition(ctx, strings.TrimSpace(part), inputs)
+			if err != nil {
+				return false, err
+			}
+			if result {
+				return true, nil
+			}
+		}
+		return false, nil
+	}
+	
+	/* Handle comparison operators */
+	if strings.Contains(condition, " == ") {
+		return awe.evaluateComparison(condition, " == ", inputs, func(a, b interface{}) bool {
+			return compareValues(a, b) == 0
+		})
+	}
+	
+	if strings.Contains(condition, " != ") {
+		return awe.evaluateComparison(condition, " != ", inputs, func(a, b interface{}) bool {
+			return compareValues(a, b) != 0
+		})
+	}
+	
+	if strings.Contains(condition, " >= ") {
+		return awe.evaluateComparison(condition, " >= ", inputs, func(a, b interface{}) bool {
+			return compareValues(a, b) >= 0
+		})
+	}
+	
+	if strings.Contains(condition, " <= ") {
+		return awe.evaluateComparison(condition, " <= ", inputs, func(a, b interface{}) bool {
+			return compareValues(a, b) <= 0
+		})
+	}
+	
+	if strings.Contains(condition, " > ") {
+		return awe.evaluateComparison(condition, " > ", inputs, func(a, b interface{}) bool {
+			return compareValues(a, b) > 0
+		})
+	}
+	
+	if strings.Contains(condition, " < ") {
+		return awe.evaluateComparison(condition, " < ", inputs, func(a, b interface{}) bool {
+			return compareValues(a, b) < 0
+		})
+	}
+	
+	/* Handle 'in' operator */
+	if strings.Contains(condition, " in ") {
+		return awe.evaluateInOperator(condition, inputs)
+	}
+	
+	/* If no operator found, treat as boolean value */
+	if val, ok := inputs[condition]; ok {
+		if boolVal, ok := val.(bool); ok {
+			return boolVal, nil
+		}
+	}
+	
+	/* Default to false if condition cannot be evaluated */
+	return false, fmt.Errorf("unable to evaluate condition: '%s'", condition)
+}
+
+func (awe *AdvancedWorkflowEngine) evaluateComparison(condition, operator string, inputs map[string]interface{}, compareFunc func(interface{}, interface{}) bool) (bool, error) {
+	parts := strings.Split(condition, operator)
+	if len(parts) != 2 {
+		return false, fmt.Errorf("invalid comparison expression: '%s'", condition)
+	}
+	
+	left := strings.TrimSpace(parts[0])
+	right := strings.TrimSpace(parts[1])
+	
+	/* Get left value */
+	leftVal := awe.getValue(left, inputs)
+	
+	/* Get right value (could be literal or variable) */
+	rightVal := awe.getValue(right, inputs)
+	
+	return compareFunc(leftVal, rightVal), nil
+}
+
+func (awe *AdvancedWorkflowEngine) evaluateInOperator(condition string, inputs map[string]interface{}) (bool, error) {
+	parts := strings.Split(condition, " in ")
+	if len(parts) != 2 {
+		return false, fmt.Errorf("invalid 'in' expression: '%s'", condition)
+	}
+	
+	left := strings.TrimSpace(parts[0])
+	right := strings.TrimSpace(parts[1])
+	
+	/* Get left value */
+	leftVal := awe.getValue(left, inputs)
+	
+	/* Parse right side as array */
+	/* Remove brackets if present */
+	right = strings.TrimSpace(right)
+	if strings.HasPrefix(right, "[") && strings.HasSuffix(right, "]") {
+		right = right[1 : len(right)-1]
+	}
+	
+	/* Split by comma */
+	rightParts := strings.Split(right, ",")
+	for _, part := range rightParts {
+		part = strings.TrimSpace(part)
+		/* Remove quotes if present */
+		if (strings.HasPrefix(part, "'") && strings.HasSuffix(part, "'")) ||
+			(strings.HasPrefix(part, "\"") && strings.HasSuffix(part, "\"")) {
+			part = part[1 : len(part)-1]
+		}
+		
+		rightVal := awe.parseValue(part)
+		if compareValues(leftVal, rightVal) == 0 {
+			return true, nil
+		}
+	}
+	
+	return false, nil
+}
+
+func (awe *AdvancedWorkflowEngine) getValue(expr string, inputs map[string]interface{}) interface{} {
+	expr = strings.TrimSpace(expr)
+	
+	/* Check if it's a variable reference (input.xxx or just xxx) */
+	if strings.HasPrefix(expr, "input.") {
+		key := strings.TrimPrefix(expr, "input.")
+		if val, ok := inputs[key]; ok {
+			return val
+		}
+	} else if val, ok := inputs[expr]; ok {
+		return val
+	}
+	
+	/* Try to parse as literal value */
+	return awe.parseValue(expr)
+}
+
+func (awe *AdvancedWorkflowEngine) parseValue(expr string) interface{} {
+	expr = strings.TrimSpace(expr)
+	
+	/* Remove quotes if present */
+	if (strings.HasPrefix(expr, "'") && strings.HasSuffix(expr, "'")) ||
+		(strings.HasPrefix(expr, "\"") && strings.HasSuffix(expr, "\"")) {
+		return expr[1 : len(expr)-1]
+	}
+	
+	/* Try boolean */
+	if expr == "true" {
+		return true
+	}
+	if expr == "false" {
+		return false
+	}
+	
+	/* Try integer */
+	if intVal, err := strconv.ParseInt(expr, 10, 64); err == nil {
+		return intVal
+	}
+	
+	/* Try float */
+	if floatVal, err := strconv.ParseFloat(expr, 64); err == nil {
+		return floatVal
+	}
+	
+	/* Return as string */
+	return expr
+}
+
+func compareValues(a, b interface{}) int {
+	/* Convert to comparable types */
+	aFloat, aIsFloat := toFloat(a)
+	bFloat, bIsFloat := toFloat(b)
+	
+	if aIsFloat && bIsFloat {
+		if aFloat < bFloat {
+			return -1
+		}
+		if aFloat > bFloat {
+			return 1
+		}
+		return 0
+	}
+	
+	/* String comparison */
+	aStr := fmt.Sprintf("%v", a)
+	bStr := fmt.Sprintf("%v", b)
+	
+	if aStr < bStr {
+		return -1
+	}
+	if aStr > bStr {
+		return 1
+	}
+	return 0
+}
+
+func toFloat(v interface{}) (float64, bool) {
+	switch val := v.(type) {
+	case int:
+		return float64(val), true
+	case int64:
+		return float64(val), true
+	case float32:
+		return float64(val), true
+	case float64:
+		return val, true
+	default:
+		return 0, false
+	}
 }
 
 func (awe *AdvancedWorkflowEngine) substituteParameters(config map[string]interface{}, parameterValues map[string]interface{}) map[string]interface{} {

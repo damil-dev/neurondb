@@ -39,7 +39,7 @@ type TrainModelTool struct {
 func NewTrainModelTool(db *database.Database, logger *logging.Logger) *TrainModelTool {
 	return &TrainModelTool{
 		BaseTool: NewBaseTool(
-			"neurondb_train_model",
+			"postgresql_train_model",
 			"Train an ML model using specified algorithm",
 			map[string]interface{}{
 				"type": "object",
@@ -210,7 +210,7 @@ type PredictTool struct {
 func NewPredictTool(db *database.Database, logger *logging.Logger) *PredictTool {
 	return &PredictTool{
 		BaseTool: NewBaseTool(
-			"neurondb_predict",
+			"postgresql_predict",
 			"Predict using a trained ML model",
 			map[string]interface{}{
 				"type": "object",
@@ -310,7 +310,7 @@ type EvaluateModelTool struct {
 func NewEvaluateModelTool(db *database.Database, logger *logging.Logger) *EvaluateModelTool {
 	return &EvaluateModelTool{
 		BaseTool: NewBaseTool(
-			"neurondb_evaluate_model",
+			"postgresql_evaluate_model",
 			"Evaluate a trained ML model",
 			map[string]interface{}{
 				"type": "object",
@@ -425,7 +425,7 @@ type ListModelsTool struct {
 func NewListModelsTool(db *database.Database, logger *logging.Logger) *ListModelsTool {
 	return &ListModelsTool{
 		BaseTool: NewBaseTool(
-			"neurondb_list_models",
+			"postgresql_list_models",
 			"List all trained ML models",
 			map[string]interface{}{
 				"type": "object",
@@ -504,7 +504,7 @@ type GetModelInfoTool struct {
 func NewGetModelInfoTool(db *database.Database, logger *logging.Logger) *GetModelInfoTool {
 	return &GetModelInfoTool{
 		BaseTool: NewBaseTool(
-			"neurondb_get_model_info",
+			"postgresql_get_model_info",
 			"Get detailed information about a trained model",
 			map[string]interface{}{
 				"type": "object",
@@ -574,7 +574,7 @@ type DeleteModelTool struct {
 func NewDeleteModelTool(db *database.Database, logger *logging.Logger) *DeleteModelTool {
 	return &DeleteModelTool{
 		BaseTool: NewBaseTool(
-			"neurondb_delete_model",
+			"postgresql_delete_model",
 			"Delete a trained ML model",
 			map[string]interface{}{
 				"type": "object",

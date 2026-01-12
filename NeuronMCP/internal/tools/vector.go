@@ -37,10 +37,9 @@ type VectorSearchTool struct {
 
 /* NewVectorSearchTool creates a new vector search tool */
 func NewVectorSearchTool(db *database.Database, logger *logging.Logger) *VectorSearchTool {
-	tool := NewBaseToolWithVersion(
-		"neurondb_vector_search",
+	tool := NewBaseTool(
+		"postgresql_vector_search",
 		"Perform vector similarity search using L2, cosine, inner product, L1, Hamming, Chebyshev, or Minkowski distance",
-		"2.0.0",
 		map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
@@ -82,7 +81,6 @@ func NewVectorSearchTool(db *database.Database, logger *logging.Logger) *VectorS
 			"required": []interface{}{"table", "vector_column", "query_vector"},
 			"additionalProperties": false,
 		},
-		VectorSearchOutputSchema(),
 	)
 	return &VectorSearchTool{
 		BaseTool:     tool,
@@ -219,7 +217,7 @@ type VectorSearchL2Tool struct {
 func NewVectorSearchL2Tool(db *database.Database, logger *logging.Logger) *VectorSearchL2Tool {
 	return &VectorSearchL2Tool{
 		BaseTool: NewBaseTool(
-			"neurondb_vector_search_l2",
+			"postgresql_vector_search_l2",
 			"Perform vector similarity search using L2 (Euclidean) distance",
 			map[string]interface{}{
 				"type": "object",
@@ -282,7 +280,7 @@ type VectorSearchCosineTool struct {
 func NewVectorSearchCosineTool(db *database.Database, logger *logging.Logger) *VectorSearchCosineTool {
 	return &VectorSearchCosineTool{
 		BaseTool: NewBaseTool(
-			"neurondb_vector_search_cosine",
+			"postgresql_vector_search_cosine",
 			"Perform vector similarity search using cosine distance",
 			map[string]interface{}{
 				"type": "object",
@@ -345,7 +343,7 @@ type VectorSearchInnerProductTool struct {
 func NewVectorSearchInnerProductTool(db *database.Database, logger *logging.Logger) *VectorSearchInnerProductTool {
 	return &VectorSearchInnerProductTool{
 		BaseTool: NewBaseTool(
-			"neurondb_vector_search_inner_product",
+			"postgresql_vector_search_inner_product",
 			"Perform vector similarity search using inner product distance",
 			map[string]interface{}{
 				"type": "object",
@@ -408,7 +406,7 @@ type VectorSearchL1Tool struct {
 func NewVectorSearchL1Tool(db *database.Database, logger *logging.Logger) *VectorSearchL1Tool {
 	return &VectorSearchL1Tool{
 		BaseTool: NewBaseTool(
-			"neurondb_vector_search_l1",
+			"postgresql_vector_search_l1",
 			"Perform vector similarity search using L1 (Manhattan) distance",
 			map[string]interface{}{
 				"type": "object",
@@ -471,7 +469,7 @@ type VectorSearchHammingTool struct {
 func NewVectorSearchHammingTool(db *database.Database, logger *logging.Logger) *VectorSearchHammingTool {
 	return &VectorSearchHammingTool{
 		BaseTool: NewBaseTool(
-			"neurondb_vector_search_hamming",
+			"postgresql_vector_search_hamming",
 			"Perform vector similarity search using Hamming distance",
 			map[string]interface{}{
 				"type": "object",
@@ -534,7 +532,7 @@ type VectorSearchChebyshevTool struct {
 func NewVectorSearchChebyshevTool(db *database.Database, logger *logging.Logger) *VectorSearchChebyshevTool {
 	return &VectorSearchChebyshevTool{
 		BaseTool: NewBaseTool(
-			"neurondb_vector_search_chebyshev",
+			"postgresql_vector_search_chebyshev",
 			"Perform vector similarity search using Chebyshev distance",
 			map[string]interface{}{
 				"type": "object",
@@ -597,7 +595,7 @@ type VectorSearchMinkowskiTool struct {
 func NewVectorSearchMinkowskiTool(db *database.Database, logger *logging.Logger) *VectorSearchMinkowskiTool {
 	return &VectorSearchMinkowskiTool{
 		BaseTool: NewBaseTool(
-			"neurondb_vector_search_minkowski",
+			"postgresql_vector_search_minkowski",
 			"Perform vector similarity search using Minkowski distance with configurable p parameter",
 			map[string]interface{}{
 				"type": "object",
@@ -676,7 +674,7 @@ type GenerateEmbeddingTool struct {
 func NewGenerateEmbeddingTool(db *database.Database, logger *logging.Logger) *GenerateEmbeddingTool {
 	return &GenerateEmbeddingTool{
 		BaseTool: NewBaseTool(
-			"neurondb_generate_embedding",
+			"postgresql_generate_embedding",
 			"Generate text embedding using configured model",
 			map[string]interface{}{
 				"type": "object",
@@ -701,10 +699,6 @@ func NewGenerateEmbeddingTool(db *database.Database, logger *logging.Logger) *Ge
 
 /* Execute executes the embedding generation */
 func (t *GenerateEmbeddingTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
-	t.logger.Info("GenerateEmbeddingTool.Execute called", map[string]interface{}{
-		"params": params,
-	})
-
 	valid, errors := t.ValidateParams(params, t.InputSchema())
 	if !valid {
 		return Error("Invalid parameters", "VALIDATION_ERROR", map[string]interface{}{"errors": errors}), nil
@@ -728,20 +722,9 @@ func (t *GenerateEmbeddingTool) Execute(ctx context.Context, params map[string]i
 		/* Try to get default model for embedding operation */
 		if defaultModel, err := t.configHelper.GetDefaultModel(ctx, "embedding"); err == nil {
 			modelName = defaultModel
-			t.logger.Info("Using default embedding model from database", map[string]interface{}{"model": modelName})
 		} else {
 			modelName = "default"
-			t.logger.Info("Using fallback default model", map[string]interface{}{"model": modelName, "error": err.Error()})
 		}
-	}
-
-	/* Try to resolve API key from database (for future use with NeuronDB functions that accept keys) */
-	/* For now, NeuronDB uses GUC settings, but we log usage */
-	/* TODO: Use resolved API key when NeuronDB functions support it */
-	if _, err := t.configHelper.ResolveModelKey(ctx, modelName); err == nil {
-		t.logger.Debug("Resolved API key from database", map[string]interface{}{"model": modelName, "has_key": true})
-	} else {
-		t.logger.Debug("No API key in database, will use GUC settings", map[string]interface{}{"model": modelName, "error": err.Error()})
 	}
 
 	var result interface{}
@@ -750,13 +733,6 @@ func (t *GenerateEmbeddingTool) Execute(ctx context.Context, params map[string]i
 	
 	query := "SELECT embed_text($1, $2)::text AS embedding"
 	queryParams := []interface{}{text, modelName}
-	
-	t.logger.Info("Generating embedding", map[string]interface{}{
-		"method": "embed_text",
-		"model":  modelName,
-		"text_length": textLen,
-		"query": query,
-	})
 	
 	result, err = t.executor.ExecuteQueryOneWithTimeout(ctx, query, queryParams, EmbeddingQueryTimeout)
 	if err != nil {
@@ -847,7 +823,7 @@ type BatchEmbeddingTool struct {
 func NewBatchEmbeddingTool(db *database.Database, logger *logging.Logger) *BatchEmbeddingTool {
 	return &BatchEmbeddingTool{
 		BaseTool: NewBaseTool(
-			"neurondb_batch_embedding",
+			"postgresql_batch_embedding",
 			"Generate embeddings for multiple texts efficiently",
 			map[string]interface{}{
 				"type": "object",
@@ -930,13 +906,6 @@ func (t *BatchEmbeddingTool) Execute(ctx context.Context, params map[string]inte
 
 	query := "SELECT json_agg(embedding::text) AS embeddings FROM unnest(neurondb.embed_batch($1, $2::text[])) AS embedding"
 	queryParams := []interface{}{modelName, textStrings}
-
-	t.logger.Info("Generating batch embeddings", map[string]interface{}{
-		"method": "neurondb.embed_batch",
-		"model":  modelName,
-		"texts_count": textsCount,
-		"query": query,
-	})
 
 	result, err := t.executor.ExecuteQueryOneWithTimeout(ctx, query, queryParams, EmbeddingQueryTimeout)
 	if err != nil {

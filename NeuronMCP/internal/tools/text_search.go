@@ -34,7 +34,7 @@ type TextSearchTool struct {
 func NewTextSearchTool(db *database.Database, logger *logging.Logger) *TextSearchTool {
 	return &TextSearchTool{
 		BaseTool: NewBaseTool(
-			"neurondb_text_search",
+			"postgresql_text_search",
 			"Perform full-text search using PostgreSQL FTS (text-only, no vectors required)",
 			map[string]interface{}{
 				"type": "object",

@@ -34,7 +34,7 @@ type WorkerManagementTool struct {
 func NewWorkerManagementTool(db *database.Database, logger *logging.Logger) *WorkerManagementTool {
 	return &WorkerManagementTool{
 		BaseTool: NewBaseTool(
-			"neurondb_worker_management",
+			"postgresql_worker_management",
 			"Manage background workers: status, jobs, queue",
 			map[string]interface{}{
 				"type": "object",

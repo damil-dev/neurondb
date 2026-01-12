@@ -11,6 +11,71 @@ Model Context Protocol server for NeuronDB PostgreSQL extension, implemented in 
 
 NeuronMCP implements the Model Context Protocol using JSON-RPC 2.0 over stdio. It provides tools and resources for MCP clients to interact with NeuronDB, including vector operations, ML model training, and database schema management.
 
+## Tool Registration Modes
+
+### Claude Desktop Compatibility
+
+**Important**: Claude Desktop has compatibility issues with tools that have `neurondb_` prefixes in their names. By default, only PostgreSQL tools are registered for maximum compatibility.
+
+#### Default Mode (PostgreSQL-only)
+```json
+{
+  "mcpServers": {
+    "neurondb_postgresql_mcp": {
+      "command": "/path/to/neuronmcp",
+      "env": {
+        "NEURONDB_HOST": "localhost",
+        "NEURONDB_PORT": "5432",
+        "NEURONDB_DATABASE": "neurondb",
+        "NEURONDB_USER": "pgedge"
+      }
+    }
+  }
+}
+```
+**Tools available**: 5 essential PostgreSQL tools (version, execute_query, tables, query_plan, cancel_query)
+
+**Note**: Claude Desktop has a hard limit of 5 tools per MCP server. Additional tools can be enabled using category-based selection.
+
+#### Enable NeuronDB Tools (Advanced Mode)
+⚠️ **Warning**: `neurondb_` prefixed tools will NOT display in Claude Desktop, but work with other MCP clients.
+
+```json
+{
+  "mcpServers": {
+    "neurondb_postgresql_mcp": {
+      "command": "/path/to/neuronmcp",
+      "env": {
+        "NEURONDB_HOST": "localhost",
+        "NEURONDB_PORT": "5432",
+        "NEURONDB_DATABASE": "neurondb",
+        "NEURONDB_USER": "pgedge",
+        "NEURONMCP_ALLOW_NEURONDB_TOOLS": "true"
+      }
+    }
+  }
+}
+```
+**Tools available**: 6 tools including vector and RAG tools
+
+#### Category-Based Selection
+```json
+{
+  "mcpServers": {
+    "neurondb_postgresql_mcp": {
+      "command": "/path/to/neuronmcp",
+      "env": {
+        "NEURONDB_HOST": "localhost",
+        "NEURONDB_PORT": "5432",
+        "NEURONDB_DATABASE": "neurondb",
+        "NEURONDB_USER": "pgedge",
+        "NEURONMCP_TOOL_CATEGORIES": "postgresql,vector"
+      }
+    }
+  }
+}
+```
+
 ## Official Documentation
 
 **For comprehensive documentation, detailed tutorials, complete tool references, and integration guides, visit:**

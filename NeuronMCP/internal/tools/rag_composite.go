@@ -34,10 +34,9 @@ type IngestDocumentsTool struct {
 /* NewIngestDocumentsTool creates a new ingest documents tool */
 func NewIngestDocumentsTool(db *database.Database, logger *logging.Logger) *IngestDocumentsTool {
 	return &IngestDocumentsTool{
-		BaseTool: NewBaseToolWithVersion(
-			"neurondb_ingest_documents",
+		BaseTool: NewBaseTool(
+			"postgresql_ingest_documents",
 			"Composite tool: Ingest documents into a collection with automatic chunking and embedding",
-			"2.0.0",
 			map[string]interface{}{
 				"type": "object",
 				"properties": map[string]interface{}{
@@ -71,24 +70,6 @@ func NewIngestDocumentsTool(db *database.Database, logger *logging.Logger) *Inge
 				},
 				"required": []interface{}{"collection", "source"},
 				"additionalProperties": false,
-			},
-			map[string]interface{}{
-				"type": "object",
-				"properties": map[string]interface{}{
-					"chunks_created": map[string]interface{}{
-						"type":        "integer",
-						"description": "Number of chunks created",
-					},
-					"collection": map[string]interface{}{
-						"type":        "string",
-						"description": "Collection name",
-					},
-					"message": map[string]interface{}{
-						"type":        "string",
-						"description": "Success message",
-					},
-				},
-				"required": []interface{}{"chunks_created", "collection"},
 			},
 		),
 		executor:     NewQueryExecutor(db),
@@ -193,10 +174,9 @@ type AnswerWithCitationsTool struct {
 /* NewAnswerWithCitationsTool creates a new answer with citations tool */
 func NewAnswerWithCitationsTool(db *database.Database, logger *logging.Logger) *AnswerWithCitationsTool {
 	return &AnswerWithCitationsTool{
-		BaseTool: NewBaseToolWithVersion(
-			"neurondb_answer_with_citations",
+		BaseTool: NewBaseTool(
+			"postgresql_answer_with_citations",
 			"Composite tool: Answer a question using RAG with source citations",
-			"2.0.0",
 			map[string]interface{}{
 				"type": "object",
 				"properties": map[string]interface{}{
@@ -224,25 +204,6 @@ func NewAnswerWithCitationsTool(db *database.Database, logger *logging.Logger) *
 				},
 				"required": []interface{}{"collection", "query"},
 				"additionalProperties": false,
-			},
-			map[string]interface{}{
-				"type": "object",
-				"properties": map[string]interface{}{
-					"answer": map[string]interface{}{
-						"type":        "string",
-						"description": "Generated answer",
-					},
-					"citations": map[string]interface{}{
-						"type":        "array",
-						"items":       map[string]interface{}{"type": "string"},
-						"description": "Source citations",
-					},
-					"context_count": map[string]interface{}{
-						"type":        "integer",
-						"description": "Number of context chunks used",
-					},
-				},
-				"required": []interface{}{"answer", "citations"},
 			},
 		),
 		executor:     NewQueryExecutor(db),

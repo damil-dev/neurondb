@@ -91,21 +91,16 @@ func (s *Server) Run(ctx context.Context) error {
   /* Register initialize handler */
 	s.SetHandler("initialize", s.HandleInitialize)
 	
-	s.transport.WriteError(fmt.Errorf("DEBUG: Server Run() started, entering main loop"))
-	
 	var initializedSent bool
 
 	for {
-		s.transport.WriteError(fmt.Errorf("DEBUG: Loop iteration started"))
 		select {
 		case <-ctx.Done():
     /* Context cancelled - exit gracefully */
 			return ctx.Err()
 		default:
     /* Read next message - this will block until a message arrives or EOF */
-			s.transport.WriteError(fmt.Errorf("DEBUG: About to call ReadMessage()"))
 			req, err := s.transport.ReadMessage()
-			s.transport.WriteError(fmt.Errorf("DEBUG: ReadMessage() returned, err=%v", err))
 			if err != nil {
      /* Check for EOF - this means stdin closed (client disconnected) */
 				if err == io.EOF {
@@ -134,20 +129,13 @@ func (s *Server) Run(ctx context.Context) error {
 
     /* Handle initialize request - respond with server capabilities */
 			if req.Method == "initialize" && !initializedSent {
-				s.transport.WriteError(fmt.Errorf("DEBUG: Received initialize request"))
-				
 				resp := s.handleRequest(ctx, req)
-				
-				s.transport.WriteError(fmt.Errorf("DEBUG: Generated initialize response, hasError=%v", resp.Error != nil))
 				
      /* CRITICAL: ALWAYS send response for initialize request immediately */
 				if !IsNotification(req) {
       /* Send the initialize response - client will then send notifications/initialized */
-					s.transport.WriteError(fmt.Errorf("DEBUG: About to write initialize response"))
 					if err := s.transport.WriteMessage(resp); err != nil {
 						s.transport.WriteError(fmt.Errorf("CRITICAL: failed to write initialize response: %w", err))
-					} else {
-						s.transport.WriteError(fmt.Errorf("DEBUG: Initialize response written successfully"))
 					}
 					
       /* Note: Client sends notifications/initialized notification, not the server */
@@ -160,7 +148,6 @@ func (s *Server) Run(ctx context.Context) error {
 						initializedSent = true
 					}
 				}
-				s.transport.WriteError(fmt.Errorf("DEBUG: Finished processing initialize, continuing loop"))
      /* Continue loop to wait for next message (including notifications/initialized from client) */
 			} else {
      /* Handle other requests */

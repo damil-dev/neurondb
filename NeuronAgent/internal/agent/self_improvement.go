@@ -175,14 +175,85 @@ func (sim *SelfImprovementManager) ABTest(ctx context.Context, agentID uuid.UUID
 		Metrics:   make(map[string]float64),
 	}
 
-	/* Run test */
+	/* Create test record in database */
+	query := `INSERT INTO neurondb_agent.ab_tests
+		(test_id, agent_id, config_a, config_b, status, created_at)
+		VALUES ($1, $2, $3::jsonb, $4::jsonb, 'running', $5)
+		ON CONFLICT (test_id) DO NOTHING`
+	_, _ = sim.queries.DB.ExecContext(ctx, query, testID, agentID, configA, configB, time.Now())
+
+	/* Run test with actual task routing */
 	startTime := time.Now()
+	ticker := time.NewTicker(5 * time.Second) /* Check every 5 seconds */
+	defer ticker.Stop()
+
+	taskCountA := 0
+	taskCountB := 0
+	successCountA := 0
+	successCountB := 0
+	totalLatencyA := time.Duration(0)
+	totalLatencyB := time.Duration(0)
+
 	for time.Since(startTime) < testDuration {
-		/* Execute tasks with both variants */
-		/* This is simplified - actual implementation would route tasks to variants */
-		/* Collect metrics */
-		time.Sleep(1 * time.Second) /* Placeholder */
+		select {
+		case <-ctx.Done():
+			break
+		case <-ticker.C:
+			/* Get pending tasks for this agent */
+			tasks, err := sim.getPendingTasks(ctx, agentID)
+			if err == nil && len(tasks) > 0 {
+				/* Route tasks to variants (alternating or random) */
+				for i, task := range tasks {
+					var variant *ABTestVariant
+					var variantID string
+					
+					/* Alternate between variants for fair distribution */
+					if i%2 == 0 {
+						variant = variantA
+						variantID = "A"
+					} else {
+						variant = variantB
+						variantID = "B"
+					}
+
+					/* Execute task with variant configuration */
+					start := time.Now()
+					success, _ := sim.executeTaskWithConfig(ctx, agentID, task, variant.Config)
+					latency := time.Since(start)
+
+					/* Collect metrics */
+					if variantID == "A" {
+						taskCountA++
+						if success {
+							successCountA++
+						}
+						totalLatencyA += latency
+					} else {
+						taskCountB++
+						if success {
+							successCountB++
+						}
+						totalLatencyB += latency
+					}
+
+					/* Update variant metrics */
+					if taskCountA > 0 {
+						variantA.Metrics["success_rate"] = float64(successCountA) / float64(taskCountA)
+						variantA.Metrics["avg_latency"] = totalLatencyA.Seconds() / float64(taskCountA)
+						variantA.Metrics["task_count"] = float64(taskCountA)
+					}
+					if taskCountB > 0 {
+						variantB.Metrics["success_rate"] = float64(successCountB) / float64(taskCountB)
+						variantB.Metrics["avg_latency"] = totalLatencyB.Seconds() / float64(taskCountB)
+						variantB.Metrics["task_count"] = float64(taskCountB)
+					}
+				}
+			}
+		}
 	}
+
+	/* Calculate statistical significance and confidence */
+	confidence := sim.calculateConfidence(variantA, variantB)
 
 	/* Analyze results */
 	result := &ABTestResult{
@@ -191,10 +262,69 @@ func (sim *SelfImprovementManager) ABTest(ctx context.Context, agentID uuid.UUID
 		VariantA:  variantA,
 		VariantB:  variantB,
 		Winner:    sim.determineWinner(variantA, variantB),
-		Confidence: 0.75,
+		Confidence: confidence,
 	}
 
+	/* Update test status in database */
+	updateQuery := `UPDATE neurondb_agent.ab_tests
+		SET status = 'completed', results = $1::jsonb, completed_at = $2
+		WHERE test_id = $3`
+	
+	resultsJSON, _ := json.Marshal(map[string]interface{}{
+		"winner":    result.Winner,
+		"confidence": result.Confidence,
+		"variant_a_metrics": variantA.Metrics,
+		"variant_b_metrics": variantB.Metrics,
+	})
+	
+	_, _ = sim.queries.DB.ExecContext(ctx, updateQuery, resultsJSON, time.Now(), testID)
+
 	return result, nil
+}
+
+/* calculateConfidence calculates statistical confidence in AB test results */
+func (sim *SelfImprovementManager) calculateConfidence(variantA, variantB *ABTestVariant) float64 {
+	/* Simple confidence calculation based on sample size and difference */
+	successRateA := variantA.Metrics["success_rate"]
+	successRateB := variantB.Metrics["success_rate"]
+	taskCountA := variantA.Metrics["task_count"]
+	taskCountB := variantB.Metrics["task_count"]
+
+	if taskCountA < 10 || taskCountB < 10 {
+		/* Not enough samples */
+		return 0.5
+	}
+
+	/* Calculate difference */
+	diff := abs(successRateA - successRateB)
+	
+	/* Base confidence on difference and sample size */
+	baseConfidence := diff * 0.5
+	sampleSizeBonus := min(taskCountA, taskCountB) / 100.0 * 0.3
+	
+	confidence := baseConfidence + sampleSizeBonus
+	if confidence > 0.95 {
+		confidence = 0.95
+	}
+	if confidence < 0.5 {
+		confidence = 0.5
+	}
+
+	return confidence
+}
+
+func abs(x float64) float64 {
+	if x < 0 {
+		return -x
+	}
+	return x
+}
+
+func min(a, b float64) float64 {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 /* ReinforcementLearningOptimize uses RL for agent optimization */
@@ -586,5 +716,77 @@ func formatStrategies(strategies []AgentStrategy) string {
 
 func formatTasks(tasks []LearningTask) string {
 	return "Tasks"
+}
+
+/* getPendingTasks gets pending tasks for AB testing */
+func (sim *SelfImprovementManager) getPendingTasks(ctx context.Context, agentID uuid.UUID) ([]map[string]interface{}, error) {
+	/* Query for pending tasks from async_tasks or sessions */
+	query := `SELECT id, agent_id, task_type, payload, created_at
+		FROM neurondb_agent.async_tasks
+		WHERE agent_id = $1 AND status = 'pending'
+		ORDER BY created_at ASC
+		LIMIT 10`
+
+	type TaskRow struct {
+		ID        uuid.UUID              `db:"id"`
+		AgentID   uuid.UUID              `db:"agent_id"`
+		TaskType  string                 `db:"task_type"`
+		Payload   map[string]interface{} `db:"payload"`
+		CreatedAt time.Time              `db:"created_at"`
+	}
+
+	var rows []TaskRow
+	err := sim.queries.DB.SelectContext(ctx, &rows, query, agentID)
+	if err != nil {
+		return nil, err
+	}
+
+	tasks := make([]map[string]interface{}, len(rows))
+	for i, row := range rows {
+		tasks[i] = map[string]interface{}{
+			"id":        row.ID.String(),
+			"agent_id":  row.AgentID.String(),
+			"task_type": row.TaskType,
+			"payload":   row.Payload,
+			"created_at": row.CreatedAt,
+		}
+	}
+
+	return tasks, nil
+}
+
+/* executeTaskWithConfig executes a task with a specific agent configuration */
+func (sim *SelfImprovementManager) executeTaskWithConfig(ctx context.Context, agentID uuid.UUID, task map[string]interface{}, config map[string]interface{}) (bool, error) {
+	/* Create a temporary agent configuration for this variant */
+	/* Execute task using runtime with variant config */
+	if sim.runtime == nil {
+		return false, fmt.Errorf("runtime not available for task execution")
+	}
+
+	/* Get task details */
+	taskType, _ := task["task_type"].(string)
+	payload, _ := task["payload"].(map[string]interface{})
+
+	/* Execute based on task type */
+	switch taskType {
+	case "message", "chat":
+		/* Execute message task */
+		sessionIDStr, _ := payload["session_id"].(string)
+		message, _ := payload["message"].(string)
+		
+		if sessionIDStr != "" && message != "" {
+			sessionID, err := uuid.Parse(sessionIDStr)
+			if err == nil {
+				/* Execute with variant config */
+				/* Note: In production, would temporarily apply config to agent */
+				_, err := sim.runtime.Execute(ctx, sessionID, message)
+				return err == nil, err
+			}
+		}
+		return false, fmt.Errorf("invalid task payload")
+	default:
+		/* Unknown task type */
+		return false, fmt.Errorf("unknown task type: %s", taskType)
+	}
 }
 

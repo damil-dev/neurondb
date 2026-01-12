@@ -33,7 +33,7 @@ type VectorQuantizationTool struct {
 func NewVectorQuantizationTool(db *database.Database, logger *logging.Logger) *VectorQuantizationTool {
 	return &VectorQuantizationTool{
 		BaseTool: NewBaseTool(
-			"neurondb_vector_quantize",
+			"postgresql_vector_quantize",
 			"Quantize or dequantize vectors using int8, fp16, binary, uint8, ternary, or int4 formats",
 			map[string]interface{}{
 				"type": "object",
@@ -326,7 +326,7 @@ type QuantizationAnalysisTool struct {
 func NewQuantizationAnalysisTool(db *database.Database, logger *logging.Logger) *QuantizationAnalysisTool {
 	return &QuantizationAnalysisTool{
 		BaseTool: NewBaseTool(
-			"neurondb_quantization_analyze",
+			"postgresql_quantization_analyze",
 			"Analyze quantization options for a vector (int8, fp16, binary, uint8, ternary, int4) or compare distances",
 			map[string]interface{}{
 				"type": "object",

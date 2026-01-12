@@ -568,9 +568,68 @@ Respond with average score (e.g., 0.75).`, query, joinStrings(contexts, "\n\n"))
 }
 
 func (r *AdvancedRAG) calculateContextRecall(ctx context.Context, query string, contexts []string) (float64, error) {
-	/* Simplified recall calculation */
-	/* In practice, would need ground truth relevant contexts */
-	return 0.75, nil /* Placeholder */
+	if len(contexts) == 0 {
+		return 0.0, nil
+	}
+
+	/* Generate query embedding */
+	queryEmbedding, err := r.embed.Embed(ctx, query, "all-MiniLM-L6-v2")
+	if err != nil {
+		return 0.5, fmt.Errorf("context recall calculation failed: embedding_error=true, error=%w", err)
+	}
+
+	/* Calculate average similarity between query and all contexts */
+	/* Recall is approximated by how well the retrieved contexts match the query */
+	var totalSimilarity float64
+	validContexts := 0
+
+	for _, contextText := range contexts {
+		if contextText == "" {
+			continue
+		}
+
+		/* Generate context embedding */
+		ctxEmbedding, err := r.embed.Embed(ctx, contextText, "all-MiniLM-L6-v2")
+		if err != nil {
+			/* Skip contexts that fail to embed */
+			continue
+		}
+
+		/* Calculate cosine similarity */
+		similarity := r.cosineSimilarity(queryEmbedding, ctxEmbedding)
+		totalSimilarity += similarity
+		validContexts++
+	}
+
+	if validContexts == 0 {
+		return 0.0, nil
+	}
+
+	/* Average similarity as recall proxy */
+	/* Higher similarity = better recall (more relevant contexts retrieved) */
+	avgSimilarity := totalSimilarity / float64(validContexts)
+
+	/* Normalize to 0-1 range (similarity is already in that range, but we can adjust) */
+	/* Use a threshold: if average similarity > 0.7, consider it good recall */
+	recall := avgSimilarity
+
+	/* Apply sigmoid-like function to map similarity to recall score */
+	/* This gives better differentiation in the 0.5-0.9 range */
+	if recall < 0.5 {
+		recall = recall * 0.8 /* Penalize low similarity */
+	} else if recall > 0.8 {
+		recall = 0.8 + (recall-0.8)*0.5 /* Cap very high similarity */
+	}
+
+	/* Ensure result is in [0, 1] range */
+	if recall < 0 {
+		recall = 0
+	}
+	if recall > 1 {
+		recall = 1
+	}
+
+	return recall, nil
 }
 
 func (r *AdvancedRAG) calculateSemanticSimilarity(ctx context.Context, query, answer string) (float64, error) {

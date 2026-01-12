@@ -240,13 +240,91 @@ func (ad *AnalyticsDashboard) getAgentMetrics(ctx context.Context, startTime, en
 		return nil, err
 	}
 
+	/* Calculate success rate from messages */
+	/* Success is determined by absence of errors in metadata */
+	successQuery := `SELECT 
+		COUNT(*) AS total_messages,
+		COUNT(*) FILTER (WHERE metadata->>'error' IS NULL AND role = 'assistant') AS successful_messages
+		FROM neurondb_agent.messages m
+		INNER JOIN neurondb_agent.sessions s ON m.session_id = s.id
+		WHERE s.created_at BETWEEN $1 AND $2 AND m.role = 'assistant'`
+	
+	type SuccessRow struct {
+		TotalMessages     int64 `db:"total_messages"`
+		SuccessfulMessages int64 `db:"successful_messages"`
+	}
+	
+	var successRow SuccessRow
+	err = ad.queries.DB.GetContext(ctx, &successRow, successQuery, startTime, endTime)
+	if err != nil {
+		/* If query fails, use default */
+		successRow = SuccessRow{TotalMessages: 1, SuccessfulMessages: 1}
+	}
+	
+	var successRate float64
+	if successRow.TotalMessages > 0 {
+		successRate = float64(successRow.SuccessfulMessages) / float64(successRow.TotalMessages)
+	} else {
+		successRate = 1.0 /* Default to 100% if no messages */
+	}
+	
+	/* Calculate average latency */
+	/* Latency is time between user message and assistant response */
+	latencyQuery := `SELECT 
+		AVG(EXTRACT(EPOCH FROM (assistant.created_at - user_msg.created_at))) AS avg_latency_seconds
+		FROM neurondb_agent.messages assistant
+		INNER JOIN neurondb_agent.messages user_msg ON assistant.session_id = user_msg.session_id
+			AND assistant.created_at > user_msg.created_at
+			AND assistant.role = 'assistant'
+			AND user_msg.role = 'user'
+		INNER JOIN neurondb_agent.sessions s ON assistant.session_id = s.id
+		WHERE s.created_at BETWEEN $1 AND $2
+			AND NOT EXISTS (
+				SELECT 1 FROM neurondb_agent.messages m2
+				WHERE m2.session_id = user_msg.session_id
+					AND m2.role = 'user'
+					AND m2.created_at > user_msg.created_at
+					AND m2.created_at < assistant.created_at
+			)`
+	
+	type LatencyRow struct {
+		AvgLatencySeconds *float64 `db:"avg_latency_seconds"`
+	}
+	
+	var latencyRow LatencyRow
+	err = ad.queries.DB.GetContext(ctx, &latencyRow, latencyQuery, startTime, endTime)
+	if err != nil {
+		/* If query fails, use default */
+		latencyRow = LatencyRow{AvgLatencySeconds: nil}
+	}
+	
+	var avgLatency time.Duration
+	if latencyRow.AvgLatencySeconds != nil && *latencyRow.AvgLatencySeconds > 0 {
+		avgLatency = time.Duration(*latencyRow.AvgLatencySeconds * float64(time.Second))
+	} else {
+		avgLatency = 2 * time.Second /* Default if no data */
+	}
+	
+	/* Get total messages count */
+	totalMessagesQuery := `SELECT COUNT(*) AS total_messages
+		FROM neurondb_agent.messages m
+		INNER JOIN neurondb_agent.sessions s ON m.session_id = s.id
+		WHERE s.created_at BETWEEN $1 AND $2`
+	
+	var totalMessages int64
+	err = ad.queries.DB.GetContext(ctx, &totalMessages, totalMessagesQuery, startTime, endTime)
+	if err != nil {
+		totalMessages = 0
+	}
+
 	return &AgentMetrics{
 		TotalAgents:    row.TotalAgents,
 		ActiveAgents:   row.ActiveAgents,
 		TotalSessions:  row.TotalSessions,
 		ActiveSessions: row.ActiveSessions,
-		SuccessRate:    0.85, /* Placeholder */
-		AverageLatency: 2 * time.Second, /* Placeholder */
+		TotalMessages:  totalMessages,
+		SuccessRate:    successRate,
+		AverageLatency: avgLatency,
 	}, nil
 }
 

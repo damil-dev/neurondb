@@ -32,7 +32,7 @@ type GPUMonitoringTool struct {
 func NewGPUMonitoringTool(db *database.Database, logger *logging.Logger) *GPUMonitoringTool {
 	return &GPUMonitoringTool{
 		BaseTool: NewBaseTool(
-			"neurondb_gpu_info",
+			"postgresql_gpu_info",
 			"Get GPU information and monitoring data",
 			map[string]interface{}{
 				"type":       "object",

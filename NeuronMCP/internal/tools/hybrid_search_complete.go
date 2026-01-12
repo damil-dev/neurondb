@@ -33,7 +33,7 @@ type ReciprocalRankFusionTool struct {
 func NewReciprocalRankFusionTool(db *database.Database, logger *logging.Logger) *ReciprocalRankFusionTool {
 	return &ReciprocalRankFusionTool{
 		BaseTool: NewBaseTool(
-			"neurondb_reciprocal_rank_fusion",
+			"postgresql_reciprocal_rank_fusion",
 			"Perform reciprocal rank fusion on multiple ranking arrays",
 			map[string]interface{}{
 				"type": "object",
@@ -122,7 +122,7 @@ type SemanticKeywordSearchTool struct {
 func NewSemanticKeywordSearchTool(db *database.Database, logger *logging.Logger) *SemanticKeywordSearchTool {
 	return &SemanticKeywordSearchTool{
 		BaseTool: NewBaseTool(
-			"neurondb_semantic_keyword_search",
+			"postgresql_semantic_keyword_search",
 			"Perform semantic + keyword search",
 			map[string]interface{}{
 				"type": "object",
@@ -209,7 +209,7 @@ type MultiVectorSearchTool struct {
 func NewMultiVectorSearchTool(db *database.Database, logger *logging.Logger) *MultiVectorSearchTool {
 	return &MultiVectorSearchTool{
 		BaseTool: NewBaseTool(
-			"neurondb_multi_vector_search",
+			"postgresql_multi_vector_search",
 			"Perform search with multiple query vectors",
 			map[string]interface{}{
 				"type": "object",
@@ -313,7 +313,7 @@ type FacetedVectorSearchTool struct {
 func NewFacetedVectorSearchTool(db *database.Database, logger *logging.Logger) *FacetedVectorSearchTool {
 	return &FacetedVectorSearchTool{
 		BaseTool: NewBaseTool(
-			"neurondb_faceted_vector_search",
+			"postgresql_faceted_vector_search",
 			"Perform faceted vector search",
 			map[string]interface{}{
 				"type": "object",
@@ -400,7 +400,7 @@ type TemporalVectorSearchTool struct {
 func NewTemporalVectorSearchTool(db *database.Database, logger *logging.Logger) *TemporalVectorSearchTool {
 	return &TemporalVectorSearchTool{
 		BaseTool: NewBaseTool(
-			"neurondb_temporal_vector_search",
+			"postgresql_temporal_vector_search",
 			"Perform temporal vector search with time decay",
 			map[string]interface{}{
 				"type": "object",
@@ -496,7 +496,7 @@ type DiverseVectorSearchTool struct {
 func NewDiverseVectorSearchTool(db *database.Database, logger *logging.Logger) *DiverseVectorSearchTool {
 	return &DiverseVectorSearchTool{
 		BaseTool: NewBaseTool(
-			"neurondb_diverse_vector_search",
+			"postgresql_diverse_vector_search",
 			"Perform diverse vector search to maximize result diversity",
 			map[string]interface{}{
 				"type": "object",

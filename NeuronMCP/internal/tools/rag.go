@@ -34,7 +34,7 @@ type ProcessDocumentTool struct {
 func NewProcessDocumentTool(db *database.Database, logger *logging.Logger) *ProcessDocumentTool {
 	return &ProcessDocumentTool{
 		BaseTool: NewBaseTool(
-			"neurondb_process_document",
+			"postgresql_process_document",
 			"Process a document: chunk text and generate embeddings",
 			map[string]interface{}{
 				"type": "object",
@@ -190,7 +190,7 @@ type RetrieveContextTool struct {
 func NewRetrieveContextTool(db *database.Database, logger *logging.Logger) *RetrieveContextTool {
 	return &RetrieveContextTool{
 		BaseTool: NewBaseTool(
-			"neurondb_retrieve_context",
+			"postgresql_retrieve_context",
 			"Retrieve relevant context using vector search",
 			map[string]interface{}{
 				"type": "object",
@@ -339,7 +339,7 @@ type GenerateResponseTool struct {
 func NewGenerateResponseTool(db *database.Database, logger *logging.Logger) *GenerateResponseTool {
 	return &GenerateResponseTool{
 		BaseTool: NewBaseTool(
-			"neurondb_generate_response",
+			"postgresql_generate_response",
 			"Generate a response using RAG pipeline",
 			map[string]interface{}{
 				"type": "object",
@@ -459,7 +459,7 @@ type ChunkDocumentTool struct {
 func NewChunkDocumentTool(db *database.Database, logger *logging.Logger) *ChunkDocumentTool {
 	return &ChunkDocumentTool{
 		BaseTool: NewBaseTool(
-			"neurondb_chunk_document",
+			"postgresql_chunk_document",
 			"Chunk a document into smaller pieces with optional overlap",
 			map[string]interface{}{
 				"type": "object",

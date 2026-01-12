@@ -34,7 +34,7 @@ type HybridSearchTool struct {
 func NewHybridSearchTool(db *database.Database, logger *logging.Logger) *HybridSearchTool {
 	return &HybridSearchTool{
 		BaseTool: NewBaseTool(
-			"neurondb_hybrid_search",
+			"postgresql_hybrid_search",
 			"Perform hybrid search combining semantic (vector) and lexical (BM25/text) search",
 			map[string]interface{}{
 				"type": "object",

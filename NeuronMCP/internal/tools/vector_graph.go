@@ -32,7 +32,7 @@ type VectorGraphTool struct {
 func NewVectorGraphTool(db *database.Database, logger *logging.Logger) *VectorGraphTool {
 	return &VectorGraphTool{
 		BaseTool: NewBaseTool(
-			"neurondb_vector_graph",
+			"postgresql_vector_graph",
 			"Perform graph operations: BFS, DFS, PageRank, community detection on vgraph type",
 			map[string]interface{}{
 				"type": "object",

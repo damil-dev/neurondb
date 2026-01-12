@@ -32,7 +32,7 @@ type AutoMLTool struct {
 func NewAutoMLTool(db *database.Database, logger *logging.Logger) *AutoMLTool {
 	return &AutoMLTool{
 		BaseTool: NewBaseTool(
-			"neurondb_automl",
+			"postgresql_automl",
 			"Automated machine learning: model selection, hyperparameter tuning",
 			map[string]interface{}{
 				"type": "object",

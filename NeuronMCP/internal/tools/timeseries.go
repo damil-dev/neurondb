@@ -32,7 +32,7 @@ type TimeSeriesTool struct {
 func NewTimeSeriesTool(db *database.Database, logger *logging.Logger) *TimeSeriesTool {
 	return &TimeSeriesTool{
 		BaseTool: NewBaseTool(
-			"neurondb_timeseries_analysis",
+			"postgresql_timeseries_analysis",
 			"Perform time series analysis: ARIMA, forecasting",
 			map[string]interface{}{
 				"type": "object",

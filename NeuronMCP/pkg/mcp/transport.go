@@ -54,16 +54,13 @@ func NewStdioTransportWithMaxSize(maxRequestSize int64) *StdioTransport {
 
 /* ReadMessage reads a JSON-RPC message from stdin */
 func (t *StdioTransport) ReadMessage() (*JSONRPCRequest, error) {
-	t.WriteError(fmt.Errorf("DEBUG: ReadMessage() called, starting to read headers"))
   /* Read headers */
 	var contentLength int
 	headerLines := 0
  	maxHeaders := 10 /* Prevent infinite loop */
 	
 	for headerLines < maxHeaders {
-		t.WriteError(fmt.Errorf("DEBUG: Reading header line %d", headerLines))
 		line, err := t.stdin.ReadString('\n')
-		t.WriteError(fmt.Errorf("DEBUG: Read header line: %q, err=%v", line, err))
 		if err != nil {
 			if err == io.EOF {
      /* If we got EOF while reading headers and haven't found Content-Length, */
@@ -85,7 +82,6 @@ func (t *StdioTransport) ReadMessage() (*JSONRPCRequest, error) {
    /* Standard MCP protocol always uses Content-Length headers */
    /* Claude Desktop sends with Content-Length, but we support direct JSON for compatibility */
 		if headerLines == 1 && strings.HasPrefix(strings.TrimSpace(line), "{") {
-			t.WriteError(fmt.Errorf("DEBUG: First line is JSON (fallback mode, no Content-Length headers), parsing directly"))
 			/* Client doesn't use headers - we'll respond without headers too */
 			t.clientUsesHeaders = false
 			
@@ -119,13 +115,11 @@ func (t *StdioTransport) ReadMessage() (*JSONRPCRequest, error) {
 	if contentLength <= 0 {
    /* This can happen if we read an empty line before getting Content-Length */
    /* or if there's malformed input. Return error but don't treat as fatal. */
-		t.WriteError(fmt.Errorf("DEBUG: No valid Content-Length found after %d headers", headerLines))
 		return nil, fmt.Errorf("missing or invalid Content-Length header")
 	}
 
 	/* Client uses Content-Length headers */
 	t.clientUsesHeaders = true
-	t.WriteError(fmt.Errorf("DEBUG: Headers parsed, contentLength=%d, reading body", contentLength))
 	
 	/* Enforce maximum request size */
 	if t.maxRequestSize > 0 && int64(contentLength) > t.maxRequestSize {
@@ -155,8 +149,6 @@ func (t *StdioTransport) WriteMessage(resp *JSONRPCResponse) error {
 		return fmt.Errorf("failed to serialize response: %w", err)
 	}
 
-	t.WriteError(fmt.Errorf("DEBUG: Writing response: %s (clientUsesHeaders=%v)", string(data), t.clientUsesHeaders))
-
   /* WORKAROUND: Claude Desktop appears to have issues parsing Content-Length headers in responses
    * Even though it sends requests with headers, it expects responses without headers
    * This is a known issue with some MCP clients - always respond without headers for compatibility
@@ -164,14 +156,13 @@ func (t *StdioTransport) WriteMessage(resp *JSONRPCResponse) error {
    */
 	forceNoHeaders := os.Getenv("NEURONMCP_FORCE_NO_HEADERS") == "true"
 	
-  /* Default to no headers for Claude Desktop compatibility, unless explicitly enabled
-   * MCP spec says to use headers, but Claude Desktop doesn't handle them properly
+  /* IMPORTANT: Claude Desktop sends requests with Content-Length headers
+   * Per MCP spec, we should respond with headers when client uses headers
+   * Previous assumption that Claude Desktop can't parse headers was incorrect
+   * Always match the client's header usage for proper MCP protocol compliance
    */
-	if t.clientUsesHeaders && !forceNoHeaders {
-		/* Client sent headers, but Claude Desktop can't parse response headers
-		 * So we respond WITHOUT headers as a workaround
-		 * This is technically not MCP spec compliant, but necessary for Claude Desktop
-		 */
+	if forceNoHeaders {
+		/* Only disable headers if explicitly forced */
 		t.clientUsesHeaders = false
 	}
 	
@@ -208,8 +199,6 @@ func (t *StdioTransport) WriteMessage(resp *JSONRPCResponse) error {
 		return fmt.Errorf("failed to flush stdout: %w", err)
 	}
 
-	t.WriteError(fmt.Errorf("DEBUG: Response written and flushed (format: %s)", map[bool]string{true: "Content-Length headers", false: "direct JSON"}[t.clientUsesHeaders]))
-
 	return nil
 }
 
@@ -228,8 +217,6 @@ func (t *StdioTransport) WriteNotification(method string, params interface{}) er
 	if err != nil {
 		return fmt.Errorf("failed to serialize notification: %w", err)
 	}
-
-	t.WriteError(fmt.Errorf("DEBUG: Writing notification: %s (clientUsesHeaders=%v)", string(data), t.clientUsesHeaders))
 
   /* WORKAROUND: Check environment variable for forced no headers */
 	forceNoHeaders := os.Getenv("NEURONMCP_FORCE_NO_HEADERS") == "true"
@@ -260,8 +247,6 @@ func (t *StdioTransport) WriteNotification(method string, params interface{}) er
 	if err := t.stdout.Flush(); err != nil {
 		return fmt.Errorf("failed to flush stdout: %w", err)
 	}
-
-	t.WriteError(fmt.Errorf("DEBUG: Notification written and flushed"))
 
 	return nil
 }

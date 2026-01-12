@@ -32,7 +32,7 @@ type DriftDetectionTool struct {
 func NewDriftDetectionTool(db *database.Database, logger *logging.Logger) *DriftDetectionTool {
 	return &DriftDetectionTool{
 		BaseTool: NewBaseTool(
-			"neurondb_detect_drift",
+			"postgresql_detect_drift",
 			"Detect data drift: centroid drift, distribution divergence, temporal monitoring",
 			map[string]interface{}{
 				"type": "object",

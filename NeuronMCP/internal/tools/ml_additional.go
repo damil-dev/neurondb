@@ -32,7 +32,7 @@ type PredictBatchTool struct {
 func NewPredictBatchTool(db *database.Database, logger *logging.Logger) *PredictBatchTool {
 	return &PredictBatchTool{
 		BaseTool: NewBaseTool(
-			"neurondb_predict_batch",
+			"postgresql_predict_batch",
 			"Perform batch prediction using a trained machine learning model for multiple feature vectors",
 			map[string]interface{}{
 				"type": "object",
@@ -200,7 +200,7 @@ type ExportModelTool struct {
 func NewExportModelTool(db *database.Database, logger *logging.Logger) *ExportModelTool {
 	return &ExportModelTool{
 		BaseTool: NewBaseTool(
-			"neurondb_export_model",
+			"postgresql_export_model",
 			"Export a trained machine learning model to various formats (ONNX, PMML, JSON)",
 			map[string]interface{}{
 				"type": "object",
