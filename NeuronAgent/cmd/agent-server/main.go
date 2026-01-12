@@ -198,8 +198,8 @@ func main() {
 	runtime.SetSubAgentManager(subAgentManager)
 	runtime.SetAlertManager(taskNotifier)
 
-	/* Initialize enhanced multimodal processor */
-	multimodalProcessor := multimodal.NewEnhancedMultimodalProcessor()
+	/* Initialize enhanced multimodal processor with database connection */
+	multimodalProcessor := multimodal.NewEnhancedMultimodalProcessorWithDB(database.DB)
 	runtime.SetMultimodalProcessor(multimodalProcessor)
 
 	/* Initialize session management */
