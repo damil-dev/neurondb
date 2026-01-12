@@ -32,7 +32,7 @@ type VectorArithmeticTool struct {
 func NewVectorArithmeticTool(db *database.Database, logger *logging.Logger) *VectorArithmeticTool {
 	return &VectorArithmeticTool{
 		BaseTool: NewBaseTool(
-			"neurondb_vector_arithmetic",
+			"postgresql_vector_arithmetic",
 			"Perform vector arithmetic operations: add, subtract, multiply, normalize, concat, norm",
 			map[string]interface{}{
 				"type": "object",
@@ -164,7 +164,7 @@ type VectorDistanceTool struct {
 func NewVectorDistanceTool(db *database.Database, logger *logging.Logger) *VectorDistanceTool {
 	return &VectorDistanceTool{
 		BaseTool: NewBaseTool(
-			"neurondb_vector_distance",
+			"postgresql_vector_distance",
 			"Compute distance between two vectors using L1, L2, Hamming, Chebyshev, Minkowski, Jaccard, Dice, or Mahalanobis metrics",
 			map[string]interface{}{
 				"type": "object",
@@ -311,7 +311,7 @@ type VectorSimilarityUnifiedTool struct {
 func NewVectorSimilarityUnifiedTool(db *database.Database, logger *logging.Logger) *VectorSimilarityUnifiedTool {
 	return &VectorSimilarityUnifiedTool{
 		BaseTool: NewBaseTool(
-			"neurondb_vector_similarity_unified",
+			"postgresql_vector_similarity_unified",
 			"Compute similarity between two vectors using unified similarity function (cosine, inner_product, l2)",
 			map[string]interface{}{
 				"type": "object",

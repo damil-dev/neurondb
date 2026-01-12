@@ -32,7 +32,7 @@ type QualityMetricsTool struct {
 func NewQualityMetricsTool(db *database.Database, logger *logging.Logger) *QualityMetricsTool {
 	return &QualityMetricsTool{
 		BaseTool: NewBaseTool(
-			"neurondb_quality_metrics",
+			"postgresql_quality_metrics",
 			"Compute quality metrics: Recall@K, Precision@K, F1@K, MRR, Davies-Bouldin Index",
 			map[string]interface{}{
 				"type": "object",

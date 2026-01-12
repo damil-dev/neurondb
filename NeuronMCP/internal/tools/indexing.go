@@ -35,7 +35,7 @@ type CreateHNSWIndexTool struct {
 func NewCreateHNSWIndexTool(db *database.Database, logger *logging.Logger) *CreateHNSWIndexTool {
 	return &CreateHNSWIndexTool{
 		BaseTool: NewBaseTool(
-			"neurondb_create_hnsw_index",
+			"postgresql_create_hnsw_index",
 			"Create HNSW index for vector column",
 			map[string]interface{}{
 				"type": "object",
@@ -219,7 +219,7 @@ type CreateIVFIndexTool struct {
 func NewCreateIVFIndexTool(db *database.Database, logger *logging.Logger) *CreateIVFIndexTool {
 	return &CreateIVFIndexTool{
 		BaseTool: NewBaseTool(
-			"neurondb_create_ivf_index",
+			"postgresql_create_ivf_index",
 			"Create IVF index for vector column",
 			map[string]interface{}{
 				"type": "object",
@@ -354,7 +354,7 @@ type IndexStatusTool struct {
 func NewIndexStatusTool(db *database.Database, logger *logging.Logger) *IndexStatusTool {
 	return &IndexStatusTool{
 		BaseTool: NewBaseTool(
-			"neurondb_index_status",
+			"postgresql_index_status",
 			"Get status and statistics for a vector index",
 			map[string]interface{}{
 				"type": "object",
@@ -444,7 +444,7 @@ type DropIndexTool struct {
 func NewDropIndexTool(db *database.Database, logger *logging.Logger) *DropIndexTool {
 	return &DropIndexTool{
 		BaseTool: NewBaseTool(
-			"neurondb_drop_index",
+			"postgresql_drop_index",
 			"Drop a vector index",
 			map[string]interface{}{
 				"type": "object",

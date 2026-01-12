@@ -32,7 +32,7 @@ type TopicDiscoveryTool struct {
 func NewTopicDiscoveryTool(db *database.Database, logger *logging.Logger) *TopicDiscoveryTool {
 	return &TopicDiscoveryTool{
 		BaseTool: NewBaseTool(
-			"neurondb_topic_discovery",
+			"postgresql_topic_discovery",
 			"Perform topic modeling and discovery on text data",
 			map[string]interface{}{
 				"type": "object",

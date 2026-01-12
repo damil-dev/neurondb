@@ -33,7 +33,7 @@ type RerankCrossEncoderTool struct {
 func NewRerankCrossEncoderTool(db *database.Database, logger *logging.Logger) *RerankCrossEncoderTool {
 	return &RerankCrossEncoderTool{
 		BaseTool: NewBaseTool(
-			"neurondb_rerank_cross_encoder",
+			"postgresql_rerank_cross_encoder",
 			"Rerank documents using cross-encoder model",
 			map[string]interface{}{
 				"type": "object",
@@ -132,7 +132,7 @@ type RerankLLMTool struct {
 func NewRerankLLMTool(db *database.Database, logger *logging.Logger) *RerankLLMTool {
 	return &RerankLLMTool{
 		BaseTool: NewBaseTool(
-			"neurondb_rerank_llm",
+			"postgresql_rerank_llm",
 			"Rerank documents using LLM",
 			map[string]interface{}{
 				"type": "object",
@@ -231,7 +231,7 @@ type RerankCohereTool struct {
 func NewRerankCohereTool(db *database.Database, logger *logging.Logger) *RerankCohereTool {
 	return &RerankCohereTool{
 		BaseTool: NewBaseTool(
-			"neurondb_rerank_cohere",
+			"postgresql_rerank_cohere",
 			"Rerank documents using Cohere API",
 			map[string]interface{}{
 				"type": "object",
@@ -321,7 +321,7 @@ type RerankColBERTTool struct {
 func NewRerankColBERTTool(db *database.Database, logger *logging.Logger) *RerankColBERTTool {
 	return &RerankColBERTTool{
 		BaseTool: NewBaseTool(
-			"neurondb_rerank_colbert",
+			"postgresql_rerank_colbert",
 			"Rerank documents using ColBERT model",
 			map[string]interface{}{
 				"type": "object",
@@ -409,7 +409,7 @@ type RerankLTRTool struct {
 func NewRerankLTRTool(db *database.Database, logger *logging.Logger) *RerankLTRTool {
 	return &RerankLTRTool{
 		BaseTool: NewBaseTool(
-			"neurondb_rerank_ltr",
+			"postgresql_rerank_ltr",
 			"Rerank documents using learning-to-rank",
 			map[string]interface{}{
 				"type": "object",
@@ -498,7 +498,7 @@ type RerankEnsembleTool struct {
 func NewRerankEnsembleTool(db *database.Database, logger *logging.Logger) *RerankEnsembleTool {
 	return &RerankEnsembleTool{
 		BaseTool: NewBaseTool(
-			"neurondb_rerank_ensemble",
+			"postgresql_rerank_ensemble",
 			"Rerank documents using ensemble of multiple rerankers",
 			map[string]interface{}{
 				"type": "object",

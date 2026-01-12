@@ -33,7 +33,7 @@ type ClusterDataTool struct {
 func NewClusterDataTool(db *database.Database, logger *logging.Logger) *ClusterDataTool {
 	return &ClusterDataTool{
 		BaseTool: NewBaseTool(
-			"neurondb_cluster_data",
+			"postgresql_cluster_data",
 			"Perform clustering on vector data using K-means, GMM, DBSCAN, or hierarchical clustering",
 			map[string]interface{}{
 				"type": "object",
@@ -219,7 +219,7 @@ type DetectOutliersTool struct {
 func NewDetectOutliersTool(db *database.Database, logger *logging.Logger) *DetectOutliersTool {
 	return &DetectOutliersTool{
 		BaseTool: NewBaseTool(
-			"neurondb_detect_outliers",
+			"postgresql_detect_outliers",
 			"Detect outliers in vector data using Z-score method",
 			map[string]interface{}{
 				"type": "object",
@@ -319,7 +319,7 @@ type ReduceDimensionalityTool struct {
 func NewReduceDimensionalityTool(db *database.Database, logger *logging.Logger) *ReduceDimensionalityTool {
 	return &ReduceDimensionalityTool{
 		BaseTool: NewBaseTool(
-			"neurondb_reduce_dimensionality",
+			"postgresql_reduce_dimensionality",
 			"Reduce dimensionality using PCA",
 			map[string]interface{}{
 				"type": "object",

@@ -32,7 +32,7 @@ type ONNXTool struct {
 func NewONNXTool(db *database.Database, logger *logging.Logger) *ONNXTool {
 	return &ONNXTool{
 		BaseTool: NewBaseTool(
-			"neurondb_onnx_model",
+			"postgresql_onnx_model",
 			"Manage ONNX models: import, export, info, predict",
 			map[string]interface{}{
 				"type": "object",

@@ -33,7 +33,7 @@ type AnalyzeDataTool struct {
 func NewAnalyzeDataTool(db *database.Database, logger *logging.Logger) *AnalyzeDataTool {
 	return &AnalyzeDataTool{
 		BaseTool: NewBaseTool(
-			"neurondb_analyze_data",
+			"postgresql_analyze_data",
 			"Perform comprehensive data analysis including statistics, distributions, and data quality metrics",
 			map[string]interface{}{
 				"type": "object",

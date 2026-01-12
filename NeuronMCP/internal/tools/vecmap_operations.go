@@ -33,7 +33,7 @@ type VecmapOperationsTool struct {
 func NewVecmapOperationsTool(db *database.Database, logger *logging.Logger) *VecmapOperationsTool {
 	return &VecmapOperationsTool{
 		BaseTool: NewBaseTool(
-			"neurondb_vecmap_operations",
+			"postgresql_vecmap_operations",
 			"Perform operations on vecmap (sparse vector) type: distances, arithmetic, norm",
 			map[string]interface{}{
 				"type": "object",

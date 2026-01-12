@@ -34,7 +34,7 @@ type EmbedImageTool struct {
 func NewEmbedImageTool(db *database.Database, logger *logging.Logger) *EmbedImageTool {
 	return &EmbedImageTool{
 		BaseTool: NewBaseTool(
-			"neurondb_embed_image",
+			"postgresql_embed_image",
 			"Generate image embedding from image bytes",
 			map[string]interface{}{
 				"type": "object",
@@ -155,7 +155,7 @@ type EmbedMultimodalTool struct {
 func NewEmbedMultimodalTool(db *database.Database, logger *logging.Logger) *EmbedMultimodalTool {
 	return &EmbedMultimodalTool{
 		BaseTool: NewBaseTool(
-			"neurondb_embed_multimodal",
+			"postgresql_embed_multimodal",
 			"Generate multimodal embedding from text and image",
 			map[string]interface{}{
 				"type": "object",
@@ -253,7 +253,7 @@ type EmbedCachedTool struct {
 func NewEmbedCachedTool(db *database.Database, logger *logging.Logger) *EmbedCachedTool {
 	return &EmbedCachedTool{
 		BaseTool: NewBaseTool(
-			"neurondb_embed_cached",
+			"postgresql_embed_cached",
 			"Generate cached text embedding (uses cache if available)",
 			map[string]interface{}{
 				"type": "object",
@@ -330,7 +330,7 @@ type ConfigureEmbeddingModelTool struct {
 func NewConfigureEmbeddingModelTool(db *database.Database, logger *logging.Logger) *ConfigureEmbeddingModelTool {
 	return &ConfigureEmbeddingModelTool{
 		BaseTool: NewBaseTool(
-			"neurondb_configure_embedding_model",
+			"postgresql_configure_embedding_model",
 			"Configure embedding model settings",
 			map[string]interface{}{
 				"type": "object",
@@ -409,7 +409,7 @@ type GetEmbeddingModelConfigTool struct {
 func NewGetEmbeddingModelConfigTool(db *database.Database, logger *logging.Logger) *GetEmbeddingModelConfigTool {
 	return &GetEmbeddingModelConfigTool{
 		BaseTool: NewBaseTool(
-			"neurondb_get_embedding_model_config",
+			"postgresql_get_embedding_model_config",
 			"Get embedding model configuration",
 			map[string]interface{}{
 				"type": "object",
@@ -476,7 +476,7 @@ type ListEmbeddingModelConfigsTool struct {
 func NewListEmbeddingModelConfigsTool(db *database.Database, logger *logging.Logger) *ListEmbeddingModelConfigsTool {
 	return &ListEmbeddingModelConfigsTool{
 		BaseTool: NewBaseTool(
-			"neurondb_list_embedding_model_configs",
+			"postgresql_list_embedding_model_configs",
 			"List all embedding model configurations",
 			map[string]interface{}{
 				"type":       "object",
@@ -519,7 +519,7 @@ type DeleteEmbeddingModelConfigTool struct {
 func NewDeleteEmbeddingModelConfigTool(db *database.Database, logger *logging.Logger) *DeleteEmbeddingModelConfigTool {
 	return &DeleteEmbeddingModelConfigTool{
 		BaseTool: NewBaseTool(
-			"neurondb_delete_embedding_model_config",
+			"postgresql_delete_embedding_model_config",
 			"Delete embedding model configuration",
 			map[string]interface{}{
 				"type": "object",

@@ -39,7 +39,7 @@ type DatasetLoadingTool struct {
 func NewDatasetLoadingTool(db *database.Database, logger *logging.Logger) *DatasetLoadingTool {
 	return &DatasetLoadingTool{
 		BaseTool: NewBaseTool(
-			"neurondb_load_dataset",
+			"postgresql_load_dataset",
 			"Load datasets from multiple sources (HuggingFace, URLs, GitHub, S3, local files) into PostgreSQL with automatic schema detection, embedding generation, and index creation",
 			map[string]interface{}{
 				"type": "object",

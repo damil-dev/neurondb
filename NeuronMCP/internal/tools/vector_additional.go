@@ -32,7 +32,7 @@ type VectorSimilarityTool struct {
 func NewVectorSimilarityTool(db *database.Database, logger *logging.Logger) *VectorSimilarityTool {
 	return &VectorSimilarityTool{
 		BaseTool: NewBaseTool(
-			"neurondb_vector_similarity",
+			"postgresql_vector_similarity",
 			"Compute similarity between two vectors",
 			map[string]interface{}{
 				"type": "object",
@@ -160,7 +160,7 @@ type CreateVectorIndexTool struct {
 func NewCreateVectorIndexTool(db *database.Database, logger *logging.Logger) *CreateVectorIndexTool {
 	return &CreateVectorIndexTool{
 		BaseTool: NewBaseTool(
-			"neurondb_create_vector_index",
+			"postgresql_create_vector_index",
 			"Create a vector index (HNSW or IVF) for a vector column",
 			map[string]interface{}{
 				"type": "object",
