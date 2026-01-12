@@ -52,7 +52,7 @@ func (b *Bootstrap) Initialize(ctx context.Context) error {
 			"errors": validation.Errors,
 		})
 		for _, errMsg := range validation.Errors {
-			b.logger.Error("Validation error", fmt.Errorf(errMsg), nil)
+			b.logger.Error("Validation error", fmt.Errorf("%s", errMsg), nil)
 		}
 		metrics.TrackStep("validation", time.Since(validationStart), false)
 	} else {
