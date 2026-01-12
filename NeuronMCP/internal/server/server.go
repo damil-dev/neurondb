@@ -120,7 +120,14 @@ func NewServerWithConfig(configPath string) (*Server, error) {
 	setupBuiltInMiddleware(mwManager, cfgMgr, logger)
 
 	toolRegistry := tools.NewToolRegistry(db, logger)
-	tools.RegisterAllTools(toolRegistry, db, logger)
+	
+	/* Check if minimal tool mode is enabled for testing */
+	if os.Getenv("NEURONMCP_MINIMAL_TOOLS") == "true" {
+		logger.Info("Minimal tool mode enabled - registering only essential tools", nil)
+		tools.RegisterMinimalTools(toolRegistry, db, logger)
+	} else {
+		tools.RegisterAllTools(toolRegistry, db, logger)
+	}
 
 	capabilitiesManager := NewCapabilitiesManager(serverSettings.GetName(), serverSettings.GetVersion(), toolRegistry)
 

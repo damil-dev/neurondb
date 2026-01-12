@@ -270,3 +270,41 @@ func RegisterAllTools(registry *ToolRegistry, db *database.Database, logger *log
 	registry.Register(NewAudioEmbedTool(db, logger))
 }
 
+/* RegisterMinimalTools registers only essential tools for testing (approximately 15-20 tools) */
+func RegisterMinimalTools(registry *ToolRegistry, db *database.Database, logger *logging.Logger) {
+	if logger != nil {
+		logger.Info("Registering minimal tool set for testing", nil)
+	}
+
+  /* Essential PostgreSQL tools - Server Info (3 tools) */
+	registry.Register(NewPostgreSQLVersionTool(db, logger))
+	registry.Register(NewPostgreSQLDatabaseListTool(db, logger))
+	registry.Register(NewPostgreSQLTablesTool(db, logger))
+
+  /* Essential PostgreSQL tools - Query Execution (2 tools) */
+	registry.Register(NewPostgreSQLExecuteQueryTool(db, logger))
+	registry.Register(NewPostgreSQLQueryPlanTool(db, logger))
+
+  /* Essential Vector tools - Core Operations (3 tools) */
+	registry.Register(NewGenerateEmbeddingTool(db, logger))
+	registry.Register(NewVectorSearchTool(db, logger))
+	registry.Register(NewVectorSearchCosineTool(db, logger))
+
+  /* Essential Vector tools - Index Management (2 tools) */
+	registry.Register(NewCreateVectorIndexTool(db, logger))
+	registry.Register(NewIndexStatusTool(db, logger))
+
+  /* Essential RAG tools (3 tools) */
+	registry.Register(NewRetrieveContextTool(db, logger))
+	registry.Register(NewChunkDocumentTool(db, logger))
+	registry.Register(NewIngestDocumentsTool(db, logger))
+
+  /* Essential ML tools (2 tools) */
+	registry.Register(NewListModelsTool(db, logger))
+	registry.Register(NewGetModelInfoTool(db, logger))
+
+	if logger != nil {
+		logger.Info("Minimal tool set registered successfully", nil)
+	}
+}
+
