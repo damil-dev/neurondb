@@ -19,10 +19,23 @@ from .core.exceptions import (
     AuthenticationError,
     NotFoundError,
     ServerError,
-    ValidationError
+    ValidationError,
+    ConnectionError,
+    TimeoutError
 )
 from .agents import AgentManager, AgentProfile
 from .sessions import SessionManager, ConversationManager
+from .tools import ToolManager
+from .workflows import WorkflowManager
+from .budgets import BudgetManager
+from .evaluation import EvaluationManager
+from .replay import ReplayManager
+from .specializations import SpecializationManager
+from .plans import PlanManager
+from .webhooks import WebhookManager
+from .memory import MemoryManager
+from .vfs import VFSManager
+from .collaboration import CollaborationManager
 from .utils.config import ConfigLoader
 from .utils.logging import setup_logging
 from .utils.metrics import MetricsCollector
@@ -34,6 +47,17 @@ __all__ = [
     "AgentProfile",
     "SessionManager",
     "ConversationManager",
+    "ToolManager",
+    "WorkflowManager",
+    "BudgetManager",
+    "EvaluationManager",
+    "ReplayManager",
+    "SpecializationManager",
+    "PlanManager",
+    "WebhookManager",
+    "MemoryManager",
+    "VFSManager",
+    "CollaborationManager",
     "ConfigLoader",
     "MetricsCollector",
     "setup_logging",
@@ -42,6 +66,8 @@ __all__ = [
     "NotFoundError",
     "ServerError",
     "ValidationError",
+    "ConnectionError",
+    "TimeoutError",
 ]
 
 

@@ -74,7 +74,17 @@ func runTest(cmd *cobra.Command, args []string) error {
 func testConfigFile(configPath string) error {
 	fmt.Printf("🔍 Validating configuration: %s\n", configPath)
 	
-	// TODO: Validate config file
+	/*
+	 * TODO: Implement comprehensive configuration file validation.
+	 * This should include:
+	 * 1. Parsing the configuration file (YAML/JSON).
+	 * 2. Validating required fields are present.
+	 * 3. Checking data types and value ranges.
+	 * 4. Verifying file paths and network endpoints are accessible.
+	 * 5. Returning detailed error messages for any validation failures.
+	 *
+	 * Current state: Placeholder, always returns success.
+	 */
 	fmt.Println("✅ Configuration file is valid")
 	return nil
 }
