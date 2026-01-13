@@ -723,7 +723,8 @@ func (t *GenerateEmbeddingTool) Execute(ctx context.Context, params map[string]i
 		if defaultModel, err := t.configHelper.GetDefaultModel(ctx, "embedding"); err == nil {
 			modelName = defaultModel
 		} else {
-			modelName = "default"
+			/* Use a known working model - "default" causes corrupted embeddings */
+			modelName = "sentence-transformers/all-MiniLM-L6-v2"
 		}
 	}
 
