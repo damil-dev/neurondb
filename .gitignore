@@ -196,6 +196,7 @@ NeuronDB/src/gpu/metal/*.metallib
 Makefile.local
 NeuronDB/Makefile.local
 build/
+NeuronDB/build
 dist/
 *.build/
 
@@ -357,6 +358,11 @@ NeuronDB/benchmark/detailed_reports/
 
 # Benchmark results
 NeuronDB/benchmark/vector/results/
+NeuronDB/benchmark/rag/test_results/rag_benchmark_results_*.md
+NeuronDB/benchmark/rag/test_results/rag_benchmark_results_*.json
+
+# Test core analysis files
+NeuronDB/tests/core_analysis/*.txt
 
 # ============================================================================
 # DATABASE & MIGRATIONS
