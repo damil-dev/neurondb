@@ -277,7 +277,7 @@ SELECT vector_l2_distance_gpu(a, b);  -- Experimental
 ## Related Documentation
 
 - [Top 20 Functions](TOP_FUNCTIONS.md) - Most commonly used functions
-- [SQL API Reference](sql-api-complete.md) - Complete API documentation
+- [SQL API Reference](../../NeuronDB/docs/sql-api.md) - Complete API documentation
 - [CHANGELOG](../../CHANGELOG.md) - Version history and changes
 - [Upgrade Guide](../../NeuronDB/docs/operations/playbook.md#upgrades) - Upgrade procedures
 

@@ -47,7 +47,7 @@ psql -d neurondb -c "CREATE EXTENSION neurondb;"
 **NeuronAgent:**
 ```bash
 cd NeuronAgent
-./scripts/run_migrations.sh
+./NeuronAgent/scripts/neuronagent_migrate.sh
 ```
 This runs all migrations including `migrations/001_initial_schema.sql` and subsequent migrations.
 
@@ -152,6 +152,33 @@ export SERVER_PORT=8081
 3. NeuronAgent retrieves relevant context using vector search
 4. Context passed to LLM through NeuronAgent
 5. Response generated and returned
+
+### Workflow 5: Multi-Agent Collaboration
+
+1. Primary agent receives complex task requiring multiple capabilities
+2. Primary agent delegates subtasks to specialized agents (research agent, analysis agent, etc.)
+3. Agents communicate via NeuronAgent collaboration API
+4. Each agent uses hierarchical memory to retrieve relevant context
+5. Results aggregated and returned to primary agent
+6. Final response generated with combined insights
+
+### Workflow 6: DAG-Based Workflow Engine with HITL
+
+1. User creates workflow definition with DAG structure (agent steps, tool steps, approval steps)
+2. Workflow engine executes steps based on dependencies
+3. Human-in-the-loop (HITL) approval step triggers notification (email/webhook)
+4. Human reviews and approves/rejects via approval API
+5. Workflow continues based on approval decision
+6. All steps logged with execution history and state snapshots
+7. Workflow completion triggers webhook notifications
+
+### Workflow 7: Agent with Budget Management
+
+1. Agent created with budget constraints (per-agent or per-session)
+2. Agent processes requests with real-time cost tracking
+3. Budget alerts triggered when approaching thresholds
+4. Agent operations paused or limited when budget exceeded
+5. Cost reports generated for analysis and optimization
 
 ## Docker Integration
 

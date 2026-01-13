@@ -62,9 +62,25 @@ docker compose up -d
 - The canonical compose file is `docker-compose.yml` at repo root.
 - For the full Docker layout and the helper script, see `dockers/readme.md` and `dockers/docker.sh`.
 
-### Method 2: Source build
+### Method 2: Native installation (without Docker)
 
-This repository contains build instructions per component:
+Install components directly on your system using automated installation scripts or manual setup.
+
+**Quick Installation:**
+
+```bash
+# Install all components
+sudo ./scripts/install-components.sh
+
+# Install specific components
+sudo ./scripts/install-components.sh neuronmcp neuronagent
+```
+
+For detailed instructions, see [Native Installation Guide](installation-native.md) and [Service Management Guide](installation-services.md).
+
+### Method 3: Source build (manual)
+
+Build and install components manually:
 
 #### Build/install NeuronDB extension
 
@@ -166,7 +182,7 @@ psql -d neurondb -c "CREATE EXTENSION neurondb;"
 **NeuronAgent:**
 ```bash
 cd NeuronAgent
-./scripts/run_migrations.sh
+./NeuronAgent/scripts/neuronagent_migrate.sh
 ```
 This runs all migrations including `migrations/001_initial_schema.sql` and subsequent migrations.
 

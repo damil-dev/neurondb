@@ -741,15 +741,13 @@ typedef struct {
 
 ## Related Documentation
 
-- [SQL API Reference](sql-api-complete.md)
-- [Configuration Reference](configuration-complete.md)
+- [SQL API Reference](../../NeuronDB/docs/sql-api.md)
+- [Configuration Reference](../../NeuronDB/docs/configuration.md)
 - [Index Methods](../internals/index-methods.md)
-- [Quantization Guide](../advanced/vector-search/quantization.md)
+- [Vector Search Documentation](../../NeuronDB/docs/vector-search/)
 
 ---
 
 **Last Updated:** 2025-01-01  
 **Documentation Version:** 1.0.0
-
-
 

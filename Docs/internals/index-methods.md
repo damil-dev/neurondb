@@ -351,14 +351,14 @@ SELECT * FROM pg_stat_neurondb_indexes;
 
 ## Related Documentation
 
-- [SQL API Reference](../reference/sql-api-complete.md)
-- [Configuration Reference](../reference/configuration-complete.md)
-- [Architecture](../internals/architecture-complete.md)
+- [SQL API Reference](../../NeuronDB/docs/sql-api.md)
+- [Configuration Reference](../../NeuronDB/docs/configuration.md)
+- [NeuronDB Documentation](../../NeuronDB/docs/)
+- [NeuronAgent Architecture](../../NeuronAgent/docs/ARCHITECTURE.md)
+- [NeuronDesktop Frontend Architecture](neurondesktop-frontend.md)
 
 ---
 
 **Last Updated:** 2025-01-01  
 **Documentation Version:** 1.0.0
-
-
 

@@ -1,14 +1,25 @@
-# Quick Start Guide
+# 🚀 Quick Start Guide
 
-Get NeuronDB up and running in minutes with this step-by-step guide.
+<div align="center">
 
+**Get NeuronDB up and running in minutes with this step-by-step guide**
+
+[![Quick Start](https://img.shields.io/badge/quick--start-5_min-green)](.)
+[![Difficulty](https://img.shields.io/badge/difficulty-easy-brightgreen)](.)
+
+</div>
+
+---
+
+> [!TIP]
 > **New here?** Start with **[Simple Start Guide](Docs/getting-started/simple-start.md)** instead - it explains everything in plain English!
 
+> [!NOTE]
 > **TECHNICAL USER?** Continue below for a streamlined technical setup.
 
 ---
 
-## Prerequisites
+## 📋 Prerequisites
 
 **Before starting, verify you have:**
 
@@ -16,6 +27,14 @@ Get NeuronDB up and running in minutes with this step-by-step guide.
 - [ ] **5-10 minutes** for setup and verification
 - [ ] **4GB RAM** minimum (8GB recommended)
 - [ ] Ports **5433, 8080, 8081, 3000** available
+
+| Requirement | Minimum | Recommended |
+|-------------|---------|-------------|
+| **Docker** | 20.10+ | Latest |
+| **Docker Compose** | 2.0+ | Latest |
+| **RAM** | 4GB | 8GB+ |
+| **Disk Space** | 5GB | 10GB+ |
+| **Time** | 5 min | 10 min |
 
 <details>
 <summary><strong>Verify Docker installation</strong></summary>
@@ -33,7 +52,7 @@ Docker Compose version v2.0.0 or higher
 
 </details>
 
-## Step 1: Start All Services
+## 🚀 Step 1: Start All Services
 
 Start the complete NeuronDB ecosystem with a single command:
 
@@ -81,7 +100,7 @@ You should see five services running:
 
 **Wait for all services to show "healthy" status** (may take 30-60 seconds)
 
-## Step 2: Run Smoke Tests
+## ✅ Step 2: Run Verification Tests
 
 Verify everything works with these quick smoke tests.
 
@@ -149,15 +168,20 @@ python neurondb_mcp_client.py -c ../../neuronmcp_server.json -e "list_tools" 2>/
 
 **Note:** NeuronMCP communicates via stdio (standard input/output), not HTTP. It's designed to be used with MCP-compatible clients like Claude Desktop.
 
-## Step 3: Quick Verification Script
+## 🔍 Step 3: Quick Verification
 
-Run the automated smoke test script:
+Run the verification commands manually:
 
 ```bash
-./scripts/smoke-test.sh
-```
+# Test 1: SQL query
+docker compose exec neurondb psql -U neurondb -d neurondb -c "SELECT neurondb.version();"
 
-This script runs all three tests above and reports success or failure.
+# Test 2: REST API
+curl -s http://localhost:8080/health
+
+# Test 3: MCP server (if using Python client)
+cd NeuronMCP/client && python neurondb_mcp_client.py -c ../../neuronmcp_server.json -e "list_tools" 2>/dev/null | head -30
+```
 
 **Expected output:**
 ```
@@ -183,7 +207,7 @@ docker compose exec neurondb psql -U neurondb -d neurondb <<EOF
 CREATE TABLE documents (
   id SERIAL PRIMARY KEY,
   content TEXT,
-  embedding vector(1536)
+  embedding vector(3)
 );
 
 INSERT INTO documents (content, embedding)
@@ -208,7 +232,7 @@ CREATE EXTENSION IF NOT EXISTS neurondb;
 CREATE TABLE documents (
   id SERIAL PRIMARY KEY,
   content TEXT,
-  embedding vector(1536)
+  embedding vector(3)
 );
 INSERT INTO documents (content, embedding)
 VALUES ('Hello, world!', '[0.1, 0.2, 0.3]'::vector);
@@ -255,7 +279,7 @@ curl -X POST http://localhost:8080/api/v1/agents \
 
 </details>
 
-## Troubleshooting
+## 🔧 Troubleshooting
 
 **Having issues?** Check these common problems:
 
@@ -330,7 +354,7 @@ docker compose logs --tail=50 neurondesk-frontend
 - NeuronAgent waits for NeuronDB to be ready
 - NeuronMCP waits for NeuronDB to be ready
 
-## Uninstall and Cleanup
+## 🗑️ Uninstall and Cleanup
 
 When you're done, clean up all resources:
 
@@ -375,7 +399,7 @@ docker compose stop neuronagent
 docker compose rm neuronagent
 ```
 
-## What's Running?
+## 📊 What's Running?
 
 After `docker compose up -d`, you have:
 
@@ -392,7 +416,7 @@ After `docker compose up -d`, you have:
 **Data:**Persistent data stored in Docker volumes:
 - `neurondb-data` (PostgreSQL data)
 
-## Accessing Services
+## 🔌 Accessing Services
 
 ### PostgreSQL (NeuronDB)
 
@@ -473,7 +497,7 @@ curl -s http://localhost:8081/health | jq .
 - Agent management interface
 - Vector search and RAG pipeline tools
 
-## Configuration
+## ⚙️ Configuration
 
 All services use default configuration suitable for development. To customize:
 
@@ -483,13 +507,13 @@ All services use default configuration suitable for development. To customize:
 
 See component-specific documentation for detailed configuration options.
 
-## Getting Help
+## 💬 Getting Help
 
 - **Documentation:**See [readme.md](readme.md) for detailed documentation
 - **Issues:**Check service logs: `docker compose logs [service-name]`
 - **Support:**Contact support@neurondb.ai
 
-## Quickstart with Sample Data
+## 📦 Quickstart with Sample Data
 
 Get started immediately with pre-generated sample data:
 
@@ -518,7 +542,7 @@ EOF
 
 For more details, see [Quickstart Data Pack documentation](examples/quickstart-data/README.md).
 
-## SQL Recipes
+## 📝 SQL Recipes
 
 Explore ready-to-run SQL recipes for common patterns:
 
@@ -555,7 +579,7 @@ psql "postgresql://neurondb:neurondb@localhost:5433/neurondb" \
 
 See [SQL Recipe Library](examples/sql-recipes/README.md) for all recipes.
 
-## CLI Helpers
+## 🛠️ CLI Helpers
 
 Use command-line helpers for common operations:
 

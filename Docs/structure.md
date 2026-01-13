@@ -22,7 +22,7 @@ This file explains how docs are organized and how to extend them.
 1. Pick the right section (`getting-started`, `internals`, or `reference`)
 2. Add the file
 3. Link it from:
-   - the relevant section `readme.md`
+   - the relevant section `README.md`
    - `DOCUMENTATION.md` if it's a core entry point
 
 
