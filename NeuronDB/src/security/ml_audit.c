@@ -60,10 +60,6 @@ log_ml_inference(PG_FUNCTION_ARGS)
 	StringInfoData query;
 	NdbSpiSession *session = NULL;
 	int			ret;
-	text	   *operation_text = NULL;
-	text	   *user_id_text = NULL;
-	text	   *input_hash_text = NULL;
-	text	   *output_hash_text = NULL;
 
 	/* Check if audit logging is enabled */
 	if (!neurondb_audit_ml_enabled)

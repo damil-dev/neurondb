@@ -128,9 +128,15 @@ filtered_hnsw_scan_gpu(FilteredHnswScanState * state,
 					   int entry_level,
 					   int m)
 {
-	/* Use GPU HNSW search with filter applied in kernel */
-	/* For now, use standard GPU search and filter results */
-	/* TODO: Implement GPU kernel with integrated filtering */
+	/*
+	 * TODO: Implement GPU kernel with integrated filtering.
+	 * The current implementation performs GPU search followed by CPU-side
+	 * filtering, which is inefficient. A proper implementation should integrate
+	 * the filter predicate evaluation directly into the GPU HNSW search kernel,
+	 * allowing early termination and reducing data transfer between GPU and CPU.
+	 * This requires modifying the GPU kernel to accept filter functions and
+	 * evaluate them during the search traversal.
+	 */
 
 	int			rc = neurondb_gpu_hnsw_search(state->query,
 											  nodes,

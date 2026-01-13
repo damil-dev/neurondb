@@ -152,14 +152,15 @@ hybrid_planner_hook(Query * parse, const char *query_string, int cursorOptions,
 		result = standard_planner(parse, query_string, cursorOptions, boundParams);
 
 	/*
-	 * TODO: Analyze query and add CustomPath for hybrid scan when: - Query
-	 * involves both vector search and full-text search - Multiple
-	 * tables/indexes are involved - Hybrid search would be more efficient
-	 * than separate scans
-	 *
-	 * This would require: 1. Detecting vector and FTS operations in the query
-	 * 2. Creating CustomPath with appropriate cost estimates 3. Adding path
-	 * to rel->pathlist for planner consideration
+	 * TODO: Analyze query and add CustomPath for hybrid scan.
+	 * This planner hook should detect when a query involves both vector
+	 * similarity search and full-text search operations, and create a
+	 * CustomPath that combines both searches efficiently. The implementation
+	 * requires: (1) Parsing the query tree to detect vector and FTS operations,
+	 * (2) Creating a CustomPath with appropriate cost estimates based on
+	 * selectivity and index statistics, (3) Adding the path to rel->pathlist
+	 * for planner consideration. The hybrid scan should be more efficient than
+	 * separate scans when both operations are on the same relation.
 	 */
 
 	return result;

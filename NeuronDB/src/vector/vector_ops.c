@@ -658,7 +658,6 @@ vector_eq(PG_FUNCTION_ARGS)
 {
 	Vector	   *a = NULL;
 	Vector	   *b = NULL;
-	int			i;
 
 	/* Validate argument count */
 	if (PG_NARGS() != 2)
