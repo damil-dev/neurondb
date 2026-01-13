@@ -60,6 +60,7 @@ tramp
 *.log.*
 pg.log
 pg.log.log
+stderr.log
 build_output.log
 build_warnings.log
 
@@ -68,6 +69,7 @@ build_warnings.log
 *.temp
 *.bak
 *.BAK
+*_bak
 *.backup
 *.backup.*
 *.old
