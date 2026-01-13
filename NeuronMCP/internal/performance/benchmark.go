@@ -274,3 +274,4 @@ func FormatDuration(d time.Duration) string {
 	return fmt.Sprintf("%.2fs", float64(d)/float64(time.Second))
 }
 
+

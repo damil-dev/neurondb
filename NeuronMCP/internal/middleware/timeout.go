@@ -111,11 +111,35 @@ func (m *TimeoutMiddleware) Execute(ctx context.Context, params map[string]inter
 	errChan := make(chan error, 1)
 
 	go func() {
+		/* Check if context is already cancelled before starting */
+		select {
+		case <-timeoutCtx.Done():
+			/* Context already cancelled, don't start execution */
+			return
+		default:
+		}
+		
 		result, err := next(timeoutCtx, params)
-		if err != nil {
-			errChan <- err
-		} else {
-			resultChan <- result
+		
+		/* Check context again before sending result */
+		select {
+		case <-timeoutCtx.Done():
+			/* Context was cancelled, don't send result */
+			return
+		default:
+			if err != nil {
+				select {
+				case errChan <- err:
+				case <-timeoutCtx.Done():
+					/* Context cancelled while sending error */
+				}
+			} else {
+				select {
+				case resultChan <- result:
+				case <-timeoutCtx.Done():
+					/* Context cancelled while sending result */
+				}
+			}
 		}
 	}()
 

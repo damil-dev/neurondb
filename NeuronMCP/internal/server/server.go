@@ -122,8 +122,11 @@ func NewServerWithConfig(configPath string) (*Server, error) {
 	samplingManager := sampling.NewManager(db, logger)
 	samplingManager.SetToolRegistry(toolRegistry) /* Enable tool calling in sampling */
 	healthChecker := health.NewChecker(db, logger)
+	healthChecker.SetToolRegistry(toolRegistry)
+	healthChecker.SetResources(resourcesManager)
 	progressTracker := progress.NewTracker()
 	batchProcessor := batch.NewProcessor(db, toolRegistry, logger)
+	batchProcessor.SetProgressTracker(progressTracker)
 
 	/* Create idempotency cache with 1 hour TTL */
 	idempotencyCache := cache.NewIdempotencyCache(time.Hour)
@@ -144,7 +147,7 @@ func NewServerWithConfig(configPath string) (*Server, error) {
 		if envAddr := os.Getenv("NEURONMCP_HTTP_ADDR"); envAddr != "" {
 			httpAddr = envAddr
 		}
-		httpServer = NewHTTPServer(httpAddr, prometheusExporter.Handler())
+		httpServer = NewHTTPServerWithLogger(httpAddr, prometheusExporter.Handler(), logger)
 		logger.Info("HTTP metrics server enabled", map[string]interface{}{
 			"address": httpAddr,
 		})
@@ -229,31 +232,77 @@ func (s *Server) Start(ctx context.Context) error {
 
 /* Stop stops the server gracefully */
 func (s *Server) Stop() error {
-	s.logger.Info("Stopping Neurondb MCP server", nil)
+	if s == nil {
+		return fmt.Errorf("server instance is nil")
+	}
+	
+	shutdownTimeout := 30 * time.Second
+	if s.logger != nil {
+		s.logger.Info("Stopping Neurondb MCP server", map[string]interface{}{
+			"shutdown_timeout_seconds": shutdownTimeout.Seconds(),
+		})
+	}
 
-	/* Shutdown HTTP metrics server */
+	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+	defer cancel()
+
+	/* Collect shutdown errors */
+	var shutdownErrors []error
+
+	/* Step 1: Shutdown HTTP metrics server first (external connections) */
 	if s.httpServer != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		if err := s.httpServer.Shutdown(ctx); err != nil {
-			s.logger.Warn("HTTP metrics server shutdown error", map[string]interface{}{
-				"error": err.Error(),
-			})
+		httpCtx, httpCancel := context.WithTimeout(ctx, 5*time.Second)
+		if err := s.httpServer.Shutdown(httpCtx); err != nil {
+			shutdownErrors = append(shutdownErrors, fmt.Errorf("HTTP metrics server shutdown error: %w", err))
+			if s.logger != nil {
+				s.logger.Warn("HTTP metrics server shutdown error", map[string]interface{}{
+					"error": err.Error(),
+				})
+			}
 		}
+		httpCancel()
 	}
 
-	/* Close database connections */
-	if s.db != nil {
-		s.db.Close()
-	}
-
-	/* Close idempotency cache */
+	/* Step 2: Close idempotency cache (in-memory resources) */
 	if s.idempotencyCache != nil {
-		s.idempotencyCache.Close()
+		if err := func() error {
+			defer func() {
+				if r := recover(); r != nil {
+					if s.logger != nil {
+						s.logger.Warn("Panic during idempotency cache close", map[string]interface{}{
+							"panic": r,
+						})
+					}
+				}
+			}()
+			s.idempotencyCache.Close()
+			return nil
+		}(); err != nil {
+			shutdownErrors = append(shutdownErrors, fmt.Errorf("idempotency cache close error: %w", err))
+		}
 		s.idempotencyCache = nil
 	}
 
-	/* Close other resources */
+	/* Step 3: Close database connections (external resources) */
+	if s.db != nil {
+		if err := func() error {
+			defer func() {
+				if r := recover(); r != nil {
+					if s.logger != nil {
+						s.logger.Warn("Panic during database close", map[string]interface{}{
+							"panic": r,
+						})
+					}
+				}
+			}()
+			s.db.Close()
+			return nil
+		}(); err != nil {
+			shutdownErrors = append(shutdownErrors, fmt.Errorf("database close error: %w", err))
+		}
+	}
+
+	/* Step 4: Clean up other resources */
 	if s.progress != nil {
 		/* Progress tracker cleanup if needed */
 		s.progress = nil
@@ -262,6 +311,17 @@ func (s *Server) Stop() error {
 	if s.batch != nil {
 		/* Batch processor cleanup if needed */
 		s.batch = nil
+	}
+
+	/* Step 5: Clean up metrics and exporters */
+	if s.metricsCollector != nil {
+		/* Metrics collector cleanup if needed */
+		s.metricsCollector = nil
+	}
+
+	if s.prometheusExporter != nil {
+		/* Prometheus exporter cleanup if needed */
+		s.prometheusExporter = nil
 	}
 
 	/* Note: HTTP server and SSE connections are managed by transport manager
@@ -274,7 +334,19 @@ func (s *Server) Stop() error {
 	/* Context cancellation will handle goroutine cleanup */
 	/* All goroutines should respect context cancellation */
 
-	s.logger.Info("NeuronMCP server stopped", nil)
+	if len(shutdownErrors) > 0 {
+		if s.logger != nil {
+			s.logger.Warn("Server shutdown completed with errors", map[string]interface{}{
+				"error_count": len(shutdownErrors),
+				"errors":      shutdownErrors,
+			})
+		}
+		return fmt.Errorf("server shutdown completed with %d error(s): %v", len(shutdownErrors), shutdownErrors)
+	}
+
+	if s.logger != nil {
+		s.logger.Info("NeuronMCP server stopped successfully", nil)
+	}
 	return nil
 }
 

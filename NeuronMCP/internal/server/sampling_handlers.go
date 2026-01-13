@@ -29,6 +29,16 @@ func (s *Server) setupSamplingHandlers() {
 
 /* handleCreateMessage handles the sampling/createMessage request */
 func (s *Server) handleCreateMessage(ctx context.Context, params json.RawMessage) (interface{}, error) {
+	if s == nil {
+		return nil, fmt.Errorf("server instance is nil")
+	}
+	if s.middleware == nil {
+		return nil, fmt.Errorf("middleware manager is not initialized")
+	}
+	if s.sampling == nil {
+		return nil, fmt.Errorf("sampling manager is not initialized")
+	}
+	
 	mcpReq := &middleware.MCPRequest{
 		Method: "sampling/createMessage",
 		Params: make(map[string]interface{}),

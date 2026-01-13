@@ -19,6 +19,7 @@ import (
 
 	"github.com/neurondb/NeuronMCP/internal/database"
 	"github.com/neurondb/NeuronMCP/internal/logging"
+	"github.com/neurondb/NeuronMCP/internal/validation"
 )
 
 /* QualityMetricsTool computes quality metrics for search results */
@@ -80,8 +81,13 @@ func (t *QualityMetricsTool) Execute(ctx context.Context, params map[string]inte
 	metric, _ := params["metric"].(string)
 	table, _ := params["table"].(string)
 
-	if table == "" {
-		return Error("table is required", "VALIDATION_ERROR", nil), nil
+	/* Validate table name (SQL identifier) */
+	if err := validation.ValidateSQLIdentifierRequired(table, "table"); err != nil {
+		return Error(fmt.Sprintf("Invalid table parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
+			"parameter": "table",
+			"error":     err.Error(),
+			"params":    params,
+		}), nil
 	}
 
   /* Build query based on metric type */
@@ -96,8 +102,21 @@ func (t *QualityMetricsTool) Execute(ctx context.Context, params map[string]inte
 		}
 		groundTruthCol, _ := params["ground_truth_col"].(string)
 		predictedCol, _ := params["predicted_col"].(string)
-		if groundTruthCol == "" || predictedCol == "" {
-			return Error("ground_truth_col and predicted_col are required for @K metrics", "VALIDATION_ERROR", nil), nil
+		if err := validation.ValidateSQLIdentifierRequired(groundTruthCol, "ground_truth_col"); err != nil {
+			return Error(fmt.Sprintf("Invalid ground_truth_col parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
+				"parameter": "ground_truth_col",
+				"table":     table,
+				"error":     err.Error(),
+				"params":    params,
+			}), nil
+		}
+		if err := validation.ValidateSQLIdentifierRequired(predictedCol, "predicted_col"); err != nil {
+			return Error(fmt.Sprintf("Invalid predicted_col parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
+				"parameter": "predicted_col",
+				"table":     table,
+				"error":     err.Error(),
+				"params":    params,
+			}), nil
 		}
    /* Use appropriate NeuronDB function */
 		funcName := "recall_at_k"
@@ -111,16 +130,42 @@ func (t *QualityMetricsTool) Execute(ctx context.Context, params map[string]inte
 	case "mrr":
 		groundTruthCol, _ := params["ground_truth_col"].(string)
 		predictedCol, _ := params["predicted_col"].(string)
-		if groundTruthCol == "" || predictedCol == "" {
-			return Error("ground_truth_col and predicted_col are required for MRR", "VALIDATION_ERROR", nil), nil
+		if err := validation.ValidateSQLIdentifierRequired(groundTruthCol, "ground_truth_col"); err != nil {
+			return Error(fmt.Sprintf("Invalid ground_truth_col parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
+				"parameter": "ground_truth_col",
+				"table":     table,
+				"error":     err.Error(),
+				"params":    params,
+			}), nil
+		}
+		if err := validation.ValidateSQLIdentifierRequired(predictedCol, "predicted_col"); err != nil {
+			return Error(fmt.Sprintf("Invalid predicted_col parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
+				"parameter": "predicted_col",
+				"table":     table,
+				"error":     err.Error(),
+				"params":    params,
+			}), nil
 		}
 		query = "SELECT mrr($1::text, $2::text, $3::text) AS metric_value"
 		queryParams = []interface{}{table, groundTruthCol, predictedCol}
 	case "davies_bouldin":
 		vectorCol, _ := params["vector_column"].(string)
 		clusterCol, _ := params["cluster_column"].(string)
-		if vectorCol == "" || clusterCol == "" {
-			return Error("vector_column and cluster_column are required for Davies-Bouldin", "VALIDATION_ERROR", nil), nil
+		if err := validation.ValidateSQLIdentifierRequired(vectorCol, "vector_column"); err != nil {
+			return Error(fmt.Sprintf("Invalid vector_column parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
+				"parameter": "vector_column",
+				"table":     table,
+				"error":     err.Error(),
+				"params":    params,
+			}), nil
+		}
+		if err := validation.ValidateSQLIdentifierRequired(clusterCol, "cluster_column"); err != nil {
+			return Error(fmt.Sprintf("Invalid cluster_column parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
+				"parameter": "cluster_column",
+				"table":     table,
+				"error":     err.Error(),
+				"params":    params,
+			}), nil
 		}
 		query = "SELECT davies_bouldin_index($1::text, $2::text, $3::text) AS metric_value"
 		queryParams = []interface{}{table, vectorCol, clusterCol}

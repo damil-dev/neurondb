@@ -18,10 +18,25 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/neurondb/NeuronMCP/internal/database"
 	"github.com/neurondb/NeuronMCP/internal/logging"
 	"github.com/neurondb/NeuronMCP/internal/tools"
+)
+
+const (
+	DefaultMaxIterations     = 5
+	DefaultLLMTimeout        = 120 * time.Second
+	DefaultMaxRetries        = 3
+	DefaultRetryBaseDelay    = 1 * time.Second
+	MaxTemperature           = 2.0
+	MinTemperature           = 0.0
+	MaxMaxTokens             = 100000
+	MinMaxTokens             = 1
+	MaxTopP                  = 1.0
+	MinTopP                  = 0.0
+	MaxMessageCount          = 100
 )
 
 /* Message represents a chat message */
@@ -73,67 +88,152 @@ func (m *Manager) SetToolRegistry(registry *tools.ToolRegistry) {
 
 /* CreateMessage creates a completion from messages with tool calling support */
 func (m *Manager) CreateMessage(ctx context.Context, req SamplingRequest) (*SamplingResponse, error) {
-	if ctx == nil {
-		return nil, fmt.Errorf("context cannot be nil")
+	/* Nil checks */
+	if m == nil {
+		return nil, fmt.Errorf("sampling manager instance is nil")
 	}
-
-	if len(req.Messages) == 0 {
-		return nil, fmt.Errorf("messages array cannot be empty")
+	if ctx == nil {
+		return nil, fmt.Errorf("sampling: context cannot be nil")
+	}
+	if m.db == nil {
+		return nil, fmt.Errorf("sampling: database instance is not initialized")
+	}
+	if m.logger == nil {
+		return nil, fmt.Errorf("sampling: logger is not initialized")
 	}
 
 	/* Validate messages */
+	if len(req.Messages) == 0 {
+		return nil, fmt.Errorf("sampling: messages array cannot be empty")
+	}
+
+	if len(req.Messages) > MaxMessageCount {
+		return nil, fmt.Errorf("sampling: messages array exceeds maximum size of %d: received %d messages", MaxMessageCount, len(req.Messages))
+	}
+
+	/* Validate individual messages */
 	for i, msg := range req.Messages {
 		if msg.Role == "" {
-			return nil, fmt.Errorf("message at index %d has empty role", i)
+			return nil, fmt.Errorf("sampling: message at index %d has empty role: message_count=%d", i, len(req.Messages))
 		}
 		if msg.Content == "" {
-			return nil, fmt.Errorf("message at index %d has empty content", i)
+			return nil, fmt.Errorf("sampling: message at index %d has empty content: message_count=%d, role='%s'", i, len(req.Messages), msg.Role)
+		}
+		/* Validate message content length */
+		if len(msg.Content) > 10*1024*1024 { /* 10MB max */
+			return nil, fmt.Errorf("sampling: message at index %d content too long: content_length=%d, max_length=%d", i, len(msg.Content), 10*1024*1024)
 		}
 	}
 
 	/* Determine model to use */
 	modelName := req.Model
 	if modelName == "" {
-		return nil, fmt.Errorf("model name is required")
+		return nil, fmt.Errorf("sampling: model name is required and cannot be empty")
+	}
+	if len(modelName) > 200 {
+		return nil, fmt.Errorf("sampling: model name too long: model_name_length=%d, max_length=200, model_name='%s'", len(modelName), modelName[:min(50, len(modelName))])
 	}
 
-	/* Build LLM parameters */
+	/* Validate and build LLM parameters */
 	temperature := 0.7
 	if req.Temperature != nil {
-		temperature = *req.Temperature
+		temp := *req.Temperature
+		if temp < MinTemperature || temp > MaxTemperature {
+			return nil, fmt.Errorf("sampling: temperature out of range: temperature=%f, min=%f, max=%f", temp, MinTemperature, MaxTemperature)
+		}
+		temperature = temp
 	}
+
 	/* Increase default max_tokens to give model more room for complete responses */
 	/* Tool calls need space for JSON formatting */
 	/* Set to 8192 to allow for large prompts + complete tool call responses */
 	maxTokens := 8192
 	if req.MaxTokens != nil {
-		maxTokens = *req.MaxTokens
+		tokens := *req.MaxTokens
+		if tokens < MinMaxTokens || tokens > MaxMaxTokens {
+			return nil, fmt.Errorf("sampling: maxTokens out of range: max_tokens=%d, min=%d, max=%d", tokens, MinMaxTokens, MaxMaxTokens)
+		}
+		maxTokens = tokens
 	}
 
+	/* Validate topP if provided */
+	if req.TopP != nil {
+		topP := *req.TopP
+		if topP < MinTopP || topP > MaxTopP {
+			return nil, fmt.Errorf("sampling: topP out of range: top_p=%f, min=%f, max=%f", topP, MinTopP, MaxTopP)
+		}
+	}
+
+	/* Add timeout context */
+	llmCtx, cancel := context.WithTimeout(ctx, DefaultLLMTimeout)
+	defer cancel()
+
 	/* Start agent loop with tool support */
-	maxIterations := 5
+	maxIterations := DefaultMaxIterations
 	messages := make([]Message, len(req.Messages))
 	copy(messages, req.Messages)
 
 	for iteration := 0; iteration < maxIterations; iteration++ {
-		m.logger.Debug(fmt.Sprintf("Agent iteration %d/%d", iteration+1, maxIterations), map[string]interface{}{
-			"message_count": len(messages),
-		})
+		/* Check context timeout */
+		if llmCtx.Err() != nil {
+			return nil, fmt.Errorf("sampling: timeout after %v: model='%s', iteration=%d/%d, error=%w", DefaultLLMTimeout, modelName, iteration+1, maxIterations, llmCtx.Err())
+		}
+
+		if m.logger != nil {
+			m.logger.Debug(fmt.Sprintf("Agent iteration %d/%d", iteration+1, maxIterations), map[string]interface{}{
+				"message_count": len(messages),
+				"model":         modelName,
+			})
+		}
 
 		/* Build prompt with tool awareness */
 		prompt := m.buildPromptWithTools(messages)
 
-		/* Call LLM */
-		completion, err := m.callLLM(ctx, prompt, temperature, maxTokens)
+		/* Call LLM with retry logic */
+		var completion string
+		var err error
+		for retry := 0; retry < DefaultMaxRetries; retry++ {
+			completion, err = m.callLLM(llmCtx, prompt, temperature, maxTokens)
+			if err == nil {
+				break
+			}
+
+			/* Check if context was cancelled */
+			if llmCtx.Err() != nil {
+				return nil, fmt.Errorf("sampling: LLM call cancelled: model='%s', iteration=%d/%d, retry=%d/%d, error=%w", modelName, iteration+1, maxIterations, retry+1, DefaultMaxRetries, llmCtx.Err())
+			}
+
+			/* Exponential backoff */
+			if retry < DefaultMaxRetries-1 {
+				delay := DefaultRetryBaseDelay * time.Duration(1<<uint(retry))
+				if m.logger != nil {
+					m.logger.Warn("LLM call failed, retrying", map[string]interface{}{
+						"model":      modelName,
+						"iteration":  iteration + 1,
+						"retry":      retry + 1,
+						"max_retries": DefaultMaxRetries,
+						"delay":      delay,
+						"error":      err.Error(),
+					})
+				}
+				time.Sleep(delay)
+			}
+		}
+
 		if err != nil {
-			return nil, fmt.Errorf("failed to call LLM: %w", err)
+			return nil, fmt.Errorf("sampling: failed to call LLM after %d retries: model='%s', iteration=%d/%d, error=%w", DefaultMaxRetries, modelName, iteration+1, maxIterations, err)
 		}
 
 		/* Check if LLM wants to call a tool */
 		toolCall, err := m.parseToolCall(completion)
 		if err != nil {
 			/* Not a tool call, return as final response */
-			m.logger.Debug("No tool call detected, returning response", nil)
+			if m.logger != nil {
+				m.logger.Debug("No tool call detected, returning response", map[string]interface{}{
+					"model":     modelName,
+					"iteration": iteration + 1,
+				})
+			}
 			return &SamplingResponse{
 				Content:    completion,
 				Model:      modelName,
@@ -143,18 +243,26 @@ func (m *Manager) CreateMessage(ctx context.Context, req SamplingRequest) (*Samp
 		}
 
 		/* Execute the tool */
-		m.logger.Info("Executing tool", map[string]interface{}{
-			"tool_name": toolCall.Name,
-			"arguments": toolCall.Arguments,
-		})
-
-		toolResult, err := m.executeTool(ctx, toolCall.Name, toolCall.Arguments)
-		if err != nil {
-			m.logger.Error("Tool execution failed", err, map[string]interface{}{
+		if m.logger != nil {
+			m.logger.Info("Executing tool", map[string]interface{}{
 				"tool_name": toolCall.Name,
+				"arguments": toolCall.Arguments,
+				"iteration": iteration + 1,
+				"model":     modelName,
 			})
+		}
+
+		toolResult, err := m.executeTool(llmCtx, toolCall.Name, toolCall.Arguments)
+		if err != nil {
+			if m.logger != nil {
+				m.logger.Error("Tool execution failed", err, map[string]interface{}{
+					"tool_name": toolCall.Name,
+					"iteration": iteration + 1,
+					"model":     modelName,
+				})
+			}
 			/* Return error to user */
-			return nil, fmt.Errorf("tool execution failed: %w", err)
+			return nil, fmt.Errorf("sampling: tool execution failed: tool='%s', iteration=%d/%d, model='%s', error=%w", toolCall.Name, iteration+1, maxIterations, modelName, err)
 		}
 
 		/* Add assistant's tool call and tool result to conversation */
@@ -190,6 +298,15 @@ type ModelConfig struct {
 
 /* getModelConfig gets model configuration */
 func (m *Manager) getModelConfig(ctx context.Context, modelName string) (*ModelConfig, error) {
+	if m == nil || m.db == nil {
+		/* Fallback if db not available */
+		return &ModelConfig{
+			Provider: "ollama",
+			BaseURL:  "http://localhost:11434",
+			APIKey:   "",
+		}, nil
+	}
+
 	/* Try to get model config from neurondesk database */
 	query := `
 		SELECT 
@@ -210,9 +327,12 @@ func (m *Manager) getModelConfig(ctx context.Context, modelName string) (*ModelC
 
 	if err != nil {
 		/* Fallback: assume it's Ollama if no config found */
-		m.logger.Warn("Model config not found, assuming Ollama", map[string]interface{}{
-			"model": modelName,
-		})
+		if m.logger != nil {
+			m.logger.Warn("Model config not found, assuming Ollama", map[string]interface{}{
+				"model": modelName,
+				"error": err.Error(),
+			})
+		}
 		return &ModelConfig{
 			Provider: "ollama",
 			BaseURL:  "http://localhost:11434",
@@ -286,6 +406,14 @@ func (m *Manager) buildPromptWithTools(messages []Message) string {
 
 /* callLLM calls the NeuronDB LLM function */
 func (m *Manager) callLLM(ctx context.Context, prompt string, temperature float64, maxTokens int) (string, error) {
+	if m == nil || m.db == nil {
+		return "", fmt.Errorf("sampling: database instance is not initialized")
+	}
+
+	if prompt == "" {
+		return "", fmt.Errorf("sampling: prompt cannot be empty")
+	}
+
 	llmParamsJSON := fmt.Sprintf(`{"temperature": %.2f, "max_tokens": %d}`, temperature, maxTokens)
 
 	/* Call neurondb.llm() function directly */
@@ -297,11 +425,11 @@ func (m *Manager) callLLM(ctx context.Context, prompt string, temperature float6
 	var completion string
 	err := m.db.QueryRow(ctx, query, prompt, llmParamsJSON, maxTokens).Scan(&completion)
 	if err != nil {
-		return "", fmt.Errorf("failed to call neurondb.llm(): %w", err)
+		return "", fmt.Errorf("sampling: failed to call neurondb.llm(): prompt_length=%d, temperature=%f, max_tokens=%d, error=%w", len(prompt), temperature, maxTokens, err)
 	}
 
 	if completion == "" {
-		return "", fmt.Errorf("empty response from neurondb.llm()")
+		return "", fmt.Errorf("sampling: empty response from neurondb.llm(): prompt_length=%d, temperature=%f, max_tokens=%d", len(prompt), temperature, maxTokens)
 	}
 
 	return completion, nil
@@ -344,25 +472,40 @@ func (m *Manager) parseToolCall(response string) (*ToolCall, error) {
 
 /* executeTool executes a tool by name with given arguments */
 func (m *Manager) executeTool(ctx context.Context, name string, arguments map[string]interface{}) (interface{}, error) {
+	if m == nil {
+		return nil, fmt.Errorf("sampling: manager instance is nil")
+	}
 	if m.toolRegistry == nil {
-		return nil, fmt.Errorf("tool registry not configured")
+		return nil, fmt.Errorf("sampling: tool registry not configured: tool='%s'", name)
+	}
+
+	if name == "" {
+		return nil, fmt.Errorf("sampling: tool name cannot be empty")
+	}
+
+	if arguments == nil {
+		arguments = make(map[string]interface{})
 	}
 
 	tool := m.toolRegistry.GetTool(name)
 	if tool == nil {
-		return nil, fmt.Errorf("tool not found: %s", name)
+		return nil, fmt.Errorf("sampling: tool not found: tool_name='%s'", name)
 	}
 
 	result, err := tool.Execute(ctx, arguments)
 	if err != nil {
-		return nil, fmt.Errorf("tool execution error: %w", err)
+		return nil, fmt.Errorf("sampling: tool execution error: tool='%s', error=%w", name, err)
+	}
+
+	if result == nil {
+		return nil, fmt.Errorf("sampling: tool returned nil result: tool='%s'", name)
 	}
 
 	if !result.Success {
 		if result.Error != nil {
-			return nil, fmt.Errorf("tool returned error: %s", result.Error.Message)
+			return nil, fmt.Errorf("sampling: tool returned error: tool='%s', error_code='%s', error_message='%s'", name, result.Error.Code, result.Error.Message)
 		}
-		return nil, fmt.Errorf("tool execution failed without error details")
+		return nil, fmt.Errorf("sampling: tool execution failed without error details: tool='%s'", name)
 	}
 
 	return result.Data, nil

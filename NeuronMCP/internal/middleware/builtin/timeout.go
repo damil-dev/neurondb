@@ -63,12 +63,36 @@ func (m *TimeoutMiddleware) Execute(ctx context.Context, req *middleware.MCPRequ
 	errChan := make(chan error, 1)
 
 	go func() {
-		resp, err := next(ctx, req)
-		if err != nil {
-			errChan <- err
+		/* Check if context is already cancelled before starting */
+		select {
+		case <-ctx.Done():
+			/* Context already cancelled, don't start execution */
 			return
+		default:
 		}
-		done <- resp
+		
+		resp, err := next(ctx, req)
+		
+		/* Check context again before sending result */
+		select {
+		case <-ctx.Done():
+			/* Context was cancelled, don't send result */
+			return
+		default:
+			if err != nil {
+				select {
+				case errChan <- err:
+				case <-ctx.Done():
+					/* Context cancelled while sending error */
+				}
+			} else {
+				select {
+				case done <- resp:
+				case <-ctx.Done():
+					/* Context cancelled while sending response */
+				}
+			}
+		}
 	}()
 
 	select {

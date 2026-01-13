@@ -49,6 +49,16 @@ func (s *Server) setupToolHandlers() {
 
 /* handleListTools handles the tools/list request */
 func (s *Server) handleListTools(ctx context.Context, params json.RawMessage) (interface{}, error) {
+	if s == nil {
+		return nil, fmt.Errorf("server instance is nil")
+	}
+	if s.toolRegistry == nil {
+		return nil, fmt.Errorf("tool registry is not initialized")
+	}
+	if s.logger == nil {
+		return nil, fmt.Errorf("logger is not initialized")
+	}
+
 	startTime := time.Now()
 	method := "tools/list"
 	
@@ -146,6 +156,19 @@ func (s *Server) handleListTools(ctx context.Context, params json.RawMessage) (i
 
 /* handleCallTool handles the tools/call request */
 func (s *Server) handleCallTool(ctx context.Context, params json.RawMessage) (interface{}, error) {
+	if s == nil {
+		return nil, fmt.Errorf("server instance is nil")
+	}
+	if s.toolRegistry == nil {
+		return nil, fmt.Errorf("tool registry is not initialized")
+	}
+	if s.middleware == nil {
+		return nil, fmt.Errorf("middleware manager is not initialized")
+	}
+	if s.logger == nil {
+		return nil, fmt.Errorf("logger is not initialized")
+	}
+
 	startTime := time.Now()
 	method := "tools/call"
 	
@@ -155,6 +178,9 @@ func (s *Server) handleCallTool(ctx context.Context, params json.RawMessage) (in
 	}
 	
 	var req mcp.CallToolRequest
+	if params == nil || len(params) == 0 {
+		return nil, fmt.Errorf("tools/call request parameters are required: received nil or empty params")
+	}
 	if err := json.Unmarshal(params, &req); err != nil {
 		if s.metricsCollector != nil {
 			s.metricsCollector.IncrementError(method, "PARSE_ERROR")
@@ -203,6 +229,30 @@ func (s *Server) handleCallTool(ctx context.Context, params json.RawMessage) (in
 
 /* executeTool executes a tool and returns the response */
 func (s *Server) executeTool(ctx context.Context, toolName string, arguments map[string]interface{}, dryRun bool, idempotencyKey string, requireConfirm bool) (*middleware.MCPResponse, error) {
+	if s == nil {
+		return &middleware.MCPResponse{
+			Content: []middleware.ContentBlock{
+				{Type: "text", Text: "Server instance is nil"},
+			},
+			IsError: true,
+		}, nil
+	}
+	if s.toolRegistry == nil {
+		return &middleware.MCPResponse{
+			Content: []middleware.ContentBlock{
+				{Type: "text", Text: "Tool registry is not initialized"},
+			},
+			IsError: true,
+		}, nil
+	}
+	if s.logger == nil {
+		return &middleware.MCPResponse{
+			Content: []middleware.ContentBlock{
+				{Type: "text", Text: "Logger is not initialized"},
+			},
+			IsError: true,
+		}, nil
+	}
 	if toolName == "" {
 		return &middleware.MCPResponse{
 			Content: []middleware.ContentBlock{
@@ -210,6 +260,9 @@ func (s *Server) executeTool(ctx context.Context, toolName string, arguments map
 			},
 			IsError: true,
 		}, nil
+	}
+	if arguments == nil {
+		arguments = make(map[string]interface{})
 	}
 
 	tool := s.toolRegistry.GetTool(toolName)
@@ -274,10 +327,16 @@ func (s *Server) executeTool(ctx context.Context, toolName string, arguments map
 
 	/* Handle idempotency - check cache for existing result */
 	if idempotencyKey != "" {
-		s.logger.Debug(fmt.Sprintf("Tool execution with idempotency key: %s", idempotencyKey), nil)
-		
-		/* Check if we have a cached result for this idempotency key */
-		if cachedResult, found := s.idempotencyCache.Get(idempotencyKey); found {
+		if s.idempotencyCache == nil {
+			s.logger.Warn("Idempotency cache is not initialized, skipping cache check", map[string]interface{}{
+				"idempotency_key": idempotencyKey,
+				"tool_name":       toolName,
+			})
+		} else {
+			s.logger.Debug(fmt.Sprintf("Tool execution with idempotency key: %s", idempotencyKey), nil)
+			
+			/* Check if we have a cached result for this idempotency key */
+			if cachedResult, found := s.idempotencyCache.Get(idempotencyKey); found {
 			s.logger.Info("Returning cached result for idempotency key", map[string]interface{}{
 				"idempotency_key": idempotencyKey,
 				"tool_name":       toolName,
@@ -303,6 +362,7 @@ func (s *Server) executeTool(ctx context.Context, toolName string, arguments map
 					"tool":          toolName,
 				},
 			}, nil
+			}
 		}
 	}
 
@@ -323,7 +383,7 @@ func (s *Server) executeTool(ctx context.Context, toolName string, arguments map
 	}
 	
 	/* Cache the result if idempotency key is provided */
-	if idempotencyKey != "" {
+	if idempotencyKey != "" && s.idempotencyCache != nil {
 		/* Convert middleware.MCPResponse to mcp.ToolResult for caching */
 		cachedResult := &mcp.ToolResult{
 			Content: make([]mcp.ContentBlock, len(response.Content)),
@@ -348,6 +408,14 @@ func (s *Server) executeTool(ctx context.Context, toolName string, arguments map
 
 /* formatToolResult formats a tool result as an MCP response */
 func (s *Server) formatToolResult(result *tools.ToolResult) (*middleware.MCPResponse, error) {
+	if result == nil {
+		return &middleware.MCPResponse{
+			Content: []middleware.ContentBlock{
+				{Type: "text", Text: "Tool result is nil"},
+			},
+			IsError: true,
+		}, nil
+	}
 	if !result.Success {
 		return s.formatToolError(result), nil
 	}
@@ -394,12 +462,21 @@ func (s *Server) formatToolError(result *tools.ToolResult) *middleware.MCPRespon
 
 /* handleSearchTools handles the tools/search request */
 func (s *Server) handleSearchTools(ctx context.Context, params json.RawMessage) (interface{}, error) {
+	if s == nil {
+		return nil, fmt.Errorf("server instance is nil")
+	}
+	if s.toolRegistry == nil {
+		return nil, fmt.Errorf("tool registry is not initialized")
+	}
+
 	var req struct {
 		Query    string `json:"query,omitempty"`
 		Category string `json:"category,omitempty"`
 	}
-	if err := json.Unmarshal(params, &req); err != nil {
-		return nil, fmt.Errorf("failed to parse tools/search request: %w", err)
+	if params != nil && len(params) > 0 {
+		if err := json.Unmarshal(params, &req); err != nil {
+			return nil, fmt.Errorf("failed to parse tools/search request: %w", err)
+		}
 	}
 
 	definitions := s.toolRegistry.Search(req.Query, req.Category)

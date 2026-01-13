@@ -9,25 +9,61 @@ package server
 
 import (
 	"github.com/neurondb/NeuronMCP/internal/config"
+	"github.com/neurondb/NeuronMCP/internal/logging"
 	"github.com/neurondb/NeuronMCP/internal/tools"
 )
 
 /* filterToolsByFeatures filters tools based on feature flags */
 func (s *Server) filterToolsByFeatures(definitions []tools.ToolDefinition) []tools.ToolDefinition {
+	if s == nil || s.config == nil {
+		/* If config is not available, return all tools */
+		return definitions
+	}
+	
 	features := s.config.GetFeaturesConfig()
 	filtered := make([]tools.ToolDefinition, 0, len(definitions))
+	filteredOut := make([]string, 0)
 	
 	for _, def := range definitions {
-		if shouldIncludeTool(def.Name, features) {
-			filtered = append(filtered, def)
+		/* Skip tools with empty names */
+		if def.Name == "" {
+			if s.logger != nil {
+				s.logger.Warn("Skipping tool with empty name in filter", map[string]interface{}{
+					"description": def.Description,
+				})
+			}
+			filteredOut = append(filteredOut, "<empty>")
+			continue
 		}
+		
+		if shouldIncludeTool(def.Name, features, s.logger) {
+			filtered = append(filtered, def)
+		} else {
+			filteredOut = append(filteredOut, def.Name)
+		}
+	}
+	
+	if s.logger != nil && len(filteredOut) > 0 {
+		s.logger.Debug("Tools filtered out by feature flags", map[string]interface{}{
+			"filtered_count": len(filteredOut),
+			"filtered_tools": filteredOut,
+		})
 	}
 	
 	return filtered
 }
 
 /* shouldIncludeTool determines if a tool should be included based on feature flags */
-func shouldIncludeTool(toolName string, features *config.FeaturesConfig) bool {
+func shouldIncludeTool(toolName string, features *config.FeaturesConfig, logger *logging.Logger) bool {
+	if toolName == "" {
+		return false
+	}
+	
+	/* If features config is nil, default to enabled for all tools */
+	if features == nil {
+		return true
+	}
+	
   /* PostgreSQL tools - always enabled by default */
 	if isPostgreSQLTool(toolName) {
 		return true
@@ -81,11 +117,15 @@ func shouldIncludeTool(toolName string, features *config.FeaturesConfig) bool {
 		return features.GPU.Enabled
 	}
 	
+	/* Default to enabled for unknown tool categories */
 	return true
 }
 
 /* Tool category checkers */
 func isVectorTool(name string) bool {
+	if name == "" {
+		return false
+	}
 	/* Check for neurondb_ prefix first, then check for vector-related patterns */
 	if len(name) >= 10 && name[:10] == "neurondb_" {
 		vectorPatterns := []string{"vector_", "embed_", "generate_embedding", "batch_embedding", "create_hnsw_index", "create_ivf_index", "drop_index", "tune_hnsw", "tune_ivf", "index_status", "vector_similarity", "vector_distance", "vector_arithmetic", "vector_quantize", "hybrid_search", "semantic_keyword", "multi_vector", "faceted_vector", "temporal_vector", "diverse_vector", "text_search", "reciprocal_rank"}
@@ -105,6 +145,9 @@ func isVectorTool(name string) bool {
 }
 
 func isMLTool(name string) bool {
+	if name == "" {
+		return false
+	}
 	/* Check for neurondb_ prefix first */
 	if len(name) >= 10 && name[:10] == "neurondb_" {
 		mlPatterns := []string{"train_model", "predict", "evaluate_model", "list_models", "get_model_info", "delete_model", "export_model", "predict_batch", "automl", "onnx_model", "model_"}
@@ -124,6 +167,9 @@ func isMLTool(name string) bool {
 }
 
 func isAnalyticsTool(name string) bool {
+	if name == "" {
+		return false
+	}
 	/* Check for neurondb_ prefix first */
 	if len(name) >= 10 && name[:10] == "neurondb_" {
 		analyticsPatterns := []string{"cluster_data", "detect_outliers", "reduce_dimensionality", "analyze_data", "quality_metrics", "drift_detection", "topic_discovery", "timeseries"}
@@ -143,6 +189,9 @@ func isAnalyticsTool(name string) bool {
 }
 
 func isRAGTool(name string) bool {
+	if name == "" {
+		return false
+	}
 	/* Check for neurondb_ prefix first */
 	if len(name) >= 10 && name[:10] == "neurondb_" {
 		ragPatterns := []string{"process_document", "retrieve_context", "generate_response", "ingest_documents", "answer_with_citations", "chunk_document"}
@@ -162,6 +211,9 @@ func isRAGTool(name string) bool {
 }
 
 func isProjectTool(name string) bool {
+	if name == "" {
+		return false
+	}
 	projectPrefixes := []string{"create_ml_project", "list_ml_projects", "project_"}
 	for _, prefix := range projectPrefixes {
 		if len(name) >= len(prefix) && name[:len(prefix)] == prefix {
@@ -172,6 +224,9 @@ func isProjectTool(name string) bool {
 }
 
 func isGPUTool(name string) bool {
+	if name == "" {
+		return false
+	}
 	/* Check for neurondb_ prefix first */
 	if len(name) >= 10 && name[:10] == "neurondb_" {
 		if len(name) >= 13 && name[10:13] == "gpu" {
@@ -188,6 +243,9 @@ func isGPUTool(name string) bool {
 }
 
 func isPostgreSQLTool(name string) bool {
+	if name == "" {
+		return false
+	}
 	return len(name) >= 11 && name[:11] == "postgresql_"
 }
 

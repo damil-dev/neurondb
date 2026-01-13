@@ -802,9 +802,19 @@ func (t *GenerateEmbeddingTool) Execute(ctx context.Context, params map[string]i
 		latencyMS := &latency
 		
 		/* Log asynchronously (don't fail if logging fails) */
+		/* Use a timeout context to prevent goroutine leak if logging hangs */
 		go func() {
-			if err := t.configHelper.LogModelUsage(ctx, modelName, "embedding", tokensInput, nil, latencyMS, true, nil); err != nil {
-				t.logger.Warn("Failed to log model usage", map[string]interface{}{"error": err.Error()})
+			logCtx, logCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer logCancel()
+			
+			if err := t.configHelper.LogModelUsage(logCtx, modelName, "embedding", tokensInput, nil, latencyMS, true, nil); err != nil {
+				if logCtx.Err() != nil {
+					/* Timeout occurred, don't log error */
+					return
+				}
+				if t.logger != nil {
+					t.logger.Warn("Failed to log model usage", map[string]interface{}{"error": err.Error()})
+				}
 			}
 		}()
 	}

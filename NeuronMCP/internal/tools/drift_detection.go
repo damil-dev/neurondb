@@ -19,6 +19,7 @@ import (
 
 	"github.com/neurondb/NeuronMCP/internal/database"
 	"github.com/neurondb/NeuronMCP/internal/logging"
+	"github.com/neurondb/NeuronMCP/internal/validation"
 )
 
 /* DriftDetectionTool detects data drift */
@@ -81,8 +82,23 @@ func (t *DriftDetectionTool) Execute(ctx context.Context, params map[string]inte
 	table, _ := params["table"].(string)
 	vectorColumn, _ := params["vector_column"].(string)
 
-	if table == "" || vectorColumn == "" {
-		return Error("table and vector_column are required", "VALIDATION_ERROR", nil), nil
+	/* Validate table name (SQL identifier) */
+	if err := validation.ValidateSQLIdentifierRequired(table, "table"); err != nil {
+		return Error(fmt.Sprintf("Invalid table parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
+			"parameter": "table",
+			"error":     err.Error(),
+			"params":    params,
+		}), nil
+	}
+
+	/* Validate vector_column (SQL identifier) */
+	if err := validation.ValidateSQLIdentifierRequired(vectorColumn, "vector_column"); err != nil {
+		return Error(fmt.Sprintf("Invalid vector_column parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
+			"parameter": "vector_column",
+			"table":     table,
+			"error":     err.Error(),
+			"params":    params,
+		}), nil
 	}
 
   /* Build query based on method */
@@ -92,22 +108,37 @@ func (t *DriftDetectionTool) Execute(ctx context.Context, params map[string]inte
 	switch method {
 	case "centroid":
 		referenceTable, _ := params["reference_table"].(string)
-		if referenceTable == "" {
-			return Error("reference_table is required for centroid drift", "VALIDATION_ERROR", nil), nil
+		if err := validation.ValidateSQLIdentifierRequired(referenceTable, "reference_table"); err != nil {
+			return Error(fmt.Sprintf("Invalid reference_table parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
+				"parameter": "reference_table",
+				"table":     table,
+				"error":     err.Error(),
+				"params":    params,
+			}), nil
 		}
 		query = "SELECT detect_centroid_drift($1::text, $2::text, $3::text, $4::text) AS drift_score"
 		queryParams = []interface{}{table, vectorColumn, referenceTable, vectorColumn}
 	case "distribution":
 		referenceTable, _ := params["reference_table"].(string)
-		if referenceTable == "" {
-			return Error("reference_table is required for distribution drift", "VALIDATION_ERROR", nil), nil
+		if err := validation.ValidateSQLIdentifierRequired(referenceTable, "reference_table"); err != nil {
+			return Error(fmt.Sprintf("Invalid reference_table parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
+				"parameter": "reference_table",
+				"table":     table,
+				"error":     err.Error(),
+				"params":    params,
+			}), nil
 		}
 		query = "SELECT detect_distribution_drift($1::text, $2::text, $3::text, $4::text) AS drift_score"
 		queryParams = []interface{}{table, vectorColumn, referenceTable, vectorColumn}
 	case "temporal":
 		timestampCol, _ := params["timestamp_column"].(string)
-		if timestampCol == "" {
-			return Error("timestamp_column is required for temporal drift", "VALIDATION_ERROR", nil), nil
+		if err := validation.ValidateSQLIdentifierRequired(timestampCol, "timestamp_column"); err != nil {
+			return Error(fmt.Sprintf("Invalid timestamp_column parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
+				"parameter": "timestamp_column",
+				"table":     table,
+				"error":     err.Error(),
+				"params":    params,
+			}), nil
 		}
 		query = "SELECT detect_temporal_drift($1::text, $2::text, $3::text) AS drift_score"
 		queryParams = []interface{}{table, vectorColumn, timestampCol}

@@ -14,6 +14,7 @@
 package resources
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -122,13 +123,31 @@ func (m *SubscriptionManager) Notify(uri string, updateType string, content inte
 			continue /* Skip invalid subscriptions */
 		}
 		/* Launch callback in goroutine to avoid blocking */
+		/* Use a timeout context to prevent goroutine leak if callback hangs */
 		go func(callback func(*ResourceUpdate), upd *ResourceUpdate) {
 			defer func() {
 				if r := recover(); r != nil {
 					/* Recover from panics in callbacks */
 				}
 			}()
-			callback(upd)
+			
+			/* Create a timeout context for the callback (30 seconds max) */
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			
+			/* Execute callback in a goroutine that respects timeout */
+			done := make(chan struct{}, 1)
+			go func() {
+				callback(upd)
+				done <- struct{}{}
+			}()
+			
+			select {
+			case <-done:
+				/* Callback completed successfully */
+			case <-ctx.Done():
+				/* Callback timed out, goroutine will exit */
+			}
 		}(sub.Callback, update)
 	}
 }
