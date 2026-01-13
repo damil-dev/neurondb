@@ -17,7 +17,10 @@ import (
 
 /* ProfileHandlers handles profile-related endpoints */
 type ProfileHandlers struct {
-	queries *db.Queries
+	queries          *db.Queries
+	neurondbHandlers *NeuronDBHandlers
+	agentHandlers    *AgentHandlers
+	mcpManager       *MCPManager
 }
 
 func isAdmin(ctx context.Context) bool {
@@ -27,6 +30,13 @@ func isAdmin(ctx context.Context) bool {
 /* NewProfileHandlers creates new profile handlers */
 func NewProfileHandlers(queries *db.Queries) *ProfileHandlers {
 	return &ProfileHandlers{queries: queries}
+}
+
+/* SetHandlers sets references to other handlers for client invalidation */
+func (h *ProfileHandlers) SetHandlers(neurondbHandlers *NeuronDBHandlers, agentHandlers *AgentHandlers, mcpManager *MCPManager) {
+	h.neurondbHandlers = neurondbHandlers
+	h.agentHandlers = agentHandlers
+	h.mcpManager = mcpManager
 }
 
 /* ListProfiles lists profiles for the current user */
@@ -216,9 +226,25 @@ func (h *ProfileHandlers) UpdateProfile(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	/* Check if connection details changed - if so, invalidate clients */
+	dsnChanged := existingProfile.NeuronDBDSN != profile.NeuronDBDSN
+	agentEndpointChanged := existingProfile.AgentEndpoint != profile.AgentEndpoint
+	mcpConfigChanged := !mapsEqual(existingProfile.MCPConfig, profile.MCPConfig)
+
 	if err := h.queries.UpdateProfile(r.Context(), &profile); err != nil {
 		WriteError(w, r, http.StatusInternalServerError, err, nil)
 		return
+	}
+
+	/* Invalidate clients if connection details changed */
+	if dsnChanged && h.neurondbHandlers != nil {
+		h.neurondbHandlers.InvalidateClient(profileID)
+	}
+	if agentEndpointChanged && h.agentHandlers != nil {
+		h.agentHandlers.InvalidateClient(profileID)
+	}
+	if mcpConfigChanged && h.mcpManager != nil {
+		h.mcpManager.InvalidateClient(profileID)
 	}
 
 	WriteSuccess(w, profile, http.StatusOK)
@@ -255,6 +281,17 @@ func (h *ProfileHandlers) DeleteProfile(w http.ResponseWriter, r *http.Request) 
 	if err := h.queries.DeleteProfile(r.Context(), profileID); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	/* Invalidate all clients for this profile */
+	if h.neurondbHandlers != nil {
+		h.neurondbHandlers.InvalidateClient(profileID)
+	}
+	if h.agentHandlers != nil {
+		h.agentHandlers.InvalidateClient(profileID)
+	}
+	if h.mcpManager != nil {
+		h.mcpManager.InvalidateClient(profileID)
 	}
 
 	w.WriteHeader(http.StatusNoContent)
@@ -562,4 +599,35 @@ func getMap(m map[string]interface{}, key string) map[string]interface{} {
 		return v
 	}
 	return nil
+}
+
+/* mapsEqual compares two maps for equality (used for MCP config comparison) */
+func mapsEqual(a, b map[string]interface{}) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	if len(a) != len(b) {
+		return false
+	}
+	for k, v := range a {
+		if bv, ok := b[k]; !ok || !interfaceEqual(v, bv) {
+			return false
+		}
+	}
+	return true
+}
+
+/* interfaceEqual compares two interface{} values for equality */
+func interfaceEqual(a, b interface{}) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	/* Simple comparison - for complex types this may need enhancement */
+	return fmt.Sprintf("%v", a) == fmt.Sprintf("%v", b)
 }

@@ -34,8 +34,8 @@ func Middleware(keyManager *APIKeyManager) func(http.Handler) http.Handler {
 				return
 			}
 
-			ctx := context.WithValue(r.Context(), "api_key", apiKey)
-			ctx = context.WithValue(ctx, "user_id", apiKey.UserID)
+			ctx := SetAPIKey(r.Context(), apiKey)
+			ctx = SetUserID(ctx, apiKey.UserID)
 
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
@@ -44,8 +44,7 @@ func Middleware(keyManager *APIKeyManager) func(http.Handler) http.Handler {
 
 /* GetAPIKeyFromContext gets the API key from context */
 func GetAPIKeyFromContext(ctx context.Context) (*db.APIKey, bool) {
-	key, ok := ctx.Value("api_key").(*db.APIKey)
-	return key, ok
+	return getAPIKeyValueFromContext(ctx)
 }
 
 /* NOTE: GetUserIDFromContext is now in middleware_jwt.go for JWT authentication

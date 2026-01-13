@@ -5,14 +5,23 @@ interface SkeletonProps {
   lines?: number
   width?: string
   height?: string
+  variant?: 'default' | 'pulse' | 'shimmer'
 }
 
-export function Skeleton({ className = '', lines = 1, width, height }: SkeletonProps) {
-  const baseClasses = 'animate-pulse bg-gray-200 dark:bg-gray-700 rounded'
+export function Skeleton({ 
+  className = '', 
+  lines = 1, 
+  width, 
+  height,
+  variant = 'shimmer'
+}: SkeletonProps) {
+  const baseClasses = variant === 'shimmer' 
+    ? 'bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200 dark:from-slate-800 dark:via-slate-700 dark:to-slate-800 rounded animate-shimmer bg-[length:200%_100%]'
+    : 'animate-pulse bg-slate-200 dark:bg-slate-700 rounded'
 
   if (lines > 1) {
     return (
-      <div className={`space-y-2 ${className}`}>
+      <div className={`space-y-3 ${className}`}>
         {Array.from({ length: lines }).map((_, i) => (
           <div
             key={i}
@@ -40,13 +49,13 @@ export function Skeleton({ className = '', lines = 1, width, height }: SkeletonP
 
 export function SkeletonCard() {
   return (
-    <div className="card animate-pulse">
-      <div className="space-y-4">
-        <Skeleton height="1.5rem" width="60%" />
-        <Skeleton lines={3} />
+    <div className="card border-slate-200 dark:border-slate-700">
+      <div className="space-y-4 animate-fade-in">
+        <Skeleton height="1.5rem" width="60%" variant="shimmer" />
+        <Skeleton lines={3} variant="shimmer" />
         <div className="flex gap-2">
-          <Skeleton width="80px" height="2rem" />
-          <Skeleton width="80px" height="2rem" />
+          <Skeleton width="80px" height="2rem" variant="shimmer" />
+          <Skeleton width="80px" height="2rem" variant="shimmer" />
         </div>
       </div>
     </div>
@@ -85,6 +94,7 @@ export function SkeletonTable({ rows = 5, cols = 4 }: { rows?: number; cols?: nu
     </div>
   )
 }
+
 
 
 

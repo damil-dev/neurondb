@@ -88,7 +88,34 @@ func NewClient(config MCPConfig) (*Client, error) {
 		return nil, fmt.Errorf("failed to initialize MCP connection: %w", err)
 	}
 
+	/* Start goroutine to read stderr to prevent blocking */
+	go client.readStderr()
+
 	return client, nil
+}
+
+/* readStderr reads from stderr to prevent pipe blocking */
+func (c *Client) readStderr() {
+	buf := make([]byte, 4096)
+	for {
+		select {
+		case <-c.ctx.Done():
+			return
+		default:
+			n, err := c.stderr.Read(buf)
+			if err != nil {
+				if err == io.EOF {
+					return
+				}
+				return
+			}
+			/* Log stderr output for debugging (could be enhanced to use proper logger) */
+			if n > 0 {
+				/* Silently consume stderr to prevent pipe blocking */
+				_ = buf[:n]
+			}
+		}
+	}
 }
 
 /* initialize performs the MCP initialize handshake (like Claude Desktop) */
@@ -117,7 +144,10 @@ func (c *Client) initialize() error {
 	}
 
 	var initResp InitializeResponse
-	respBytes, _ := json.Marshal(resp)
+	respBytes, err := json.Marshal(resp)
+	if err != nil {
+		return fmt.Errorf("failed to marshal initialize response: %w", err)
+	}
 	if err := json.Unmarshal(respBytes, &initResp); err != nil {
 		return fmt.Errorf("invalid initialize response: %w", err)
 	}
@@ -210,6 +240,21 @@ func (c *Client) Notify(method string, params interface{}) error {
 /* readResponses reads JSON-RPC responses from stdout */
 func (c *Client) readResponses() {
 	for {
+		/* Check context cancellation */
+		select {
+		case <-c.ctx.Done():
+			c.mu.Lock()
+			for _, ch := range c.requests {
+				select {
+				case ch <- nil:
+				default:
+				}
+			}
+			c.mu.Unlock()
+			return
+		default:
+		}
+
 		var contentLength int
 		for {
 			line, err := c.stdout.ReadString('\n')
@@ -283,7 +328,10 @@ func (c *Client) ListTools() (*ListToolsResponse, error) {
 		return nil, err
 	}
 
-	respBytes, _ := json.Marshal(resp)
+	respBytes, err := json.Marshal(resp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal tools/list response: %w", err)
+	}
 	var toolsResp ListToolsResponse
 	if err := json.Unmarshal(respBytes, &toolsResp); err != nil {
 		return nil, fmt.Errorf("failed to parse tools/list response: %w", err)
@@ -304,7 +352,10 @@ func (c *Client) CallTool(name string, arguments map[string]interface{}) (*ToolR
 		return nil, err
 	}
 
-	respBytes, _ := json.Marshal(resp)
+	respBytes, err := json.Marshal(resp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal tools/call response: %w", err)
+	}
 	var toolResp ToolResult
 	if err := json.Unmarshal(respBytes, &toolResp); err != nil {
 		return nil, fmt.Errorf("failed to parse tools/call response: %w", err)
@@ -320,7 +371,10 @@ func (c *Client) ListResources() (*ListResourcesResponse, error) {
 		return nil, err
 	}
 
-	respBytes, _ := json.Marshal(resp)
+	respBytes, err := json.Marshal(resp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal resources/list response: %w", err)
+	}
 	var resourcesResp ListResourcesResponse
 	if err := json.Unmarshal(respBytes, &resourcesResp); err != nil {
 		return nil, fmt.Errorf("failed to parse resources/list response: %w", err)
@@ -340,7 +394,10 @@ func (c *Client) ReadResource(uri string) (*ReadResourceResponse, error) {
 		return nil, err
 	}
 
-	respBytes, _ := json.Marshal(resp)
+	respBytes, err := json.Marshal(resp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal resources/read response: %w", err)
+	}
 	var resourceResp ReadResourceResponse
 	if err := json.Unmarshal(respBytes, &resourceResp); err != nil {
 		return nil, fmt.Errorf("failed to parse resources/read response: %w", err)
@@ -356,7 +413,10 @@ func (c *Client) ListPrompts() (*ListPromptsResponse, error) {
 		return nil, err
 	}
 
-	respBytes, _ := json.Marshal(resp)
+	respBytes, err := json.Marshal(resp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal prompts/list response: %w", err)
+	}
 	var promptsResp ListPromptsResponse
 	if err := json.Unmarshal(respBytes, &promptsResp); err != nil {
 		return nil, fmt.Errorf("failed to parse prompts/list response: %w", err)
@@ -377,7 +437,10 @@ func (c *Client) GetPrompt(name string, arguments map[string]interface{}) (*GetP
 		return nil, err
 	}
 
-	respBytes, _ := json.Marshal(resp)
+	respBytes, err := json.Marshal(resp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal prompts/get response: %w", err)
+	}
 	var promptResp GetPromptResponse
 	if err := json.Unmarshal(respBytes, &promptResp); err != nil {
 		return nil, fmt.Errorf("failed to parse prompts/get response: %w", err)

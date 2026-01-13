@@ -90,39 +90,87 @@ body.dark {
   background: rgb(var(--text-muted));
 }
 
-/* Professional card styling - Claude Desktop style */
+/* Professional card styling - Enhanced with glassmorphism */
 .card {
   background: rgb(var(--card-bg));
   border: 1px solid rgb(var(--border-color));
-  border-radius: 8px;
+  border-radius: 12px;
   padding: 1.5rem;
-  transition: all 0.2s ease-in-out;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgb(var(--accent-primary)), transparent);
+  opacity: 0;
+  transition: opacity 0.3s ease;
 }
 
 .card:hover {
-  border-color: rgb(148, 163, 184);
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  border-color: rgb(var(--accent-primary));
+  box-shadow: 0 20px 40px rgba(139, 92, 246, 0.15), 0 0 0 1px rgba(139, 92, 246, 0.1);
+  transform: translateY(-2px);
 }
 
-/* Professional button styling - Claude Desktop style */
-.btn-primary {
-  position: relative;
-  z-index: 10;
-  background: rgb(var(--accent-primary));
-  color: white;
-  font-weight: 600;
-  padding: 0.75rem 1.5rem;
-  border-radius: 6px;
-  transition: all 0.2s ease-in-out;
-  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.2);
-  border: none;
+.card:hover::before {
+  opacity: 1;
+}
+
+.card-interactive {
   cursor: pointer;
 }
 
-.btn-primary:hover {
-  background: rgb(var(--accent-hover));
+.card-interactive:active {
+  transform: translateY(0);
+}
+
+/* Professional button styling - Enhanced with gradients and animations */
+.btn-primary {
+  position: relative;
+  z-index: 10;
+  background: linear-gradient(135deg, rgb(var(--accent-primary)), rgb(var(--accent-secondary)));
+  color: white;
+  font-weight: 600;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
-  transform: translateY(-1px);
+  border: none;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.btn-primary::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s ease;
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, rgb(var(--accent-hover)), rgb(var(--accent-secondary)));
+  box-shadow: 0 8px 20px rgba(139, 92, 246, 0.4);
+  transform: translateY(-2px);
+}
+
+.btn-primary:hover::before {
+  left: 100%;
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3);
 }
 
 .btn-primary:focus {
@@ -131,6 +179,12 @@ body.dark {
   ring-color: rgb(var(--accent-primary));
   ring-offset: 2px;
   ring-offset-color: rgb(var(--background-start-rgb));
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .btn-secondary {
@@ -149,26 +203,39 @@ body.dark {
   border-color: rgb(148, 163, 184);
 }
 
-/* Professional input styling - Claude Desktop style */
+/* Professional input styling - Enhanced with better focus states */
 .input {
   background: rgb(var(--card-bg));
   border: 1px solid rgb(var(--border-color));
   color: rgb(var(--text-primary));
-  border-radius: 6px;
-  padding: 0.5rem 1rem;
-  transition: all 0.2s ease-in-out;
+  border-radius: 8px;
+  padding: 0.625rem 1rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   font-size: 0.875rem;
+  width: 100%;
 }
 
 .input::placeholder {
   color: rgb(var(--text-muted));
+  opacity: 0.6;
+}
+
+.input:hover {
+  border-color: rgb(148, 163, 184);
 }
 
 .input:focus {
   outline: none;
   border-color: rgb(var(--accent-primary));
-  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1), 0 0 0 1px rgb(var(--accent-primary));
   background: rgb(var(--card-bg));
+  transform: translateY(-1px);
+}
+
+.input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: rgb(var(--hover-bg));
 }
 
 /* Professional code/JSON viewer - Claude Desktop style */
@@ -220,7 +287,7 @@ body.dark {
   border-color: rgba(99, 102, 241, 0.3);
 }
 
-/* Animations */
+/* Enhanced Animations */
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -232,8 +299,15 @@ body.dark {
   }
 }
 
-.animate-fade-in {
-  animation: fadeIn 0.3s ease-out;
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes slideIn {
@@ -245,8 +319,233 @@ body.dark {
   }
 }
 
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(139, 92, 246, 0.6);
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes gradient-shift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.4s ease-out;
+}
+
 .animate-slide-in {
   animation: slideIn 0.3s ease-out;
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.3s ease-out;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.2s ease-out;
+}
+
+.animate-shimmer {
+  animation: shimmer 2s infinite linear;
+  background: linear-gradient(
+    to right,
+    transparent 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    transparent 100%
+  );
+  background-size: 1000px 100%;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-gradient {
+  background-size: 200% 200%;
+  animation: gradient-shift 3s ease infinite;
+}
+
+/* Glassmorphism effect */
+.glass {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.dark .glass {
+  background: rgba(30, 41, 59, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Smooth transitions for all interactive elements */
+* {
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+/* Responsive utilities */
+@media (max-width: 640px) {
+  .container-responsive {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
+@media (min-width: 640px) and (max-width: 1024px) {
+  .container-responsive {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .container-responsive {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
+@media (min-width: 1280px) {
+  .container-responsive {
+    padding-left: 2.5rem;
+    padding-right: 2.5rem;
+  }
+}
+
+@media (min-width: 1536px) {
+  .container-responsive {
+    padding-left: 3rem;
+    padding-right: 3rem;
+  }
+}
+
+/* Better text scaling */
+@media (max-width: 640px) {
+  html {
+    font-size: 14px;
+  }
+}
+
+@media (min-width: 640px) and (max-width: 1024px) {
+  html {
+    font-size: 15px;
+  }
+}
+
+@media (min-width: 1024px) {
+  html {
+    font-size: 16px;
+  }
+}
+
+/* Responsive spacing utilities */
+@media (max-width: 640px) {
+  .responsive-padding {
+    padding: 1rem;
+  }
+  
+  .responsive-gap {
+    gap: 0.75rem;
+  }
+}
+
+@media (min-width: 640px) {
+  .responsive-padding {
+    padding: 1.5rem;
+  }
+  
+  .responsive-gap {
+    gap: 1rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .responsive-padding {
+    padding: 2rem;
+  }
+  
+  .responsive-gap {
+    gap: 1.5rem;
+  }
+}
+
+/* Enhanced hover effects */
+.hover-lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+}
+
+.hover-glow {
+  transition: box-shadow 0.3s ease;
+}
+
+.hover-glow:hover {
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.4);
 }
 
 /* Code block styling - Claude Desktop style */
