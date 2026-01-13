@@ -483,7 +483,7 @@ ansible-playbook playbooks/deploy-neurondb.yml \
 For issues and questions:
 - Check existing scripts in `scripts/` directory
 - Review deployment documentation in `Docs/deployment/`
-- See troubleshooting guide in `Docs/TROUBLESHOOTING.md`
+- See troubleshooting guide in `Docs/operations/troubleshooting.md`
 
 ## Related Documentation
 

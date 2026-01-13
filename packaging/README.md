@@ -108,7 +108,7 @@ sudo rpm -ivh neurondb-1.0.0-1.x86_64.rpm
 
 Package-based Docker builds use these scripts. See:
 - [`dockers/neurondb/Dockerfile.package`](../dockers/neurondb/Dockerfile.package)
-- [`Docs/PACKAGE.md`](../Docs/PACKAGE.md)
+- [`Docs/deployment/package.md`](../Docs/deployment/package.md)
 
 ## Versioning
 
@@ -127,7 +127,7 @@ Set architecture via environment variable or build script parameters.
 
 ## Related Documentation
 
-- [Package Documentation](../Docs/PACKAGE.md)
+- [Package Documentation](../Docs/deployment/package.md)
 - [Installation Guide](../NeuronDB/INSTALL.md)
 - [Ecosystem Setup Script](../scripts/ecosystem-setup.sh)
 

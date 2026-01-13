@@ -1358,7 +1358,7 @@ psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -c "SELECT 1;"
 
 - **[Main README](../README.md)** - Project overview
 - **[Quick Start](../QUICKSTART.md)** - Get started quickly
-- **[Documentation Index](../DOCUMENTATION.md)** - Complete documentation
+- **[Documentation Index](../Docs/documentation.md)** - Complete documentation
 - **[Contributing Guide](../CONTRIBUTING.md)** - Contribution guidelines
 
 ---

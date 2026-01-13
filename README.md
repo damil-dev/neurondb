@@ -500,7 +500,7 @@ No additional services, ports, or configuration required!
 
 ## Documentation
 
-- **Start here**: [`DOCUMENTATION.md`](DOCUMENTATION.md) (documentation index)
+- **Start here**: [`Docs/documentation.md`](Docs/documentation.md) (documentation index)
 - **Beginner walkthrough**: [`Docs/getting-started/simple-start.md`](Docs/getting-started/simple-start.md) - Step-by-step guide for beginners
 - **Technical quick start**: [`QUICKSTART.md`](QUICKSTART.md) - Fast setup for experienced users
 - **Complete guide**: [`Docs/getting-started/installation.md`](Docs/getting-started/installation.md) - Detailed installation options
