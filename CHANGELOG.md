@@ -13,6 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - DEB and RPM package builds
 - Comprehensive documentation
 
+## [3.0.0-devel] - Development
+
+### Changed
+- Version updated to 3.0.0-devel for main branch development
+- Extension default version updated to 3.0
+- All package versions, Docker images, and Helm charts updated to 3.0.0-devel
+
 ## [1.0.0] - TBD
 
 ### Added

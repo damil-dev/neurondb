@@ -36,7 +36,7 @@ cd /path/to/neurondb/NeuronMCP/docker
 # Build from repository root
 cd /path/to/neurondb
 sudo docker build -f NeuronMCP/docker/Dockerfile.package \
-  --build-arg PACKAGE_VERSION=2.0.0.beta \
+  --build-arg PACKAGE_VERSION=3.0.0-devel \
   -t neuronmcp:package .
 ```
 
@@ -379,7 +379,7 @@ Example with all build arguments:
 ```bash
 docker build -f docker/Dockerfile \
   --build-arg GO_VERSION=1.23 \
-  --build-arg VERSION=2.0.0 \
+  --build-arg VERSION=3.0.0-devel \
   --build-arg BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') \
   --build-arg VCS_REF=$(git rev-parse --short HEAD) \
   -t neurondb-mcp:1.0.0 ..
@@ -390,7 +390,7 @@ docker build -f docker/Dockerfile \
 For production builds with versioning:
 
 ```bash
-VERSION=2.0.0
+VERSION=3.0.0-devel
 BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
 VCS_REF=$(git rev-parse --short HEAD)
 
