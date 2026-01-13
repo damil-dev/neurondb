@@ -20,10 +20,6 @@
 
 set -euo pipefail
 
-#=========================================================================
-# SELF-SUFFICIENT CONFIGURATION - NO EXTERNAL DEPENDENCIES
-#=========================================================================
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SCRIPT_NAME=$(basename "$0")
@@ -43,9 +39,6 @@ COMMAND=""
 VERBOSE=false
 DRY_RUN=false
 
-#=========================================================================
-# SELF-SUFFICIENT LOGGING FUNCTIONS (INLINE)
-#=========================================================================
 
 log_info() {
     echo -e "${CYAN}[INFO]${NC} $*"
@@ -106,9 +99,6 @@ print_test() {
     esac
 }
 
-#=========================================================================
-# SELF-SUFFICIENT DOCKER UTILITY FUNCTIONS (INLINE)
-#=========================================================================
 
 get_compose_cmd() {
     if docker compose version >/dev/null 2>&1; then
@@ -150,9 +140,6 @@ get_container_status() {
     docker ps -a --format "{{.Status}}" --filter "name=^${container_name}$" 2>/dev/null | head -1
 }
 
-#=========================================================================
-# SELF-SUFFICIENT VALIDATION FUNCTIONS (INLINE)
-#=========================================================================
 
 validate_component() {
     local component="$1"
@@ -190,9 +177,6 @@ validate_test_type() {
     return 1
 }
 
-#=========================================================================
-# HELP FUNCTION
-#=========================================================================
 
 show_help() {
     cat << EOF
@@ -259,9 +243,6 @@ ${BOLD}Examples:${NC}
 EOF
 }
 
-#=========================================================================
-# RUN COMMAND
-#=========================================================================
 
 run_command() {
     local component=""
@@ -432,9 +413,6 @@ run_command() {
     fi
 }
 
-#=========================================================================
-# TEST COMMAND - ALL TEST FUNCTIONALITY INLINE
-#=========================================================================
 
 test_command() {
     local test_type=""
@@ -646,9 +624,6 @@ test_deep() {
     log_info "Deep tests completed"
 }
 
-#=========================================================================
-# VERIFY COMMAND - ALL VERIFICATION FUNCTIONALITY INLINE
-#=========================================================================
 
 verify_command() {
     local verify_deps=false
@@ -768,9 +743,6 @@ verify_ecosystem_full() {
     [[ $checks_failed -eq 0 ]] && return 0 || return 1
 }
 
-#=========================================================================
-# LOGS COMMAND
-#=========================================================================
 
 logs_command() {
     local component=""
@@ -834,9 +806,6 @@ logs_command() {
     fi
 }
 
-#=========================================================================
-# STATUS COMMAND
-#=========================================================================
 
 status_command() {
     shift
@@ -865,27 +834,18 @@ status_command() {
     compose_cmd=$(get_compose_cmd) 2>/dev/null && $compose_cmd ps 2>/dev/null || log_warning "Cannot get compose status"
 }
 
-#=========================================================================
-# BUILD COMMAND
-#=========================================================================
 
 build_command() {
     shift
     run_command run "$@" --action build
 }
 
-#=========================================================================
-# CLEAN COMMAND
-#=========================================================================
 
 clean_command() {
     shift
     run_command run "$@" --action clean
 }
 
-#=========================================================================
-# EXEC COMMAND
-#=========================================================================
 
 exec_command() {
     local component=""
@@ -927,9 +887,6 @@ exec_command() {
     docker exec -it "$container_name" sh -c "$command"
 }
 
-#=========================================================================
-# ARGUMENT PARSING
-#=========================================================================
 
 parse_arguments() {
     if [[ $# -eq 0 ]]; then
@@ -965,9 +922,6 @@ parse_arguments() {
     done
 }
 
-#=========================================================================
-# MAIN FUNCTION
-#=========================================================================
 
 main() {
     parse_arguments "$@"
