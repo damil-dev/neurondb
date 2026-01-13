@@ -83,3 +83,4 @@ func (gd *GracefulDegradation) GetMode() DegradationMode {
 	return gd.mode
 }
 
+

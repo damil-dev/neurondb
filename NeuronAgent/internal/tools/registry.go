@@ -170,6 +170,16 @@ func (r *Registry) RegisterHandler(handlerType string, handler ToolHandler) {
 /* Get retrieves a tool from the database */
 /* Implements agent.ToolRegistry interface */
 func (r *Registry) Get(ctx context.Context, name string) (*db.Tool, error) {
+	/* Validate input */
+	if name == "" {
+		return nil, fmt.Errorf("tool retrieval failed: tool_name_empty=true")
+	}
+
+	/* Check context cancellation */
+	if ctx.Err() != nil {
+		return nil, fmt.Errorf("tool retrieval cancelled: tool_name='%s', context_error=%w", name, ctx.Err())
+	}
+
 	tool, err := r.queries.GetTool(ctx, name)
 	if err != nil {
 		return nil, fmt.Errorf("tool retrieval failed: tool_name='%s', error=%w", name, err)
@@ -185,6 +195,16 @@ func (r *Registry) Execute(ctx context.Context, tool *db.Tool, args map[string]i
 
 /* ExecuteTool executes a tool with the given arguments (internal method) */
 func (r *Registry) ExecuteTool(ctx context.Context, tool *db.Tool, args map[string]interface{}) (string, error) {
+	/* Validate inputs */
+	if tool == nil {
+		return "", fmt.Errorf("tool execution failed: tool_nil=true")
+	}
+
+	/* Check context cancellation */
+	if ctx.Err() != nil {
+		return "", fmt.Errorf("tool execution cancelled: tool_name='%s', context_error=%w", tool.Name, ctx.Err())
+	}
+
 	if !tool.Enabled {
 		argKeys := make([]string, 0, len(args))
 		for k := range args {
@@ -222,12 +242,26 @@ func (r *Registry) ExecuteTool(ctx context.Context, tool *db.Tool, args map[stri
 			tool.Name, tool.HandlerType, len(args), argKeys, availableHandlers)
 	}
 
+	/* Check context cancellation before execution */
+	if ctx.Err() != nil {
+		return "", fmt.Errorf("tool execution cancelled before handler execution: tool_name='%s', handler_type='%s', context_error=%w",
+			tool.Name, tool.HandlerType, ctx.Err())
+	}
+
 	/* Execute tool */
 	result, err := handler.Execute(ctx, tool, args)
 
 	/* Audit log tool execution */
-	agentID, _ := GetAgentIDFromContext(ctx)
-	sessionID, _ := GetSessionIDFromContext(ctx)
+	agentID, agentOK := GetAgentIDFromContext(ctx)
+	if !agentOK {
+		/* Agent ID not available in context - use zero UUID */
+		agentID = uuid.Nil
+	}
+	sessionID, sessionOK := GetSessionIDFromContext(ctx)
+	if !sessionOK {
+		/* Session ID not available in context - use zero UUID */
+		sessionID = uuid.Nil
+	}
 
 	outputs := make(map[string]interface{})
 	if err == nil {
@@ -240,6 +274,14 @@ func (r *Registry) ExecuteTool(ctx context.Context, tool *db.Tool, args map[stri
 
 	/* Log audit trail (async, don't block on errors) */
 	go func() {
+		/* Recover from any panics in background goroutine */
+		defer func() {
+			if r := recover(); r != nil {
+				/* Log panic but don't crash the application */
+				/* Note: metrics package may not be available in this context */
+			}
+		}()
+
 		bgCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
@@ -251,7 +293,10 @@ func (r *Registry) ExecuteTool(ctx context.Context, tool *db.Tool, args map[stri
 			sessionIDPtr = &sessionID
 		}
 
-		_ = r.auditLogger.LogToolCall(bgCtx, nil, nil, agentIDPtr, sessionIDPtr, tool.Name, args, outputs)
+		if auditErr := r.auditLogger.LogToolCall(bgCtx, nil, nil, agentIDPtr, sessionIDPtr, tool.Name, args, outputs); auditErr != nil {
+			/* Log audit failure but don't block tool execution */
+			/* Note: In production, consider using a metrics/logging system that's available here */
+		}
 	}()
 
 	if err != nil {

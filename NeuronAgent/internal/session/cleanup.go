@@ -18,9 +18,11 @@ package session
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/neurondb/NeuronAgent/internal/db"
+	"github.com/neurondb/NeuronAgent/internal/metrics"
 )
 
 type CleanupService struct {
@@ -78,24 +80,57 @@ func (s *CleanupService) cleanup() {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
+	/* Recover from panics in cleanup */
+	defer func() {
+		if r := recover(); r != nil {
+			metrics.ErrorWithContext(ctx, "Panic in session cleanup", fmt.Errorf("panic: %v", r), nil)
+		}
+	}()
+
 	/* Delete sessions older than maxAge */
 	cutoffTime := time.Now().Add(-s.maxAge)
 
 	/* Get all agents to check their sessions */
 	agents, err := s.queries.ListAgents(ctx)
 	if err != nil {
+		/* Log error but don't crash - cleanup will retry on next interval */
+		metrics.WarnWithContext(ctx, "Failed to list agents for session cleanup", map[string]interface{}{
+			"error": err.Error(),
+		})
 		return
 	}
 
 	for _, agent := range agents {
+		/* Check context cancellation */
+		if ctx.Err() != nil {
+			return
+		}
+
 		sessions, err := s.queries.ListSessions(ctx, agent.ID, 1000, 0)
 		if err != nil {
+			/* Log error but continue with other agents */
+			metrics.WarnWithContext(ctx, "Failed to list sessions for cleanup", map[string]interface{}{
+				"agent_id": agent.ID.String(),
+				"error":    err.Error(),
+			})
 			continue
 		}
 
 		for _, session := range sessions {
+			/* Check context cancellation */
+			if ctx.Err() != nil {
+				return
+			}
+
 			if session.LastActivityAt.Before(cutoffTime) {
-				_ = s.queries.DeleteSession(ctx, session.ID)
+				if err := s.queries.DeleteSession(ctx, session.ID); err != nil {
+					/* Log deletion error but continue with other sessions */
+					metrics.WarnWithContext(ctx, "Failed to delete expired session", map[string]interface{}{
+						"session_id": session.ID.String(),
+						"agent_id":   agent.ID.String(),
+						"error":      err.Error(),
+					})
+				}
 			}
 		}
 	}

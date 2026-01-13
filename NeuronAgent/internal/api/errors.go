@@ -57,7 +57,11 @@ func (e *APIError) Error() string {
 		parts = append(parts, fmt.Sprintf("error=%v", e.Err))
 	}
 
-	return fmt.Sprintf("%s", fmt.Sprintf("%s: %s", parts[0], fmt.Sprintf("%v", parts[1:])))
+	/* Build error message from parts */
+	if len(parts) > 1 {
+		return fmt.Sprintf("%s: %v", parts[0], parts[1:])
+	}
+	return parts[0]
 }
 
 func NewError(code int, message string, err error) *APIError {

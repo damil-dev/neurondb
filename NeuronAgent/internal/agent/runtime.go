@@ -27,6 +27,7 @@ import (
 	"github.com/lib/pq"
 	"github.com/neurondb/NeuronAgent/internal/auth"
 	"github.com/neurondb/NeuronAgent/internal/db"
+	"github.com/neurondb/NeuronAgent/internal/metrics"
 	"github.com/neurondb/NeuronAgent/pkg/neurondb"
 )
 
@@ -174,8 +175,13 @@ func (r *Runtime) Execute(ctx context.Context, sessionID uuid.UUID, userMessage 
 	if r.subAgentManager != nil {
 		subAgent, err := r.subAgentManager.GetAgentSpecialization(ctx, agent.ID)
 		if err == nil && subAgent != nil {
-			/* Agent has specialization, use it for routing decisions */
-			_ = subAgent
+			/* Agent has specialization - could be used for routing decisions in future */
+			/* For now, we log that specialization exists but continue with current agent */
+			metrics.DebugWithContext(ctx, "Agent has specialization but using current agent", map[string]interface{}{
+				"session_id":      sessionID.String(),
+				"agent_id":        agent.ID.String(),
+				"specialization": subAgent.Specialization,
+			})
 		}
 	}
 
@@ -189,10 +195,27 @@ func (r *Runtime) Execute(ctx context.Context, sessionID uuid.UUID, userMessage 
 
 	/* Enhance context with hierarchical memory if available */
 	if r.hierMemory != nil {
-		_, err := r.hierMemory.RetrieveHierarchical(ctx, agent.ID, userMessage, []string{"stm", "mtm", "lpm"}, 5)
-		if err == nil {
-			/* Hierarchical memory retrieved successfully */
-			/* Context already loaded above */
+		hierMemoryChunks, err := r.hierMemory.RetrieveHierarchical(ctx, agent.ID, userMessage, []string{"stm", "mtm", "lpm"}, 5)
+		if err == nil && hierMemoryChunks != nil {
+			/* Add hierarchical memory chunks to context */
+			for tier, chunks := range hierMemoryChunks {
+				for _, chunk := range chunks {
+					agentContext.MemoryChunks = append(agentContext.MemoryChunks, MemoryChunk{
+						ID:              chunk.ID,
+						Content:         chunk.Content,
+						ImportanceScore: chunk.ImportanceScore,
+						Similarity:      chunk.Similarity,
+						Metadata:        map[string]interface{}{"tier": tier},
+					})
+				}
+			}
+		} else if err != nil {
+			/* Log error but continue - hierarchical memory is optional */
+			metrics.WarnWithContext(ctx, "Failed to retrieve hierarchical memory", map[string]interface{}{
+				"session_id": sessionID.String(),
+				"agent_id":   agent.ID.String(),
+				"error":      err.Error(),
+			})
 		}
 	}
 
@@ -318,12 +341,26 @@ func (r *Runtime) Execute(ctx context.Context, sessionID uuid.UUID, userMessage 
 		if len(state.FinalAnswer) > 200 {
 			importance = 0.7
 		}
-		r.hierMemory.StoreSTM(ctx, agent.ID, sessionID, state.FinalAnswer, importance)
+		if _, err := r.hierMemory.StoreSTM(ctx, agent.ID, sessionID, state.FinalAnswer, importance); err != nil {
+			/* Log error but continue - STM storage is non-critical */
+			metrics.WarnWithContext(ctx, "Failed to store in short-term memory", map[string]interface{}{
+				"session_id": sessionID.String(),
+				"agent_id":   agent.ID.String(),
+				"error":      err.Error(),
+			})
+		}
 	}
 
 	/* Queue output for verification */
 	if r.verifier != nil {
-		r.verifier.QueueVerification(ctx, sessionID, nil, state.FinalAnswer, "medium")
+		if _, err := r.verifier.QueueVerification(ctx, sessionID, nil, state.FinalAnswer, "medium"); err != nil {
+			/* Log error but continue - verification queuing is non-critical */
+			metrics.WarnWithContext(ctx, "Failed to queue output for verification", map[string]interface{}{
+				"session_id": sessionID.String(),
+				"agent_id":   agent.ID.String(),
+				"error":      err.Error(),
+			})
+		}
 	}
 
 	/* Step 8: Store messages with token counts */
@@ -336,7 +373,28 @@ func (r *Runtime) Execute(ctx context.Context, sessionID uuid.UUID, userMessage 
 	go func() {
 		bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
+
+		/* Recover from any panics in background goroutine */
+		defer func() {
+			if r := recover(); r != nil {
+				metrics.ErrorWithContext(bgCtx, "Panic in background memory storage goroutine", fmt.Errorf("panic: %v", r), map[string]interface{}{
+					"session_id": sessionID.String(),
+					"agent_id":   agent.ID.String(),
+				})
+			}
+		}()
+
+		/* Store chunks - errors are handled internally by StoreChunks */
 		r.memory.StoreChunks(bgCtx, agent.ID, sessionID, state.FinalAnswer, state.ToolResults)
+
+		/* Check if context was cancelled or timed out */
+		if bgCtx.Err() != nil {
+			metrics.WarnWithContext(bgCtx, "Memory storage context cancelled or timed out", map[string]interface{}{
+				"session_id": sessionID.String(),
+				"agent_id":   agent.ID.String(),
+				"error":      bgCtx.Err().Error(),
+			})
+		}
 	}()
 
 	/* Step 10: Send completion alert if configured */
@@ -407,10 +465,15 @@ func (r *Runtime) executeToolsParallel(ctx context.Context, agent *db.Agent, too
 		}(i, call)
 	}
 
-	/* Collect results */
+	/* Collect results with context cancellation support */
 	for i := 0; i < len(toolCalls); i++ {
-		ri := <-resultChan
-		results[ri.index] = ri.result
+		select {
+		case ri := <-resultChan:
+			results[ri.index] = ri.result
+		case <-ctx.Done():
+			/* Context cancelled - return partial results with error */
+			return results, fmt.Errorf("tool execution cancelled: context_error=%w", ctx.Err())
+		}
 	}
 
 	return results, nil
@@ -528,12 +591,25 @@ func (r *Runtime) storeMessages(ctx context.Context, sessionID uuid.UUID, userMs
 
 	/* Store tool calls as messages */
 	for _, call := range toolCalls {
-		callJSON, _ := json.Marshal(call.Arguments)
+		var callJSONStr string
+		callJSON, err := json.Marshal(call.Arguments)
+		if err != nil {
+			/* If JSON marshaling fails, use fallback string representation */
+			metrics.WarnWithContext(ctx, "Failed to marshal tool call arguments to JSON", map[string]interface{}{
+				"session_id": sessionID.String(),
+				"tool_call_id": call.ID,
+				"tool_name": call.Name,
+				"error": err.Error(),
+			})
+			callJSONStr = fmt.Sprintf("%v", call.Arguments)
+		} else {
+			callJSONStr = string(callJSON)
+		}
 		toolCallID := call.ID
 		if _, err := r.queries.CreateMessage(ctx, &db.Message{
 			SessionID:  sessionID,
 			Role:       "assistant",
-			Content:    fmt.Sprintf("Tool call: %s with args: %s", call.Name, string(callJSON)),
+			Content:    fmt.Sprintf("Tool call: %s with args: %s", call.Name, callJSONStr),
 			ToolCallID: &toolCallID,
 			Metadata:   map[string]interface{}{"tool_call": call},
 		}); err != nil {
@@ -748,12 +824,43 @@ func (r *Runtime) ExecuteStream(ctx context.Context, sessionID uuid.UUID, userMe
 			sessionID.String(), session.AgentID.String(), len(userMessage), err)
 	}
 
+	/* Check context cancellation before proceeding */
+	if ctx.Err() != nil {
+		return nil, fmt.Errorf("agent execution cancelled (streaming): session_id='%s', context_error=%w", sessionID.String(), ctx.Err())
+	}
+
 	/* Step 2: Load context */
 	contextLoader := NewContextLoader(r.queries, r.memory, r.llm)
 	agentContext, err := contextLoader.Load(ctx, sessionID, agent.ID, userMessage, 20, 5)
 	if err != nil {
 		return nil, fmt.Errorf("agent execution failed at step 2 (load context): session_id='%s', agent_id='%s', agent_name='%s', user_message_length=%d, max_messages=20, max_memory_chunks=5, error=%w",
 			sessionID.String(), agent.ID.String(), agent.Name, len(userMessage), err)
+	}
+
+	/* Enhance context with hierarchical memory if available */
+	if r.hierMemory != nil {
+		hierMemoryChunks, err := r.hierMemory.RetrieveHierarchical(ctx, agent.ID, userMessage, []string{"stm", "mtm", "lpm"}, 5)
+		if err == nil && hierMemoryChunks != nil {
+			/* Add hierarchical memory chunks to context */
+			for tier, chunks := range hierMemoryChunks {
+				for _, chunk := range chunks {
+					agentContext.MemoryChunks = append(agentContext.MemoryChunks, MemoryChunk{
+						ID:              chunk.ID,
+						Content:         chunk.Content,
+						ImportanceScore: chunk.ImportanceScore,
+						Similarity:      chunk.Similarity,
+						Metadata:        map[string]interface{}{"tier": tier},
+					})
+				}
+			}
+		} else if err != nil {
+			/* Log error but continue - hierarchical memory is optional */
+			metrics.WarnWithContext(ctx, "Failed to retrieve hierarchical memory in streaming", map[string]interface{}{
+				"session_id": sessionID.String(),
+				"agent_id":   agent.ID.String(),
+				"error":      err.Error(),
+			})
+		}
 	}
 
 	state.Context = agentContext
@@ -790,8 +897,22 @@ func (r *Runtime) ExecuteStream(ctx context.Context, sessionID uuid.UUID, userMe
 		state.ToolCalls = toolCalls
 		/* Notify about tool calls */
 		if callback != nil {
-			toolCallsJSON, _ := json.Marshal(toolCalls)
-			_ = callback(string(toolCallsJSON), "tool_calls")
+			toolCallsJSON, err := json.Marshal(toolCalls)
+			if err == nil {
+				if callbackErr := callback(string(toolCallsJSON), "tool_calls"); callbackErr != nil {
+					metrics.WarnWithContext(ctx, "Callback error when notifying about tool calls", map[string]interface{}{
+						"session_id": sessionID.String(),
+						"agent_id":   agent.ID.String(),
+						"error":      callbackErr.Error(),
+					})
+				}
+			} else {
+				metrics.WarnWithContext(ctx, "Failed to marshal tool calls for callback", map[string]interface{}{
+					"session_id": sessionID.String(),
+					"agent_id":   agent.ID.String(),
+					"error":      err.Error(),
+				})
+			}
 		}
 
 		/* Execute tools */
@@ -804,8 +925,22 @@ func (r *Runtime) ExecuteStream(ctx context.Context, sessionID uuid.UUID, userMe
 
 		/* Notify about tool results */
 		if callback != nil {
-			toolResultsJSON, _ := json.Marshal(toolResults)
-			_ = callback(string(toolResultsJSON), "tool_results")
+			toolResultsJSON, err := json.Marshal(toolResults)
+			if err == nil {
+				if callbackErr := callback(string(toolResultsJSON), "tool_results"); callbackErr != nil {
+					metrics.WarnWithContext(ctx, "Callback error when notifying about tool results", map[string]interface{}{
+						"session_id": sessionID.String(),
+						"agent_id":   agent.ID.String(),
+						"error":      callbackErr.Error(),
+					})
+				}
+			} else {
+				metrics.WarnWithContext(ctx, "Failed to marshal tool results for callback", map[string]interface{}{
+					"session_id": sessionID.String(),
+					"agent_id":   agent.ID.String(),
+					"error":      err.Error(),
+				})
+			}
 		}
 
 		/* Build final prompt with tool results */
@@ -832,19 +967,81 @@ func (r *Runtime) ExecuteStream(ctx context.Context, sessionID uuid.UUID, userMe
 	/* Estimate token usage */
 	state.TokensUsed = EstimateTokens(prompt) + EstimateTokens(state.FinalAnswer)
 
+	/* Store in short-term memory */
+	if r.hierMemory != nil && state.FinalAnswer != "" {
+		importance := 0.5
+		if len(state.FinalAnswer) > 200 {
+			importance = 0.7
+		}
+		if _, err := r.hierMemory.StoreSTM(ctx, agent.ID, sessionID, state.FinalAnswer, importance); err != nil {
+			/* Log error but continue - STM storage is non-critical */
+			metrics.WarnWithContext(ctx, "Failed to store in short-term memory (streaming)", map[string]interface{}{
+				"session_id": sessionID.String(),
+				"agent_id":   agent.ID.String(),
+				"error":      err.Error(),
+			})
+		}
+	}
+
+	/* Queue output for verification */
+	if r.verifier != nil && state.FinalAnswer != "" {
+		if _, err := r.verifier.QueueVerification(ctx, sessionID, nil, state.FinalAnswer, "medium"); err != nil {
+			/* Log error but continue - verification queuing is non-critical */
+			metrics.WarnWithContext(ctx, "Failed to queue output for verification (streaming)", map[string]interface{}{
+				"session_id": sessionID.String(),
+				"agent_id":   agent.ID.String(),
+				"error":      err.Error(),
+			})
+		}
+	}
+
 	/* Store messages */
-	_ = r.storeMessages(ctx, sessionID, userMessage, state.FinalAnswer, state.ToolCalls, state.ToolResults, state.TokensUsed)
+	if err := r.storeMessages(ctx, sessionID, userMessage, state.FinalAnswer, state.ToolCalls, state.ToolResults, state.TokensUsed); err != nil {
+		/* Log error but continue - message storage failure shouldn't break streaming */
+		metrics.WarnWithContext(ctx, "Failed to store messages in streaming execution", map[string]interface{}{
+			"session_id": sessionID.String(),
+			"agent_id":   agent.ID.String(),
+			"error":      err.Error(),
+		})
+	}
 
 	/* Store memory chunks (async) */
 	go func() {
 		bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
+
+		/* Recover from any panics in background goroutine */
+		defer func() {
+			if r := recover(); r != nil {
+				metrics.ErrorWithContext(bgCtx, "Panic in background memory storage goroutine (streaming)", fmt.Errorf("panic: %v", r), map[string]interface{}{
+					"session_id": sessionID.String(),
+					"agent_id":   agent.ID.String(),
+				})
+			}
+		}()
+
+		/* Store chunks - errors are handled internally by StoreChunks */
 		r.memory.StoreChunks(bgCtx, agent.ID, sessionID, state.FinalAnswer, state.ToolResults)
+
+		/* Check if context was cancelled or timed out */
+		if bgCtx.Err() != nil {
+			metrics.WarnWithContext(bgCtx, "Memory storage context cancelled or timed out (streaming)", map[string]interface{}{
+				"session_id": sessionID.String(),
+				"agent_id":   agent.ID.String(),
+				"error":      bgCtx.Err().Error(),
+			})
+		}
 	}()
 
 	/* Notify completion */
 	if callback != nil {
-		_ = callback("", "done")
+		if callbackErr := callback("", "done"); callbackErr != nil {
+			metrics.WarnWithContext(ctx, "Callback error when notifying completion", map[string]interface{}{
+				"session_id": sessionID.String(),
+				"agent_id":   agent.ID.String(),
+				"error":      callbackErr.Error(),
+			})
+		}
 	}
 
 	return state, nil

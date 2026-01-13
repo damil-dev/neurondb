@@ -24,6 +24,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/neurondb/NeuronAgent/internal/db"
+	"github.com/neurondb/NeuronAgent/internal/metrics"
 	"github.com/neurondb/NeuronAgent/pkg/neurondb"
 )
 
@@ -270,14 +271,28 @@ func (sim *SelfImprovementManager) ABTest(ctx context.Context, agentID uuid.UUID
 		SET status = 'completed', results = $1::jsonb, completed_at = $2
 		WHERE test_id = $3`
 	
-	resultsJSON, _ := json.Marshal(map[string]interface{}{
+	resultsJSON, err := json.Marshal(map[string]interface{}{
 		"winner":    result.Winner,
 		"confidence": result.Confidence,
 		"variant_a_metrics": variantA.Metrics,
 		"variant_b_metrics": variantB.Metrics,
 	})
+	if err != nil {
+		/* If JSON marshaling fails, log error and use fallback representation */
+		metrics.WarnWithContext(ctx, "Failed to marshal A/B test results to JSON", map[string]interface{}{
+			"test_id": testID.String(),
+			"error": err.Error(),
+		})
+		/* Use a simple JSON representation as fallback */
+		resultsJSON = []byte(fmt.Sprintf(`{"winner":"%s","confidence":%f,"error":"json_marshal_failed"}`, result.Winner, result.Confidence))
+	}
 	
-	_, _ = sim.queries.DB.ExecContext(ctx, updateQuery, resultsJSON, time.Now(), testID)
+	if _, execErr := sim.queries.DB.ExecContext(ctx, updateQuery, resultsJSON, time.Now(), testID); execErr != nil {
+		metrics.WarnWithContext(ctx, "Failed to update A/B test results in database", map[string]interface{}{
+			"test_id": testID.String(),
+			"error": execErr.Error(),
+		})
+	}
 
 	return result, nil
 }

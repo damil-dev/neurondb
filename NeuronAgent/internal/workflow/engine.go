@@ -27,6 +27,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/neurondb/NeuronAgent/internal/agent"
 	"github.com/neurondb/NeuronAgent/internal/db"
+	"github.com/neurondb/NeuronAgent/internal/metrics"
 	"github.com/neurondb/NeuronAgent/internal/notifications"
 )
 
@@ -91,7 +92,13 @@ func (e *Engine) ExecuteWorkflow(ctx context.Context, workflowID uuid.UUID, trig
 		execution.Status = "failed"
 		errorMsg := fmt.Sprintf("failed to load workflow: %v", err)
 		execution.ErrorMessage = &errorMsg
-		_ = e.queries.UpdateWorkflowExecution(ctx, execution)
+		if updateErr := e.queries.UpdateWorkflowExecution(ctx, execution); updateErr != nil {
+			metrics.WarnWithContext(ctx, "Failed to update workflow execution status after workflow load error", map[string]interface{}{
+				"execution_id": execution.ID.String(),
+				"workflow_id":  workflowID.String(),
+				"error":        updateErr.Error(),
+			})
+		}
 		return nil, fmt.Errorf("failed to load workflow: %w", err)
 	}
 
@@ -100,13 +107,25 @@ func (e *Engine) ExecuteWorkflow(ctx context.Context, workflowID uuid.UUID, trig
 		execution.Status = "failed"
 		errorMsg := fmt.Sprintf("failed to load workflow steps: %v", err)
 		execution.ErrorMessage = &errorMsg
-		_ = e.queries.UpdateWorkflowExecution(ctx, execution)
+		if updateErr := e.queries.UpdateWorkflowExecution(ctx, execution); updateErr != nil {
+			metrics.WarnWithContext(ctx, "Failed to update workflow execution status after steps load error", map[string]interface{}{
+				"execution_id": execution.ID.String(),
+				"workflow_id":  workflowID.String(),
+				"error":        updateErr.Error(),
+			})
+		}
 		return nil, fmt.Errorf("failed to load workflow steps: %w", err)
 	}
 
 	if len(steps) == 0 {
 		execution.Status = "completed"
-		_ = e.queries.UpdateWorkflowExecution(ctx, execution)
+		if err := e.queries.UpdateWorkflowExecution(ctx, execution); err != nil {
+			metrics.WarnWithContext(ctx, "Failed to update workflow execution status for empty workflow", map[string]interface{}{
+				"execution_id": execution.ID.String(),
+				"workflow_id":  workflowID.String(),
+				"error":        err.Error(),
+			})
+		}
 		return execution, nil
 	}
 
@@ -116,7 +135,13 @@ func (e *Engine) ExecuteWorkflow(ctx context.Context, workflowID uuid.UUID, trig
 		execution.Status = "failed"
 		errorMsg := fmt.Sprintf("failed to build dependency graph: %v", err)
 		execution.ErrorMessage = &errorMsg
-		_ = e.queries.UpdateWorkflowExecution(ctx, execution)
+		if updateErr := e.queries.UpdateWorkflowExecution(ctx, execution); updateErr != nil {
+			metrics.WarnWithContext(ctx, "Failed to update workflow execution status after DAG build error", map[string]interface{}{
+				"execution_id": execution.ID.String(),
+				"workflow_id":  workflowID.String(),
+				"error":        updateErr.Error(),
+			})
+		}
 		return nil, fmt.Errorf("failed to build dependency graph: %w", err)
 	}
 
@@ -140,7 +165,14 @@ func (e *Engine) ExecuteWorkflow(ctx context.Context, workflowID uuid.UUID, trig
 			execution.Status = "failed"
 			errorMsg := fmt.Sprintf("step not found: %s", stepID.String())
 			execution.ErrorMessage = &errorMsg
-			_ = e.queries.UpdateWorkflowExecution(ctx, execution)
+			if updateErr := e.queries.UpdateWorkflowExecution(ctx, execution); updateErr != nil {
+				metrics.WarnWithContext(ctx, "Failed to update workflow execution status after step not found error", map[string]interface{}{
+					"execution_id": execution.ID.String(),
+					"workflow_id":  workflowID.String(),
+					"step_id":      stepID.String(),
+					"error":        updateErr.Error(),
+				})
+			}
 			return nil, fmt.Errorf("step not found: %s", stepID.String())
 		}
 

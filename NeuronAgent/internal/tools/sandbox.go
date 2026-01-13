@@ -14,7 +14,6 @@
 package tools
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -108,12 +107,12 @@ func (s *Sandbox) Chroot(cmd *exec.Cmd) error {
 /* SetTimeout sets a timeout for command execution */
 /* Note: exec.Cmd doesn't have a settable Context field directly. */
 /* The context should be set when creating the command with exec.CommandContext */
+/* This function is deprecated - use exec.CommandContext instead */
 func SetTimeout(cmd *exec.Cmd, timeout time.Duration) *exec.Cmd {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	/* Note: cancel should be called after command completes */
-	/* For now, we return a new command with context */
-	/* In practice, use exec.CommandContext when creating the command */
-	_ = cancel
-	_ = ctx
+	/* Note: This function cannot properly set context on an existing command. */
+	/* The context must be provided when creating the command with exec.CommandContext. */
+	/* This function is kept for backward compatibility but does nothing. */
+	/* Callers should use exec.CommandContext(ctx, name, args...) instead. */
+	_ = timeout
 	return cmd
 }

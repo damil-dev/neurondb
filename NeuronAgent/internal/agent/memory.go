@@ -51,6 +51,25 @@ func NewMemoryManager(db *db.DB, queries *db.Queries, embedClient *neurondb.Embe
 }
 
 func (m *MemoryManager) Retrieve(ctx context.Context, agentID uuid.UUID, queryEmbedding []float32, topK int) ([]MemoryChunk, error) {
+	/* Validate inputs */
+	if agentID == uuid.Nil {
+		return nil, fmt.Errorf("memory retrieval failed: agent_id_empty=true")
+	}
+	if len(queryEmbedding) == 0 {
+		return nil, fmt.Errorf("memory retrieval failed: query_embedding_empty=true, agent_id='%s'", agentID.String())
+	}
+	if topK <= 0 {
+		return nil, fmt.Errorf("memory retrieval failed: top_k_invalid=%d, agent_id='%s'", topK, agentID.String())
+	}
+	if topK > 1000 {
+		topK = 1000 /* Cap at reasonable limit */
+	}
+
+	/* Check context cancellation */
+	if ctx.Err() != nil {
+		return nil, fmt.Errorf("memory retrieval cancelled: agent_id='%s', context_error=%w", agentID.String(), ctx.Err())
+	}
+
 	startTime := time.Now()
 	status := "success"
 	
@@ -113,6 +132,16 @@ func (m *MemoryManager) StoreChunks(ctx context.Context, agentID, sessionID uuid
 	}
 	metrics.RecordEmbeddingGeneration(embeddingModel, "success", embedDuration)
 
+	/* Check context cancellation */
+	if ctx.Err() != nil {
+		metrics.WarnWithContext(ctx, "Memory storage cancelled", map[string]interface{}{
+			"agent_id":   agentID.String(),
+			"session_id": sessionID.String(),
+			"error":      ctx.Err().Error(),
+		})
+		return
+	}
+
 	/* Store chunk */
 	_, err = m.queries.CreateMemoryChunk(ctx, &db.MemoryChunk{
 		AgentID:         agentID,
@@ -123,7 +152,13 @@ func (m *MemoryManager) StoreChunks(ctx context.Context, agentID, sessionID uuid
 	})
 	if err != nil {
 		/* Log error but don't fail (async operation) */
-		/* Error is already detailed in queries.CreateMemoryChunk */
+		metrics.WarnWithContext(ctx, "Failed to store memory chunk", map[string]interface{}{
+			"agent_id":   agentID.String(),
+			"session_id": sessionID.String(),
+			"content_length": len(content),
+			"importance": importance,
+			"error":      err.Error(),
+		})
 		return
 	}
 
@@ -133,6 +168,14 @@ func (m *MemoryManager) StoreChunks(ctx context.Context, agentID, sessionID uuid
 
 /* StoreChunksBatch stores multiple memory chunks in a single transaction for efficiency */
 func (m *MemoryManager) StoreChunksBatch(ctx context.Context, agentID, sessionID uuid.UUID, contents []string, toolResults []ToolResult) {
+	/* Validate inputs */
+	if agentID == uuid.Nil {
+		metrics.WarnWithContext(ctx, "Memory batch storage skipped: invalid agent ID", map[string]interface{}{
+			"session_id": sessionID.String(),
+			"contents_count": len(contents),
+		})
+		return
+	}
 	if len(contents) == 0 {
 		return
 	}
@@ -182,10 +225,31 @@ func (m *MemoryManager) StoreChunksBatch(ctx context.Context, agentID, sessionID
 		return
 	}
 
+	/* Check context cancellation */
+	if ctx.Err() != nil {
+		metrics.WarnWithContext(ctx, "Memory batch storage cancelled", map[string]interface{}{
+			"agent_id":   agentID.String(),
+			"session_id": sessionID.String(),
+			"chunks_count": len(chunksToStore),
+			"error":      ctx.Err().Error(),
+		})
+		return
+	}
+
 	/* Store chunks in batch (using transaction for efficiency) */
 	/* Note: This would require a batch insert method in queries */
 	/* For now, store sequentially but in same transaction context */
 	for _, chunk := range chunksToStore {
+		/* Check context cancellation during batch */
+		if ctx.Err() != nil {
+			metrics.WarnWithContext(ctx, "Memory batch storage cancelled during processing", map[string]interface{}{
+				"agent_id":   agentID.String(),
+				"session_id": sessionID.String(),
+				"error":      ctx.Err().Error(),
+			})
+			return
+		}
+
 		_, err := m.queries.CreateMemoryChunk(ctx, &db.MemoryChunk{
 			AgentID:         agentID,
 			SessionID:       &sessionID,
@@ -195,6 +259,13 @@ func (m *MemoryManager) StoreChunksBatch(ctx context.Context, agentID, sessionID
 		})
 		if err != nil {
 			/* Log error but continue with other chunks */
+			metrics.WarnWithContext(ctx, "Failed to store memory chunk in batch", map[string]interface{}{
+				"agent_id":   agentID.String(),
+				"session_id": sessionID.String(),
+				"content_length": len(chunk.content),
+				"importance": chunk.importanceScore,
+				"error":      err.Error(),
+			})
 			continue
 		}
 		metrics.RecordMemoryChunkStored(agentID.String())
@@ -236,6 +307,22 @@ func (m *MemoryManager) computeImportance(content string, toolResults []ToolResu
 
 /* SummarizeMemory summarizes old memories to compress them */
 func (m *MemoryManager) SummarizeMemory(ctx context.Context, agentID uuid.UUID, maxChunks int) error {
+	/* Validate inputs */
+	if agentID == uuid.Nil {
+		return fmt.Errorf("memory summarization failed: agent_id_empty=true")
+	}
+	if maxChunks <= 0 {
+		return fmt.Errorf("memory summarization failed: max_chunks_invalid=%d, agent_id='%s'", maxChunks, agentID.String())
+	}
+	if maxChunks > 10000 {
+		maxChunks = 10000 /* Cap at reasonable limit */
+	}
+
+	/* Check context cancellation */
+	if ctx.Err() != nil {
+		return fmt.Errorf("memory summarization cancelled: agent_id='%s', context_error=%w", agentID.String(), ctx.Err())
+	}
+
 	/* Get old memory chunks */
 	query := `SELECT id, content, created_at
 		FROM neurondb_agent.memory_chunks
@@ -322,6 +409,19 @@ func (m *MemoryManager) SummarizeMemory(ctx context.Context, agentID uuid.UUID, 
 
 /* ApplyTemporalDecay applies temporal decay to memory importance scores */
 func (m *MemoryManager) ApplyTemporalDecay(ctx context.Context, agentID uuid.UUID, decayRate float64) error {
+	/* Validate inputs */
+	if agentID == uuid.Nil {
+		return fmt.Errorf("temporal decay application failed: agent_id_empty=true")
+	}
+	if decayRate <= 0 || decayRate > 1 {
+		return fmt.Errorf("temporal decay application failed: decay_rate_invalid=%.2f, agent_id='%s'", decayRate, agentID.String())
+	}
+
+	/* Check context cancellation */
+	if ctx.Err() != nil {
+		return fmt.Errorf("temporal decay application cancelled: agent_id='%s', context_error=%w", agentID.String(), ctx.Err())
+	}
+
 	/* Update importance scores based on age */
 	query := `UPDATE neurondb_agent.memory_chunks
 		SET importance_score = GREATEST(0.1, importance_score * POWER($1, EXTRACT(EPOCH FROM (NOW() - created_at)) / 86400.0))

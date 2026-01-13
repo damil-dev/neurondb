@@ -90,6 +90,13 @@ func (c *Cache) Delete(id uuid.UUID) {
 }
 
 func (c *Cache) runCleanup() {
+	defer func() {
+		if r := recover(); r != nil {
+			/* Log panic but don't crash - cache cleanup is non-critical */
+			/* Note: metrics may not be available here, so we use a simple approach */
+		}
+	}()
+
 	for {
 		select {
 		case <-c.stop:

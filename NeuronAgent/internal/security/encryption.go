@@ -122,3 +122,4 @@ func (e *Encryption) DecryptString(ciphertext string) (string, error) {
 	return string(plaintext), nil
 }
 
+
