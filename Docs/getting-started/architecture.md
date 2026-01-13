@@ -545,6 +545,6 @@ graph TD
 
 <div align="center">
 
-[⬆ Back to Top](#️-architecture-overview) · [📚 Main Documentation](../../DOCUMENTATION.md) · [🚀 Simple Start](simple-start.md)
+[⬆ Back to Top](#️-architecture-overview) · [📚 Main Documentation](../../documentation.md) · [🚀 Simple Start](simple-start.md)
 
 </div>

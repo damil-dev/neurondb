@@ -494,11 +494,11 @@ docker network rm neurondb-network 2>/dev/null || true
 
 ## Related Documentation
 
-- [Docker Guide](docker.md) - General Docker usage
-- [NeuronDB Docker Guide](../dockers/neurondb/readme.md) - NeuronDB-specific Docker info
-- [NeuronAgent Docker Guide](../dockers/neuronagent/readme.md) - NeuronAgent-specific Docker info
-- [NeuronMCP Docker Guide](../dockers/neuronmcp/readme.md) - NeuronMCP-specific Docker info
-- [Quick Start Guide](../QUICKSTART.md) - Quick start instructions
+- [Docker Unified Guide](docker-unified.md) - Unified Docker orchestration
+- [NeuronDB Docker Guide](../../dockers/neurondb/readme.md) - NeuronDB-specific Docker info
+- [NeuronAgent Docker Guide](../../dockers/neuronagent/readme.md) - NeuronAgent-specific Docker info
+- [NeuronMCP Docker Guide](../../dockers/neuronmcp/readme.md) - NeuronMCP-specific Docker info
+- [Quick Start Guide](../../QUICKSTART.md) - Quick start instructions
 
 ## Support
 
@@ -507,9 +507,4 @@ For issues and questions:
 - Run verification script: `./scripts/verify-docker-ecosystem.sh --verbose`
 - GitHub Issues: [Report Issues](https://github.com/neurondb/NeurondB/issues)
 - Documentation: [Full Documentation](https://neurondb.ai/docs)
-
-
-
-
-
 

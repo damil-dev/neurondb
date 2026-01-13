@@ -336,5 +336,5 @@ kubectl get jobs -n neurondb | grep backup
 
 ## Troubleshooting
 
-See [Troubleshooting Guide](../troubleshooting.md) for common issues.
+See [Troubleshooting Guide](../operations/troubleshooting.md) for common issues.
 

@@ -616,12 +616,12 @@ For all 520+ functions, see the [Complete SQL API Reference](../../NeuronDB/docs
 | **[SQL Recipes](../../examples/sql-recipes/)** | Ready-to-run examples |
 | **[Getting Started Guide](../getting-started/quickstart.md)** | Step-by-step tutorial |
 | **[Architecture Guide](../getting-started/architecture.md)** | System overview |
-| **[Complete Documentation](../../DOCUMENTATION.md)** | Full documentation index |
+| **[Complete Documentation](../../documentation.md)** | Full documentation index |
 
 ---
 
 <div align="center">
 
-[⬆ Back to Top](#-top-20-neurondb-functions-you-need) · [📚 Main Documentation](../../DOCUMENTATION.md) · [🔍 Complete API](../../NeuronDB/docs/sql-api.md)
+[⬆ Back to Top](#-top-20-neurondb-functions-you-need) · [📚 Main Documentation](../../documentation.md) · [🔍 Complete API](../../NeuronDB/docs/sql-api.md)
 
 </div>

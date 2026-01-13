@@ -356,7 +356,7 @@ NeuronDB adds vector search capabilities directly to PostgreSQL, so you can:
 
 - [ ] 📐 Read [`architecture.md`](architecture.md) to understand the moving parts
 - [ ] 🧪 Try examples from [`examples/`](../../examples/)
-- [ ] 📚 Explore the [complete documentation](../../DOCUMENTATION.md)
+- [ ] 📚 Explore the [complete documentation](../../documentation.md)
 - [ ] 🔍 If something fails, check [`troubleshooting.md`](troubleshooting.md)
 - [ ] 🚀 Try the [Quickstart Data Pack](../../examples/quickstart-data/) for sample data
 
@@ -436,12 +436,12 @@ docker compose down -v
 | **[Architecture Guide](architecture.md)** | Understand how components work |
 | **[Installation Guide](installation.md)** | Detailed installation options |
 | **[Troubleshooting](troubleshooting.md)** | Common issues and solutions |
-| **[Complete Documentation](../../DOCUMENTATION.md)** | Full documentation index |
+| **[Complete Documentation](../../documentation.md)** | Full documentation index |
 
 ---
 
 <div align="center">
 
-[⬆ Back to Top](#-simple-start-guide) · [📚 Main Documentation](../../DOCUMENTATION.md) · [🚀 Quickstart](quickstart.md)
+[⬆ Back to Top](#-simple-start-guide) · [📚 Main Documentation](../../documentation.md) · [🚀 Quickstart](quickstart.md)
 
 </div>

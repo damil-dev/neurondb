@@ -432,7 +432,7 @@ An **embedding** is a vector (array of numbers) that represents the semantic mea
 
 - [ ] 📐 Read [Architecture Guide](architecture.md) to understand components
 - [ ] 🧪 Try more [SQL Recipes](../../examples/sql-recipes/)
-- [ ] 📚 Explore [Complete Documentation](../../DOCUMENTATION.md)
+- [ ] 📚 Explore [Complete Documentation](../../documentation.md)
 - [ ] 🔍 Check [Troubleshooting Guide](troubleshooting.md) if needed
 - [ ] 🤖 Try [NeuronAgent Examples](../../NeuronAgent/examples/) for agent workflows
 - [ ] 🔌 Explore [NeuronMCP Integration](../../NeuronMCP/docs/) for MCP tools
@@ -514,12 +514,12 @@ UPDATE my_docs SET embedding = embed_text(content, 'all-MiniLM-L6-v2');
 | **[Architecture Guide](architecture.md)** | Understand components |
 | **[Installation Guide](installation.md)** | Detailed installation options |
 | **[SQL Recipes](../../examples/sql-recipes/)** | Ready-to-run SQL examples |
-| **[Complete Documentation](../../DOCUMENTATION.md)** | Full documentation index |
+| **[Complete Documentation](../../documentation.md)** | Full documentation index |
 
 ---
 
 <div align="center">
 
-[⬆ Back to Top](#-quick-start-guide) · [📚 Main Documentation](../../DOCUMENTATION.md) · [🚀 Simple Start](simple-start.md)
+[⬆ Back to Top](#-quick-start-guide) · [📚 Main Documentation](../../documentation.md) · [🚀 Simple Start](simple-start.md)
 
 </div>

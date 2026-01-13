@@ -44,7 +44,7 @@ docker compose up -d neurondesk-api neurondesk-frontend
 
 ## Unified Docker Orchestration
 
-For unified orchestration of all services, see the [Unified Docker Guide](../../Docs/DOCKER.md) which provides:
+For unified orchestration of all services, see the [Unified Docker Guide](docker-unified.md) which provides:
 
 - Single command to build and run all services
 - Automatic networking between containers
@@ -236,7 +236,7 @@ ports:
 
 ## Related Documentation
 
-- [Unified Docker Guide](../../Docs/DOCKER.md) - Complete unified orchestration guide
+- [Unified Docker Guide](docker-unified.md) - Complete unified orchestration guide
 - [NeuronDB Docker](../../dockers/neurondb/readme.md) - NeuronDB-specific Docker guide
 - [NeuronAgent Docker](../../dockers/neuronagent/readme.md) - NeuronAgent Docker guide
 - [NeuronMCP Docker](../../dockers/neuronmcp/readme.md) - NeuronMCP Docker guide

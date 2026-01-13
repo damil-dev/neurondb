@@ -98,7 +98,7 @@
 |-----------|---------------|-------------|
 | **NeuronAgent** | [API Reference](reference/neuronagent-api.md) | REST and WebSocket API |
 | **NeuronMCP** | [Tools Reference](../../NeuronMCP/TOOLS_REFERENCE.md) | All 100+ MCP tools |
-| **NeuronDesktop** | [API Reference](../../Docs/API_REFERENCE.md#neurondesktop-api) | REST and WebSocket API |
+| **NeuronDesktop** | [API Reference](reference/api-reference.md#neurondesktop-api) | REST and WebSocket API |
 
 </details>
 
@@ -301,7 +301,7 @@
 
 | Document | Description |
 |----------|-------------|
-| **[Main Documentation Index](../../DOCUMENTATION.md)** | Original documentation index |
+| **[Main Documentation Index](documentation.md)** | Original documentation index |
 | **[Contributing Guide](../../CONTRIBUTING.md)** | Contribution guidelines |
 | **[README](../../README.md)** | Project overview |
 
@@ -312,6 +312,6 @@
 **Last Updated:** 2026-01-08  
 **Documentation Version:** 2.0.0
 
-[⬆ Back to Top](#-neurondb-complete-documentation-index) · [📚 Main Documentation](../../DOCUMENTATION.md)
+[⬆ Back to Top](#-neurondb-complete-documentation-index) · [📚 Main Documentation](documentation.md)
 
 </div>
