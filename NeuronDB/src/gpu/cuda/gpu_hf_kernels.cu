@@ -1160,8 +1160,14 @@ ndb_cuda_hf_sort_logits_kernel(const float *logits,
 	sorted_logits[tid] = logits[tid];
 	sorted_indices[tid] = tid;
 
-	/* Simple bubble sort (inefficient but correct) */
-	/* TODO: Use bitonic sort or radix sort for better performance */
+	/*
+	 * TODO: Use bitonic sort or radix sort for better performance.
+	 * The current bubble sort implementation has O(n^2) complexity which
+	 * becomes inefficient for large vocabularies. Bitonic sort (O(n log^2 n))
+	 * or radix sort (O(n)) would provide significant performance improvements
+	 * for GPU execution. CUDA provides optimized sorting primitives that
+	 * should be leveraged here.
+	 */
 	int i;
 	int j;
 
@@ -1485,9 +1491,14 @@ ndb_cuda_hf_generate_inference(const char *model_name,
 	if (status != cudaSuccess)
 		goto error;
 
-	/* Initialize KV cache with prompt tokens */
-	/* TODO: This is a simplified version - full implementation would run
-	 *       transformer layers on prompt tokens to populate KV cache
+	/*
+	 * TODO: Implement full KV cache initialization with prompt tokens.
+	 * The current implementation is simplified and doesn't properly populate
+	 * the KV cache. A full implementation should: (1) Run all transformer
+	 * layers on the input prompt tokens, (2) Store the computed K and V
+	 * vectors for each layer in the KV cache, (3) Set current_pos to the
+	 * end of the prompt sequence. This enables efficient autoregressive
+	 * generation by reusing precomputed key-value pairs from the prompt.
 	 */
 	current_pos = input_seq_len - 1;
 
@@ -2687,9 +2698,15 @@ ndb_cuda_hf_generate_inference(const char *model_name,
 		/* Sample next token */
 		if (gen_params->do_sample)
 		{
-			/* Multinomial sampling */
-			/* Generate random value on host (simplified) */
-			/* TODO: Use curand for device-side random number generation */
+			/*
+			 * TODO: Use curand for device-side random number generation.
+			 * The current implementation generates random numbers on the host
+			 * and transfers them to the device, which is inefficient. CUDA's
+			 * curand library should be used to generate random numbers directly
+			 * on the GPU, eliminating host-device transfers and improving
+			 * performance. This requires initializing curand state on the
+			 * device and using curand_uniform() for random number generation.
+			 */
 			float random_value;
 			if (gen_params->seed > 0)
 				srand(gen_params->seed + generated_count);
@@ -2742,9 +2759,17 @@ ndb_cuda_hf_generate_inference(const char *model_name,
 		generated_count++;
 		current_pos++;
 
-		/* Update KV cache with new token (simplified) */
-		/* TODO: Implement proper KV cache update after transformer forward pass */
-		/* For now, just increment cache position */
+		/*
+		 * TODO: Implement proper KV cache update after transformer forward pass.
+		 * The current implementation only increments the cache position. A
+		 * proper implementation should: (1) Store the newly computed K and V
+		 * vectors from the transformer forward pass into the KV cache at the
+		 * current position for each layer, (2) Ensure proper memory layout
+		 * and alignment for efficient access during subsequent generation steps,
+		 * (3) Handle cache overflow scenarios when max_seq_len is reached.
+		 * The K and V vectors are already computed in the transformer layers
+		 * above and should be stored in kv_cache->key_cache and kv_cache->value_cache.
+		 */
 		if (kv_cache != NULL)
 			kv_cache->current_pos = current_pos;
 

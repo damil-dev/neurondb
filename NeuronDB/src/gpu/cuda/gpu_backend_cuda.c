@@ -855,7 +855,15 @@ ndb_cuda_hnsw_search(const float *query,
 					 float *result_distances,
 					 ndb_stream_t stream)
 {
-	(void) stream; /* TODO: Use stream for async execution */
+	/*
+	 * TODO: Use stream for async execution.
+	 * The stream parameter should be used to enqueue CUDA kernel launches
+	 * asynchronously, allowing overlap of computation with data transfers
+	 * and other operations. This requires modifying the kernel launch calls
+	 * to use the stream parameter and ensuring proper synchronization when
+	 * results are needed.
+	 */
+	(void) stream;
 
 	if (!cuda_ctx.initialized)
 		return -1;
@@ -892,7 +900,15 @@ ndb_cuda_hnsw_search_batch(const float *queries,
 							float *result_distances,
 							ndb_stream_t stream)
 {
-	(void) stream; /* TODO: Use stream for async execution */
+	/*
+	 * TODO: Use stream for async execution.
+	 * The stream parameter should be used to enqueue CUDA kernel launches
+	 * asynchronously, allowing overlap of computation with data transfers
+	 * and other operations. This requires modifying the kernel launch calls
+	 * to use the stream parameter and ensuring proper synchronization when
+	 * results are needed.
+	 */
+	(void) stream;
 
 	if (!cuda_ctx.initialized)
 		return -1;
@@ -927,7 +943,15 @@ ndb_cuda_ivf_search(const float *query,
 					float *result_distances,
 					ndb_stream_t stream)
 {
-	(void) stream; /* TODO: Use stream for async execution */
+	/*
+	 * TODO: Use stream for async execution.
+	 * The stream parameter should be used to enqueue CUDA kernel launches
+	 * asynchronously, allowing overlap of computation with data transfers
+	 * and other operations. This requires modifying the kernel launch calls
+	 * to use the stream parameter and ensuring proper synchronization when
+	 * results are needed.
+	 */
+	(void) stream;
 
 	if (!cuda_ctx.initialized)
 		return -1;
@@ -960,7 +984,15 @@ ndb_cuda_ivf_search_batch(const float *queries,
 						   float *result_distances,
 						   ndb_stream_t stream)
 {
-	(void) stream; /* TODO: Use stream for async execution */
+	/*
+	 * TODO: Use stream for async execution.
+	 * The stream parameter should be used to enqueue CUDA kernel launches
+	 * asynchronously, allowing overlap of computation with data transfers
+	 * and other operations. This requires modifying the kernel launch calls
+	 * to use the stream parameter and ensuring proper synchronization when
+	 * results are needed.
+	 */
+	(void) stream;
 
 	if (!cuda_ctx.initialized)
 		return -1;

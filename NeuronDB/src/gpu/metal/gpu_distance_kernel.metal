@@ -24,11 +24,11 @@ kernel void l2_distance_kernel(
     constant uint& dimension [[buffer(3)]],
     uint gid [[thread_position_in_grid]])
 {
-    if (gid >= 1) return;  // Single output value
+    if (gid >= 1) return;  /* Single output value */
     
     float sum = 0.0f;
     
-    // Parallel reduction across GPU threads
+    /* Parallel reduction across GPU threads */
     for (uint i = 0; i < dimension; i++) {
         float diff = vec_a[i] - vec_b[i];
         sum += diff * diff;
@@ -58,7 +58,7 @@ kernel void batch_l2_distance_kernel(
     if (query_idx >= num_queries || target_idx >= num_targets)
         return;
     
-    // Compute L2 distance
+    /* Compute L2 distance */
     float sum = 0.0f;
     uint q_offset = query_idx * dimension;
     uint t_offset = target_idx * dimension;
