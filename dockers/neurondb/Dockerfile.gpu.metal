@@ -152,13 +152,18 @@ COPY --from=builder /usr/lib/postgresql/${PG_MAJOR}/lib/neurondb*.so /usr/lib/po
 COPY --from=builder /usr/share/postgresql/${PG_MAJOR}/extension/neurondb* /usr/share/postgresql/${PG_MAJOR}/extension/
 COPY --from=builder /usr/local/onnxruntime ${ONNX_PATH}
 
-COPY docker/docker-entrypoint-initdb.d/ /docker-entrypoint-initdb.d/
+COPY dockers/neurondb/docker-entrypoint-initdb.d/ /docker-entrypoint-initdb.d/
+
+# Ship custom entrypoint wrapper (ensures extension exists after PostgreSQL starts)
+COPY dockers/neurondb/docker-entrypoint-neurondb.sh /usr/local/bin/docker-entrypoint-neurondb.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint-neurondb.sh && \
+    chown root:root /usr/local/bin/docker-entrypoint-neurondb.sh
 
 # Copy NeuronMCP SQL files for auto-setup
 COPY NeuronMCP/sql/ /docker-entrypoint-initdb.d/neurondb_mcp/
 
-# Copy NeuronAgent migration files for auto-setup
-COPY NeuronAgent/migrations/ /docker-entrypoint-initdb.d/neurondb_agent/
+# Copy NeuronAgent SQL files for auto-setup
+COPY NeuronAgent/sql/ /docker-entrypoint-initdb.d/neurondb_agent/
 
 VOLUME ["/var/lib/postgresql/data"]
 
