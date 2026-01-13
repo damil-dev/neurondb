@@ -254,7 +254,14 @@ func validateType(value interface{}, schema map[string]interface{}) string {
 			return "expected number"
 		}
 	case "integer":
-		if valueType != reflect.Int && valueType != reflect.Int64 {
+		/* JSON numbers come as float64 in Go, so we need to accept float64 values that are whole numbers */
+		if valueType == reflect.Float64 {
+			f := value.(float64)
+			if f != float64(int64(f)) {
+				return "expected integer, got float with decimal part"
+			}
+			/* It's a whole number, so it's valid as an integer */
+		} else if valueType != reflect.Int && valueType != reflect.Int64 {
 			return "expected integer"
 		}
 	case "boolean":
