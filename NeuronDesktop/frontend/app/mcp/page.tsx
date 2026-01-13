@@ -619,7 +619,7 @@ function MCPPage() {
     ws.onmessage = async (event) => {
       try {
         const data = JSON.parse(event.data)
-        console.log('WebSocket message received:', data) // Debug logging
+        console.log('WebSocket message received:', data)
         
         if (data.type === 'connected') {
           // Skip adding 'connected' message if threads aren't loaded yet
@@ -959,7 +959,7 @@ function MCPPage() {
           content: userMessage,
           model_id: selectedModel
         }
-        console.log('Sending WebSocket message:', message) // Debug logging
+        console.log('Sending WebSocket message:', message)
         wsRef.current.send(JSON.stringify(message))
         
         // Set a timeout to clear loading state if no response is received
