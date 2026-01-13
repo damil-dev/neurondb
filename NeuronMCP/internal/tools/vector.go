@@ -914,8 +914,16 @@ func (t *BatchEmbeddingTool) Execute(ctx context.Context, params map[string]inte
 		}
 	}
 
-	query := "SELECT json_agg(embedding::text) AS embeddings FROM unnest(neurondb.embed_batch($1, $2::text[])) AS embedding"
-	queryParams := []interface{}{modelName, textStrings}
+	// embed_text_batch takes (text[], text) - array of texts first, then optional model name
+	var query string
+	var queryParams []interface{}
+	if modelName != "" && modelName != "default" {
+		query = "SELECT json_agg(embedding::text) AS embeddings FROM unnest(embed_text_batch($1::text[], $2)) AS embedding"
+		queryParams = []interface{}{textStrings, modelName}
+	} else {
+		query = "SELECT json_agg(embedding::text) AS embeddings FROM unnest(embed_text_batch($1::text[])) AS embedding"
+		queryParams = []interface{}{textStrings}
+	}
 
 	result, err := t.executor.ExecuteQueryOneWithTimeout(ctx, query, queryParams, EmbeddingQueryTimeout)
 	if err != nil {

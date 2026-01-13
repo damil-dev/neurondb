@@ -64,15 +64,47 @@ Create `mcp-config.json`:
 
 ## Claude Desktop Setup
 
+### Prerequisites
+
+Before configuring Claude Desktop, you must install Python dependencies. Claude Desktop starts the MCP server automatically without running setup scripts, so all dependencies must be pre-installed.
+
+**Run the setup script:**
+
+```bash
+cd NeuronMCP
+./scripts/neuronmcp_setup_claude_desktop.sh
+```
+
+This script will:
+- Check for Python 3.8+
+- Install required packages (datasets, pandas, psycopg2-binary, etc.)
+- Verify installation
+- Optionally check embedding configuration
+
+**Or install manually:**
+
+```bash
+cd NeuronMCP
+pip install -r requirements.txt
+```
+
+**Verify installation:**
+
+```bash
+python3 -c "from datasets import load_dataset; print('OK')"
+```
+
 ### macOS
 
-1. Create configuration file:
+1. **Install Python dependencies** (see Prerequisites above)
+
+2. Create configuration file:
    ```bash
    mkdir -p ~/Library/Application\ Support/Claude
    cp claude_desktop_config.macos.json ~/Library/Application\ Support/Claude/claude_desktop_config.json
    ```
 
-2. Edit the configuration file and update the path to `neurondb-mcp`:
+3. Edit the configuration file and update the path to `neurondb-mcp`:
    ```json
    {
      "mcpServers": {
@@ -90,30 +122,34 @@ Create `mcp-config.json`:
    }
    ```
 
-3. Restart Claude Desktop
+4. Restart Claude Desktop
 
 ### Windows
 
-1. Create configuration file:
+1. **Install Python dependencies** (see Prerequisites above)
+
+2. Create configuration file:
    ```
    %APPDATA%\Claude\claude_desktop_config.json
    ```
 
-2. Copy content from `claude_desktop_config.windows.json` and update paths
+3. Copy content from `claude_desktop_config.windows.json` and update paths
 
-3. Restart Claude Desktop
+4. Restart Claude Desktop
 
 ### Linux
 
-1. Create configuration file:
+1. **Install Python dependencies** (see Prerequisites above)
+
+2. Create configuration file:
    ```bash
    mkdir -p ~/.config/Claude
    cp claude_desktop_config.linux.json ~/.config/Claude/claude_desktop_config.json
    ```
 
-2. Edit the configuration file and update the path to `neurondb-mcp`
+3. Edit the configuration file and update the path to `neurondb-mcp`
 
-3. Restart Claude Desktop
+4. Restart Claude Desktop
 
 ## Testing
 
@@ -157,6 +193,62 @@ Create `mcp-config.json`:
    ```bash
    echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' | ./neurondb-mcp
    ```
+
+### Python Dependencies Not Found
+
+If you see errors like "No module named 'datasets'" when using dataset loading:
+
+1. **Run the setup script:**
+   ```bash
+   cd NeuronMCP
+   ./scripts/neuronmcp_setup_claude_desktop.sh
+   ```
+
+2. **Or install manually:**
+   ```bash
+   pip install -r NeuronMCP/requirements.txt
+   ```
+
+3. **Verify installation:**
+   ```bash
+   python3 -c "from datasets import load_dataset; import pandas; import psycopg2; print('All dependencies installed!')"
+   ```
+
+4. **Note:** When Claude Desktop starts the MCP server, it uses the system `python3` command. Make sure dependencies are installed in the same Python environment that `python3` points to.
+
+### Embeddings Returning Zeros
+
+If embeddings are all zeros when loading datasets:
+
+1. **Check embedding API key:**
+   ```sql
+   SELECT current_setting('neurondb.llm_api_key', true);
+   ```
+
+2. **Set API key (for Hugging Face API):**
+   ```sql
+   ALTER SYSTEM SET neurondb.llm_api_key = 'your-api-key';
+   SELECT pg_reload_conf();
+   ```
+
+3. **Or use session-level setting:**
+   ```sql
+   SET neurondb.llm_api_key = 'your-api-key';
+   ```
+
+4. **Verify embedding model configuration:**
+   ```sql
+   SHOW neurondb.llm_provider;
+   SHOW neurondb.llm_endpoint;
+   SHOW neurondb.llm_model;
+   ```
+
+5. **Test embedding generation:**
+   ```sql
+   SELECT embed_text('test text')::text;
+   ```
+
+   If this returns all zeros, the embedding service is not properly configured.
 
 ### Stdio Issues
 
