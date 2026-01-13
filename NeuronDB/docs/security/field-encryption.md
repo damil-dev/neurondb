@@ -99,3 +99,4 @@ Encrypted vectors are stored as BYTEA containing the `EncryptedVector` structure
 - [Security Overview](overview.md)
 - [RLS for Embeddings](rls-embeddings.md)
 - [Audit Logging](audit-logging.md)
+
