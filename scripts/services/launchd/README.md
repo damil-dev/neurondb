@@ -221,3 +221,4 @@ macOS automatically rotates logs, but you can configure log rotation by:
 - RunAtLoad=true starts the service immediately when loaded
 - Environment variables in plist files are limited; consider using wrapper scripts for complex configurations
 
+

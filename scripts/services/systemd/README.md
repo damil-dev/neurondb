@@ -172,3 +172,4 @@ sudo chown -R neurondb:neurondb /opt/neurondb
 sudo chmod 600 /etc/neurondb/*.env
 ```
 
+

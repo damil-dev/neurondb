@@ -140,3 +140,4 @@ JOIN quickstart_documents d ON dc.doc_id = d.id
 ORDER BY dc.doc_id, dc.chunk_index
 LIMIT 10;
 
+

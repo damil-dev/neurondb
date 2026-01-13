@@ -144,3 +144,4 @@ ON quickstart_documents USING hnsw (embedding vector_cosine_ops)
 INCLUDE (id, title);  -- Covering columns
 */
 
+

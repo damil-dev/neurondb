@@ -83,3 +83,4 @@ WHERE d.embedding IS NOT NULL
 ORDER BY q.query_text, similarity DESC
 LIMIT 5;
 
+

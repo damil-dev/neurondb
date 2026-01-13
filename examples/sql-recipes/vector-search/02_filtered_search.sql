@@ -116,3 +116,4 @@ WHERE embedding IS NOT NULL
   AND (1 - (embedding <=> query_vector.query_emb)) > 0.6  -- Similarity threshold
 ORDER BY embedding <=> query_vector.query_emb;
 
+

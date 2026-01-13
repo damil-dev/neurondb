@@ -26,3 +26,4 @@ class MCPToolError(MCPError):
         self.code = code
         super().__init__(self.message)
 
+
