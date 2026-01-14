@@ -196,7 +196,7 @@ SELECT neurondb_set_model_key('text-embedding-3-small', 'sk-your-api-key');
 SELECT * FROM neurondb.v_llm_models_ready;
 ```
 
-**For complete documentation**, see [NEURONDB_MCP_SETUP.md](docs/NEURONDB_MCP_SETUP.md)
+**For complete documentation**, see [neurondb_mcp_setup.md](docs/neurondb_mcp_setup.md)
 
 ### Configuration
 
@@ -269,7 +269,7 @@ cd docker
 docker compose up -d
 ```
 
-See [Docker Guide](docker/readme.md) for Docker deployment details.
+See [Docker Guide](docker/README.md) for Docker deployment details.
 
 #### Running as a Service
 
@@ -349,7 +349,7 @@ NeuronMCP provides comprehensive tools covering all NeuronDB capabilities:
 | **PostgreSQL (27 tools)** | Complete PostgreSQL administration: `postgresql_version`, `postgresql_stats`, `postgresql_databases`, `postgresql_connections`, `postgresql_locks`, `postgresql_replication`, `postgresql_settings`, `postgresql_extensions`, `postgresql_tables`, `postgresql_indexes`, `postgresql_schemas`, `postgresql_views`, `postgresql_sequences`, `postgresql_functions`, `postgresql_triggers`, `postgresql_constraints`, `postgresql_users`, `postgresql_roles`, `postgresql_permissions`, `postgresql_table_stats`, `postgresql_index_stats`, `postgresql_active_queries`, `postgresql_wait_events`, `postgresql_table_size`, `postgresql_index_size`, `postgresql_bloat`, `postgresql_vacuum_stats` |
 
 **Comprehensive Documentation:**
-- **[TOOLS_REFERENCE.md](TOOLS_REFERENCE.md)** - Complete reference for all 100+ tools with parameters, examples, and error codes
+- **[REGISTERED_TOOLS.md](REGISTERED_TOOLS.md)** - Complete reference for all 100+ tools with parameters, examples, and error codes
 - **[POSTGRESQL_TOOLS.md](POSTGRESQL_TOOLS.md)** - Detailed documentation for all 27 PostgreSQL administration tools
 
 For a comprehensive catalog of all tools and resources, see [docs/tool-resource-catalog.md](docs/tool-resource-catalog.md).
@@ -580,7 +580,7 @@ docker run -i --rm \
 
 | Document | Description |
 |----------|-------------|
-| [Docker Guide](docker/readme.md) | Container deployment guide |
+| [Docker Guide](docker/README.md) | Container deployment guide |
 | [MCP Specification](https://modelcontextprotocol.io/) | Model Context Protocol documentation |
 | [Claude Desktop Config Examples](claude_desktop_config.json) | Example configurations for macOS, Linux, and Windows |
 
@@ -601,7 +601,7 @@ NeuronMCP requires:
 - Database user with appropriate permissions
 - Access to NeuronDB vector search, ML, and embedding functions
 
-See [NeuronDB documentation](../NeuronDB/readme.md) for installation instructions.
+See [NeuronDB documentation](../NeuronDB/README.md) for installation instructions.
 
 ## Troubleshooting
 
@@ -673,7 +673,7 @@ env | grep -E "^NEURONDB_"
 
 ## Support
 
-- **Documentation**: [Component Documentation](../readme.md)
+- **Documentation**: [Component Documentation](../README.md)
 - **GitHub Issues**: [Report Issues](https://github.com/neurondb/NeurondB/issues)
 - **Email**: support@neurondb.ai
 

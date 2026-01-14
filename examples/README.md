@@ -80,7 +80,7 @@ Complete working example for semantic search over document collections.
 
 **Files:**
 - `semantic_search.py` - Complete working implementation
-- `readme.md` - Detailed documentation
+- `README.md` - Detailed documentation
 
 **Quick Start:**
 ```bash
@@ -112,7 +112,7 @@ Full RAG (Retrieval-Augmented Generation) chatbot over PDF documents.
 
 **Files:**
 - `rag_chatbot.py` - Complete RAG implementation
-- `readme.md` - Usage guide
+- `README.md` - Usage guide
 
 **Quick Start:**
 ```bash
@@ -148,7 +148,7 @@ NeuronAgent with multiple tools (SQL, HTTP, custom tools).
 - Error handling
 
 **Files:**
-- `readme.md` - Setup and examples
+- `README.md` - Setup and examples
 
 **Coming Soon:**
 Complete implementation with working agent examples.
@@ -168,7 +168,7 @@ Model Context Protocol integration examples.
 **Files:**
 - `claude_desktop_config.json` - Claude Desktop setup
 - `test_mcp_connection.py` - Connection testing
-- `readme.md` - Complete guide
+- `README.md` - Complete guide
 
 **Quick Start:**
 ```bash
@@ -559,32 +559,32 @@ psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -c "SELECT 1;"
 
 ```
 examples/
-├── readme.md                          # This file
+├── README.md                          # This file
 │
 ├── semantic-search-docs/              # ✅ Complete working example
 │   ├── semantic_search.py
-│   └── readme.md
+│   └── README.md
 │
 ├── rag-chatbot-pdfs/                  # ✅ Complete working example  
 │   ├── rag_chatbot.py
-│   └── readme.md
+│   └── README.md
 │
 ├── agent-tools/                       # 📋 Documentation + samples
-│   └── readme.md
+│   └── README.md
 │
 ├── mcp-integration/                   # 📋 Configuration examples
-│   └── readme.md
+│   └── README.md
 │
 ├── data_loading/                      # ✅ Complete working example
 │   ├── load_huggingface_dataset.py
-│   └── readme.md (to be created)
+│   └── README.md (to be created)
 │
 └── llm_training/                      # ✅ Complete working example
     ├── train_postgres_llm.py
     ├── export_to_ollama.sh
     ├── start_custom_llm_system.sh
     ├── stop_custom_llm_system.sh
-    └── readme.md (to be created)
+    └── README.md (to be created)
 ```
 
 ---
@@ -592,15 +592,15 @@ examples/
 ## 🔗 Related Documentation
 
 ### Core Documentation
-- **[Scripts README](../scripts/readme.md)** - Production scripts
-- **[Main README](../readme.md)** - Project overview
+- **[Scripts README](../scripts/README.md)** - Production scripts
+- **[Main README](../README.md)** - Project overview
 - **[Quick Start](../QUICKSTART.md)** - Getting started
 
 ### Component Documentation
-- **[NeuronDB](../NeuronDB/readme.md)** - Database extension
-- **[NeuronAgent](../NeuronAgent/readme.md)** - Agent runtime
-- **[NeuronMCP](../NeuronMCP/readme.md)** - MCP server
-- **[NeuronDesktop](../NeuronDesktop/readme.md)** - Web interface
+- **[NeuronDB](../NeuronDB/README.md)** - Database extension
+- **[NeuronAgent](../NeuronAgent/README.md)** - Agent runtime
+- **[NeuronMCP](../NeuronMCP/README.md)** - MCP server
+- **[NeuronDesktop](../NeuronDesktop/README.md)** - Web interface
 
 ### Advanced Guides
 - **[RAG Playbook](../NeuronDB/docs/rag/playbook.md)** - Complete RAG guidance
@@ -615,7 +615,7 @@ Want to add your own example?
 
 1. Create a new directory in `examples/`
 2. Include a working Python script or application
-3. Add a comprehensive readme.md
+3. Add a comprehensive README.md
 4. Include requirements.txt
 5. Test thoroughly
 6. Submit a pull request
@@ -623,7 +623,7 @@ Want to add your own example?
 **Example Template:**
 ```
 my-example/
-├── readme.md           # Explain what it does, prerequisites, usage
+├── README.md           # Explain what it does, prerequisites, usage
 ├── example.py          # Complete working code
 ├── requirements.txt    # Python dependencies
 └── sample_data/        # Optional sample data

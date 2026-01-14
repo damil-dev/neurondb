@@ -12,7 +12,7 @@ examples_modular/
 ├── 04_streaming.py             # WebSocket streaming
 ├── 05_production_patterns.py   # Reliability patterns
 ├── 06_advanced_agent_management.py  # Advanced agent operations
-└── readme.md                   # This file
+└── README.md                   # This file
 ```
 
 ## Client Library Structure
@@ -227,7 +227,7 @@ api_key = loader.get_env("NEURONAGENT_API_KEY")
 
 ## Next Steps
 
-- Read the [main README](../readme.md) for API documentation
+- Read the [main README](../README.md) for API documentation
 - Check [QUICKSTART.md](../QUICKSTART.md) for quick setup
 - Explore the client library source code
 - Build your own custom agents!

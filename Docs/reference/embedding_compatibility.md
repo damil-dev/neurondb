@@ -1,6 +1,18 @@
 # Embedding Compatibility Guide
 
-Supported vector dimensions, storage layout, memory behavior, limits, and performance characteristics for NeuronDB embeddings.
+<div align="center">
+
+**Vector dimensions, storage layout, memory behavior, and performance characteristics**
+
+[![Reference](https://img.shields.io/badge/reference-complete-brightgreen)](.)
+[![Dimensions](https://img.shields.io/badge/dimensions-1--16K-blue)](.)
+
+</div>
+
+---
+
+> [!NOTE]
+> This guide covers embedding compatibility, storage, and performance. Use it to plan your vector dimensions and storage requirements.
 
 ## Supported Vector Dimensions
 
@@ -235,10 +247,23 @@ REINDEX INDEX documents_embedding_idx;
 | **Memory per 1M vectors** | ~520 MB | ~1.5 GB | ~3.1 GB | ~6.2 GB |
 | **Recommended use** | High QPS | General | Quality | Highest quality |
 
-## Related Documentation
+---
 
-- [Vector Types](../../NeuronDB/docs/vector-search/vector-types.md) - Vector type details
-- [Embedding Generation](../../NeuronDB/docs/ml-embeddings/embedding-generation.md) - How to generate embeddings
-- [Indexing Guide](../../NeuronDB/docs/vector-search/indexing.md) - Index configuration
-- [Performance Tuning](../../NeuronDB/docs/configuration.md) - Performance optimization
+## 🔗 Related Documentation
+
+| Document | Description |
+|----------|-------------|
+| **[Vector Types](../../NeuronDB/docs/vector-search/vector-types.md)** | Vector type details |
+| **[Data Types Reference](data-types.md)** | Complete data types reference |
+| **[Embedding Generation](../../NeuronDB/docs/ml-embeddings/embedding-generation.md)** | How to generate embeddings |
+| **[Indexing Guide](../../NeuronDB/docs/vector-search/indexing.md)** | Index configuration |
+| **[Performance Tuning](../../NeuronDB/docs/configuration.md)** | Performance optimization |
+
+---
+
+<div align="center">
+
+[⬆ Back to Top](#embedding-compatibility-guide) · [📚 Reference Index](README.md) · [📚 Main Documentation](../../README.md)
+
+</div>
 

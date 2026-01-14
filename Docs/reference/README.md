@@ -19,9 +19,9 @@
 |----------|-------------|--------|
 | **[Glossary](glossary.md)** | Terminology and definitions | ✅ Complete |
 | **[Data Types](data-types.md)** | Complete data types reference with C structures | ✅ Complete |
-| **[Top Functions](TOP_FUNCTIONS.md)** | Most commonly used SQL functions | ✅ Complete |
-| **[API Stability](API_STABILITY.md)** | API stability and versioning policy | ✅ Complete |
-| **[Embedding Compatibility](EMBEDDING_COMPATIBILITY.md)** | Embedding model compatibility guide | ✅ Complete |
+| **[Top Functions](top_functions.md)** | Most commonly used SQL functions | ✅ Complete |
+| **[API Stability](api_stability.md)** | API stability and versioning policy | ✅ Complete |
+| **[Embedding Compatibility](embedding_compatibility.md)** | Embedding model compatibility guide | ✅ Complete |
 
 ---
 
@@ -69,7 +69,7 @@
 <details>
 <summary><strong>🔌 MCP Protocol Tools</strong></summary>
 
-- **[Tools Reference](../../NeuronMCP/TOOLS_REFERENCE.md)** - All 100+ MCP tools
+- **[Tools Reference](../../NeuronMCP/REGISTERED_TOOLS.md)** - All 100+ MCP tools
   - ✅ Vector operations (50+ tools)
   - ✅ Embedding functions
   - ✅ Hybrid search operations

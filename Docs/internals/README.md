@@ -29,7 +29,7 @@
 
 | Component | Documentation | Description |
 |-----------|---------------|-------------|
-| **NeuronAgent** | `NeuronAgent/docs/DEPLOYMENT.md` | Production deployment |
+| **NeuronAgent** | `NeuronAgent/docs/deployment.md` | Production deployment |
 | **NeuronDesktop** | `NeuronDesktop/docs/` | Desktop deployment |
 | **Security** | `SECURITY.md` | Security overview |
 | **Docker** | `dockers/README.md` and `docker-compose.yml` | Docker orchestration |
@@ -55,7 +55,7 @@
 | **NeuronDB SQL** | `NeuronDB/neurondb--1.0.sql` | Extension SQL definitions |
 | **NeuronDB API** | `NeuronDB/docs/sql-api.md` | Generated API reference |
 | **NeuronAgent** | `NeuronAgent/openapi/openapi.yaml` | OpenAPI 3.0 specification |
-| **NeuronMCP** | `NeuronMCP/TOOLS_REFERENCE.md` | Tools reference |
+| **NeuronMCP** | `NeuronMCP/REGISTERED_TOOLS.md` | Tools reference |
 
 ### 💻 Development
 

@@ -175,7 +175,7 @@ Deprecated functions include:
 - `set_llm_config(provider, api_key, endpoint)`
 - `get_llm_config()`
 
-*See [Top 20 Functions](TOP_FUNCTIONS.md) for commonly used stable APIs.*
+*See [Top 20 Functions](top_functions.md) for commonly used stable APIs.*
 
 ## Extension Upgrade Path
 
@@ -276,7 +276,7 @@ SELECT vector_l2_distance_gpu(a, b);  -- Experimental
 
 ## Related Documentation
 
-- [Top 20 Functions](TOP_FUNCTIONS.md) - Most commonly used functions
+- [Top 20 Functions](top_functions.md) - Most commonly used functions
 - [SQL API Reference](../../NeuronDB/docs/sql-api.md) - Complete API documentation
 - [CHANGELOG](../../CHANGELOG.md) - Version history and changes
 - [Upgrade Guide](../../NeuronDB/docs/operations/playbook.md#upgrades) - Upgrade procedures

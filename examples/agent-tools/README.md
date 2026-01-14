@@ -96,9 +96,9 @@ Allows agent to call external APIs:
 
 ## Related Documentation
 
-- [NeuronAgent API](../../NeuronAgent/docs/API.md) - Complete API reference
-- [NeuronAgent Architecture](../../NeuronAgent/docs/ARCHITECTURE.md) - System design
-- [Tool Registry](../../NeuronAgent/readme.md#tool-registry) - Tool configuration
+- [NeuronAgent API](../../NeuronAgent/docs/api.md) - Complete API reference
+- [NeuronAgent Architecture](../../NeuronAgent/docs/architecture.md) - System design
+- [Tool Registry](../../NeuronAgent/README.md#tool-registry) - Tool configuration
 
 
 

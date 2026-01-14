@@ -775,7 +775,7 @@ NeuronAgent already has a solid foundation:
 
 ## References
 
-- [NeuronAgent Architecture](docs/ARCHITECTURE.md)
+- [NeuronAgent Architecture](docs/architecture.md)
 - [NeuronAgent API Documentation](docs/API.md)
 - [NeuronDB Documentation](../NeuronDB/README.md)
 - [NeuronDB Technology Roadmap](../NeuronDB/docs/TECHNOLOGY_ROADMAP.md)

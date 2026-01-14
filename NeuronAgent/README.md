@@ -129,7 +129,7 @@ export DB_PASSWORD=neurondb
 export SERVER_PORT=8080
 ```
 
-See [Deployment Guide](docs/DEPLOYMENT.md) for complete configuration options.
+See [Deployment Guide](docs/deployment.md) for complete configuration options.
 
 ### Run Service
 
@@ -182,7 +182,7 @@ cd docker
 docker compose up -d
 ```
 
-See [Docker Guide](docker/readme.md) for Docker deployment details.
+See [Docker Guide](docker/README.md) for Docker deployment details.
 
 #### Running as a Service
 
@@ -350,9 +350,9 @@ ws.onmessage = (event) => {
 | Document | Description |
 |----------|-------------|
 | [API Reference](docs/API.md) | Complete REST API documentation |
-| [Architecture](docs/ARCHITECTURE.md) | System design and structure |
-| [Deployment Guide](docs/DEPLOYMENT.md) | Production deployment instructions |
-| [Docker Guide](docker/readme.md) | Container deployment guide |
+| [Architecture](docs/architecture.md) | System design and structure |
+| [Deployment Guide](docs/deployment.md) | Production deployment instructions |
+| [Docker Guide](docker/README.md) | Container deployment guide |
 
 ## System Requirements
 
@@ -371,7 +371,7 @@ NeuronAgent requires:
 - Database user with appropriate permissions
 - Access to NeuronDB vector search and embedding functions
 
-See [NeuronDB documentation](../NeuronDB/readme.md) for installation instructions.
+See [NeuronDB documentation](../NeuronDB/README.md) for installation instructions.
 
 ## Security
 
@@ -381,7 +381,7 @@ See [NeuronDB documentation](../NeuronDB/readme.md) for installation instruction
 - Supports TLS/SSL for encrypted connections
 - Non-root user in Docker containers
 
-See [Deployment Guide](docs/DEPLOYMENT.md) for security best practices.
+See [Deployment Guide](docs/deployment.md) for security best practices.
 
 ## Troubleshooting
 
@@ -437,7 +437,7 @@ curl -H "Authorization: Bearer YOUR_API_KEY" \
 
 ## Support
 
-- **Documentation**: [Component Documentation](../readme.md)
+- **Documentation**: [Component Documentation](../README.md)
 - **GitHub Issues**: [Report Issues](https://github.com/neurondb/NeurondB/issues)
 - **Email**: support@neurondb.ai
 

@@ -216,7 +216,7 @@ The model name you use in NeuronAgent must match the model identifier configured
 
 ## More Information
 
-- [NeuronAgent README](../NeuronAgent/readme.md)
-- [NeuronAgent API Documentation](../NeuronAgent/docs/API.md)
-- [NeuronAgent Architecture](../NeuronAgent/docs/ARCHITECTURE.md)
+- [NeuronAgent README](../NeuronAgent/README.md)
+- [NeuronAgent API Documentation](../NeuronAgent/docs/api.md)
+- [NeuronAgent Architecture](../NeuronAgent/docs/architecture.md)
 

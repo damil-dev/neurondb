@@ -221,7 +221,7 @@ NeuronDesktop/
 │   └── Dockerfile          # Docker image
 ├── docs/                   # Documentation
 │   ├── API.md             # API documentation
-│   └── DEPLOYMENT.md      # Deployment guide
+│   └── deployment.md      # Deployment guide
 └── docker-compose.yml      # Docker Compose configuration
 ```
 
@@ -309,7 +309,7 @@ npm test
 
 ## Deployment
 
-See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for detailed deployment instructions.
+See [docs/deployment.md](docs/deployment.md) for detailed deployment instructions.
 
 ### Deployment checklist
 

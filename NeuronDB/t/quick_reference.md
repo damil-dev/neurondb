@@ -134,7 +134,7 @@ ls -1 t/*.t | nl -v0 -w3 -s'. '
 
 ## 📚 Documentation Files
 
-- `readme.md` - Complete test suite documentation
+- `README.md` - Complete test suite documentation
 - `FINAL_SUMMARY.md` - Detailed summary and statistics
 - `QUICK_REFERENCE.md` - This quick reference (you are here)
 

@@ -544,7 +544,7 @@ See the `examples_modular/` directory for complete working examples:
 ## Support
 
 For issues or questions:
-- Check the [main README](../readme.md)
+- Check the [main README](../README.md)
 - Review [API documentation](../docs/API.md)
 - See example code in `examples_modular/`
 
