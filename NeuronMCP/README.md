@@ -11,6 +11,12 @@ Model Context Protocol server for NeuronDB PostgreSQL extension, implemented in 
 
 NeuronMCP implements the Model Context Protocol using JSON-RPC 2.0 over stdio. It provides tools and resources for MCP clients to interact with NeuronDB, including vector operations, ML model training, and database schema management.
 
+## Documentation
+
+- **[Features](docs/features.md)** - Complete feature list and capabilities
+- **[Tool & Resource Catalog](docs/tool-resource-catalog.md)** - Complete catalog of all tools and resources
+- **[Setup Guide](setup_guide.md)** - Setup and configuration guide
+
 ## Tool Registration Modes
 
 ### Claude Desktop Compatibility
@@ -98,7 +104,7 @@ The official documentation provides:
 | **Vector Operations** | 50+ tools for vector search (L2, cosine, inner product), embedding generation, indexing (HNSW, IVF), quantization (int8, fp16, binary, uint8, ternary, int4), and 7+ distance metrics |
 | **ML Tools** | Complete ML pipeline: training (52+ algorithms), prediction, evaluation, AutoML, ONNX model support, time series analysis, and analytics |
 | **RAG Operations** | Document processing, context retrieval, response generation with multiple reranking methods (cross-encoder, LLM, Cohere, ColBERT, LTR, ensemble) |
-| **PostgreSQL Tools** | 27 comprehensive PostgreSQL administration tools for version, stats, databases, connections, locks, replication, settings, extensions, tables, indexes, schemas, views, sequences, functions, triggers, constraints, users, roles, permissions, table/index stats, active queries, wait events, sizes, bloat, and vacuum stats |
+| **PostgreSQL Tools** | 100+ comprehensive PostgreSQL tools providing complete database control: DDL (CREATE/ALTER/DROP for databases, schemas, tables, indexes, views, functions, triggers, sequences, types, domains), DML (INSERT, UPDATE, DELETE, TRUNCATE, COPY), DCL (GRANT/REVOKE), user/role management, backup/restore, materialized views, partitioning, foreign tables, security validation, and full administration capabilities |
 | **Dataset Loading** | Load datasets from HuggingFace, URLs, GitHub, S3, and local files with automatic schema detection, embedding generation, and index creation |
 | **Resources** | Schema, models, indexes, config, workers, stats with real-time subscriptions |
 | **Prompts Protocol** | Full prompts/list and prompts/get with template engine |
@@ -196,7 +202,7 @@ SELECT neurondb_set_model_key('text-embedding-3-small', 'sk-your-api-key');
 SELECT * FROM neurondb.v_llm_models_ready;
 ```
 
-**For complete documentation**, see [neurondb_mcp_setup.md](docs/neurondb_mcp_setup.md)
+**For complete documentation**, see [neurondb-mcp-setup.md](docs/neurondb-mcp-setup.md)
 
 ### Configuration
 
@@ -269,7 +275,7 @@ cd docker
 docker compose up -d
 ```
 
-See [Docker Guide](docker/README.md) for Docker deployment details.
+See [Docker Guide](docker/readme.md) for Docker deployment details.
 
 #### Running as a Service
 
@@ -346,11 +352,11 @@ NeuronMCP provides comprehensive tools covering all NeuronDB capabilities:
 | **Vector Graph** | `vector_graph` (BFS, DFS, PageRank, community detection) |
 | **Vecmap Operations** | `vecmap_operations` (distances, arithmetic, norm on sparse vectors) |
 | **Dataset Loading** | `load_dataset` (HuggingFace, URLs, GitHub, S3, local files with auto-embedding) |
-| **PostgreSQL (27 tools)** | Complete PostgreSQL administration: `postgresql_version`, `postgresql_stats`, `postgresql_databases`, `postgresql_connections`, `postgresql_locks`, `postgresql_replication`, `postgresql_settings`, `postgresql_extensions`, `postgresql_tables`, `postgresql_indexes`, `postgresql_schemas`, `postgresql_views`, `postgresql_sequences`, `postgresql_functions`, `postgresql_triggers`, `postgresql_constraints`, `postgresql_users`, `postgresql_roles`, `postgresql_permissions`, `postgresql_table_stats`, `postgresql_index_stats`, `postgresql_active_queries`, `postgresql_wait_events`, `postgresql_table_size`, `postgresql_index_size`, `postgresql_bloat`, `postgresql_vacuum_stats` |
+| **PostgreSQL (100+ tools)** | Complete PostgreSQL control: **DDL** (CREATE/ALTER/DROP for databases, schemas, tables, indexes, views, functions, triggers, sequences, types, domains, materialized views, partitions, foreign tables), **DML** (INSERT, UPDATE, DELETE, TRUNCATE, COPY), **DCL** (GRANT/REVOKE), **User/Role Management** (CREATE/ALTER/DROP USER/ROLE), **Backup/Recovery** (pg_dump/pg_restore), **Security** (SQL validation, permission checking, audit), plus all administration, monitoring, and statistics tools |
 
 **Comprehensive Documentation:**
-- **[REGISTERED_TOOLS.md](REGISTERED_TOOLS.md)** - Complete reference for all 100+ tools with parameters, examples, and error codes
-- **[POSTGRESQL_TOOLS.md](POSTGRESQL_TOOLS.md)** - Detailed documentation for all 27 PostgreSQL administration tools
+- **[TOOLS_REFERENCE.md](TOOLS_REFERENCE.md)** - Complete reference for all 100+ tools with parameters, examples, and error codes
+- **[POSTGRESQL_TOOLS.md](POSTGRESQL_TOOLS.md)** - Detailed documentation for all PostgreSQL tools (100+ tools covering DDL, DML, DCL, administration, backup, security)
 
 For a comprehensive catalog of all tools and resources, see [docs/tool-resource-catalog.md](docs/tool-resource-catalog.md).
 
@@ -580,7 +586,7 @@ docker run -i --rm \
 
 | Document | Description |
 |----------|-------------|
-| [Docker Guide](docker/README.md) | Container deployment guide |
+| [Docker Guide](docker/readme.md) | Container deployment guide |
 | [MCP Specification](https://modelcontextprotocol.io/) | Model Context Protocol documentation |
 | [Claude Desktop Config Examples](claude_desktop_config.json) | Example configurations for macOS, Linux, and Windows |
 
@@ -601,7 +607,7 @@ NeuronMCP requires:
 - Database user with appropriate permissions
 - Access to NeuronDB vector search, ML, and embedding functions
 
-See [NeuronDB documentation](../NeuronDB/README.md) for installation instructions.
+See [NeuronDB documentation](../NeuronDB/readme.md) for installation instructions.
 
 ## Troubleshooting
 
@@ -673,7 +679,7 @@ env | grep -E "^NEURONDB_"
 
 ## Support
 
-- **Documentation**: [Component Documentation](../README.md)
+- **Documentation**: [Component Documentation](../readme.md)
 - **GitHub Issues**: [Report Issues](https://github.com/neurondb/NeurondB/issues)
 - **Email**: support@neurondb.ai
 
