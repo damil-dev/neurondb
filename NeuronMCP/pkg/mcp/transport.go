@@ -3,7 +3,7 @@
  * transport.go
  *    Database operations
  *
- * Copyright (c) 2024-2026, neurondb, Inc. <admin@neurondb.com>
+ * Copyright (c) 2024-2026, neurondb, Inc. <support@neurondb.ai>
  *
  * IDENTIFICATION
  *    NeuronMCP/pkg/mcp/transport.go
@@ -140,6 +140,12 @@ func (t *StdioTransport) ReadMessage() (*JSONRPCRequest, error) {
 
 /* WriteMessage writes a JSON-RPC message to stdout */
 func (t *StdioTransport) WriteMessage(resp *JSONRPCResponse) error {
+	if t == nil {
+		return fmt.Errorf("transport is nil")
+	}
+	if t.stdout == nil {
+		return fmt.Errorf("stdout writer is nil")
+	}
 	if resp == nil {
 		return fmt.Errorf("cannot write nil response")
 	}
@@ -148,21 +154,28 @@ func (t *StdioTransport) WriteMessage(resp *JSONRPCResponse) error {
 	if err != nil {
 		return fmt.Errorf("failed to serialize response: %w", err)
 	}
+	if data == nil || len(data) == 0 {
+		return fmt.Errorf("serialized response is empty")
+	}
 
-  /* WORKAROUND: Claude Desktop appears to have issues parsing Content-Length headers in responses
-   * Even though it sends requests with headers, it expects responses without headers
-   * This is a known issue with some MCP clients - always respond without headers for compatibility
-   * TODO: This should be fixed in Claude Desktop to properly support MCP spec
+  /* MCP Protocol Header Handling:
+   * The MCP specification requires Content-Length headers for proper message framing.
+   * This implementation automatically detects whether the client uses headers by examining
+   * the first line of incoming requests. If the client sends Content-Length headers,
+   * we respond with headers. If the client sends direct JSON, we respond with direct JSON.
+   * 
+   * Environment Variable Override:
+   * NEURONMCP_FORCE_NO_HEADERS=true can be set to force headerless mode for compatibility
+   * with older clients that don't support the full MCP specification.
+   * 
+   * Note: Claude Desktop and other modern MCP clients properly support Content-Length headers
+   * per the MCP specification. The automatic detection ensures compatibility with both
+   * standard-compliant and legacy clients.
    */
 	forceNoHeaders := os.Getenv("NEURONMCP_FORCE_NO_HEADERS") == "true"
 	
-  /* IMPORTANT: Claude Desktop sends requests with Content-Length headers
-   * Per MCP spec, we should respond with headers when client uses headers
-   * Previous assumption that Claude Desktop can't parse headers was incorrect
-   * Always match the client's header usage for proper MCP protocol compliance
-   */
 	if forceNoHeaders {
-		/* Only disable headers if explicitly forced */
+		/* Only disable headers if explicitly forced via environment variable */
 		t.clientUsesHeaders = false
 	}
 	
@@ -174,13 +187,13 @@ func (t *StdioTransport) WriteMessage(resp *JSONRPCResponse) error {
 		
     /* Write header first, then body, then flush */
 		if _, err := t.stdout.Write(headerBytes); err != nil {
-			return fmt.Errorf("failed to write header: %w", err)
+			return fmt.Errorf("failed to write header (data_length=%d): %w", len(data), err)
 		}
 	}
 	
   /* Write JSON body */
 	if _, err := t.stdout.Write(data); err != nil {
-		return fmt.Errorf("failed to write body: %w", err)
+		return fmt.Errorf("failed to write body (data_length=%d, using_headers=%v): %w", len(data), t.clientUsesHeaders, err)
 	}
 	
   /* When sending without headers (direct JSON), add a newline for compatibility

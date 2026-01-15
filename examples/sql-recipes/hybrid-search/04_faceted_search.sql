@@ -194,3 +194,5 @@ FROM faceted_results
 ORDER BY boosted_score DESC
 LIMIT 10;
 
+
+

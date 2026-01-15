@@ -137,6 +137,26 @@ pip install datasets huggingface-hub
 chmod +x internal/tools/dataset_loader.py
 ```
 
+### Issue: Embeddings Returning Zeros
+
+**Root Cause**: The embedding API key is not configured in PostgreSQL.
+
+**Solution**: Set the API key in PostgreSQL:
+
+```sql
+-- For Hugging Face API
+ALTER SYSTEM SET neurondb.llm_api_key = 'hf_your_token_here';
+SELECT pg_reload_conf();
+
+-- Verify
+SELECT current_setting('neurondb.llm_api_key', true);
+
+-- Test embedding
+SELECT embed_text('test text')::text;
+```
+
+**For SQL-based testing**, see [test_embeddings.sql](../../examples/data_loading/test_embeddings.sql)
+
 ## Updating Dependencies
 
 ```bash
@@ -150,4 +170,5 @@ pip install --upgrade -r requirements.txt
 ```bash
 deactivate
 ```
+
 

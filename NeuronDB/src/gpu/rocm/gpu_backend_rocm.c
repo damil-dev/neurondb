@@ -1196,10 +1196,40 @@ static const ndb_gpu_backend ndb_rocm_backend = {
 	.hf_rerank = ndb_rocm_hf_rerank,
 	.hf_vision_complete = NULL,
 
-	.hnsw_search = NULL, /* TODO: Implement ROCm HNSW search */
-	.hnsw_search_batch = NULL, /* TODO: Implement ROCm batch HNSW search */
-	.ivf_search = NULL, /* TODO: Implement ROCm IVF search */
-	.ivf_search_batch = NULL, /* TODO: Implement ROCm batch IVF search */
+	/*
+	 * TODO: Implement ROCm HNSW search.
+	 * This function should perform HNSW (Hierarchical Navigable Small World)
+	 * graph search on AMD GPUs using HIP. The implementation should traverse
+	 * the multi-layer graph structure starting from the entry point, using
+	 * greedy search at each level to find approximate nearest neighbors.
+	 * See gpu_hnsw.c for reference implementation patterns.
+	 */
+	.hnsw_search = NULL,
+	/*
+	 * TODO: Implement ROCm batch HNSW search.
+	 * This function should perform batch HNSW searches for multiple query
+	 * vectors in parallel on AMD GPUs. The implementation should leverage
+	 * HIP's parallel execution model to process multiple queries concurrently,
+	 * improving throughput for batch workloads.
+	 */
+	.hnsw_search_batch = NULL,
+	/*
+	 * TODO: Implement ROCm IVF search.
+	 * This function should perform IVF (Inverted File) index search on AMD
+	 * GPUs using HIP. The implementation should: (1) Find the nearest
+	 * centroids using the query vector, (2) Search within the selected lists
+	 * for nearest neighbors, (3) Return top-k results. See gpu_ivf.c for
+	 * reference implementation.
+	 */
+	.ivf_search = NULL,
+	/*
+	 * TODO: Implement ROCm batch IVF search.
+	 * This function should perform batch IVF searches for multiple query
+	 * vectors in parallel on AMD GPUs. The implementation should process
+	 * multiple queries concurrently, sharing centroid distance computations
+	 * where possible for efficiency.
+	 */
+	.ivf_search_batch = NULL,
 
 	.stream_create = ndb_rocm_stream_create,
 	.stream_destroy = ndb_rocm_stream_destroy,

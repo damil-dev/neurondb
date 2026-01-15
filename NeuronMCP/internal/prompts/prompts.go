@@ -3,7 +3,7 @@
  * prompts.go
  *    Prompt management for NeuronMCP
  *
- * Copyright (c) 2024-2026, neurondb, Inc. <admin@neurondb.com>
+ * Copyright (c) 2024-2026, neurondb, Inc. <support@neurondb.ai>
  *
  * IDENTIFICATION
  *    NeuronMCP/internal/prompts/prompts.go
@@ -62,6 +62,16 @@ func NewManager(db *database.Database, logger *logging.Logger) *Manager {
 
 /* ListPrompts lists all available prompts */
 func (m *Manager) ListPrompts(ctx context.Context) ([]Prompt, error) {
+	if m == nil {
+		return nil, fmt.Errorf("prompts: manager instance is nil")
+	}
+	if m.db == nil {
+		return nil, fmt.Errorf("prompts: database instance is not initialized")
+	}
+	if ctx == nil {
+		return nil, fmt.Errorf("prompts: context cannot be nil")
+	}
+
 	query := `
 		SELECT 
 			prompt_id,
@@ -81,7 +91,7 @@ func (m *Manager) ListPrompts(ctx context.Context) ([]Prompt, error) {
 
 	rows, err := m.db.Query(ctx, query)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query prompts: %w", err)
+		return nil, fmt.Errorf("prompts: failed to query prompts: error=%w", err)
 	}
 	defer rows.Close()
 
@@ -113,10 +123,14 @@ func (m *Manager) ListPrompts(ctx context.Context) ([]Prompt, error) {
 			if err := json.Unmarshal(variablesJSON, &p.Variables); err != nil {
 				if m.logger != nil {
 					m.logger.Warn("Failed to unmarshal variables", map[string]interface{}{
-						"prompt_id": p.ID,
-						"error":     err.Error(),
+						"prompt_id":       p.ID,
+						"prompt_name":     p.Name,
+						"variables_json": string(variablesJSON),
+						"error":           err.Error(),
 					})
 				}
+				/* Continue with empty variables rather than failing */
+				p.Variables = []VariableDefinition{}
 			}
 		}
 
@@ -131,8 +145,29 @@ func (m *Manager) ListPrompts(ctx context.Context) ([]Prompt, error) {
 
 /* GetPrompt retrieves a prompt by name */
 func (m *Manager) GetPrompt(ctx context.Context, name string) (*Prompt, error) {
+	if m == nil {
+		return nil, fmt.Errorf("prompts: manager instance is nil")
+	}
+	if m.db == nil {
+		return nil, fmt.Errorf("prompts: database instance is not initialized")
+	}
+	if ctx == nil {
+		return nil, fmt.Errorf("prompts: context cannot be nil")
+	}
 	if name == "" {
-		return nil, fmt.Errorf("prompt name cannot be empty")
+		return nil, fmt.Errorf("prompts: prompt name cannot be empty")
+	}
+
+	/* Validate prompt name format and length */
+	if len(name) > 200 {
+		return nil, fmt.Errorf("prompts: prompt name too long: name_length=%d, max_length=200, name='%s'", len(name), name[:min(50, len(name))])
+	}
+
+	/* Validate prompt name doesn't contain control characters */
+	for _, char := range name {
+		if char < 32 && char != 9 && char != 10 && char != 13 { /* Allow tab, newline, carriage return */
+			return nil, fmt.Errorf("prompts: prompt name contains invalid control characters: name='%s'", name)
+		}
 	}
 
 	query := `
@@ -172,19 +207,23 @@ func (m *Manager) GetPrompt(ctx context.Context, name string) (*Prompt, error) {
 	)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			return nil, fmt.Errorf("prompt not found: %s", name)
+			return nil, fmt.Errorf("prompts: prompt not found: prompt_name='%s'", name)
 		}
-		return nil, fmt.Errorf("failed to get prompt: %w", err)
+		return nil, fmt.Errorf("prompts: failed to get prompt: prompt_name='%s', error=%w", name, err)
 	}
 
 	if len(variablesJSON) > 0 {
 		if err := json.Unmarshal(variablesJSON, &p.Variables); err != nil {
 			if m.logger != nil {
 				m.logger.Warn("Failed to unmarshal variables", map[string]interface{}{
-					"prompt_id": p.ID,
-					"error":     err.Error(),
+					"prompt_id":       p.ID,
+					"prompt_name":     p.Name,
+					"variables_json":  string(variablesJSON),
+					"error":           err.Error(),
 				})
 			}
+			/* Continue with empty variables rather than failing */
+			p.Variables = []VariableDefinition{}
 		}
 	}
 
@@ -196,19 +235,42 @@ func (m *Manager) GetPrompt(ctx context.Context, name string) (*Prompt, error) {
 
 /* RenderPrompt renders a prompt template with provided variables */
 func (m *Manager) RenderPrompt(ctx context.Context, name string, variables map[string]string) (string, error) {
+	if m == nil {
+		return "", fmt.Errorf("prompts: manager instance is nil")
+	}
+	if m.db == nil {
+		return "", fmt.Errorf("prompts: database instance is not initialized")
+	}
+	if ctx == nil {
+		return "", fmt.Errorf("prompts: context cannot be nil")
+	}
 	if name == "" {
-		return "", fmt.Errorf("prompt name cannot be empty")
+		return "", fmt.Errorf("prompts: prompt name cannot be empty")
+	}
+
+	/* Validate variables map */
+	if variables == nil {
+		variables = make(map[string]string)
 	}
 
 	prompt, err := m.GetPrompt(ctx, name)
 	if err != nil {
-		return "", fmt.Errorf("failed to get prompt '%s': %w", name, err)
+		return "", fmt.Errorf("prompts: failed to get prompt: prompt_name='%s', error=%w", name, err)
+	}
+
+	if prompt == nil {
+		return "", fmt.Errorf("prompts: GetPrompt returned nil: prompt_name='%s'", name)
 	}
 
 	if prompt.Template == "" {
-		return "", fmt.Errorf("prompt template is empty for prompt '%s'", name)
+		return "", fmt.Errorf("prompts: prompt template is empty: prompt_name='%s', prompt_id=%d", name, prompt.ID)
 	}
 
-	return RenderTemplate(prompt.Template, prompt.Variables, variables)
+	rendered, err := RenderTemplate(prompt.Template, prompt.Variables, variables)
+	if err != nil {
+		return "", fmt.Errorf("prompts: failed to render template: prompt_name='%s', prompt_id=%d, variable_count=%d, error=%w", name, prompt.ID, len(variables), err)
+	}
+
+	return rendered, nil
 }
 

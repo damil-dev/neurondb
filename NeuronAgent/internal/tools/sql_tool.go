@@ -3,7 +3,7 @@
  * sql_tool.go
  *    Tool implementation for NeuronMCP
  *
- * Copyright (c) 2024-2026, neurondb, Inc. <admin@neurondb.com>
+ * Copyright (c) 2024-2026, neurondb, Inc. <support@neurondb.ai>
  *
  * IDENTIFICATION
  *    NeuronAgent/internal/tools/sql_tool.go
@@ -91,7 +91,14 @@ func (t *SQLTool) Execute(ctx context.Context, tool *db.Tool, args map[string]in
 		/* This is more accurate than simple Contains() but still not perfect */
 		/* For production, a proper SQL parser would be better */
 		pattern := "\\b" + keyword + "\\b"
-		if matched, _ := regexp.MatchString(pattern, queryUpper); matched {
+		matched, err := regexp.MatchString(pattern, queryUpper)
+		if err != nil {
+			/* If regex compilation fails, fall back to simple string contains check */
+			/* This should rarely happen with our simple patterns, but handle gracefully */
+			if strings.Contains(queryUpper, " "+keyword+" ") {
+				foundKeywords = append(foundKeywords, keyword)
+			}
+		} else if matched {
 			foundKeywords = append(foundKeywords, keyword)
 		}
 	}
@@ -116,8 +123,16 @@ func (t *SQLTool) Execute(ctx context.Context, tool *db.Tool, args map[string]in
 	}
 
 	/* Apply data permissions: row filters and check permissions */
-	agentID, _ := GetAgentIDFromContext(ctx)
-	sessionID, _ := GetSessionIDFromContext(ctx)
+	agentID, agentOK := GetAgentIDFromContext(ctx)
+	if !agentOK {
+		/* Agent ID not available in context - use zero UUID */
+		agentID = uuid.Nil
+	}
+	sessionID, sessionOK := GetSessionIDFromContext(ctx)
+	if !sessionOK {
+		/* Session ID not available in context - use zero UUID */
+		sessionID = uuid.Nil
+	}
 
 	/* Try to extract schema and table name from query (simple case) */
 	schemaName, tableName := extractTableFromQuery(query)
@@ -227,9 +242,7 @@ func (t *SQLTool) Execute(ctx context.Context, tool *db.Tool, args map[string]in
 
 	resultStr := string(jsonResult)
 
-	/* Audit log SQL statement */
-	agentID, _ = GetAgentIDFromContext(ctx)
-	sessionID, _ = GetSessionIDFromContext(ctx)
+	/* Audit log SQL statement - use already extracted IDs from above */
 
 	outputs := map[string]interface{}{
 		"row_count":     rowCount,

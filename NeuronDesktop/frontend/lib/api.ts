@@ -27,7 +27,6 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
-    // Log error for debugging
     console.error('API Error:', {
       status: error.response?.status,
       statusText: error.response?.statusText,
@@ -426,13 +425,11 @@ const databaseTestApi = axios.create({
   withCredentials: false, // Don't send credentials for database test
 })
 
-// Log the API base URL for debugging
 if (typeof window !== 'undefined') {
   console.log('Database Test API Base URL:', API_BASE_URL)
   console.log('Full test endpoint URL:', API_BASE_URL + '/database/test')
 }
 
-// Add request interceptor for debugging
 databaseTestApi.interceptors.request.use(
   (config) => {
     console.log('Database test request:', {

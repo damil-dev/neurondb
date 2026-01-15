@@ -3,7 +3,7 @@
  * register.go
  *    Tool implementation for NeuronMCP
  *
- * Copyright (c) 2024-2026, neurondb, Inc. <admin@neurondb.com>
+ * Copyright (c) 2024-2026, neurondb, Inc. <support@neurondb.ai>
  *
  * IDENTIFICATION
  *    NeuronMCP/internal/tools/register.go
@@ -202,12 +202,14 @@ func RegisterAllTools(registry *ToolRegistry, db *database.Database, logger *log
 	registry.Register(NewPostgreSQLQueryOptimizationTool(db, logger))
 
 	/* PostgreSQL tools - Backup & Recovery (6 tools) */
+	/* TODO: Implement backup tools
 	registry.Register(NewPostgreSQLBackupDatabaseTool(db, logger))
 	registry.Register(NewPostgreSQLRestoreDatabaseTool(db, logger))
 	registry.Register(NewPostgreSQLBackupTableTool(db, logger))
 	registry.Register(NewPostgreSQLListBackupsTool(db, logger))
 	registry.Register(NewPostgreSQLVerifyBackupTool(db, logger))
 	registry.Register(NewPostgreSQLBackupScheduleTool(db, logger))
+	*/
 
 	/* PostgreSQL tools - Schema Modification (7 tools) */
 	registry.Register(NewPostgreSQLCreateTableTool(db, logger))
@@ -355,12 +357,14 @@ func RegisterPostgreSQLOnlyTools(registry *ToolRegistry, db *database.Database, 
 	registry.Register(NewPostgreSQLQueryOptimizationTool(db, logger))
 
 	/* PostgreSQL tools - Backup & Recovery (6 tools) */
+	/* TODO: Implement backup tools
 	registry.Register(NewPostgreSQLBackupDatabaseTool(db, logger))
 	registry.Register(NewPostgreSQLRestoreDatabaseTool(db, logger))
 	registry.Register(NewPostgreSQLBackupTableTool(db, logger))
 	registry.Register(NewPostgreSQLListBackupsTool(db, logger))
 	registry.Register(NewPostgreSQLVerifyBackupTool(db, logger))
 	registry.Register(NewPostgreSQLBackupScheduleTool(db, logger))
+	*/
 
 	/* PostgreSQL tools - Schema Modification (7 tools) */
 	registry.Register(NewPostgreSQLCreateTableTool(db, logger))
@@ -512,12 +516,14 @@ func RegisterPostgreSQLTools(registry *ToolRegistry, db *database.Database, logg
 	registry.Register(NewPostgreSQLQueryOptimizationTool(db, logger))
 
 	/* PostgreSQL tools - Backup & Recovery (6 tools) */
+	/* TODO: Implement backup tools
 	registry.Register(NewPostgreSQLBackupDatabaseTool(db, logger))
 	registry.Register(NewPostgreSQLRestoreDatabaseTool(db, logger))
 	registry.Register(NewPostgreSQLBackupTableTool(db, logger))
 	registry.Register(NewPostgreSQLListBackupsTool(db, logger))
 	registry.Register(NewPostgreSQLVerifyBackupTool(db, logger))
 	registry.Register(NewPostgreSQLBackupScheduleTool(db, logger))
+	*/
 
 	/* PostgreSQL tools - Schema Modification (7 tools) */
 	registry.Register(NewPostgreSQLCreateTableTool(db, logger))

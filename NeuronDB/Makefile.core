@@ -15,7 +15,7 @@
 
 MODULE_big = neurondb
 EXTENSION = neurondb
-DATA = neurondb--1.0.sql neurondb--2.0.sql neurondb--1.0--2.0.sql
+DATA = neurondb--1.0.sql neurondb--2.0.sql neurondb--3.0.sql neurondb--1.0--2.0.sql neurondb--2.0--3.0.sql
 DOCS = README.md
 
 PG_CPPFLAGS += -I$(srcdir)/include
@@ -304,11 +304,15 @@ ifndef ONNX_PATH
 	endif
 endif
 
-# Old CUDA/ROCm system (disabled when using modular GPU system)
+# Old CUDA/ROCm system (disabled when using modular GPU system or CPU-only mode)
+# Skip old system if GPU_MODE is explicitly set to "none" or GPU_BACKENDS is set to "none"
+ifeq ($(GPU_MODE),none)
+# CPU-only mode: skip old GPU detection
+else
 ifneq ($(GPU_BACKENDS),none)
 # Modular GPU system is active - skip old CUDA/ROCm
 else
-# Check for CUDA
+# Check for CUDA (only if not in CPU-only mode)
 ifdef CUDA_PATH
 	HAVE_CUDA := $(shell test -f $(CUDA_PATH)/include/cuda_runtime.h && echo "yes" || echo "no")
 	ifeq ($(HAVE_CUDA),yes)
@@ -347,6 +351,7 @@ ifdef ROCM_PATH
 	endif
 endif
 endif
+endif
 
 # Platform detection (must be before GPU includes)
 UNAME_S := $(shell uname -s)
@@ -382,11 +387,15 @@ endif
 # This provides stub implementations when GPU backends are disabled
 OBJS += src/gpu/gpu_stubs.o
 
-# Old Metal system (disabled when using modular GPU system)
+# Old Metal system (disabled when using modular GPU system or CPU-only mode)
+# Skip old system if GPU_MODE is explicitly set to "none" or GPU_BACKENDS is set to "none"
+ifeq ($(GPU_MODE),none)
+# CPU-only mode: skip old Metal detection
+else
 ifneq ($(GPU_BACKENDS),none)
 # Modular GPU system is active - skip old Metal (don't clear METAL_OBJS set by modular system)
 else
-# Old Metal system (only used if GPU_BACKENDS is not set)
+# Old Metal system (only used if GPU_BACKENDS is not set and not in CPU-only mode)
 # Allow disabling explicitly: DISABLE_METAL=1 make ...
 ifeq ($(UNAME_S),Darwin)
 ifneq ($(DISABLE_METAL),1)
@@ -409,6 +418,7 @@ endif
 ifneq ($(strip $(METAL_OBJS)),)
 src/gpu/metal/gpu_metal_impl.o: src/gpu/metal/gpu_metal_impl.m
 	$(CC) $(filter-out -I/usr/local/include, $(PG_CPPFLAGS)) $(CFLAGS) $(CPPFLAGS) -c -o $@ $<
+endif
 endif
 endif
 

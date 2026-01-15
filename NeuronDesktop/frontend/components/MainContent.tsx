@@ -20,12 +20,15 @@ export default function MainContent({ children }: { children: React.ReactNode })
   return (
     <main
       className={`
-        flex-1 overflow-auto bg-slate-50 transition-all duration-300 ease-in-out
-        ${isOpen && isDesktop ? 'lg:ml-64' : 'lg:ml-0'}
+        flex-1 overflow-auto bg-transparent dark:bg-slate-950/50 transition-all duration-300 ease-in-out
+        ${isOpen && isDesktop ? 'lg:ml-64 xl:ml-72' : 'lg:ml-0'}
+        min-h-[calc(100vh-3.5rem)] sm:min-h-[calc(100vh-3.5rem)]
       `}
     >
-      <div className="max-w-7xl mx-auto w-full px-6">
-        {children}
+      <div className="w-full max-w-[1920px] mx-auto px-3 sm:px-4 md:px-6 lg:px-8 xl:px-10 2xl:px-12 3xl:px-16">
+        <div className="w-full">
+          {children}
+        </div>
       </div>
     </main>
   )

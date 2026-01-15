@@ -3,7 +3,7 @@
  * prompt_handlers.go
  *    Prompt handler setup for NeuronMCP
  *
- * Copyright (c) 2024-2026, neurondb, Inc. <admin@neurondb.com>
+ * Copyright (c) 2024-2026, neurondb, Inc. <support@neurondb.ai>
  *
  * IDENTIFICATION
  *    NeuronMCP/internal/server/prompt_handlers.go
@@ -32,6 +32,16 @@ func (s *Server) setupPromptHandlers() {
 
 /* handleListPrompts handles the prompts/list request */
 func (s *Server) handleListPrompts(ctx context.Context, params json.RawMessage) (interface{}, error) {
+	if s == nil {
+		return nil, fmt.Errorf("server instance is nil")
+	}
+	if s.middleware == nil {
+		return nil, fmt.Errorf("middleware manager is not initialized")
+	}
+	if s.prompts == nil {
+		return nil, fmt.Errorf("prompts manager is not initialized")
+	}
+	
 	mcpReq := &middleware.MCPRequest{
 		Method: "prompts/list",
 		Params: make(map[string]interface{}),
@@ -59,6 +69,16 @@ func (s *Server) handleListPrompts(ctx context.Context, params json.RawMessage) 
 
 /* handleGetPrompt handles the prompts/get request */
 func (s *Server) handleGetPrompt(ctx context.Context, params json.RawMessage) (interface{}, error) {
+	if s == nil {
+		return nil, fmt.Errorf("server instance is nil")
+	}
+	if s.middleware == nil {
+		return nil, fmt.Errorf("middleware manager is not initialized")
+	}
+	if s.prompts == nil {
+		return nil, fmt.Errorf("prompts manager is not initialized")
+	}
+	
 	mcpReq := &middleware.MCPRequest{
 		Method: "prompts/get",
 		Params: make(map[string]interface{}),

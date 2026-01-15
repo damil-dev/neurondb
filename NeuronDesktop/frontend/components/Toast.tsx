@@ -15,9 +15,11 @@ export default function ToastContainer() {
   if (toasts.length === 0) return null
 
   return (
-    <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 max-w-md">
-      {toasts.map((toast) => (
-        <ToastItem key={toast.id} toast={toast} />
+    <div className="fixed top-4 right-4 z-50 flex flex-col gap-3 max-w-md pointer-events-none">
+      {toasts.map((toast, index) => (
+        <div key={toast.id} className="pointer-events-auto" style={{ animationDelay: `${index * 50}ms` }}>
+          <ToastItem toast={toast} />
+        </div>
       ))}
     </div>
   )
@@ -25,37 +27,47 @@ export default function ToastContainer() {
 
 function ToastItem({ toast }: { toast: Toast }) {
   const [isVisible, setIsVisible] = useState(true)
+  const [isExiting, setIsExiting] = useState(false)
 
   useEffect(() => {
     setIsVisible(true)
     return () => setIsVisible(false)
   }, [])
 
+  const handleClose = () => {
+    setIsExiting(true)
+    setTimeout(() => {
+      setIsVisible(false)
+      toastManager.remove(toast.id)
+    }, 300)
+  }
+
   if (!isVisible) return null
 
   const getIcon = () => {
+    const iconClass = "w-6 h-6"
     switch (toast.type) {
       case 'success':
-        return <CheckCircleIcon className="w-5 h-5 text-green-500" />
+        return <CheckCircleIcon className={`${iconClass} text-green-500 animate-scale-in`} />
       case 'error':
-        return <XCircleIcon className="w-5 h-5 text-red-500" />
+        return <XCircleIcon className={`${iconClass} text-red-500 animate-scale-in`} />
       case 'warning':
-        return <ExclamationTriangleIcon className="w-5 h-5 text-yellow-500" />
+        return <ExclamationTriangleIcon className={`${iconClass} text-yellow-500 animate-scale-in`} />
       case 'info':
-        return <InformationCircleIcon className="w-5 h-5 text-blue-500" />
+        return <InformationCircleIcon className={`${iconClass} text-blue-500 animate-scale-in`} />
     }
   }
 
   const getBgColor = () => {
     switch (toast.type) {
       case 'success':
-        return 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+        return 'bg-green-50/95 dark:bg-green-900/30 border-green-300 dark:border-green-700'
       case 'error':
-        return 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+        return 'bg-red-50/95 dark:bg-red-900/30 border-red-300 dark:border-red-700'
       case 'warning':
-        return 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800'
+        return 'bg-yellow-50/95 dark:bg-yellow-900/30 border-yellow-300 dark:border-yellow-700'
       case 'info':
-        return 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
+        return 'bg-blue-50/95 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700'
     }
   }
 
@@ -72,26 +84,47 @@ function ToastItem({ toast }: { toast: Toast }) {
     }
   }
 
+  const getGlowColor = () => {
+    switch (toast.type) {
+      case 'success':
+        return 'shadow-green-500/20'
+      case 'error':
+        return 'shadow-red-500/20'
+      case 'warning':
+        return 'shadow-yellow-500/20'
+      case 'info':
+        return 'shadow-blue-500/20'
+    }
+  }
+
   return (
     <div
-      className={`${getBgColor()} ${getTextColor()} border rounded-lg shadow-lg p-4 flex items-start gap-3 animate-in slide-in-from-right fade-in`}
+      className={`
+        ${getBgColor()} ${getTextColor()} 
+        border-2 rounded-xl shadow-2xl ${getGlowColor()}
+        backdrop-blur-xl
+        p-4 flex items-start gap-3 
+        ${isExiting ? 'animate-slide-in-right opacity-0 scale-95' : 'animate-slide-in-right'}
+        transition-all duration-300
+        hover:scale-[1.02] hover:shadow-2xl
+        min-w-[320px] max-w-md
+      `}
     >
-      <div className="flex-shrink-0 mt-0.5">{getIcon()}</div>
+      <div className="flex-shrink-0 mt-0.5 animate-fade-in">{getIcon()}</div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium break-words">{toast.message}</p>
+        <p className="text-sm font-semibold break-words leading-relaxed">{toast.message}</p>
       </div>
       <button
-        onClick={() => {
-          setIsVisible(false)
-          setTimeout(() => toastManager.remove(toast.id), 300)
-        }}
-        className="flex-shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+        onClick={handleClose}
+        className="flex-shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:scale-110 transition-all duration-200 rounded-lg p-1 hover:bg-black/5 dark:hover:bg-white/5"
+        aria-label="Close"
       >
         <XMarkIcon className="w-4 h-4" />
       </button>
     </div>
   )
 }
+
 
 
 

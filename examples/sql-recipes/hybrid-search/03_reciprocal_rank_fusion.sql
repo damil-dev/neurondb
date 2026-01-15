@@ -162,3 +162,5 @@ JOIN rrf_scores rs ON d.id = rs.id
 ORDER BY rs.rrf_score DESC
 LIMIT 10;
 
+
+

@@ -28,6 +28,9 @@
 
 extern float4 l2_distance_simd(Vector *a, Vector *b);
 extern float4 inner_product_simd(Vector *a, Vector *b);
+
+/* Internal distance functions */
+static float4 l2_squared_distance(Vector *a, Vector *b);
 extern float4 cosine_distance_simd(Vector *a, Vector *b);
 extern float4 l1_distance_simd(Vector *a, Vector *b);
 

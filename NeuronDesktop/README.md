@@ -68,7 +68,7 @@ export DB_USER=neurondb     # Docker Compose default user
 export DB_PASSWORD=neurondb  # Docker Compose default password
 
 # Run automated setup
-./scripts/neurondesktop_setup.sh
+./scripts/neurondesktop-setup.sh
 ```
 
 This script will:
@@ -177,7 +177,7 @@ Or use the setup script:
 
 ```bash
 cd NeuronDesktop
-./scripts/neurondesktop_setup.sh
+./scripts/neurondesktop-setup.sh
 cd api
 go run cmd/server/main.go
 ```
@@ -221,7 +221,7 @@ NeuronDesktop/
 │   └── Dockerfile          # Docker image
 ├── docs/                   # Documentation
 │   ├── API.md             # API documentation
-│   └── DEPLOYMENT.md      # Deployment guide
+│   └── deployment.md      # Deployment guide
 └── docker-compose.yml      # Docker Compose configuration
 ```
 
@@ -309,7 +309,7 @@ npm test
 
 ## Deployment
 
-See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for detailed deployment instructions.
+See [docs/deployment.md](docs/deployment.md) for detailed deployment instructions.
 
 ### Deployment checklist
 

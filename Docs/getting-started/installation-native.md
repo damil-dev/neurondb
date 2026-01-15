@@ -139,21 +139,21 @@ sudo chmod +x /usr/local/bin/neurondesktop
 
 ```bash
 cd NeuronMCP
-./scripts/neuronmcp_setup.sh
+./scripts/neuronmcp-setup.sh
 ```
 
 #### NeuronAgent
 
 ```bash
 cd NeuronAgent
-./scripts/neuronagent_setup.sh
+./scripts/neuronagent-setup.sh
 ```
 
 #### NeuronDesktop
 
 ```bash
 cd NeuronDesktop
-./scripts/neurondesktop_setup.sh
+./scripts/neurondesktop-setup.sh
 ```
 
 ### Step 4: Configuration
@@ -391,4 +391,6 @@ sudo rm -rf /etc/neurondb
 - [Docker Installation Guide](../deployment/docker.md) - Docker-based installation
 - [NeuronDB Installation](../../NeuronDB/docs/getting-started/installation.md) - PostgreSQL extension installation
 - [Production Deployment](../deployment/production.md) - Production deployment guide
+
+
 

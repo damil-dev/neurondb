@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"context"
 	"net/http"
 	"strings"
 )
@@ -54,36 +53,15 @@ func JWTMiddleware() func(http.Handler) http.Handler {
 				return
 			}
 
-			ctx := context.WithValue(r.Context(), "user_id", claims.UserID)
-			ctx = context.WithValue(ctx, "username", claims.Username)
-			ctx = context.WithValue(ctx, "is_admin", claims.IsAdmin)
-			ctx = context.WithValue(ctx, "claims", claims)
+			ctx := SetUserID(r.Context(), claims.UserID)
+			ctx = SetUsername(ctx, claims.Username)
+			ctx = SetIsAdmin(ctx, claims.IsAdmin)
+			ctx = SetClaims(ctx, claims)
 
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
 }
 
-/* GetUserIDFromContext gets the user ID from context (primary method for JWT auth) */
-func GetUserIDFromContext(ctx context.Context) (string, bool) {
-	userID, ok := ctx.Value("user_id").(string)
-	return userID, ok
-}
-
-/* GetUsernameFromContext gets the username from context (for JWT) */
-func GetUsernameFromContext(ctx context.Context) (string, bool) {
-	username, ok := ctx.Value("username").(string)
-	return username, ok
-}
-
-/* GetIsAdminFromContext gets the admin flag from context (for JWT) */
-func GetIsAdminFromContext(ctx context.Context) bool {
-	isAdmin, ok := ctx.Value("is_admin").(bool)
-	return ok && isAdmin
-}
-
-/* GetClaimsFromContext gets the claims from context */
-func GetClaimsFromContext(ctx context.Context) (*Claims, bool) {
-	claims, ok := ctx.Value("claims").(*Claims)
-	return claims, ok
-}
+/* NOTE: GetUserIDFromContext, GetUsernameFromContext, GetIsAdminFromContext, and GetClaimsFromContext
+ * are now defined in context_keys.go for type-safe context access */

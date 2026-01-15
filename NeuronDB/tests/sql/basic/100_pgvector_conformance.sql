@@ -399,3 +399,5 @@ SELECT l2_norm('[0,0,0]'::vector) AS zero_norm;
 \echo ''
 
 
+
+

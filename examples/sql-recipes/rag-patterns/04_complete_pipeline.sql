@@ -212,3 +212,5 @@ SELECT
     ROUND((high_similarity_chunks::FLOAT / NULLIF(total_chunks_searched, 0) * 100)::numeric, 2) AS high_similarity_percentage
 FROM performance_test;
 
+
+

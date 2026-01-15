@@ -166,3 +166,5 @@ WHERE (indexname LIKE '%embedding%' OR indexname LIKE '%vector%')
 -- Drop if confirmed unused:
 -- DROP INDEX IF EXISTS unused_index_name;
 
+
+

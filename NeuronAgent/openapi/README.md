@@ -136,6 +136,6 @@ The OpenAPI specification covers:
 ## Related Documentation
 
 - [API Documentation](../docs/API.md) - Human-readable API documentation
-- [Architecture Guide](../docs/ARCHITECTURE.md) - System architecture
-- [Deployment Guide](../docs/DEPLOYMENT.md) - Deployment instructions
+- [Architecture Guide](../docs/architecture.md) - System architecture
+- [Deployment Guide](../docs/deployment.md) - Deployment instructions
 

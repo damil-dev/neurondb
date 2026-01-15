@@ -3,7 +3,7 @@
  * automl.go
  *    Tool implementation for NeuronMCP
  *
- * Copyright (c) 2024-2026, neurondb, Inc. <admin@neurondb.com>
+ * Copyright (c) 2024-2026, neurondb, Inc. <support@neurondb.ai>
  *
  * IDENTIFICATION
  *    NeuronMCP/internal/tools/automl.go
@@ -19,6 +19,7 @@ import (
 
 	"github.com/neurondb/NeuronMCP/internal/database"
 	"github.com/neurondb/NeuronMCP/internal/logging"
+	"github.com/neurondb/NeuronMCP/internal/validation"
 )
 
 /* AutoMLTool performs automated machine learning */
@@ -89,8 +90,42 @@ func (t *AutoMLTool) Execute(ctx context.Context, params map[string]interface{})
 	labelCol, _ := params["label_col"].(string)
 	taskType, _ := params["task_type"].(string)
 
-	if table == "" || featureCol == "" || labelCol == "" || taskType == "" {
-		return Error("table, feature_col, label_col, and task_type are required", "VALIDATION_ERROR", nil), nil
+	/* Validate table name (SQL identifier) */
+	if err := validation.ValidateSQLIdentifierRequired(table, "table"); err != nil {
+		return Error(fmt.Sprintf("Invalid table parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
+			"parameter": "table",
+			"error":     err.Error(),
+			"params":    params,
+		}), nil
+	}
+
+	/* Validate feature_col (SQL identifier) */
+	if err := validation.ValidateSQLIdentifierRequired(featureCol, "feature_col"); err != nil {
+		return Error(fmt.Sprintf("Invalid feature_col parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
+			"parameter": "feature_col",
+			"table":     table,
+			"error":     err.Error(),
+			"params":    params,
+		}), nil
+	}
+
+	/* Validate label_col (SQL identifier) */
+	if err := validation.ValidateSQLIdentifierRequired(labelCol, "label_col"); err != nil {
+		return Error(fmt.Sprintf("Invalid label_col parameter: %v", err), "VALIDATION_ERROR", map[string]interface{}{
+			"parameter": "label_col",
+			"table":     table,
+			"error":     err.Error(),
+			"params":    params,
+		}), nil
+	}
+
+	/* Validate task_type */
+	if taskType == "" {
+		return Error("task_type is required and cannot be empty", "VALIDATION_ERROR", map[string]interface{}{
+			"parameter": "task_type",
+			"table":     table,
+			"params":    params,
+		}), nil
 	}
 
 	var query string

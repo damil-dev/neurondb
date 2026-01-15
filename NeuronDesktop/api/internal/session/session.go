@@ -13,6 +13,14 @@ import (
 	"github.com/google/uuid"
 )
 
+/* Context keys for session and user ID */
+type contextKey string
+
+const (
+	sessionKey contextKey = "session"
+	userIDKey  contextKey = "userID"
+)
+
 /* Session represents a user session */
 type Session struct {
 	ID            string
@@ -381,8 +389,9 @@ func (m *Manager) SessionMiddleware() func(http.Handler) http.Handler {
 				accessToken = newAccessToken
 
 				/* Add session to context */
-				ctx := context.WithValue(r.Context(), "session", session)
-				ctx = context.WithValue(ctx, "user_id", session.UserID)
+				ctx := r.Context()
+				ctx = context.WithValue(ctx, sessionKey, session)
+				ctx = context.WithValue(ctx, userIDKey, session.UserID)
 				next.ServeHTTP(w, r.WithContext(ctx))
 				return
 			}
@@ -395,8 +404,9 @@ func (m *Manager) SessionMiddleware() func(http.Handler) http.Handler {
 			}
 
 			/* Add session to context */
-			ctx := context.WithValue(r.Context(), "session", session)
-			ctx = context.WithValue(ctx, "user_id", session.UserID)
+			ctx := r.Context()
+			ctx = context.WithValue(ctx, sessionKey, session)
+			ctx = context.WithValue(ctx, userIDKey, session.UserID)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
@@ -404,12 +414,12 @@ func (m *Manager) SessionMiddleware() func(http.Handler) http.Handler {
 
 /* GetSessionFromContext gets session from context */
 func GetSessionFromContext(ctx context.Context) (*Session, bool) {
-	session, ok := ctx.Value("session").(*Session)
+	session, ok := ctx.Value(sessionKey).(*Session)
 	return session, ok
 }
 
 /* GetUserIDFromContext gets user ID from context */
 func GetUserIDFromContext(ctx context.Context) (string, bool) {
-	userID, ok := ctx.Value("user_id").(string)
+	userID, ok := ctx.Value(userIDKey).(string)
 	return userID, ok
 }

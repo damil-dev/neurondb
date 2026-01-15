@@ -6,7 +6,7 @@
  * Provides benchmarking infrastructure for measuring tool call latency,
  * throughput, memory usage, and concurrent request handling.
  *
- * Copyright (c) 2024-2026, neurondb, Inc. <admin@neurondb.com>
+ * Copyright (c) 2024-2026, neurondb, Inc. <support@neurondb.ai>
  *
  * IDENTIFICATION
  *    NeuronMCP/internal/performance/benchmark.go
@@ -273,4 +273,6 @@ func FormatDuration(d time.Duration) string {
 	}
 	return fmt.Sprintf("%.2fs", float64(d)/float64(time.Second))
 }
+
+
 

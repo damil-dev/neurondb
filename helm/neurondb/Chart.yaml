@@ -2,8 +2,8 @@ apiVersion: v2
 name: neurondb
 description: A Helm chart for NeuronDB PostgreSQL AI ecosystem
 type: application
-version: 2.0.0
-appVersion: "2.0.0"
+version: 3.0.0-devel
+appVersion: "3.0.0-devel"
 keywords:
   - postgresql
   - vector-database
@@ -12,8 +12,3 @@ keywords:
 maintainers:
   - name: NeuronDB Team
     email: support@neurondb.ai
-
-
-
-
-

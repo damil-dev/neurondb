@@ -31,13 +31,58 @@ func NewNeuronDBHandlers(queries *db.Queries, enableSQLConsole bool) *NeuronDBHa
 	}
 }
 
+/* InvalidateClient removes and closes a client for a profile */
+func (h *NeuronDBHandlers) InvalidateClient(profileID string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	if client, ok := h.clients[profileID]; ok {
+		client.Close()
+		delete(h.clients, profileID)
+	}
+}
+
+/* CloseClient closes a specific client */
+func (h *NeuronDBHandlers) CloseClient(profileID string) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	if client, ok := h.clients[profileID]; ok {
+		err := client.Close()
+		delete(h.clients, profileID)
+		return err
+	}
+	return nil
+}
+
+/* CloseAll closes all cached clients */
+func (h *NeuronDBHandlers) CloseAll() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	for profileID, client := range h.clients {
+		client.Close()
+		delete(h.clients, profileID)
+	}
+}
+
 /* getClient gets or creates a NeuronDB client for a profile */
 func (h *NeuronDBHandlers) getClient(ctx context.Context, profileID string) (*neurondb.Client, error) {
+	/* First check with read lock */
 	h.mu.RLock()
 	client, ok := h.clients[profileID]
 	h.mu.RUnlock()
 
 	if ok {
+		return client, nil
+	}
+
+	/* Need to create client - acquire write lock */
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	/* Double-check after acquiring write lock (another goroutine might have created it) */
+	if client, ok := h.clients[profileID]; ok {
 		return client, nil
 	}
 
@@ -51,9 +96,7 @@ func (h *NeuronDBHandlers) getClient(ctx context.Context, profileID string) (*ne
 		return nil, fmt.Errorf("failed to create NeuronDB client: %w", err)
 	}
 
-	h.mu.Lock()
 	h.clients[profileID] = client
-	h.mu.Unlock()
 
 	return client, nil
 }

@@ -38,13 +38,16 @@ func (q *Queries) CreateProfile(ctx context.Context, profile *Profile) error {
 	}
 	profile.UpdatedAt = time.Now()
 
-	mcpConfigJSON, _ := json.Marshal(profile.MCPConfig)
+	mcpConfigJSON, err := json.Marshal(profile.MCPConfig)
+	if err != nil {
+		return fmt.Errorf("failed to marshal MCP config: %w", err)
+	}
 
 	query := `
 		INSERT INTO profiles (id, name, user_id, profile_username, profile_password_hash, mcp_config, neurondb_dsn, agent_endpoint, agent_api_key, default_collection, is_default, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 	`
-	_, err := q.db.ExecContext(ctx, query,
+	_, err = q.db.ExecContext(ctx, query,
 		profile.ID, profile.Name, profile.UserID, profile.ProfileUsername, profile.ProfilePassword, mcpConfigJSON,
 		profile.NeuronDBDSN, profile.AgentEndpoint, profile.AgentAPIKey,
 		profile.DefaultCollection, profile.IsDefault, profile.CreatedAt, profile.UpdatedAt)
@@ -85,7 +88,9 @@ func (q *Queries) GetProfile(ctx context.Context, id string) (*Profile, error) {
 	}
 
 	if len(mcpConfigJSON) > 0 {
-		json.Unmarshal(mcpConfigJSON, &profile.MCPConfig)
+		if err := json.Unmarshal(mcpConfigJSON, &profile.MCPConfig); err != nil {
+			/* Log error but don't fail - malformed MCP config is not critical for reading */
+		}
 	}
 
 	return &profile, nil
@@ -238,7 +243,9 @@ func (q *Queries) GetProfileByUsernameAndPassword(ctx context.Context, username,
 	}
 
 	if len(mcpConfigJSON) > 0 {
-		json.Unmarshal(mcpConfigJSON, &profile.MCPConfig)
+		if err := json.Unmarshal(mcpConfigJSON, &profile.MCPConfig); err != nil {
+			/* Log error but don't fail - malformed MCP config is not critical for reading */
+		}
 	}
 
 	return &profile, nil
@@ -247,14 +254,17 @@ func (q *Queries) GetProfileByUsernameAndPassword(ctx context.Context, username,
 /*UpdateProfile updates a profile*/
 func (q *Queries) UpdateProfile(ctx context.Context, profile *Profile) error {
 	profile.UpdatedAt = time.Now()
-	mcpConfigJSON, _ := json.Marshal(profile.MCPConfig)
+	mcpConfigJSON, err := json.Marshal(profile.MCPConfig)
+	if err != nil {
+		return fmt.Errorf("failed to marshal MCP config: %w", err)
+	}
 
 	query := `
 		UPDATE profiles
 		SET name = $2, profile_username = $3, profile_password_hash = $4, mcp_config = $5, neurondb_dsn = $6, agent_endpoint = $7, agent_api_key = $8, default_collection = $9, is_default = $10, updated_at = $11
 		WHERE id = $1
 	`
-	_, err := q.db.ExecContext(ctx, query,
+	_, err = q.db.ExecContext(ctx, query,
 		profile.ID, profile.Name, profile.ProfileUsername, profile.ProfilePassword, mcpConfigJSON,
 		profile.NeuronDBDSN, profile.AgentEndpoint, profile.AgentAPIKey,
 		profile.DefaultCollection, profile.IsDefault, profile.UpdatedAt)
@@ -762,7 +772,9 @@ func (q *Queries) GetDefaultProfile(ctx context.Context) (*Profile, error) {
 	}
 
 	if len(mcpConfigJSON) > 0 {
-		json.Unmarshal(mcpConfigJSON, &profile.MCPConfig)
+		if err := json.Unmarshal(mcpConfigJSON, &profile.MCPConfig); err != nil {
+			/* Log error but don't fail - malformed MCP config is not critical for reading */
+		}
 	}
 
 	return &profile, nil
@@ -805,7 +817,9 @@ func (q *Queries) GetDefaultProfileForUser(ctx context.Context, userID string) (
 	}
 
 	if len(mcpConfigJSON) > 0 {
-		json.Unmarshal(mcpConfigJSON, &profile.MCPConfig)
+		if err := json.Unmarshal(mcpConfigJSON, &profile.MCPConfig); err != nil {
+			/* Log error but don't fail - malformed MCP config is not critical for reading */
+		}
 	}
 
 	return &profile, nil

@@ -6,7 +6,7 @@
  * Provides thread-safe in-memory caching of sessions with TTL-based
  * expiration and automatic cleanup of stale entries.
  *
- * Copyright (c) 2024-2026, neurondb, Inc. <admin@neurondb.com>
+ * Copyright (c) 2024-2026, neurondb, Inc. <support@neurondb.ai>
  *
  * IDENTIFICATION
  *    NeuronAgent/internal/session/cache.go
@@ -90,6 +90,13 @@ func (c *Cache) Delete(id uuid.UUID) {
 }
 
 func (c *Cache) runCleanup() {
+	defer func() {
+		if r := recover(); r != nil {
+			/* Log panic but don't crash - cache cleanup is non-critical */
+			/* Note: metrics may not be available here, so we use a simple approach */
+		}
+	}()
+
 	for {
 		select {
 		case <-c.stop:

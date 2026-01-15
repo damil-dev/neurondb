@@ -6,7 +6,7 @@
  * Implements high availability operations as specified in Phase 1.1
  * of the roadmap.
  *
- * Copyright (c) 2024-2026, neurondb, Inc. <admin@neurondb.com>
+ * Copyright (c) 2024-2026, neurondb, Inc. <support@neurondb.ai>
  *
  * IDENTIFICATION
  *    NeuronMCP/internal/tools/postgresql_ha.go
@@ -395,4 +395,6 @@ func (t *PostgreSQLClusterTool) Execute(ctx context.Context, params map[string]i
 		"tool": "postgresql_cluster",
 	}), nil
 }
+
+
 

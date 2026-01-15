@@ -17,11 +17,29 @@ import (
 /* MCPHandlers handles MCP-related endpoints */
 type MCPHandlers struct {
 	mcpManager *MCPManager
+	corsConfig *CORSConfig
+}
+
+/* CORSConfig holds CORS configuration for WebSocket */
+type CORSConfig struct {
+	AllowedOrigins []string
 }
 
 /* NewMCPHandlers creates new MCP handlers */
 func NewMCPHandlers(mcpManager *MCPManager) *MCPHandlers {
-	return &MCPHandlers{mcpManager: mcpManager}
+	return &MCPHandlers{
+		mcpManager: mcpManager,
+		corsConfig: &CORSConfig{
+			AllowedOrigins: []string{"*"}, /* Default to allow all */
+		},
+	}
+}
+
+/* SetCORSConfig sets the CORS configuration for WebSocket */
+func (h *MCPHandlers) SetCORSConfig(allowedOrigins []string) {
+	h.corsConfig = &CORSConfig{
+		AllowedOrigins: allowedOrigins,
+	}
 }
 
 /* ListTools lists tools from the MCP server */
@@ -155,6 +173,41 @@ func NewMCPManager(queries *db.Queries) *MCPManager {
 	}
 }
 
+/* InvalidateClient removes and closes a client for a profile */
+func (m *MCPManager) InvalidateClient(profileID string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if client, ok := m.clients[profileID]; ok {
+		client.Close()
+		delete(m.clients, profileID)
+	}
+}
+
+/* CloseClient closes a specific client */
+func (m *MCPManager) CloseClient(profileID string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if client, ok := m.clients[profileID]; ok {
+		err := client.Close()
+		delete(m.clients, profileID)
+		return err
+	}
+	return nil
+}
+
+/* CloseAll closes all cached clients */
+func (m *MCPManager) CloseAll() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	for profileID, client := range m.clients {
+		client.Close()
+		delete(m.clients, profileID)
+	}
+}
+
 /* GetMCPManager returns the MCP manager (for use in websocket handler) */
 func (h *MCPHandlers) GetMCPManager() *MCPManager {
 	return h.mcpManager
@@ -162,12 +215,28 @@ func (h *MCPHandlers) GetMCPManager() *MCPManager {
 
 /* GetClient gets or creates an MCP client for a profile */
 func (m *MCPManager) GetClient(ctx context.Context, profileID string) (*mcp.Client, error) {
+	/* First check with read lock */
 	m.mu.RLock()
 	client, ok := m.clients[profileID]
 	m.mu.RUnlock()
 
 	if ok && client.IsAlive() {
 		return client, nil
+	}
+
+	/* Need to create client - acquire write lock */
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	/* Double-check after acquiring write lock (another goroutine might have created it) */
+	if client, ok := m.clients[profileID]; ok && client.IsAlive() {
+		return client, nil
+	}
+
+	/* Close old client if it exists but is not alive */
+	if client, ok := m.clients[profileID]; ok {
+		client.Close()
+		delete(m.clients, profileID)
 	}
 
 	/* Get profile */
@@ -227,9 +296,7 @@ func (m *MCPManager) GetClient(ctx context.Context, profileID string) (*mcp.Clie
 	}
 	client = newClient
 
-	m.mu.Lock()
 	m.clients[profileID] = client
-	m.mu.Unlock()
 
 	return client, nil
 }

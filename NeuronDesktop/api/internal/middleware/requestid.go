@@ -7,7 +7,10 @@ import (
 	"github.com/google/uuid"
 )
 
-const RequestIDKey = "request_id"
+/* Context key type for type-safe context values */
+type requestIDKeyType string
+
+const RequestIDKey requestIDKeyType = "request_id"
 
 /* RequestIDMiddleware adds a request ID to each request */
 func RequestIDMiddleware() func(http.Handler) http.Handler {

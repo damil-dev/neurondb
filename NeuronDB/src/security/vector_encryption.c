@@ -129,7 +129,14 @@ encrypt_vector(PG_FUNCTION_ARGS)
 	SET_VARSIZE(result, result_size);
 
 	encrypted = (EncryptedVector *) VARDATA(result);
-	encrypted->tenant_id = 0;	/* TODO: get from context */
+	/*
+	 * TODO: Get tenant_id from execution context.
+	 * The tenant identifier should be retrieved from the current execution
+	 * context (e.g., via a GUC variable or session variable) to support
+	 * multi-tenant encryption. This requires integration with the multi-tenant
+	 * system to properly isolate encrypted vectors by tenant.
+	 */
+	encrypted->tenant_id = 0;
 	encrypted->dim = input->dim;
 
 	/* Generate random IV */

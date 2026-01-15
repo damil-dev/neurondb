@@ -39,7 +39,11 @@ func RecoveryMiddleware(logger *logging.Logger) func(http.Handler) http.Handler 
 						RequestID: requestID,
 					}
 
-					json.NewEncoder(w).Encode(response)
+					if err := json.NewEncoder(w).Encode(response); err != nil {
+						logger.Error("Failed to encode error response", err, map[string]interface{}{
+							"request_id": requestID,
+						})
+					}
 				}
 			}()
 

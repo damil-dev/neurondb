@@ -128,8 +128,8 @@ print_success "Binary installed"
 # Database setup
 if [ "$SKIP_DB_SETUP" = false ]; then
     print_info "Setting up database schema..."
-    if [ -f "$PROJECT_ROOT/NeuronDesktop/scripts/neurondesktop_setup.sh" ]; then
-        "$PROJECT_ROOT/NeuronDesktop/scripts/neurondesktop_setup.sh"
+    if [ -f "$PROJECT_ROOT/NeuronDesktop/scripts/neurondesktop-setup.sh" ]; then
+        "$PROJECT_ROOT/NeuronDesktop/scripts/neurondesktop-setup.sh"
         print_success "Database setup completed"
     else
         print_warning "Database setup script not found. Skipping database setup."
@@ -172,4 +172,6 @@ fi
 print_success "NeuronDesktop installation completed!"
 print_info "Binary location: $INSTALL_PREFIX/bin/neurondesktop"
 print_info "Note: Frontend needs to be built and served separately (see NeuronDesktop/README.md)"
+
+
 

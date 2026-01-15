@@ -978,12 +978,15 @@ neurondb_predict_transformer_llm(PG_FUNCTION_ARGS)
 			 errdetail("model_id=%d, input_length=%zu", model_id, strlen(input_str))));
 	
 	/*
-	 * TODO: Implement actual prediction logic
-	 * 1. Load ONNX model from model_path or model_data
-	 * 2. Use ONNX Runtime to run inference
-	 * 3. Return generated text
-	 * 
-	 * For now, return placeholder response
+	 * TODO: Implement actual prediction logic for transformer LLM models.
+	 * This function should: (1) Load the ONNX model from either model_path
+	 * (file system) or model_data (bytea stored in database), (2) Initialize
+	 * ONNX Runtime session with appropriate execution providers (CPU, CUDA,
+	 * etc.), (3) Tokenize the input string using the model's tokenizer,
+	 * (4) Run inference through the transformer model, (5) Decode the output
+	 * tokens back to text. The implementation should handle batching, memory
+	 * management, and error recovery. See neurondb_onnx.c for ONNX integration
+	 * utilities.
 	 */
 	/* Suppress unused variable warnings until ONNX is implemented */
 	(void) model_data;

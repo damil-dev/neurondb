@@ -61,10 +61,6 @@ log_rag_operation(PG_FUNCTION_ARGS)
 	StringInfoData query;
 	NdbSpiSession *session = NULL;
 	int			ret;
-	text	   *pipeline_text = NULL;
-	text	   *operation_text = NULL;
-	text	   *user_id_text = NULL;
-	text	   *query_hash_text = NULL;
 
 	/* Check if audit logging is enabled */
 	if (!neurondb_audit_rag_enabled)
@@ -119,10 +115,6 @@ log_rag_operation(PG_FUNCTION_ARGS)
 		Oid			argtypes[6] = {TEXTOID, TEXTOID, TEXTOID, TEXTOID, INT4OID, JSONBOID};
 		Datum		values[6];
 		char		nulls[6] = {' ', ' ', ' ', ' ', ' ', ' '};
-		text	   *pipeline_text = NULL;
-		text	   *operation_text = NULL;
-		text	   *user_id_text = NULL;
-		text	   *query_hash_text = NULL;
 
 		values[0] = CStringGetTextDatum(pipeline_str);
 		values[1] = CStringGetTextDatum(operation_str);

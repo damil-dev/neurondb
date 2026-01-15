@@ -122,8 +122,8 @@ print_success "Binary installed"
 # Database setup
 if [ "$SKIP_DB_SETUP" = false ]; then
     print_info "Setting up database schema..."
-    if [ -f "$PROJECT_ROOT/NeuronAgent/scripts/neuronagent_setup.sh" ]; then
-        "$PROJECT_ROOT/NeuronAgent/scripts/neuronagent_setup.sh"
+    if [ -f "$PROJECT_ROOT/NeuronAgent/scripts/neuronagent-setup.sh" ]; then
+        "$PROJECT_ROOT/NeuronAgent/scripts/neuronagent-setup.sh"
         print_success "Database setup completed"
     else
         print_warning "Database setup script not found. Skipping database setup."
@@ -165,4 +165,6 @@ fi
 
 print_success "NeuronAgent installation completed!"
 print_info "Binary location: $INSTALL_PREFIX/bin/neuronagent"
+
+
 

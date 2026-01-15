@@ -413,7 +413,15 @@ ivf_handler(PG_FUNCTION_ARGS)
 	amroutine->amstorage = false;
 	amroutine->amclusterable = false;
 	amroutine->ampredlocks = false;
-	amroutine->amcanparallel = false;	/* TODO: Parallel build not yet implemented */
+	/*
+	 * TODO: Implement parallel build for IVF index.
+	 * The IVF index build process (KMeans clustering and vector assignment)
+	 * can be parallelized using PostgreSQL's parallel index build infrastructure.
+	 * This requires implementing amestimateparallelscan, aminitparallelscan,
+	 * and amparallelrescan callbacks. The parallel build should distribute
+	 * vector sampling and KMeans iterations across multiple workers.
+	 */
+	amroutine->amcanparallel = false;
 	amroutine->amcaninclude = false;
 	amroutine->amusemaintenanceworkmem = false;
 	amroutine->amsummarizing = false;

@@ -81,13 +81,13 @@ NeuronDB is a PostgreSQL extension that adds vector search, machine learning, an
 - **Main README**: `NeuronDB/README.md`
 - **Installation**: `NeuronDB/INSTALL.md`
 - **Complete Docs**: `NeuronDB/docs/`
-- **SQL API**: 520+ functions defined in `NeuronDB/neurondb--2.0.sql``
+- **SQL API**: 520+ functions defined in `NeuronDB/neurondb--2.0.sql`
 - **Official Docs**: [https://www.neurondb.ai/docs](https://www.neurondb.ai/docs)
 
 ## Docker
 
 - Compose services: `neurondb` (cpu), `neurondb-cuda`, `neurondb-rocm`, `neurondb-metal`
-- See: `dockers/neurondb/readme.md` and repo-root `docker-compose.yml`
+- See: `dockers/neurondb/README.md` and repo-root `docker-compose.yml`
 
 ## Quick Start
 

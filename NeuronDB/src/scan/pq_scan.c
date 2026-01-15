@@ -131,8 +131,14 @@ pq_scan_coarse_search(PqScanState * state,
 												 state->coarse_distances);
 	}
 
-	/* CPU fallback */
-	return -1;					/* TODO: Implement CPU fallback */
+	/*
+	 * TODO: Implement CPU fallback for PQ coarse search.
+	 * When GPU is unavailable or fails, this function should perform the
+	 * Product Quantization coarse search on CPU. This requires implementing
+	 * the PQ codebook lookup and distance computation using CPU SIMD operations
+	 * for optimal performance.
+	 */
+	return -1;
 }
 
 /*
@@ -163,8 +169,12 @@ pq_scan_fine_rerank(PqScanState * state, const float *full_vectors)
 		distances[i] = sqrtf(dist);
 	}
 
-	/* Select top-k */
-	/* TODO: Use proper heap/selection algorithm */
+	/*
+	 * TODO: Use proper heap/selection algorithm for top-k selection.
+	 * The current O(n*k) selection sort should be replaced with a more
+	 * efficient algorithm such as a min-heap (O(n log k)) or quickselect
+	 * (O(n) average case) to improve performance for large coarse_count values.
+	 */
 	for (i = 0; i < state->k && i < state->coarse_count; i++)
 	{
 		int			best_idx = i;

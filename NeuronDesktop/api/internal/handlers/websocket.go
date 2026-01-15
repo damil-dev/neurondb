@@ -1,19 +1,52 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 )
 
+/* newUpgrader creates a WebSocket upgrader with CORS checking */
+func newUpgrader(allowedOrigins []string) websocket.Upgrader {
+	return websocket.Upgrader{
+		CheckOrigin: func(r *http.Request) bool {
+			origin := r.Header.Get("Origin")
+			if origin == "" {
+				return true /* No origin header means same-origin request */
+			}
+
+			/* Check against allowed origins */
+			for _, allowedOrigin := range allowedOrigins {
+				if allowedOrigin == "*" {
+					return true /* Allow all origins if configured */
+				}
+				if allowedOrigin == origin {
+					return true
+				}
+				/* Support wildcard subdomains like *.example.com */
+				if strings.HasPrefix(allowedOrigin, "*.") {
+					domain := strings.TrimPrefix(allowedOrigin, "*.")
+					if strings.HasSuffix(origin, domain) && len(origin) > len(domain) && origin[len(origin)-len(domain)-1] == '.' {
+						return true
+					}
+				}
+			}
+			return false
+		},
+	}
+}
+
+/* Global upgrader for backwards compatibility (will be replaced with config-based one) */
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
-		return true /* Allow all origins in development */
+		return true /* Allow all origins - will be replaced when handlers are updated */
 	},
 }
 
@@ -33,6 +66,15 @@ func keys(m map[string]interface{}) []string {
 	return result
 }
 
+/* safeWriteJSON safely writes JSON to WebSocket connection with error handling */
+func safeWriteJSON(conn *websocket.Conn, data map[string]interface{}) bool {
+	if err := conn.WriteJSON(data); err != nil {
+		log.Printf("WebSocket write error: %v", err)
+		return false
+	}
+	return true
+}
+
 /* MCPWebSocket handles WebSocket connections for MCP chat */
 func (h *MCPHandlers) MCPWebSocket(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
@@ -40,7 +82,9 @@ func (h *MCPHandlers) MCPWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("WebSocket upgrade attempt for profile: %s", profileID)
 
-	conn, err := upgrader.Upgrade(w, r, nil)
+	/* Use CORS-aware upgrader */
+	wsUpgrader := newUpgrader(h.corsConfig.AllowedOrigins)
+	conn, err := wsUpgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Printf("WebSocket upgrade failed: %v", err)
 		return
@@ -72,6 +116,10 @@ func (h *MCPHandlers) MCPWebSocket(w http.ResponseWriter, r *http.Request) {
 		"message": "Connected to MCP server successfully",
 	})
 
+	/* Create context for goroutine cancellation */
+	ctx, cancel := context.WithCancel(r.Context())
+	defer cancel()
+
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -81,11 +129,19 @@ func (h *MCPHandlers) MCPWebSocket(w http.ResponseWriter, r *http.Request) {
 					"error": "Internal server error in WebSocket handler",
 				})
 			}
+			cancel() /* Cancel context when goroutine exits */
 		}()
 
 		conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 
 		for {
+			/* Check context cancellation */
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+
 			var msg map[string]interface{}
 			if err := conn.ReadJSON(&msg); err != nil {
 				if netErr, ok := err.(interface{ Timeout() bool }); ok && netErr.Timeout() {
@@ -377,6 +433,8 @@ func (h *MCPHandlers) MCPWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	for {
 		select {
+		case <-ctx.Done():
+			return
 		case <-ticker.C:
 			if !client.IsAlive() {
 				log.Printf("MCP client not alive, closing WebSocket for profile %s", profileID)
@@ -409,7 +467,9 @@ func (h *AgentHandlers) AgentWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	conn, err := upgrader.Upgrade(w, r, nil)
+	/* Use CORS-aware upgrader */
+	wsUpgrader := newUpgrader(h.corsConfig.AllowedOrigins)
+	conn, err := wsUpgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Printf("WebSocket upgrade failed: %v", err)
 		return
@@ -421,13 +481,6 @@ func (h *AgentHandlers) AgentWebSocket(w http.ResponseWriter, r *http.Request) {
 		conn.WriteJSON(map[string]interface{}{
 			"type":  "error",
 			"error": "Failed to get profile: " + err.Error(),
-		})
-		return
-	}
-	if err != nil {
-		conn.WriteJSON(map[string]interface{}{
-			"type":  "error",
-			"error": "Failed to get profile",
 		})
 		return
 	}
@@ -445,11 +498,22 @@ func (h *AgentHandlers) AgentWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 	defer agentConn.Close()
 
+	/* Create context for goroutine cancellation */
+	ctx, cancel := context.WithCancel(r.Context())
+	defer cancel()
+
 	done := make(chan struct{})
 
 	go func() {
 		defer close(done)
+		defer cancel()
 		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+
 			var msg map[string]interface{}
 			if err := conn.ReadJSON(&msg); err != nil {
 				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
@@ -465,6 +529,14 @@ func (h *AgentHandlers) AgentWebSocket(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-done:
+			return
+		default:
+		}
+
 		var msg map[string]interface{}
 		if err := agentConn.ReadJSON(&msg); err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {

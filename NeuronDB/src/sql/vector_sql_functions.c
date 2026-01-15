@@ -108,8 +108,14 @@ vector_batch_search(PG_FUNCTION_ARGS)
 
 	funcctx = SRF_PERCALL_SETUP();
 
-	/* TODO: Execute batch search and return results */
-	/* For now, return done */
+	/*
+	 * TODO: Execute batch search and return results.
+	 * This function should perform batch vector similarity search across
+	 * multiple query vectors, returning the top k results for each query
+	 * through the SRF (Set Returning Function) mechanism. Implementation
+	 * requires integration with the vector index access methods (HNSW or
+	 * IVF) to perform efficient batch searches.
+	 */
 	SRF_RETURN_DONE(funcctx);
 }
 
@@ -153,7 +159,13 @@ vector_pq_search(PG_FUNCTION_ARGS)
 					 errmsg("function returning record called in context that cannot accept type record")));
 
 		funcctx->tuple_desc = BlessTupleDesc(tupdesc);
-		funcctx->user_fctx = NULL; /* TODO: Store PQ search state */
+		/*
+		 * TODO: Store PQ search state in funcctx->user_fctx.
+		 * The Product Quantization search requires maintaining state across
+		 * multiple SRF calls, including the PQ index reference, query vector,
+		 * and intermediate results from the coarse search stage.
+		 */
+		funcctx->user_fctx = NULL;
 		funcctx->max_calls = k;
 
 		MemoryContextSwitchTo(oldcontext);
@@ -161,8 +173,14 @@ vector_pq_search(PG_FUNCTION_ARGS)
 
 	funcctx = SRF_PERCALL_SETUP();
 
-	/* TODO: Execute PQ search and return results */
-	/* For now, return done */
+	/*
+	 * TODO: Execute PQ search and return results.
+	 * This function should perform a two-stage Product Quantization search:
+	 * Stage 1 (coarse): Search using PQ-encoded vectors for fast approximate
+	 * results. Stage 2 (rerank): Re-rank the top rerank_k candidates using
+	 * full-precision vectors. Results should be returned through the SRF
+	 * mechanism, one tuple per call.
+	 */
 	SRF_RETURN_DONE(funcctx);
 }
 
@@ -205,7 +223,14 @@ vector_filtered_search(PG_FUNCTION_ARGS)
 
 		/* Parse filter predicate */
 		filter_str = text_to_cstring(filter_predicate);
-		/* TODO: Parse and compile filter predicate */
+		/*
+		 * TODO: Parse and compile filter predicate.
+		 * The filter_predicate text should be parsed into a PostgreSQL
+		 * expression tree that can be evaluated during vector search.
+		 * This requires integrating with the planner to compile the predicate
+		 * and store the compiled expression in funcctx->user_fctx for use
+		 * during the search phase.
+		 */
 		funcctx->user_fctx = filter_str;
 		funcctx->max_calls = k;
 
@@ -214,8 +239,14 @@ vector_filtered_search(PG_FUNCTION_ARGS)
 
 	funcctx = SRF_PERCALL_SETUP();
 
-	/* TODO: Execute filtered search and return results */
-	/* For now, return done */
+	/*
+	 * TODO: Execute filtered search and return results.
+	 * This function should perform vector similarity search with predicate
+	 * filtering. The search should first retrieve candidate vectors using
+	 * the index, then apply the compiled filter predicate to each candidate,
+	 * returning only vectors that satisfy both the similarity and filter
+	 * constraints. Results should be returned through the SRF mechanism.
+	 */
 	SRF_RETURN_DONE(funcctx);
 }
 

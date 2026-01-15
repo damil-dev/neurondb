@@ -6,7 +6,7 @@
  * Provides a marketplace for sharing and discovering agents, tools,
  * workflows, and plugins.
  *
- * Copyright (c) 2024-2026, neurondb, Inc. <admin@neurondb.com>
+ * Copyright (c) 2024-2026, neurondb, Inc. <support@neurondb.ai>
  *
  * IDENTIFICATION
  *    NeuronAgent/internal/marketplace/marketplace.go
@@ -250,4 +250,6 @@ func (m *Marketplace) DownloadItem(ctx context.Context, itemID uuid.UUID) error 
 
 	return nil
 }
+
+
 

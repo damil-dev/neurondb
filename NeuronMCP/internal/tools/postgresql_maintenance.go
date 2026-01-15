@@ -7,7 +7,7 @@
  * - Kill query (more forceful than cancel)
  * - Maintenance window scheduling
  *
- * Copyright (c) 2024-2026, neurondb, Inc. <admin@neurondb.com>
+ * Copyright (c) 2024-2026, neurondb, Inc. <support@neurondb.ai>
  *
  * IDENTIFICATION
  *    NeuronMCP/internal/tools/postgresql_maintenance.go
@@ -512,4 +512,6 @@ func (t *PostgreSQLFailoverTool) Execute(ctx context.Context, params map[string]
 		return Error(fmt.Sprintf("Invalid operation: %s", operation), "INVALID_PARAMETER", nil), nil
 	}
 }
+
+
 

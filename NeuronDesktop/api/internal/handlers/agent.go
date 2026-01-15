@@ -15,9 +15,10 @@ import (
 
 /* AgentHandlers handles NeuronAgent proxy endpoints */
 type AgentHandlers struct {
-	queries *db.Queries
-	clients map[string]*agent.Client
-	mu      sync.RWMutex
+	queries    *db.Queries
+	clients    map[string]*agent.Client
+	mu         sync.RWMutex
+	corsConfig *CORSConfig
 }
 
 /* GetQueries returns the queries instance (for use in websocket handler) */
@@ -30,16 +31,68 @@ func NewAgentHandlers(queries *db.Queries) *AgentHandlers {
 	return &AgentHandlers{
 		queries: queries,
 		clients: make(map[string]*agent.Client),
+		corsConfig: &CORSConfig{
+			AllowedOrigins: []string{"*"}, /* Default to allow all */
+		},
+	}
+}
+
+/* SetCORSConfig sets the CORS configuration for WebSocket */
+func (h *AgentHandlers) SetCORSConfig(allowedOrigins []string) {
+	h.corsConfig = &CORSConfig{
+		AllowedOrigins: allowedOrigins,
+	}
+}
+
+/* InvalidateClient removes and closes a client for a profile */
+func (h *AgentHandlers) InvalidateClient(profileID string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	if _, ok := h.clients[profileID]; ok {
+		/* Agent clients don't have a Close method, just remove from cache */
+		delete(h.clients, profileID)
+	}
+}
+
+/* CloseClient closes a specific client */
+func (h *AgentHandlers) CloseClient(profileID string) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	if _, ok := h.clients[profileID]; ok {
+		delete(h.clients, profileID)
+	}
+	return nil
+}
+
+/* CloseAll closes all cached clients */
+func (h *AgentHandlers) CloseAll() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	for profileID := range h.clients {
+		delete(h.clients, profileID)
 	}
 }
 
 /* getClient gets or creates an agent client for a profile */
 func (h *AgentHandlers) getClient(ctx context.Context, profileID string) (*agent.Client, error) {
+	/* First check with read lock */
 	h.mu.RLock()
 	client, ok := h.clients[profileID]
 	h.mu.RUnlock()
 
 	if ok {
+		return client, nil
+	}
+
+	/* Need to create client - acquire write lock */
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	/* Double-check after acquiring write lock (another goroutine might have created it) */
+	if _, ok := h.clients[profileID]; ok {
 		return client, nil
 	}
 
@@ -54,9 +107,7 @@ func (h *AgentHandlers) getClient(ctx context.Context, profileID string) (*agent
 
 	client = agent.NewClient(profile.AgentEndpoint, profile.AgentAPIKey)
 
-	h.mu.Lock()
 	h.clients[profileID] = client
-	h.mu.Unlock()
 
 	return client, nil
 }

@@ -6,7 +6,7 @@
  * Provides fallback mechanisms and degraded modes when services
  * fail or are unavailable.
  *
- * Copyright (c) 2024-2026, neurondb, Inc. <admin@neurondb.com>
+ * Copyright (c) 2024-2026, neurondb, Inc. <support@neurondb.ai>
  *
  * IDENTIFICATION
  *    NeuronAgent/internal/reliability/graceful_degradation.go
@@ -82,4 +82,6 @@ func (gd *GracefulDegradation) SetMode(mode DegradationMode) {
 func (gd *GracefulDegradation) GetMode() DegradationMode {
 	return gd.mode
 }
+
+
 

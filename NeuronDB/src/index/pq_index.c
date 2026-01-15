@@ -151,19 +151,75 @@ pqhandler(PG_FUNCTION_ARGS)
 
 	/* Interface functions */
 	amroutine->ambuildempty = pqbuildempty;
-	amroutine->ambuild = NULL; /* TODO: Implement */
-	amroutine->aminsert = NULL; /* TODO: Implement */
-	amroutine->ambulkdelete = NULL; /* TODO: Implement */
-	amroutine->amvacuumcleanup = NULL; /* TODO: Implement */
+	/*
+	 * TODO: Implement PQ index build routine (ambuild).
+	 * This function should construct a Product Quantization index by:
+	 * (1) Training codebooks for each subspace using k-means clustering,
+	 * (2) Encoding all vectors using the trained codebooks,
+	 * (3) Storing the encoded vectors and codebooks in the index structure.
+	 * See pq_index.c for index structure details and vector/quantization.c
+	 * for quantization utilities.
+	 */
+	amroutine->ambuild = NULL;
+	/*
+	 * TODO: Implement PQ index insert routine (aminsert).
+	 * This function should insert a new vector into the PQ index by encoding
+	 * it using the existing codebooks and storing the encoded representation.
+	 * The implementation should handle index growth and maintain index
+	 * consistency. See hnsw_am.c for reference implementation patterns.
+	 */
+	amroutine->aminsert = NULL;
+	/*
+	 * TODO: Implement PQ index bulk delete routine (ambulkdelete).
+	 * This function should efficiently remove multiple vectors from the PQ
+	 * index. The implementation should mark deleted entries and handle
+	 * index compaction. See hnsw_am.c ambulkdelete for reference.
+	 */
+	amroutine->ambulkdelete = NULL;
+	/*
+	 * TODO: Implement PQ index vacuum cleanup routine (amvacuumcleanup).
+	 * This function should perform cleanup operations after VACUUM, including
+	 * removing dead entries, updating statistics, and optionally compacting
+	 * the index structure. See hnsw_am.c amvacuumcleanup for reference.
+	 */
+	amroutine->amvacuumcleanup = NULL;
 	amroutine->amcanreturn = NULL;
-	amroutine->amcostestimate = NULL; /* TODO: Implement */
-	amroutine->amoptions = NULL; /* TODO: Implement */
+	/*
+	 * TODO: Implement PQ index cost estimation (amcostestimate).
+	 * This function should estimate the cost of using the PQ index for a
+	 * query, considering the two-stage search (coarse PQ search + fine
+	 * rerank). The cost should account for index page reads, distance
+	 * computations, and reranking overhead. See hnsw_am.c amcostestimate
+	 * for reference implementation.
+	 */
+	amroutine->amcostestimate = NULL;
+	/*
+	 * TODO: Implement PQ index options handler (amoptions).
+	 * This function should parse and validate index options such as m
+	 * (number of subspaces), ks (codebook size), and rerank_k (number of
+	 * candidates for reranking). See hnsw_am.c amoptions for reference.
+	 */
+	amroutine->amoptions = NULL;
 	amroutine->amproperty = NULL;
 	amroutine->ambuildphasename = NULL;
 	amroutine->amvalidate = NULL;
-	amroutine->ambeginscan = NULL; /* TODO: Implement */
+	/*
+	 * TODO: Implement PQ index scan begin routine (ambeginscan).
+	 * This function should initialize scan state for a PQ index scan,
+	 * including setting up the query vector, initializing the two-stage
+	 * search state (coarse and fine), and preparing result buffers.
+	 * See hnsw_am.c ambeginscan for reference.
+	 */
+	amroutine->ambeginscan = NULL;
 	amroutine->amrescan = NULL;
-	amroutine->amgettuple = NULL; /* TODO: Implement */
+	/*
+	 * TODO: Implement PQ index tuple retrieval (amgettuple).
+	 * This function should return the next matching tuple from the PQ index
+	 * scan. The implementation should handle the two-stage search: first
+	 * retrieve candidates from coarse PQ search, then return them one by one
+	 * after fine reranking. See hnsw_am.c amgettuple for reference.
+	 */
+	amroutine->amgettuple = NULL;
 	amroutine->amgetbitmap = NULL;
 	amroutine->amendscan = NULL;
 	amroutine->ammarkpos = NULL;
@@ -171,5 +227,6 @@ pqhandler(PG_FUNCTION_ARGS)
 
 	PG_RETURN_POINTER(amroutine);
 }
+
 
 

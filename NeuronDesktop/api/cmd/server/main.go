@@ -167,10 +167,13 @@ func main() {
 	authHandlers := handlers.NewAuthHandlers(queries)
 	mcpManager := handlers.NewMCPManager(queries)
 	mcpHandlers := handlers.NewMCPHandlers(mcpManager)
+	mcpHandlers.SetCORSConfig(cfg.CORS.AllowedOrigins)
 	neurondbHandlers := handlers.NewNeuronDBHandlers(queries, cfg.Security.EnableSQLConsole)
 	agentHandlers := handlers.NewAgentHandlers(queries)
+	agentHandlers.SetCORSConfig(cfg.CORS.AllowedOrigins)
 	templateHandlers := handlers.NewTemplateHandlers(queries, logger)
 	profileHandlers := handlers.NewProfileHandlers(queries)
+	profileHandlers.SetHandlers(neurondbHandlers, agentHandlers, mcpManager)
 	metricsHandlers := handlers.NewMetricsHandlers()
 	factoryHandlers := handlers.NewFactoryHandlers(queries)
 	systemMetricsHandlers := handlers.NewSystemMetricsHandlers(logger)
@@ -472,6 +475,12 @@ func main() {
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer shutdownCancel()
+
+	/* Close all client connections gracefully */
+	logger.Info("Closing client connections", nil)
+	neurondbHandlers.CloseAll()
+	agentHandlers.CloseAll()
+	mcpManager.CloseAll()
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		logger.Error("Server shutdown failed", err, nil)

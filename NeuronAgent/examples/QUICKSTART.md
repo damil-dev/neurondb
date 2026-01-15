@@ -112,9 +112,9 @@ psql -h localhost -p 5432 -U postgres -d neurondb -c "SELECT 1;"
 
 ## Next Steps
 
-- Read the [full README](readme.md) for detailed examples
+- Read the [full README](README.md) for detailed examples
 - Explore [API documentation](../docs/API.md)
-- Check out [architecture guide](../docs/ARCHITECTURE.md)
+- Check out [architecture guide](../docs/architecture.md)
 
 Happy coding! 🚀
 

@@ -6,7 +6,7 @@
  * Provides database query execution functionality with timeouts and
  * error handling for all tool operations.
  *
- * Copyright (c) 2024-2026, neurondb, Inc. <admin@neurondb.com>
+ * Copyright (c) 2024-2026, neurondb, Inc. <support@neurondb.ai>
  *
  * IDENTIFICATION
  *    NeuronMCP/internal/tools/executor.go
@@ -180,9 +180,18 @@ func (e *QueryExecutor) ExecuteQueryOneWithTimeout(ctx context.Context, query st
 	
 	rows, err := e.db.Query(queryCtx, query, params...)
 	if err != nil {
+		/* Check if error is due to context cancellation/timeout */
+		if queryCtx.Err() != nil {
+			return nil, fmt.Errorf("query timeout after %v: query='%s', parameter_count=%d, error=%w", timeout, query, len(params), queryCtx.Err())
+		}
 		return nil, fmt.Errorf("single-row query execution failed: query='%s', parameter_count=%d, parameters=%v, error=%w", query, len(params), params, err)
 	}
 	defer rows.Close()
+
+	/* Check context before scanning */
+	if queryCtx.Err() != nil {
+		return nil, fmt.Errorf("query timeout after %v: query='%s', parameter_count=%d, error=%w", timeout, query, len(params), queryCtx.Err())
+	}
 
 	if !rows.Next() {
 		return nil, fmt.Errorf("no rows returned from single-row query: query='%s', parameter_count=%d, parameters=%v (expected exactly one row)", query, len(params), params)
@@ -190,6 +199,10 @@ func (e *QueryExecutor) ExecuteQueryOneWithTimeout(ctx context.Context, query st
 
 	result, err := scanRowToMap(rows)
 	if err != nil {
+		/* Check context again after scanning */
+		if queryCtx.Err() != nil {
+			return nil, fmt.Errorf("query timeout after %v during row scanning: query='%s', parameter_count=%d, error=%w", timeout, query, len(params), queryCtx.Err())
+		}
 		return nil, fmt.Errorf("failed to scan single row result: query='%s', parameter_count=%d, error=%w", query, len(params), err)
 	}
 
@@ -197,6 +210,7 @@ func (e *QueryExecutor) ExecuteQueryOneWithTimeout(ctx context.Context, query st
 		return nil, fmt.Errorf("multiple rows returned from single-row query: query='%s', parameter_count=%d, parameters=%v (expected exactly one row, got at least two)", query, len(params), params)
 	}
 
+	/* Final context check */
 	if queryCtx.Err() != nil {
 		return nil, fmt.Errorf("query timeout after %v: query='%s', parameter_count=%d, error=%w", timeout, query, len(params), queryCtx.Err())
 	}

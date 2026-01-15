@@ -317,14 +317,14 @@ psql -d neurondb -c "SELECT * FROM pg_extension WHERE extname = 'neurondb';"
 
 ## Next Steps
 
-- Read the [Architecture Documentation](../docs/ARCHITECTURE.md)
-- Check the [Deployment Guide](../docs/DEPLOYMENT.md)
-- Explore the [NeuronDB Documentation](../../NeuronDB/readme.md)
+- Read the [Architecture Documentation](../docs/architecture.md)
+- Check the [Deployment Guide](../docs/deployment.md)
+- Explore the [NeuronDB Documentation](../../NeuronDB/README.md)
 - Build your own custom agents!
 
 ## Support
 
-- **Documentation**: See [main README](../readme.md)
+- **Documentation**: See [main README](../README.md)
 - **Issues**: Report on GitHub
 - **Email**: support@neurondb.ai
 

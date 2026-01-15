@@ -68,7 +68,7 @@ psql "postgresql://neurondb:neurondb@localhost:5433/neurondb" <<EOF
 CREATE TABLE documents (
   id SERIAL PRIMARY KEY,
   content TEXT,
-  embedding vector(384)
+  embedding vector(3)
 );
 
 INSERT INTO documents (content, embedding) VALUES
@@ -114,25 +114,137 @@ EOF
 - [Contributing / security / license](#contributing--security--license)
 - [Project statistics](#project-statistics)
 
-## What you can build
+## 🎯 What You Can Build
 
-- **Semantic & hybrid search**: vector similarity + SQL filters + full-text search
-- **RAG pipelines**: store, retrieve, and serve context with Postgres-native primitives
-- **Agent backends**: durable memory and tool execution backed by PostgreSQL
-- **MCP integrations**: MCP clients connecting to NeuronDB via tools/resources
+NeuronDB enables you to build powerful AI applications directly in PostgreSQL:
 
-## What's different
+<details>
+<summary><strong>🔍 Semantic & Hybrid Search</strong></summary>
 
-| Feature | NeuronDB | Alternatives |
-|---|---|---|
-| **Index types** | HNSW, IVF, PQ, hybrid, multi-vector | Comprehensive indexing options |
+**Combine vector similarity with SQL filters and full-text search:**
+
+```sql
+-- Find similar documents with metadata filters
+SELECT content, embedding <=> query_vector AS similarity
+FROM documents
+WHERE category = 'technology'
+  AND created_at > '2024-01-01'
+ORDER BY embedding <=> query_vector
+LIMIT 10;
+```
+
+**Use cases:**
+- Document search with filters
+- Product recommendations
+- Content discovery
+- Similarity matching
+
+</details>
+
+<details>
+<summary><strong>📄 RAG Pipelines</strong></summary>
+
+**Build retrieval-augmented generation systems with Postgres-native primitives:**
+
+```sql
+-- Generate embedding for query
+WITH query AS (SELECT embed_text('your question') AS q_vec)
+-- Retrieve relevant context
+SELECT content, embedding <=> q.q_vec AS distance
+FROM documents, query q
+ORDER BY embedding <=> q.q_vec
+LIMIT 5;
+```
+
+**Use cases:**
+- Question answering systems
+- Document Q&A
+- Knowledge bases
+- Chatbots with context
+
+</details>
+
+<details>
+<summary><strong>🤖 Agent Backends</strong></summary>
+
+**Create AI agents with durable memory and tool execution:**
+
+- ✅ Persistent memory with vector search
+- ✅ Tool execution (SQL, HTTP, Code, Shell)
+- ✅ Multi-agent collaboration
+- ✅ Workflow orchestration
+- ✅ Budget and cost management
+
+**Use cases:**
+- Autonomous agents
+- Workflow automation
+- Data analysis agents
+- Customer service bots
+
+</details>
+
+<details>
+<summary><strong>🔌 MCP Integrations</strong></summary>
+
+**Connect MCP clients (Claude Desktop, etc.) to NeuronDB:**
+
+- ✅ 100+ tools available via MCP
+- ✅ Vector operations
+- ✅ ML pipeline tools
+- ✅ PostgreSQL administration
+- ✅ Dataset loading
+
+**Use cases:**
+- Claude Desktop integration
+- LLM tool access
+- Database management via LLMs
+- Automated workflows
+
+</details>
+
+## ⭐ What Makes NeuronDB Different
+
+<details>
+<summary><strong>📊 Feature Comparison</strong></summary>
+
+| Feature | NeuronDB | Typical Alternatives |
+|---------|----------|---------------------|
+| **Index types** | HNSW, IVF, PQ, hybrid, multi-vector | Limited (usually just HNSW) |
 | **GPU acceleration** | CUDA, ROCm, Metal (3 backends) | Single backend or CPU-only |
 | **Benchmark coverage** | RAGAS, MTEB, BEIR integrated | Manual setup required |
-| **Agent runtime** | NeuronAgent included (REST/WebSocket API, multi-agent collaboration, workflow engine with HITL, hierarchical memory, evaluation framework, budget management, 20+ tools) | External services needed |
-| **MCP server** | NeuronMCP included (100+ tools, middleware system, batch operations, progress tracking, enterprise features, authentication, caching) | Separate integration required |
-| **Desktop UI** | NeuronDesktop included | Build your own |
-| **ML algorithms** | 52+ algorithms (classification, regression, clustering) | Extension only (limited) |
+| **Agent runtime** | ✅ NeuronAgent included | ❌ External services needed |
+| **MCP server** | ✅ NeuronMCP included (100+ tools) | ❌ Separate integration required |
+| **Desktop UI** | ✅ NeuronDesktop included | ❌ Build your own |
+| **ML algorithms** | 52+ algorithms | Extension only (limited) |
 | **SQL functions** | 520+ functions | Typically <100 |
+
+</details>
+
+<details>
+<summary><strong>🎯 Key Advantages</strong></summary>
+
+### 🚀 Performance
+
+- **10x faster** HNSW index building than pgvector
+- **SIMD-optimized** distance calculations
+- **GPU acceleration** for embeddings and ML
+- **Efficient memory** management
+
+### 🔧 Developer Experience
+
+- **Complete ecosystem** - Database + Agent + MCP + UI
+- **SQL-first** - Everything accessible via SQL
+- **Rich tooling** - CLI helpers, examples, recipes
+- **Comprehensive docs** - 60+ documentation files
+
+### 🏢 Enterprise Ready
+
+- **Production features** - Monitoring, backups, HA
+- **Security** - RBAC, encryption, audit logging
+- **Scalability** - Horizontal and vertical scaling
+- **Observability** - Prometheus metrics, structured logging
+
+</details>
 
 ## Architecture
 
@@ -183,7 +295,7 @@ docker compose up -d
 docker compose ps
 
 # Verify all services are running
-./scripts/health-check.sh
+./scripts/neurondb-healthcheck.sh quick
 ```
 
 **What you'll see:**
@@ -206,7 +318,7 @@ docker compose logs -f
 docker compose ps
 
 # Verify all services are running
-./scripts/health-check.sh
+./scripts/neurondb-healthcheck.sh quick
 ```
 
 **Build time:** First build takes 5-10 minutes depending on your system. Subsequent starts are 30-60 seconds.
@@ -388,7 +500,7 @@ No additional services, ports, or configuration required!
 
 ## Documentation
 
-- **Start here**: [`DOCUMENTATION.md`](DOCUMENTATION.md) (documentation index)
+- **Start here**: [`Docs/documentation.md`](Docs/documentation.md) (documentation index)
 - **Beginner walkthrough**: [`Docs/getting-started/simple-start.md`](Docs/getting-started/simple-start.md) - Step-by-step guide for beginners
 - **Technical quick start**: [`QUICKSTART.md`](QUICKSTART.md) - Fast setup for experienced users
 - **Complete guide**: [`Docs/getting-started/installation.md`](Docs/getting-started/installation.md) - Detailed installation options
@@ -413,19 +525,19 @@ No additional services, ports, or configuration required!
 <details>
 <summary><strong>NeuronAgent documentation</strong></summary>
 
-- **Architecture**: [`ARCHITECTURE.md`](NeuronAgent/docs/ARCHITECTURE.md)
-- **API Reference**: [`API.md`](NeuronAgent/docs/API.md)
-- **CLI Guide**: [`CLI_GUIDE.md`](NeuronAgent/docs/CLI_GUIDE.md)
-- **Connectors**: [`CONNECTORS.md`](NeuronAgent/docs/CONNECTORS.md)
-- **Deployment**: [`DEPLOYMENT.md`](NeuronAgent/docs/DEPLOYMENT.md)
-- **Troubleshooting**: [`TROUBLESHOOTING.md`](NeuronAgent/docs/TROUBLESHOOTING.md)
+- **Architecture**: [`architecture.md`](NeuronAgent/docs/architecture.md)
+- **API Reference**: [`API.md`](NeuronAgent/docs/api.md)
+- **CLI Guide**: [`cli_guide.md`](NeuronAgent/docs/cli_guide.md)
+- **Connectors**: [`connectors.md`](NeuronAgent/docs/connectors.md)
+- **Deployment**: [`deployment.md`](NeuronAgent/docs/deployment.md)
+- **Troubleshooting**: [`troubleshooting.md`](NeuronAgent/docs/troubleshooting.md)
 
 </details>
 
 <details>
 <summary><strong>NeuronMCP documentation</strong></summary>
 
-- **Setup Guide**: [`NEURONDB_MCP_SETUP.md`](NeuronMCP/docs/NEURONDB_MCP_SETUP.md)
+- **Setup Guide**: [`neurondb_mcp_setup.md`](NeuronMCP/docs/neurondb_mcp_setup.md)
 - **Tool & Resource Catalog**: [`tool-resource-catalog.md`](NeuronMCP/docs/tool-resource-catalog.md)
 - **Examples**: [`README.md`](NeuronMCP/docs/examples/README.md) • [`example-transcript.md`](NeuronMCP/docs/examples/example-transcript.md)
 
@@ -434,11 +546,11 @@ No additional services, ports, or configuration required!
 <details>
 <summary><strong>NeuronDesktop documentation</strong></summary>
 
-- **API Reference**: [`API.md`](NeuronDesktop/docs/API.md)
-- **Deployment**: [`DEPLOYMENT.md`](NeuronDesktop/docs/DEPLOYMENT.md)
-- **Integration**: [`INTEGRATION.md`](NeuronDesktop/docs/INTEGRATION.md)
-- **NeuronAgent Usage**: [`NEURONAGENT_USAGE.md`](NeuronDesktop/docs/NEURONAGENT_USAGE.md)
-- **NeuronMCP Setup**: [`NEURONMCP_SETUP.md`](NeuronDesktop/docs/NEURONMCP_SETUP.md)
+- **API Reference**: [`API.md`](NeuronDesktop/docs/api.md)
+- **Deployment**: [`deployment.md`](NeuronDesktop/docs/deployment.md)
+- **Integration**: [`integration.md`](NeuronDesktop/docs/integration.md)
+- **NeuronAgent Usage**: [`neuronagent_usage.md`](NeuronDesktop/docs/neuronagent_usage.md)
+- **NeuronMCP Setup**: [`neuronmcp_setup.md`](NeuronDesktop/docs/neuronmcp_setup.md)
 
 </details>
 

@@ -199,7 +199,7 @@ client/
 │   └── output.py            # Output management
 ├── commands.txt             # Example commands file
 ├── requirements.txt         # Python dependencies
-└── readme.md               # This file
+└── README.md               # This file
 ```
 
 ## Error Handling

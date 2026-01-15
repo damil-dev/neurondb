@@ -6,7 +6,7 @@
  * Provides tools for vector similarity search with multiple distance metrics
  * and text embedding generation.
  *
- * Copyright (c) 2024-2026, neurondb, Inc. <admin@neurondb.com>
+ * Copyright (c) 2024-2026, neurondb, Inc. <support@neurondb.ai>
  *
  * IDENTIFICATION
  *    NeuronMCP/internal/tools/vector.go
@@ -803,9 +803,19 @@ func (t *GenerateEmbeddingTool) Execute(ctx context.Context, params map[string]i
 		latencyMS := &latency
 		
 		/* Log asynchronously (don't fail if logging fails) */
+		/* Use a timeout context to prevent goroutine leak if logging hangs */
 		go func() {
-			if err := t.configHelper.LogModelUsage(ctx, modelName, "embedding", tokensInput, nil, latencyMS, true, nil); err != nil {
-				t.logger.Warn("Failed to log model usage", map[string]interface{}{"error": err.Error()})
+			logCtx, logCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer logCancel()
+			
+			if err := t.configHelper.LogModelUsage(logCtx, modelName, "embedding", tokensInput, nil, latencyMS, true, nil); err != nil {
+				if logCtx.Err() != nil {
+					/* Timeout occurred, don't log error */
+					return
+				}
+				if t.logger != nil {
+					t.logger.Warn("Failed to log model usage", map[string]interface{}{"error": err.Error()})
+				}
 			}
 		}()
 	}
@@ -905,8 +915,16 @@ func (t *BatchEmbeddingTool) Execute(ctx context.Context, params map[string]inte
 		}
 	}
 
-	query := "SELECT json_agg(embedding::text) AS embeddings FROM unnest(neurondb.embed_batch($1, $2::text[])) AS embedding"
-	queryParams := []interface{}{modelName, textStrings}
+	// embed_text_batch takes (text[], text) - array of texts first, then optional model name
+	var query string
+	var queryParams []interface{}
+	if modelName != "" && modelName != "default" {
+		query = "SELECT json_agg(embedding::text) AS embeddings FROM unnest(embed_text_batch($1::text[], $2)) AS embedding"
+		queryParams = []interface{}{textStrings, modelName}
+	} else {
+		query = "SELECT json_agg(embedding::text) AS embeddings FROM unnest(embed_text_batch($1::text[])) AS embedding"
+		queryParams = []interface{}{textStrings}
+	}
 
 	result, err := t.executor.ExecuteQueryOneWithTimeout(ctx, query, queryParams, EmbeddingQueryTimeout)
 	if err != nil {

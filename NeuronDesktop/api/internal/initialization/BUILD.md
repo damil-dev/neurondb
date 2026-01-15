@@ -5,7 +5,7 @@
 ```
 internal/initialization/
 ├── bootstrap.go      # Main bootstrap orchestration
-├── readme.md         # Package documentation
+├── README.md         # Package documentation
 └── BUILD.md          # This file - architecture guide
 ```
 

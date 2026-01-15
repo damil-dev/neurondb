@@ -73,3 +73,5 @@ CREATE INDEX quickstart_documents_embedding_ivf_idx
 ON quickstart_documents USING ivfflat (embedding vector_cosine_ops)
 WITH (lists = 100);
 
+
+

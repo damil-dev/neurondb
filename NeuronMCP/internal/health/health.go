@@ -3,7 +3,7 @@
  * health.go
  *    Health check handler for NeuronMCP
  *
- * Copyright (c) 2024-2026, neurondb, Inc. <admin@neurondb.com>
+ * Copyright (c) 2024-2026, neurondb, Inc. <support@neurondb.ai>
  *
  * IDENTIFICATION
  *    NeuronMCP/internal/health/health.go
@@ -19,6 +19,12 @@ import (
 
 	"github.com/neurondb/NeuronMCP/internal/database"
 	"github.com/neurondb/NeuronMCP/internal/logging"
+	"github.com/neurondb/NeuronMCP/internal/resources"
+	"github.com/neurondb/NeuronMCP/internal/tools"
+)
+
+const (
+	DefaultHealthCheckTimeout = 10 * time.Second
 )
 
 /* HealthStatus represents health status */
@@ -64,8 +70,10 @@ type PoolHealth struct {
 
 /* Checker performs health checks */
 type Checker struct {
-	db     *database.Database
-	logger *logging.Logger
+	db           *database.Database
+	logger       *logging.Logger
+	toolRegistry *tools.ToolRegistry
+	resources    *resources.Manager
 }
 
 /* NewChecker creates a new health checker */
@@ -76,26 +84,47 @@ func NewChecker(db *database.Database, logger *logging.Logger) *Checker {
 	}
 }
 
+/* SetToolRegistry sets the tool registry for dynamic tool counting */
+func (c *Checker) SetToolRegistry(registry *tools.ToolRegistry) {
+	c.toolRegistry = registry
+}
+
+/* SetResources sets the resources manager for dynamic resource counting */
+func (c *Checker) SetResources(manager *resources.Manager) {
+	c.resources = manager
+}
+
 /* Check performs a health check */
 func (c *Checker) Check(ctx context.Context) *HealthStatus {
+	if c == nil {
+		return &HealthStatus{
+			Status:    "unknown",
+			Timestamp: time.Now(),
+		}
+	}
+
+	/* Add timeout context */
+	healthCtx, cancel := context.WithTimeout(ctx, DefaultHealthCheckTimeout)
+	defer cancel()
+
 	status := &HealthStatus{
 		Timestamp: time.Now(),
 	}
 
 	/* Check database */
-	dbHealth := c.checkDatabase(ctx)
+	dbHealth := c.checkDatabase(healthCtx)
 	status.Database = dbHealth
 
 	/* Check tools */
-	toolsHealth := c.checkTools(ctx)
+	toolsHealth := c.checkTools(healthCtx)
 	status.Tools = toolsHealth
 
 	/* Check resources */
-	resourcesHealth := c.checkResources(ctx)
+	resourcesHealth := c.checkResources(healthCtx)
 	status.Resources = resourcesHealth
 
 	/* Check connection pool */
-	poolHealth := c.checkPool(ctx)
+	poolHealth := c.checkPool(healthCtx)
 	status.Pool = poolHealth
 
 	/* Overall status */
@@ -110,6 +139,13 @@ func (c *Checker) Check(ctx context.Context) *HealthStatus {
 
 /* checkDatabase checks database health */
 func (c *Checker) checkDatabase(ctx context.Context) DatabaseHealth {
+	if c == nil || c.db == nil {
+		return DatabaseHealth{
+			Status: "unknown",
+			Error:  "database instance is not initialized",
+		}
+	}
+
 	start := time.Now()
 	
 	var result int
@@ -131,28 +167,83 @@ func (c *Checker) checkDatabase(ctx context.Context) DatabaseHealth {
 
 /* checkTools checks tools health */
 func (c *Checker) checkTools(ctx context.Context) ToolsHealth {
-	/* For now, assume tools are available if database is healthy */
-	/* In a full implementation, we'd check each tool */
+	if c == nil {
+		return ToolsHealth{
+			Status:        "unknown",
+			TotalCount:    0,
+			AvailableCount: 0,
+		}
+	}
+
+	if c.toolRegistry == nil {
+		return ToolsHealth{
+			Status:        "unknown",
+			TotalCount:    0,
+			AvailableCount: 0,
+		}
+	}
+
+	/* Get actual tool count from registry */
+	definitions := c.toolRegistry.GetAllDefinitions()
+	totalCount := len(definitions)
+	
+	/* For now, assume all registered tools are available */
+	/* In a full implementation, we could test each tool's availability */
+	availableCount := totalCount
+	status := "healthy"
+	
+	if totalCount == 0 {
+		status = "degraded"
+	}
+
 	return ToolsHealth{
-		Status:        "healthy",
-		TotalCount:    50, /* Approximate */
-		AvailableCount: 50,
+		Status:        status,
+		TotalCount:    totalCount,
+		AvailableCount: availableCount,
 	}
 }
 
 /* checkResources checks resources health */
 func (c *Checker) checkResources(ctx context.Context) ResourcesHealth {
-	/* For now, assume resources are available if database is healthy */
+	if c == nil {
+		return ResourcesHealth{
+			Status:        "unknown",
+			TotalCount:    0,
+			AvailableCount: 0,
+		}
+	}
+
+	if c.resources == nil {
+		return ResourcesHealth{
+			Status:        "unknown",
+			TotalCount:    0,
+			AvailableCount: 0,
+		}
+	}
+
+	/* Get actual resource count from manager */
+	definitions := c.resources.ListResources()
+	totalCount := len(definitions)
+	
+	/* For now, assume all registered resources are available */
+	/* In a full implementation, we could test each resource's availability */
+	availableCount := totalCount
+	status := "healthy"
+	
+	if totalCount == 0 {
+		status = "degraded"
+	}
+
 	return ResourcesHealth{
-		Status:        "healthy",
-		TotalCount:    6, /* schema, models, indexes, config, workers, stats */
-		AvailableCount: 6,
+		Status:        status,
+		TotalCount:    totalCount,
+		AvailableCount: availableCount,
 	}
 }
 
 /* checkPool checks connection pool health */
 func (c *Checker) checkPool(ctx context.Context) PoolHealth {
-	if c.db == nil {
+	if c == nil || c.db == nil {
 		return PoolHealth{
 			Status: "unknown",
 		}

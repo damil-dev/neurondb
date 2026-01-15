@@ -43,3 +43,5 @@ extern int neurondb_gpu_ivf_search_batch(const float *queries,
 #endif /* GPU_IVF_H */
 
 
+
+

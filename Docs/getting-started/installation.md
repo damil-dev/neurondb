@@ -60,11 +60,27 @@ docker compose up -d
 #### Notes
 
 - The canonical compose file is `docker-compose.yml` at repo root.
-- For the full Docker layout and the helper script, see `dockers/readme.md` and `dockers/docker.sh`.
+- For the full Docker layout and the helper script, see `dockers/README.md` and `dockers/docker.sh`.
 
-### Method 2: Source build
+### Method 2: Native installation (without Docker)
 
-This repository contains build instructions per component:
+Install components directly on your system using automated installation scripts or manual setup.
+
+**Quick Installation:**
+
+```bash
+# Install all components
+sudo ./scripts/install-components.sh
+
+# Install specific components
+sudo ./scripts/install-components.sh neuronmcp neuronagent
+```
+
+For detailed instructions, see [Native Installation Guide](installation-native.md) and [Service Management Guide](installation-services.md).
+
+### Method 3: Source build (manual)
+
+Build and install components manually:
 
 #### Build/install NeuronDB extension
 
@@ -89,7 +105,7 @@ go build ./cmd/agent-server
 ./agent-server -config configs/config.yaml
 ```
 
-See `NeuronAgent/readme.md` and `NeuronAgent/openapi/` for details.
+See `NeuronAgent/README.md` and `NeuronAgent/openapi/` for details.
 
 #### Build NeuronMCP
 
@@ -113,7 +129,7 @@ export NEURONDB_DATABASE=neurondb
 ./neurondb-mcp
 ```
 
-See [NeuronMCP README](../../NeuronMCP/readme.md) for setup details.
+See [NeuronMCP README](../../NeuronMCP/README.md) for setup details.
 
 #### Step 4: Build NeuronDesktop
 
@@ -131,7 +147,7 @@ npm install
 npm run dev
 ```
 
-See [NeuronDesktop README](../../NeuronDesktop/readme.md) for detailed setup.
+See [NeuronDesktop README](../../NeuronDesktop/README.md) for detailed setup.
 
 ### Method 3: Package Installation
 
@@ -145,7 +161,7 @@ sudo dpkg -i neurondb_*.deb
 sudo rpm -i neurondb_*.rpm
 ```
 
-See [Packaging Documentation](../../Docs/package.md) for package build instructions.
+See [Packaging Documentation](../deployment/package.md) for package build instructions.
 
 ## Database Setup
 
@@ -166,7 +182,7 @@ psql -d neurondb -c "CREATE EXTENSION neurondb;"
 **NeuronAgent:**
 ```bash
 cd NeuronAgent
-./scripts/run_migrations.sh
+./scripts/neuronagent-migrate.sh
 ```
 This runs all migrations including `migrations/001_initial_schema.sql` and subsequent migrations.
 
@@ -174,7 +190,7 @@ This runs all migrations including `migrations/001_initial_schema.sql` and subse
 ```bash
 cd NeuronDesktop
 createdb neurondesk
-./scripts/setup_neurondesktop.sh
+./scripts/neurondesktop-setup.sh
 ```
 This runs all migrations including `api/migrations/001_initial_schema.sql` and subsequent migrations.
 
@@ -216,9 +232,9 @@ curl http://localhost:8081/health
 Each component requires specific environment variables. See component-specific documentation:
 
 - [NeuronDB Configuration](../../NeuronDB/docs/configuration.md)
-- [NeuronAgent Configuration](../../NeuronAgent/readme.md#configuration)
-- [NeuronMCP Configuration](../../NeuronMCP/readme.md#configuration)
-- [NeuronDesktop Configuration](../../NeuronDesktop/readme.md#configuration)
+- [NeuronAgent Configuration](../../NeuronAgent/README.md#configuration)
+- [NeuronMCP Configuration](../../NeuronMCP/README.md#configuration)
+- [NeuronDesktop Configuration](../../NeuronDesktop/README.md#configuration)
 
 ### Configuration Files
 
@@ -229,7 +245,7 @@ Each component requires specific environment variables. See component-specific d
 ## Next Steps
 
 1. **[Quick Start Guide](quickstart.md)** - Run your first queries
-2. **[Component Documentation](../components/readme.md)** - Learn about each component
+2. **[Component Documentation](../components/README.md)** - Learn about each component
 3. **[Integration Guide](../ecosystem/integration.md)** - Connect components together
 
 ## Troubleshooting

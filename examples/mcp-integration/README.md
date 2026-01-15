@@ -74,7 +74,7 @@ If using Docker:
 - `test_mcp_connection.py` - Test MCP server connection
 - `list_tools.py` - List available MCP tools
 - `call_tool_example.py` - Example tool call
-- `readme.md` - This file
+- `README.md` - This file
 
 ## Testing MCP Connection
 
@@ -152,9 +152,11 @@ agent = Agent(tools=[mcp_tool])
 
 ## Related Documentation
 
-- [NeuronMCP README](../../NeuronMCP/readme.md) - Complete MCP documentation
+- [NeuronMCP README](../../NeuronMCP/README.md) - Complete MCP documentation
 - [Tool Catalog](../../NeuronMCP/docs/tool-resource-catalog.md) - All available tools
 - [MCP Protocol](https://modelcontextprotocol.io) - MCP specification
+
+
 
 
 

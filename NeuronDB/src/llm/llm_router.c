@@ -234,6 +234,7 @@ ndb_llm_route_complete(const NdbLLMConfig *cfg,
 				}
 
 #ifdef HAVE_ONNX_RUNTIME
+			{
 				int32		token_length;
 				int32	   *token_ids = NULL;
 
@@ -248,8 +249,9 @@ ndb_llm_route_complete(const NdbLLMConfig *cfg,
 						0;
 				if (token_ids)
 					pfree(token_ids);
+			}
 #else
-				out->tokens_in = 0;
+			out->tokens_in = 0;
 #endif
 
 #ifdef HAVE_ONNX_RUNTIME

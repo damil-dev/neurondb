@@ -2243,12 +2243,17 @@ ndb_metal_lr_train(const float *features,
 	int			correct = 0;
 	double		accuracy = 0.0;
 
-	/* TODO: Metal backend has similar memory corruption as linear regression.
-	 * Root cause: Same issue as linreg - memory corruption in training loops.
-	 * CUDA backend works fine. Until fixed, fall back to CPU.
+	/*
+	 * TODO: Fix Metal backend memory corruption in logistic regression training.
+	 * Root cause: Memory corruption issues in training loops, similar to linear
+	 * regression. The CUDA backend works correctly, indicating the issue is
+	 * Metal-specific. Investigation needed: (1) Check Metal buffer allocation
+	 * and deallocation patterns, (2) Verify memory alignment requirements,
+	 * (3) Review Metal kernel memory access patterns. Until fixed, fall back
+	 * to CPU implementation.
 	 */
 	if (errstr)
-		*errstr = pstrdup("Metal logreg: using CPU fallback (memory corruption - TODO: fix Metal backend)");
+		*errstr = pstrdup("Metal logreg: using CPU fallback (memory corruption issue)");
 	return -1;
 
 	if (errstr)
@@ -4400,12 +4405,17 @@ ndb_metal_dt_train(const float *features,
 	int			i;
 	int			rc = -1;
 
-	/* TODO: Metal backend has memory corruption issues in decision tree training.
-	 * Root cause: Similar to other ML algorithms - memory management issues.
-	 * CUDA backend works fine. Until fixed, fall back to CPU.
+	/*
+	 * TODO: Fix Metal backend memory corruption in decision tree training.
+	 * Root cause: Memory management issues similar to other ML algorithms in
+	 * the Metal backend. The CUDA backend works correctly, indicating the issue
+	 * is Metal-specific. Investigation needed: (1) Review tree node allocation
+	 * and deallocation, (2) Check recursive tree building memory patterns,
+	 * (3) Verify Metal buffer usage in tree construction. Until fixed, fall
+	 * back to CPU implementation.
 	 */
 	if (errstr)
-		*errstr = pstrdup("Metal DT: using CPU fallback (memory corruption - TODO: fix Metal backend)");
+		*errstr = pstrdup("Metal DT: using CPU fallback (memory corruption issue)");
 	return -1;
 
 	if (errstr)
@@ -4900,7 +4910,7 @@ ndb_metal_ridge_train(const float *features,
 	 * CUDA backend works fine. Until fixed, fall back to CPU.
 	 */
 	if (errstr)
-		*errstr = pstrdup("Metal Ridge: using CPU fallback (memory corruption - TODO: fix Metal backend)");
+		*errstr = pstrdup("Metal Ridge: using CPU fallback (memory corruption issue)");
 	return -1;
 
 	if (errstr)
@@ -6567,12 +6577,17 @@ ndb_metal_knn_train(const float *features,
 	double *labels_copy = NULL;
 	int			rc = -1;
 
-	/* TODO: Metal backend has memory corruption issues in KNN training.
-	 * Root cause: Similar to other ML algorithms - memory management issues.
-	 * CUDA backend works fine. Until fixed, fall back to CPU.
+	/*
+	 * TODO: Fix Metal backend memory corruption in KNN training.
+	 * Root cause: Memory management issues similar to other ML algorithms in
+	 * the Metal backend. The CUDA backend works correctly, indicating the issue
+	 * is Metal-specific. Investigation needed: (1) Review distance computation
+	 * memory patterns, (2) Check neighbor storage and retrieval, (3) Verify
+	 * Metal buffer usage in KNN operations. Until fixed, fall back to CPU
+	 * implementation.
 	 */
 	if (errstr)
-		*errstr = pstrdup("Metal KNN: using CPU fallback (memory corruption - TODO: fix Metal backend)");
+		*errstr = pstrdup("Metal KNN: using CPU fallback (memory corruption issue)");
 	return -1;
 
 	if (errstr)
@@ -6818,7 +6833,7 @@ ndb_metal_xgboost_train(const float *features,
 	 * CUDA backend works fine. Until fully fixed, fall back to CPU.
 	 */
 	if (errstr)
-		*errstr = pstrdup("Metal XGBoost: using CPU fallback (pfree errors - TODO: fix Metal backend)");
+		*errstr = pstrdup("Metal XGBoost: using CPU fallback (pfree errors)");
 	return -1;
 
 	if (errstr)
@@ -7000,8 +7015,15 @@ ndb_metal_xgboost_predict(const bytea * model_data,
 		return -1;
 	}
 
-	/* Simplified prediction: mean of input features (placeholder) */
-	/* TODO: Implement full XGBoost prediction */
+	/*
+	 * TODO: Implement full XGBoost prediction.
+	 * The current implementation returns a placeholder (mean of input features).
+	 * A proper implementation should: (1) Load the XGBoost model structure from
+	 * model_data, (2) Traverse the gradient boosting trees to compute predictions,
+	 * (3) Aggregate predictions from all trees. The model structure includes tree
+	 * nodes with split conditions, leaf values, and tree metadata. See
+	 * gpu_xgboost_cuda.c for reference implementation patterns.
+	 */
 	for (i = 0; i < feature_dim; i++)
 		prediction += (double) input[i];
 	prediction /= feature_dim;
@@ -7045,12 +7067,17 @@ ndb_metal_catboost_train(const float *features,
 	char	   *base = NULL;
 	NdbCudaCatBoostModelHeader *hdr = NULL;
 
-	/* TODO: Metal backend has pfree invalid pointer errors in CatBoost training.
-	 * Root cause: Same as XGBoost - memory corruption when freeing text_to_cstring results.
-	 * CUDA backend works fine. Until fully fixed, fall back to CPU.
+	/*
+	 * TODO: Fix Metal backend pfree invalid pointer errors in CatBoost training.
+	 * Root cause: Memory corruption when freeing text_to_cstring results, similar
+	 * to XGBoost. The CUDA backend works correctly, indicating the issue is
+	 * Metal-specific. Investigation needed: (1) Review text_to_cstring usage and
+	 * memory context management, (2) Check pfree calls on PostgreSQL-managed
+	 * memory, (3) Verify memory context switches during training. Until fixed,
+	 * fall back to CPU implementation.
 	 */
 	if (errstr)
-		*errstr = pstrdup("Metal CatBoost: using CPU fallback (pfree errors - TODO: fix Metal backend)");
+		*errstr = pstrdup("Metal CatBoost: using CPU fallback (pfree errors)");
 	return -1;
 
 	if (errstr)
@@ -7232,8 +7259,15 @@ ndb_metal_catboost_predict(const bytea * model_data,
 		return -1;
 	}
 
-	/* Simplified prediction: mean of input features (placeholder) */
-	/* TODO: Implement full CatBoost prediction */
+	/*
+	 * TODO: Implement full CatBoost prediction.
+	 * The current implementation returns a placeholder (mean of input features).
+	 * A proper implementation should: (1) Load the CatBoost model structure from
+	 * model_data, (2) Traverse the gradient boosting trees with categorical
+	 * feature handling, (3) Aggregate predictions from all trees. CatBoost uses
+	 * ordered boosting and handles categorical features differently than XGBoost.
+	 * See gpu_catboost_cuda.c for reference implementation patterns.
+	 */
 	for (i = 0; i < feature_dim; i++)
 		prediction += (double) input[i];
 	prediction /= feature_dim;
@@ -7671,10 +7705,41 @@ static const ndb_gpu_backend ndb_metal_backend = {
 	.hf_complete = ndb_metal_hf_complete,
 	.hf_rerank = ndb_metal_hf_rerank,
 
-	.hnsw_search = NULL, /* TODO: Implement Metal HNSW search */
-	.hnsw_search_batch = NULL, /* TODO: Implement Metal batch HNSW search */
-	.ivf_search = NULL, /* TODO: Implement Metal IVF search */
-	.ivf_search_batch = NULL, /* TODO: Implement Metal batch IVF search */
+	/*
+	 * TODO: Implement Metal HNSW search.
+	 * This function should perform HNSW (Hierarchical Navigable Small World)
+	 * graph search on Apple Silicon GPUs using Metal compute shaders. The
+	 * implementation should traverse the multi-layer graph structure starting
+	 * from the entry point, using greedy search at each level. Metal kernels
+	 * should be written to leverage GPU parallelism for distance computations
+	 * and neighbor traversal. See gpu_hnsw.c for reference implementation.
+	 */
+	.hnsw_search = NULL,
+	/*
+	 * TODO: Implement Metal batch HNSW search.
+	 * This function should perform batch HNSW searches for multiple query
+	 * vectors in parallel on Apple Silicon GPUs. The implementation should
+	 * leverage Metal's parallel execution model to process multiple queries
+	 * concurrently, improving throughput for batch workloads.
+	 */
+	.hnsw_search_batch = NULL,
+	/*
+	 * TODO: Implement Metal IVF search.
+	 * This function should perform IVF (Inverted File) index search on Apple
+	 * Silicon GPUs using Metal compute shaders. The implementation should:
+	 * (1) Find the nearest centroids using the query vector, (2) Search within
+	 * the selected lists for nearest neighbors, (3) Return top-k results.
+	 * See gpu_ivf.c for reference implementation.
+	 */
+	.ivf_search = NULL,
+	/*
+	 * TODO: Implement Metal batch IVF search.
+	 * This function should perform batch IVF searches for multiple query
+	 * vectors in parallel on Apple Silicon GPUs. The implementation should
+	 * process multiple queries concurrently, sharing centroid distance
+	 * computations where possible for efficiency.
+	 */
+	.ivf_search_batch = NULL,
 
 	.stream_create = ndb_metal_stream_create,
 	.stream_destroy = ndb_metal_stream_destroy,

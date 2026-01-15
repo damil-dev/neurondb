@@ -165,3 +165,5 @@ WHERE vs.vector_score IS NOT NULL OR ts.text_score IS NOT NULL
 ORDER BY hybrid_score DESC
 LIMIT 10;
 
+
+

@@ -1,11 +1,13 @@
 name: SLSA Provenance
 
 on:
+  # Manual trigger only - workflow_dispatch
   workflow_dispatch:
 
 jobs:
   generate-provenance:
     runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
     permissions:
       contents: write
       id-token: write
