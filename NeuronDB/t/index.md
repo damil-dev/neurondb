@@ -2,7 +2,7 @@
 
 ## 🎯 Quick Navigation
 
-- **[README.md](README.md)** - Complete documentation and usage guide
+- **[readme.md](readme.md)** - Complete documentation and usage guide
 - **[FINAL_SUMMARY.md](FINAL_SUMMARY.md)** - Detailed statistics and achievements
 - **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** - Command reference card
 
